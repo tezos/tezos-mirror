@@ -847,7 +847,7 @@ let rec dummy_type_generator depth =
   if depth = 0 then Ex_ty (unit_t ~annot:None)
   else
     match dummy_type_generator (depth - 1) with
-    | Ex_ty something -> Ex_ty (list_t something ~annot:None)
+    | Ex_ty something -> Ex_ty (Michelson_types.list something)
 
 (* Generate combs; the size of a comb of depth d should be
    d * 2 + 1. *)
@@ -859,7 +859,10 @@ let rec dummy_comparable_type_generator depth =
     match dummy_comparable_type_generator (depth - 1) with
     | Ex_comparable_ty r ->
         let l = unit_key ~annot:None in
-        Ex_comparable_ty (pair_key (l, None) (r, None) ~annot:None)
+        Ex_comparable_ty
+          (match pair_key (-1) (l, None) (r, None) ~annot:None with
+          | Error _ -> assert false
+          | Ok t -> t)
 
 module Parse_type_shared = struct
   type config = {max_size : int}

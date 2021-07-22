@@ -29,6 +29,52 @@ open Script_int
 
 (* Preliminary definitions. *)
 
+(* This error registered in script_tc_errors_registration.ml *)
+(* type error += Type_too_large : Script.location * int -> error *)
+
+module type TYPE_SIZE = sig
+  type t
+
+  val one : t
+
+  val two : t
+
+  val three : t
+
+  val four : t
+
+  val merge : t -> t -> t tzresult
+
+  val compound1 : Script.location -> t -> t tzresult
+
+  val compound2 : Script.location -> t -> t -> t tzresult
+end
+
+module Type_size : TYPE_SIZE = struct
+  type t = int
+
+  let one = 1
+
+  let two = 2
+
+  let three = 3
+
+  let four = 4
+
+  let merge x y =
+    if Compare.Int.(x = y) then ok x
+    else error @@ Script_tc_errors.Inconsistent_type_sizes (x, y)
+
+  let of_int loc size =
+    let max_size = Constants.michelson_maximum_type_size in
+    if Compare.Int.(size <= max_size) then ok size
+    else error (Script_tc_errors.Type_too_large (loc, max_size))
+
+  let compound1 loc size = of_int loc (1 + size)
+
+  let compound2 loc size1 size2 = of_int loc (1 + size1 + size2)
+end
+
 type var_annot = Var_annot of string
 
 type type_annot = Type_annot of string
@@ -51,7 +97,7 @@ type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
-type ty_metadata = {annot : type_annot option; size : int}
+type ty_metadata = {annot : type_annot option; size : Type_size.t}
 
 type _ comparable_ty =
   | Unit_key : ty_metadata -> unit comparable_ty
@@ -102,48 +148,48 @@ let comparable_ty_metadata : type a. a comparable_ty -> ty_metadata = function
 
 let comparable_ty_size t = (comparable_ty_metadata t).size
 
-let unit_key ~annot = Unit_key {annot; size = 1}
+let unit_key ~annot = Unit_key {annot; size = Type_size.one}
 
-let never_key ~annot = Never_key {annot; size = 1}
+let never_key ~annot = Never_key {annot; size = Type_size.one}
 
-let int_key ~annot = Int_key {annot; size = 1}
+let int_key ~annot = Int_key {annot; size = Type_size.one}
 
-let nat_key ~annot = Nat_key {annot; size = 1}
+let nat_key ~annot = Nat_key {annot; size = Type_size.one}
 
-let signature_key ~annot = Signature_key {annot; size = 1}
+let signature_key ~annot = Signature_key {annot; size = Type_size.one}
 
-let string_key ~annot = String_key {annot; size = 1}
+let string_key ~annot = String_key {annot; size = Type_size.one}
 
-let bytes_key ~annot = Bytes_key {annot; size = 1}
+let bytes_key ~annot = Bytes_key {annot; size = Type_size.one}
 
-let mutez_key ~annot = Mutez_key {annot; size = 1}
+let mutez_key ~annot = Mutez_key {annot; size = Type_size.one}
 
-let bool_key ~annot = Bool_key {annot; size = 1}
+let bool_key ~annot = Bool_key {annot; size = Type_size.one}
 
-let key_hash_key ~annot = Key_hash_key {annot; size = 1}
+let key_hash_key ~annot = Key_hash_key {annot; size = Type_size.one}
 
-let key_key ~annot = Key_key {annot; size = 1}
+let key_key ~annot = Key_key {annot; size = Type_size.one}
 
-let timestamp_key ~annot = Timestamp_key {annot; size = 1}
+let timestamp_key ~annot = Timestamp_key {annot; size = Type_size.one}
 
-let chain_id_key ~annot = Chain_id_key {annot; size = 1}
+let chain_id_key ~annot = Chain_id_key {annot; size = Type_size.one}
 
-let address_key ~annot = Address_key {annot; size = 1}
+let address_key ~annot = Address_key {annot; size = Type_size.one}
 
-let pair_key (l, fannot_l) (r, fannot_r) ~annot =
-  Pair_key
-    ( (l, fannot_l),
-      (r, fannot_r),
-      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+let pair_key loc (l, fannot_l) (r, fannot_r) ~annot =
+  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
+  >|? fun size -> Pair_key ((l, fannot_l), (r, fannot_r), {annot; size})
 
-let union_key (l, fannot_l) (r, fannot_r) ~annot =
-  Union_key
-    ( (l, fannot_l),
-      (r, fannot_r),
-      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+let pair_3_key loc l m r =
+  pair_key loc m r ~annot:None >>? fun r -> pair_key loc l (r, None) ~annot:None
 
-let option_key t ~annot =
-  Option_key (t, {annot; size = 1 + comparable_ty_size t})
+let union_key loc (l, fannot_l) (r, fannot_r) ~annot =
+  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
+  >|? fun size -> Union_key ((l, fannot_l), (r, fannot_r), {annot; size})
+
+let option_key loc t ~annot =
+  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
+  Option_key (t, {annot; size})
 
 module type Boxed_set = sig
   type elt
@@ -1473,77 +1519,162 @@ let ty_metadata : type a. a ty -> ty_metadata = function
 
 let ty_size t = (ty_metadata t).size
 
-let unit_t ~annot = Unit_t {annot; size = 1}
+let unit_t ~annot = Unit_t {annot; size = Type_size.one}
 
-let int_t ~annot = Int_t {annot; size = 1}
+let int_t ~annot = Int_t {annot; size = Type_size.one}
 
-let nat_t ~annot = Nat_t {annot; size = 1}
+let nat_t ~annot = Nat_t {annot; size = Type_size.one}
 
-let signature_t ~annot = Signature_t {annot; size = 1}
+let signature_t ~annot = Signature_t {annot; size = Type_size.one}
 
-let string_t ~annot = String_t {annot; size = 1}
+let string_t ~annot = String_t {annot; size = Type_size.one}
 
-let bytes_t ~annot = Bytes_t {annot; size = 1}
+let bytes_t ~annot = Bytes_t {annot; size = Type_size.one}
 
-let mutez_t ~annot = Mutez_t {annot; size = 1}
+let mutez_t ~annot = Mutez_t {annot; size = Type_size.one}
 
-let key_hash_t ~annot = Key_hash_t {annot; size = 1}
+let key_hash_t ~annot = Key_hash_t {annot; size = Type_size.one}
 
-let key_t ~annot = Key_t {annot; size = 1}
+let key_t ~annot = Key_t {annot; size = Type_size.one}
 
-let timestamp_t ~annot = Timestamp_t {annot; size = 1}
+let timestamp_t ~annot = Timestamp_t {annot; size = Type_size.one}
 
-let address_t ~annot = Address_t {annot; size = 1}
+let address_t ~annot = Address_t {annot; size = Type_size.one}
 
-let bool_t ~annot = Bool_t {annot; size = 1}
+let bool_t ~annot = Bool_t {annot; size = Type_size.one}
 
-let pair_t (l, fannot_l, vannot_l) (r, fannot_r, vannot_r) ~annot =
-  Pair_t
-    ( (l, fannot_l, vannot_l),
-      (r, fannot_r, vannot_r),
-      {annot; size = 1 + ty_size l + ty_size r} )
+let pair_t loc (l, fannot_l, vannot_l) (r, fannot_r, vannot_r) ~annot =
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  Pair_t ((l, fannot_l, vannot_l), (r, fannot_r, vannot_r), {annot; size})
 
-let union_t (l, fannot_l) (r, fannot_r) ~annot =
+let union_t loc (l, fannot_l) (r, fannot_r) ~annot =
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  Union_t ((l, fannot_l), (r, fannot_r), {annot; size})
+
+let union_bytes_bool_t =
   Union_t
-    ((l, fannot_l), (r, fannot_r), {annot; size = 1 + ty_size l + ty_size r})
+    ( (bytes_t ~annot:None, None),
+      (bool_t ~annot:None, None),
+      {annot = None; size = Type_size.three} )
 
-let lambda_t l r ~annot =
-  Lambda_t (l, r, {annot; size = 1 + ty_size l + ty_size r})
+let lambda_t loc l r ~annot =
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  Lambda_t (l, r, {annot; size})
 
-let option_t t ~annot = Option_t (t, {annot; size = 1 + ty_size t})
+let option_t loc t ~annot =
+  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {annot; size})
 
-let list_t t ~annot = List_t (t, {annot; size = 1 + ty_size t})
+let option_string'_t meta =
+  let {annot; size = _} = meta in
+  Option_t (string_t ~annot, {annot = None; size = Type_size.two})
 
-let set_t t ~annot = Set_t (t, {annot; size = 1 + comparable_ty_size t})
+let option_bytes'_t meta =
+  let {annot; size = _} = meta in
+  Option_t (bytes_t ~annot, {annot = None; size = Type_size.two})
 
-let map_t l r ~annot =
-  Map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+let option_nat_t =
+  Option_t (nat_t ~annot:None, {annot = None; size = Type_size.two})
 
-let big_map_t l r ~annot =
-  Big_map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+let option_pair_nat_nat_t =
+  Option_t
+    ( Pair_t
+        ( (nat_t ~annot:None, None, None),
+          (nat_t ~annot:None, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
 
-let contract_t t ~annot = Contract_t (t, {annot; size = 1 + ty_size t})
+let option_pair_nat'_nat'_t meta =
+  let {annot; size = _} = meta in
+  Option_t
+    ( Pair_t
+        ( (nat_t ~annot, None, None),
+          (nat_t ~annot, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
+
+let option_pair_nat_mutez'_t meta =
+  let {annot; size = _} = meta in
+  Option_t
+    ( Pair_t
+        ( (nat_t ~annot:None, None, None),
+          (mutez_t ~annot, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
+
+let option_pair_mutez'_mutez'_t meta =
+  let {annot; size = _} = meta in
+  Option_t
+    ( Pair_t
+        ( (mutez_t ~annot, None, None),
+          (mutez_t ~annot, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
+
+let option_pair_int'_nat_t meta =
+  let {annot; size = _} = meta in
+  Option_t
+    ( Pair_t
+        ( (int_t ~annot, None, None),
+          (nat_t ~annot:None, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
+
+let option_pair_int_nat'_t meta =
+  let {annot; size = _} = meta in
+  Option_t
+    ( Pair_t
+        ( (int_t ~annot:None, None, None),
+          (nat_t ~annot, None, None),
+          {annot = None; size = Type_size.three} ),
+      {annot = None; size = Type_size.four} )
+
+let list_t loc t ~annot =
+  Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {annot; size})
+
+let operation_t ~annot = Operation_t {annot; size = Type_size.one}
+
+let list_operation_t =
+  List_t (operation_t ~annot:None, {annot = None; size = Type_size.two})
+
+let set_t loc t ~annot =
+  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
+  Set_t (t, {annot; size})
+
+let map_t loc l r ~annot =
+  Type_size.compound2 loc (comparable_ty_size l) (ty_size r) >|? fun size ->
+  Map_t (l, r, {annot; size})
+
+let big_map_t loc l r ~annot =
+  Type_size.compound2 loc (comparable_ty_size l) (ty_size r) >|? fun size ->
+  Big_map_t (l, r, {annot; size})
+
+let contract_t loc t ~annot =
+  Type_size.compound1 loc (ty_size t) >|? fun size ->
+  Contract_t (t, {annot; size})
+
+let contract_unit_t =
+  Contract_t (unit_t ~annot:None, {annot = None; size = Type_size.two})
 
 let sapling_transaction_t ~memo_size ~annot =
-  Sapling_transaction_t (memo_size, {annot; size = 1})
+  Sapling_transaction_t (memo_size, {annot; size = Type_size.one})
 
 let sapling_state_t ~memo_size ~annot =
-  Sapling_state_t (memo_size, {annot; size = 1})
+  Sapling_state_t (memo_size, {annot; size = Type_size.one})
 
-let operation_t ~annot = Operation_t {annot; size = 1}
+let chain_id_t ~annot = Chain_id_t {annot; size = Type_size.one}
 
-let chain_id_t ~annot = Chain_id_t {annot; size = 1}
+let never_t ~annot = Never_t {annot; size = Type_size.one}
 
-let never_t ~annot = Never_t {annot; size = 1}
+let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot; size = Type_size.one}
 
-let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot; size = 1}
+let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot; size = Type_size.one}
 
-let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot; size = 1}
+let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot; size = Type_size.one}
 
-let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot; size = 1}
+let ticket_t loc t ~annot =
+  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
+  Ticket_t (t, {annot; size})
 
-let ticket_t t ~annot = Ticket_t (t, {annot; size = 1 + comparable_ty_size t})
+let chest_key_t ~annot = Chest_key_t {annot; size = Type_size.one}
 
-let chest_key_t ~annot = Chest_key_t {annot; size = 1}
-
-let chest_t ~annot = Chest_t {annot; size = 1}
+let chest_t ~annot = Chest_t {annot; size = Type_size.one}

@@ -15,6 +15,11 @@ let ( >>=?? ) x y =
   | Ok s -> y s
   | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
 
+let ( >>??= ) x y =
+  match x with
+  | Ok s -> y s
+  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+
 let test_context () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
@@ -151,7 +156,7 @@ let test_stack_overflow_in_lwt () =
   let unit_t = unit_t ~annot:None in
   let unit_k = unit_key ~annot:None in
   let bool_t = bool_t ~annot:None in
-  let big_map_t = big_map_t unit_k unit_t ~annot:None in
+  big_map_t (-1) unit_k unit_t ~annot:None >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo s = {iloc = -1; kstack_ty = s} in
   let stack1 = item big_map_t Bot_t in

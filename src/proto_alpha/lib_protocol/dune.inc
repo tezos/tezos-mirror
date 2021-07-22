@@ -95,8 +95,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
-   script_typed_ir.ml
    script_tc_errors.ml
+   script_typed_ir.mli script_typed_ir.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
@@ -196,8 +196,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
-   script_typed_ir.ml
    script_tc_errors.ml
+   script_typed_ir.mli script_typed_ir.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
@@ -297,8 +297,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
-   script_typed_ir.ml
    script_tc_errors.ml
+   script_typed_ir.mli script_typed_ir.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
@@ -420,8 +420,8 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_validator
    Global_constants_storage
    Alpha_context
-   Script_typed_ir
    Script_tc_errors
+   Script_typed_ir
    Michelson_v1_gas
    Script_ir_annot
    Script_type_size
@@ -560,8 +560,8 @@ include Tezos_raw_protocol_alpha.Main
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
-   script_typed_ir.ml
    script_tc_errors.ml
+   script_typed_ir.mli script_typed_ir.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml

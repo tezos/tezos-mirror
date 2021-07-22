@@ -77,29 +77,46 @@ let chain_id = chain_id_t ~annot:None
 let timestamp = timestamp_t ~annot:None
 
 (* list type constructor *)
-let list x = list_t x ~annot:None
+let list x =
+  match list_t (-1) x ~annot:None with Error _ -> assert false | Ok t -> t
 
 (* option type constructor *)
-let option x = option_t x ~annot:None
+let option x =
+  match option_t (-1) x ~annot:None with Error _ -> assert false | Ok t -> t
 
 (* map type constructor*)
-let map k v = map_t k v ~annot:None
+let map k v =
+  match map_t (-1) k v ~annot:None with Error _ -> assert false | Ok t -> t
 
 (* map type constructor*)
-let big_map k v = big_map_t k v ~annot:None
+let big_map k v =
+  match big_map_t (-1) k v ~annot:None with
+  | Error _ -> assert false
+  | Ok t -> t
 
 (* set type constructor*)
-let set k = set_t k ~annot:None
+let set k =
+  match set_t (-1) k ~annot:None with Error _ -> assert false | Ok t -> t
 
 (* pair type constructor*)
-let pair k1 k2 = pair_t (k1, None, None) (k2, None, None) ~annot:None
+let pair k1 k2 =
+  match pair_t (-1) (k1, None, None) (k2, None, None) ~annot:None with
+  | Error _ -> assert false
+  | Ok t -> t
 
 (* union type constructor*)
-let union k1 k2 = union_t (k1, None) (k2, None) ~annot:None
+let union k1 k2 =
+  match union_t (-1) (k1, None) (k2, None) ~annot:None with
+  | Error _ -> assert false
+  | Ok t -> t
 
-let lambda x y = lambda_t x y ~annot:None
+let lambda x y =
+  match lambda_t (-1) x y ~annot:None with Error _ -> assert false | Ok t -> t
 
-let contract arg_ty = contract_t arg_ty ~annot:None
+let contract arg_ty =
+  match contract_t (-1) arg_ty ~annot:None with
+  | Error _ -> assert false
+  | Ok t -> t
 
 let operation = operation_t ~annot:None
 
@@ -113,7 +130,8 @@ let bls12_381_g2 = bls12_381_g2_t ~annot:None
 
 let bls12_381_fr = bls12_381_fr_t ~annot:None
 
-let ticket ty = ticket_t ty ~annot:None
+let ticket ty =
+  match ticket_t (-1) ty ~annot:None with Error _ -> assert false | Ok t -> t
 
 let chest_key = chest_key_t ~annot:None
 

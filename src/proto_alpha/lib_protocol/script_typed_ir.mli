@@ -51,7 +51,13 @@ type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
-type ty_metadata = {annot : type_annot option; size : int}
+module Type_size : sig
+  type t
+
+  val merge : t -> t -> t tzresult
+end
+
+type ty_metadata = {annot : type_annot option; size : Type_size.t}
 
 type _ comparable_ty =
   | Unit_key : ty_metadata -> unit comparable_ty
@@ -82,8 +88,6 @@ type _ comparable_ty =
 
 val comparable_ty_metadata : 'a comparable_ty -> ty_metadata
 
-val comparable_ty_size : 'a comparable_ty -> int
-
 val unit_key : annot:type_annot option -> unit comparable_ty
 
 val never_key : annot:type_annot option -> never comparable_ty
@@ -113,19 +117,31 @@ val chain_id_key : annot:type_annot option -> Chain_id.t comparable_ty
 val address_key : annot:type_annot option -> address comparable_ty
 
 val pair_key :
+  Script.location ->
   'a comparable_ty * field_annot option ->
   'b comparable_ty * field_annot option ->
   annot:type_annot option ->
-  ('a, 'b) pair comparable_ty
+  ('a, 'b) pair comparable_ty tzresult
+
+val pair_3_key :
+  Script.location ->
+  'a comparable_ty * field_annot option ->
+  'b comparable_ty * field_annot option ->
+  'c comparable_ty * field_annot option ->
+  ('a, ('b, 'c) pair) pair comparable_ty tzresult
 
 val union_key :
+  Script.location ->
   'a comparable_ty * field_annot option ->
   'b comparable_ty * field_annot option ->
   annot:type_annot option ->
-  ('a, 'b) union comparable_ty
+  ('a, 'b) union comparable_ty tzresult
 
 val option_key :
-  'v comparable_ty -> annot:type_annot option -> 'v option comparable_ty
+  Script.location ->
+  'v comparable_ty ->
+  annot:type_annot option ->
+  'v option comparable_ty tzresult
 
 module type Boxed_set = sig
   type elt
@@ -1333,8 +1349,6 @@ val kinstr_rewritek :
 
 val ty_metadata : 'a ty -> ty_metadata
 
-val ty_size : 'a ty -> int
-
 val unit_t : annot:type_annot option -> unit ty
 
 val int_t : annot:type_annot option -> z num ty
@@ -1360,33 +1374,86 @@ val address_t : annot:type_annot option -> address ty
 val bool_t : annot:type_annot option -> bool ty
 
 val pair_t :
+  Script.location ->
   'a ty * field_annot option * var_annot option ->
   'b ty * field_annot option * var_annot option ->
   annot:type_annot option ->
-  ('a, 'b) pair ty
+  ('a, 'b) pair ty tzresult
 
 val union_t :
+  Script.location ->
   'a ty * field_annot option ->
   'b ty * field_annot option ->
   annot:type_annot option ->
-  ('a, 'b) union ty
+  ('a, 'b) union ty tzresult
+
+val union_bytes_bool_t : (Bytes.t, bool) union ty
 
 val lambda_t :
-  'arg ty -> 'ret ty -> annot:type_annot option -> ('arg, 'ret) lambda ty
+  Script.location ->
+  'arg ty ->
+  'ret ty ->
+  annot:type_annot option ->
+  ('arg, 'ret) lambda ty tzresult
 
-val option_t : 'v ty -> annot:type_annot option -> 'v option ty
+val option_t :
+  Script.location -> 'v ty -> annot:type_annot option -> 'v option ty tzresult
 
-val list_t : 'v ty -> annot:type_annot option -> 'v boxed_list ty
+(* the quote is used to indicate where the annotation will go *)
 
-val set_t : 'v comparable_ty -> annot:type_annot option -> 'v set ty
+val option_string'_t : ty_metadata -> Script_string.t option ty
+
+val option_bytes'_t : ty_metadata -> Bytes.t option ty
+
+val option_nat_t : n num option ty
+
+val option_pair_nat_nat_t : (n num, n num) pair option ty
+
+val option_pair_nat'_nat'_t : ty_metadata -> (n num, n num) pair option ty
+
+val option_pair_nat_mutez'_t : ty_metadata -> (n num, Tez.t) pair option ty
+
+val option_pair_mutez'_mutez'_t : ty_metadata -> (Tez.t, Tez.t) pair option ty
+
+val option_pair_int'_nat_t : ty_metadata -> (z num, n num) pair option ty
+
+val option_pair_int_nat'_t : ty_metadata -> (z num, n num) pair option ty
+
+val list_t :
+  Script.location ->
+  'v ty ->
+  annot:type_annot option ->
+  'v boxed_list ty tzresult
+
+val list_operation_t : operation boxed_list ty
+
+val set_t :
+  Script.location ->
+  'v comparable_ty ->
+  annot:type_annot option ->
+  'v set ty tzresult
 
 val map_t :
-  'k comparable_ty -> 'v ty -> annot:type_annot option -> ('k, 'v) map ty
+  Script.location ->
+  'k comparable_ty ->
+  'v ty ->
+  annot:type_annot option ->
+  ('k, 'v) map ty tzresult
 
 val big_map_t :
-  'k comparable_ty -> 'v ty -> annot:type_annot option -> ('k, 'v) big_map ty
+  Script.location ->
+  'k comparable_ty ->
+  'v ty ->
+  annot:type_annot option ->
+  ('k, 'v) big_map ty tzresult
 
-val contract_t : 'arg ty -> annot:type_annot option -> 'arg typed_contract ty
+val contract_t :
+  Script.location ->
+  'arg ty ->
+  annot:type_annot option ->
+  'arg typed_contract ty tzresult
+
+val contract_unit_t : unit typed_contract ty
 
 val sapling_transaction_t :
   memo_size:Sapling.Memo_size.t ->
@@ -1408,7 +1475,11 @@ val bls12_381_g2_t : annot:type_annot option -> Bls12_381.G2.t ty
 
 val bls12_381_fr_t : annot:type_annot option -> Bls12_381.Fr.t ty
 
-val ticket_t : 'a comparable_ty -> annot:type_annot option -> 'a ticket ty
+val ticket_t :
+  Script.location ->
+  'a comparable_ty ->
+  annot:type_annot option ->
+  'a ticket ty tzresult
 
 val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
 

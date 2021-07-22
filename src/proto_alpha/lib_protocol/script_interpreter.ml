@@ -1030,6 +1030,12 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           kinstr;
                         },
                         _script_view ) -> (
+                      pair_t
+                        kloc
+                        (input_ty, None, None)
+                        (storage_type, None, None)
+                        ~annot:None
+                      >>?= fun pair_ty ->
                       let open Gas_monad in
                       let io_ty =
                         Script_ir_translator.merge_types
@@ -1044,10 +1050,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           ~legacy:true
                           kloc
                           bef_ty
-                          (pair_t
-                             (input_ty, None, None)
-                             (storage_type, None, None)
-                             ~annot:None)
+                          pair_ty
                         >|$ fun (in_eq, _ty) -> (out_eq, in_eq)
                       in
                       Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->
