@@ -100,7 +100,7 @@ module type T = sig
     shell : types_state_shell;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
-      ([`Applied | `Refused | `Branch_refused | `Branch_delayed]
+      (Classification.classification
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -349,7 +349,7 @@ module Make
     shell : types_state_shell;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
-      ([`Applied | `Refused | `Branch_refused | `Branch_delayed]
+      (Classification.classification
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -523,7 +523,7 @@ module Make
     Notifier.maybe_notify_operation
       ?should_notify
       pv.operation_stream
-      `Branch_refused
+      (`Branch_refused errors)
       op ;
     Classification.add (`Branch_refused errors) oph op pv.shell.classification
 
@@ -531,7 +531,7 @@ module Make
     Notifier.maybe_notify_operation
       ?should_notify
       pv.operation_stream
-      `Branch_delayed
+      (`Branch_delayed errors)
       op ;
     Classification.add (`Branch_delayed errors) oph op pv.shell.classification
 
@@ -539,7 +539,7 @@ module Make
     Notifier.maybe_notify_operation
       ?should_notify
       pv.operation_stream
-      `Refused
+      (`Refused errors)
       op ;
     Classification.add (`Refused errors) oph op pv.shell.classification
 
@@ -907,9 +907,9 @@ module Make
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
                | `Applied -> params#applied
-               | `Refused -> params#refused
-               | `Branch_refused -> params#branch_refused
-               | `Branch_delayed -> params#branch_delayed
+               | `Refused _ -> params#refused
+               | `Branch_refused _ -> params#branch_refused
+               | `Branch_delayed _ -> params#branch_delayed
              in
              let rec next () =
                match !current_mempool with
