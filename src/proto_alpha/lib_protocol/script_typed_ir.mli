@@ -80,70 +80,52 @@ type _ comparable_ty =
       -> ('a, 'b) union comparable_ty
   | Option_key : 'v comparable_ty * ty_metadata -> 'v option comparable_ty
 
-let comparable_ty_metadata : type a. a comparable_ty -> ty_metadata = function
-  | Unit_key meta
-  | Never_key meta
-  | Int_key meta
-  | Nat_key meta
-  | Signature_key meta
-  | String_key meta
-  | Bytes_key meta
-  | Mutez_key meta
-  | Bool_key meta
-  | Key_hash_key meta
-  | Key_key meta
-  | Timestamp_key meta
-  | Chain_id_key meta
-  | Address_key meta
-  | Pair_key (_, _, meta)
-  | Union_key (_, _, meta)
-  | Option_key (_, meta) ->
-      meta
+val comparable_ty_metadata : 'a comparable_ty -> ty_metadata
 
-let comparable_ty_size t = (comparable_ty_metadata t).size
+val comparable_ty_size : 'a comparable_ty -> int
 
-let unit_key ~annot = Unit_key {annot; size = 1}
+val unit_key : annot:type_annot option -> unit comparable_ty
 
-let never_key ~annot = Never_key {annot; size = 1}
+val never_key : annot:type_annot option -> never comparable_ty
 
-let int_key ~annot = Int_key {annot; size = 1}
+val int_key : annot:type_annot option -> z num comparable_ty
 
-let nat_key ~annot = Nat_key {annot; size = 1}
+val nat_key : annot:type_annot option -> n num comparable_ty
 
-let signature_key ~annot = Signature_key {annot; size = 1}
+val signature_key : annot:type_annot option -> signature comparable_ty
 
-let string_key ~annot = String_key {annot; size = 1}
+val string_key : annot:type_annot option -> Script_string.t comparable_ty
 
-let bytes_key ~annot = Bytes_key {annot; size = 1}
+val bytes_key : annot:type_annot option -> Bytes.t comparable_ty
 
-let mutez_key ~annot = Mutez_key {annot; size = 1}
+val mutez_key : annot:type_annot option -> Tez.t comparable_ty
 
-let bool_key ~annot = Bool_key {annot; size = 1}
+val bool_key : annot:type_annot option -> bool comparable_ty
 
-let key_hash_key ~annot = Key_hash_key {annot; size = 1}
+val key_hash_key : annot:type_annot option -> public_key_hash comparable_ty
 
-let key_key ~annot = Key_key {annot; size = 1}
+val key_key : annot:type_annot option -> public_key comparable_ty
 
-let timestamp_key ~annot = Timestamp_key {annot; size = 1}
+val timestamp_key : annot:type_annot option -> Script_timestamp.t comparable_ty
 
-let chain_id_key ~annot = Chain_id_key {annot; size = 1}
+val chain_id_key : annot:type_annot option -> Chain_id.t comparable_ty
 
-let address_key ~annot = Address_key {annot; size = 1}
+val address_key : annot:type_annot option -> address comparable_ty
 
-let pair_key (l, fannot_l) (r, fannot_r) ~annot =
-  Pair_key
-    ( (l, fannot_l),
-      (r, fannot_r),
-      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+val pair_key :
+  'a comparable_ty * field_annot option ->
+  'b comparable_ty * field_annot option ->
+  annot:type_annot option ->
+  ('a, 'b) pair comparable_ty
 
-let union_key (l, fannot_l) (r, fannot_r) ~annot =
-  Union_key
-    ( (l, fannot_l),
-      (r, fannot_r),
-      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+val union_key :
+  'a comparable_ty * field_annot option ->
+  'b comparable_ty * field_annot option ->
+  annot:type_annot option ->
+  ('a, 'b) union comparable_ty
 
-let option_key t ~annot =
-  Option_key (t, {annot; size = 1 + comparable_ty_size t})
+val option_key :
+  'v comparable_ty -> annot:type_annot option -> 'v option comparable_ty
 
 module type Boxed_set = sig
   type elt
@@ -174,11 +156,7 @@ end
 type ('key, 'value) map =
   (module Boxed_map with type key = 'key and type value = 'value)
 
-module Big_map_overlay = Map.Make (struct
-  type t = Script_expr_hash.t
-
-  let compare = Script_expr_hash.compare
-end)
+module Big_map_overlay : Map.S with type key = Script_expr_hash.t
 
 type ('key, 'value) big_map_overlay = {
   map : ('key * 'value option) Big_map_overlay.t;
@@ -187,7 +165,7 @@ type ('key, 'value) big_map_overlay = {
 
 type 'elt boxed_list = {elements : 'elt list; length : int}
 
-module SMap = Map.Make (Script_string)
+module SMap : Map.S with type key = Script_string.t
 
 type view = {
   input_ty : Script.node;
@@ -202,6 +180,7 @@ type ('arg, 'storage) script = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
+  code_size : int;
 }
 
 (* ---- Instructions --------------------------------------------------------*)
@@ -1343,470 +1322,94 @@ and ('a, 'b) view_signature =
       output_ty : 'b ty;
     }
 
-let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
- fun i ->
-  match i with
-  | IDrop (kinfo, _) -> kinfo
-  | IDup (kinfo, _) -> kinfo
-  | ISwap (kinfo, _) -> kinfo
-  | IConst (kinfo, _, _) -> kinfo
-  | ICons_pair (kinfo, _) -> kinfo
-  | ICar (kinfo, _) -> kinfo
-  | ICdr (kinfo, _) -> kinfo
-  | IUnpair (kinfo, _) -> kinfo
-  | ICons_some (kinfo, _) -> kinfo
-  | ICons_none (kinfo, _, _) -> kinfo
-  | IIf_none {kinfo; _} -> kinfo
-  | ICons_left (kinfo, _) -> kinfo
-  | ICons_right (kinfo, _) -> kinfo
-  | IIf_left {kinfo; _} -> kinfo
-  | ICons_list (kinfo, _) -> kinfo
-  | INil (kinfo, _) -> kinfo
-  | IIf_cons {kinfo; _} -> kinfo
-  | IList_map (kinfo, _, _) -> kinfo
-  | IList_iter (kinfo, _, _) -> kinfo
-  | IList_size (kinfo, _) -> kinfo
-  | IEmpty_set (kinfo, _, _) -> kinfo
-  | ISet_iter (kinfo, _, _) -> kinfo
-  | ISet_mem (kinfo, _) -> kinfo
-  | ISet_update (kinfo, _) -> kinfo
-  | ISet_size (kinfo, _) -> kinfo
-  | IEmpty_map (kinfo, _, _, _) -> kinfo
-  | IMap_map (kinfo, _, _) -> kinfo
-  | IMap_iter (kinfo, _, _) -> kinfo
-  | IMap_mem (kinfo, _) -> kinfo
-  | IMap_get (kinfo, _) -> kinfo
-  | IMap_update (kinfo, _) -> kinfo
-  | IMap_get_and_update (kinfo, _) -> kinfo
-  | IMap_size (kinfo, _) -> kinfo
-  | IEmpty_big_map (kinfo, _, _, _) -> kinfo
-  | IBig_map_mem (kinfo, _) -> kinfo
-  | IBig_map_get (kinfo, _) -> kinfo
-  | IBig_map_update (kinfo, _) -> kinfo
-  | IBig_map_get_and_update (kinfo, _) -> kinfo
-  | IConcat_string (kinfo, _) -> kinfo
-  | IConcat_string_pair (kinfo, _) -> kinfo
-  | ISlice_string (kinfo, _) -> kinfo
-  | IString_size (kinfo, _) -> kinfo
-  | IConcat_bytes (kinfo, _) -> kinfo
-  | IConcat_bytes_pair (kinfo, _) -> kinfo
-  | ISlice_bytes (kinfo, _) -> kinfo
-  | IBytes_size (kinfo, _) -> kinfo
-  | IAdd_seconds_to_timestamp (kinfo, _) -> kinfo
-  | IAdd_timestamp_to_seconds (kinfo, _) -> kinfo
-  | ISub_timestamp_seconds (kinfo, _) -> kinfo
-  | IDiff_timestamps (kinfo, _) -> kinfo
-  | IAdd_tez (kinfo, _) -> kinfo
-  | ISub_tez (kinfo, _) -> kinfo
-  | IMul_teznat (kinfo, _) -> kinfo
-  | IMul_nattez (kinfo, _) -> kinfo
-  | IEdiv_teznat (kinfo, _) -> kinfo
-  | IEdiv_tez (kinfo, _) -> kinfo
-  | IOr (kinfo, _) -> kinfo
-  | IAnd (kinfo, _) -> kinfo
-  | IXor (kinfo, _) -> kinfo
-  | INot (kinfo, _) -> kinfo
-  | IIs_nat (kinfo, _) -> kinfo
-  | INeg_nat (kinfo, _) -> kinfo
-  | INeg_int (kinfo, _) -> kinfo
-  | IAbs_int (kinfo, _) -> kinfo
-  | IInt_nat (kinfo, _) -> kinfo
-  | IAdd_intint (kinfo, _) -> kinfo
-  | IAdd_intnat (kinfo, _) -> kinfo
-  | IAdd_natint (kinfo, _) -> kinfo
-  | IAdd_natnat (kinfo, _) -> kinfo
-  | ISub_int (kinfo, _) -> kinfo
-  | IMul_intint (kinfo, _) -> kinfo
-  | IMul_intnat (kinfo, _) -> kinfo
-  | IMul_natint (kinfo, _) -> kinfo
-  | IMul_natnat (kinfo, _) -> kinfo
-  | IEdiv_intint (kinfo, _) -> kinfo
-  | IEdiv_intnat (kinfo, _) -> kinfo
-  | IEdiv_natint (kinfo, _) -> kinfo
-  | IEdiv_natnat (kinfo, _) -> kinfo
-  | ILsl_nat (kinfo, _) -> kinfo
-  | ILsr_nat (kinfo, _) -> kinfo
-  | IOr_nat (kinfo, _) -> kinfo
-  | IAnd_nat (kinfo, _) -> kinfo
-  | IAnd_int_nat (kinfo, _) -> kinfo
-  | IXor_nat (kinfo, _) -> kinfo
-  | INot_nat (kinfo, _) -> kinfo
-  | INot_int (kinfo, _) -> kinfo
-  | IIf {kinfo; _} -> kinfo
-  | ILoop (kinfo, _, _) -> kinfo
-  | ILoop_left (kinfo, _, _) -> kinfo
-  | IDip (kinfo, _, _) -> kinfo
-  | IExec (kinfo, _) -> kinfo
-  | IApply (kinfo, _, _) -> kinfo
-  | ILambda (kinfo, _, _) -> kinfo
-  | IFailwith (kinfo, _, _, _) -> kinfo
-  | ICompare (kinfo, _, _) -> kinfo
-  | IEq (kinfo, _) -> kinfo
-  | INeq (kinfo, _) -> kinfo
-  | ILt (kinfo, _) -> kinfo
-  | IGt (kinfo, _) -> kinfo
-  | ILe (kinfo, _) -> kinfo
-  | IGe (kinfo, _) -> kinfo
-  | IAddress (kinfo, _) -> kinfo
-  | IContract (kinfo, _, _, _) -> kinfo
-  | ITransfer_tokens (kinfo, _) -> kinfo
-  | IView (kinfo, _, _) -> kinfo
-  | IImplicit_account (kinfo, _) -> kinfo
-  | ICreate_contract {kinfo; _} -> kinfo
-  | ISet_delegate (kinfo, _) -> kinfo
-  | INow (kinfo, _) -> kinfo
-  | IBalance (kinfo, _) -> kinfo
-  | ILevel (kinfo, _) -> kinfo
-  | ICheck_signature (kinfo, _) -> kinfo
-  | IHash_key (kinfo, _) -> kinfo
-  | IPack (kinfo, _, _) -> kinfo
-  | IUnpack (kinfo, _, _) -> kinfo
-  | IBlake2b (kinfo, _) -> kinfo
-  | ISha256 (kinfo, _) -> kinfo
-  | ISha512 (kinfo, _) -> kinfo
-  | ISource (kinfo, _) -> kinfo
-  | ISender (kinfo, _) -> kinfo
-  | ISelf (kinfo, _, _, _) -> kinfo
-  | ISelf_address (kinfo, _) -> kinfo
-  | IAmount (kinfo, _) -> kinfo
-  | ISapling_empty_state (kinfo, _, _) -> kinfo
-  | ISapling_verify_update (kinfo, _) -> kinfo
-  | IDig (kinfo, _, _, _) -> kinfo
-  | IDug (kinfo, _, _, _) -> kinfo
-  | IDipn (kinfo, _, _, _, _) -> kinfo
-  | IDropn (kinfo, _, _, _) -> kinfo
-  | IChainId (kinfo, _) -> kinfo
-  | INever kinfo -> kinfo
-  | IVoting_power (kinfo, _) -> kinfo
-  | ITotal_voting_power (kinfo, _) -> kinfo
-  | IKeccak (kinfo, _) -> kinfo
-  | ISha3 (kinfo, _) -> kinfo
-  | IAdd_bls12_381_g1 (kinfo, _) -> kinfo
-  | IAdd_bls12_381_g2 (kinfo, _) -> kinfo
-  | IAdd_bls12_381_fr (kinfo, _) -> kinfo
-  | IMul_bls12_381_g1 (kinfo, _) -> kinfo
-  | IMul_bls12_381_g2 (kinfo, _) -> kinfo
-  | IMul_bls12_381_fr (kinfo, _) -> kinfo
-  | IMul_bls12_381_z_fr (kinfo, _) -> kinfo
-  | IMul_bls12_381_fr_z (kinfo, _) -> kinfo
-  | IInt_bls12_381_fr (kinfo, _) -> kinfo
-  | INeg_bls12_381_g1 (kinfo, _) -> kinfo
-  | INeg_bls12_381_g2 (kinfo, _) -> kinfo
-  | INeg_bls12_381_fr (kinfo, _) -> kinfo
-  | IPairing_check_bls12_381 (kinfo, _) -> kinfo
-  | IComb (kinfo, _, _, _) -> kinfo
-  | IUncomb (kinfo, _, _, _) -> kinfo
-  | IComb_get (kinfo, _, _, _) -> kinfo
-  | IComb_set (kinfo, _, _, _) -> kinfo
-  | IDup_n (kinfo, _, _, _) -> kinfo
-  | ITicket (kinfo, _) -> kinfo
-  | IRead_ticket (kinfo, _) -> kinfo
-  | ISplit_ticket (kinfo, _) -> kinfo
-  | IJoin_tickets (kinfo, _, _) -> kinfo
-  | IHalt kinfo -> kinfo
-  | ILog (kinfo, _, _, _) -> kinfo
-  | IOpen_chest (kinfo, _) -> kinfo
+val kinfo_of_kinstr : ('a, 's, 'b, 'f) kinstr -> ('a, 's) kinfo
 
 type kinstr_rewritek = {
   apply : 'b 'u 'r 'f. ('b, 'u, 'r, 'f) kinstr -> ('b, 'u, 'r, 'f) kinstr;
 }
 
-let kinstr_rewritek :
-    type a s r f. (a, s, r, f) kinstr -> kinstr_rewritek -> (a, s, r, f) kinstr
-    =
- fun i f ->
-  match i with
-  | IDrop (kinfo, k) -> IDrop (kinfo, f.apply k)
-  | IDup (kinfo, k) -> IDup (kinfo, f.apply k)
-  | ISwap (kinfo, k) -> ISwap (kinfo, f.apply k)
-  | IConst (kinfo, x, k) -> IConst (kinfo, x, f.apply k)
-  | ICons_pair (kinfo, k) -> ICons_pair (kinfo, f.apply k)
-  | ICar (kinfo, k) -> ICar (kinfo, f.apply k)
-  | ICdr (kinfo, k) -> ICdr (kinfo, f.apply k)
-  | IUnpair (kinfo, k) -> IUnpair (kinfo, f.apply k)
-  | ICons_some (kinfo, k) -> ICons_some (kinfo, f.apply k)
-  | ICons_none (kinfo, ty, k) -> ICons_none (kinfo, ty, f.apply k)
-  | IIf_none {kinfo; branch_if_none; branch_if_some} ->
-      let branch_if_none = f.apply branch_if_none
-      and branch_if_some = f.apply branch_if_some in
-      IIf_none {kinfo; branch_if_none; branch_if_some}
-  | ICons_left (kinfo, k) -> ICons_left (kinfo, f.apply k)
-  | ICons_right (kinfo, k) -> ICons_right (kinfo, f.apply k)
-  | IIf_left {kinfo; branch_if_left; branch_if_right} ->
-      let branch_if_left = f.apply branch_if_left
-      and branch_if_right = f.apply branch_if_right in
-      IIf_left {kinfo; branch_if_left; branch_if_right}
-  | ICons_list (kinfo, k) -> ICons_list (kinfo, f.apply k)
-  | INil (kinfo, k) -> INil (kinfo, f.apply k)
-  | IIf_cons {kinfo; branch_if_cons; branch_if_nil} ->
-      let branch_if_nil = f.apply branch_if_nil
-      and branch_if_cons = f.apply branch_if_cons in
-      IIf_cons {kinfo; branch_if_cons; branch_if_nil}
-  | IList_map (kinfo, body, k) -> IList_map (kinfo, f.apply body, f.apply k)
-  | IList_iter (kinfo, body, k) -> IList_iter (kinfo, f.apply body, f.apply k)
-  | IList_size (kinfo, k) -> IList_size (kinfo, f.apply k)
-  | IEmpty_set (kinfo, ty, k) -> IEmpty_set (kinfo, ty, f.apply k)
-  | ISet_iter (kinfo, body, k) -> ISet_iter (kinfo, f.apply body, f.apply k)
-  | ISet_mem (kinfo, k) -> ISet_mem (kinfo, f.apply k)
-  | ISet_update (kinfo, k) -> ISet_update (kinfo, f.apply k)
-  | ISet_size (kinfo, k) -> ISet_size (kinfo, f.apply k)
-  | IEmpty_map (kinfo, cty, ty, k) -> IEmpty_map (kinfo, cty, ty, f.apply k)
-  | IMap_map (kinfo, body, k) -> IMap_map (kinfo, f.apply body, f.apply k)
-  | IMap_iter (kinfo, body, k) -> IMap_iter (kinfo, f.apply body, f.apply k)
-  | IMap_mem (kinfo, k) -> IMap_mem (kinfo, f.apply k)
-  | IMap_get (kinfo, k) -> IMap_get (kinfo, f.apply k)
-  | IMap_update (kinfo, k) -> IMap_update (kinfo, f.apply k)
-  | IMap_get_and_update (kinfo, k) -> IMap_get_and_update (kinfo, f.apply k)
-  | IMap_size (kinfo, k) -> IMap_size (kinfo, f.apply k)
-  | IEmpty_big_map (kinfo, cty, ty, k) ->
-      IEmpty_big_map (kinfo, cty, ty, f.apply k)
-  | IBig_map_mem (kinfo, k) -> IBig_map_mem (kinfo, f.apply k)
-  | IBig_map_get (kinfo, k) -> IBig_map_get (kinfo, f.apply k)
-  | IBig_map_update (kinfo, k) -> IBig_map_update (kinfo, f.apply k)
-  | IBig_map_get_and_update (kinfo, k) ->
-      IBig_map_get_and_update (kinfo, f.apply k)
-  | IConcat_string (kinfo, k) -> IConcat_string (kinfo, f.apply k)
-  | IConcat_string_pair (kinfo, k) -> IConcat_string_pair (kinfo, f.apply k)
-  | ISlice_string (kinfo, k) -> ISlice_string (kinfo, f.apply k)
-  | IString_size (kinfo, k) -> IString_size (kinfo, f.apply k)
-  | IConcat_bytes (kinfo, k) -> IConcat_bytes (kinfo, f.apply k)
-  | IConcat_bytes_pair (kinfo, k) -> IConcat_bytes_pair (kinfo, f.apply k)
-  | ISlice_bytes (kinfo, k) -> ISlice_bytes (kinfo, f.apply k)
-  | IBytes_size (kinfo, k) -> IBytes_size (kinfo, f.apply k)
-  | IAdd_seconds_to_timestamp (kinfo, k) ->
-      IAdd_seconds_to_timestamp (kinfo, f.apply k)
-  | IAdd_timestamp_to_seconds (kinfo, k) ->
-      IAdd_timestamp_to_seconds (kinfo, f.apply k)
-  | ISub_timestamp_seconds (kinfo, k) ->
-      ISub_timestamp_seconds (kinfo, f.apply k)
-  | IDiff_timestamps (kinfo, k) -> IDiff_timestamps (kinfo, f.apply k)
-  | IAdd_tez (kinfo, k) -> IAdd_tez (kinfo, f.apply k)
-  | ISub_tez (kinfo, k) -> ISub_tez (kinfo, f.apply k)
-  | IMul_teznat (kinfo, k) -> IMul_teznat (kinfo, f.apply k)
-  | IMul_nattez (kinfo, k) -> IMul_nattez (kinfo, f.apply k)
-  | IEdiv_teznat (kinfo, k) -> IEdiv_teznat (kinfo, f.apply k)
-  | IEdiv_tez (kinfo, k) -> IEdiv_tez (kinfo, f.apply k)
-  | IOr (kinfo, k) -> IOr (kinfo, f.apply k)
-  | IAnd (kinfo, k) -> IAnd (kinfo, f.apply k)
-  | IXor (kinfo, k) -> IXor (kinfo, f.apply k)
-  | INot (kinfo, k) -> INot (kinfo, f.apply k)
-  | IIs_nat (kinfo, k) -> IIs_nat (kinfo, f.apply k)
-  | INeg_nat (kinfo, k) -> INeg_nat (kinfo, f.apply k)
-  | INeg_int (kinfo, k) -> INeg_int (kinfo, f.apply k)
-  | IAbs_int (kinfo, k) -> IAbs_int (kinfo, f.apply k)
-  | IInt_nat (kinfo, k) -> IInt_nat (kinfo, f.apply k)
-  | IAdd_intint (kinfo, k) -> IAdd_intint (kinfo, f.apply k)
-  | IAdd_intnat (kinfo, k) -> IAdd_intnat (kinfo, f.apply k)
-  | IAdd_natint (kinfo, k) -> IAdd_natint (kinfo, f.apply k)
-  | IAdd_natnat (kinfo, k) -> IAdd_natnat (kinfo, f.apply k)
-  | ISub_int (kinfo, k) -> ISub_int (kinfo, f.apply k)
-  | IMul_intint (kinfo, k) -> IMul_intint (kinfo, f.apply k)
-  | IMul_intnat (kinfo, k) -> IMul_intnat (kinfo, f.apply k)
-  | IMul_natint (kinfo, k) -> IMul_natint (kinfo, f.apply k)
-  | IMul_natnat (kinfo, k) -> IMul_natnat (kinfo, f.apply k)
-  | IEdiv_intint (kinfo, k) -> IEdiv_intint (kinfo, f.apply k)
-  | IEdiv_intnat (kinfo, k) -> IEdiv_intnat (kinfo, f.apply k)
-  | IEdiv_natint (kinfo, k) -> IEdiv_natint (kinfo, f.apply k)
-  | IEdiv_natnat (kinfo, k) -> IEdiv_natnat (kinfo, f.apply k)
-  | ILsl_nat (kinfo, k) -> ILsl_nat (kinfo, f.apply k)
-  | ILsr_nat (kinfo, k) -> ILsr_nat (kinfo, f.apply k)
-  | IOr_nat (kinfo, k) -> IOr_nat (kinfo, f.apply k)
-  | IAnd_nat (kinfo, k) -> IAnd_nat (kinfo, f.apply k)
-  | IAnd_int_nat (kinfo, k) -> IAnd_int_nat (kinfo, f.apply k)
-  | IXor_nat (kinfo, k) -> IXor_nat (kinfo, f.apply k)
-  | INot_nat (kinfo, k) -> INot_nat (kinfo, f.apply k)
-  | INot_int (kinfo, k) -> INot_int (kinfo, f.apply k)
-  | IIf {kinfo; branch_if_true; branch_if_false} ->
-      let branch_if_true = f.apply branch_if_true
-      and branch_if_false = f.apply branch_if_false in
-      IIf {kinfo; branch_if_true; branch_if_false}
-  | ILoop (kinfo, kbody, k) -> ILoop (kinfo, f.apply kbody, f.apply k)
-  | ILoop_left (kinfo, kl, kr) -> ILoop_left (kinfo, f.apply kl, f.apply kr)
-  | IDip (kinfo, body, k) -> IDip (kinfo, f.apply body, f.apply k)
-  | IExec (kinfo, k) -> IExec (kinfo, f.apply k)
-  | IApply (kinfo, ty, k) -> IApply (kinfo, ty, f.apply k)
-  | ILambda (kinfo, l, k) -> ILambda (kinfo, l, f.apply k)
-  | IFailwith (kinfo, i, ty, k) -> IFailwith (kinfo, i, ty, f.apply k)
-  | ICompare (kinfo, ty, k) -> ICompare (kinfo, ty, f.apply k)
-  | IEq (kinfo, k) -> IEq (kinfo, f.apply k)
-  | INeq (kinfo, k) -> INeq (kinfo, f.apply k)
-  | ILt (kinfo, k) -> ILt (kinfo, f.apply k)
-  | IGt (kinfo, k) -> IGt (kinfo, f.apply k)
-  | ILe (kinfo, k) -> ILe (kinfo, f.apply k)
-  | IGe (kinfo, k) -> IGe (kinfo, f.apply k)
-  | IAddress (kinfo, k) -> IAddress (kinfo, f.apply k)
-  | IContract (kinfo, ty, code, k) -> IContract (kinfo, ty, code, f.apply k)
-  | ITransfer_tokens (kinfo, k) -> ITransfer_tokens (kinfo, f.apply k)
-  | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
-  | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
-  | ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k} ->
-      let k = f.apply k in
-      ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k}
-  | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
-  | INow (kinfo, k) -> INow (kinfo, f.apply k)
-  | IBalance (kinfo, k) -> IBalance (kinfo, f.apply k)
-  | ILevel (kinfo, k) -> ILevel (kinfo, f.apply k)
-  | ICheck_signature (kinfo, k) -> ICheck_signature (kinfo, f.apply k)
-  | IHash_key (kinfo, k) -> IHash_key (kinfo, f.apply k)
-  | IPack (kinfo, ty, k) -> IPack (kinfo, ty, f.apply k)
-  | IUnpack (kinfo, ty, k) -> IUnpack (kinfo, ty, f.apply k)
-  | IBlake2b (kinfo, k) -> IBlake2b (kinfo, f.apply k)
-  | ISha256 (kinfo, k) -> ISha256 (kinfo, f.apply k)
-  | ISha512 (kinfo, k) -> ISha512 (kinfo, f.apply k)
-  | ISource (kinfo, k) -> ISource (kinfo, f.apply k)
-  | ISender (kinfo, k) -> ISender (kinfo, f.apply k)
-  | ISelf (kinfo, ty, s, k) -> ISelf (kinfo, ty, s, f.apply k)
-  | ISelf_address (kinfo, k) -> ISelf_address (kinfo, f.apply k)
-  | IAmount (kinfo, k) -> IAmount (kinfo, f.apply k)
-  | ISapling_empty_state (kinfo, s, k) ->
-      ISapling_empty_state (kinfo, s, f.apply k)
-  | ISapling_verify_update (kinfo, k) ->
-      ISapling_verify_update (kinfo, f.apply k)
-  | IDig (kinfo, n, p, k) -> IDig (kinfo, n, p, f.apply k)
-  | IDug (kinfo, n, p, k) -> IDug (kinfo, n, p, f.apply k)
-  | IDipn (kinfo, n, p, k1, k2) -> IDipn (kinfo, n, p, f.apply k1, f.apply k2)
-  | IDropn (kinfo, n, p, k) -> IDropn (kinfo, n, p, f.apply k)
-  | IChainId (kinfo, k) -> IChainId (kinfo, f.apply k)
-  | INever kinfo -> INever kinfo
-  | IVoting_power (kinfo, k) -> IVoting_power (kinfo, f.apply k)
-  | ITotal_voting_power (kinfo, k) -> ITotal_voting_power (kinfo, f.apply k)
-  | IKeccak (kinfo, k) -> IKeccak (kinfo, f.apply k)
-  | ISha3 (kinfo, k) -> ISha3 (kinfo, f.apply k)
-  | IAdd_bls12_381_g1 (kinfo, k) -> IAdd_bls12_381_g1 (kinfo, f.apply k)
-  | IAdd_bls12_381_g2 (kinfo, k) -> IAdd_bls12_381_g2 (kinfo, f.apply k)
-  | IAdd_bls12_381_fr (kinfo, k) -> IAdd_bls12_381_fr (kinfo, f.apply k)
-  | IMul_bls12_381_g1 (kinfo, k) -> IMul_bls12_381_g1 (kinfo, f.apply k)
-  | IMul_bls12_381_g2 (kinfo, k) -> IMul_bls12_381_g2 (kinfo, f.apply k)
-  | IMul_bls12_381_fr (kinfo, k) -> IMul_bls12_381_fr (kinfo, f.apply k)
-  | IMul_bls12_381_z_fr (kinfo, k) -> IMul_bls12_381_z_fr (kinfo, f.apply k)
-  | IMul_bls12_381_fr_z (kinfo, k) -> IMul_bls12_381_fr_z (kinfo, f.apply k)
-  | IInt_bls12_381_fr (kinfo, k) -> IInt_bls12_381_fr (kinfo, f.apply k)
-  | INeg_bls12_381_g1 (kinfo, k) -> INeg_bls12_381_g1 (kinfo, f.apply k)
-  | INeg_bls12_381_g2 (kinfo, k) -> INeg_bls12_381_g2 (kinfo, f.apply k)
-  | INeg_bls12_381_fr (kinfo, k) -> INeg_bls12_381_fr (kinfo, f.apply k)
-  | IPairing_check_bls12_381 (kinfo, k) ->
-      IPairing_check_bls12_381 (kinfo, f.apply k)
-  | IComb (kinfo, n, p, k) -> IComb (kinfo, n, p, f.apply k)
-  | IUncomb (kinfo, n, p, k) -> IUncomb (kinfo, n, p, f.apply k)
-  | IComb_get (kinfo, n, p, k) -> IComb_get (kinfo, n, p, f.apply k)
-  | IComb_set (kinfo, n, p, k) -> IComb_set (kinfo, n, p, f.apply k)
-  | IDup_n (kinfo, n, p, k) -> IDup_n (kinfo, n, p, f.apply k)
-  | ITicket (kinfo, k) -> ITicket (kinfo, f.apply k)
-  | IRead_ticket (kinfo, k) -> IRead_ticket (kinfo, f.apply k)
-  | ISplit_ticket (kinfo, k) -> ISplit_ticket (kinfo, f.apply k)
-  | IJoin_tickets (kinfo, ty, k) -> IJoin_tickets (kinfo, ty, f.apply k)
-  | IHalt kinfo -> IHalt kinfo
-  | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
-  | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
+val kinstr_rewritek :
+  ('a, 's, 'r, 'f) kinstr -> kinstr_rewritek -> ('a, 's, 'r, 'f) kinstr
 
-let ty_metadata : type a. a ty -> ty_metadata = function
-  | Unit_t meta
-  | Never_t meta
-  | Int_t meta
-  | Nat_t meta
-  | Signature_t meta
-  | String_t meta
-  | Bytes_t meta
-  | Mutez_t meta
-  | Bool_t meta
-  | Key_hash_t meta
-  | Key_t meta
-  | Timestamp_t meta
-  | Chain_id_t meta
-  | Address_t meta
-  | Pair_t (_, _, meta)
-  | Union_t (_, _, meta)
-  | Option_t (_, meta)
-  | Lambda_t (_, _, meta)
-  | List_t (_, meta)
-  | Set_t (_, meta)
-  | Map_t (_, _, meta)
-  | Big_map_t (_, _, meta)
-  | Ticket_t (_, meta)
-  | Contract_t (_, meta)
-  | Sapling_transaction_t (_, meta)
-  | Sapling_state_t (_, meta)
-  | Operation_t meta
-  | Bls12_381_g1_t meta
-  | Bls12_381_g2_t meta
-  | Bls12_381_fr_t meta
-  | Chest_t meta
-  | Chest_key_t meta ->
-      meta
+val ty_metadata : 'a ty -> ty_metadata
 
-let ty_size t = (ty_metadata t).size
+val ty_size : 'a ty -> int
 
-let unit_t ~annot = Unit_t {annot; size = 1}
+val unit_t : annot:type_annot option -> unit ty
 
-let int_t ~annot = Int_t {annot; size = 1}
+val int_t : annot:type_annot option -> z num ty
 
-let nat_t ~annot = Nat_t {annot; size = 1}
+val nat_t : annot:type_annot option -> n num ty
 
-let signature_t ~annot = Signature_t {annot; size = 1}
+val signature_t : annot:type_annot option -> signature ty
 
-let string_t ~annot = String_t {annot; size = 1}
+val string_t : annot:type_annot option -> Script_string.t ty
 
-let bytes_t ~annot = Bytes_t {annot; size = 1}
+val bytes_t : annot:type_annot option -> Bytes.t ty
 
-let mutez_t ~annot = Mutez_t {annot; size = 1}
+val mutez_t : annot:type_annot option -> Tez.t ty
 
-let key_hash_t ~annot = Key_hash_t {annot; size = 1}
+val key_hash_t : annot:type_annot option -> public_key_hash ty
 
-let key_t ~annot = Key_t {annot; size = 1}
+val key_t : annot:type_annot option -> public_key ty
 
-let timestamp_t ~annot = Timestamp_t {annot; size = 1}
+val timestamp_t : annot:type_annot option -> Script_timestamp.t ty
 
-let address_t ~annot = Address_t {annot; size = 1}
+val address_t : annot:type_annot option -> address ty
 
-let bool_t ~annot = Bool_t {annot; size = 1}
+val bool_t : annot:type_annot option -> bool ty
 
-let pair_t (l, fannot_l, vannot_l) (r, fannot_r, vannot_r) ~annot =
-  Pair_t
-    ( (l, fannot_l, vannot_l),
-      (r, fannot_r, vannot_r),
-      {annot; size = 1 + ty_size l + ty_size r} )
+val pair_t :
+  'a ty * field_annot option * var_annot option ->
+  'b ty * field_annot option * var_annot option ->
+  annot:type_annot option ->
+  ('a, 'b) pair ty
 
-let union_t (l, fannot_l) (r, fannot_r) ~annot =
-  Union_t
-    ((l, fannot_l), (r, fannot_r), {annot; size = 1 + ty_size l + ty_size r})
+val union_t :
+  'a ty * field_annot option ->
+  'b ty * field_annot option ->
+  annot:type_annot option ->
+  ('a, 'b) union ty
 
-let lambda_t l r ~annot =
-  Lambda_t (l, r, {annot; size = 1 + ty_size l + ty_size r})
+val lambda_t :
+  'arg ty -> 'ret ty -> annot:type_annot option -> ('arg, 'ret) lambda ty
 
-let option_t t ~annot = Option_t (t, {annot; size = 1 + ty_size t})
+val option_t : 'v ty -> annot:type_annot option -> 'v option ty
 
-let list_t t ~annot = List_t (t, {annot; size = 1 + ty_size t})
+val list_t : 'v ty -> annot:type_annot option -> 'v boxed_list ty
 
-let set_t t ~annot = Set_t (t, {annot; size = 1 + comparable_ty_size t})
+val set_t : 'v comparable_ty -> annot:type_annot option -> 'v set ty
 
-let map_t l r ~annot =
-  Map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+val map_t :
+  'k comparable_ty -> 'v ty -> annot:type_annot option -> ('k, 'v) map ty
 
-let big_map_t l r ~annot =
-  Big_map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+val big_map_t :
+  'k comparable_ty -> 'v ty -> annot:type_annot option -> ('k, 'v) big_map ty
 
-let contract_t t ~annot = Contract_t (t, {annot; size = 1 + ty_size t})
+val contract_t : 'arg ty -> annot:type_annot option -> 'arg typed_contract ty
 
-let sapling_transaction_t ~memo_size ~annot =
-  Sapling_transaction_t (memo_size, {annot; size = 1})
+val sapling_transaction_t :
+  memo_size:Sapling.Memo_size.t ->
+  annot:type_annot option ->
+  Sapling.transaction ty
 
-let sapling_state_t ~memo_size ~annot =
-  Sapling_state_t (memo_size, {annot; size = 1})
+val sapling_state_t :
+  memo_size:Sapling.Memo_size.t -> annot:type_annot option -> Sapling.state ty
 
-let operation_t ~annot = Operation_t {annot; size = 1}
+val operation_t : annot:type_annot option -> operation ty
 
-let chain_id_t ~annot = Chain_id_t {annot; size = 1}
+val chain_id_t : annot:type_annot option -> Chain_id.t ty
 
-let never_t ~annot = Never_t {annot; size = 1}
+val never_t : annot:type_annot option -> never ty
 
-let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot; size = 1}
+val bls12_381_g1_t : annot:type_annot option -> Bls12_381.G1.t ty
 
-let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot; size = 1}
+val bls12_381_g2_t : annot:type_annot option -> Bls12_381.G2.t ty
 
-let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot; size = 1}
+val bls12_381_fr_t : annot:type_annot option -> Bls12_381.Fr.t ty
 
-let ticket_t t ~annot = Ticket_t (t, {annot; size = 1 + comparable_ty_size t})
+val ticket_t : 'a comparable_ty -> annot:type_annot option -> 'a ticket ty
 
-let chest_key_t ~annot = Chest_key_t {annot; size = 1}
+val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
 
-let chest_t ~annot = Chest_t {annot; size = 1}
+val chest_t : annot:type_annot option -> Timelock.chest ty
