@@ -40,5 +40,5 @@ class MichelsonLexer(RegexLexer):
 
 
 def setup(sphinx):
-    sphinx.add_lexer("michelson", MichelsonLexer())
+    sphinx.add_lexer("michelson", MichelsonLexer)
     
