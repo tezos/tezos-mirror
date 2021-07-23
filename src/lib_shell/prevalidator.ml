@@ -629,42 +629,6 @@ module Make
             in
             set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
 
-  (* This function fetches operations through the [distributed_db] and
-     ensures that an operation is fetched at most once by adding
-     operations being fetched into [pv.fetching]. On errors, the
-     operation is simply removed from this set and could be fetched
-     again if it is advertised again by a peer. *)
-  let fetch_operations w (pv : types_state_shell) ?peer to_fetch =
-    let fetch_operation w pv ?peer oph =
-      Worker.log_event w (Fetching_operation oph) >>= fun () ->
-      Distributed_db.Operation.fetch
-        ~timeout:pv.parameters.limits.operation_timeout
-        pv.parameters.chain_db
-        ?peer
-        oph
-        ()
-      >>= function
-      | Ok op ->
-          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
-          Lwt.return_unit
-      | Error (Distributed_db.Operation.Canceled _ :: _) ->
-          Worker.log_event w (Operation_included oph) >>= fun () ->
-          Lwt.return_unit
-      | Error _ ->
-          (* This may happen if the peer timed out for example. *)
-          Worker.log_event w (Operation_not_fetched oph) >>= fun () ->
-          Lwt.return_unit
-    in
-    pv.fetching <- Operation_hash.Set.union to_fetch pv.fetching ;
-    Operation_hash.Set.iter
-      (fun oph ->
-        let p = fetch_operation w pv ?peer oph in
-        (* We ensure that when the fetch is over (successfuly or not),
-           we remove the operation from the [pv.fetching] set. *)
-        Lwt.on_termination p (fun () ->
-            pv.fetching <- Operation_hash.Set.remove oph pv.fetching))
-      to_fetch
-
   let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
@@ -975,25 +939,57 @@ module Make
               Prevalidation.pp_result
               res
 
+    (* This function fetches one operation through the
+       [distributed_db]. On errors, we emit an event and proceed as
+       usual. *)
+    let fetch_operation w pv ?peer oph =
+      Worker.log_event w (Fetching_operation oph) >>= fun () ->
+      Distributed_db.Operation.fetch
+        ~timeout:pv.parameters.limits.operation_timeout
+        pv.parameters.chain_db
+        ?peer
+        oph
+        ()
+      >>= function
+      | Ok op ->
+          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+          Lwt.return_unit
+      | Error (Distributed_db.Operation.Canceled _ :: _) ->
+          Worker.log_event w (Operation_included oph)
+      | Error _ ->
+          (* This may happen if the peer timed out for example. *)
+          Worker.log_event w (Operation_not_fetched oph)
+
+    (* This function fetches an operation if it is not already handled
+       by the mempool. To ensure we fetch at most a given operation,
+       we record it in the [pv.fetching] field.
+
+       Invariant: This function should be the only one to modify this
+       field.
+
+       Invariant: To ensure, there is no leak, we ensure that when the
+       promise [p] is terminated, we remove the operation from the
+       fetching operations. This is to ensure that if an error
+       happened, we can still fetch this operation in the future. *)
+    let may_fetch_operation w pv peer oph =
+      let situation = Operation_encountered.Notified peer in
+      if not @@ already_handled ~situation w pv oph then
+        (* Do not wait the operation to be fetched. The
+           [fetch_operation] will push a worker request if the
+           operation is fetched succesffuly. *)
+        ignore
+          (Lwt.finalize
+             (fun () ->
+               pv.fetching <- Operation_hash.Set.add oph pv.fetching ;
+               fetch_operation w pv ?peer oph)
+             (fun () ->
+               pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
+               Lwt.return_unit))
+
     let on_notify w pv peer mempool =
-      let all_ophs =
-        List.fold_left
-          (fun s oph -> Operation_hash.Set.add oph s)
-          mempool.Mempool.pending
-          mempool.known_valid
-      in
-      let to_fetch =
-        Operation_hash.Set.filter
-          (fun oph ->
-            not
-              (already_handled
-                 ~situation:(Operation_encountered.Notified peer)
-                 w
-                 pv
-                 oph))
-          all_ophs
-      in
-      fetch_operations w pv ~peer to_fetch
+      let may_fetch_operation = may_fetch_operation w pv (Some peer) in
+      List.iter may_fetch_operation mempool.Mempool.known_valid ;
+      Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
     let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
@@ -1238,7 +1234,7 @@ module Make
           rpc_directory = build_rpc_directory w;
         }
       in
-      fetch_operations w pv.shell fetching ;
+      Operation_hash.Set.iter (may_fetch_operation w pv.shell None) fetching ;
       return pv
 
     let on_error w r st errs =
