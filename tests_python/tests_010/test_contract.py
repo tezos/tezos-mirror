@@ -1655,3 +1655,198 @@ class TestBadIndentation:
 
     def test_formatted_typechecks(self, client, session):
         client.typecheck(session['formatted_script'], file=False)
+
+
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestContractTypeChecking:
+    """Typechecking tests for the address and (contract _) types."""
+
+    def check_address(self, client, address):
+        """An address followed by an entrypoint typechecks at type address if
+        and only if the entrypoint is not "default"."""
+
+        address_a = f'"{address}%a"'
+        address_opt = client.normalize(
+            f'"{address}"', 'address', 'Optimized'
+        ).strip()
+        address_opt_a = client.normalize(
+            address_a, 'address', 'Optimized'
+        ).strip()
+
+        client.typecheck_data(f'"{address}"', 'address')
+        client.typecheck_data(f'{address_a}', 'address')
+        client.typecheck_data(f'{address_opt}', 'address')
+        client.typecheck_data(f'{address_opt_a}', 'address')
+
+        unexpected_annotation_error = "unexpected annotation."
+
+        with utils.assert_run_failure(unexpected_annotation_error):
+            client.typecheck_data(f'"{address}%default"', 'address')
+
+        # 64656661756c74 is "default" in hexa
+        with utils.assert_run_failure(unexpected_annotation_error):
+            client.typecheck_data(address_opt + '64656661756c74', 'address')
+
+    def check_contract_ok(self, client, address, entrypoint, typ):
+        """Helper to check that an address followed by an entrypoint typechecks
+        at type (contract typ) using both readable and optimised
+        representations."""
+
+        address_readable = f'"{address}"'
+        if entrypoint is not None:
+            address_readable = f'"{address}%{entrypoint}"'
+
+        address_opt = client.normalize(
+            address_readable, 'address', 'Optimized'
+        ).strip()
+
+        client.typecheck_data(address_readable, f'contract ({typ})')
+        client.typecheck_data(address_opt, f'contract ({typ})')
+
+        client.run_script(
+            f"""
+parameter unit;
+storage address;
+code {{
+        CDR;
+        CONTRACT ({typ});
+        ASSERT_SOME;
+        ADDRESS;
+        NIL operation;
+        PAIR }}""",
+            address_readable,
+            'Unit',
+            file=False,
+        )
+
+    def check_contract_ko(
+        self, client, address, entrypoint, typ, expected_error
+    ):
+        """Helper to check that an address followed by an entrypoint does not
+        typecheck at type (contract typ) using both readable and optimised
+        representations."""
+
+        address_readable = f'"{address}"'
+        if entrypoint is not None:
+            address_readable = f'"{address}%{entrypoint}"'
+
+        address_opt = client.normalize(
+            address_readable, 'address', 'Optimized'
+        ).strip()
+
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data(address_readable, f'contract ({typ})')
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data(address_opt, f'contract ({typ})')
+
+        client.run_script(
+            f"""
+parameter unit;
+storage address;
+code {{
+        CDR;
+        DUP;
+        CONTRACT ({typ});
+        ASSERT_NONE;
+        NIL operation;
+        PAIR }}""",
+            address_readable,
+            'Unit',
+            file=False,
+        )
+
+    def test_implicit(self, client):
+        """The address of an implicit account followed by some entrypoint
+        typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if the entrypoint is empty and ty is unit."""
+
+        tz1 = 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx'
+
+        self.check_address(client, tz1)
+        self.check_contract_ok(client, tz1, None, 'unit')
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        type_mismatch_error = 'Type nat is not compatible with type unit.'
+        self.check_contract_ko(client, tz1, 'a', 'unit', no_entrypoint_error)
+        self.check_contract_ko(client, tz1, 'a', 'nat', type_mismatch_error)
+        self.check_contract_ko(client, tz1, None, 'nat', type_mismatch_error)
+
+    def test_originated_inexistent(self, client):
+        """The address of an inexistent originated account followed by some
+        entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at no (contract _) type."""
+
+        kt1 = 'KT1RvwLgpxVv9ANCKsDb5vBgTaZRG1W4bKWP'
+
+        self.check_address(client, kt1)
+
+        invalid_contract_error = 'invalid contract.'
+        self.check_contract_ko(
+            client, kt1, None, 'unit', invalid_contract_error
+        )
+        self.check_contract_ko(client, kt1, 'a', 'unit', invalid_contract_error)
+        self.check_contract_ko(client, kt1, None, 'nat', invalid_contract_error)
+        self.check_contract_ko(client, kt1, 'a', 'nat', invalid_contract_error)
+
+    def test_originated_no_default(self, client, session):
+        """The address of an existent originated account that does not specify
+        a default entrypoint followed by some entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if
+          - the entrypoint is empty and <ty> is the root type
+          - the entrypoint is non-empty, one of the declared entrypoints, and
+            <ty> is the type associated to that entrypoint."""
+
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'simple_entrypoints.tz'
+        )
+        origination = originate(client, session, path, 'Unit', 0)
+        kt1 = origination.contract
+        root_type = 'or (unit %A) (or (string %B) (nat %C))'
+        a_type = 'unit'
+        b_type = 'string'
+
+        self.check_address(client, kt1)
+        self.check_contract_ok(client, kt1, None, root_type)
+        self.check_contract_ok(client, kt1, 'A', a_type)
+        self.check_contract_ok(client, kt1, 'B', b_type)
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        self.check_contract_ko(client, kt1, 'a', a_type, no_entrypoint_error)
+
+    def test_originated_with_default(self, client, session):
+        """The address of an existent originated account that specifies
+        a default entrypoint followed by some entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if
+          - the entrypoint is empty and <ty> is the type of the default
+            entrypoint
+          - the entrypoint is non-empty, one of the declared entrypoints, and
+            <ty> is the type associated to that entrypoint."""
+
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'delegatable_target.tz'
+        )
+        initial_storage = 'Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "" 0'
+        origination = originate(client, session, path, initial_storage, 0)
+        kt1 = origination.contract
+        root_type = (
+            'or (or (key_hash %set_delegate) (unit %remove_delegate))'
+            '(or %default string nat)'
+        )
+        default_type = 'or string nat'
+
+        self.check_address(client, kt1)
+        self.check_contract_ok(client, kt1, None, default_type)
+        self.check_contract_ok(client, kt1, 'set_delegate', 'key_hash')
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        self.check_contract_ko(client, kt1, 'a', root_type, no_entrypoint_error)
+
+        type_mismatch_error = 'is not compatible with type'
+        self.check_contract_ko(
+            client, kt1, None, root_type, type_mismatch_error
+        )
