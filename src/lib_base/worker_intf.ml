@@ -92,18 +92,6 @@ module type TYPES = sig
 
   (** The parameters provided when launching a new worker. *)
   type parameters
-
-  (** A simplified view of the worker's state for introspection. *)
-  type view
-
-  (** The projection function from full state to simple views. *)
-  val view : state -> parameters -> view
-
-  (** Serializer for the introspection RPCs *)
-  val encoding : view Data_encoding.t
-
-  (** Pretty printer for introspection. *)
-  val pp : Format.formatter -> view -> unit
 end
 
 module type LOGGER = sig

@@ -414,28 +414,6 @@ module Make
     type state = types_state
 
     type parameters = limits * Distributed_db.chain_db
-
-    include Worker_state
-
-    let view (state : state) _ : view =
-      let domain map =
-        Operation_hash.Map.fold
-          (fun elt _ acc -> Operation_hash.Set.add elt acc)
-          map
-          Operation_hash.Set.empty
-      in
-      {
-        head = Store.Block.hash state.shell.predecessor;
-        timestamp = state.shell.timestamp;
-        fetching = state.shell.fetching;
-        pending = domain state.shell.pending;
-        applied =
-          List.rev_map (fun (h, _) -> h) state.shell.classification.applied;
-        delayed =
-          Operation_hash.Set.union
-            (domain state.shell.classification.branch_delayed.map)
-            (domain state.shell.classification.branch_refused.map);
-      }
   end
 
   module Worker :

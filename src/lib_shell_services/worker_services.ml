@@ -101,8 +101,7 @@ module Peer_validators = struct
                    (Worker_types.worker_information_encoding RPC_error.encoding))
                 (req
                    "pipelines"
-                   Peer_validator_worker_state.Worker_state
-                   .pipeline_length_encoding)))
+                   Peer_validator_worker_state.pipeline_length_encoding)))
         RPC_path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg
           / "peers_validators")

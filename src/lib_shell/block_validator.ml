@@ -52,8 +52,6 @@ module Name = struct
 end
 
 module Types = struct
-  include Worker_state
-
   type state = {
     protocol_validator : Protocol_validator.t;
     validation_process : Block_validator_process.t;
@@ -62,8 +60,6 @@ module Types = struct
   }
 
   type parameters = limits * bool * Distributed_db.t * Block_validator_process.t
-
-  let view _state _parameters = ()
 end
 
 module Request = struct
