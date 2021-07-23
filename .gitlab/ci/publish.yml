@@ -70,6 +70,7 @@ build_release:docker_arm64:
   before_script:
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # TODO: include static version of this libraries to the default docker image
+    - cp packaging/build/hidapi-configure.ac.patch .
     - packaging/build/build-libusb-and-hidapi.sh
     # dune build @install make ocamlopt stack overflow when compiling
     # protocol functor with static linking (because of
