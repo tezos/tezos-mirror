@@ -14,7 +14,7 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "bls12-381"
+  "bls12-381" { < "0.5" }
   "tezos-hacl-glue"
   "tezos-hacl-glue-unix" {with-test}
   "zarith"
