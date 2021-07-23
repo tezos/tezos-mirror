@@ -137,11 +137,8 @@ let read ?canceler readable buffer =
       readable.partial_read <- None ;
       Lwt.return (read_from readable buffer (Ok msg))
   | None ->
-      Lwt.catch
-        (fun () ->
-          protect ?canceler (fun () -> Lwt_pipe.pop readable.read_queue)
-          >|= read_from readable buffer)
-        (fun _ -> fail P2p_errors.Connection_closed)
+      protect ?canceler (fun () -> Lwt_pipe.pop readable.read_queue)
+      >|= read_from readable buffer
 
 let read_full ?canceler readable buffer =
   let rec loop ({length_to_copy; _} as buffer) =
