@@ -7,6 +7,10 @@
 ; and copy always the same (generated itself) empty file
 ; "void_for_linking".
 
+; build static executable with --profile static
+(env
+ (static (flags (:standard -ccopt -static ))))
+
 (executable
  (name main)
  (instrumentation (backend bisect_ppx))
