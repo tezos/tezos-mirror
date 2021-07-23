@@ -533,7 +533,7 @@ The code for the bot is at
 work-in-progress and new warnings and comments will appear little by little.
 We welcome specific issues or contributions there too.
 
-.. dev_tools:
+.. _dev_tools:
 
 Developer Tools
 ~~~~~~~~~~~~~~~
