@@ -211,106 +211,6 @@ type ('arg, 'storage) script = {
 }
 
 (* ---- Instructions --------------------------------------------------------*)
-
-(*
-
-   The instructions of Michelson are represented in the following
-   Generalized Algebraic Datatypes.
-
-   There are three important aspects in that type declaration.
-
-   First, we follow a tagless approach for values: they are directly
-   represented as OCaml values. This reduces the computational cost of
-   interpretation because there is no need to check the shape of a
-   value before applying an operation to it. To achieve that, the GADT
-   encodes the typing rules of the Michelson programming
-   language. This static information is sufficient for the typechecker
-   to justify the absence of runtime checks.  As a bonus, it also
-   ensures that well-typed Michelson programs cannot go wrong: if the
-   interpreter typechecks then we have the static guarantee that no
-   stack underflow or type error can occur at runtime.
-
-   Second, we maintain the invariant that the stack type always has a
-   distinguished topmost element. This invariant is important to
-   implement the stack as an accumulator followed by a linked list of
-   cells, a so-called A-Stack. This representation is considered in
-   the literature[1] as an efficient representation of the stack for a
-   stack-based abstract machine, mainly because this opens the
-   opportunity for the accumulator to be stored in a hardware
-   register. In the GADT, this invariant is encoded by representing
-   the stack type using two parameters instead of one: the first one
-   is the type of the accumulator while the second is the type of the
-   rest of the stack.
-
-   Third, in this representation, each instruction embeds its
-   potential successor instructions in the control flow. This design
-   choice permits an efficient implementation of the continuation
-   stack in the interpreter. Assigning a precise type to this kind of
-   instruction which is a cell in a linked list of instructions is
-   similar to the typing of delimited continuations: we need to give a
-   type to the stack ['before] the execution of the instruction, a
-   type to the stack ['after] the execution of the instruction and
-   before the execution of the next, and a type for the [`result]ing
-   stack type after the execution of the whole chain of instructions.
-
-   Combining these three aspects, the type [kinstr] needs four
-   parameters:
-
-   ('before_top, 'before, 'result_top, 'result) kinstr
-
-   Notice that we could have chosen to only give two parameters to
-   [kinstr] by manually enforcing each argument to be a pair but this
-   is error-prone: with four parameters, this constraint is enforced
-   by the arity of the type constructor itself.
-
-   Hence, an instruction which has a successor instruction enjoys a
-   type of the form:
-
-   ... * ('after_top, 'after, 'result_top, 'result) kinstr * ... ->
-   ('before_top, 'before, 'result_top, 'result) kinstr
-
-   where ['before_top] and ['before] are the types of the stack top
-   and rest before the instruction chain, ['after_top] and ['after]
-   are the types of the stack top and rest after the instruction
-   chain, and ['result_top] and ['result] are the types of the stack
-   top and rest after the instruction chain. The [IHalt] instruction
-   ends a sequence of instructions and has no successor, as shown by
-   its type:
-
-   IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
-
-   Each instruction is decorated by some metadata (typically to hold
-   locations). The type for these metadata is [kinfo]: such a value is
-   only used for logging and error reporting and has no impact on the
-   operational semantics.
-
-   Notations:
-   ----------
-
-   In the following declaration, we use 'a, 'b, 'c, 'd, ...  to assign
-   types to stack cell contents while we use 's, 't, 'u, 'v, ... to
-   assign types to stacks.
-
-   The types for the final result and stack rest of a whole sequence
-   of instructions are written 'r and 'f (standing for "result" and
-   "final stack rest", respectively).
-
-   Instructions for internal execution steps
-   =========================================
-
-   Some instructions encoded in the following type are not present in the
-   source language. They only appear during evaluation to account for
-   intermediate execution steps. Indeed, since the interpreter follows
-   a small-step style, it is sometimes necessary to decompose a
-   source-level instruction (e.g. List_map) into several instructions
-   with smaller steps. This technique seems required to get an
-   efficient tail-recursive interpreter.
-
-   References
-   ==========
-   [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
-
- *)
 and ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
@@ -356,9 +256,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
       branch_if_none : ('b, 's, 'r, 'f) kinstr;
       branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
     }
@@ -375,7 +272,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
-      (* See remark in IIf_none. *)
       branch_if_left : ('a, 's, 'r, 'f) kinstr;
       branch_if_right : ('b, 's, 'r, 'f) kinstr;
     }
@@ -392,7 +288,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
-      (* See remark in IIf_none. *)
       branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
       branch_if_nil : ('b, 's, 'r, 'f) kinstr;
     }
@@ -679,7 +574,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       kinfo : (bool, 'a * 's) kinfo;
-      (* See remark in IIf_none. *)
       branch_if_true : ('a, 's, 'r, 'f) kinstr;
       branch_if_false : ('a, 's, 'r, 'f) kinstr;
     }
@@ -840,67 +734,27 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr
   | IDig :
       ('a, 's) kinfo
-      (*
-         There is a prefix of length [n] common to the input stack
-         of type ['a * 's] and an intermediary stack of type ['d * 'u].
-      *)
       * int
-        (*
-         Under this common prefix, the input stack has type ['b * 'c * 't] and
-         the intermediary stack type ['c * 't] because we removed the ['b] from
-         the input stack. This value of type ['b] is pushed on top of the
-         stack passed to the continuation.
-      *)
       * ('b, 'c * 't, 'c, 't, 'a, 's, 'd, 'u) stack_prefix_preservation_witness
       * ('b, 'd * 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IDug :
       ('a, 'b * 's) kinfo
-      (*
-         The input stack has type ['a * 'b * 's].
-
-         There is a prefix of length [n] common to its substack
-         of type ['b * 's] and the output stack of type ['d * 'u].
-      *)
       * int
-        (*
-         Under this common prefix, the first stack has type ['c * 't]
-         and the second has type ['a * 'c * 't] because we have pushed
-         the topmost element of this input stack under the common prefix.
-      *)
       * ('c, 't, 'a, 'c * 't, 'b, 's, 'd, 'u) stack_prefix_preservation_witness
       * ('d, 'u, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IDipn :
       ('a, 's) kinfo
-      (*
-         The body of Dipn is applied under a prefix of size [n]...
-      *)
       * int
-        (*
-         ... the relation between the types of the input and output stacks
-         is characterized by the following witness.
-         (See forthcoming comments about [stack_prefix_preservation_witness].)
-      *)
       * ('c, 't, 'd, 'v, 'a, 's, 'b, 'u) stack_prefix_preservation_witness
       * ('c, 't, 'd, 'v) kinstr
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IDropn :
       ('a, 's) kinfo
-      (*
-         The input stack enjoys a prefix of length [n]...
-      *)
       * int
-        (*
-         ... and the following value witnesses that under this prefix
-         the stack has type ['b * 'u].
-      *)
       * ('b, 'u, 'b, 'u, 'a, 's, 'a, 's) stack_prefix_preservation_witness
-      (*
-         This stack is passed to the continuation since we drop the
-         entire prefix.
-      *)
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IChainId :
@@ -1016,12 +870,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
       -> (Timelock.chest_key, Timelock.chest * (n num * 's), 'r, 'f) kinstr
   (*
-
      Internal control instructions
-     =============================
-
-     The following instructions are not available in the source language.
-     They are used by the internals of the interpreter.
+     -----------------------------
   *)
   | IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
   | ILog :
@@ -1040,79 +890,26 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract = 'arg ty * address
 
-(*
-
-  Control stack
-  =============
-
-  The control stack is a list of [kinstr].
-
-  Since [kinstr] denotes a list  of instructions, the control stack
-  can be seen as a list of instruction sequences, each representing a
-  form of delimited continuation (i.e. a control stack fragment). The
-  [continuation] GADT ensures that the input and output stack types of the
-  continuations are consistent.
-
-  Loops have a special treatment because their control stack is reused
-  as is for the next iteration. This avoids the reallocation of a
-  control stack cell at each iteration.
-
-  To implement [step] as a tail-recursive function, we implement
-  higher-order iterators (i.e. MAPs and ITERs) using internal instructions
-. Roughly speaking, these instructions help in decomposing the execution
-  of [I f c] (where [I] is an higher-order iterator over a container [c])
-  into three phases: to start the iteration, to execute [f] if there are
-  elements to be processed in [c], and to loop.
-
-  Dip also has a dedicated constructor in the control stack.  This
-  allows the stack prefix to be restored after the execution of the
-  [Dip]'s body.
-
-  Following the same style as in [kinstr], [continuation] has four
-  arguments, two for each stack types. More precisely, with
-
-            [('bef_top, 'bef, 'aft_top, 'aft) continuation]
-
-  we encode the fact that the stack before executing the continuation
-  has type [('bef_top * 'bef)] and that the stack after this execution
-  has type [('aft_top * 'aft)].
-
-*)
 and (_, _, _, _) continuation =
-  (* This continuation returns immediately. *)
   | KNil : ('r, 'f, 'r, 'f) continuation
-  (* This continuation starts with the next instruction to execute. *)
   | KCons :
       ('a, 's, 'b, 't) kinstr * ('b, 't, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
-  (* This continuation represents a call frame: it stores the caller's
-     stack of type ['s] and the continuation which expects the callee's
-     result on top of the stack. *)
   | KReturn :
       's * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
-  (* This continuation comes right after a [Dip i] to restore the topmost
-     element ['b] of the stack after having executed [i] in the substack
-     of type ['a * 's]. *)
   | KUndip :
       'b * ('b, 'a * 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
-  (* This continuation is executed at each iteration of a loop with
-     a Boolean condition. *)
   | KLoop_in :
       ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
       -> (bool, 'a * 's, 'r, 'f) continuation
-  (* This continuation is executed at each iteration of a loop with
-     a condition encoded by a sum type. *)
   | KLoop_in_left :
       ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
       -> (('a, 'b) union, 's, 'r, 'f) continuation
-  (* This continuation is executed at each iteration of a traversal.
-     (Used in List, Map and Set.) *)
   | KIter :
       ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
-  (* This continuation represents each step of a List.map. *)
   | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
@@ -1120,7 +917,6 @@ and (_, _, _, _) continuation =
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
-  (* This continuation represents what is done after each step of a List.map. *)
   | KList_exit_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
@@ -1128,14 +924,12 @@ and (_, _, _, _) continuation =
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
-  (* This continuation represents each step of a Map.map. *)
   | KMap_enter_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
-  (* This continuation represents what is done after each step of a Map.map. *)
   | KMap_exit_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
@@ -1143,28 +937,10 @@ and (_, _, _, _) continuation =
       * 'a
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('c, 'd * 's, 'r, 'f) continuation
-  (* This continuation instruments the execution with a [logger]. *)
   | KLog :
       ('a, 's, 'r, 'f) continuation * logger
       -> ('a, 's, 'r, 'f) continuation
 
-(*
-
-    Execution instrumentation
-    =========================
-
-   One can observe the context and the stack at some specific points
-   of an execution step. This feature is implemented by calling back
-   some [logging_function]s defined in a record of type [logger]
-   passed as argument to the step function.
-
-   A [logger] is typically embedded in an [KLog] continuation by the
-   client to trigger an evaluation instrumented with some logging. The
-   logger is then automatically propagated to the logging instruction
-   [ILog] as well as to any instructions that need to generate a
-   backtrace when it fails (e.g., [IFailwith], [IMul_teznat], ...).
-
-*)
 and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
   ('a, 's, 'b, 'f) kinstr ->
   context ->
@@ -1178,21 +954,10 @@ and execution_trace =
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-      (** [log_interp] is called at each call of the internal function
-          [interp]. [interp] is called when starting the interpretation of
-          a script and subsequently at each [Exec] instruction. *)
   log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
-      (** [log_entry] is called {i before} executing each instruction but
-          {i after} gas for this instruction has been successfully
-          consumed. *)
   log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
-      (** [log_control] is called {i before} the interpretation of the
-          current continuation. *)
   log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-      (** [log_exit] is called {i after} executing each instruction. *)
   get_log : unit -> execution_trace option tzresult Lwt.t;
-      (** [get_log] allows to obtain an execution trace, if any was
-          produced. *)
 }
 
 (* ---- Auxiliary types -----------------------------------------------------*)
@@ -1260,30 +1025,6 @@ and ('a, 's, 'r, 'f) kdescr = {
 
 and ('a, 's) kinfo = {iloc : Script.location; kstack_ty : ('a, 's) stack_ty}
 
-(*
-
-   Several instructions work under an arbitrary deep stack prefix
-   (e.g, IDipn, IDropn, etc). To convince the typechecker that
-   these instructions are well-typed, we must provide a witness
-   to statically characterize the relationship between the input
-   and the output stacks. The inhabitants of the following GADT
-   act as such witnesses.
-
-   More precisely, a value [w] of type
-
-   [(c, t, d, v, a, s, b, u) stack_prefix_preservation_witness]
-
-   proves that there is a common prefix between an input stack
-   of type [a * s] and an output stack of type [b * u]. This prefix
-   is as deep as the number of [KPrefix] application in [w]. When
-   used with an operation parameterized by a natural number [n]
-   characterizing the depth at which the operation must be applied,
-   [w] is the Peano encoding of [n].
-
-   When this prefix is removed from the two stacks, the input stack
-   has type [c * t] while the output stack has type [d * v].
-
-*)
 and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
   | KPrefix :
       ('y, 'u) kinfo
@@ -1326,16 +1067,6 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
       -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
 [@@coq_force_gadt]
 
-(*
-
-   [dup_n_gadt_witness ('s, 't)] ensures that there exists at least
-   [n] elements in ['s] and that the [n]-th element of ['s] is of type
-   ['t]. Here [n] follows Peano's encoding (0 and successor).
-   Besides, [0] corresponds to the topmost element of ['s].
-
-   This relational predicate is defined by induction on [n].
-
-*)
 and (_, _) dup_n_gadt_witness =
   | Dup_n_zero : ('a * 'rest, 'a) dup_n_gadt_witness
   | Dup_n_succ :
