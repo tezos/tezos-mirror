@@ -128,18 +128,18 @@ let rec check_type_size_of_stack_head :
           tail
           ~up_to:(up_to - 1)
 
-let check_comparable_type_size ~legacy ctxt ~loc ty =
+let check_comparable_type_size ~legacy ~loc ty =
   if legacy then ok_unit
   else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+    let maximum_type_size = Constants.michelson_maximum_type_size in
     if
       Compare.Int.(
         deduce_comparable_type_size ~remaining:maximum_type_size ty >= 0)
     then ok_unit
     else error (Type_too_large (loc, maximum_type_size))
 
-let check_type_size ~legacy ctxt ~loc ty =
+let check_type_size ~legacy ~loc ty =
   if legacy then ok_unit
   else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+    let maximum_type_size = Constants.michelson_maximum_type_size in
     check_type_size_internal ~loc ~maximum_type_size ty

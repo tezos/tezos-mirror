@@ -57,8 +57,6 @@ val proof_of_work_threshold : Raw_context.t -> int64
 
 val tokens_per_roll : Raw_context.t -> Tez_repr.t
 
-val michelson_maximum_type_size : Raw_context.t -> int
-
 val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
 val origination_size : Raw_context.t -> int

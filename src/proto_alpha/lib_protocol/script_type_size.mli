@@ -42,8 +42,8 @@ open Script_typed_ir
 val deduce_type_size : remaining:int -> 't Script_typed_ir.ty -> int
 
 (**
-   [check_comparable_type_size ~legacy ctxt ~loc ty] checks that the size of type [ty]
-   is not larger than the constant [maximum_type_size] from the context [ctxt].
+   [check_comparable_type_size ~legacy ~loc ty] checks that the size of type [ty]
+   is not larger than the constant [maximum_type_size].
    If the check fails, an error [Type_too_large] is returned.
    If [legacy] is [true], there is no check at all and [ok_unit] is returned directly.
 
@@ -51,18 +51,17 @@ val deduce_type_size : remaining:int -> 't Script_typed_ir.ty -> int
 *)
 val check_comparable_type_size :
   legacy:bool ->
-  context ->
   loc:Script.location ->
   't Script_typed_ir.comparable_ty ->
   unit tzresult
 
 (** Assert that expression's type size does not exceed the limit.
 
-    [check_type_size ~legacy ctxt ~loc ty] returns [Ok ()] if the size of
+    [check_type_size ~legacy ~loc ty] returns [Ok ()] if the size of
     [ty] is not greater than the limit or an error otherwise. The limit is
     taken from constants except for legacy mode, where there is no limit. *)
 val check_type_size :
-  legacy:bool -> context -> loc:int -> 'a ty -> (unit, error trace) result
+  legacy:bool -> loc:int -> 'a ty -> (unit, error trace) result
 
 (** Assert that the type size of neither of some top stack items exceeds the
     limit.
