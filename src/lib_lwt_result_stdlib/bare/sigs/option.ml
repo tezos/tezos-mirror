@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -223,6 +223,12 @@ module type S = sig
       and {!Out_of_memory}. *)
   val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 
+  (** [catch_o f] is equivalent to [join @@ catch f]. In other words, it is
+      [f ()] if [f] doesn't raise any exception, and it is [None] otherwise.
+
+      [catch_only] has the same behaviour and limitations as with [catch]. *)
+  val catch_o : ?catch_only:(exn -> bool) -> (unit -> 'a option) -> 'a option
+
   (** [catch_s f] is a promise that resolves to [Some x] if and when [f ()]
       resolves to [x]. Alternatively, it resolves to [None] if and when [f ()]
       is rejected.
@@ -240,4 +246,12 @@ module type S = sig
       and {!Out_of_memory}. *)
   val catch_s :
     ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
+
+  (** [catch_os f] is like [catch_s f] where [f] returns a promise that resolves
+      to an option. [catch_os f] resolves to [None] if [f ()] resolves to
+      [None] or is rejected. It resolves to [Some _] if [f ()] does.
+
+      [catch_only] has the same behaviour and limitations as with [catch]. *)
+  val catch_os :
+    ?catch_only:(exn -> bool) -> (unit -> 'a option Lwt.t) -> 'a option Lwt.t
 end

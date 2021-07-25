@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -134,16 +134,26 @@ val protect :
     *)
 val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
 
+(** [catch_e] is like {!catch} but when [f] returns a [tzresult].
+    I.e., [catch_e f] is equivalent to
+    [try f () with e -> Error (error_of_exn e)].
+
+    [catch_only] has the same use as with {!catch}. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
+val catch_e : ?catch_only:(exn -> bool) -> (unit -> 'a tzresult) -> 'a tzresult
+
 (** [catch_f f handler] is equivalent to [map_error (catch f) handler].
     In other words, it catches exceptions in [f ()] and either returns the
     value in an [Ok] or passes the exception to [handler] for the [Error].
 
-    [catch_only] has the same use as with [catch]. The same restriction on
+    No attempt is made to catch the exceptions raised by [handler].
+
+    [catch_only] has the same use as with {!catch}. The same restriction on
     catching non-deterministic runtime exceptions applies. *)
 val catch_f :
   ?catch_only:(exn -> bool) -> (unit -> 'a) -> (exn -> error) -> 'a tzresult
 
-(** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
+(** [catch_s] is like {!catch} but when [f] returns a promise. It is equivalent
     to
 
 {[
@@ -152,15 +162,20 @@ Lwt.try_bind f
   (fun e -> Lwt.return (Error (error_of_exn e)))
 ]}
 
-    If [catch_only] is set, then only exceptions [e] such that [catch_only e] is
-    [true] are caught.
-
-    Whether [catch_only] is set or not, this function never catches
-    non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
-    {!Out_of_memory}.
-    *)
+    [catch_only] has the same use as with {!catch}. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a tzresult Lwt.t
+
+(** [catch_es] is like !{catch_s} but when [f] returns a promise of a
+    [tzresult].
+    I.e., [catch_es f] is equivalent to
+    [Lwt.catch f (fun e -> Lwt.return_error (error_of_exn e))].
+
+    [catch_only] has the same use as with {!catch}. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
+val catch_es :
+  ?catch_only:(exn -> bool) -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
 type error += Timeout
 

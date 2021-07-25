@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -159,12 +159,19 @@ let cancel_with_exceptions canceler =
   | Ok () | Error [] -> Lwt.return_unit
   | Error (h :: _) -> raise h
 
-let catch ?catch_only f =
-  TzLwtreslib.Result.catch ?catch_only f |> Result.map_error error_of_exn
+let catch ?catch_only f = TzLwtreslib.Result.catch_f ?catch_only f error_of_exn
+
+let catch_e ?catch_only f =
+  TzLwtreslib.Result.catch_f ?catch_only f error_of_exn |> Result.join
 
 let catch_f ?catch_only f exc_mapper =
-  TzLwtreslib.Result.catch ?catch_only f
-  |> Result.map_error (fun exc -> TzTrace.make (exc_mapper exc))
+  TzLwtreslib.Result.catch_f ?catch_only f (fun exc ->
+      TzTrace.make (exc_mapper exc))
 
 let catch_s ?catch_only f =
   TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error error_of_exn
+
+let catch_es ?catch_only f =
+  TzLwtreslib.Result.catch_s ?catch_only f
+  >|= Result.map_error error_of_exn
+  >|= Result.join

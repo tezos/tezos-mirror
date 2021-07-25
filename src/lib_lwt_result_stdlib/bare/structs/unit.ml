@@ -23,20 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Make] is a functor that takes a [Trace] as argument and instantiates all
-    the Traced modules based on it. *)
-module Make (Trace : Traced_sigs.Trace.S) = struct
-  module Monad = Monad.Make (Trace)
-  module Seq = Seq.Make (Monad)
-  module Hashtbl = Hashtbl.Make (Monad) (Seq)
-  module List = List.Make (Monad)
-  module Map = Map.Make (Monad) (Seq)
-  module Option = Bare_structs.Option
-  module Result = Bare_structs.Result
-  module Set = Set.Make (Monad) (Seq)
-  module Seq_e = Seq_e
-  module Seq_s = Seq_s.Make (Monad)
-  module Seq_es = Seq_es.Make (Monad) (Seq_e) (Seq_s)
-  module Unit = Bare_structs.Unit
-  module WithExceptions = Bare_structs.WithExceptions
-end
+include Stdlib.Unit
+
+let unit = ()
+
+let unit_s = Monad.unit_s
+
+let unit_e = Monad.unit_e
+
+let unit_es = Monad.unit_es
+
+let catch ?(catch_only = fun _ -> true) f =
+  match f () with
+  | () -> ()
+  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
+  | exception e -> if catch_only e then () else raise e
+
+let catch_f ?(catch_only = fun _ -> true) f h =
+  match f () with
+  | () -> ()
+  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
+  | exception e -> if catch_only e then h e else raise e
+
+let catch_s ?(catch_only = fun _ -> true) f =
+  Lwt.catch f (function
+      | (Stack_overflow | Out_of_memory) as e -> raise e
+      | e -> if catch_only e then Lwt.return_unit else raise e)
