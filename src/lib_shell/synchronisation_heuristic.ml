@@ -70,9 +70,10 @@ module Core = struct
     latency : int;
     (* Store the [threshold] best validated block timestamps with their peer. *)
     candidates : candidate option Array.t;
-    (* Index of one of the least candidates in [candidates]. *)
+    (* Index of one of the candidates in [candidates] with the oldest timestamp. *)
     mutable index_of_oldest_candidate : int;
-    (* Index of one of the best candidates in [candidates]. *)
+    (* Index of one of the candidates in [candidates] with the most recent
+       timestamp. *)
     mutable index_of_youngest_candidate : int;
     (* Current status of the heuristic. *)
     mutable current_status : status;
@@ -90,10 +91,10 @@ module Core = struct
      index of state.candidates
 
      - forall state i, state.threshold > 0 -> 0 <= i < state.threshold
-     -> state.candidates.(state.least) <= state.candidates.(i)
+     -> state.candidates.(state.index_of_oldest_candidate) <= state.candidates.(i)
 
      - forall state i, state.threshold > 0 -> 0 <= i < state.threshold
-     -> state.candidates.(state.best) >= state.candidates.(i)
+     -> state.candidates.(state.index_of_youngest_candidate) >= state.candidates.(i)
 
      - forall state i j, 0 <= i,j < state.threshold ->
      snd(state.candidates(i)) = snd (state.candidates(j)) -> i = j

@@ -93,6 +93,7 @@ type status = Chain_validator_worker_state.Event.synchronisation_status =
    particular defines a [bootstrapped] flag which is set to [true] if
    the heuristic was synchronised at least once.
 
+
   *)
 
 (** {2 Core}
