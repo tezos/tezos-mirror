@@ -119,8 +119,7 @@ let read_block_header db h =
       Lwt.return_some (chain_id, Store.Block.header block)
 
 let read_predecessor_header {disk; _} h offset =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       let offset = Int32.to_int offset in
       Store.all_chain_stores disk >>= fun chain_stores ->
       Lwt_utils.find_map_s
@@ -129,7 +128,6 @@ let read_predecessor_header {disk; _} h offset =
           | None -> Lwt.return_none
           | Some block -> Lwt.return_some (Store.Block.header block))
         chain_stores)
-    (fun _ -> Lwt.return_none)
 
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains

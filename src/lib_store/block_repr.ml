@@ -256,10 +256,7 @@ let read_next_block_exn fd =
   Lwt.return
     (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
 
-let read_next_block fd =
-  Lwt.catch
-    (fun () -> read_next_block_exn fd >>= fun b -> Lwt.return_some b)
-    (fun _exn -> Lwt.return_none)
+let read_next_block fd = Option.catch_s (fun () -> read_next_block_exn fd)
 
 let pread_block_exn fd ~file_offset =
   (* Read length *)
@@ -280,6 +277,4 @@ let pread_block_exn fd ~file_offset =
     (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
 
 let pread_block fd ~file_offset =
-  Lwt.catch
-    (fun () -> pread_block_exn fd ~file_offset >>= fun b -> Lwt.return_some b)
-    (fun _exn -> Lwt.return_none)
+  Option.catch_s (fun () -> pread_block_exn fd ~file_offset)

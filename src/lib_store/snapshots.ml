@@ -726,11 +726,9 @@ let ensure_valid_export_path = function
 let clean_all paths =
   Lwt_list.iter_s
     (fun path ->
-      Lwt.catch
-        (fun () ->
+      Unit.catch_s (fun () ->
           if Sys.is_directory path then Lwt_utils_unix.remove_dir path
-          else Lwt_unix.unlink path)
-        (fun _ -> Lwt.return_unit))
+          else Lwt_unix.unlink path))
     paths
 
 (* This module allows to create a tar archive by adding files to it,
@@ -1014,7 +1012,8 @@ end = struct
     Lwt_unix.close fd >>= fun () -> Lwt.return_unit
 
   let rec readdir dir_handler =
-    Lwt.catch
+    Option.catch_os
+      ~catch_only:(function End_of_file -> true | _ -> false)
       (fun () ->
         Lwt_unix.readdir dir_handler >>= function
         | filename
@@ -1022,7 +1021,6 @@ end = struct
                || filename = Filename.parent_dir_name ->
             readdir dir_handler
         | any -> Lwt.return_some any)
-      (function End_of_file -> Lwt.return_none | e -> Lwt.fail e)
 
   let enumerate path =
     let rec aux prefix dir_handler acc =

@@ -172,8 +172,7 @@ let try_lock_for_write lockfile =
       Lwt_unix.lockf lockfile Unix.F_TLOCK 0 >>= fun () -> Lwt.return_true)
     (fun _ -> Lwt.return_false)
 
-let may_unlock lockfile =
-  Lwt.catch (fun () -> unlock lockfile) (fun _ -> Lwt.return_unit)
+let may_unlock lockfile = Unit.catch_s (fun () -> unlock lockfile)
 
 module Block = struct
   type nonrec block = block

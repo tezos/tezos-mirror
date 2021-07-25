@@ -101,11 +101,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     Lwt_unix.accept fd >>= fun (cfd, _) ->
     Lwt.dont_wait
       (fun () ->
-        protect
-          ~on_error:(function
-            | Exn End_of_file :: _ -> return_unit
-            | errs -> Lwt.return_error errs)
-          (fun () ->
+        Unit.catch_s (fun () ->
             Lwt.finalize
               (fun () ->
                 handle_client_loop

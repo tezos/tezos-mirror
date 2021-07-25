@@ -35,14 +35,12 @@ type _ t =
       -> 'a t
 
 let read_json_file file =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       Lwt_utils_unix.Json.read_file (Naming.encoded_file_path file) >>= function
       | Ok json ->
           let encoding = Naming.file_encoding file in
           Lwt.return_some (Data_encoding.Json.destruct encoding json)
       | _ -> Lwt.return_none)
-    (fun _ -> Lwt.return_none)
 
 let read_file file =
   Lwt.try_bind
