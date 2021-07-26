@@ -388,10 +388,7 @@ module Make
         (Worker.log_event w (Banned_operation_encountered (situation, oph))) ;
       true)
     else
-      Operation_hash.Map.mem
-        oph
-        (Classification.map shell.classification.refused)
-      || Operation_hash.Map.mem oph shell.pending
+      Operation_hash.Map.mem oph shell.pending
       || Operation_hash.Set.mem oph shell.fetching
       || Operation_hash.Set.mem oph shell.live_operations
       || Operation_hash.Set.mem oph shell.classification.in_mempool
