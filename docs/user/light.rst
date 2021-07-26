@@ -34,11 +34,12 @@ pass two arguments to ``tezos-client``:
 The ``sources.json`` file contains:
 
 * The list of endpoints to contact for retrieving data, as a list of URIs in the ``uris`` field.
-  Because ``--sources`` must be the sole source of truth for incoming data, it
-  must be a superset of ``--endpoint``. This is enforced by checking that the URI
-  passed to ``--endpoint`` (if any) also appears in the ``uris`` field of the file
-  passed to ``--sources``. Therefore, it is recommended to use the first
-  member of the ``uris`` field as the value of ``--endpoint``.
+  These endpoints are added to the main endpoint, either specified by option ``--endpoint``,
+  if given, or to the default endpoint (``localhost:8732``), otherwise.
+  To avoid being surprised by the automatic addition of the default endpoint,
+  it is recommended to supply option ``--endpoint`` whenever ``--sources`` is supplied,
+  valued as one member of the ``uris`` field in ``--sources`` (e.g., the first member).
+  At some point, an automatic check will be implemented to enforce this recommendation.
 * An optional ``min_agreement`` field, which must be a float from ``0.0`` (excluded) to ``1.0`` (included).
   This field specifies the ratio of endpoints that must agree for data
   to be accepted. The default value is ``1.0``, which means that
