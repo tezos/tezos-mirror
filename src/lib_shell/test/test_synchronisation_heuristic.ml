@@ -48,6 +48,7 @@
    executed. *)
 
 open Synchronisation_heuristic
+open Core
 
 let prn = function
   | Synchronised {is_chain_stuck = true} -> "Synchronised (stuck)"
@@ -457,3 +458,226 @@ let tests_raw : (string * (unit -> unit)) list =
 
 let tests =
   List.map (fun (s, f) -> Alcotest_lwt.test_case_sync s `Quick f) tests_raw
+
+open Bootstrapping
+
+let test_bp_create () =
+  let latency = 100 in
+  let called = ref false in
+  let when_status_changes _ =
+    called := true ;
+    Lwt.return_unit
+  in
+  let _heuristic = create ~when_status_changes ~threshold:3 ~latency () in
+  Assert.equal !called false ;
+  Lwt.return_unit
+
+let test_bp_activate () =
+  let latency = 100 in
+  let called = ref false in
+  let when_status_changes _ =
+    called := true ;
+    Lwt.return_unit
+  in
+  let heuristic = create ~when_status_changes ~threshold:3 ~latency () in
+  activate heuristic >>= fun () ->
+  Assert.equal !called true ;
+  Lwt.return_unit
+
+let test_bp_create_2 () =
+  let latency = 100 in
+  let status_changes_called = ref false in
+  let bootstrapped_changes_called = ref false in
+  let when_status_changes _ =
+    status_changes_called := true ;
+    Lwt.return_unit
+  in
+  let when_bootstrapped_changes b =
+    Assert.equal b true ;
+    bootstrapped_changes_called := true ;
+    Lwt.return_unit
+  in
+  let _heuristic =
+    create
+      ~when_status_changes
+      ~when_bootstrapped_changes
+      ~threshold:0
+      ~latency
+      ()
+  in
+  Assert.equal !bootstrapped_changes_called false ;
+  Assert.equal !status_changes_called false ;
+  Lwt.return_unit
+
+let test_bp_activate_2 () =
+  let latency = 100 in
+  let status_changes_called = ref false in
+  let bootstrapped_changes_called = ref false in
+  let when_status_changes _ =
+    status_changes_called := true ;
+    Lwt.return_unit
+  in
+  let when_bootstrapped_changes b =
+    Assert.equal b true ;
+    bootstrapped_changes_called := true ;
+    Lwt.return_unit
+  in
+  let heuristic =
+    create
+      ~when_status_changes
+      ~when_bootstrapped_changes
+      ~threshold:0
+      ~latency
+      ()
+  in
+  activate heuristic >>= fun () ->
+  Assert.equal !status_changes_called true ;
+  Assert.equal !bootstrapped_changes_called true ;
+  Lwt.return_unit
+
+let test_force_bootstrapped () =
+  let latency = 100 in
+  let bootstrapped_changes_called = ref 0 in
+  let when_bootstrapped_changes b =
+    let expected_value =
+      if !bootstrapped_changes_called = 0 then false else true
+    in
+    Assert.equal b expected_value ;
+    incr bootstrapped_changes_called ;
+    Lwt.return_unit
+  in
+  let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  force_bootstrapped heuristic true >>= fun () ->
+  Assert.equal !bootstrapped_changes_called 2 ;
+  Lwt.return_unit
+
+let test_force_bootstrapped_2 () =
+  let latency = 100 in
+  let bootstrapped_changes_called = ref 0 in
+  let when_bootstrapped_changes b =
+    Assert.equal b false ;
+    incr bootstrapped_changes_called ;
+    Lwt.return_unit
+  in
+  let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  force_bootstrapped heuristic false >>= fun () ->
+  Assert.equal !bootstrapped_changes_called 1 ;
+  Lwt.return_unit
+
+let test_force_bootstrapped_3 () =
+  let latency = 100 in
+  let bootstrapped_changes_called = ref 0 in
+  let when_bootstrapped_changes _b =
+    incr bootstrapped_changes_called ;
+    Lwt.return_unit
+  in
+  let heuristic = create ~when_bootstrapped_changes ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  force_bootstrapped heuristic true >>= fun () ->
+  force_bootstrapped heuristic false >>= fun () ->
+  Assert.equal !bootstrapped_changes_called 3 ;
+  Lwt.return_unit
+
+let test_is_bootstrapped () =
+  let latency = 100 in
+  let heuristic = create ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  Assert.equal (is_bootstrapped heuristic) false ;
+  Lwt.return_unit
+
+let test_is_bootstrapped_2 () =
+  let latency = 100 in
+  let heuristic = create ~threshold:0 ~latency () in
+  activate heuristic >>= fun () ->
+  Assert.equal (is_bootstrapped heuristic) true ;
+  Lwt.return_unit
+
+let test_is_bootstrapped_3 () =
+  let latency = 100 in
+  let heuristic = create ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  force_bootstrapped heuristic true >>= fun () ->
+  Assert.equal (is_bootstrapped heuristic) true ;
+  Lwt.return_unit
+
+let test_bootstrapped () =
+  let latency = 100 in
+  let heuristic = create ~threshold:0 ~latency () in
+  activate heuristic >>= fun () -> bootstrapped heuristic
+
+let test_bootstrapped_2 () =
+  let latency = 100 in
+  let heuristic = create ~threshold:1 ~latency () in
+  activate heuristic >>= fun () ->
+  let p = bootstrapped heuristic in
+  Assert.equal (Lwt.state p) Lwt.Sleep ;
+  force_bootstrapped heuristic true >>= fun () -> p
+
+(* A copy of test_threshold_is_three_and_stuck *)
+let test_threshold_is_three_and_stuck_with_callbacks () =
+  let latency = 120 in
+  let status_changes = ref 0 in
+  let when_status_changes status =
+    let expected_value =
+      if !status_changes = 0 then Not_synchronised
+      else if !status_changes = 1 then Synchronised {is_chain_stuck = true}
+      else if !status_changes = 2 then Not_synchronised
+      else Synchronised {is_chain_stuck = false}
+    in
+    incr status_changes ;
+    Assert.equal status expected_value ;
+    Lwt.return_unit
+  in
+  let heuristic = create ~when_status_changes ~threshold:3 ~latency () in
+  activate heuristic >>= fun () ->
+  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let peer1 = forge_peer_id () in
+  let timestamp = forge_timestamp ~delay:(latency * -2) () in
+  update heuristic @@ forge_value ~peer:peer1 ~timestamp () >>= fun () ->
+  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let peer2 = forge_peer_id () in
+  update heuristic @@ forge_value ~peer:peer2 ~delay:(latency * -2) ()
+  >>= fun () ->
+  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  let peer3 = forge_peer_id () in
+  update heuristic @@ forge_value ~peer:peer3 ~timestamp () >>= fun () ->
+  Assert.equal
+    ~prn
+    (Synchronised {is_chain_stuck = true})
+    (get_status heuristic) ;
+  update heuristic @@ forge_value ~peer:peer1 () >>= fun () ->
+  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  update heuristic @@ forge_value ~peer:peer2 () >>= fun () ->
+  Assert.equal ~prn Not_synchronised (get_status heuristic) ;
+  update heuristic @@ forge_value ~peer:peer3 () >>= fun () ->
+  Assert.equal
+    ~prn
+    (Synchronised {is_chain_stuck = false})
+    (get_status heuristic) ;
+  Assert.equal !status_changes 4 ;
+  Lwt.return_unit
+
+let wrap f _switch () = f ()
+
+let tests_lwt_raw : (string * (Lwt_switch.t -> unit -> unit Lwt.t)) list =
+  [
+    ("test bp create", wrap test_bp_create);
+    ("test bp create 2", wrap test_bp_create_2);
+    ("test bp activate", wrap test_bp_activate);
+    ("test bp activate 2", wrap test_bp_activate_2);
+    ("test force bootstrapped", wrap test_force_bootstrapped);
+    ("test force bootstrapped 2", wrap test_force_bootstrapped_2);
+    ("test force bootstrapped 3", wrap test_force_bootstrapped_3);
+    ("test is bootstrapped", wrap test_is_bootstrapped);
+    ("test is bootstrapped 2", wrap test_is_bootstrapped_2);
+    ("test is bootstrapped 3", wrap test_is_bootstrapped_3);
+    ("test waiting for bootstrapped", wrap test_bootstrapped);
+    ("test waiting for bootstrapped 2", wrap test_bootstrapped_2);
+    ( "test when status changes",
+      wrap test_threshold_is_three_and_stuck_with_callbacks );
+  ]
+
+let tests_lwt =
+  List.map (fun (s, f) -> Alcotest_lwt.test_case s `Quick f) tests_lwt_raw

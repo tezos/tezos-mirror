@@ -235,7 +235,7 @@ let tests =
      semantics as the reference implementation given in the Reference
      module. We use QCheck to generate a bunch of updates and check
      that both implementations send the same result. *)
-  let module L = Synchronisation_heuristic in
+  let module L = Synchronisation_heuristic.Core in
   let module R = Reference in
   let check_update state_left state_right value =
     L.update state_left value ;

@@ -56,6 +56,14 @@ val force_bootstrapped :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/is_bootstrapped *)
+val is_bootstrapped :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/checkpoint *)
 val get_checkpoint :
   ?endpoint:Client.endpoint ->

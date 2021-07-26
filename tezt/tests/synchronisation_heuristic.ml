@@ -38,7 +38,16 @@ let wait_for_sync node =
     | None -> None
     | Some status -> if status = "synced" then Some () else None
   in
-  Node.wait_for node "node_chain_validator.v0" filter
+  let event = Node.wait_for node "node_chain_validator.v0" filter in
+  (* If a node is synchronised before the node to be ready, we check
+     if the nde is not already synchronised via an RPC. *)
+  let is_synchronised =
+    let* client = Client.init ~endpoint:(Node node) () in
+    let* json = RPC.is_bootstrapped client in
+    if JSON.(json |-> "sync_state" |> as_string = "synced") then Lwt.return_unit
+    else fst @@ Lwt.task ()
+  in
+  Lwt.pick [event; is_synchronised]
 
 (* This test starts 4 + 1 nodes. The main nodes activate the alpha
    protocol. All the other nodes connects to the main nodes and
