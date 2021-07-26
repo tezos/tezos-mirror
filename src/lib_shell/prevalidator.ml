@@ -493,7 +493,8 @@ module Make
   let classify_operation ~notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle ~notify pv (`Unparsed (oph, op)) (`Refused errors) ;
+        (* We should not notify since the operation cannot be parsed. *)
+        handle ~notify:false pv (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -589,7 +590,9 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
           (fun oph op ->
-            handle ~notify:true pv (`Unparsed (oph, op)) (`Branch_delayed err))
+            (* We should not notify since we can't validate and this
+               is supposed to be dead code. *)
+            handle ~notify:false pv (`Unparsed (oph, op)) (`Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -863,14 +866,14 @@ module Make
         let is_alternative_endorsement () =
           Lwt.return validation_state >>=? fun validation_state ->
           Prevalidation.apply_operation validation_state op >>= function
-          | Applied _ | Branch_delayed _ -> return_true
-          | _ -> return_false
+          | Applied _ | Branch_delayed _ -> return_some op
+          | _ -> return_none
         in
-        if is_endorsement op then is_alternative_endorsement ()
-        else return_false )
+        if is_endorsement op then is_alternative_endorsement () else return_none
+      )
       >|= function
       | Ok b -> b
-      | Error _ -> false
+      | Error _ -> None
 
     let on_arrived w (pv : state) oph op =
       if already_handled ~situation:Operation_encountered.Arrived w pv.shell oph
@@ -884,21 +887,15 @@ module Make
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then (
-              (* FIXME: Remove this for Tenderbake. *)
               may_propagate_unknown_branch_operation pv.validation_state op
               >>= function
-              | true ->
+              | Some op ->
                   let error = [Exn (Failure "Unknown branch operation")] in
-                  (* FIXME: We have already parsed the operation. *)
-                  handle
-                    ~notify:true
-                    pv
-                    (`Unparsed (oph, op))
-                    (`Branch_refused error) ;
+                  handle ~notify:true pv (`Parsed op) (`Branch_refused error) ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
-              | false ->
+              | None ->
                   Distributed_db.Operation.clear_or_cancel
                     pv.shell.parameters.chain_db
                     oph ;
