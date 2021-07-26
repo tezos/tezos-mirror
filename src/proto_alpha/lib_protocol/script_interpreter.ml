@@ -321,7 +321,7 @@ and next :
     (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
  fun ((ctxt, _) as g) gas ks0 accu stack ->
   match consume_control gas ks0 with
-  | None -> Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
+  | None -> fail Gas.Operation_quota_exceeded
   | Some gas -> (
       match ks0 with
       | KLog (ks, logger) ->
@@ -468,7 +468,7 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
 and step : type a s b t r f. (a, s, b, t, r, f) step_type =
  fun ((ctxt, sc) as g) gas i ks accu stack ->
   match consume_instr gas i accu stack with
-  | None -> Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
+  | None -> fail Gas.Operation_quota_exceeded
   | Some gas -> (
       match i with
       | ILog (_, event, logger, k) ->

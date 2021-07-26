@@ -245,10 +245,6 @@ module Gas : sig
      gas level for operations to [remaining]. *)
   val update_remaining_operation_gas : context -> Arith.fp -> context
 
-  (** [gas_exhausted_error ctxt] raises an error indicating the gas
-      has been exhausted. *)
-  val gas_exhausted_error : context -> 'a tzresult
-
   (** [consumed since until] is the operation gas level difference
      between context [since] and context [until]. This function
      returns [Arith.zero] if any of the two contexts allows for an

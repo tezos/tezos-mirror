@@ -92,8 +92,8 @@ let update_and_check gas_counter (cost : Gas.cost) =
   if Compare.Int.(gas_counter < 0) then None else Some gas_counter
   [@@ocaml.inline always]
 
-let consume ctxt local_gas_counter cost =
+let consume _ctxt local_gas_counter cost =
   match update_and_check local_gas_counter cost with
-  | None -> Gas.gas_exhausted_error (update_context local_gas_counter ctxt)
+  | None -> error Gas.Operation_quota_exceeded
   | Some local_gas_counter -> Ok local_gas_counter
   [@@ocaml.inline always]
