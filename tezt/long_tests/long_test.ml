@@ -460,8 +460,8 @@ let get_previous_stats ?limit ?(minimum_count = 3) ?(tags = []) measurement
       if limit < minimum_count then
         invalid_arg
         @@ sf
-             "Long_test.get_previous_stats: limit = %d must be at least \
-              equal to minimum_count = %d"
+             "Long_test.get_previous_stats: limit = %d must be at least equal \
+              to minimum_count = %d"
              limit
              minimum_count)
     limit ;
@@ -611,11 +611,21 @@ let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
         get_previous_with_stddev stats
         @@ fun (previous_count, previous_value) ->
         if current_value > previous_value *. (1. +. margin) then
+          let tags =
+            match tags with
+            | [] -> ""
+            | _ ->
+                "["
+                ^ (List.map (fun (k, v) -> sf "%S = %S" k v) tags
+                  |> String.concat ", ")
+                ^ "]"
+          in
           alert
-            "%s(%S.%S) = %g is more than %d%% more than the value for the \
+            "%s(%S%s.%S) = %g is more than %d%% more than the value for the \
              previous %d measurements, which is %g"
             name
             measurement
+            tags
             field
             current_value
             (int_of_float (margin *. 100.))
