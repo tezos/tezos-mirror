@@ -455,6 +455,16 @@ end
 
 let get_previous_stats ?limit ?(minimum_count = 3) ?(tags = []) measurement
     field stats =
+  Option.iter
+    (fun limit ->
+      if limit < minimum_count then
+        invalid_arg
+        @@ sf
+             "Long_test.get_previous_stats: limit = %d must be at least \
+              equal to minimum_count = %d"
+             limit
+             minimum_count)
+    limit ;
   let stats = Stats.(_2 count) stats in
   let select =
     let where =
