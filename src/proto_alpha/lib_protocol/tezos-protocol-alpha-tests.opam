@@ -19,6 +19,8 @@ depends: [
   "tezos-protocol-alpha-parameters" { with-test }
   "tezos-shell-services" { with-test }
   "tezos-base-test-helpers" { with-test }
+  "tezos-benchmark" { with-test }
+  "tezos-benchmark-alpha" { with-test }
 ]
 build: [
   [
