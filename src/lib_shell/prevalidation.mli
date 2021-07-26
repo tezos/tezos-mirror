@@ -48,9 +48,12 @@ module type T = sig
 
   val parse : Operation.t -> Proto.operation_data operation tzresult
 
-  (** [parse_unsafe bytes] parses [bytes] as operation data. Any error happening during parsing becomes {!Parse_error}.
+  (** [parse_unsafe bytes] parses [bytes] as operation data. Any error
+     happening during parsing becomes {!Parse_error}.
 
-      [unsafe] because there are no length checks, unlike {!parse}. *)
+      [unsafe] because there are no length checks, unlike {!parse}.
+
+     @deprecated You should use {parse} instead. *)
   val parse_unsafe : bytes -> Proto.operation_data tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
