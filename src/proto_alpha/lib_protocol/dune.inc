@@ -99,6 +99,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_storage.mli global_constants_storage.ml
    cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
+   local_gas_counter.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
@@ -205,6 +206,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_storage.mli global_constants_storage.ml
    cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
+   local_gas_counter.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
@@ -311,6 +313,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_storage.mli global_constants_storage.ml
    cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
+   local_gas_counter.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
@@ -439,6 +442,7 @@ include Tezos_raw_protocol_alpha.Main
    Global_constants_storage
    Cache_costs
    Alpha_context
+   Local_gas_counter
    Script_tc_errors
    Script_typed_ir
    Script_typed_ir_size
@@ -584,6 +588,7 @@ include Tezos_raw_protocol_alpha.Main
    global_constants_storage.mli global_constants_storage.ml
    cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
+   local_gas_counter.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml

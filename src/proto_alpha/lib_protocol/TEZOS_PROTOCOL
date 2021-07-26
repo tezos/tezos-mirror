@@ -80,6 +80,7 @@
 
         "Alpha_context",
 
+        "Local_gas_counter",
         "Script_tc_errors",
         "Script_typed_ir",
         "Script_typed_ir_size",

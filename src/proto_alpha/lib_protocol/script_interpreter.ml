@@ -86,6 +86,7 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
+open Local_gas_counter
 open Script_interpreter_defs
 module S = Saturation_repr
 
