@@ -65,7 +65,7 @@ let rec deduce_type_size : type t. remaining:int -> t ty -> int =
   | Mutez_t _ | Key_hash_t _ | Key_t _ | Timestamp_t _ | Address_t _ | Bool_t _
   | Operation_t _ | Chain_id_t _ | Never_t _ | Bls12_381_g1_t _
   | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Sapling_transaction_t _
-  | Sapling_state_t _ ->
+  | Sapling_state_t _ | Chest_key_t _ | Chest_t _ ->
       remaining - 1
   | Pair_t ((l, _, _), (r, _, _), _) ->
       let remaining = remaining - 1 in

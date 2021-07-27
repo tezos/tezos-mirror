@@ -228,7 +228,7 @@ type ('arg, 'storage) script = {
    ==========
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
-*)
+ *)
 and ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
@@ -924,6 +924,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * 'a comparable_ty
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
+  | IOpen_chest :
+      (Timelock.chest_key, Timelock.chest * (n num * 's)) kinfo
+      * ((bytes, bool) union, 's, 'r, 'f) kinstr
+      -> (Timelock.chest_key, Timelock.chest * (n num * 's), 'r, 'f) kinstr
   (*
 
      Internal control instructions
@@ -1150,6 +1154,8 @@ and 'ty ty =
   | Bls12_381_g2_t : type_annot option -> Bls12_381.G2.t ty
   | Bls12_381_fr_t : type_annot option -> Bls12_381.Fr.t ty
   | Ticket_t : 'a comparable_ty * type_annot option -> 'a ticket ty
+  | Chest_key_t : type_annot option -> Timelock.chest_key ty
+  | Chest_t : type_annot option -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
@@ -1416,6 +1422,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IJoin_tickets (kinfo, _, _) -> kinfo
   | IHalt kinfo -> kinfo
   | ILog (kinfo, _, _, _) -> kinfo
+  | IOpen_chest (kinfo, _) -> kinfo
 
 type kinstr_rewritek = {
   apply : 'b 'u 'r 'f. ('b, 'u, 'r, 'f) kinstr -> ('b, 'u, 'r, 'f) kinstr;
@@ -1606,3 +1613,4 @@ let kinstr_rewritek :
   | IJoin_tickets (kinfo, ty, k) -> IJoin_tickets (kinfo, ty, f.apply k)
   | IHalt kinfo -> IHalt kinfo
   | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
+  | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)

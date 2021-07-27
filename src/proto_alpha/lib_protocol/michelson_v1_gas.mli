@@ -391,6 +391,8 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       Gas.cost
 
+    val open_chest : Timelock.chest -> Z.t -> Gas.cost
+
     module Control : sig
       val nil : Gas.cost
 
@@ -470,6 +472,10 @@ module Cost_of : sig
     val contract_exists : Gas.cost
 
     val proof_argument : int -> Gas.cost
+
+    val chest_key : Gas.cost
+
+    val chest : Gas.cost
   end
 
   module Unparsing : sig
@@ -518,5 +524,9 @@ module Cost_of : sig
     val sapling_transaction : Sapling.transaction -> Gas.cost
 
     val sapling_diff : Sapling.diff -> Gas.cost
+
+    val chest_key : Gas.cost
+
+    val chest : Gas.cost
   end
 end

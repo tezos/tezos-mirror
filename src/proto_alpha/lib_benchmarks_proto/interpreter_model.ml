@@ -259,6 +259,27 @@ module Models = struct
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
+  let open_chest_model name =
+    let module M = struct
+      type arg_type = int * (int * unit)
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size -> size -> size
+
+        let arity = Model.arity_2
+
+        let model =
+          lam ~name:"size1" @@ fun size1 ->
+          lam ~name:"size2" @@ fun size2 ->
+          free ~name:(fv (sf "%s_const" name))
+          + (free ~name:(fv (sf "%s_time_coeff" name)) * size1)
+          + (free ~name:(fv (sf "%s_plaintext_coeff" name)) * size2)
+      end
+    end in
+    (module M : Model.Model_impl with type arg_type = int * (int * unit))
+
   let verify_update_model name =
     Model.bilinear_affine
       ~intercept:(fv (sf "%s_const" name))
@@ -441,7 +462,8 @@ let ir_model ?specialization instr_or_cont =
       | N_ISet_iter -> model_1 instr_or_cont (affine_model name)
       | N_IHalt -> model_0 instr_or_cont (const1_model name)
       | N_IApply -> model_0 instr_or_cont (const1_model name)
-      | N_ILog -> model_0 instr_or_cont (const1_model name))
+      | N_ILog -> model_0 instr_or_cont (const1_model name)
+      | N_IOpen_chest -> model_2 instr_or_cont (open_chest_model name))
   | Cont_name cont -> (
       match cont with
       | N_KNil -> model_0 instr_or_cont (const1_model name)

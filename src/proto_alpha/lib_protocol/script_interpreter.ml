@@ -1328,7 +1328,24 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 }
             else None
           in
-          (step [@ocaml.tailcall]) g gas k ks result stack)
+          (step [@ocaml.tailcall]) g gas k ks result stack
+      | IOpen_chest (_, k) ->
+          let open Timelock in
+          let chest_key = accu in
+          let (chest, (time_z, stack)) = stack in
+          (* If the time is not an integer we then consider the proof as
+             incorrect. Indeed the verification asks for an integer for practical reasons.
+             Therfore no proof can be correct.*)
+          let (accu, stack) =
+            match Alpha_context.Script_int.to_int time_z with
+            | None -> (R false, stack)
+            | Some time -> (
+                match open_chest chest chest_key ~time with
+                | Correct bytes -> (L bytes, stack)
+                | Bogus_cipher -> (R false, stack)
+                | Bogus_opening -> (R true, stack))
+          in
+          (step [@ocaml.tailcall]) g gas k ks accu stack)
 
 (*
 

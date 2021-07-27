@@ -1284,6 +1284,8 @@ module Cost_of = struct
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
+    let open_chest _chest_key _chest = atomic_step_cost (S.safe_int 3)
+
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
 
@@ -1645,6 +1647,10 @@ module Cost_of = struct
        monad, allocating at each step. We charge a reasonable overapproximation. *)
     let proof_argument n =
       atomic_step_cost (S.mul (S.safe_int n) (S.safe_int 50))
+
+    let chest_key = Gas.write_bytes_cost 1
+
+    let chest = Gas.write_bytes_cost 1
   end
 
   module Unparsing = struct
@@ -1748,5 +1754,9 @@ module Cost_of = struct
       let nfs = List.length d.nullifiers in
       let cms = List.length d.commitments_and_ciphertexts in
       atomic_step_cost (cost_SAPLING_DIFF_ENCODING ~nfs ~cms)
+
+    let chest_key = Gas.write_bytes_cost 1
+
+    let chest = Gas.write_bytes_cost 1
   end
 end
