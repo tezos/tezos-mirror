@@ -10,10 +10,10 @@ recommended_rust_version=1.44.0
 ## Please update `.gitlab-ci.yml` accordingly
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-full_opam_repository_tag=634828f0e488b41f6b0a5ba9dac39fa6496b1904
+full_opam_repository_tag=d2b022bcd8e39f765da6df49a005a3bb88246097
 
 ## opam_repository is an additional, tezos-specific opam repository.
-opam_repository_tag=b19f263f65febd44d6ef211cebbc46e2b606bdad
+opam_repository_tag=c4d206c4c89568ea5120e1373bd5db0c0aca7cc4
 opam_repository_url=https://gitlab.com/tezos/opam-repository.git
 opam_repository=$opam_repository_url\#$opam_repository_tag
 
