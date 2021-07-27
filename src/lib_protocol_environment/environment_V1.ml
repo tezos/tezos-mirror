@@ -532,6 +532,8 @@ struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
         (Tezos_protocol_environment_structs.V1.M.Error_monad_classification)
+
+    let error_encoding = Data_encoding.dynamic_size error_encoding
   end
 
   type error_category = Error_core.error_category
