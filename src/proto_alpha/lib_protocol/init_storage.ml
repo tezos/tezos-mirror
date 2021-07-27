@@ -44,14 +44,18 @@ module Flatten_storage = struct
     >>= fun dst_tree ->
     (* rm -rf $index_key
        mv $tmp_index_key $index_key *)
-    Raw_context.Tree.add_tree tree key dst_tree >>= return
+    Raw_context.Tree.add_tree tree key dst_tree
 
   (* /abs_key/*(depth')/mid_key/*(depth)
      => /abs_key/*(depth')/mid_key/rename( *(depth) )
   *)
   let fold_flatten ctxt abs_key depth' mid_key ~depth ~rename =
-    Raw_context.fold ~depth:(`Eq depth') ctxt abs_key ~init:(ok ctxt) ~f:(fun key tree ctxt_res ->
-        ctxt_res >>?= fun ctxt ->
+    Raw_context.fold
+      ~depth:(`Eq depth')
+      ctxt
+      abs_key
+      ~init:ctxt
+      ~f:(fun key tree ctxt ->
         (* tree at /abs_key/*(depth') *)
         flatten
           ~tree
@@ -59,8 +63,7 @@ module Flatten_storage = struct
           ~depth
           ~rename
           ~init:(Raw_context.Tree.empty ctxt)
-        >>=? fun tree -> Raw_context.add_tree ctxt (abs_key @ key) tree
-        >|= ok)
+        >>= fun tree -> Raw_context.add_tree ctxt (abs_key @ key) tree)
 
   let flatten_storage ctxt =
     log "Flattening the context storage.  It takes several minutes." ;
@@ -85,7 +88,7 @@ module Flatten_storage = struct
        => /contracts/index/yyyyyyyyyy
     *)
     fold_flatten ctxt ["contracts"; "index"] 0 [] ~depth:7 ~rename:(drop 6)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /contracts/index/yyyyyyyyyy/delegated/xx/xx/xx/xx/xx/xx/zzzzzzzzzz
        => /contracts/index/yyyyyyyyyy/delegated/zzzzzzzzzz
@@ -97,13 +100,13 @@ module Flatten_storage = struct
       ["delegated"]
       ~depth:7
       ~rename:(drop 6)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /big_maps/index/xx/xx/xx/xx/xx/xx/n
        => /big_maps/index/n
     *)
     fold_flatten ctxt ["big_maps"; "index"] 0 [] ~depth:7 ~rename:(drop 6)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /big_maps/index/n/contents/yy/yy/yy/yy/yy/yyyyyyyy
        => /big_maps/index/n/contents/yyyyyyyyyyyyyyyyyy
@@ -115,13 +118,13 @@ module Flatten_storage = struct
       ["contents"]
       ~depth:6
       ~rename:rename_blake2b
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /rolls/index/x/y/n
        => /rolls/index/n
     *)
     fold_flatten ctxt ["rolls"; "index"] 0 [] ~depth:3 ~rename:(drop 2)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /rolls/owner/current/x/y/n
        => /rolls/owner/current/n
@@ -133,7 +136,7 @@ module Flatten_storage = struct
       []
       ~depth:3
       ~rename:(drop 2)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /rolls/owner/snapshot/n1/n2/x/y/n3
        => /rolls/owner/snapshot/n1/n2/n3
@@ -145,13 +148,13 @@ module Flatten_storage = struct
       []
       ~depth:3
       ~rename:(drop 2)
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /commitments/xx/xx/xx/xx/xx/xxxxxx
        => /commitments/xxxxxxxxxxxxxxxx
     *)
     fold_flatten ctxt ["commitments"] 0 [] ~depth:6 ~rename:rename_blake2b
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /votes/listings/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /votes/listings/kk/xxxxxxxxxxxxxxxxxx
@@ -163,7 +166,7 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /votes/ballots/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /votes/ballots/KK/xxxxxxxxxxxxxxxxxxxx
@@ -175,7 +178,7 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /votes/proposals_count/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /votes/proposals_count/kk/xxxxxxxxxxxxxxxxxxxx
@@ -187,7 +190,7 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /votes/proposals/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /votes/proposals/xxxxxxxxxxxxxxxxxxxx
@@ -199,7 +202,7 @@ module Flatten_storage = struct
       []
       ~depth:6
       ~rename:rename_blake2b
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /votes/proposals/yyyyyyyyyyyyyyyyyyyy/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /votes/proposals/yyyyyyyyyyyyyyyyyyyy/KK/xxxxxxxxxxxxxxxxxxxx
@@ -211,13 +214,13 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /delegates/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /delegates/KK/xxxxxxxxxxxxxxxxxxxx
     *)
     fold_flatten ctxt ["delegates"] 0 [] ~depth:7 ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /active_delegates_with_rolls/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /active_delegates_with_rolls/KK/xxxxxxxxxxxxxxxxxxxx
@@ -229,7 +232,7 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >>=? fun ctxt ->
+    >>= fun ctxt ->
     (* *)
     (* /delegates_with_frozen_balance/n/kk/xx/xx/xx/xx/xx/xx/xxxxxxxx
        => /delegates_with_frozen_balance/n/KK/xxxxxxxxxxxxxxxxxxxx
@@ -241,7 +244,7 @@ module Flatten_storage = struct
       []
       ~depth:7
       ~rename:rename_public_key_hash
-    >|=? fun ctxt ->
+    >|= fun ctxt ->
     log "Flattened the context storage." ;
     ctxt
 end
@@ -301,7 +304,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
   | Florence_009 ->
-      Flatten_storage.flatten_storage ctxt >>=? fun ctxt ->
+      Flatten_storage.flatten_storage ctxt >>= fun ctxt ->
       (* Only the starting position of the voting period is shifted by
          one level into the future, so that voting periods are again
          aligned with cycles. The period kind does not change, as a new
