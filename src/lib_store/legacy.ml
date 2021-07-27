@@ -264,7 +264,7 @@ let import_floating legacy_chain_state legacy_chain_store chain_store
       let rec aux ~pred_block block =
         Block_store.store_block block_store block >>=? fun () ->
         let level = Block_repr.level block in
-        if level >= end_limit then return_unit
+        if level >= end_limit then notify () >>= fun () -> return_unit
         else
           (* At protocol change, update the protocol_table *)
           (match pred_block with
