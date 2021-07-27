@@ -49,9 +49,9 @@ struct
     key :: l
 
   let of_path = function
-    | [path] ->
-        Option.bind
-          (try Some (Hex.to_bytes (`Hex path)) with _ -> None)
-          H.of_bytes_opt
+    | [path] -> (
+        match Hex.to_bytes (`Hex path) with
+        | bytes -> H.of_bytes_opt bytes
+        | exception _ -> None)
     | _ -> None
 end
