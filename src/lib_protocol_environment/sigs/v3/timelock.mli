@@ -42,7 +42,12 @@ val chest_key_encoding : chest_key Data_encoding.t
     we return [Bogus_cipher] and the provider of the chest is at fault.
     Otherwise we return [Correct payload] where payload was what had
     originally been put in the chest. *)
-
 type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
 
-val open_chest : chest -> chest_key -> opening_result
+(** Takes a chest, chest key and time and tries to recover the underlying
+    plaintext. See the documentation of opening_result. *)
+val open_chest : chest -> chest_key -> time:int -> opening_result
+
+(** Gives the size of the underlying plaintext in a chest in bytes.
+    Used for gas accounting*)
+val get_plaintext_size : chest -> int
