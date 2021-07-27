@@ -28,7 +28,8 @@
 (* do nothing for now *)
 let log fmt = Format.kasprintf (fun _ -> ()) fmt
 
-module Flatten_storage = struct
+(* Remove me after protocol H *)
+module Flatten_storage_for_H = struct
   (* /tree_abs_key/key/*/*/*/*/*
      => /tree_abs_key/key/rename( */*/*/*/* )
   *)
@@ -304,7 +305,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
   | Florence_009 ->
-      Flatten_storage.flatten_storage ctxt >>= fun ctxt ->
+      Flatten_storage_for_H.flatten_storage ctxt >>= fun ctxt ->
       (* Only the starting position of the voting period is shifted by
          one level into the future, so that voting periods are again
          aligned with cycles. The period kind does not change, as a new
