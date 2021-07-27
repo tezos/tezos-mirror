@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Mockup args library
-    Invocation:   dune build @runtest_fuzzing_mockup_args
+    Invocation:   dune build @src/lib_mockup/runtest
     Subject:      Fuzzing tests of the Mockup args library
 *)
 

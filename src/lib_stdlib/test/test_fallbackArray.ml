@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest_fallbackArray
+    Invocation:   dune build @src/lib_stdlib/test/runtest
     Subject:      Fallback arrays
  *)
 

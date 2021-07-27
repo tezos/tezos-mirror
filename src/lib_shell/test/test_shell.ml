@@ -28,7 +28,8 @@
     -------
     Component:    Shell
     Invocation:   dune build @src/lib_shell/runtest
-    Subject:      Entrypoint
+    Subject:      Entrypoint of tests, delegates to other files in the
+                  enclosing directory.
 *)
 
 let () =

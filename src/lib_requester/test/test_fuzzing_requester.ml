@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest_fuzzing_requester
+    Invocation:   dune build @src/lib_requester/runtest
     Subject:      Relations between functions of [Requester]'s API
 *)
 

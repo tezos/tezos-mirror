@@ -27,7 +27,7 @@
 
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy_server_config/runtest_proxy_server_config
+    Invocation:   dune build @src/lib_proxy_server_config/runtest
     Description:  Test various functions and types regarding the configuration
                   of [tezos-proxy-server]
 *)

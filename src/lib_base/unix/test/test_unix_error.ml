@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, Unix
-   Invocation:   dune build @src/lib_base/unix/test/runtest_unix_error
+   Invocation:   dune build @src/lib_base/unix/runtest
    Subject:      Check the serialization or deserialization of unix errors
 *)
 

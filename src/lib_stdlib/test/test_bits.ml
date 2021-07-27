@@ -28,7 +28,7 @@ open Utils.Infix
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest_bits
+    Invocation:   dune build @src/lib_stdlib/test/runtest
     Subject:      On fast numbits implementation
  *)
 

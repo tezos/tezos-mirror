@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, Protocol
-   Invocation:   dune build @src/lib_base/test/runtest_protocol
+   Invocation:   dune build @src/lib_base/runtest
    Subject:      Check the ordering of protocol versions
 *)
 

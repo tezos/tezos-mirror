@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Mockup args library
-    Invocation:   dune build @runtest_mockup_args
+    Invocation:   dune build @src/lib_mockup/runtest
     Subject:      Unit tests of the Mockup args library
 *)
 

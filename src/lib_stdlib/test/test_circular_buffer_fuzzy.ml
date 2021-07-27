@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest_circular_buffer_fuzzy
+    Invocation:   dune build @src/lib_stdlib/test/runtest
     Subject:      Test the circular buffer with a reference implementation
  *)
 

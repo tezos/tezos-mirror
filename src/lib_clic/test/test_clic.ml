@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    Clic library
-    Invocation:   dune build @runtest_clic
+    Invocation:   dune build @src/lib_clic/runtest
     Subject:      Test the functionality of the Clic library, such as CLI
                   command dispatch, parameters and auto-completion.
 *)
