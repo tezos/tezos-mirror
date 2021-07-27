@@ -13,5 +13,5 @@ keywords = ["tezos"]
 [tool.poetry.dependencies]
 python = "~3.9"
 sphinx = "*"
-sphinx-rtd-theme = "0.4.3"
+sphinx-rtd-theme = "0.5.1"
 recommonmark = "*"
