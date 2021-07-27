@@ -51,7 +51,7 @@ module Flatten_storage = struct
   *)
   let fold_flatten ctxt abs_key depth' mid_key ~depth ~rename =
     Raw_context.fold ~depth:(`Eq depth') ctxt abs_key ~init:(ok ctxt) ~f:(fun key tree ctxt_res ->
-        Lwt.return ctxt_res >>=? fun ctxt ->
+        ctxt_res >>?= fun ctxt ->
         (* tree at /abs_key/*(depth') *)
         flatten
           ~tree
