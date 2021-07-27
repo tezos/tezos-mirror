@@ -150,18 +150,6 @@ let wrap data_dir config_file network connections max_download_speed
   let rpc_tls =
     Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
   in
-  if List.compare_length_with allow_all_rpc 1 >= 0 then (
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       @,\
-      \               You have enabled @{<warning>FULL@} access to the RPC on\n\
-      \                     the following addresses:@," ;
-    List.iter (Format.eprintf "%a@," P2p_point.Id.pp_addr_port_id) allow_all_rpc ;
-    Format.eprintf
-      "@,\
-      \         Please make sure that untrusted clients cannot reach the node \
-       on these addresses.\n\
-       @.") ;
   {
     disable_config_validation;
     data_dir;

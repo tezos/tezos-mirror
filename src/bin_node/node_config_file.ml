@@ -1218,6 +1218,19 @@ module Event = struct
       ~msg:"failed to convert {addr} to an ipv4 address"
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
+
+  let all_rpc_allowed =
+    declare_1
+      ~level:Error
+      ~section
+      ~name:"all_rpc_allowed"
+      ~msg:"FULL access to RPC enabled; this is very risky."
+      ~pp1:
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+            P2p_point.Id.pp_addr_port_id)
+      ("addresses", Data_encoding.(list P2p_point.Id.addr_port_id_encoding))
 end
 
 let string_of_json_encoding_error exn =
@@ -1258,6 +1271,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     cfg.disable_config_validation || disable_config_validation
   in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
+  (if List.compare_length_with allow_all_rpc 1 >= 0 then
+   Event.(emit all_rpc_allowed allow_all_rpc)
+  else Lwt.return_unit)
+  >>= fun () ->
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
