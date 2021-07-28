@@ -33,23 +33,7 @@
 let to_account client alias =
   Client.show_address ~show_secret:true ~alias client
 
-let test_baker =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"baker stresstest"
-    ~tags:["node"; "baker"]
-  @@ fun protocol ->
-  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
-  let keys : Constant.key list =
-    List.filter
-      (fun {Constant.alias; _} -> alias <> "activator")
-      Constant.all_secret_keys
-  in
-  let* (accounts : Account.key list) =
-    Lwt_list.map_s
-      (fun (account : Constant.key) -> to_account client account.alias)
-      keys
-  in
+let sources_file_of_accounts (accounts : Account.key list) =
   let account_to_json (account : Account.key) =
     let mandatory name = function
       | None -> Test.fail "Unexpected Nothing in field %s" name
@@ -68,7 +52,27 @@ let test_baker =
     Lwt_io.with_file ~mode:Lwt_io.Output sources (fun oc ->
         Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string accounts_json_obj)
   in
+  return sources
+
+let test_baker =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker stresstest"
+    ~tags:["node"; "baker"]
+  @@ fun protocol ->
+  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
   let* _ = Baker.init ~protocol node client in
+  let keys : Constant.key list =
+    List.filter
+      (fun {Constant.alias; _} -> alias <> "activator")
+      Constant.all_secret_keys
+  in
+  let* (accounts : Account.key list) =
+    Lwt_list.map_s
+      (fun (account : Constant.key) -> to_account client account.alias)
+      keys
+  in
+  let* sources = sources_file_of_accounts accounts in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~sources ~transfers:100 client in
   Lwt.return_unit
