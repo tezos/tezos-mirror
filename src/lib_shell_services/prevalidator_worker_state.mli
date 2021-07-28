@@ -56,7 +56,11 @@ end
 
     This module is used in {!Event.Banned_operation_encountered}. *)
 module Operation_encountered : sig
-  type situation = Injected | Arrived | Notified of P2p_peer_id.t | Other
+  type situation =
+    | Injected
+    | Arrived
+    | Notified of P2p_peer_id.t option
+    | Other
 
   type t = situation * Operation_hash.t
 

@@ -68,7 +68,7 @@ module Logger =
 
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
-module Classification = Prevalidation.Classification
+module Classification = Prevalidator_classification
 
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
@@ -100,7 +100,7 @@ module type T = sig
     shell : types_state_shell;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
-      ([`Applied | `Refused | `Branch_refused | `Branch_delayed]
+      (Classification.classification
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -133,102 +133,6 @@ module type ARG = sig
   val chain_db : Distributed_db.chain_db
 
   val chain_id : Chain_id.t
-end
-
-(** Centralised operation stream for the RPCs *)
-module type NOTIFIER = sig
-  type operation_data
-
-  (** [maybe_notify_operation ?should_notify stream kind op] should be
-   *  called when [op] is about to be classified as [kind]. In practice
-   *  [kind] is one of [`Applied], [`Branch_delayed], [`Branch_refused],
-   *  or [`Refused]. If [should_notify] is [false], do nothing; its
-   *  default value is [true].
-   *
-   *  Each classified operation should be notified exactly ONCE for a
-   *  given stream. The flag [should_notify] is used to avoid notifying
-   *  multiple times on the same operation, e.g. an operation that is
-   *  reclassified upon banning an applied operation. *)
-  val maybe_notify_operation :
-    ?should_notify:bool ->
-    ('kind * Operation.shell_header * operation_data) Lwt_watcher.input ->
-    'kind ->
-    Operation.t ->
-    unit
-end
-
-module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
-  NOTIFIER with type operation_data = Proto.operation_data = struct
-  type operation_data = Proto.operation_data
-
-  module Prevalidation = Prevalidation.Make (Proto)
-
-  let notify_operation operation_stream result {Operation.shell; proto} =
-    match Prevalidation.parse_unsafe proto with
-    | Ok protocol_data ->
-        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
-    | Error _ ->
-        (* possible enhancement: https://gitlab.com/tezos/tezos/-/issues/1510 *)
-        ()
-
-  let maybe_notify_operation ?(should_notify = true) operation_stream result op
-      =
-    if should_notify then notify_operation operation_stream result op
-end
-
-(** How to treat branch_refused, branch_delayed, and refused operations *)
-module type CLASSIFICATOR = sig
-  type input
-
-  val handle_branch_refused :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-  val handle_branch_delayed :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-  val handle_refused :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-end
-
-(* For the moment we only use the function [clear_or_cancel] from
- * [Requester.REQUESTER], so we could take a smaller module as
- * input. However, in the future, we may want to extend
- * what [Classificator] does and will then use more of [Requester.REQUESTER] *)
-module Classificator
-    (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
-  CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
-struct
-  type input = Requester.t * Prevalidation.Classification.t
-
-  let handle_branch_refused
-      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
-      ~on_discarded_operation
-      (`Branch_refused errors)
-      oph
-      op
-      classes
-
-  let handle_branch_delayed
-      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
-      ~on_discarded_operation
-      (`Branch_delayed errors)
-      oph
-      op
-      classes
-
-  let handle_refused (requester, (classes : Prevalidation.Classification.t)) op
-      oph errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
-      ~on_discarded_operation
-      (`Refused errors)
-      oph
-      op
-      classes
 end
 
 type t = (module T)
@@ -372,12 +276,11 @@ type t = (module T)
 module Make
     (Filter : Prevalidator_filters.FILTER)
     (Arg : ARG)
-    (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data)
     (Requester : Requester.REQUESTER
-                   with type t = Distributed_db.chain_db
-                    and type key = Operation_hash.t
-                    and type value = Operation.t
-                    and type param = unit) : T = struct
+                   with type t := Distributed_db.chain_db
+                    and type key := Operation_hash.t
+                    and type value := Operation.t
+                    and type param := unit) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -396,14 +299,15 @@ module Make
 
   let name = (Arg.chain_id, Proto.hash)
 
-  module Classification = Prevalidation.Classification
+  type 'operation_data operation = 'operation_data Prevalidation.operation
+
   module Prevalidation = Prevalidation.Make (Protocol)
 
   type types_state = {
     shell : types_state_shell;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
-      ([`Applied | `Refused | `Branch_refused | `Branch_delayed]
+      (Classification.classification
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -484,8 +388,7 @@ module Make
         (Worker.log_event w (Banned_operation_encountered (situation, oph))) ;
       true)
     else
-      Operation_hash.Map.mem oph shell.classification.refused.map
-      || Operation_hash.Map.mem oph shell.pending
+      Operation_hash.Map.mem oph shell.pending
       || Operation_hash.Set.mem oph shell.fetching
       || Operation_hash.Set.mem oph shell.live_operations
       || Operation_hash.Set.mem oph shell.classification.in_mempool
@@ -493,8 +396,10 @@ module Make
   let validation_result (state : types_state) =
     {
       Preapply_result.applied = List.rev state.shell.classification.applied;
-      branch_delayed = state.shell.classification.branch_delayed.map;
-      branch_refused = state.shell.classification.branch_refused.map;
+      branch_delayed =
+        Classification.map state.shell.classification.branch_delayed;
+      branch_refused =
+        Classification.map state.shell.classification.branch_refused;
       refused = Operation_hash.Map.empty;
     }
 
@@ -517,7 +422,7 @@ module Make
             Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
 
-  let is_endorsement (op : Prevalidation.operation) =
+  let is_endorsement (op : Proto.operation_data operation) =
     Proto.acceptable_passes
       {shell = op.raw.shell; protocol_data = op.protocol_data}
     = [0]
@@ -569,56 +474,27 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  module Proto_classificator = struct
-    module Classificator = Classificator (Requester)
+  (* Each classified operation should be notified exactly ONCE for a
+     given stream. The flag [should_notify] is used to avoid notifying
+     multiple times on the same operation, e.g. an operation that is
+     reclassified upon banning an applied operation. *)
+  let handle ~notify pv op kind =
+    let notify () =
+      match op with
+      | `Parsed ({raw; protocol_data; _} : Proto.operation_data operation)
+        when notify = true ->
+          Lwt_watcher.notify pv.operation_stream (kind, raw.shell, protocol_data)
+      | _ -> ()
+    in
+    match op with
+    | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
+        Classification.add ~notify kind hash raw pv.shell.classification
 
-    let handle_branch_refused ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Branch_refused
-        op ;
-      Classificator.handle_branch_refused input op oph errors
-
-    let handle_branch_delayed ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Branch_delayed
-        op ;
-      Classificator.handle_branch_delayed input op oph errors
-
-    let handle_refused ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Refused
-        op ;
-      Classificator.handle_refused input op oph errors
-  end
-
-  let handle_applied ?should_notify pv (op : Prevalidation.operation) =
-    let classification = pv.shell.classification in
-    Notifier.maybe_notify_operation
-      ?should_notify
-      pv.operation_stream
-      `Applied
-      op.raw ;
-    let on_discarded_operation _ = () in
-    Classification.add
-      ~on_discarded_operation
-      `Applied
-      op.hash
-      op.raw
-      classification
-
-  let classify_operation ?should_notify w pv validation_state mempool op oph =
+  let classify_operation ~notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        Proto_classificator.handle_refused ?should_notify pv op oph errors ;
+        (* We should not notify since the operation cannot be parsed. *)
+        handle ~notify:false pv (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -634,7 +510,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle_applied ?should_notify pv op ;
+              handle ~notify pv (`Parsed op) `Applied ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -646,28 +522,13 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            Proto_classificator.handle_branch_delayed
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle ~notify pv (`Parsed op) (`Branch_delayed errors) ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            Proto_classificator.handle_branch_refused
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle ~notify pv (`Parsed op) (`Branch_refused errors) ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            Proto_classificator.handle_refused
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle ~notify pv (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -703,7 +564,14 @@ module Make
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
           pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-          classify_operation w pv acc_validation_state acc_mempool op oph
+          classify_operation
+            ~notify:true
+            w
+            pv
+            acc_validation_state
+            acc_mempool
+            op
+            oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
       pv.shell.pending
@@ -722,7 +590,9 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
           (fun oph op ->
-            Proto_classificator.handle_branch_delayed pv op oph err)
+            (* We should not notify since we can't validate and this
+               is supposed to be dead code. *)
+            handle ~notify:false pv (`Unparsed (oph, op)) (`Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -758,42 +628,6 @@ module Make
               }
             in
             set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
-
-  (* This function fetches operations through the [distributed_db] and
-     ensures that an operation is fetched at most once by adding
-     operations being fetched into [pv.fetching]. On errors, the
-     operation is simply removed from this set and could be fetched
-     again if it is advertised again by a peer. *)
-  let fetch_operations w (pv : types_state_shell) ?peer to_fetch =
-    let fetch_operation w pv ?peer oph =
-      Worker.log_event w (Fetching_operation oph) >>= fun () ->
-      Distributed_db.Operation.fetch
-        ~timeout:pv.parameters.limits.operation_timeout
-        pv.parameters.chain_db
-        ?peer
-        oph
-        ()
-      >>= function
-      | Ok op ->
-          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
-          Lwt.return_unit
-      | Error (Distributed_db.Operation.Canceled _ :: _) ->
-          Worker.log_event w (Operation_included oph) >>= fun () ->
-          Lwt.return_unit
-      | Error _ ->
-          (* This may happen if the peer timed out for example. *)
-          Worker.log_event w (Operation_not_fetched oph) >>= fun () ->
-          Lwt.return_unit
-    in
-    pv.fetching <- Operation_hash.Set.union to_fetch pv.fetching ;
-    Operation_hash.Set.iter
-      (fun oph ->
-        let p = fetch_operation w pv ?peer oph in
-        (* We ensure that when the fetch is over (successfuly or not),
-           we remove the operation from the [pv.fetching] set. *)
-        Lwt.on_termination p (fun () ->
-            pv.fetching <- Operation_hash.Set.remove oph pv.fetching))
-      to_fetch
 
   let build_rpc_directory w =
     lazy
@@ -882,14 +716,21 @@ module Make
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
+
              let refused =
-               filter map_op_error pv.shell.classification.refused.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.refused)
              in
              let branch_refused =
-               filter map_op_error pv.shell.classification.branch_refused.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.branch_refused)
              in
              let branch_delayed =
-               filter map_op_error pv.shell.classification.branch_delayed.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.branch_delayed)
              in
              let unprocessed =
                Operation_hash.Map.fold
@@ -954,17 +795,23 @@ module Make
              in
              let refused =
                if params#refused then
-                 Operation_hash.Map.fold fold_op refused.map []
+                 Operation_hash.Map.fold fold_op (Classification.map refused) []
                else []
              in
              let branch_refused =
                if params#branch_refused then
-                 Operation_hash.Map.fold fold_op branch_refused.map []
+                 Operation_hash.Map.fold
+                   fold_op
+                   (Classification.map branch_refused)
+                   []
                else []
              in
              let branch_delayed =
                if params#branch_delayed then
-                 Operation_hash.Map.fold fold_op branch_delayed.map []
+                 Operation_hash.Map.fold
+                   fold_op
+                   (Classification.map branch_delayed)
+                   []
                else []
              in
              let current_mempool =
@@ -973,9 +820,9 @@ module Make
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
                | `Applied -> params#applied
-               | `Refused -> params#refused
-               | `Branch_refused -> params#branch_refused
-               | `Branch_delayed -> params#branch_delayed
+               | `Refused _ -> params#refused
+               | `Branch_refused _ -> params#branch_refused
+               | `Branch_delayed _ -> params#branch_delayed
              in
              let rec next () =
                match !current_mempool with
@@ -1019,14 +866,14 @@ module Make
         let is_alternative_endorsement () =
           Lwt.return validation_state >>=? fun validation_state ->
           Prevalidation.apply_operation validation_state op >>= function
-          | Applied _ | Branch_delayed _ -> return_true
-          | _ -> return_false
+          | Applied _ | Branch_delayed _ -> return_some op
+          | _ -> return_none
         in
-        if is_endorsement op then is_alternative_endorsement ()
-        else return_false )
+        if is_endorsement op then is_alternative_endorsement () else return_none
+      )
       >|= function
       | Ok b -> b
-      | Error _ -> false
+      | Error _ -> None
 
     let on_arrived w (pv : state) oph op =
       if already_handled ~situation:Operation_encountered.Arrived w pv.shell oph
@@ -1042,13 +889,13 @@ module Make
             then (
               may_propagate_unknown_branch_operation pv.validation_state op
               >>= function
-              | true ->
+              | Some op ->
                   let error = [Exn (Failure "Unknown branch operation")] in
-                  Proto_classificator.handle_branch_refused pv op oph error ;
+                  handle ~notify:true pv (`Parsed op) (`Branch_refused error) ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
-              | false ->
+              | None ->
                   Distributed_db.Operation.clear_or_cancel
                     pv.shell.parameters.chain_db
                     oph ;
@@ -1086,25 +933,57 @@ module Make
               Prevalidation.pp_result
               res
 
+    (* This function fetches one operation through the
+       [distributed_db]. On errors, we emit an event and proceed as
+       usual. *)
+    let fetch_operation w pv ?peer oph =
+      Worker.log_event w (Fetching_operation oph) >>= fun () ->
+      Distributed_db.Operation.fetch
+        ~timeout:pv.parameters.limits.operation_timeout
+        pv.parameters.chain_db
+        ?peer
+        oph
+        ()
+      >>= function
+      | Ok op ->
+          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+          Lwt.return_unit
+      | Error (Distributed_db.Operation.Canceled _ :: _) ->
+          Worker.log_event w (Operation_included oph)
+      | Error _ ->
+          (* This may happen if the peer timed out for example. *)
+          Worker.log_event w (Operation_not_fetched oph)
+
+    (* This function fetches an operation if it is not already handled
+       by the mempool. To ensure we fetch at most a given operation,
+       we record it in the [pv.fetching] field.
+
+       Invariant: This function should be the only one to modify this
+       field.
+
+       Invariant: To ensure, there is no leak, we ensure that when the
+       promise [p] is terminated, we remove the operation from the
+       fetching operations. This is to ensure that if an error
+       happened, we can still fetch this operation in the future. *)
+    let may_fetch_operation w pv peer oph =
+      let situation = Operation_encountered.Notified peer in
+      if not @@ already_handled ~situation w pv oph then
+        (* Do not wait the operation to be fetched. The
+           [fetch_operation] will push a worker request if the
+           operation is fetched succesffuly. *)
+        ignore
+          (Lwt.finalize
+             (fun () ->
+               pv.fetching <- Operation_hash.Set.add oph pv.fetching ;
+               fetch_operation w pv ?peer oph)
+             (fun () ->
+               pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
+               Lwt.return_unit))
+
     let on_notify w pv peer mempool =
-      let all_ophs =
-        List.fold_left
-          (fun s oph -> Operation_hash.Set.add oph s)
-          mempool.Mempool.pending
-          mempool.known_valid
-      in
-      let to_fetch =
-        Operation_hash.Set.filter
-          (fun oph ->
-            not
-              (already_handled
-                 ~situation:(Operation_encountered.Notified peer)
-                 w
-                 pv
-                 oph))
-          all_ophs
-      in
-      fetch_operations w pv ~peer to_fetch
+      let may_fetch_operation = may_fetch_operation w pv (Some peer) in
+      List.iter may_fetch_operation mempool.Mempool.known_valid ;
+      Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
     let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
@@ -1156,40 +1035,35 @@ module Make
             pv.predecessor
 
     (** Recomputes the [validation_state] by replaying the list of
-        [applied] operations.
+       [applied] operations.
 
-        This should be called when the list of [applied] operations
-        is modified in a way that is not easily transmitted to the
-        [validation_state], and/or might make this list invalid.
-        E.g. a banned operation has been removed from this list, but
-        we could not simply revert its effect on the state; moreover
-        operations that were initially applied after the banned
-        operation might no longer be classified as [`Applied].
+        This should be called when the list of [applied] operations is
+       modified in a way that is not easily transmitted to the
+       [validation_state], and/or might make this list invalid.
+       E.g. a banned operation has been removed from this list, but we
+       could not simply revert its effect on the state; moreover
+       operations that were initially applied after the banned
+       operation might no longer be classified as [`Applied].
 
-        Applied operations are removed from fields [applied] and
-        [in_mempool], and sent back to [pending]. The [validation_state]
-        is reset to the chain head, and the field [mempool.known_valid]
-        is cleared. Previously applied operations are then classified
-        anew, in the order they were initially applied. *)
-    let reclassify_applied_operations w pv =
+       [to_reclassify] which are operations applied but reseted by
+       [Classification.remove_applied] are sent back to [pending],
+       except the one banned of course. The [validation_state] is
+       reset to the chain head, and the field [mempool.known_valid] is
+       cleared. Previously applied operations are then classified
+       anew, the order might be a bit different from the one in which
+       they were applied. *)
+    let reclassify_applied_operations w pv to_reclassify =
       (* List of previously applied operations, in the order they should
          be reclassified (since [applied] operations are stored in reverse
          order of application: cf "General description of the mempool"
          comment). *)
-      let previously_applied = List.rev pv.shell.classification.applied in
-      (* Previously applied operations are removed from [applied] and
-         [in_mempool], and added instead to [pending]. *)
-      pv.shell.classification.applied <- [] ;
-      let (in_mempool_without_applied, pending_with_applied) =
-        List.fold_left
-          (fun (in_mempool, pending) (oph, op) ->
-            ( Operation_hash.Set.remove oph in_mempool,
-              Operation_hash.Map.add oph op pending ))
-          (pv.shell.classification.in_mempool, pv.shell.pending)
-          previously_applied
+      let pending =
+        Operation_hash.Map.union
+          (fun _ v _ -> Some v)
+          pv.shell.pending
+          to_reclassify
       in
-      pv.shell.classification.in_mempool <- in_mempool_without_applied ;
-      pv.shell.pending <- pending_with_applied ;
+      pv.shell.pending <- pending ;
       (* The [validation_state] is reset to the chain head. *)
       Prevalidation.create
         (Distributed_db.chain_store pv.shell.parameters.chain_db)
@@ -1204,12 +1078,12 @@ module Make
         Mempool.{known_valid = []; pending = pv.shell.mempool.pending}
       in
       (* Previously applied operations are classified anew. *)
-      let reclassify_operation (acc_validation_state, acc_mempool) (oph, op) =
+      let reclassify_operation oph op (acc_validation_state, acc_mempool) =
         pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
         (* These operations should not be notified again: they have already
            been notified when they were initially classified. *)
         classify_operation
-          ~should_notify:false
+          ~notify:false
           w
           pv
           acc_validation_state
@@ -1217,10 +1091,10 @@ module Make
           op
           oph
       in
-      List.fold_left_s
+      Operation_hash.Map.fold_s
         reclassify_operation
+        to_reclassify
         (validation_state, mempool)
-        previously_applied
       >>= fun (new_validation_state, new_mempool) ->
       pv.validation_state <- Ok new_validation_state ;
       set_mempool
@@ -1243,18 +1117,19 @@ module Make
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       if Classification.is_in_mempool oph_to_ban pv.shell.classification then
-        if Classification.is_applied oph_to_ban pv.shell.classification then (
-          Classification.remove_applied oph_to_ban pv.shell.classification ;
-          (* To revert the effect of the banned operation's application on the
-             [validation_state], we have to reset it to the chain head and
-             reclassify the other applied operations.
-             Note: [oph_to_ban] has not been removed from
-             [pv.shell.mempool.known_valid], because
-             {!reclassify_applied_operations} will empty it anyway. *)
-          reclassify_applied_operations w pv)
-        else (
-          Classification.remove_not_applied oph_to_ban pv.shell.classification ;
-          set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool))
+        (* To revert the effect of the banned operation's application on the
+           [validation_state], we have to reset it to the chain head and
+           reclassify the other applied operations.
+           Note: [oph_to_ban] has not been removed from
+           [pv.shell.mempool.known_valid], because
+           {!reclassify_applied_operations} will empty it anyway. *)
+        match
+          Classification.remove_applied oph_to_ban pv.shell.classification
+        with
+        | None ->
+            Classification.remove_not_applied oph_to_ban pv.shell.classification ;
+            set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool)
+        | Some to_reclassify -> reclassify_applied_operations w pv to_reclassify
       else (
         pv.shell.pending <-
           Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
@@ -1319,10 +1194,15 @@ module Make
           Operation_hash.Set.empty
           mempool.known_valid
       in
-      let parameters = {limits; chain_db} in
-      let classification =
-        Classification.mk_empty limits.max_refused_operations
+      let classification_parameters =
+        Classification.
+          {
+            map_size_limit = limits.max_refused_operations;
+            on_discarded_operation = Requester.clear_or_cancel chain_db;
+          }
       in
+      let classification = Classification.create classification_parameters in
+      let parameters = {limits; chain_db} in
       let shell =
         {
           classification;
@@ -1348,7 +1228,7 @@ module Make
           rpc_directory = build_rpc_directory w;
         }
       in
-      fetch_operations w pv.shell fetching ;
+      Operation_hash.Set.iter (may_fetch_operation w pv.shell None) fetching ;
       return pv
 
     let on_error w r st errs =
@@ -1420,7 +1300,6 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
     ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
-      let module Notifier = Make_notifier (Filter.Proto) in
       let module Prevalidator =
         Make
           (Filter)
@@ -1431,8 +1310,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 
             let chain_id = chain_id
           end)
-          (Notifier)
-          (Prevalidation.Requester)
+          (Distributed_db.Operation)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
@@ -1577,13 +1455,3 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
-
-module Internal_for_tests = struct
-  module type CLASSIFICATOR = CLASSIFICATOR
-
-  module Classificator : functor
-    (Requester : Requester.REQUESTER with type key = Operation_hash.t)
-    ->
-    CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
-    Classificator
-end

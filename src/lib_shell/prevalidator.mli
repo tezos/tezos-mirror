@@ -128,23 +128,3 @@ val information : t -> Worker_types.worker_information
 val pipeline_length : t -> int
 
 val rpc_directory : t option RPC_directory.t
-
-module Internal_for_tests : sig
-  module type CLASSIFICATOR = sig
-    type input
-
-    val handle_branch_refused :
-      input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-    val handle_branch_delayed :
-      input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-    val handle_refused :
-      input -> Operation.t -> Operation_hash.t -> error list -> unit
-  end
-
-  module Classificator : functor
-    (Requester : Requester.REQUESTER with type key = Operation_hash.t)
-    ->
-    CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t
-end

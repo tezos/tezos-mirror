@@ -133,7 +133,11 @@ module Request = struct
 end
 
 module Operation_encountered = struct
-  type situation = Injected | Arrived | Notified of P2p_peer_id.t | Other
+  type situation =
+    | Injected
+    | Arrived
+    | Notified of P2p_peer_id.t option
+    | Other
 
   type t = situation * Operation_hash.t
 
@@ -164,24 +168,25 @@ module Operation_encountered = struct
           (obj3
              (req "situation" (constant "notified"))
              (req "operation" Operation_hash.encoding)
-             (req "peer" P2p_peer_id.encoding))
+             (req "peer" (option P2p_peer_id.encoding)))
           (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
           (fun ((), oph, peer) -> (Notified peer, oph));
         case
           (Tag 3)
           ~title:"other"
-          (obj3
+          (obj2
              (req "situation" (constant "other"))
-             (req "operation" Operation_hash.encoding)
-             (req "peer" P2p_peer_id.encoding))
-          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
-          (fun ((), oph, peer) -> (Notified peer, oph));
+             (req "operation" Operation_hash.encoding))
+          (function (Other, hash) -> Some ((), hash) | _ -> None)
+          (fun ((), oph) -> (Other, oph));
       ]
 
   let situation_pp ppf = function
     | Injected -> Format.fprintf ppf "injected"
     | Arrived -> Format.fprintf ppf "arrived"
-    | Notified pid -> Format.fprintf ppf "notified from %a" P2p_peer_id.pp pid
+    | Notified None -> Format.fprintf ppf "notified from the previous run"
+    | Notified (Some pid) ->
+        Format.fprintf ppf "notified from %a" P2p_peer_id.pp pid
     | Other -> Format.fprintf ppf "encountered"
 
   let pp ppf (situation, oph) =
