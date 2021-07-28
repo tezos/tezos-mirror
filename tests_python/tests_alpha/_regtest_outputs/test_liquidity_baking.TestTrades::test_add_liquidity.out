@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestTrades::test_add_liquidity
 
 Node is bootstrapped.
-Estimated gas: 12505.752 units (will add 100 for safety)
+Estimated gas: 12085.752 units (will add 100 for safety)
 Estimated storage: 141 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001616
+    Fee to the baker: ꜩ0.001574
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 12606
+    Gas limit: 12186
     Storage limit: 161 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001616
-      fees(the baker who will include this operation,0) ... +ꜩ0.001616
+      [CONTRACT_HASH] ................ -ꜩ0.001574
+      fees(the baker who will include this operation,0) ... +ꜩ0.001574
     Transaction:
       Amount: ꜩ9001
       From: [CONTRACT_HASH]
@@ -57,7 +57,7 @@ This sequence of operations was run:
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
         Storage size: 2263 bytes
         Paid storage size diff: 68 bytes
-        Consumed gas: 4930.813
+        Consumed gas: 4720.813
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.017
       Transaction:
@@ -73,7 +73,7 @@ This sequence of operations was run:
           Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
         Storage size: 2048 bytes
         Paid storage size diff: 70 bytes
-        Consumed gas: 3374.441
+        Consumed gas: 3164.441
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0175
 

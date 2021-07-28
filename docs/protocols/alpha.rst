@@ -35,4 +35,4 @@ Minor changes
 - Gas improvements for typechecking instruction ``CONTRACT`` (MR :gl:`!3241`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
-  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075`)
+  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266`)
