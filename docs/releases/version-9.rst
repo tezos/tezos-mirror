@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.4
+Version 9.5
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -31,23 +31,27 @@ Version 9.4 fixes an issue in the mempool that caused too many
 operations referring to unknown blocks to be kept, resulting in the
 node running out of memory.
 
+Version 9.5 fixes a bug that could result in a corrupted storage
+and in assert failure errors.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.4
+  git checkout v9.5
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.4`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.5`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.5 <../CHANGES.html#version-9-5>`_
 - `Version 9.4 <../CHANGES.html#version-9-4>`_
 - `Version 9.3 <../CHANGES.html#version-9-3>`_
 - `Version 9.2 <../CHANGES.html#version-9-2>`_
