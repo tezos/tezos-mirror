@@ -116,6 +116,12 @@ in which case the rule applies to any port on that address. Note that this does 
 enable RPC on that address, to do that the address must be included in ``listen-addrs`` or passed
 by command-line argument ``--rpc-addr`` when starting the node.
 
+.. note::
+   Both listening addresses and ACL addresses are resolved at the node's startup
+   (they're not re-resolved at any point after that), before matching. This
+   means that only IP addresses are ever matched, so if e.g. "localhost" is
+   written in the policy and listening address is set "127.0.0.1", it *does* match. The converse is also true.
+
 Additionally either the ``whitelist`` **or** the ``blacklist`` field must be specified
 (but not both), containing a list of paths which should be black-listed or
 white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``tezos-client rpc``
