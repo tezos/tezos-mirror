@@ -449,7 +449,7 @@ let default_rpc =
     cors_origins = [];
     cors_headers = [];
     tls = None;
-    acl = RPC_server.Acl.default_policy;
+    acl = RPC_server.Acl.empty_policy;
   }
 
 let default_shell =
@@ -861,7 +861,7 @@ let rpc : rpc Data_encoding.t =
           "acl"
           ~description:"A list of RPC ACLs for specific listening addresses."
           RPC_server.Acl.policy_encoding
-          RPC_server.Acl.default_policy))
+          RPC_server.Acl.empty_policy))
 
 let worker_limits_encoding default_size default_level =
   let open Data_encoding in

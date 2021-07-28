@@ -76,10 +76,6 @@ module Acl : sig
       for testing. *)
   val empty_policy : policy
 
-  (** This is the default policy. Currently equivalent to [empty] above, but that
-      will likely change at some point in the future. *)
-  val default_policy : policy
-
   val policy_encoding : policy Data_encoding.t
 
   (** Returns the JSON representation of the policy. *)
@@ -115,4 +111,13 @@ module Acl : sig
       to match them with listening addresses given to the server. *)
 
   val resolve_domain_names : policy -> policy Lwt.t
+
+  module Internal_for_test : sig
+    type endpoint = P2p_point.Id.addr_port_id
+
+    val resolve_domain_names :
+      (endpoint -> (Ipaddr.V6.t * int option) list Lwt.t) ->
+      policy ->
+      policy Lwt.t
+  end
 end
