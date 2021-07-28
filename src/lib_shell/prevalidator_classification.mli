@@ -81,16 +81,17 @@ val remove_applied :
       from all fields of [classes] except from [applied]. *)
 val remove_not_applied : Operation_hash.t -> t -> unit
 
-(** [add ~on_discarded_operation class oph op classes] adds the
-   operation [op] with hash [oph] classified as [class] to the
-   classifier [classes]. The [on_discarded_operation] callback is
-   called for any operation discarded in this process. Currently, an
-   operation is discarded if the corresponding class field is full. In
-   that case, the new operation is added to the class, and the one
-   removed is discarded. An operation is also discarded when it is
-   classified as [Refused]. The callback [on_discarded_operation]
-   which was given by the function {create} when the value [classes]
-   was created is called on each discarded operation. **)
+(** [add ~notify class oph op classes] adds the operation [op] with
+   hash [oph] classified as [class] to the classifier [classes]. The
+   [on_discarded_operation] callback (given as a parameter of
+   [classes]) is called for any operation discarded in this
+   process. Currently, an operation is discarded if the corresponding
+   class field is full. In that case, the new operation is added to
+   the class, and the one removed is discarded. An operation is also
+   discarded when it is classified as [Refused]. The callback
+   [on_discarded_operation] which was given by the function {create}
+   when the value [classes] was created is called on each discarded
+   operation. *)
 val add :
   notify:(unit -> unit) ->
   classification ->
