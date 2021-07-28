@@ -52,41 +52,43 @@ type empty_cell = EmptyCell
 type end_of_stack = empty_cell * empty_cell
 
 module Type_size : sig
-  type t
+  type 'a t
 
-  val merge : t -> t -> t tzresult
+  val merge : 'a t -> 'b t -> 'a t tzresult
 end
 
-type ty_metadata = {annot : type_annot option; size : Type_size.t}
+type 'a ty_metadata = {annot : type_annot option; size : 'a Type_size.t}
 
 type _ comparable_ty =
-  | Unit_key : ty_metadata -> unit comparable_ty
-  | Never_key : ty_metadata -> never comparable_ty
-  | Int_key : ty_metadata -> z num comparable_ty
-  | Nat_key : ty_metadata -> n num comparable_ty
-  | Signature_key : ty_metadata -> signature comparable_ty
-  | String_key : ty_metadata -> Script_string.t comparable_ty
-  | Bytes_key : ty_metadata -> Bytes.t comparable_ty
-  | Mutez_key : ty_metadata -> Tez.t comparable_ty
-  | Bool_key : ty_metadata -> bool comparable_ty
-  | Key_hash_key : ty_metadata -> public_key_hash comparable_ty
-  | Key_key : ty_metadata -> public_key comparable_ty
-  | Timestamp_key : ty_metadata -> Script_timestamp.t comparable_ty
-  | Chain_id_key : ty_metadata -> Chain_id.t comparable_ty
-  | Address_key : ty_metadata -> address comparable_ty
+  | Unit_key : unit ty_metadata -> unit comparable_ty
+  | Never_key : never ty_metadata -> never comparable_ty
+  | Int_key : z num ty_metadata -> z num comparable_ty
+  | Nat_key : n num ty_metadata -> n num comparable_ty
+  | Signature_key : signature ty_metadata -> signature comparable_ty
+  | String_key : Script_string.t ty_metadata -> Script_string.t comparable_ty
+  | Bytes_key : Bytes.t ty_metadata -> Bytes.t comparable_ty
+  | Mutez_key : Tez.t ty_metadata -> Tez.t comparable_ty
+  | Bool_key : bool ty_metadata -> bool comparable_ty
+  | Key_hash_key : public_key_hash ty_metadata -> public_key_hash comparable_ty
+  | Key_key : public_key ty_metadata -> public_key comparable_ty
+  | Timestamp_key :
+      Script_timestamp.t ty_metadata
+      -> Script_timestamp.t comparable_ty
+  | Chain_id_key : Chain_id.t ty_metadata -> Chain_id.t comparable_ty
+  | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * ty_metadata
+      * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair comparable_ty
   | Union_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * ty_metadata
+      * ('a, 'b) union ty_metadata
       -> ('a, 'b) union comparable_ty
-  | Option_key : 'v comparable_ty * ty_metadata -> 'v option comparable_ty
-
-val comparable_ty_metadata : 'a comparable_ty -> ty_metadata
+  | Option_key :
+      'v comparable_ty * 'v option ty_metadata
+      -> 'v option comparable_ty
 
 val unit_key : annot:type_annot option -> unit comparable_ty
 
@@ -1186,46 +1188,58 @@ and logger = {
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
-  | Unit_t : ty_metadata -> unit ty
-  | Int_t : ty_metadata -> z num ty
-  | Nat_t : ty_metadata -> n num ty
-  | Signature_t : ty_metadata -> signature ty
-  | String_t : ty_metadata -> Script_string.t ty
-  | Bytes_t : ty_metadata -> bytes ty
-  | Mutez_t : ty_metadata -> Tez.t ty
-  | Key_hash_t : ty_metadata -> public_key_hash ty
-  | Key_t : ty_metadata -> public_key ty
-  | Timestamp_t : ty_metadata -> Script_timestamp.t ty
-  | Address_t : ty_metadata -> address ty
-  | Bool_t : ty_metadata -> bool ty
+  | Unit_t : unit ty_metadata -> unit ty
+  | Int_t : z num ty_metadata -> z num ty
+  | Nat_t : n num ty_metadata -> n num ty
+  | Signature_t : signature ty_metadata -> signature ty
+  | String_t : Script_string.t ty_metadata -> Script_string.t ty
+  | Bytes_t : Bytes.t ty_metadata -> bytes ty
+  | Mutez_t : Tez.t ty_metadata -> Tez.t ty
+  | Key_hash_t : public_key_hash ty_metadata -> public_key_hash ty
+  | Key_t : public_key ty_metadata -> public_key ty
+  | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
+  | Address_t : address ty_metadata -> address ty
+  | Bool_t : bool ty_metadata -> bool ty
   | Pair_t :
       ('a ty * field_annot option * var_annot option)
       * ('b ty * field_annot option * var_annot option)
-      * ty_metadata
+      * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair ty
   | Union_t :
-      ('a ty * field_annot option) * ('b ty * field_annot option) * ty_metadata
+      ('a ty * field_annot option)
+      * ('b ty * field_annot option)
+      * ('a, 'b) union ty_metadata
       -> ('a, 'b) union ty
-  | Lambda_t : 'arg ty * 'ret ty * ty_metadata -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * ty_metadata -> 'v option ty
-  | List_t : 'v ty * ty_metadata -> 'v boxed_list ty
-  | Set_t : 'v comparable_ty * ty_metadata -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) map ty
-  | Big_map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty * ty_metadata -> 'arg typed_contract ty
+  | Lambda_t :
+      'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
+      -> ('arg, 'ret) lambda ty
+  | Option_t : 'v ty * 'v option ty_metadata -> 'v option ty
+  | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
+  | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
+  | Map_t :
+      'k comparable_ty * 'v ty * ('k, 'v) map ty_metadata
+      -> ('k, 'v) map ty
+  | Big_map_t :
+      'k comparable_ty * 'v ty * ('k, 'v) big_map ty_metadata
+      -> ('k, 'v) big_map ty
+  | Contract_t :
+      'arg ty * 'arg typed_contract ty_metadata
+      -> 'arg typed_contract ty
   | Sapling_transaction_t :
-      Sapling.Memo_size.t * ty_metadata
+      Sapling.Memo_size.t * Sapling.transaction ty_metadata
       -> Sapling.transaction ty
-  | Sapling_state_t : Sapling.Memo_size.t * ty_metadata -> Sapling.state ty
-  | Operation_t : ty_metadata -> operation ty
-  | Chain_id_t : ty_metadata -> Chain_id.t ty
-  | Never_t : ty_metadata -> never ty
-  | Bls12_381_g1_t : ty_metadata -> Bls12_381.G1.t ty
-  | Bls12_381_g2_t : ty_metadata -> Bls12_381.G2.t ty
-  | Bls12_381_fr_t : ty_metadata -> Bls12_381.Fr.t ty
-  | Ticket_t : 'a comparable_ty * ty_metadata -> 'a ticket ty
-  | Chest_key_t : ty_metadata -> Timelock.chest_key ty
-  | Chest_t : ty_metadata -> Timelock.chest ty
+  | Sapling_state_t :
+      Sapling.Memo_size.t * Sapling.state ty_metadata
+      -> Sapling.state ty
+  | Operation_t : operation ty_metadata -> operation ty
+  | Chain_id_t : Chain_id.t ty_metadata -> Chain_id.t ty
+  | Never_t : never ty_metadata -> never ty
+  | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
+  | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
+  | Bls12_381_fr_t : Bls12_381.Fr.t ty_metadata -> Bls12_381.Fr.t ty
+  | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
+  | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
+  | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
@@ -1347,8 +1361,6 @@ type kinstr_rewritek = {
 val kinstr_rewritek :
   ('a, 's, 'r, 'f) kinstr -> kinstr_rewritek -> ('a, 's, 'r, 'f) kinstr
 
-val ty_metadata : 'a ty -> ty_metadata
-
 val unit_t : annot:type_annot option -> unit ty
 
 val int_t : annot:type_annot option -> z num ty
@@ -1401,23 +1413,23 @@ val option_t :
 
 (* the quote is used to indicate where the annotation will go *)
 
-val option_string'_t : ty_metadata -> Script_string.t option ty
+val option_string'_t : _ ty_metadata -> Script_string.t option ty
 
-val option_bytes'_t : ty_metadata -> Bytes.t option ty
+val option_bytes'_t : _ ty_metadata -> Bytes.t option ty
 
 val option_nat_t : n num option ty
 
 val option_pair_nat_nat_t : (n num, n num) pair option ty
 
-val option_pair_nat'_nat'_t : ty_metadata -> (n num, n num) pair option ty
+val option_pair_nat'_nat'_t : _ ty_metadata -> (n num, n num) pair option ty
 
-val option_pair_nat_mutez'_t : ty_metadata -> (n num, Tez.t) pair option ty
+val option_pair_nat_mutez'_t : _ ty_metadata -> (n num, Tez.t) pair option ty
 
-val option_pair_mutez'_mutez'_t : ty_metadata -> (Tez.t, Tez.t) pair option ty
+val option_pair_mutez'_mutez'_t : _ ty_metadata -> (Tez.t, Tez.t) pair option ty
 
-val option_pair_int'_nat_t : ty_metadata -> (z num, n num) pair option ty
+val option_pair_int'_nat_t : _ ty_metadata -> (z num, n num) pair option ty
 
-val option_pair_int_nat'_t : ty_metadata -> (z num, n num) pair option ty
+val option_pair_int_nat'_t : _ ty_metadata -> (z num, n num) pair option ty
 
 val list_t :
   Script.location ->

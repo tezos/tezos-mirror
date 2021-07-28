@@ -847,7 +847,7 @@ let serialize_ty_for_error_carbonated t =
   Gas_monad.unsafe_embed (fun ctxt -> serialize_ty_for_error ctxt t)
 
 let merge_type_metadata :
-    legacy:bool -> ty_metadata -> ty_metadata -> ty_metadata tzresult =
+    legacy:bool -> 'a ty_metadata -> 'b ty_metadata -> 'a ty_metadata tzresult =
  fun ~legacy {size = size_a; annot = annot_a} {size = size_b; annot = annot_b} ->
   Type_size.merge size_a size_b >>? fun size ->
   merge_type_annot ~legacy annot_a annot_b >|? fun annot -> {annot; size}
@@ -3470,17 +3470,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
        fun n value_ty ty ->
         match (n, ty) with
         | (0, _) -> ok @@ Comb_set_proof_argument (Comb_set_zero, value_ty)
-        | (1, Pair_t ((_hd_ty, at1, at2), (tl_ty, bt1, bt2), annot)) ->
-            let after_ty =
-              Pair_t ((value_ty, at1, at2), (tl_ty, bt1, bt2), annot)
-            in
-            ok @@ Comb_set_proof_argument (Comb_set_one, after_ty)
-        | (n, Pair_t ((hd_ty, at1, at2), (tl_ty, bt1, bt2), annot)) ->
+        | (1, Pair_t ((_hd_ty, at1, at2), (tl_ty, bt1, bt2), {annot; _})) ->
+            pair_t loc (value_ty, at1, at2) (tl_ty, bt1, bt2) ~annot
+            >|? fun after_ty -> Comb_set_proof_argument (Comb_set_one, after_ty)
+        | (n, Pair_t ((hd_ty, at1, at2), (tl_ty, bt1, bt2), {annot; _})) ->
             make_proof_argument (n - 2) value_ty tl_ty
-            >|? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
-            let after_ty =
-              Pair_t ((hd_ty, at1, at2), (tl_ty', bt1, bt2), annot)
-            in
+            >>? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
+            pair_t loc (hd_ty, at1, at2) (tl_ty', bt1, bt2) ~annot
+            >|? fun after_ty ->
             Comb_set_proof_argument
               (Comb_set_plus_two comb_set_left_witness, after_ty)
         | _ ->
@@ -4266,7 +4263,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( capture,
           Item_t
             ( Lambda_t
-                (Pair_t ((capture_ty, _, _), (arg_ty, _, _), lam_annot), ret, _),
+                ( Pair_t
+                    ((capture_ty, _, _), (arg_ty, _, _), {annot = lam_annot; _}),
+                  ret,
+                  _ ),
               rest,
               _ ),
           _ ) ) ->
@@ -4275,7 +4275,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Eq, capture_ty, ctxt) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> IApply (kinfo, capture_ty, k))} in
-      let stack = Item_t (Lambda_t (arg_ty, ret, lam_annot), rest, annot) in
+      lambda_t loc arg_ty ret ~annot:lam_annot
+      (* This cannot fail because the type [lambda 'arg 'ret] is always smaller than
+         the input type [lambda (pair 'arg 'capture) 'ret]. In an ideal world, there
+         would be a smart deconstructor to ensure this statically. *)
+      >>?=
+      fun res_ty ->
+      let stack = Item_t (res_ty, rest, annot) in
       (typed ctxt 0 loc instr stack
         : ((a, s) judgement * context) tzresult Lwt.t)
   | (Prim (loc, I_DIP, [code], annot), Item_t (v, rest, stack_annot)) -> (
@@ -4393,11 +4399,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (Timestamp_t tname, rest, annot) in
       typed ctxt 0 loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
-      Item_t (Timestamp_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ) ->
+      Item_t
+        ( Timestamp_t {annot = tn1; _},
+          Item_t (Timestamp_t {annot = tn2; _}, rest, _),
+          _ ) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_annot ~legacy tn1 tn2 >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IDiff_timestamps (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest, annot) in
+      let stack = Item_t (int_t ~annot:tname, rest, annot) in
       typed ctxt 0 loc instr stack
   (* string operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
@@ -5155,16 +5164,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (Bls12_381_fr_t tname, rest, annot) in
       typed ctxt 0 loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Nat_t tname, Item_t (Bls12_381_fr_t _, rest, _), _) ) ->
+      Item_t (Nat_t {annot = tname; _}, Item_t (Bls12_381_fr_t _, rest, _), _)
+    ) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr_z (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest, annot) in
+      let stack = Item_t (bls12_381_fr_t ~annot:tname, rest, annot) in
       typed ctxt 0 loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Int_t tname, Item_t (Bls12_381_fr_t _, rest, _), _) ) ->
+      Item_t (Int_t {annot = tname; _}, Item_t (Bls12_381_fr_t _, rest, _), _)
+    ) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr_z (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest, annot) in
+      let stack = Item_t (bls12_381_fr_t ~annot:tname, rest, annot) in
       typed ctxt 0 loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_fr_t tname, Item_t (Int_t _, rest, _), _) ) ->

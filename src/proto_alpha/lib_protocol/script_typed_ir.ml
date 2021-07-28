@@ -29,29 +29,62 @@ open Script_int
 
 (* Preliminary definitions. *)
 
-(* This error registered in script_tc_errors_registration.ml *)
-(* type error += Type_too_large : Script.location * int -> error *)
+type var_annot = Var_annot of string
+
+type type_annot = Type_annot of string
+
+type field_annot = Field_annot of string
+
+type never = |
+
+type address = Contract.t * string
+
+type ('a, 'b) pair = 'a * 'b
+
+type ('a, 'b) union = L of 'a | R of 'b
+
+type operation = packed_internal_operation * Lazy_storage.diffs option
+
+type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
 
 module type TYPE_SIZE = sig
-  type t
+  (* A type size represents the size of its type parameter.
+     This constraint is enforced inside this module (Script_type_ir), hence there
+     should be no way to construct a type size outside of it.
 
-  val one : t
+     It allows keeping type metadata and types non-private.
 
-  val two : t
+     This module is here because we want three levels of visibility over this
+     code:
+     - inside this submodule, we have [type 'a t = int]
+     - outside of [Script_typed_ir], the ['a t] type is abstract and we have
+        the invariant that whenever [x : 'a t] we have that [x] is exactly
+        the size of ['a].
+     - in-between (inside [Script_typed_ir] but outside the [Type_size]
+        submodule), the type is abstract but we have access to unsafe
+        constructors that can break the invariant.
+  *)
+  type 'a t
 
-  val three : t
+  val merge : 'a t -> 'b t -> 'a t tzresult
 
-  val four : t
+  (* Unsafe constructors, to be used only safely and inside this module *)
 
-  val merge : t -> t -> t tzresult
+  val one : _ t
 
-  val compound1 : Script.location -> t -> t tzresult
+  val two : _ t
 
-  val compound2 : Script.location -> t -> t -> t tzresult
+  val three : _ t
+
+  val four : (_, _) pair option t
+
+  val compound1 : Script.location -> _ t -> _ t tzresult
+
+  val compound2 : Script.location -> _ t -> _ t -> _ t tzresult
 end
 
 module Type_size : TYPE_SIZE = struct
-  type t = int
+  type 'a t = int
 
   let one = 1
 
@@ -75,76 +108,61 @@ module Type_size : TYPE_SIZE = struct
   let compound2 loc size1 size2 = of_int loc (1 + size1 + size2)
 end
 
-type var_annot = Var_annot of string
-
-type type_annot = Type_annot of string
-
-type field_annot = Field_annot of string
-
-type never = |
-
-type address = Contract.t * string
-
-type ('a, 'b) pair = 'a * 'b
-
-type ('a, 'b) union = L of 'a | R of 'b
-
-type operation = packed_internal_operation * Lazy_storage.diffs option
-
-type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
-
 type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
-type ty_metadata = {annot : type_annot option; size : Type_size.t}
+type 'a ty_metadata = {annot : type_annot option; size : 'a Type_size.t}
 
 type _ comparable_ty =
-  | Unit_key : ty_metadata -> unit comparable_ty
-  | Never_key : ty_metadata -> never comparable_ty
-  | Int_key : ty_metadata -> z num comparable_ty
-  | Nat_key : ty_metadata -> n num comparable_ty
-  | Signature_key : ty_metadata -> signature comparable_ty
-  | String_key : ty_metadata -> Script_string.t comparable_ty
-  | Bytes_key : ty_metadata -> Bytes.t comparable_ty
-  | Mutez_key : ty_metadata -> Tez.t comparable_ty
-  | Bool_key : ty_metadata -> bool comparable_ty
-  | Key_hash_key : ty_metadata -> public_key_hash comparable_ty
-  | Key_key : ty_metadata -> public_key comparable_ty
-  | Timestamp_key : ty_metadata -> Script_timestamp.t comparable_ty
-  | Chain_id_key : ty_metadata -> Chain_id.t comparable_ty
-  | Address_key : ty_metadata -> address comparable_ty
+  | Unit_key : unit ty_metadata -> unit comparable_ty
+  | Never_key : never ty_metadata -> never comparable_ty
+  | Int_key : z num ty_metadata -> z num comparable_ty
+  | Nat_key : n num ty_metadata -> n num comparable_ty
+  | Signature_key : signature ty_metadata -> signature comparable_ty
+  | String_key : Script_string.t ty_metadata -> Script_string.t comparable_ty
+  | Bytes_key : Bytes.t ty_metadata -> Bytes.t comparable_ty
+  | Mutez_key : Tez.t ty_metadata -> Tez.t comparable_ty
+  | Bool_key : bool ty_metadata -> bool comparable_ty
+  | Key_hash_key : public_key_hash ty_metadata -> public_key_hash comparable_ty
+  | Key_key : public_key ty_metadata -> public_key comparable_ty
+  | Timestamp_key :
+      Script_timestamp.t ty_metadata
+      -> Script_timestamp.t comparable_ty
+  | Chain_id_key : Chain_id.t ty_metadata -> Chain_id.t comparable_ty
+  | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * ty_metadata
+      * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair comparable_ty
   | Union_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * ty_metadata
+      * ('a, 'b) union ty_metadata
       -> ('a, 'b) union comparable_ty
-  | Option_key : 'v comparable_ty * ty_metadata -> 'v option comparable_ty
+  | Option_key :
+      'v comparable_ty * 'v option ty_metadata
+      -> 'v option comparable_ty
 
-let comparable_ty_metadata : type a. a comparable_ty -> ty_metadata = function
-  | Unit_key meta
-  | Never_key meta
-  | Int_key meta
-  | Nat_key meta
-  | Signature_key meta
-  | String_key meta
-  | Bytes_key meta
-  | Mutez_key meta
-  | Bool_key meta
-  | Key_hash_key meta
-  | Key_key meta
-  | Timestamp_key meta
-  | Chain_id_key meta
-  | Address_key meta
-  | Pair_key (_, _, meta)
-  | Union_key (_, _, meta)
-  | Option_key (_, meta) ->
-      meta
+let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
+  | Unit_key meta -> meta
+  | Never_key meta -> meta
+  | Int_key meta -> meta
+  | Nat_key meta -> meta
+  | Signature_key meta -> meta
+  | String_key meta -> meta
+  | Bytes_key meta -> meta
+  | Mutez_key meta -> meta
+  | Bool_key meta -> meta
+  | Key_hash_key meta -> meta
+  | Key_key meta -> meta
+  | Timestamp_key meta -> meta
+  | Chain_id_key meta -> meta
+  | Address_key meta -> meta
+  | Pair_key (_, _, meta) -> meta
+  | Union_key (_, _, meta) -> meta
+  | Option_key (_, meta) -> meta
 
 let comparable_ty_size t = (comparable_ty_metadata t).size
 
@@ -1008,46 +1026,58 @@ and logger = {
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
-  | Unit_t : ty_metadata -> unit ty
-  | Int_t : ty_metadata -> z num ty
-  | Nat_t : ty_metadata -> n num ty
-  | Signature_t : ty_metadata -> signature ty
-  | String_t : ty_metadata -> Script_string.t ty
-  | Bytes_t : ty_metadata -> bytes ty
-  | Mutez_t : ty_metadata -> Tez.t ty
-  | Key_hash_t : ty_metadata -> public_key_hash ty
-  | Key_t : ty_metadata -> public_key ty
-  | Timestamp_t : ty_metadata -> Script_timestamp.t ty
-  | Address_t : ty_metadata -> address ty
-  | Bool_t : ty_metadata -> bool ty
+  | Unit_t : unit ty_metadata -> unit ty
+  | Int_t : z num ty_metadata -> z num ty
+  | Nat_t : n num ty_metadata -> n num ty
+  | Signature_t : signature ty_metadata -> signature ty
+  | String_t : Script_string.t ty_metadata -> Script_string.t ty
+  | Bytes_t : Bytes.t ty_metadata -> bytes ty
+  | Mutez_t : Tez.t ty_metadata -> Tez.t ty
+  | Key_hash_t : public_key_hash ty_metadata -> public_key_hash ty
+  | Key_t : public_key ty_metadata -> public_key ty
+  | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
+  | Address_t : address ty_metadata -> address ty
+  | Bool_t : bool ty_metadata -> bool ty
   | Pair_t :
       ('a ty * field_annot option * var_annot option)
       * ('b ty * field_annot option * var_annot option)
-      * ty_metadata
+      * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair ty
   | Union_t :
-      ('a ty * field_annot option) * ('b ty * field_annot option) * ty_metadata
+      ('a ty * field_annot option)
+      * ('b ty * field_annot option)
+      * ('a, 'b) union ty_metadata
       -> ('a, 'b) union ty
-  | Lambda_t : 'arg ty * 'ret ty * ty_metadata -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * ty_metadata -> 'v option ty
-  | List_t : 'v ty * ty_metadata -> 'v boxed_list ty
-  | Set_t : 'v comparable_ty * ty_metadata -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) map ty
-  | Big_map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty * ty_metadata -> 'arg typed_contract ty
+  | Lambda_t :
+      'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
+      -> ('arg, 'ret) lambda ty
+  | Option_t : 'v ty * 'v option ty_metadata -> 'v option ty
+  | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
+  | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
+  | Map_t :
+      'k comparable_ty * 'v ty * ('k, 'v) map ty_metadata
+      -> ('k, 'v) map ty
+  | Big_map_t :
+      'k comparable_ty * 'v ty * ('k, 'v) big_map ty_metadata
+      -> ('k, 'v) big_map ty
+  | Contract_t :
+      'arg ty * 'arg typed_contract ty_metadata
+      -> 'arg typed_contract ty
   | Sapling_transaction_t :
-      Sapling.Memo_size.t * ty_metadata
+      Sapling.Memo_size.t * Sapling.transaction ty_metadata
       -> Sapling.transaction ty
-  | Sapling_state_t : Sapling.Memo_size.t * ty_metadata -> Sapling.state ty
-  | Operation_t : ty_metadata -> operation ty
-  | Chain_id_t : ty_metadata -> Chain_id.t ty
-  | Never_t : ty_metadata -> never ty
-  | Bls12_381_g1_t : ty_metadata -> Bls12_381.G1.t ty
-  | Bls12_381_g2_t : ty_metadata -> Bls12_381.G2.t ty
-  | Bls12_381_fr_t : ty_metadata -> Bls12_381.Fr.t ty
-  | Ticket_t : 'a comparable_ty * ty_metadata -> 'a ticket ty
-  | Chest_key_t : ty_metadata -> Timelock.chest_key ty
-  | Chest_t : ty_metadata -> Timelock.chest ty
+  | Sapling_state_t :
+      Sapling.Memo_size.t * Sapling.state ty_metadata
+      -> Sapling.state ty
+  | Operation_t : operation ty_metadata -> operation ty
+  | Chain_id_t : Chain_id.t ty_metadata -> Chain_id.t ty
+  | Never_t : never ty_metadata -> never ty
+  | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
+  | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
+  | Bls12_381_fr_t : Bls12_381.Fr.t ty_metadata -> Bls12_381.Fr.t ty
+  | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
+  | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
+  | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
@@ -1482,40 +1512,39 @@ let kinstr_rewritek :
   | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
   | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
 
-let ty_metadata : type a. a ty -> ty_metadata = function
-  | Unit_t meta
-  | Never_t meta
-  | Int_t meta
-  | Nat_t meta
-  | Signature_t meta
-  | String_t meta
-  | Bytes_t meta
-  | Mutez_t meta
-  | Bool_t meta
-  | Key_hash_t meta
-  | Key_t meta
-  | Timestamp_t meta
-  | Chain_id_t meta
-  | Address_t meta
-  | Pair_t (_, _, meta)
-  | Union_t (_, _, meta)
-  | Option_t (_, meta)
-  | Lambda_t (_, _, meta)
-  | List_t (_, meta)
-  | Set_t (_, meta)
-  | Map_t (_, _, meta)
-  | Big_map_t (_, _, meta)
-  | Ticket_t (_, meta)
-  | Contract_t (_, meta)
-  | Sapling_transaction_t (_, meta)
-  | Sapling_state_t (_, meta)
-  | Operation_t meta
-  | Bls12_381_g1_t meta
-  | Bls12_381_g2_t meta
-  | Bls12_381_fr_t meta
-  | Chest_t meta
-  | Chest_key_t meta ->
-      meta
+let ty_metadata : type a. a ty -> a ty_metadata = function
+  | Unit_t meta -> meta
+  | Never_t meta -> meta
+  | Int_t meta -> meta
+  | Nat_t meta -> meta
+  | Signature_t meta -> meta
+  | String_t meta -> meta
+  | Bytes_t meta -> meta
+  | Mutez_t meta -> meta
+  | Bool_t meta -> meta
+  | Key_hash_t meta -> meta
+  | Key_t meta -> meta
+  | Timestamp_t meta -> meta
+  | Chain_id_t meta -> meta
+  | Address_t meta -> meta
+  | Pair_t (_, _, meta) -> meta
+  | Union_t (_, _, meta) -> meta
+  | Option_t (_, meta) -> meta
+  | Lambda_t (_, _, meta) -> meta
+  | List_t (_, meta) -> meta
+  | Set_t (_, meta) -> meta
+  | Map_t (_, _, meta) -> meta
+  | Big_map_t (_, _, meta) -> meta
+  | Ticket_t (_, meta) -> meta
+  | Contract_t (_, meta) -> meta
+  | Sapling_transaction_t (_, meta) -> meta
+  | Sapling_state_t (_, meta) -> meta
+  | Operation_t meta -> meta
+  | Bls12_381_g1_t meta -> meta
+  | Bls12_381_g2_t meta -> meta
+  | Bls12_381_fr_t meta -> meta
+  | Chest_t meta -> meta
+  | Chest_key_t meta -> meta
 
 let ty_size t = (ty_metadata t).size
 
