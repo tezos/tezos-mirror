@@ -127,9 +127,28 @@ module Arbitrary = struct
     make generate
 end
 
+let resolve_domain_name =
+  let resolver =
+    TzString.Map.of_seq
+    @@ List.to_seq
+         [
+           ( "localhost",
+             List.map Ipaddr.V6.of_int64 [(0L, 1L); (0L, 281472812449793L)] );
+           ("127.0.0.1", List.map Ipaddr.V6.of_int64 [(0L, 281472812449793L)]);
+         ]
+  in
+  fun addr -> TzString.Map.find_opt addr resolver |> Option.value ~default:[]
+
+let resolve_domain_names_in_policy =
+  RPC_server.Acl.Internal_for_test.resolve_domain_names (fun {addr; port; _} ->
+      resolve_domain_name addr
+      |> List.map (fun addr -> (addr, port))
+      |> Lwt.return)
+
 let example_policy =
   `A
     [
+      `O [("address", `String "localhost:22"); ("blacklist", `A [])];
       `O
         [
           ("address", `String "localhost");
@@ -215,13 +234,10 @@ let check_find_policy =
   Test.make
     ~name:"put_policy preserves existing entries."
     Arbitrary.find_policy_setup
-    (fun {policy; searched_for; added_entry} ->
+    (fun {policy; searched_for = {addr; port; _}; added_entry} ->
       let open RPC_server.Acl in
-      let search_str = P2p_point.Id.addr_port_id_to_string searched_for in
-      let before = find_policy_by_domain_name policy search_str in
-      let after =
-        find_policy_by_domain_name (put_policy added_entry policy) search_str
-      in
+      let before = find_policy policy (addr, port) in
+      let after = find_policy (put_policy added_entry policy) (addr, port) in
       assert_results_satisfactory before after)
 
 let mk_acl ((tag, matchers) : [`Whitelist | `Blacklist] * string list) =
@@ -231,38 +247,43 @@ let mk_acl ((tag, matchers) : [`Whitelist | `Blacklist] * string list) =
   | `Whitelist -> Deny_all {except}
   | `Blacklist -> Allow_all {except}
 
-let check_acl_search (description : string)
+let check_acl_search (description : string) (policy : RPC_server.Acl.policy)
     (expected : ([`Whitelist | `Blacklist] * string list) option)
-    (addr : string) =
+    (addr : string * int option) =
   Alcotest.check
     (Alcotest.option acl_testable)
     description
     (Option.map mk_acl expected)
-    (RPC_server.Acl.find_policy_by_domain_name example_policy addr)
+    (RPC_server.Acl.find_policy policy addr)
 
 let test_finding_policy =
   Alcotest.test_case "policy matching rules" `Quick (fun () ->
       check_acl_search
         "An exact match is when address and port match exactly."
+        example_policy
         (Some (`Whitelist, ["GET/**"; "DELETE/chains/*/invalid_blocks/*"]))
-        "192.168.1.5:8732" ;
+        ("192.168.1.5", Some 8732) ;
       check_acl_search
         "When port is present in ACL and does not match given port, then it's \
          not a match."
+        example_policy
         None
-        "192.168.1.5:5431" ;
+        ("192.168.1.5", Some 5431) ;
       check_acl_search
         "If policy omits a port, any port matches"
+        example_policy
         (Some (`Blacklist, ["/monitor/**"]))
-        "192.168.0.3:8732" ;
+        ("192.168.0.3", Some 8732) ;
       check_acl_search
         "If policy omits a port, any port matches"
+        example_policy
         (Some (`Blacklist, ["/monitor/**"]))
-        "192.168.0.3:9732" ;
+        ("192.168.0.3", Some 9732) ;
       check_acl_search
         "The first matching rule returns immediately"
+        example_policy
         (Some (`Whitelist, ["/chains/**"]))
-        "localhost:8732")
+        ("localhost", Some 8732))
 
 let ensure_default_policy_parses =
   let open QCheck in
@@ -316,6 +337,29 @@ let ensure_unsafe_rpcs_blocked =
             ~actual:RPC_server.Acl.(allowed ~meth ~path secure))
         known_unsafe_rpcs)
 
+let test_matching_with_name_resolving =
+  let to_test =
+    [
+      ("::1", Some 22, Some (`Blacklist, []));
+      ("::1", Some 8732, Some (`Whitelist, ["/chains/**"]));
+    ]
+  in
+  Alcotest.test_case
+    "make sure addresses match well with domain name resolving"
+    `Quick
+    (fun () ->
+      Lwt_main.run
+        ( resolve_domain_names_in_policy example_policy >>= fun policy ->
+          List.iter
+            (fun (ip_addr, port, expected) ->
+              check_acl_search
+                "a domain name should match an appropriate IP address"
+                policy
+                expected
+                (ip_addr, port))
+            to_test ;
+          Lwt.return () ))
+
 let () =
   let open Qcheck_helpers in
   Alcotest.run
@@ -327,4 +371,5 @@ let () =
       );
       ("find_policy_matching_rules", [test_finding_policy]);
       ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
+      ("test_matching_with_name_resolving", [test_matching_with_name_resolving]);
     ]

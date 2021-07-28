@@ -93,10 +93,6 @@ module Acl : sig
       returned. *)
   val find_policy : policy -> string * int option -> t option
 
-  (** The same as [find_policy], but it accepts a string representing a domain
-      name address or an IP address (and optionally a port number). *)
-  val find_policy_by_domain_name : policy -> string -> t option
-
   (** Returns string representation of a given matcher. Useful for testing. *)
   val matcher_to_string : matcher -> string
 

@@ -204,11 +204,6 @@ module Acl = struct
     in
     List.find_map (match_addr port address) policy
 
-  let find_policy_by_domain_name policies hostname =
-    match P2p_point.Id.parse_addr_port_id hostname with
-    | Error _ -> None
-    | Ok {addr; port; _} -> find_policy policies (addr, port)
-
   let acl_type = function Allow_all _ -> `Blacklist | Deny_all _ -> `Whitelist
 
   module Internal_for_test = struct
