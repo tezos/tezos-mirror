@@ -79,7 +79,6 @@
         "Script_typed_ir",
         "Michelson_v1_gas",
         "Script_ir_annot",
-        "Script_type_size",
         "Script_list",
         "Script_comparable",
         "Script_set",
