@@ -73,6 +73,12 @@
             (select void_for_linking-008-PtEdo2Zk from
               (tezos-embedded-protocol-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
               (-> void_for_linking-008-PtEdo2Zk.empty))
+            (select void_for_linking-009-PsFLoren from
+              (tezos-embedded-protocol-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
+              (-> void_for_linking-009-PsFLoren.empty))
+            (select void_for_linking-010-PtGRANAD from
+              (tezos-embedded-protocol-010-PtGRANAD -> void_for_linking-010-PtGRANAD.empty)
+              (-> void_for_linking-010-PtGRANAD.empty))
             (select void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer from
               (tezos-protocol-plugin-008-PtEdo2Zk-registerer -> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty)
               (-> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty))
