@@ -281,6 +281,12 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
+Version 9.5
+===========
+
+-  Fixed a bug that could result in a corrupted storage and in assert
+   failure errors.
+
 Version 9.4
 ===========
 
