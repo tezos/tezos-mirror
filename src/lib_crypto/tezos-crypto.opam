@@ -16,13 +16,14 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "hacl-star" { >= "0.3" }
+  "hacl-star" { >= "0.3" & < "0.4"}
   "zarith"
   "secp256k1-internal"
   "uecc"
   "ringo" { = "0.5" }
   "alcotest" { with-test & >= "1.1.0" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "mirage-crypto" {= "0.10.2"}
 ]
 conflicts: [
   "hacl_x25519"
