@@ -1218,6 +1218,19 @@ module Event = struct
       ~msg:"failed to convert {addr} to an ipv4 address"
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
+
+  let all_rpc_allowed =
+    declare_1
+      ~level:Error
+      ~section
+      ~name:"all_rpc_allowed"
+      ~msg:"FULL access to RPC enabled; this is very risky."
+      ~pp1:
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+            P2p_point.Id.pp_addr_port_id)
+      ("addresses", Data_encoding.(list P2p_point.Id.addr_port_id_encoding))
 end
 
 let string_of_json_encoding_error exn =
@@ -1249,7 +1262,7 @@ let to_string cfg =
 let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
-    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
+    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = []) ?(allow_all_rpc = [])
     ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
@@ -1258,6 +1271,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     cfg.disable_config_validation || disable_config_validation
   in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
+  (if List.compare_length_with allow_all_rpc 1 >= 0 then
+   Event.(emit all_rpc_allowed allow_all_rpc)
+  else Lwt.return_unit)
+  >>= fun () ->
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
@@ -1283,6 +1300,14 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
+  let acl =
+    (* Take addresses listed in allow_all_rpc and add each of them with allow_all
+       ACL to the policy. *)
+    List.fold_right
+      RPC_server.Acl.put_policy
+      (List.map (fun addr -> (addr, RPC_server.Acl.allow_all)) allow_all_rpc)
+      cfg.rpc.acl
+  in
   let p2p : p2p =
     {
       expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
@@ -1302,7 +1327,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;
-      acl = cfg.rpc.acl;
+      acl;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}

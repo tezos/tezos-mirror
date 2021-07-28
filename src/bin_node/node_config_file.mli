@@ -99,6 +99,10 @@ val default_p2p : p2p
 
 val default_config : t
 
+(** Update the given configuration. This is mostly used to apply the CLI
+    arguments to the default config when starting or configuring the node.
+    Arguments to this function roughly reflect the options in
+    [Node_shared_arg.t]. *)
 val update :
   ?disable_config_validation:bool ->
   ?data_dir:string ->
@@ -114,6 +118,7 @@ val update :
   ?listen_addr:string ->
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
+  ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
   ?enable_testchain:bool ->
