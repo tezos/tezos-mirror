@@ -603,7 +603,7 @@ let as_query_result json =
 let as_query_results json =
   JSON.(json |-> "results" |> as_list |> List.map as_query_result)
 
-let query config select =
+let raw_query config select =
   let select = prefix_measurement config select in
   let query = show_select select in
   let url = Uri.add_query_param' (make_url config "query") ("q", query) in
@@ -632,6 +632,59 @@ let get column convert_json (result_data_point : result_data_point) =
   match String_map.find_opt column result_data_point with
   | None -> failwith (sf "missing column in InfluxDB response: %s" column)
   | Some json -> convert_json json
+
+(* Wrapper over [raw_query] to handle nested queries with aggregation functions,
+   as it looks like they are not working correctly in InfluxDB (at least in v1.8). *)
+let query config select =
+  let supported_aggregate_functions =
+    let exception Not_supported in
+    let supported_aggregate_function = function
+      | Function (COUNT, _) -> `count
+      | Function (MEAN, Field f) -> `mean f
+      | Function (MEDIAN, Field f) -> `median f
+      | Function (STDDEV, Field f) -> `stddev f
+      | _ -> raise Not_supported
+    in
+    try Some (List.map supported_aggregate_function select.columns)
+    with Not_supported -> None
+  in
+  match (select.from, supported_aggregate_functions) with
+  | (Select sub_query, Some functions) ->
+      let* sub_query_results = raw_query config sub_query in
+      let aggregate (results : result_data_point list) : result_data_point =
+        let get_field field = List.map (get field JSON.as_float) results in
+        let compute_function acc = function
+          | `count ->
+              String_map.add
+                (column_name_of_func COUNT)
+                (float (List.length results))
+                acc
+          | `mean field ->
+              String_map.add
+                (column_name_of_func MEAN)
+                (Statistics.mean (get_field field))
+                acc
+          | `median field ->
+              String_map.add
+                (column_name_of_func MEDIAN)
+                (Statistics.median (get_field field))
+                acc
+          | `stddev field ->
+              String_map.add
+                (column_name_of_func STDDEV)
+                (Statistics.stddev (get_field field))
+                acc
+        in
+        let floats =
+          List.fold_left compute_function String_map.empty functions
+        in
+        String_map.map
+          (fun float ->
+            JSON.annotate ~origin:"InfluxDB.query aggregator" (`Float float))
+          floats
+      in
+      return (List.map aggregate sub_query_results |> List.map (fun x -> [x]))
+  | _ -> raw_query config select
 
 let show_query_result = function
   | [] -> "No results."

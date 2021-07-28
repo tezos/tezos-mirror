@@ -531,26 +531,6 @@ let get_pending_data_points ?(tags = []) measurement =
 
 type check = Mean | Median
 
-let mean list =
-  let count = ref 0 in
-  let sum = ref 0. in
-  List.iter
-    (fun value ->
-      incr count ;
-      sum := !sum +. value)
-    list ;
-  !sum /. float !count
-
-let median list =
-  let sorted = List.sort Float.compare list |> Array.of_list in
-  let count = Array.length sorted in
-  if count > 0 then
-    if count mod 2 = 0 then
-      let i = count / 2 in
-      (sorted.(i - 1) +. sorted.(i)) /. 2.
-    else sorted.(count / 2)
-  else invalid_arg "Long_test.median: empty list"
-
 let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
     ?(margin = 0.2) ?(check = Mean) ?(stddev = false) ?data_points ?(tags = [])
     measurement field =
@@ -577,8 +557,8 @@ let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
   | _ :: _ -> (
       let current_value =
         match check with
-        | Mean -> mean current_values
-        | Median -> median current_values
+        | Mean -> Statistics.mean current_values
+        | Median -> Statistics.median current_values
       in
       let get_previous stats handle_values =
         let* values =
