@@ -35,7 +35,7 @@
 (** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ?bake ~protocol () =
-  let* client =
+  let* (node, client) =
     Client.init_activate_bake
       ?nodes_args
       ?parameter_file
@@ -44,13 +44,7 @@ let init ?nodes_args ?parameter_file ?bake ~protocol () =
       ~protocol
       ()
   in
-  let* (node, proxy_server) =
-    match Client.get_mode client with
-    | Client (Some (Node node)) ->
-        let* proxy_server = Proxy_server.init node in
-        return (node, proxy_server)
-    | _ -> Test.fail "Client mode should be Client (Some (Node _))"
-  in
+  let* proxy_server = Proxy_server.init node in
   Client.set_mode (Client (Some (Proxy_server proxy_server))) client ;
   return (node, proxy_server, client)
 
@@ -66,13 +60,8 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         (["time_between_blocks"], Some "[\"60\"]");
       ]
   in
-  let* client =
+  let* (node, client) =
     Client.init_activate_bake ~parameter_file ~protocol `Client ()
-  in
-  let node =
-    match Client.get_mode client with
-    | Client (Some (Node node)) -> node
-    | _ -> Test.fail "Unexpected client mode"
   in
   let* (endpoint : Client.endpoint option) =
     match mode with

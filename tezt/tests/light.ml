@@ -31,8 +31,6 @@
    Dependencies: tezt/tests/proxy.ml
  *)
 
-open Lwt.Infix
-
 let init_light ~protocol =
   let get_current_level =
     match protocol with
@@ -43,8 +41,7 @@ let init_light ~protocol =
      because it uses RPC.*.get_current_level, which depends on client.ml
      already. In other words, putting this code in client.ml would
      create a cyclic dependency *)
-  let* (client, nodes) = Client.init_light () in
-  let node0 = List.nth nodes 0 in
+  let* (client, node0, node1) = Client.init_light () in
   Log.info "Activating protocol %s" @@ Protocol.tag protocol ;
   let endpoint = Client.(Node node0) in
   let* () = Client.activate_protocol ~endpoint ~protocol client in
@@ -59,12 +56,10 @@ let init_light ~protocol =
   let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap2.alias client in
   let* level_json = get_current_level ~endpoint client in
   let level = JSON.(level_json |-> "level" |> as_int) in
-  let* () =
-    Lwt_list.iter_s (fun node ->
-        Log.info "Waiting for node %s to be at level %d" (Node.name node) level ;
-        Node.wait_for_level node level >>= fun _ -> Lwt.return_unit)
-    @@ List.tl nodes
+  let () =
+    Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in
+  let* _ = Node.wait_for_level node1 level in
   Log.info "All nodes are at level %d" level ;
   (* Set mode again: back to light mode *)
   Client.set_mode mode_received client ;

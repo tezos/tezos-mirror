@@ -376,8 +376,10 @@ let show_address ?show_secret ~alias client =
           Test.fail "Cannot extract key from client_output: %s" client_output
       | Some hash -> hash
     in
-    let public_key = client_output =~* rex "Public key: ?(\\w*)" in
-    let secret_key = client_output =~* rex "Secret key: ?(\\w*)" in
+    let public_key = client_output =~* rex "Public Key: ?(\\w*)" in
+    let secret_key =
+      client_output =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
+    in
     {alias; public_key_hash; public_key; secret_key}
   in
   let* output =
@@ -561,6 +563,25 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash -> return hash
 
+let spawn_stresstest ?endpoint ?tps ~sources ~transfers client =
+  let tps_arg =
+    Option.map (fun (tps : int) -> ["--tps"; Int.to_string tps]) tps
+    |> Option.value ~default:[]
+  in
+  spawn_command ?endpoint client
+  @@ [
+       "stresstest";
+       "transfer";
+       "using";
+       sources;
+       "--transfers";
+       Int.to_string transfers;
+     ]
+  @ tps_arg
+
+let stresstest ?endpoint ?tps ~sources ~transfers client =
+  spawn_stresstest ?endpoint ?tps ~sources ~transfers client |> Process.check
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
@@ -655,11 +676,9 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     List.filter_map filter_node_arg nodes_args
     @ Node.[Connections 1; Synchronisation_threshold 0]
   in
-  let* nodes =
-    let* node1 = Node.init ~name:"node1" nodes_args
-    and* node2 = Node.init ~name:"node2" nodes_args in
-    return [node1; node2]
-  in
+  let* node1 = Node.init ~name:"node1" nodes_args
+  and* node2 = Node.init ~name:"node2" nodes_args in
+  let nodes = [node1; node2] in
   let client =
     create_with_mode
       ?path
@@ -705,7 +724,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       (fun peer -> Admin.connect_address ~peer client)
       (List.tl nodes)
   in
-  return (client, nodes)
+  return (client, node1, node2)
 
 let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
@@ -727,11 +746,11 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node, client)
   | `Light ->
-      let* (client, _) =
+      let* (client, node1, _) =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node1, client)

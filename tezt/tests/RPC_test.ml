@@ -87,7 +87,7 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
             true
         | `Client | `Light | `Proxy -> false
       in
-      let* client =
+      let* (node, client) =
         Client.init_activate_bake
           ?parameter_file
           ~bake
@@ -96,15 +96,11 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
           ()
       in
       let* endpoint =
-        match (Client.get_mode client, test_mode_tag) with
-        | (Client.Client (Some (Node node)), `Client)
-        | (Client.Light (_, Node node :: _), `Light)
-        | (Client.Proxy (Node node), `Proxy) ->
-            return Client.(Node node)
-        | (Client.Client (Some (Node node)), `Client_with_proxy_server) ->
+        match test_mode_tag with
+        | `Client | `Light | `Proxy -> return Client.(Node node)
+        | `Client_with_proxy_server ->
             let* proxy_server = Proxy_server.init node in
             return Client.(Proxy_server proxy_server)
-        | _ -> Test.fail "Unexpected state"
       in
       let* _ = rpc ?endpoint:(Some endpoint) client in
       unit)

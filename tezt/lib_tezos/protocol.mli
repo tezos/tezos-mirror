@@ -52,6 +52,9 @@ val parameter_file : ?constants:constants -> t -> string
 (** Get the path of the accuser of a protocol, such as ["./tezos-accuser-alpha"]. *)
 val accuser : t -> string
 
+(** Get the path of the baker of a protocol, such as ["./tezos-baker-alpha"]. *)
+val baker : t -> string
+
 (** Get the part of the daemon name that is specific to a protocol (e.g. ["008-PtEdo2Zk"]). *)
 val daemon_name : t -> string
 

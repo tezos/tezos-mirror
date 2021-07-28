@@ -406,6 +406,25 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** [stresstest ?endpoint ?tps souces transfers], calls
+ *  [tezos-client stresstest transfer using <sources> --transfers <transfers> --tps <tps>]. *)
+val stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  unit Lwt.t
+
+(** Same as [stresstest], but do not wait for the process to exit. *)
+val spawn_stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  Process.t
+
 (** Run [tezos-client hash data .. of type ...]
 
     Given that the output of [tezos-client] is:
@@ -487,12 +506,16 @@ val init :
   unit ->
   t Lwt.t
 
-(** Set up a client and a node and activate a protocol.
+(** Set up a client and node(s) and activate a protocol.
 
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
     - Activate the given protocol
-    - Bake (unless [~bake:false] is passed) *)
+    - Bake (unless [~bake:false] is passed)
+
+    In addition to the client, returns the first created node
+    (if [`Light] is passed, a second node has been created, but it is
+    not exposed). *)
 val init_activate_bake :
   ?path:string ->
   ?admin_path:string ->
@@ -505,7 +528,7 @@ val init_activate_bake :
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
-  t Lwt.t
+  (Node.t * t) Lwt.t
 
 (** Create a client with mode [Mockup] and run [create mockup].
 
@@ -525,8 +548,8 @@ val init_mockup :
   unit ->
   t Lwt.t
 
-(** Create a client with mode [Light]. In addition to the client, the list
-    of nodes is returned, as it is created by this call; and
+(** Create a client with mode [Light]. In addition to the client, created
+    nodes are returned, as they are created by this call; and
     the light mode needs tight interaction with the nodes. The [nodes_args]
     argument allows to configure the created nodes, but note
     that arguments [Node.Connections] and [Node.Synchronisation_threshold]
@@ -540,4 +563,4 @@ val init_light :
   ?min_agreement:float ->
   ?nodes_args:Node.argument list ->
   unit ->
-  (t * Node.t list) Lwt.t
+  (t * Node.t * Node.t) Lwt.t

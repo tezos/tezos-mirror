@@ -56,15 +56,14 @@ let parameter_file ?(constants = default_constants) protocol =
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
-let accuser = function
-  | Alpha -> "./tezos-accuser-alpha"
-  | Edo -> "./tezos-accuser-008-PtEdo2Zk"
-  | Florence -> "./tezos-accuser-009-PsFLoren"
-
 let daemon_name = function
   | Alpha -> "alpha"
   | Edo -> "008-PtEdo2Zk"
   | Florence -> "009-PsFLoren"
+
+let accuser proto = "./tezos-accuser-" ^ daemon_name proto
+
+let baker proto = "./tezos-baker-" ^ daemon_name proto
 
 let encoding_prefix = daemon_name
 
