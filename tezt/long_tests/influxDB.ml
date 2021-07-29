@@ -566,9 +566,9 @@ let show_result_data_point (data : result_data_point) =
       (String_map.bindings data
       |> List.map (fun (k, v) -> (k, JSON.unannotate v))))
 
-type query_result_serie = {name : string; values : result_data_point list}
+type query_result_series = {name : string; values : result_data_point list}
 
-let as_query_result_serie json =
+let as_query_result_series json =
   let columns = JSON.(json |-> "columns" |> as_list |> List.map as_string) in
   let as_map json =
     let values = JSON.as_list json in
@@ -589,13 +589,13 @@ let as_query_result_serie json =
   let values = JSON.(json |-> "values" |> as_list |> List.map as_map) in
   {name = JSON.(json |-> "name" |> as_string); values}
 
-type query_result = {statement_id : int; series : query_result_serie list}
+type query_result = {statement_id : int; series : query_result_series list}
 
 let as_query_result json =
   {
     statement_id = JSON.(json |-> "statement_id" |> as_int);
     series =
-      JSON.(json |-> "series" |> as_list |> List.map as_query_result_serie);
+      JSON.(json |-> "series" |> as_list |> List.map as_query_result_series);
   }
 
 let as_query_results json =
@@ -688,14 +688,14 @@ let show_query_result = function
   | [] -> "No results."
   | result ->
       with_buffer 1024 @@ fun buffer ->
-      let add_serie i serie =
-        Buffer.add_string buffer (sf "Result serie #%d:" i) ;
+      let add_series i series =
+        Buffer.add_string buffer (sf "Result series #%d:" i) ;
         let add_data_point i data_point =
           Buffer.add_char buffer '\n' ;
           Buffer.add_string
             buffer
             (sf "#%d: %s" i (show_result_data_point data_point))
         in
-        List.iteri add_data_point serie
+        List.iteri add_data_point series
       in
-      List.iteri add_serie result
+      List.iteri add_series result
