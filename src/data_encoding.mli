@@ -975,6 +975,12 @@ module Binary_schema : sig
   val encoding : t Encoding.t
 end
 
+module Binary_stream : sig
+  type t
+
+  val is_empty : t -> bool
+end
+
 module Binary : sig
   (** All the errors that might be returned while reading a binary value *)
   type read_error =
