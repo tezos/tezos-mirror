@@ -331,6 +331,8 @@ let rec unparse_ty : type a. context -> a ty -> (Script.node * context) tzresult
         ( T_sapling_state,
           [unparse_memo_size memo_size],
           unparse_type_annot tname )
+  | Chest_key_t tname -> return ctxt (T_chest_key, [], unparse_type_annot tname)
+  | Chest_t tname -> return ctxt (T_chest, [], unparse_type_annot tname)
 
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
@@ -380,7 +382,8 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       (Option_key (ty, tname), ctxt)
   | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
   | Contract_t _ | Operation_t _ | Bls12_381_fr_t _ | Bls12_381_g1_t _
-  | Bls12_381_g2_t _ | Sapling_state_t _ | Sapling_transaction_t _ ->
+  | Bls12_381_g2_t _ | Sapling_state_t _ | Sapling_transaction_t _
+  | Chest_key_t _ | Chest_t _ ->
       serialize_ty_for_error ctxt ty >>? fun (t, _ctxt) ->
       error (Comparable_type_expected (loc, t))
 
@@ -430,6 +433,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Bls12_381_fr_t tname -> tname
   | Sapling_state_t (_, tname) -> tname
   | Sapling_transaction_t (_, tname) -> tname
+  | Chest_key_t tname -> tname
+  | Chest_t tname -> tname
 
 let unparse_unit ctxt () = ok (Prim (-1, D_Unit, [], []), ctxt)
 
@@ -550,6 +555,11 @@ let unparse_bls12_381_fr ctxt x =
   let bytes = Bls12_381.Fr.to_bytes x in
   (Bytes (-1, bytes), ctxt)
 
+let unparse_with_data_encoding ctxt s unparse_cost encoding =
+  Lwt.return
+    ( Gas.consume ctxt unparse_cost >|? fun ctxt ->
+      let bytes = Data_encoding.Binary.to_bytes_exn encoding s in
+      (Bytes (-1, bytes), ctxt) )
 (* -- Unparsing data of complex types -- *)
 
 type ('ty, 'depth) comb_witness =
@@ -721,6 +731,8 @@ let rec check_dupable_ty :
   | Bls12_381_fr_t _ -> ok ctxt
   | Sapling_state_t _ -> ok ctxt
   | Sapling_transaction_t _ -> ok ctxt
+  | Chest_t _ -> ok ctxt
+  | Chest_key_t _ -> ok ctxt
   | Ticket_t _ -> error (Unexpected_ticket loc)
   | Pair_t ((ty_a, _, _), (ty_b, _, _), _) ->
       check_dupable_ty ctxt loc ty_a >>? fun ctxt ->
@@ -1115,6 +1127,10 @@ let merge_types :
           merge_type_annot tn1 tn2 >>$ fun tname ->
           merge_memo_sizes ms1 ms2 >|$ fun ms ->
           (Eq, Sapling_transaction_t (ms, tname))
+      | (Chest_t tn1, Chest_t tn2) ->
+          return (fun tname -> Chest_t tname) Eq tn1 tn2
+      | (Chest_key_t tn1, Chest_key_t tn2) ->
+          return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
           merge_type_error ~merge_type_error_flag ty1 ty2 >?$ fun err ->
           error err
@@ -1505,6 +1521,12 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
     | Prim (loc, T_key_hash, [], annot) ->
         parse_type_annot loc annot >>? fun ty_name ->
         ok (Ex_ty (Key_hash_t ty_name), ctxt)
+    | Prim (loc, T_chest_key, [], annot) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        ok (Ex_ty (Chest_key_t ty_name), ctxt)
+    | Prim (loc, T_chest, [], annot) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        ok (Ex_ty (Chest_t ty_name), ctxt)
     | Prim (loc, T_timestamp, [], annot) ->
         parse_type_annot loc annot >>? fun ty_name ->
         ok (Ex_ty (Timestamp_t ty_name), ctxt)
@@ -1850,6 +1872,8 @@ let check_packable ~legacy loc root =
     | Contract_t (_, _) when legacy -> ok_unit
     | Contract_t (_, _) -> error (Unexpected_contract loc)
     | Sapling_transaction_t _ -> ok ()
+    | Chest_key_t _ -> ok_unit
+    | Chest_t _ -> ok_unit
   in
   check root
 
@@ -2824,6 +2848,21 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
          result of a verify_update. *)
       traced_fail
         (Invalid_kind (location expr, [Int_kind; Seq_kind], kind expr))
+  (* Time lock*)
+  | (Chest_key_t _, Bytes (_, bytes)) -> (
+      match
+        Data_encoding.Binary.of_bytes_opt Timelock.chest_key_encoding bytes
+      with
+      | Some chest_key -> return (chest_key, ctxt)
+      | None -> fail_parse_data ())
+  | (Chest_key_t _, expr) ->
+      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+  | (Chest_t _, Bytes (_, bytes)) -> (
+      match Data_encoding.Binary.of_bytes_opt Timelock.chest_encoding bytes with
+      | Some chest -> return (chest, ctxt)
+      | None -> fail_parse_data ())
+  | (Chest_t _, expr) ->
+      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
 and[@coq_axiom_with_reason "gadt"] parse_returning :
     type arg ret.
@@ -5127,6 +5166,20 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let stack = Item_t (Option_t (ty, None), rest, annot) in
           typed ctxt 0 loc instr stack
       | _ -> (* TODO: fix injectivity of types *) assert false)
+  (* Timelocks *)
+  | ( Prim (loc, I_OPEN_CHEST, [], _),
+      Item_t (Chest_key_t _, Item_t (Chest_t _, Item_t (Nat_t _, rest, _), _), _)
+    ) ->
+      let instr = {apply = (fun kinfo k -> IOpen_chest (kinfo, k))} in
+      typed
+        ctxt
+        0
+        loc
+        instr
+        (Item_t
+           ( Union_t ((Bytes_t None, None), (Bool_t None, None), None),
+             rest,
+             None ))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -5141,7 +5194,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            | I_RENAME | I_PACK | I_ISNAT | I_INT | I_SELF | I_CHAIN_ID | I_NEVER
            | I_VOTING_POWER | I_TOTAL_VOTING_POWER | I_KECCAK | I_SHA3
            | I_PAIRING_CHECK | I_TICKET | I_READ_TICKET | I_SPLIT_TICKET
-           | I_JOIN_TICKETS ) as name),
+           | I_JOIN_TICKETS | I_OPEN_CHEST ) as name),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -5209,7 +5262,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            | I_LE | I_GE | I_SIZE | I_FAILWITH | I_RENAME | I_PACK | I_ISNAT
            | I_ADDRESS | I_SET_DELEGATE | I_CAST | I_MAP | I_ITER | I_LOOP_LEFT
            | I_UNPACK | I_CONTRACT | I_NEVER | I_KECCAK | I_SHA3 | I_READ_TICKET
-           | I_JOIN_TICKETS ) as name),
+           | I_JOIN_TICKETS | I_OPEN_CHEST ) as name),
           _,
           _ ),
       stack ) ->
@@ -5321,6 +5374,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_READ_TICKET;
              I_SPLIT_TICKET;
              I_JOIN_TICKETS;
+             I_OPEN_CHEST;
            ]
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
@@ -5940,6 +5994,18 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
                     Micheline.Prim
                       (-1, D_Pair, [Int (-1, id); unparsed_diff], []))),
             ctxt ) )
+  | (Chest_key_t _, s) ->
+      unparse_with_data_encoding
+        ctxt
+        s
+        Unparse_costs.chest_key
+        Timelock.chest_key_encoding
+  | (Chest_t _, s) ->
+      unparse_with_data_encoding
+        ctxt
+        s
+        Unparse_costs.chest
+        Timelock.chest_encoding
 
 and unparse_items :
     type k v.
@@ -6263,6 +6329,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Bls12_381_fr_t _ -> False_f
   | Sapling_transaction_t _ -> False_f
   | Ticket_t _ -> False_f
+  | Chest_key_t _ -> False_f
+  | Chest_t _ -> False_f
   | Pair_t ((l, _, _), (r, _, _), _) -> aux2 (fun l r -> Pair_f (l, r)) l r
   | Union_t ((l, _), (r, _), _) -> aux2 (fun l r -> Union_f (l, r)) l r
   | Option_t (t, _) -> aux1 (fun h -> Option_f h) t
@@ -6275,6 +6343,7 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
 
   Returns the updated value, the updated set of ids to copy, and the lazy
   storage diff to show on the receipt and apply on the storage.
+
 *)
 let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
     ~temporary ids_to_copy acc ty x =

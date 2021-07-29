@@ -36,3 +36,12 @@ Minor changes
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
   :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266`)
+
+New Features
+------------
+
+- Expose timelock primitive to the Michelson interpreter.
+  (MRs :gl:`!3160` :gl:`!2940` :gl:`!2950`) adds to michelson timelock
+  related types and opcode. It's allows a smart contract to include a
+  countermeasure against Block Producer Extractable Value.  More infos
+  in docs/alpha/timelock.rst

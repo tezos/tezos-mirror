@@ -114,3 +114,7 @@ let bls12_381_g2 = Bls12_381_g2_t None
 let bls12_381_fr = Bls12_381_fr_t None
 
 let ticket ty = Ticket_t (ty, None)
+
+let chest_key = Chest_key_t None
+
+let chest = Chest_t None

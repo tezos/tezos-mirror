@@ -476,6 +476,7 @@ module Script : sig
     | I_READ_TICKET
     | I_SPLIT_TICKET
     | I_JOIN_TICKETS
+    | I_OPEN_CHEST
     | T_bool
     | T_contract
     | T_int
@@ -506,6 +507,8 @@ module Script : sig
     | T_bls12_381_g2
     | T_bls12_381_fr
     | T_ticket
+    | T_chest_key
+    | T_chest
 
   type location = Micheline.canonical_location
 

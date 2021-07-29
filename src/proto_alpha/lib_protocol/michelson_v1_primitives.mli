@@ -150,6 +150,7 @@ type prim =
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
+  | I_OPEN_CHEST
   | T_bool
   | T_contract
   | T_int
@@ -180,9 +181,11 @@ type prim =
   | T_bls12_381_g2
   | T_bls12_381_fr
   | T_ticket
-
-(** Auxiliary types for error documentation.
+  | T_chest_key
+  | T_chest
+      (** Auxiliary types for error documentation.
     All the prim constructor prefixes must match their namespace. *)
+
 type namespace =
   | (* prefix "T" *) Type_namespace
   | (* prefix "D" *) Constant_namespace

@@ -963,6 +963,8 @@ module RPC = struct
               ( T_sapling_state,
                 [unparse_memo_size memo_size],
                 unparse_type_annot tname )
+        | Chest_t tname -> return (T_chest, [], unparse_type_annot tname)
+        | Chest_key_t tname -> return (T_chest_key, [], unparse_type_annot tname)
     end
 
     let register () =

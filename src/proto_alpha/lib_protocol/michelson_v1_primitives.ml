@@ -146,6 +146,7 @@ type prim =
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
+  | I_OPEN_CHEST
   | T_bool
   | T_contract
   | T_int
@@ -176,6 +177,8 @@ type prim =
   | T_bls12_381_g2
   | T_bls12_381_fr
   | T_ticket
+  | T_chest_key
+  | T_chest
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -205,13 +208,14 @@ let namespace = function
   | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
   | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SWAP
   | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT | I_UNPACK
-  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR ->
+  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST ->
       Instr_namespace
   | T_address | T_big_map | T_bool | T_bytes | T_chain_id | T_contract | T_int
   | T_key | T_key_hash | T_lambda | T_list | T_map | T_mutez | T_nat | T_never
   | T_operation | T_option | T_or | T_pair | T_sapling_state
   | T_sapling_transaction | T_set | T_signature | T_string | T_timestamp
-  | T_unit | T_bls12_381_fr | T_bls12_381_g1 | T_bls12_381_g2 | T_ticket ->
+  | T_unit | T_bls12_381_fr | T_bls12_381_g1 | T_bls12_381_g2 | T_ticket
+  | T_chest_key | T_chest ->
       Type_namespace
 
 let valid_case name =
@@ -340,6 +344,7 @@ let string_of_prim = function
   | I_READ_TICKET -> "READ_TICKET"
   | I_SPLIT_TICKET -> "SPLIT_TICKET"
   | I_JOIN_TICKETS -> "JOIN_TICKETS"
+  | I_OPEN_CHEST -> "OPEN_CHEST"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -370,6 +375,8 @@ let string_of_prim = function
   | T_bls12_381_g2 -> "bls12_381_g2"
   | T_bls12_381_fr -> "bls12_381_fr"
   | T_ticket -> "ticket"
+  | T_chest_key -> "chest_key"
+  | T_chest -> "chest"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
@@ -483,6 +490,7 @@ let prim_of_string = function
   | "READ_TICKET" -> ok I_READ_TICKET
   | "SPLIT_TICKET" -> ok I_SPLIT_TICKET
   | "JOIN_TICKETS" -> ok I_JOIN_TICKETS
+  | "OPEN_CHEST" -> ok I_OPEN_CHEST
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -513,6 +521,8 @@ let prim_of_string = function
   | "bls12_381_g2" -> ok T_bls12_381_g2
   | "bls12_381_fr" -> ok T_bls12_381_fr
   | "ticket" -> ok T_ticket
+  | "chest_key" -> ok T_chest_key
+  | "chest" -> ok T_chest
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -714,6 +724,9 @@ let prim_encoding =
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
          ("GET_AND_UPDATE", I_GET_AND_UPDATE);
+         ("chest", T_chest);
+         ("chest_key", T_chest_key);
+         ("OPEN_CHEST", I_OPEN_CHEST);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]

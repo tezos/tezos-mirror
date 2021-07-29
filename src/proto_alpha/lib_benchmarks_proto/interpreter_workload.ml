@@ -222,6 +222,8 @@ type instruction_name =
   (* Misc *)
   | N_IHalt
   | N_ILog
+  (* Timelock*)
+  | N_IOpen_chest
 
 type continuation_name =
   | N_KNil
@@ -408,6 +410,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IBig_map_get_and_update -> "N_IBig_map_get_and_update"
   | N_IHalt -> "N_IHalt"
   | N_ILog -> "N_ILog"
+  | N_IOpen_chest -> "N_IOpen_chest"
 
 let string_of_continuation_name : continuation_name -> string =
  fun c ->
@@ -629,6 +632,7 @@ let all_instructions =
     N_IBig_map_get_and_update;
     N_IHalt;
     N_ILog;
+    N_IOpen_chest;
   ]
 
 let all_continuations =
@@ -1105,6 +1109,9 @@ module Instructions = struct
   let halt = ir_sized_step N_IHalt nullary
 
   let log = ir_sized_step N_ILog nullary
+
+  let open_chest time size =
+    ir_sized_step N_IOpen_chest (binary "time" time "size" size)
 end
 
 module Control = struct
@@ -1454,6 +1461,10 @@ let extract_ir_sized_step :
       Instructions.join_tickets size1 size2 tez1 tez2
   | (IHalt _, _) -> Instructions.halt
   | (ILog _, _) -> Instructions.log
+  | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
+      let plaintext_size = Timelock.get_plaintext_size chest - 1 in
+      let log_time = Z.log2 Z.(one + pow (Script_int_repr.to_zint time) 10) in
+      Instructions.open_chest log_time plaintext_size
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =

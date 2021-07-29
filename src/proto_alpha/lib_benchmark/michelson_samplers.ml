@@ -674,6 +674,10 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
               "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_state_t _ ->
             Stdlib.failwith "Michelson_samplers: sapling state not handled yet"
+        | Chest_key_t _ ->
+            Stdlib.failwith "Michelson_samplers: chest key not handled yet"
+        | Chest_t _ ->
+            Stdlib.failwith "Michelson_samplers: chest not handled yet"
 
     and generate_lambda :
         type arg ret.

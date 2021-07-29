@@ -31,7 +31,7 @@
     fixed number of sequential operations.
 
     In the interface of this module, this fixed number is consistently named
-    [time] and is always represented by an arbitrary precision integer [Z.t].
+    [time] and is represented by an integer.
 
     Once opened via the slow method a proof of opening can be produced to avoid
     having to do so again. This proof is verifiable in logarithmic time.
@@ -65,12 +65,12 @@ type rsa_public
 type rsa_secret
 
 (** Proof that the opening of a value is the claimed value.
-    Is concretely a member of the RSA group. *)
+    It is concretely a member of the RSA group. *)
 type time_lock_proof
 
 (** Locked value that can be quickly access with a secret or slowly-access with
     a number of sequential operations.
-    Is concretely a member of the RSA group. *)
+    It is concretely a member of the RSA group. *)
 type locked_value
 
 (** Member of the RSA group that we will lock. In our case it represents a
@@ -81,7 +81,7 @@ type unlocked_value
     we want to protect *)
 type ciphertext
 
-(** Generates random RSA keys of 2046 bits.
+(** Generates random RSA keys of 2048 bits.
     The size works only if we use them for a small amount of time.
     !!! NEW KEYS SHOULD BE GENERATED FOR EACH LOCKING !!!
 
@@ -101,32 +101,32 @@ val unlocked_value_to_symmetric_key : unlocked_value -> symmetric_key
 (** Unlock a value using RSA secret and hash the result to derive a symmetric key using
     [unlocked_value_to_symmetric_key] *)
 val locked_value_to_symmetric_key_with_secret :
-  rsa_secret -> time:Z.t -> locked_value -> symmetric_key
+  rsa_secret -> time:int -> locked_value -> symmetric_key
 
 (** Unlock a value using the RSA secret. *)
 val unlock_with_secret :
-  rsa_secret -> time:Z.t -> locked_value -> unlocked_value
+  rsa_secret -> time:int -> locked_value -> unlocked_value
 
 (** Unlock a value using the RSA secret. Also produces a proof certifying
     that the result is indeed what had been locked. *)
 val unlock_and_prove_with_secret :
-  rsa_secret -> time:Z.t -> locked_value -> unlocked_value * time_lock_proof
+  rsa_secret -> time:int -> locked_value -> unlocked_value * time_lock_proof
 
 (** Unlock a value the slow way, without the RSA secret. Also produces a proof certifying
     that the result is indeed what had been locked. *)
 val unlock_and_prove_without_secret :
-  rsa_public -> time:Z.t -> locked_value -> unlocked_value * time_lock_proof
+  rsa_public -> time:int -> locked_value -> unlocked_value * time_lock_proof
 
 val prove_without_secret :
-  rsa_public -> time:Z.t -> locked_value -> unlocked_value -> time_lock_proof
+  rsa_public -> time:int -> locked_value -> unlocked_value -> time_lock_proof
 
 val prove_with_secret :
-  rsa_secret -> time:Z.t -> locked_value -> unlocked_value -> time_lock_proof
+  rsa_secret -> time:int -> locked_value -> unlocked_value -> time_lock_proof
 
 (** Verifies that [locked_value] indeed contains [unlocked_value] with parameters [rsa_public] and [time:Z.t]. *)
 val verify_time_lock :
   rsa_public ->
-  time:Z.t ->
+  time:int ->
   locked_value ->
   unlocked_value ->
   time_lock_proof ->
@@ -137,7 +137,7 @@ val verify_time_lock :
     returns None otherwise. *)
 val locked_value_to_symmetric_key_with_proof :
   rsa_public ->
-  time:Z.t ->
+  time:int ->
   unlocked_value ->
   locked_value ->
   time_lock_proof ->
@@ -151,13 +151,16 @@ val encrypt : symmetric_key -> bytes -> ciphertext
     ciphertext, otherwise returns None. *)
 val decrypt : symmetric_key -> ciphertext -> bytes option
 
+val ciphertext_encoding : ciphertext Data_encoding.t
+
+val proof_encoding : time_lock_proof Data_encoding.t
+
 (*------Exposed to the protocol----------*)
 
 (** Contains a value (the decryption of the ciphertext) that can be provably
     recovered in [time] sequential operation or with the rsa secret. *)
 type chest = {
   locked_value : locked_value;
-  time : Z.t;
   rsa_public : rsa_public;
   ciphertext : ciphertext;
 }
@@ -170,7 +173,7 @@ type chest_key = {unlocked_value : unlocked_value; proof : time_lock_proof}
 val chest_key_encoding : chest_key Data_encoding.t
 
 (** Result of the opening of a chest.
-    The opening can fail in two way which we distinguish to blame the right party.
+    The opening can fail in two ways which we distinguish to blame the right party.
     One can provide a false unlocked_value or unlocked_proof, in which case
     we return [Bogus_opening] and the provider of the chest key is at fault.
     Othewise, one can lock the wrong key or put garbage in the ciphertext in which case
@@ -180,14 +183,28 @@ val chest_key_encoding : chest_key Data_encoding.t
 
 type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
 
-val open_chest : chest -> chest_key -> opening_result
+(** Takes a chest, chest key and time and tries to recover the underlying
+    plaintext. See the documentation of opening_result. *)
+val open_chest : chest -> chest_key -> time:int -> opening_result
 
+(** Gives the size of the underlying plaintext in a chest in bytes.
+    Used for gas accounting*)
+val get_plaintext_size : chest -> int
 (*----End protocol exposure -----*)
 
 (** High level function which takes care of generating the locked value, the RSA
     parameters, and encrypt the payload. Also returns the chest key *)
 val create_chest_and_chest_key :
-  payload:Bytes.t -> time:Z.t -> chest * chest_key
+  payload:Bytes.t -> time:int -> chest * chest_key
 
 (** High level function which unlock the value and create the time-lock proof. *)
-val create_chest_key : chest -> chest_key
+val create_chest_key : chest -> time:int -> chest_key
+
+(**  ----- !!!!! Do not use for wallets: the RNG is not safe !!!!----
+     Sampler for the gasbenchmarks. Takes an Ocaml RNG state as arg for
+     reproducibility. *)
+val chest_sampler :
+  rng_state:Random.State.t ->
+  plaintext_size:int ->
+  time:int ->
+  chest * chest_key

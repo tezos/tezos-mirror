@@ -2699,6 +2699,78 @@ module Registration_section = struct
         ()
   end
 
+  module Timelock = struct
+    let name = Interpreter_workload.N_IOpen_chest
+
+    let kinstr =
+      IOpen_chest
+        ( kinfo
+            (Michelson_types.chest_key @$ Michelson_types.chest @$ nat @$ bot),
+          halt (union bytes bool @$ bot) )
+
+    let resulting_stack chest chest_key time =
+      ( chest_key,
+        ( chest,
+          ( Script_int_repr.is_nat (Script_int_repr.of_int time)
+            |> WithExceptions.Option.get ~loc:"Timelock:gas benchmarks",
+            eos ) ) )
+
+    let () =
+      benchmark_with_stack_sampler
+        ~intercept:true
+        ~name
+        ~kinstr
+        ~stack_sampler:(fun _ rng_state () ->
+          let (chest, chest_key) =
+            Timelock.chest_sampler ~plaintext_size:1 ~time:0 ~rng_state
+          in
+          resulting_stack chest chest_key 0)
+        ()
+
+    (* let () =
+     *   benchmark_with_stack_sampler
+     *     ~name
+     *     ~kinstr
+     *     ~stack_sampler:(fun _ rng_state () ->
+     *       let plaintext_size = Random.int Int.max_int in
+     *       let time = Z.one in
+     *       let (chest, chest_key) =
+     *         Timelock.chest_sampler ~plaintext_size ~time ~rng_state
+     *       in
+     *       resulting_stack chest chest_key time)
+     *     ()
+     *
+     * let () =
+     *   benchmark_with_stack_sampler
+     *     ~name
+     *     ~kinstr
+     *     ~stack_sampler:(fun _ rng_state () ->
+     *       let time =
+     *         String.init 10 (fun _ -> Char.chr (Random.int 256)) |> Z.of_bits
+     *       in
+     *
+     *       let (chest, chest_key) =
+     *         Timelock.chest_sampler ~plaintext_size:1 ~time ~rng_state
+     *       in
+     *       resulting_stack chest chest_key time)
+     *     () *)
+
+    let () =
+      benchmark_with_stack_sampler
+        ~name
+        ~kinstr
+        ~stack_sampler:(fun _ rng_state () ->
+          let log_time = Random.State.int rng_state 31 in
+          let time = Random.State.int rng_state (Int.shift_left 2 log_time) in
+          let plaintext_size = Random.State.int rng_state 10000 + 1 in
+
+          let (chest, chest_key) =
+            Timelock.chest_sampler ~plaintext_size ~time ~rng_state
+          in
+          resulting_stack chest chest_key time)
+        ()
+  end
+
   module Continuations = struct
     let () =
       (*
