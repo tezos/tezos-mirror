@@ -78,35 +78,33 @@ type data_point = {
   timestamp : timestamp;
 }
 
+let check_no_newline ~f ~in_ value =
+  if String.contains value '\n' then
+    invalid_arg (Printf.sprintf "InfluxDB.%s: newline character in %s" f in_)
+
 let data_point ?(tags = []) ?(other_fields = [])
     ?(timestamp = Unix.gettimeofday ()) measurement first_field =
+  let check_nl = check_no_newline ~f:"data_point" in
   let check_tag (tag, value) =
-    if String.contains tag '\n' then
-      invalid_arg "InfluxDB.data_point: newline character in tag name" ;
-    if String.contains value '\n' then
-      invalid_arg "InfluxDB.data_point: newline character in tag value"
+    check_nl ~in_:"tag name" tag ;
+    check_nl ~in_:"tag value" value
   in
   List.iter check_tag tags ;
   let check_field_value (name, value) =
-    if String.contains name '\n' then
-      invalid_arg "InfluxDB.data_point: newline character in field name" ;
+    check_nl ~in_:"field name" name ;
     match value with
     | Float _ -> ()
-    | String value ->
-        if String.contains value '\n' then
-          invalid_arg "InfluxDB.data_point: newline character in field value"
+    | String value -> check_nl ~in_:"field value" value
   in
   check_field_value first_field ;
   List.iter check_field_value other_fields ;
-  if String.contains measurement '\n' then
-    invalid_arg "InfluxDB.data_point: newline character in measurement name" ;
+  check_nl ~in_:"measurement name" measurement ;
   {measurement; tags; first_field; other_fields; timestamp}
 
 let add_tag tag value data_point =
-  if String.contains tag '\n' then
-    invalid_arg "InfluxDB.data_point: newline character in tag name" ;
-  if String.contains value '\n' then
-    invalid_arg "InfluxDB.add_tag: newline character in tag value" ;
+  let check_nl = check_no_newline ~f:"add_tag" in
+  check_nl ~in_:"tag name" tag ;
+  check_nl ~in_:"tag value" value ;
   {data_point with tags = (tag, value) :: data_point.tags}
 
 let make_url (V1_8 {url; database; username; password; _}) path =
