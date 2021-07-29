@@ -6,7 +6,14 @@
  (libraries tezos-base
             tezos-base.unix
             lwt.unix
-            ezjsonm)
+            ezjsonm
+            tezos-store
+            tezos-shell-context
+            tezos-context
+            tezos-protocol-009-PsFLoren
+            tezos-protocol-010-PtGRANAD
+            tezos-protocol-alpha
+)
 (modules yes_wallet_lib))
 
 (executable
