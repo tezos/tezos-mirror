@@ -292,6 +292,13 @@ module Description = struct
             (snd (Lazy.force service.output)))
   end
 
+  let pp_dynamic_tail fmt service =
+    List.last_opt service.Resto.Description.path
+    |> Option.iter (function
+           | Resto.Description.PDynamicTail {name; _} ->
+               Format.fprintf fmt "(/<%s>)*" name
+           | _ -> ())
+
   let rec pp prefix ppf dir =
     let open Resto.Description in
     match dir with
@@ -318,10 +325,12 @@ module Description = struct
     Rst.pp_ref ppf (ref_of_service (prefix, meth)) ;
     Format.fprintf
       ppf
-      "**%s %a%a**@\n@\n"
+      "**%s %a%a%a**@\n@\n"
       (Resto.string_of_meth meth)
       pp_name
       prefix
+      pp_dynamic_tail
+      service
       Query.pp_title
       service.query ;
     Tabs.pp ppf prefix service
