@@ -36,6 +36,9 @@ The shell changes the head of the chain to the valid block that has the highest 
 The fitness belongs to the shell part of the block header.
 The shell does not know the exact representation of the fitness, except that it has a total order on it.
 
+
+.. _shell_header:
+
 Shell header
 ~~~~~~~~~~~~
 

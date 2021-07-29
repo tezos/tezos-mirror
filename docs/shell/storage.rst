@@ -33,6 +33,8 @@ certain threshold are discarded. In *Rolling* mode, blocks under a certain
 threshold are discarded entirely. *Full* and *Rolling* may take a
 number of additional cycles to increase or decrease that threshold.
 
+.. _lafl:
+
 To decide whether a block should be pruned or not, the store uses the latest
 head's metadata that contains the **last allowed fork level**. This threshold
 specifies that the local chain cannot be reorganized below it.

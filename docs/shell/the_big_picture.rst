@@ -17,7 +17,7 @@ The diagram below shows a very coarse-grained architecture of Tezos.
 |Tezos architecture diagram|
 
 The characteristic that makes Tezos unique is its self-amending
-property. The part that amends itself is called the *economic protocol*
+property. The part that amends itself is called :doc:`the economic protocol<../alpha/protocol>`
 (the green eye of the octopus), sometimes abbreviated by protocol or
 even proto in the source code. The rest of a Tezos node is what we call
 the *shell* (the blue octopus).
