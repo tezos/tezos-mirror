@@ -193,12 +193,7 @@ in the :ref:`introduction <howtoget>`.
    developer/michelson_anti_patterns
    developer/entering_alpha
    developer/protocol_environment
-   developer/testing
-   developer/flextesa
-   developer/python_testing_framework
-   developer/tezt
-   developer/unit_testing_legacy_code
-   developer/proposal_testing
+   developer/testing_index
    developer/profiling
    developer/snoop
    developer/contributing

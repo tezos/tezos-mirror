@@ -3,10 +3,7 @@
 Overview of Testing in Tezos
 ============================
 
-Testing is important to ensure the quality of the Tezos codebase by
-detecting bugs and avoiding regressions. Tezos and its
-components use a variety of tools and frameworks for testing. The goal
-of this document is to give an overview on how testing is done in
+The goal of this document is to give an overview on how testing is done in
 Tezos, and to help Tezos contributors use the test suite and
 write tests by pointing them towards the most
 appropriate testing framework for their use case. Finally, this guide
