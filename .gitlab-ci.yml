@@ -78,6 +78,8 @@ stages:
       when: never
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release-doc$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
     - when: on_success
 
 # Rules for all the jobs that are run only for the master branch and the like
@@ -136,6 +138,8 @@ stages:
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release-doc$/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: always
