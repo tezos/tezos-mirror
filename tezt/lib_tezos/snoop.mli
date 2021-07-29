@@ -182,6 +182,8 @@ type tag =
   | Io
   | Misc
   | Builtin
+  | Gotc
+  | Cache
 
 type list_mode = All | Any | Exactly
 

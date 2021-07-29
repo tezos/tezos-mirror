@@ -51,7 +51,15 @@ let main () =
       "gas_translator_model";
       "size_translator_model";
       "micheline";
-      "micheline_bytes" ]
+      "micheline_bytes";
+      "Set_add";
+      "Set_elements";
+      "Script_expr_hash_of_b58check_opt";
+      "Global_constants_storage_expr_to_address_in_context";
+      "Global_constants_storage_expand_constant_branch";
+      "Global_constants_storage_expand_no_constant_branch";
+      "cache_model";
+      "ir_size_model"; ]
   in
   Lwt_list.iter_s
     (fun model_name ->

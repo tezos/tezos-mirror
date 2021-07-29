@@ -212,7 +212,11 @@ let perform_typechecker_benchmarks snoop proto =
     [ ( rex "(TYPECHECKING|UNPARSING)_CODE.*",
         fun () -> create_config Files.michelson_code_file );
       ( rex "(TYPECHECKING|UNPARSING)_DATA.*",
-        fun () -> create_config Files.michelson_data_file ) ]
+        fun () -> create_config Files.michelson_data_file );
+      ( rex "VALUE_SIZE.*",
+        fun () -> create_config Files.michelson_data_file );
+      ( rex "KINSTR_SIZE.*",
+        fun () -> create_config Files.michelson_code_file ); ]
   in
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Translator; Proto proto] snoop)
@@ -233,6 +237,14 @@ let perform_encoding_benchmarks snoop proto =
   let benches = proto_indepenent @ proto_specific in
   perform_benchmarks patches snoop benches
 
+let perform_global_constants_benchmarks snoop =
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Gotc] snoop) in
+  perform_benchmarks [] snoop benches
+
+let perform_cache_benchmarks snoop =
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Cache] snoop) in
+  perform_benchmarks [] snoop benches
+
 let perform_misc_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Misc] snoop) in
   perform_benchmarks [] snoop benches
@@ -243,4 +255,6 @@ let main protocol =
   let* () = perform_misc_benchmarks snoop in
   let* () = perform_interpreter_benchmarks snoop protocol in
   let* () = perform_typechecker_benchmarks snoop protocol in
+  let* () = perform_global_constants_benchmarks snoop in
+  let* () = perform_cache_benchmarks snoop in
   perform_encoding_benchmarks snoop protocol

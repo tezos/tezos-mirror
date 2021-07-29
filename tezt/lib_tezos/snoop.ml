@@ -41,6 +41,8 @@ type tag =
   | Io
   | Misc
   | Builtin
+  | Gotc
+  | Cache
 
 type michelson_term_kind = Data | Code
 
@@ -351,22 +353,16 @@ let michelson_concat ?protocol ~file1 ~file2 ~target snoop =
 
 let string_of_tag (tag : tag) =
   match tag with
-  | Proto proto ->
-      Protocol.tag proto
-  | Interpreter ->
-      "interpreter"
-  | Translator ->
-      "translator"
-  | Sapling ->
-      "sapling"
-  | Encoding ->
-      "encoding"
-  | Io ->
-      "io"
-  | Misc ->
-      "misc"
-  | Builtin ->
-      "builtin"
+  | Proto proto -> Protocol.tag proto
+  | Interpreter -> "interpreter"
+  | Translator -> "translator"
+  | Sapling -> "sapling"
+  | Encoding -> "encoding"
+  | Io -> "io"
+  | Misc -> "misc"
+  | Builtin -> "builtin"
+  | Gotc -> "global_constants"
+  | Cache -> "cache"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
