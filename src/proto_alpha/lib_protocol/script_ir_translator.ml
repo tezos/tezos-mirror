@@ -3077,12 +3077,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         log loc stack_ty aft ;
         ()
   in
-  let return :
-      type a s.
-      context -> (a, s) judgement -> ((a, s) judgement * context) tzresult Lwt.t
-      =
-   fun ctxt judgement -> return (judgement, ctxt)
-  in
   let typed_no_lwt ctxt loc instr aft =
     log_stack ctxt loc stack_ty aft >|? fun () ->
     let j = Typed {loc; instr; bef = stack_ty; aft} in
@@ -3310,8 +3304,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr = ifnone; bef; aft = ibt.aft}
       in
-      merge_branches ~legacy ctxt loc btr bfr {branch}
-      >>?= fun (judgement, ctxt) -> return ctxt judgement
+      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   (* pairs *)
   | ( Prim (loc, I_PAIR, [], annot),
       Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ) ->
@@ -3573,8 +3566,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      merge_branches ~legacy ctxt loc btr bfr {branch}
-      >>?= fun (judgement, ctxt) -> return ctxt judgement
+      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   (* lists *)
   | (Prim (loc, I_NIL, [t], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
@@ -3620,8 +3612,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      merge_branches ~legacy ctxt loc btr bfr {branch}
-      >>?= fun (judgement, ctxt) -> return ctxt judgement
+      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   | (Prim (loc, I_SIZE, [], annot), Item_t (List_t _, rest, _)) ->
       parse_var_type_annot loc annot >>?= fun (annot, tname) ->
       let list_size = {apply = (fun kinfo k -> IList_size (kinfo, k))} in
@@ -4045,7 +4036,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Failed _ -> fail (Fail_not_in_tail_position (Micheline.location hd))
-      | Typed ({aft = middle; _} as ihd) -> (
+      | Typed ({aft = middle; _} as ihd) ->
           non_terminal_recursion
             ?type_logger
             tc_context
@@ -4053,14 +4044,15 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             ~legacy
             (Seq (-1, tl))
             middle
-          >>=? fun (judgement, ctxt) ->
-          match judgement with
-          | Failed {descr} ->
-              let descr ret = compose_descr loc ihd (descr ret) in
-              return ctxt (Failed {descr})
-          | Typed itl ->
-              (Lwt.return (Ok (Typed (compose_descr loc ihd itl), ctxt))
-                : ((a, s) judgement * context) tzresult Lwt.t)))
+          >|=? fun (judgement, ctxt) ->
+          let judgement =
+            match judgement with
+            | Failed {descr} ->
+                let descr ret = compose_descr loc ihd (descr ret) in
+                Failed {descr}
+            | Typed itl -> Typed (compose_descr loc ihd itl)
+          in
+          (judgement, ctxt))
   | (Prim (loc, I_IF, [bt; bf], annot), (Item_t (Bool_t _, rest, _) as bef)) ->
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
@@ -4082,8 +4074,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         in
         {loc; instr; bef; aft = ibt.aft}
       in
-      merge_branches ~legacy ctxt loc btr bfr {branch}
-      >>?= fun (judgement, ctxt) -> return ctxt judgement
+      Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   | ( Prim (loc, I_LOOP, [body], annot),
       (Item_t (Bool_t _, rest, _stack_annot) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
@@ -4315,19 +4306,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             However, DIP {code} is equivalent to DIP 1 {code} so hinting at an arity of 2 makes sense. *)
       fail (Invalid_arity (loc, I_DIP, 2, List.length l))
   | (Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest, _)) ->
-      error_unexpected_annot loc annot >>?= fun () ->
-      (if legacy then ok_unit else check_packable ~legacy:false loc v)
-      >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> IFailwith (kinfo, loc, v, k))} in
-      let descr aft = {loc; instr; bef = stack_ty; aft} in
-      log_stack ctxt loc stack_ty Bot_t >>?= fun () ->
-      return ctxt (Failed {descr})
+      Lwt.return
+        ( error_unexpected_annot loc annot >>? fun () ->
+          (if legacy then ok_unit else check_packable ~legacy:false loc v)
+          >>? fun () ->
+          let instr = {apply = (fun kinfo k -> IFailwith (kinfo, loc, v, k))} in
+          let descr aft = {loc; instr; bef = stack_ty; aft} in
+          log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
+        )
   | (Prim (loc, I_NEVER, [], annot), Item_t (Never_t _, _rest, _)) ->
-      error_unexpected_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo _k -> INever kinfo)} in
-      let descr aft = {loc; instr; bef = stack_ty; aft} in
-      log_stack ctxt loc stack_ty Bot_t >>?= fun () ->
-      return ctxt (Failed {descr})
+      Lwt.return
+        ( error_unexpected_annot loc annot >>? fun () ->
+          let instr = {apply = (fun kinfo _k -> INever kinfo)} in
+          let descr aft = {loc; instr; bef = stack_ty; aft} in
+          log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
+        )
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
