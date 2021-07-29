@@ -3630,33 +3630,33 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         body
         (Item_t (elt, starting_rest, elt_annot))
       >>=? fun (judgement, ctxt) ->
+      Lwt.return
+      @@
       match judgement with
       | Typed ({aft = Item_t (ret, rest, _); _} as kibody) ->
           let invalid_map_body () =
             serialize_stack_for_error ctxt kibody.aft >|? fun (aft, _ctxt) ->
             Invalid_map_body (loc, aft)
           in
-          Lwt.return
-          @@ record_trace_eval
-               invalid_map_body
-               ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
-               >>? fun (Eq, rest, ctxt) ->
-                 let binfo = kinfo_of_descr kibody in
-                 let hinfo =
-                   {iloc = loc; kstack_ty = Item_t (ret, rest, ret_annot)}
-                 in
-                 let ibody = kibody.instr.apply binfo (IHalt hinfo) in
-                 let list_map =
-                   {apply = (fun kinfo k -> IList_map (kinfo, ibody, k))}
-                 in
-                 list_t loc ret ~annot:list_ty_name >>? fun ty ->
-                 let stack = Item_t (ty, rest, ret_annot) in
-                 typed_no_lwt ctxt loc list_map stack )
+          record_trace_eval
+            invalid_map_body
+            ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            >>? fun (Eq, rest, ctxt) ->
+              let binfo = kinfo_of_descr kibody in
+              let hinfo =
+                {iloc = loc; kstack_ty = Item_t (ret, rest, ret_annot)}
+              in
+              let ibody = kibody.instr.apply binfo (IHalt hinfo) in
+              let list_map =
+                {apply = (fun kinfo k -> IList_map (kinfo, ibody, k))}
+              in
+              list_t loc ret ~annot:list_ty_name >>? fun ty ->
+              let stack = Item_t (ty, rest, ret_annot) in
+              typed_no_lwt ctxt loc list_map stack )
       | Typed {aft; _} ->
-          Lwt.return
-            ( serialize_stack_for_error ctxt aft >>? fun (aft, _ctxt) ->
-              error (Invalid_map_body (loc, aft)) )
-      | Failed _ -> fail (Invalid_map_block_fail loc))
+          serialize_stack_for_error ctxt aft >>? fun (aft, _ctxt) ->
+          error (Invalid_map_body (loc, aft))
+      | Failed _ -> error (Invalid_map_block_fail loc))
   | ( Prim (loc, I_ITER, [body], annot),
       Item_t (List_t (elt, _), rest, list_annot) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
@@ -3680,6 +3680,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               IList_iter (kinfo, ibody, k));
         }
       in
+      Lwt.return
+      @@
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -3687,13 +3689,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             serialize_stack_for_error ctxt rest >|? fun (rest, _ctxt) ->
             Invalid_iter_body (loc, rest, aft)
           in
-          Lwt.return
-          @@ record_trace_eval
-               invalid_iter_body
-               ( merge_stacks ~legacy loc ctxt 1 aft rest
-               >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult
-                 -> typed_no_lwt ctxt loc (mk_list_iter ibody) rest )
-      | Failed {descr} -> typed ctxt loc (mk_list_iter (descr rest)) rest)
+          record_trace_eval
+            invalid_iter_body
+            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+              typed_no_lwt ctxt loc (mk_list_iter ibody) rest )
+      | Failed {descr} -> typed_no_lwt ctxt loc (mk_list_iter (descr rest)) rest
+      )
   (* sets *)
   | (Prim (loc, I_EMPTY_SET, [t], annot), rest) ->
       parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
@@ -3726,6 +3728,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               ISet_iter (kinfo, ibody, k));
         }
       in
+      Lwt.return
+      @@
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -3733,13 +3737,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             serialize_stack_for_error ctxt rest >|? fun (rest, _ctxt) ->
             Invalid_iter_body (loc, rest, aft)
           in
-          Lwt.return
-          @@ record_trace_eval
-               invalid_iter_body
-               ( merge_stacks ~legacy loc ctxt 1 aft rest
-               >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult
-                 -> typed_no_lwt ctxt loc (mk_iset_iter ibody) rest )
-      | Failed {descr} -> typed ctxt loc (mk_iset_iter (descr rest)) rest)
+          record_trace_eval
+            invalid_iter_body
+            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+              typed_no_lwt ctxt loc (mk_iset_iter ibody) rest )
+      | Failed {descr} -> typed_no_lwt ctxt loc (mk_iset_iter (descr rest)) rest
+      )
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (v, Item_t (Set_t (elt, _), rest, _), _) ) ->
       let elt = ty_of_comparable_ty elt in
@@ -3790,40 +3794,37 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         body
         (Item_t (ty, starting_rest, None))
       >>=? fun (judgement, ctxt) ->
+      Lwt.return
+      @@
       match judgement with
       | Typed ({aft = Item_t (ret, rest, _); _} as ibody) ->
           let invalid_map_body () =
             serialize_stack_for_error ctxt ibody.aft >|? fun (aft, _ctxt) ->
             Invalid_map_body (loc, aft)
           in
-          Lwt.return
-          @@ record_trace_eval
-               invalid_map_body
-               ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
-               >>? fun (Eq, rest, ctxt) ->
-                 let instr =
-                   {
-                     apply =
-                       (fun kinfo k ->
-                         let binfo = kinfo_of_descr ibody in
-                         let hinfo =
-                           {
-                             iloc = loc;
-                             kstack_ty = Item_t (ret, rest, ret_annot);
-                           }
-                         in
-                         let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                         IMap_map (kinfo, ibody, k));
-                   }
-                 in
-                 map_t loc ck ret ~annot:ty_name >>? fun ty ->
-                 let stack = Item_t (ty, rest, ret_annot) in
-                 typed_no_lwt ctxt loc instr stack )
+          record_trace_eval
+            invalid_map_body
+            ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            >>? fun (Eq, rest, ctxt) ->
+              let instr =
+                {
+                  apply =
+                    (fun kinfo k ->
+                      let binfo = kinfo_of_descr ibody in
+                      let hinfo =
+                        {iloc = loc; kstack_ty = Item_t (ret, rest, ret_annot)}
+                      in
+                      let ibody = ibody.instr.apply binfo (IHalt hinfo) in
+                      IMap_map (kinfo, ibody, k));
+                }
+              in
+              map_t loc ck ret ~annot:ty_name >>? fun ty ->
+              let stack = Item_t (ty, rest, ret_annot) in
+              typed_no_lwt ctxt loc instr stack )
       | Typed {aft; _} ->
-          Lwt.return
-            ( serialize_stack_for_error ctxt aft >>? fun (aft, _ctxt) ->
-              error (Invalid_map_body (loc, aft)) )
-      | Failed _ -> fail (Invalid_map_block_fail loc))
+          serialize_stack_for_error ctxt aft >>? fun (aft, _ctxt) ->
+          error (Invalid_map_body (loc, aft))
+      | Failed _ -> error (Invalid_map_block_fail loc))
   | ( Prim (loc, I_ITER, [body], annot),
       Item_t (Map_t (comp_elt, element_ty, _), rest, _map_annot) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
@@ -3851,6 +3852,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               IMap_iter (kinfo, ibody, k));
         }
       in
+      Lwt.return
+      @@
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -3858,13 +3861,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             serialize_stack_for_error ctxt rest >|? fun (rest, _ctxt) ->
             Invalid_iter_body (loc, rest, aft)
           in
-          Lwt.return
-          @@ record_trace_eval
-               invalid_iter_body
-               ( merge_stacks ~legacy loc ctxt 1 aft rest
-               >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult
-                 -> typed_no_lwt ctxt loc (make_instr ibody) rest )
-      | Failed {descr} -> typed ctxt loc (make_instr (descr rest)) rest)
+          record_trace_eval
+            invalid_iter_body
+            ( merge_stacks ~legacy loc ctxt 1 aft rest
+            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+              typed_no_lwt ctxt loc (make_instr ibody) rest )
+      | Failed {descr} -> typed_no_lwt ctxt loc (make_instr (descr rest)) rest)
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (vk, Item_t (Map_t (ck, _, _), rest, _), _) ) ->
       let k = ty_of_comparable_ty ck in
@@ -4081,6 +4083,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       error_unexpected_annot loc annot >>?= fun () ->
       non_terminal_recursion ?type_logger tc_context ctxt ~legacy body rest
       >>=? fun (judgement, ctxt) ->
+      Lwt.return
+      @@
       match judgement with
       | Typed ibody ->
           let unmatched_branches () =
@@ -4088,24 +4092,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             serialize_stack_for_error ctxt stack >|? fun (stack, _ctxt) ->
             Unmatched_branches (loc, aft, stack)
           in
-          Lwt.return
-          @@ record_trace_eval
-               unmatched_branches
-               ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
-               >>? fun (Eq, _stack, ctxt) ->
-                 let instr =
-                   {
-                     apply =
-                       (fun kinfo k ->
-                         let ibody =
-                           ibody.instr.apply
-                             (kinfo_of_descr ibody)
-                             (IHalt kinfo)
-                         in
-                         ILoop (kinfo, ibody, k));
-                   }
-                 in
-                 typed_no_lwt ctxt loc instr rest )
+          record_trace_eval
+            unmatched_branches
+            ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            >>? fun (Eq, _stack, ctxt) ->
+              let instr =
+                {
+                  apply =
+                    (fun kinfo k ->
+                      let ibody =
+                        ibody.instr.apply (kinfo_of_descr ibody) (IHalt kinfo)
+                      in
+                      ILoop (kinfo, ibody, k));
+                }
+              in
+              typed_no_lwt ctxt loc instr rest )
       | Failed {descr} ->
           let instr =
             {
@@ -4118,7 +4119,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                   ILoop (kinfo, ibody, k));
             }
           in
-          typed ctxt loc instr rest)
+          typed_no_lwt ctxt loc instr rest)
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
       (Item_t (Union_t ((tl, l_field), (tr, _), _), rest, union_annot) as stack)
     ) -> (
@@ -4135,6 +4136,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         body
         (Item_t (tl, rest, l_annot))
       >>=? fun (judgement, ctxt) ->
+      Lwt.return
+      @@
       match judgement with
       | Typed ibody ->
           let unmatched_branches () =
@@ -4142,25 +4145,22 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             serialize_stack_for_error ctxt stack >|? fun (stack, _ctxt) ->
             Unmatched_branches (loc, aft, stack)
           in
-          Lwt.return
-          @@ record_trace_eval
-               unmatched_branches
-               ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
-               >>? fun (Eq, _stack, ctxt) ->
-                 let instr =
-                   {
-                     apply =
-                       (fun kinfo k ->
-                         let ibody =
-                           ibody.instr.apply
-                             (kinfo_of_descr ibody)
-                             (IHalt kinfo)
-                         in
-                         ILoop_left (kinfo, ibody, k));
-                   }
-                 in
-                 let stack = Item_t (tr, rest, annot) in
-                 typed_no_lwt ctxt loc instr stack )
+          record_trace_eval
+            unmatched_branches
+            ( merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            >>? fun (Eq, _stack, ctxt) ->
+              let instr =
+                {
+                  apply =
+                    (fun kinfo k ->
+                      let ibody =
+                        ibody.instr.apply (kinfo_of_descr ibody) (IHalt kinfo)
+                      in
+                      ILoop_left (kinfo, ibody, k));
+                }
+              in
+              let stack = Item_t (tr, rest, annot) in
+              typed_no_lwt ctxt loc instr stack )
       | Failed {descr} ->
           let instr =
             {
@@ -4174,7 +4174,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             }
           in
           let stack = Item_t (tr, rest, annot) in
-          typed ctxt loc instr stack)
+          typed_no_lwt ctxt loc instr stack)
   | (Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       >>?= fun (Ex_ty arg, ctxt) ->
@@ -4274,13 +4274,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               code
               rest
             >>=? fun (judgement, ctxt) ->
+            Lwt.return
+            @@
             match judgement with
             | Typed descr ->
-                Lwt.return
-                  (ok
-                     (Dipn_proof_argument (KRest, ctxt, descr, descr.aft)
-                       : (a, s) dipn_proof_argument))
-            | Failed _ -> Lwt.return (error (Fail_not_in_tail_position loc)))
+                ok
+                  (Dipn_proof_argument (KRest, ctxt, descr, descr.aft)
+                    : (a, s) dipn_proof_argument)
+            | Failed _ -> error (Fail_not_in_tail_position loc))
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) (add_dip v annot tc_context) rest
             >|=? fun (Dipn_proof_argument (n', ctxt, descr, aft')) ->
