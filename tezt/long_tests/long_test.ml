@@ -253,6 +253,11 @@ let alert_s ~log message =
           | None -> [Text "Alert: "; Text message]
           | Some {title; filename; _} -> (
               let text =
+                let message =
+                  (* If [message] is multi-line, put "Alert from test" on its own line. *)
+                  if String.contains message '\n' then "\n" ^ message
+                  else message
+                in
                 Slack.Text (sf "Alert from test %S: %s" title message)
               in
               match alert_cfg.gitlab_project_url with
@@ -601,16 +606,19 @@ let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
                 ^ "]"
           in
           alert
-            "%s(%S%s.%S) = %g is more than %d%% more than the value for the \
-             previous %d measurements, which is %g"
+            "New measurement: %s(%S%s.%S) = %g\n\
+             Previous %d measurements: %s = %g\n\
+             Difference: +%d%% (alert threshold: %d%%)"
             name
             measurement
             tags
             field
             current_value
-            (int_of_float (margin *. 100.))
             previous_count
+            name
             previous_value
+            (int_of_float ((current_value *. 100. /. previous_value) -. 100.))
+            (int_of_float (margin *. 100.))
       in
       match check with
       | Mean -> get_previous_and_check "mean" Stats.mean
