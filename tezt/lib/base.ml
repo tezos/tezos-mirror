@@ -23,6 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* We let some exceptions propagate. They are caught when running tests and
+   logged as errors. We want to print a human-readable version of those errors.
+   Exceptions that should be caught, such as [Not_found] or [End_of_file],
+   do not need a human-readable version. *)
+let () =
+  Printexc.register_printer @@ function
+  | Unix.Unix_error (error, _, _) -> Some (Unix.error_message error)
+  | Failure error -> Some error
+  | Sys_error error -> Some error
+  | _ -> None
+
 let ( // ) = Filename.concat
 
 let sf = Printf.sprintf
