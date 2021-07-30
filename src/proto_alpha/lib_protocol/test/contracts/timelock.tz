@@ -11,7 +11,7 @@ code {
        DIIP {PUSH nat 1000};
        OPEN_CHEST;
        IF_LEFT
-         { # successfull case
+         { # successful case
            NIL operation;
            PAIR ;
          }

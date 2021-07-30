@@ -41,7 +41,7 @@ Either the author of the ciphertext produces a plaintext
 by providing a secret trapdoor (the factorization of an RSA modulus in our case).
 Otherwise a sequential computation can decrypt the ciphertext after a computation
 requiring $T$ sequential operations (modular squaring in our case),
-for some pre-determined constant $T$.
+for some pre-determined constant :math:`T`.
 
 In addition, a proof of the correctness of the decryption can also be produced and checked in sub linear time ($\log T$ in our case).
 
@@ -60,7 +60,7 @@ a proof of concept available
 General principle
 -----------------
 
-To limit BPEV, we introduce in Michelson an opcode and two types allowing
+To limit BPEV, we introduce in Michelson an opcode (``OPEN_CHEST``) and two types (``chest`` and ``chest_key``) allowing
 timelock-encrypted values to be used inside a Michelson contract.
 
 The typical usage pattern would be as follows:
@@ -84,7 +84,7 @@ Users first generate a RSA modulus and a symmetric encryption key.
 They use authenticated encryption to encrypt a packed Michelson value (an array of bytes computed with ``PACK``)
 and encrypt that encryption key using a timelock puzzle.
 They then combine the RSA modulus, the timelocked symmetric key, the constant T
-and the encrypted value as a single value as well (called chest in our library in src/lib_crypto).
+and the encrypted value as a single value as well (called chest in our library in :src:`src/lib_crypto`).
 
 A proof of decryption can be the symmetric key itself.
 However, a malicious user could propose an authenticated ciphertext that does yield a valid value
@@ -123,7 +123,7 @@ If the provided symmetric key was not the one timelocked
 it pushes on the stack ``Right True``.
 Note that we are using an authenticated encryption scheme,
 so we can detect if someone provides a wrong key while fooling the time lock proof.
-This is doable only by someone knowing the facorisation of the rsa modulus.
+This is doable only by someone knowing the factorisation of the RSA modulus.
 However, this cannot prevent someone from encrypting a wrong key, or putting
 a wrong message authentication code,
 so this is why we still need the proof of correctness.
