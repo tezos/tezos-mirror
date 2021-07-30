@@ -976,8 +976,17 @@ module Binary_schema : sig
 end
 
 module Binary_stream : sig
+  (** The type for a stream, as used in the {!Binary.read_stream} function.
+
+      You never need to initialise a stream: one is initialised for you when you
+      use first {!Binary.read_stream} and you may pass a stream around to
+      further calls to {!Binary.read_stream}.
+   *)
   type t
 
+  (** [is_empty s] is [true] iff the stream is not currently holding any
+      yet-to-be-decoded bytes. Consequently, reading on that stream will always
+      return [Await]. *)
   val is_empty : t -> bool
 end
 
@@ -1118,8 +1127,50 @@ module Binary : sig
     | Error of read_error
         (** Failure. The stream is garbled and it should be dropped. *)
 
-  (** Streamed equivalent of [read]. This variant cannot be called on
-      variable-size encodings. *)
+  (** Streamed equivalent of [read].
+
+      @raise [Invalid_argument] if called with a variable-size encoding.
+
+      [read_stream e] is [Await k] and you can use [k] to feed the first bytes
+      to be decoded.
+
+      If you feed invalid bytes (i.e., bytes that do not match [e]) to [k], it
+      returns [Error].
+
+      If you feed bytes that form a valid strict prefix for [e], then it
+      returns [Await k], and you can use [k] to feed it more bytes.
+
+      If you feed it sufficient bytes to decode a whole value described by
+      [e], then it returns [Success s] where [s.result] is the decoded value,
+      [s.size] is the number of bytes that were read to decode this value, and
+      [s.stream] is the left-over stream.
+
+      The leftover stream may contain more bytes which you may treat however
+      you like depending on your application. You may ignore padding bytes
+      reserved for extensions (in which case you can simply ignore the stream).
+      You may use the leftover stream to call [read_stream] again to decode the
+      rest of the value.
+
+      [read_stream ~init e] is the same as
+      [let (Await k) = read_stream e in k b] where [b] are the leftover bytes of
+      [init].
+
+      E.g., reading multiple values from a socket or some such source of bytes
+      that becomes available as time goes by.
+{[
+let iter socket encoding f =
+   let rec loop = function
+      | Success {result; size; stream} ->
+         log "read %d bytes" size;
+         f result (* apply iterator function on each decoded value *);
+         loop (read_stream ~init:stream e) (* continue with leftover *)
+      | Await k ->
+         loop (k (read_more_bytes_from socket))
+      | Error e ->
+         log "error: %a" pp_read_error e
+   in
+   loop (read_stream e)
+]} *)
   val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
 
   (** The internal state that writers handle. It is presented explicitly as an
