@@ -66,6 +66,6 @@ let () =
       ("level module", Test_level_module.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
       ("temp big maps", Test_temp_big_maps.tests);
-      ("time lock", Test_timelock.tests);
+      ("timelock", Test_timelock.tests);
     ]
   |> Lwt_main.run

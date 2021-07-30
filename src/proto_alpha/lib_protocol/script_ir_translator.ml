@@ -560,6 +560,7 @@ let unparse_with_data_encoding ctxt s unparse_cost encoding =
     ( Gas.consume ctxt unparse_cost >|? fun ctxt ->
       let bytes = Data_encoding.Binary.to_bytes_exn encoding s in
       (Bytes (-1, bytes), ctxt) )
+
 (* -- Unparsing data of complex types -- *)
 
 type ('ty, 'depth) comb_witness =

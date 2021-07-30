@@ -37,9 +37,10 @@ let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
 let simple_test () =
   let (public, secret) = Timelock.gen_rsa_keys () in
-  let locked_value = Timelock.gen_locked_value public and time = 1000 in
-  let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value
-  and (same_unlocked, proof) =
+  let locked_value = Timelock.gen_locked_value public in
+  let time = 1000 in
+  let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value in
+  let (same_unlocked, proof) =
     Timelock.unlock_and_prove_without_secret public ~time locked_value
   in
   assert (unlocked_value = same_unlocked) ;
@@ -89,9 +90,10 @@ let contract_test () =
   let src = match contracts with hd :: _ -> hd | _ -> assert false in
   originate_contract "contracts/timelock.tz" "0xaa" src b >>=? fun (dst, b) ->
   let (public, secret) = Timelock.gen_rsa_keys () in
-  let locked_value = Timelock.gen_locked_value public and time = 1000 in
-  let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value
-  and (_same_unlocked, proof) =
+  let locked_value = Timelock.gen_locked_value public in
+  let time = 1000 in
+  let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value in
+  let (_same_unlocked, proof) =
     Timelock.unlock_and_prove_without_secret public ~time locked_value
   in
   let sym_key = Timelock.unlocked_value_to_symmetric_key unlocked_value in
@@ -147,34 +149,26 @@ let contract_test () =
     chest_key_correct
     (Hex.show (Hex.of_bytes message))
   >>=? fun () ->
-  let bytes_cipher =
-    Data_encoding.Binary.to_bytes_exn Timelock.ciphertext_encoding c
+  (* We redo an RSA parameters generation to create incorrect cipher and proof *)
+  let (public_bogus, secret_bogus) = Timelock.gen_rsa_keys () in
+  let locked_value_bogus = Timelock.gen_locked_value public_bogus in
+  let time = 1000 in
+  let unlocked_value_bogus =
+    Timelock.unlock_with_secret secret_bogus ~time locked_value_bogus
   in
-  Bytes.set bytes_cipher 12 (Char.chr 10) ;
+  let (_same_unlocked, proof_bogus) =
+    Timelock.unlock_and_prove_without_secret public ~time locked_value_bogus
+  in
+  let sym_key_bogus =
+    Timelock.unlocked_value_to_symmetric_key unlocked_value_bogus
+  in
+  let c_bogus = Timelock.encrypt sym_key_bogus message in
+
   let chest_incorrect =
-    Timelock.
-      {
-        locked_value;
-        rsa_public = public;
-        ciphertext =
-          Data_encoding.Binary.of_bytes_exn
-            Timelock.ciphertext_encoding
-            bytes_cipher;
-      }
+    Timelock.{locked_value; rsa_public = public; ciphertext = c_bogus}
   in
   check_storage chest_incorrect chest_key_correct "00" >>=? fun () ->
-  let bytes_proof =
-    Data_encoding.Binary.to_bytes_exn Timelock.proof_encoding proof
-  in
-  Bytes.set bytes_proof (Bytes.length bytes_proof - 1) (Char.chr 3) ;
-  let chest_key_incorrect =
-    Timelock.
-      {
-        unlocked_value;
-        proof =
-          Data_encoding.Binary.of_bytes_exn Timelock.proof_encoding bytes_proof;
-      }
-  in
+  let chest_key_incorrect = Timelock.{unlocked_value; proof = proof_bogus} in
   check_storage chest_correct chest_key_incorrect "01" >>=? fun () ->
   return_unit
 
