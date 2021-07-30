@@ -19,6 +19,8 @@ To implement this contract, we use a fork of the open source code base used by `
 3. The ability to set a delegate has been removed. Rationale: the subsidy means there is no need for a baker for that contract and having one would create an imbalance.
 4. The ability to set a manager has been removed. Rationale: the only privilege of the Dexter manager is to set Dexter's delegate so this role is now unnecessary.
 
+The LIGO and Michelson code for these contracts, as well as detailed documentation, can be found on `the liquidity baking branch of the Dexter 2 repository<https://gitlab.com/dexter2tz/dexter2tz/-/tree/liquidity_baking>`_.
+
 Subsidy
 ~~~~~~~
 
