@@ -338,7 +338,12 @@ Special case: MRs that introduce a new dependency
 
 In the special case where your MR adds a new opam dependency or updates an
 existing opam dependency, you will need to follow
-:ref:`this additional dedicated guide <adding_new_opam_dependency>`.
+this additional dedicated guide:
+
+.. toctree::
+   :maxdepth: 2
+
+   contributing-adding-a-new-opam-dependency
 
 In the special case where your MR adds a new Python, Rust, Javascript, or other
 dependency, additional steps must also be followed.

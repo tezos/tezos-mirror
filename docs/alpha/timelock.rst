@@ -7,7 +7,7 @@ Block Producer Extractable Value
 
 We aim at tackling the issue known through
 the unfortunate misnomer of "generalized front running", described
-for instance in `here <https://medium.com/@danrobinson/ethereum-is-a-dark-forest-ecc5f0505dff>`_.
+for instance in `here <https://medium.com/@danrobinson/ethereum-is-a-dark-forest-ecc5f0505dff>`__.
 
 Observing a transaction before it is actually included in the chain
 can give an advantage to a trader against another one. Ultimately,
@@ -55,7 +55,7 @@ ensure a level playing field in terms of computational speed.
 An implementation of the timelock puzzle
 and proof scheme is available in :src:`src/lib_crypto/timelock.mli` inspired from
 a proof of concept available
-`here <https://gist.github.com/murbard/23a29454a107d03d8a98393b0b98466d>`_
+`here <https://gist.github.com/murbard/23a29454a107d03d8a98393b0b98466d>`__.
 
 General principle
 -----------------
@@ -81,7 +81,7 @@ Cryptographic principles
 ------------------------
 
 Users first generate a RSA modulus and a symmetric encryption key.
-They use authenticated encryption to encrypt a `PACK`ed Michelson value (i.e., bytes)
+They use authenticated encryption to encrypt a packed Michelson value (an array of bytes computed with ``PACK``)
 and encrypt that encryption key using a timelock puzzle.
 They then combine the RSA modulus, the timelocked symmetric key, the constant T
 and the encrypted value as a single value as well (called chest in our library in src/lib_crypto).

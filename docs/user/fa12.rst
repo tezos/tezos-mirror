@@ -86,7 +86,7 @@ optional argument ``--as <operator>``, allowing an approved account `operator` t
 make transfers from `source` to any other accounts. The JSON format for the
 transfers is the following:
 
-.. code-block:: json
+.. code-block:: javascript
 
    [{ "token_contract": <string>, // address or alias of the FA1.2 contract
       "destination": <string>, // address or alias of the recipient of the transfer
