@@ -114,9 +114,13 @@ p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 
 .PHONY: help Makefile
 
+.PHONY: install-dependencies
+install-dependencies:
+	@poetry install
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: Makefile api/errors.rst rpc p2p
+html: Makefile api/errors.rst rpc p2p install-dependencies
 	cp ../CHANGES.rst .
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
