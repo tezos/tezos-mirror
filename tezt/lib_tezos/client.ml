@@ -261,6 +261,10 @@ module Admin = struct
     spawn_kick_peer ?endpoint ~peer client |> Process.check
 end
 
+let spawn_version client = spawn_command client ["--version"]
+
+let version client = spawn_version client |> Process.check
+
 let spawn_import_secret_key ?endpoint client (key : Constant.key) =
   spawn_command
     ?endpoint
