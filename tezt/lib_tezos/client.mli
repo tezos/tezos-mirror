@@ -196,6 +196,12 @@ end
 
 (** {2 Regular Client Commands} *)
 
+(** Run [tezos-client --version]. *)
+val version : t -> unit Lwt.t
+
+(** Same as [version], but do not wait for the process to exit. *)
+val spawn_version : t -> Process.t
+
 (** Run [tezos-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Constant.key -> unit Lwt.t
 

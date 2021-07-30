@@ -25,28 +25,20 @@
 
 (* Testing
    -------
-   Component: All
-   Invocation: dune exec tezt/long_tests/main.exe
-   Subject: This file is the entrypoint of all long Tezt tests. It dispatches to
-            other files. Long tests do not run on the CI but on a custom
-            architecture which is particularly suited for performance regression tests.
+   Component: Client
+   Invocation: dune exec tezt/long_tests/main.exe -- --file prt_client.ml
+   Subject: check regressions in the duration it takes for the client to load.
 *)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+let grafana_panels : Grafana.panel list =
+  [Row "Test: client"; Grafana.simple_graph "client load time" "duration"]
 
-let () =
-  Long_test.update_grafana_dashboard
-    {
-      uid = "longtezts";
-      title = "Long Tezts";
-      description = "Measurements from tests in tezt/long_tests.";
-      panels = Prt_client.grafana_panels;
-    }
-
-let () =
-  (* Register your tests here. *)
-  Prt_client.register () ;
-  (* [Test.run] must be the last function to be called. *)
-  Test.run ()
+let register () =
+  Long_test.register
+    ~__FILE__
+    ~title:"client load time"
+    ~tags:["client"; "load"]
+    ~timeout:(Minutes 2)
+  @@ fun () ->
+  let client = Client.create () in
+  Long_test.time_lwt "client load time" @@ fun () -> Client.version client

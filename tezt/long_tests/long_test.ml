@@ -503,7 +503,7 @@ let get_previous_stats ?limit ?(minimum_count = 3) ?(tags = []) measurement
   let* result =
     query select @@ fun result ->
     match result with
-    | [] -> failwith "InfluxDB result contains no series"
+    | [] -> None
     | _ :: _ :: _ -> failwith "InfluxDB result contains multiple series"
     | [[]] -> failwith "InfluxDB result contains no values"
     | [(_ :: _ :: _)] -> failwith "InfluxDB result contains multiple values"
