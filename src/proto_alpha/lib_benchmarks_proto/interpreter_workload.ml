@@ -1115,8 +1115,8 @@ module Instructions = struct
 
   let log = ir_sized_step N_ILog nullary
 
-  let open_chest time size =
-    ir_sized_step N_IOpen_chest (binary "time" time "size" size)
+  let open_chest log_time size =
+    ir_sized_step N_IOpen_chest (binary "log_time" log_time "size" size)
 end
 
 module Control = struct
