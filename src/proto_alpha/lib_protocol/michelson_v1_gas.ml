@@ -1292,6 +1292,7 @@ module Cost_of = struct
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
+    (* FIXME *)
     let open_chest _chest_key _chest = atomic_step_cost (S.safe_int 3)
 
     (* --------------------------------------------------------------------- *)
@@ -1673,8 +1674,10 @@ module Cost_of = struct
     let proof_argument n =
       atomic_step_cost (S.mul (S.safe_int n) (S.safe_int 50))
 
+    (* FIXME *)
     let chest_key = Gas.write_bytes_cost 1
 
+    (* FIXME *)
     let chest = Gas.write_bytes_cost 1
   end
 
@@ -1780,8 +1783,10 @@ module Cost_of = struct
       let cms = List.length d.commitments_and_ciphertexts in
       atomic_step_cost (cost_SAPLING_DIFF_ENCODING ~nfs ~cms)
 
+    (* FIXME *)
     let chest_key = Gas.write_bytes_cost 1
 
+    (* FIXME *)
     let chest = Gas.write_bytes_cost 1
   end
 end
