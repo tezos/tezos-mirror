@@ -2742,42 +2742,22 @@ module Registration_section = struct
           resulting_stack chest chest_key 0)
         ()
 
-    (* let () =
-     *   benchmark_with_stack_sampler
-     *     ~name
-     *     ~kinstr
-     *     ~stack_sampler:(fun _ rng_state () ->
-     *       let plaintext_size = Random.int Int.max_int in
-     *       let time = Z.one in
-     *       let (chest, chest_key) =
-     *         Timelock.chest_sampler ~plaintext_size ~time ~rng_state
-     *       in
-     *       resulting_stack chest chest_key time)
-     *     ()
-     *
-     * let () =
-     *   benchmark_with_stack_sampler
-     *     ~name
-     *     ~kinstr
-     *     ~stack_sampler:(fun _ rng_state () ->
-     *       let time =
-     *         String.init 10 (fun _ -> Char.chr (Random.int 256)) |> Z.of_bits
-     *       in
-     *
-     *       let (chest, chest_key) =
-     *         Timelock.chest_sampler ~plaintext_size:1 ~time ~rng_state
-     *       in
-     *       resulting_stack chest chest_key time)
-     *     () *)
-
     let () =
       benchmark_with_stack_sampler
         ~name
         ~kinstr
         ~stack_sampler:(fun _ rng_state () ->
-          let log_time = Random.State.int rng_state 31 in
-          let time = Random.State.int rng_state (Int.shift_left 2 log_time) in
-          let plaintext_size = Random.State.int rng_state 10000 + 1 in
+          let log_time =
+            Base_samplers.sample_in_interval
+              ~range:{min = 0; max = 29}
+              rng_state
+          in
+          let time = Random.State.int rng_state (Int.shift_left 1 log_time) in
+          let plaintext_size =
+            Base_samplers.sample_in_interval
+              ~range:{min = 1; max = 10000}
+              rng_state
+          in
 
           let (chest, chest_key) =
             Timelock.chest_sampler ~plaintext_size ~time ~rng_state
