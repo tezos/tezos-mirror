@@ -2875,6 +2875,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         (Invalid_kind (location expr, [Int_kind; Seq_kind], kind expr))
   (* Time lock*)
   | (Chest_key_t _, Bytes (_, bytes)) -> (
+      Gas.consume ctxt Typecheck_costs.chest_key >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes_opt Timelock.chest_key_encoding bytes
       with
@@ -2883,6 +2884,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_key_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   | (Chest_t _, Bytes (_, bytes)) -> (
+      Gas.consume ctxt Typecheck_costs.chest >>?= fun ctxt ->
       match Data_encoding.Binary.of_bytes_opt Timelock.chest_encoding bytes with
       | Some chest -> return (chest, ctxt)
       | None -> fail_parse_data ())
