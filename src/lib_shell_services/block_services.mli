@@ -69,6 +69,11 @@ type raw_context =
           depth requested in the
           /chains/<chain_id>/blocks/<block_id/context/raw/bytes RPC *)
 
+(** [raw_context_eq rc1 rc2] tests whether [rc1] and [rc2] are equal,
+ *  that is, have the same constructors; and the constructor's content
+ *  are recursively equal *)
+val raw_context_eq : raw_context -> raw_context -> bool
+
 val pp_raw_context : Format.formatter -> raw_context -> unit
 
 type error += Invalid_depth_arg of int
@@ -86,6 +91,11 @@ type merkle_node =
 
 (** The type of Merkle tree used by the light mode *)
 and merkle_tree = merkle_node TzString.Map.t
+
+(** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
+ *  that is, have the same constructors; and the constructor's content
+ *  are recursively equal *)
+val merkle_tree_eq : merkle_tree -> merkle_tree -> bool
 
 (** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
     or whether the returned tree should contain data at the given key

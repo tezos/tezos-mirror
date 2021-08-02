@@ -28,26 +28,6 @@
 module Store = Tezos_context_memory.Context
 open Lib_test.Qcheck_helpers
 
-(** Taken from the output of:
-
-   [tezos-client rpc get /chains/main/blocks/head/context/merkle_tree/active_delegates_with_rolls]
- *)
-let irmin_hashes =
-  [
-    "CoVbip7pyXZDp1umo3cGUbCWJUA8wDkPbWR56wKqS434DiDSwGWC";
-    "CoVuTbwGSJyu9xD7vYYxxcqCFwCPf55UBqu8iqRcHYrs3Gu31v8y";
-    "CoUiEnajKeukmYFUgWTJF2z3v24MycpTaomF8a9hRzVy7as9hvgy";
-    "CoVngnGTJfudgcayQqtz2ZyWTUFB6zHmhvV1itjncRzYS4wndhH8";
-    "CoVe9oDs8t8WgH9JHB3DqbvxCZw1Q5ky7qBsZfMiLeKe6RiSMHn1";
-    "CoVXSYbKxP7jJL4ZSZnCsyynEZ6aeR7HR59UVKCDZdMGa8QCLFfW";
-    "CoVSQwz1mSz28kNCBso3F3ZHuLj5GXwXovu4byqweTa96bJAzTX6";
-    "CoVEow8t8iz6gfxB7daEHjFRD5suzdhb3wNZ5rMnoUTdjbYvxbez";
-    "CoVZDcjRgjmKnAhetUtb1AVQYwuUi3fBK7js11vjBETPuG5FcU8o";
-    "CoWRLgT2SwZkCWCwyTBxxkxPxYFvTWtHfKqX8MFQ1hNWL4SS1qdU";
-    "CoWVK1YzoDnMGrNioKL9Mze6s4XX8Uw9Vp9hPHYXqHfaFpwnmXmA";
-    "CoVnWzSVjbYHCQLD53JGJfWRSjUBrkbtCrNMgmsXX6bMhy7CE7E6";
-  ]
-
 let check_irmin_tree_eq t1 t2 =
   qcheck_eq ~pp:Store.Tree.pp ~eq:Store.Tree.equal t1 t2
 
@@ -161,47 +141,3 @@ and merkle_tree_to_simple_tree tree =
 
 let check_simple_tree_eq t1 t2 =
   qcheck_eq ~pp:pp_simple_tree ~eq:simple_tree_eq t1 t2
-
-let raw_context_arb =
-  let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let {gen = bytes_gen; shrink = bytes_shrink_opt; _} = bytes_arb in
-  let gen =
-    let open Gen in
-    (* Factor used to limit the depth of the tree. *)
-    let max_depth_factor = 10 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            (max_depth_factor, map (fun b -> Key b) bytes_gen);
-            (max_depth_factor, pure Cut);
-            ( current_depth_factor,
-              map
-                (fun d -> Dir d)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Cut -> empty
-    | Key bigger_bytes ->
-        shrink Cut
-        <+> ( of_option_shrink bytes_shrink_opt bigger_bytes
-            >|= fun smaller_bytes -> Key smaller_bytes )
-    | Dir bigger_raw_context_map ->
-        shrink Cut <+> shrink (Key Bytes.empty)
-        <+> ( MapArb.shrink
-                ~key:Shrink.string
-                ~value:shrink
-                bigger_raw_context_map
-            >|= fun smaller_dir -> Dir smaller_dir )
-  in
-  let print = Format.asprintf "%a" pp_raw_context in
-  make ~print ~shrink gen

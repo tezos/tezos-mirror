@@ -39,70 +39,13 @@ module Merkle = Internal.Merkle
 module Store = Tezos_context_memory.Context
 open Lib_test.Qcheck_helpers
 
+open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+
 (** [list1_arb arb] generates non-empty lists using [arb]. *)
 let list1_arb arb =
   QCheck.(
     list_of_size Gen.(1 -- 100) arb
     |> add_shrink_invariant (fun l -> List.length l > 0))
-
-let irmin_hash_arb = QCheck.oneofl ~print:Fun.id Light_lib.irmin_hashes
-
-let merkle_node_arb =
-  let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let open Gen in
-  let {gen = raw_context_gen; shrink = raw_context_shrink_opt; _} =
-    Light_lib.raw_context_arb
-  in
-  let {gen = irmin_hash_gen; _} = irmin_hash_arb in
-  let gen =
-    let max_depth_factor = 4 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            ( max_depth_factor,
-              map
-                (fun (kind, hash) -> Hash (kind, hash))
-                (pair (oneofl [Contents; Node]) irmin_hash_gen) );
-            ( max_depth_factor,
-              map (fun raw_context -> Data raw_context) raw_context_gen );
-            ( current_depth_factor,
-              map
-                (fun merkle_node_map -> Continue merkle_node_map)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let first_irmin_hash =
-    List.hd Light_lib.irmin_hashes |> function
-    | None -> assert false
-    | Some hash -> hash
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Hash _ -> empty
-    | Data bigger_raw_context ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> ( of_option_shrink raw_context_shrink_opt bigger_raw_context
-            >|= fun smaller_raw_context -> Data smaller_raw_context )
-    | Continue bigger_mnode ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> shrink (Data Cut)
-        <+> ( MapArb.shrink ~key:Shrink.string ~value:shrink bigger_mnode
-            >|= fun smaller_mnode -> Continue smaller_mnode )
-  in
-  let print = Format.asprintf "%a" pp_merkle_node in
-  make ~print ~shrink gen
-
-let merkle_tree_arb =
-  let open MakeMapArb (TzString.Map) in
-  arb_of_size QCheck.Gen.(0 -- 10) QCheck.string merkle_node_arb
 
 let irmin_tree_arb =
   let module StringList = struct
@@ -512,139 +455,23 @@ module Consensus = struct
         assert false
     end
 
-  (* In the following [mk_rogue_*] functions, there are a number
-     of ways to craft rogue data. I've chosen some, more variations
-     could be done; or different ones. Ideally we want as much variety
-     as possible. *)
-
-  let mk_rogue_bytes bytes =
-    if Bytes.length bytes = 0 then Bytes.of_string "1234"
-    else Bytes.concat bytes [bytes]
-
-  let mk_rogue_hash str =
-    let rec go = function
-      | [] -> Error ()
-      | h :: _ when h <> str -> Ok h
-      | _ :: rest -> go rest
+  let mk_rogue_tree (mtree : Tezos_shell_services.Block_services.merkle_tree)
+      (seed : int list) :
+      (Tezos_shell_services.Block_services.merkle_tree, string) result =
+    let merkle_tree_eq = Tezos_shell_services.Block_services.merkle_tree_eq in
+    let rec gen_rec ~rand attempts_left =
+      if attempts_left = 0 then Error "mk_rogue_tree: giving up"
+      else
+        let gen = QCheck.(gen merkle_tree_arb) in
+        let generated = QCheck.Gen.generate1 ~rand gen in
+        if merkle_tree_eq mtree generated then gen_rec ~rand (attempts_left - 1)
+        else Ok generated
     in
-    go Light_lib.irmin_hashes
-
-  (* [mk_rogue_key siblings key random] returns a variant of [key] in the
-     context of [key] being a dictionary key whose siblings keys are [siblings].
-     In this context, we want to ensure that the returned rogue version
-     of [key] differs from all members of [siblings]. Note that we don't
-     guarantee that all rogue versions of all members of [siblings] differ
-     from each other. This is more complex. Our version suffices because
-     the caller takes care of making at most a single key rogue in
-     a given list of sibling keys *)
-  let mk_rogue_key siblings key random =
-    let trial =
-      if random = 0 then "a" else Char.chr (random mod 256) |> String.make 1
-    in
-    if List.mem ~equal:String.equal trial siblings || trial = key then
-      String.concat "" siblings
-    else trial
-
-  let mk_rogue_key siblings key random =
-    assert (not (List.mem ~equal:String.equal key siblings)) ;
-    let res = mk_rogue_key siblings key random in
-    assert (not (List.mem ~equal:String.equal res siblings)) ;
-    assert (res <> key) ;
-    res
-
-  (** [mk_rogue_raw_context raw_context randoms] returns a variant of
-      [raw_context] whose hash differ from the input [raw_context]
-      (so that it's incompatible with the input data, merkle-wise) *)
-  let rec mk_rogue_raw_context raw_context (rand : Random.State.t) =
-    let open Tezos_shell_services.Block_services in
-    match raw_context with
-    | Cut -> Error ()
-    | Key v -> Ok (Key (mk_rogue_bytes v))
-    | Dir dir ->
-        let keys = List.map fst @@ TzString.Map.bindings dir in
-        let key_changed = ref false in
-        let f (success, acc) (k, v) =
-          if Random.State.bool rand && not !key_changed then (
-            (* change key *)
-            let k' =
-              mk_rogue_key (List.filter (( <> ) k) keys) k
-              @@ Random.State.int rand 1024
-            in
-            key_changed := true ;
-            (true, (k', v) :: acc))
-          else
-            (* change value *)
-            let sub = mk_rogue_raw_context v rand in
-            match sub with
-            | Ok v' -> (true, (k, v') :: acc)
-            | Error _ -> (success, (k, v) :: acc)
-        in
-        let dir_len = List.length keys in
-        let (success, dir') =
-          Seq.fold_left f (false, []) @@ TzString.Map.to_seq dir
-        in
-        assert (dir_len = List.length dir') ;
-        let dir' =
-          List.fold_left
-            (fun acc (k, v) -> TzString.Map.add k v acc)
-            TzString.Map.empty
-            dir'
-        in
-        if success then Ok (Dir dir') else Error ()
-
-  let mk_rogue_raw_context raw_context (rand : Random.State.t) =
-    let res = mk_rogue_raw_context raw_context rand in
-    Result.iter (fun raw_context' -> assert (raw_context <> raw_context')) res ;
-    res
-
-  (** [mk_rogue_tree mtree rand] returns a variant of [mtree]
-      that isn't compatible, merkle-wise, with [mtree].  *)
-  let rec mk_rogue_tree mtree (rand : Random.State.t) =
-    let f k v (success, acc) =
-      match mk_rogue_node v rand with
-      | Ok v' -> (true, TzString.Map.add k v' acc)
-      | Error _ -> (success, TzString.Map.add k v acc)
-    in
-    let (success, res) =
-      TzString.Map.fold f mtree (false, TzString.Map.empty)
-    in
-    if success then Ok res else Error ()
-
-  and mk_rogue_node mnode (rand : Random.State.t) =
-    let open Tezos_shell_services.Block_services in
-    match mnode with
-    | Hash (hash_kind, str) ->
-        (* Interestingly, swapping the hash_kind doesn't create a rogue
-           tree. *)
-        mk_rogue_hash str >>? fun h' -> Ok (Hash (hash_kind, h'))
-    | Data raw_context ->
-        mk_rogue_raw_context raw_context rand >>? fun raw_context ->
-        Ok (Data raw_context)
-    | Continue dir ->
-        let f k v (success, acc) =
-          match mk_rogue_node v rand with
-          | Ok v' -> (true, TzString.Map.add k v' acc)
-          | Error _ -> (success, TzString.Map.add k v acc)
-        in
-        let (success, dir) =
-          TzString.Map.fold f dir (false, TzString.Map.empty)
-        in
-        if success then Ok (Continue dir) else Error ()
-
-  let mk_rogue_tree mtree (seed : int) =
-    Random.init seed ;
-    let rand = Random.get_state () in
-    let i = Random.State.int rand 11 in
-    assert (0 <= i && i <= 10) ;
-    (* When QCheck lands (MR https://gitlab.com/tezos/tezos/-/merge_requests/2688),
-       this code should be generalized to also return a totally random
-       merkle_tree (as long as it differs from [mtree]). Using Crowbar,
-       this is impossible, because we cannot call a generator on our own,
-       and using Crowbar's map-function in this case doesn't suffice (we need
-       an infinite number of random trees to make sure we have one that differs
-       from [mtree]). *)
-    if i == 10 && TzString.Map.(mtree <> empty) then Ok TzString.Map.empty
-    else mk_rogue_tree mtree rand
+    let rand = Random.State.make (Array.of_list seed) in
+    if (not TzString.Map.(is_empty mtree)) && Random.State.int rand 10 = 0 then
+      (* The empty tree is an important edge case, hence this conditional *)
+      Ok TzString.Map.empty
+    else gen_rec ~rand 128
 
   (* [mock_light_rpc mtree [(endpoint1, true); (endpoint2, false)] seed]
      returns an instance of [Tezos_proxy.Light_proto.PROTO_RPCS]
@@ -745,7 +572,7 @@ let add_test_consensus (min_agreement, honest, rogue, consensus_expected) =
          honest
          rogue
          consensus_expected)
-    (triple merkle_tree_arb (list string) int)
+    (triple merkle_tree_arb (list string) (list int))
   @@ fun (mtree, key, randoms) ->
   Consensus.test_consensus
     min_agreement
@@ -769,7 +596,7 @@ let test_consensus_spec =
        min_agreement (honest + rogue + 1) <= honest"
     (pair
        (quad min_agreement_arb honest_arb rogue_arb key_arb)
-       (pair merkle_tree_arb int))
+       (pair merkle_tree_arb (list int)))
   @@ fun ((min_agreement_int, honest, rogue, key), (mtree, seed)) ->
   assert (0 <= min_agreement_int && min_agreement_int <= 100) ;
   let min_agreement = Float.of_int min_agreement_int /. 100. in

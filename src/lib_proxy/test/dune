@@ -8,6 +8,7 @@
   tezos-proxy
   tezos-base-test-helpers
   tezos-test-helpers
+  tezos-shell-services-test-helpers
   qcheck-alcotest
   alcotest-lwt)
  (flags

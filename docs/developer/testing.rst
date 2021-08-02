@@ -133,6 +133,7 @@ References:
 
 QCheck
 ~~~~~~~
+
 `QCheck <https://github.com/c-cube/qcheck>`_ is a library for
 property-based testing in OCaml.
 
@@ -146,30 +147,6 @@ Example test:
 References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
  - `QCheck module documentation <https://c-cube.github.io/qcheck/>`_
-
-Crowbar
-~~~~~~~
-
-`Crowbar <https://github.com/stedolan/crowbar>`_ is a library for
-property-based testing and fuzzing in OCaml. It also interfaces with `afl
-<https://lcamtuf.coredump.cx/afl/>`_ to enable fuzzing.
-
-Typical use cases:
- - Verifying input-output invariants for functions with
-   randomized inputs.
-
-Example test:
- - Crowbar is used in :opam:`data-encoding`, a Tezos component that
-   has been spun off into its own opam package. For instance, :opam:`data-encoding` uses
-   Crowbar to `verify that serializing and
-   deserializing a value
-   <https://gitlab.com/nomadic-labs/data-encoding/-/blob/master/test/test_generated.ml>`_
-   results in the initial value.  To run this test, you need to
-   checkout and build :opam:`data-encoding`. Then, run ``dune
-   @runtest_test_generated``.
-
-References:
- - `Crowbar README <https://github.com/stedolan/crowbar>`_
 
 .. _pytest_section:
 
@@ -480,7 +457,7 @@ Tezt integration and regression tests
    Tezt tests are grouped in 3 batch jobs. New tests increases the
    size of the last batch.
 
-The OCaml package tests (Alcotest, Crowbar & QCheck)
+The OCaml package tests (Alcotest & QCheck)
    The OCaml package tests are regrouped analogously to the ``pytest``\ s:
    one job per protocol package, in addition to one job regrouping
    tests for remaining packages.
@@ -505,7 +482,7 @@ Tezt integration and regression tests
   To rebalance the Tezt batches, run (from the root of the Tezos repository):
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
-The OCaml package tests (Alcotest, Crowbar & QCheck)
+The OCaml package tests (Alcotest & QCheck)
   Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
   include your new test in :src:`.gitlab-ci.yml`.
 

@@ -25,58 +25,33 @@
 
 (** Testing
     -------
-    Component:    Proxy getter
-    Invocation:   dune build @src/lib_proxy/runtest_proxy_fuzzing
-    Subject:      Fuzzing tests of internals of the client's --mode proxy
+    Component:    Block services
+    Invocation:   dune build @src/lib_shell_services/test_helpers/runtest_block_services
+    Subject:      Fuzzing tests of equalities
 *)
 
-module Local = Tezos_context_memory.Context
-module Proxy_getter = Tezos_proxy.Proxy_getter
-module Tree = Proxy_getter.Internal.Tree
 open Lib_test.Qcheck_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
-let key_arb =
-  (* Using small_list, otherwise the test takes considerably longer.
-     This test is quite slow already *)
-  QCheck.(small_list string)
+open Tezos_shell_services.Block_services
 
-let tree_arb =
-  let rec mk_tree acc sets =
-    match sets with
-    | [] -> Lwt.return acc
-    | (key, value) :: tl -> (
-        Tree.set_leaf acc key value >>= function
-        | Tezos_proxy.Proxy.Mutation -> (mk_tree [@ocaml.tailcall]) acc tl
-        | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
-  in
-  let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
-  QCheck.(map (mk_tree Tree.empty) (list (pair key_arb raw_context_arb)))
+let raw_context_eq_tests =
+  qcheck_eq_tests
+    ~eq:raw_context_eq
+    ~arb:raw_context_arb
+    ~eq_name:"raw_context_eq"
 
-(** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
-let test_set_leaf_get =
-  QCheck.Test.make
-    ~name:"Tree.get (Tree.set_leaf t k v) k = v"
-    QCheck.(triple tree_arb key_arb raw_context_arb)
-  @@ fun (tree, key, value) ->
-  let expected =
-    Lwt_main.run @@ Proxy_getter.Internal.raw_context_to_tree value
-  in
-  (* We need to make sure that we are actually setting something: *)
-  QCheck.assume @@ Option.is_some expected ;
-  let tree' = Lwt_main.run @@ Tree.set_leaf tree key value in
-  let tree' =
-    match tree' with
-    | Tezos_proxy.Proxy.Mutation -> tree
-    | Tezos_proxy.Proxy.Value tree' -> tree'
-  in
-  let actual = Lwt_main.run @@ Tree.get tree' key in
-  let pp = Format.pp_print_option Local.Tree.pp in
-  let eq = Option.equal Local.Tree.equal in
-  qcheck_eq' ~pp ~eq ~expected ~actual ()
+let merkle_tree_eq_tests =
+  qcheck_eq_tests
+    ~eq:merkle_tree_eq
+    ~arb:merkle_tree_arb
+    ~eq_name:"merkle_tree_eq"
 
 let () =
   Alcotest.run
-    "Proxy Getter"
-    [("Array theory", qcheck_wrap [test_set_leaf_get])]
+    "Block_services"
+    [
+      ("raw_context_eq", qcheck_wrap raw_context_eq_tests);
+      ("merkle_tree_eq", qcheck_wrap merkle_tree_eq_tests);
+    ]
