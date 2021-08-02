@@ -26,19 +26,18 @@
 open Data_encoding
 
 module Helper = struct
-  (** Convert an encoding to the JSON representation of its generated description using [describe] *)
-  let desc e = Json.(construct Binary_schema.encoding (Binary.describe e))
+  (** Convert an encoding to the JSON representation of its generated
+      description using [describe] *)
+  let desc e = Json.construct Binary_schema.encoding (Binary.describe e)
 
-  (** Ensure that all type-references found in the toplevel encoding are included in the list of defined types
-      and have not been pruned or renamed out of existence
-    *)
+  (** Ensure that all references found in the toplevel encoding are included in
+      the list of encoding definitions and have not been pruned or renamed out
+      of existence *)
   let check_refs enc () =
     let d = desc enc in
     match d with
-    | `O [("toplevel", toplevel); ("fields", fields)] ->
+    | `O [("toplevel", `O [("fields", `A tl_fields)]); ("fields", `A defs)] ->
         let tl_refs =
-          match toplevel with
-          | `O [("fields", `A tl_fields)] ->
               let get_ref : json -> string option = function
                 | `O field_specs -> (
                     match List.assoc_opt "layout" field_specs with
@@ -53,10 +52,7 @@ module Helper = struct
                 | _ -> assert false
               in
               List.filter_map get_ref tl_fields
-          | _ -> assert false
         and fld_defs =
-          match fields with
-          | `A defs ->
               let get_defname : json -> string = function
                 | `O def_specs -> (
                     match List.assoc "description" def_specs with
@@ -68,7 +64,6 @@ module Helper = struct
                 | _ -> assert false
               in
               List.map get_defname defs
-          | _ -> assert false
         in
         assert (List.for_all (fun r -> List.mem r fld_defs) tl_refs) ;
         ()
@@ -77,7 +72,7 @@ end
 
 (** Checks that a previously identified bug, in which the description of 
     an encoding defined with the {!mu} combinator contains a dangling
-    reference in the toplevel type definition, is no longer extant.
+    reference in the toplevel encoding definition, is no longer extant.
   *)
 module Mu_phantom = struct
   type boollist = Nil | Cons of bool * boollist
@@ -121,7 +116,7 @@ end
 (** Checks that a previously identified bug, in which the description of 
     an encoding using {!obj} with isomorphic field encodings defined inline
     without explicitly identical names (using {!def}) would cause dangling references
-    to persist in the toplevel type definition, is no longer extant.
+    to persist in the toplevel encoding definition, is no longer extant.
   *)
 module Inline_phantom = struct
   let first_encoding = def "first" unit
