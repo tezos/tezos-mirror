@@ -74,6 +74,33 @@ let one_balance_decreases c env state state' =
   xtz' < xtz || tzbtc' < tzbtc || lqt' < lqt
   || (xtz' = xtz && tzbtc' = tzbtc && lqt' = lqt)
 
+let get_float_balances env state =
+  let xtz =
+    Int64.to_float @@ SymbolicMachine.get_xtz_balance env.cpmm_contract state
+  in
+  let tzbtc =
+    Int.to_float
+    @@ SymbolicMachine.get_tzbtc_balance env.cpmm_contract env state
+  in
+  let lqt =
+    Int.to_float @@ SymbolicMachine.get_cpmm_total_liquidity env state
+  in
+  (xtz, tzbtc, lqt)
+
+(** [is_remove_liquidity_consistent env state state'] returns [true]
+    iff, when the liquidity pool decreased in [state'], then the
+    fraction of tzbtc and xtz returned to the liquidity provider is
+    lesser or equal than the fraction of lqt burnt. *)
+let is_remove_liquidity_consistent env state state' =
+  let (xtz, tzbtc, lqt) = get_float_balances env state in
+  let (xtz', tzbtc', lqt') = get_float_balances env state' in
+  if lqt' < lqt then
+    let flqt = (lqt -. lqt') /. lqt in
+    let fxtz = (xtz -. xtz') /. xtz in
+    let ftzbtc = (tzbtc -. tzbtc') /. tzbtc in
+    fxtz <= flqt && ftzbtc <= flqt
+  else true
+
 (** [validate_xtz_balance c env (blk, state)] returns [true] iff the
     tez balance for the contract [c] is the same in [blk] and in
     [state]. *)
@@ -214,6 +241,16 @@ let economic_tests =
         let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
           run_and_check (one_balance_decreases attacker env) scenario env state
+        in
+        true);
+    QCheck.Test.make
+      ~count:1000
+      ~name:"Remove liquidities is consistent"
+      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 20)
+      (fun (specs, scenario) ->
+        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let _ =
+          run_and_check (is_remove_liquidity_consistent env) scenario env state
         in
         true);
   ]
