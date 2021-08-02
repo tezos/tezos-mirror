@@ -101,6 +101,15 @@ let is_remove_liquidity_consistent env state state' =
     fxtz <= flqt && ftzbtc <= flqt
   else true
 
+(** [positive_pools env state] returns [true] iff the three pools of
+    the CPMM (as identified in [env]) are strictly positive in
+    [state]. *)
+let positive_pools env state =
+  let xtz = SymbolicMachine.get_xtz_balance env.cpmm_contract state in
+  let tzbtc = SymbolicMachine.get_tzbtc_balance env.cpmm_contract env state in
+  let lqt = SymbolicMachine.get_cpmm_total_liquidity env state in
+  0L < xtz && 0 < tzbtc && 0 < lqt
+
 (** [validate_xtz_balance c env (blk, state)] returns [true] iff the
     tez balance for the contract [c] is the same in [blk] and in
     [state]. *)
@@ -222,6 +231,16 @@ let machine_validation_tests =
           (let invariant = validate_storage in
            ConcreteMachine.build ~invariant specs >>=? fun (state, env) ->
            ConcreteMachine.run ~invariant scenario env state >>=? fun _ ->
+           return_unit));
+    QCheck.Test.make
+      ~count:1000
+      ~name:"Positive pools"
+      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
+      (fun (specs, scenario) ->
+        extract_qcheck_tzresult
+          (let invariant = positive_pools in
+           let (state, env) = SymbolicMachine.build ~invariant specs in
+           let _ = SymbolicMachine.run ~invariant scenario env state in
            return_unit));
   ]
 
