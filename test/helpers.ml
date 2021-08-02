@@ -88,7 +88,7 @@ let chunked_read sz encoding bytes =
       (cut sz bytes)
   in
   match status with
-  | Success {stream; _} when not (Data_encoding__Binary_stream.is_empty stream)
+  | Success {stream; _} when not (Data_encoding.Binary_stream.is_empty stream)
     ->
       Binary.Error Extra_bytes
   | _ -> status

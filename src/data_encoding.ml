@@ -135,6 +135,7 @@ end
 
 module Bson = Bson
 module Binary_schema = Binary_schema
+module Binary_stream = Binary_stream
 
 module Binary = struct
   include Binary_error_types
