@@ -101,6 +101,15 @@ let is_remove_liquidity_consistent env state state' =
     fxtz <= flqt && ftzbtc <= flqt
   else true
 
+(** [is_share_price_increasing env state state'] returns [true] iff
+    the product of supplies (tzbtc, and xtz) increases.
+
+    See https://blog.nomadic-labs.com/progress-report-on-the-verification-of-liquidity-baking-smart-contracts.html#evolution-of-the-product-of-supplies *)
+let is_share_price_increasing env state state' =
+  let (xtz, tzbtc, lqt) = get_float_balances env state in
+  let (xtz', tzbtc', lqt') = get_float_balances env state' in
+  xtz *. tzbtc /. (lqt *. lqt) <= xtz' *. tzbtc' /. (lqt' *. lqt')
+
 (** [positive_pools env state] returns [true] iff the three pools of
     the CPMM (as identified in [env]) are strictly positive in
     [state]. *)
@@ -270,6 +279,16 @@ let economic_tests =
         let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
           run_and_check (is_remove_liquidity_consistent env) scenario env state
+        in
+        true);
+    QCheck.Test.make
+      ~count:1000
+      ~name:"Share price only increases"
+      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 20)
+      (fun (specs, scenario) ->
+        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let _ =
+          run_and_check (is_share_price_increasing env) scenario env state
         in
         true);
   ]
