@@ -27,14 +27,14 @@ type secret
 type public
 
 module Rand = struct
-  let write buf =
-    if Hacl.RandomBuffer.randombytes buf then ()
+  let write out =
+    if Hacl.RandomBuffer.Noalloc.randombytes ~out then ()
     else failwith "Error getting random bytes"
 
-  let gen len =
-    let buf = Bytes.create len in
-    write buf ;
-    buf
+  let gen size =
+    match Hacl.RandomBuffer.randombytes ~size with
+    | Some buf -> buf
+    | None -> failwith "Error getting random bytes"
 end
 
 module Hash = struct
@@ -67,25 +67,16 @@ module Hash = struct
 
     let size = S.size
 
-    let init () = EverCrypt.Hash.init S.alg
+    let init () = EverCrypt.Hash.init ~alg:S.alg
 
-    let update st msg = EverCrypt.Hash.update st msg
+    let update st msg = EverCrypt.Hash.update ~st ~msg
 
-    let finish st =
-      let output = Bytes.create S.size in
-      EverCrypt.Hash.finish st output ;
-      output
+    let finish st = EverCrypt.Hash.finish ~st
 
-    let digest msg =
-      let output = Bytes.create S.size in
-      EverCrypt.Hash.hash S.alg output msg ;
-      output
+    let digest msg = EverCrypt.Hash.hash ~alg:S.alg ~msg
 
     module HMAC = struct
-      let digest ~key ~msg =
-        let output = Bytes.create S.size in
-        EverCrypt.HMAC.mac S.alg output key msg ;
-        output
+      let digest ~key ~msg = EverCrypt.HMAC.mac ~alg:S.alg ~key ~msg
     end
   end
 
@@ -122,29 +113,21 @@ module Hash = struct
   module SHA3_256 = struct
     let size = 32
 
-    let digest msg =
-      let output = Bytes.create size in
-      Hacl.SHA3_256.hash msg output ;
-      output
+    let digest = Hacl.SHA3_256.hash
   end
 
   module SHA3_512 = struct
     let size = 64
 
-    let digest msg =
-      let output = Bytes.create size in
-      Hacl.SHA3_512.hash msg output ;
-      output
+    let digest = Hacl.SHA3_512.hash
   end
 
   module Keccak_256 = struct
     let size = 32
 
     let digest msg =
-      let output = Bytes.create size in
-      let keccak_256 = Hacl.Keccak.keccak 1088 512 1 in
-      keccak_256 msg output ;
-      output
+      let keccak_256 = Hacl.Keccak.keccak ~rate:1088 ~capacity:512 ~suffix:1 in
+      keccak_256 ~msg ~size
   end
 end
 
@@ -156,13 +139,11 @@ module Blake2b = struct
   let direct ?(key = Bytes.create 0) inbuf len =
     if len < 1 || len > 64 then
       invalid_arg "Blake2b.direct: size must be between 1 and 64" ;
-    let outbuf = Bytes.create len in
     (* HACL* doesn't yet provide a multiplexing interface for Blake2b so we
      * perform this check here and use the faster version if possible *)
-    if AutoConfig2.(has_feature AVX2) then
-      Hacl.Blake2b_256.hash key inbuf outbuf
-    else Hacl.Blake2b_32.hash key inbuf outbuf ;
-    Hash outbuf
+    if AutoConfig2.(has_feature VEC256) then
+      Hash (Hacl.Blake2b_256.hash ~key inbuf len)
+    else Hash (Hacl.Blake2b_32.hash ~key inbuf len)
 end
 
 module Nonce = struct
@@ -222,11 +203,11 @@ module Secretbox = struct
   let genkey () = Rand.gen 32
 
   let secretbox ~key ~nonce ~msg ~cmsg =
-    if Hacl.NaCl.Easy.secretbox cmsg msg nonce key then ()
+    if Hacl.NaCl.Noalloc.Easy.secretbox ~pt:msg ~n:nonce ~key ~ct:cmsg then ()
     else failwith "Secretbox encryption failed"
 
   let secretbox_open ~key ~nonce ~cmsg ~msg =
-    Hacl.NaCl.Easy.secretbox_open msg cmsg nonce key
+    Hacl.NaCl.Noalloc.Easy.secretbox_open ~ct:cmsg ~n:nonce ~key ~pt:msg
 end
 
 module Box = struct
@@ -304,32 +285,42 @@ module Box = struct
   let basepoint = Bytes.init 32 (function 0 -> '\x09' | _ -> '\x00')
 
   let neuterize (Sk sk) =
-    let pk = Bytes.create pkbytes in
-    EverCrypt.Curve25519.scalarmult pk sk basepoint ;
-    Pk pk
+    Pk (EverCrypt.Curve25519.scalarmult ~scalar:sk ~point:basepoint)
 
   let keypair () =
     let sk = Sk (Rand.gen skbytes) in
     (neuterize sk, sk)
 
   let dh (Pk pk) (Sk sk) =
-    let combined = Bytes.create ckbytes in
-    if Hacl.NaCl.box_beforenm combined pk sk then Ck combined
-    else failwith "Error computing box_beforenm"
+    match Hacl.NaCl.box_beforenm ~pk ~sk with
+    | Some ck -> Ck ck
+    | None -> failwith "Error computing box_beforenm"
 
   let box ~k:(Ck k) ~nonce ~msg ~cmsg =
-    if not @@ Hacl.NaCl.Easy.box_afternm cmsg msg nonce k then
-      failwith "Box: encryption error"
+    if not @@ Hacl.NaCl.Noalloc.Easy.box_afternm ~pt:msg ~n:nonce ~ck:k ~ct:cmsg
+    then failwith "Box: encryption error"
 
   let box_open ~k:(Ck k) ~nonce ~cmsg ~msg =
-    Hacl.NaCl.Easy.box_open_afternm msg cmsg nonce k
+    Hacl.NaCl.Noalloc.Easy.box_open_afternm ~ct:cmsg ~n:nonce ~ck:k ~pt:msg
 
   let box_noalloc ~k:(Ck k) ~nonce ~tag ~buf =
-    if not @@ Hacl.NaCl.Detached.box_afternm buf tag buf nonce k then
-      failwith "Box: encryption error"
+    if
+      not
+      @@ Hacl.NaCl.Noalloc.Detached.box_afternm
+           ~pt:buf
+           ~n:nonce
+           ~ck:k
+           ~ct:buf
+           ~tag
+    then failwith "Box: encryption error"
 
   let box_open_noalloc ~k:(Ck k) ~nonce ~tag ~buf =
-    Hacl.NaCl.Detached.box_open_afternm buf buf tag nonce k
+    Hacl.NaCl.Noalloc.Detached.box_open_afternm
+      ~pt:buf
+      ~n:nonce
+      ~ck:k
+      ~ct:buf
+      ~tag
 end
 
 module type SIGNATURE = sig
@@ -402,21 +393,16 @@ module Ed25519 : SIGNATURE = struct
 
   let neuterize : type a. a key -> public key = function
     | Pk pk -> Pk pk
-    | Sk sk ->
-        let pk = Bytes.create pk_size in
-        Hacl.Ed25519.secret_to_public pk sk ;
-        Pk pk
+    | Sk sk -> Pk (Hacl.Ed25519.secret_to_public ~sk)
 
   let keypair () =
     let sk = Sk (Rand.gen sk_size) in
     (neuterize sk, sk)
 
-  let sign ~sk:(Sk sk) ~msg =
-    let signature = Bytes.create size in
-    Hacl.Ed25519.sign signature sk msg ;
-    signature
+  let sign ~sk:(Sk sk) ~msg = Hacl.Ed25519.sign ~sk ~msg
 
-  let verify ~pk:(Pk pk) ~msg ~signature = Hacl.Ed25519.verify pk msg signature
+  let verify ~pk:(Pk pk) ~msg ~signature =
+    Hacl.Ed25519.verify ~pk ~msg ~signature
 end
 
 module P256 : SIGNATURE = struct
@@ -447,20 +433,16 @@ module P256 : SIGNATURE = struct
   (* A public key is generated from a secret key using the first step of the
    * Elliptic Curve Diffie-Hellman (ECDH) key agreement protocol, in which
    * sk is multiplied with the base point of the curve. *)
-  let pk_of_sk sk pk = Hacl.P256.dh_initiator pk sk
+  let pk_of_sk sk = Hacl.P256.dh_initiator ~sk
 
-  let valid_pk pk = Hacl.P256.valid_pk pk
+  let valid_pk pk = Hacl.P256.valid_pk ~pk
 
   (* Generate a random sk_size buffer until it is valid to be used as
    * secret key, i.e. non-zero and smaller than the prime order.
    * This is also used to generate signing secrets. *)
   let rec get_valid_sk () =
     let sk = Rand.gen sk_size in
-    if Hacl.P256.valid_sk sk then sk else get_valid_sk ()
-
-  let compressed_from_raw pk cpk = Hacl.P256.compress_c pk cpk
-
-  let uncompressed_from_raw pk cpk = Hacl.P256.compress_n pk cpk
+    if Hacl.P256.valid_sk ~sk then sk else get_valid_sk ()
 
   let compare : type a. a key -> a key -> int =
    fun a b ->
@@ -473,23 +455,21 @@ module P256 : SIGNATURE = struct
 
   let neuterize : type a. a key -> public key = function
     | Pk pk -> Pk pk
-    | Sk sk ->
-        let pk = Bytes.create pk_size_raw in
-        if pk_of_sk sk pk then Pk pk else failwith "P256.neuterize: failure"
+    | Sk sk -> (
+        match pk_of_sk sk with
+        | Some pk -> Pk pk
+        | None -> failwith "P256.neuterize: failure")
 
   (* This function accepts a buffer representing a public key in either the
    * compressed or the uncompressed form. *)
   let pk_of_bytes_without_validation : Bytes.t -> public key option =
    fun buf ->
-    let pk = Bytes.create pk_size_raw in
-    match Bytes.length buf with
-    | len when len = pk_size ->
-        let decompress_ok = Hacl.P256.decompress_c buf pk in
-        if decompress_ok then Some (Pk pk) else None
-    | len when len = pk_size_uncompressed ->
-        let decompress_ok = Hacl.P256.decompress_n buf pk in
-        if decompress_ok then Some (Pk pk) else None
-    | _ -> None
+    Option.map
+      (fun pk -> Pk pk)
+      (match Bytes.length buf with
+      | len when len = pk_size -> Hacl.P256.compressed_to_raw buf
+      | len when len = pk_size_uncompressed -> Hacl.P256.uncompressed_to_raw buf
+      | _ -> None)
 
   let pk_of_bytes : Bytes.t -> public key option =
    fun buf ->
@@ -498,7 +478,7 @@ module P256 : SIGNATURE = struct
 
   let sk_of_bytes : Bytes.t -> secret key option =
    fun buf ->
-    if Bytes.length buf = sk_size && Hacl.P256.valid_sk buf then
+    if Bytes.length buf = sk_size && Hacl.P256.valid_sk ~sk:buf then
       Some (Sk (Bytes.copy buf))
     else None
 
@@ -506,15 +486,8 @@ module P256 : SIGNATURE = struct
    fun ?compress:(comp = true) -> function
     | Sk sk -> Bytes.copy sk
     | Pk pk ->
-        if comp then (
-          let buf = Bytes.create pk_size in
-          compressed_from_raw pk buf ;
-          buf)
-        else
-          let buf = Bytes.create pk_size_uncompressed in
-          uncompressed_from_raw pk buf ;
-          assert (Bytes.sub buf 1 pk_size_raw = pk) ;
-          buf
+        if comp then Hacl.P256.raw_to_compressed pk
+        else Hacl.P256.raw_to_uncompressed pk
 
   let to_bytes : type a. a key -> Bytes.t =
    fun key -> to_bytes_with_compression ~compress:true key
@@ -528,15 +501,13 @@ module P256 : SIGNATURE = struct
         Bytes.blit sk 0 buf pos len
     | Pk pk ->
         if pos = 0 then
-          if comp then compressed_from_raw pk buf
-          else uncompressed_from_raw pk buf
-        else if comp then (
-          let out = Bytes.create pk_size in
-          compressed_from_raw pk out ;
-          Bytes.blit out 0 buf pos pk_size)
+          if comp then Hacl.P256.Noalloc.raw_to_compressed ~p:pk ~result:buf
+          else Hacl.P256.Noalloc.raw_to_uncompressed ~p:pk ~result:buf
+        else if comp then
+          let out = Hacl.P256.raw_to_compressed pk in
+          Bytes.blit out 0 buf pos pk_size
         else
-          let out = Bytes.create pk_size_uncompressed in
-          uncompressed_from_raw pk out ;
+          let out = Hacl.P256.raw_to_uncompressed pk in
           Bytes.blit out 0 buf pos pk_size_uncompressed
 
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
@@ -544,21 +515,22 @@ module P256 : SIGNATURE = struct
     blit_to_bytes_with_compression ~compress:true key ?pos buf
 
   let keypair () : public key * secret key =
-    let pk = Bytes.create pk_size_raw in
     let sk = get_valid_sk () in
-    if pk_of_sk sk pk then (Pk pk, Sk sk) else failwith "P256.keypair: failure"
+    match pk_of_sk sk with
+    | Some pk -> (Pk pk, Sk sk)
+    | None -> failwith "P256.keypair: failure"
 
   let sign ~sk:(Sk sk) ~msg =
-    let signature = Bytes.create size in
     (* A random non-zero signing secret k is generated which, similar to
      * secret keys, needs to be non-zero and smaller than the prime order. *)
     let k = get_valid_sk () in
-    let res = Hacl.P256.sign sk msg k signature in
+    let res = Hacl.P256.sign ~sk ~msg ~k in
     Bytes.fill k 0 32 '\x00' ;
-    if not res then failwith "P256.sign: signing failure" ;
-    signature
+    match res with
+    | Some signature -> signature
+    | None -> failwith "P256.sign: signing failure"
 
   let verify ~pk:(Pk pk) ~msg ~signature =
     if Bytes.length signature <> size then false
-    else Hacl.P256.verify pk msg signature
+    else Hacl.P256.verify ~pk ~msg ~signature
 end
