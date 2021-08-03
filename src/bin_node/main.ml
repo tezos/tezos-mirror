@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,27 +42,8 @@ let () =
       Stdlib.exit 1)
 
 let () =
-  if Filename.basename Sys.argv.(0) = "tezos-validator" then (
-    try
-      let is_valid_directory =
-        Array.length Sys.argv = 3
-        && Sys.argv.(1) = "--socket-dir"
-        && Sys.file_exists Sys.argv.(2)
-        && Sys.is_directory Sys.argv.(2)
-      in
-      if not is_valid_directory then
-        invalid_arg
-          "Invalid arguments provided for the validator: expected \
-           'tezos-validator --socket-dir <dir>'." ;
-      Stdlib.exit
-        (Lwt_main.run
-           (Lwt_exit.wrap_and_exit @@ Validator.main ~socket_dir:Sys.argv.(2) ()
-            >>= function
-            | Ok () -> Lwt_exit.exit_and_wait 0
-            | Error _ -> Lwt.return 1))
-    with exn ->
-      Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Stdlib.exit 1)
+  if Filename.basename Sys.argv.(0) = "tezos-validator" then
+    Tezos_validator.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in
