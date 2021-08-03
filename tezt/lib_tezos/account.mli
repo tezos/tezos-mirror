@@ -23,23 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Baker
-   Invocation:   dune exec tezt/tests/main.exe -- --file baker_test.ml
-   Subject:      Run the baker while performing a lot of transfers
-*)
+(** Keys associated to an account. For example:
+    {|{
+      alias = "bootstrap1";
+      public_key_hash = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+      public_key = Some "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+      secret_key =
+        Some "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+    }|} *)
+type key = {
+  alias : string;
+  public_key_hash : string;
+  public_key : string option;
+  secret_key : string option;
+}
 
-let test_baker =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"baker stresstest"
-    ~tags:["node"; "baker"]
-  @@ fun protocol ->
-  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
-  let* _ = Baker.init ~protocol node client in
-  (* Use a large tps, to have failing operations too *)
-  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
-  Lwt.return_unit
-
-let register ~protocols = test_baker ~protocols
+(** [write_stresstest_sources_file accounts] returns the name of a
+    file containing the [accounts] in JSON format, as expected by
+    the [stresstest] client command. *)
+val write_stresstest_sources_file : key list -> string Lwt.t
