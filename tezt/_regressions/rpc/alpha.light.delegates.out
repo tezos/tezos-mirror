@@ -3,10 +3,10 @@ tezt/_regressions/rpc/alpha.light.delegates.out
 ./tezos-client --mode light rpc get /chains/main/blocks/head/context/contracts
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[CONTRACT_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
   "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
@@ -67,14 +67,14 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 Fatal error:
   Command failed: Storage error:
-                    Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
   
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 Fatal error:
   Command failed: Storage error:
-                    Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
   
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
@@ -85,7 +85,7 @@ false
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 Fatal error:
   Command failed: Storage error:
-                    Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/balance'.
   
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
@@ -104,7 +104,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 Fatal error:
   Command failed: Storage error:
-                    Missing key 'contracts/index/63/cb/4c/cb/6c/4c/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/delegate_desactivation'.
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/delegate_desactivation'.
   
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'

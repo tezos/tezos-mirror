@@ -13,15 +13,15 @@ TRANSFER_ARGS = ['--burn-cap', '0.257']
 @pytest.mark.incremental
 class TestRawContext:
     def test_delegates(self, client: Client):
-        path = '/chains/main/blocks/head/context/raw/bytes/delegates/?depth=3'
+        path = '/chains/main/blocks/head/context/raw/bytes/delegates/?depth=2'
         res = client.rpc('get', path)
         expected = {
             "ed25519": {
-                "02": {"29": None},
-                "a9": {"ce": None},
-                "c5": {"5c": None},
-                "da": {"c9": None},
-                "e7": {"67": None},
+                "02298c03ed7d454a101eb7022bc95f7e5f41ac78": None,
+                "a9ceae0f8909125492a7c4700acc59274cc6c846": None,
+                "c55cf02dbeecc978d9c84625dcae72bb77ea4fbd": None,
+                "dac9f52543da1aed0bc1d6b46bf7c10db7014cd6": None,
+                "e7670f32038107a59a2b9cfefae36ea21f5aa63c": None,
             }
         }
         assert res == expected
