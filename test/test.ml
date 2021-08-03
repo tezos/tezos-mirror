@@ -40,4 +40,6 @@ let () =
       ("conv_with_guard", Guarded_conv.tests);
       ("with_decoding_guard", Guarded_decode.tests);
       ("int31_int32", Int31_int32.tests);
+      ("inline_phantom", Reference_check.Inline_phantom.tests);
+      ("mu_phantom", Reference_check.Mu_phantom.tests);
     ]

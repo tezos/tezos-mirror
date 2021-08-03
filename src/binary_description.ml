@@ -557,4 +557,5 @@ let describe (type x) (encoding : x Encoding.t) =
       references.descriptions
   in
   let fields = List.rev (dedup_canonicalize uf filtered) in
+  let toplevel = fixup_references uf toplevel in
   {Binary_schema.toplevel; fields}
