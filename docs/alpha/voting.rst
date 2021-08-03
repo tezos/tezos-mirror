@@ -1,5 +1,3 @@
-.. _alpha_voting_procedure
-
 The Voting Process
 ==================
 
@@ -19,8 +17,7 @@ Voting periods align with cycles: a voting period starts at the first
 block of a cycle.
 
 Other than this page, there is an excellent overview from `Jacob
-Arluck on medium.
-<https://medium.com/tezos/amending-tezos-b77949d97e1e>`_
+Arluck on medium <https://medium.com/tezos/amending-tezos-b77949d97e1e>`__.
 
 Periods
 -------
@@ -216,4 +213,4 @@ For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.
 
 For Ledger support refer to Obsidian Systems' `documentation
-<https://github.com/obsidiansystems/ledger-app-tezos#proposals-and-voting>`_.
+<https://github.com/obsidiansystems/ledger-app-tezos#proposals-and-voting>`__.

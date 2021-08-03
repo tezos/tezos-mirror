@@ -53,7 +53,7 @@ module type T = sig
 
       [unsafe] because there are no length checks, unlike {!parse}.
 
-     @deprecated You should use {parse} instead. *)
+     @deprecated You should use [parse] instead. *)
   val parse_unsafe : bytes -> Proto.operation_data tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the

@@ -180,6 +180,7 @@ in the :ref:`introduction <howtoget>`.
    alpha/cli-commands
    alpha/rpc
    alpha/liquidity_baking
+   alpha/timelock
 
 .. toctree::
    :maxdepth: 2

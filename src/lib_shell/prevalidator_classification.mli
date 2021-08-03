@@ -89,7 +89,7 @@ val remove_not_applied : Operation_hash.t -> t -> unit
    class field is full. In that case, the new operation is added to
    the class, and the one removed is discarded. An operation is also
    discarded when it is classified as [Refused]. The callback
-   [on_discarded_operation] which was given by the function {create}
+   [on_discarded_operation] which was given by the function [create]
    when the value [classes] was created is called on each discarded
    operation. *)
 val add :

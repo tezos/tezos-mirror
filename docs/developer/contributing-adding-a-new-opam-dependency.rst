@@ -1,5 +1,3 @@
-.. _adding_new_opam_dependency:
-
 How to add or update opam dependencies
 ======================================
 

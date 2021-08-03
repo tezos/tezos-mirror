@@ -47,7 +47,6 @@ Works best when:
 - Code and its dependencies are pure, or "pure enough" (e.g. code may contain logging and other unharmful/unimportant side effects)
 - Dependency tree is not too deep (e.g. if A depends on B which depends on C which depends on D, then it becomes hard to write/read/maintain unit tests)
 
-Function records
 Using function records
 ----------------------
 
@@ -68,11 +67,11 @@ As an example, consider the following ``Counter`` module (signature and implemen
       type t = {
         counter : int;
       }
-      
+
       let create_from_file () =
         let counter = int_of_string (Files.read "/tmp/counter.txt") in
         {counter}
-      
+
       let increment_and_save_to_file t =
         let t = {counter = t.counter + 1} in
         Files.write "/tmp/counter.txt" (string_of_int t.counter);
@@ -93,7 +92,7 @@ One way to achieve this - when your module has a state, usually a type ``t`` - i
       type t
       val create_from_file : unit -> t
       val increment_and_save_to_file : t -> t
-      
+
       module Internal_for_tests : sig
         type dependencies = {
           files_read : string -> string;
@@ -106,30 +105,30 @@ One way to achieve this - when your module has a state, usually a type ``t`` - i
         files_read : string -> string;
         files_write : string -> string -> unit;
       }
-      
+
       type t = {
         counter : int;
         dependencies : dependencies;
       }
-      
+
       let create_from_file_internal dependencies () =
         let counter = int_of_string (dependencies.files_read "/tmp/counter.txt") in
         {counter; dependencies}
-      
+
       let create_from_file = create_from_file_internal {files_read = Files.read; files_write = Files.write}
-      
+
       let increment_and_save_to_file t =
         let t = {t with counter = t.counter + 1} in
         t.dependencies.files_write "/tmp/counter.txt" (string_of_int t.counter);
         t
-        
+
       module Internal_for_tests = struct
         type nonrec dependencies = dependencies = {
           files_read : string -> string;
           files_write : string -> string -> unit;
         }
-        
-        let create_from_file = create_from_file_internal 
+
+        let create_from_file = create_from_file_internal
       end
     end
 
@@ -165,13 +164,13 @@ An alternative solution, more verbose but not requiring any "state" value availa
       type t
       val create_from_file : unit -> t
       val increment_and_save_to_file : t -> t
-      
+
       module Internal_for_tests : sig
         type dependencies = {
           files_read : string -> string;
           files_write : string -> string -> unit;
         }
-        
+
         val create_from_file : dependencies -> unit -> t
         val increment_and_save_to_file : dependencies -> t -> t
       end
@@ -195,14 +194,14 @@ An alternative solution, more verbose but not requiring any "state" value availa
         {counter}
 
       let create_from_file = create_from_file_internal business_dependencies
-      
+
       let increment_and_save_to_file_internal dependencies t =
         let t = {counter = t.counter + 1} in
         dependencies.files_write "/tmp/counter.txt" (string_of_int t.counter);
         t
-      
+
       let increment_and_save_to_file t = increment_and_save_to_file_internal business_dependencies t
-        
+
       module Internal_for_tests = struct
         type nonrec dependencies = dependencies = {
           files_read : string -> string;
@@ -264,8 +263,8 @@ To choose between the field and the argument:
 - Else add a ``dependencies`` argument - but this requires duplicating each function, which ends up being very verbose if you have several functions
 - If your "state" value (usually a value of type ``t``) is passed to a polymorphic function like ``=`` or ``compare`` (which throw on function fields, and are famous for being an anti-pattern), and it is not possible for you to fix this anti-pattern, then either switch to function arguments, or wrap in an object.
 
-Functors
---------
+Using functors
+--------------
 
 This approach decouples the business code from its dependency modules.
 Note that unlike the Function records solution, this decouples both dependency functions **and abstract types**!
@@ -291,9 +290,9 @@ Consider the following code: it is similar to the previous ``Counter`` example b
       type t = {
         counter : int;
       }
-      
+
       let create counter = {counter}
-      
+
       let increment_and_save_to_file t =
         let t = {counter = t.counter + 1} in
         let file = Files.openf "/tmp/counter.txt" in
@@ -312,9 +311,9 @@ The technique is to transform ``Counter`` into a functor that takes a module loo
         val create : int -> t
         val increment_and_save_to_file : t -> t
       end
-      
+
       include S
-      
+
       module Internal_for_tests : sig
         module type FILES = sig
           type t
@@ -330,21 +329,21 @@ The technique is to transform ``Counter`` into a functor that takes a module loo
         val create : int -> t
         val increment_and_save_to_file : t -> t
       end
-      
+
       module type FILES = sig
         type t
         val openf : string -> t
         val write : t -> string -> unit
         val close : t -> unit
       end
-      
+
       module Make (Files : FILES) = struct
         type t = {
           counter : int;
         }
-        
+
         let create counter = {counter}
-        
+
         let increment_and_save_to_file t =
           let t = {counter = t.counter + 1} in
           let file = Files.openf "/tmp/counter.txt" in
@@ -352,13 +351,13 @@ The technique is to transform ``Counter`` into a functor that takes a module loo
           Files.close file;
           t
       end
-      
+
       (* Do not be mistaken: here [Files] refers to the real, business [Files] module! *)
       include Make (Files)
-      
+
       module Internal_for_tests = struct
         module type FILES = FILES
-        
+
         module Make = Make
       end
     end
@@ -403,4 +402,3 @@ Cons:
 - Additional complexity (functors, module types)
 - Does not scale well in more complex dependencies (``A`` depends on ``B`` and ``C`` types, and ``B`` also depends on ``C`` types) as it induces a lot of destructive substitutions and module noise to convince the typechecker that ``C.t`` in ``A`` is the same as ``C.t`` in ``B``
 - Does not work for exposed and private (exposed in read-only) dependency types
-

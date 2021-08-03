@@ -32,7 +32,7 @@ Here is a quick description of each file in this environment, all located under
    These files are assembled into a single interface file ``VX.mli`` by a helper
    program located in ``s_packer/``.
 -  Special cases: the files ``context.mli``, ``fitness.mli``, and
-  ``updater.mli`` are interfaces that the protocol exposes to the shell.
+   ``updater.mli`` are interfaces that the protocol exposes to the shell.
 -  Files in the ``structs/vX/`` directory declare compatibility layers for old
    protocol environments. E.g., ``structs/V0/error_monad_traversors.ml`` contain
    the code of error-monad-compatible list traversers that used to be part of

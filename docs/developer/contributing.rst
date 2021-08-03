@@ -30,6 +30,7 @@ Going further
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
 This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
@@ -338,7 +339,12 @@ Special case: MRs that introduce a new dependency
 
 In the special case where your MR adds a new opam dependency or updates an
 existing opam dependency, you will need to follow
-:ref:`this additional dedicated guide <adding_new_opam_dependency>`.
+this additional dedicated guide:
+
+.. toctree::
+   :maxdepth: 2
+
+   contributing-adding-a-new-opam-dependency
 
 In the special case where your MR adds a new Python, Rust, Javascript, or other
 dependency, additional steps must also be followed.
@@ -533,7 +539,7 @@ The code for the bot is at
 work-in-progress and new warnings and comments will appear little by little.
 We welcome specific issues or contributions there too.
 
-.. dev_tools:
+.. _dev_tools:
 
 Developer Tools
 ~~~~~~~~~~~~~~~

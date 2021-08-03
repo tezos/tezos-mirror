@@ -55,7 +55,7 @@ open Alpha_context
     That is, the {! ValidationMachine} reports desynchronization of
     the two machines, but cannot explain this desynchronization. *)
 
-(** {1 Machine State Characterization} Module Type} *)
+(** {1 Machine State Characterization} *)
 
 type xtz = int64
 
