@@ -49,8 +49,9 @@ let version_file_name = "version.json"
  *  - 0.0.2 : never released
  *  - 0.0.3 : store upgrade (introducing history mode)
  *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
- *  - 0.0.5 : store upgrade (switching from LMDB) *)
-let data_version = "0.0.5"
+ *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
+ *  - 0.0.6 : store upgrade (switching from LMDB) *)
+let data_version = "0.0.6"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
