@@ -36,9 +36,9 @@ Built-In Networks
 The simplest way to select the network to connect to is to use the ``--network``
 option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Granadanet::
 
-  tezos-node config init --data-dir ~/tezos-edonet --network granadanet
-  tezos-node identity generate --data-dir ~/tezos-edonet
-  tezos-node run --data-dir ~/tezos-edonet
+  tezos-node config init --data-dir ~/tezos-florencenet --network florencenet
+  tezos-node identity generate --data-dir ~/tezos-florencenet
+  tezos-node run --data-dir ~/tezos-florencenet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -64,7 +64,7 @@ You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
 it runs on Granadanet::
 
-  tezos-node run --data-dir ~/tezos-edonet --network granadanet
+  tezos-node run --data-dir ~/tezos-florencenet --network florencenet
 
 This command will fail with an error if the configured network is not Granadanet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
