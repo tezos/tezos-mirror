@@ -105,3 +105,11 @@ val add :
     - [branch_refused] is [t.branch_refused]'s map
     - [refused] is empty *)
 val validation_result : t -> error Preapply_result.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  val pp : Format.formatter -> t -> unit
+
+  val bounded_map_pp : Format.formatter -> bounded_map -> unit
+end

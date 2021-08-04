@@ -150,3 +150,38 @@ let validation_result classes =
     branch_refused = classes.branch_refused.map;
     refused = Operation_hash.Map.empty;
   }
+module Internal_for_tests = struct
+  let bounded_map_pp ppf bounded_map =
+    bounded_map.map |> Operation_hash.Map.bindings
+    |> List.map (fun (key, _value) -> key)
+    |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+
+  let pp ppf
+      {parameters; refused; branch_refused; branch_delayed; applied; in_mempool}
+      =
+    let applied_pp ppf applied =
+      applied
+      |> List.map (fun (key, _value) -> key)
+      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    in
+    let in_mempool_pp ppf in_mempool =
+      in_mempool |> Operation_hash.Set.elements
+      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    in
+    Format.fprintf
+      ppf
+      "Map_size_limit:@.%i@.On discarded operation: \
+       <function>@.Refused:%a@.Branch refused:@.%a@.Branch \
+       delayed:@.%a@.Applied:@.%a@.In Mempool:@.%a"
+      parameters.map_size_limit
+      bounded_map_pp
+      refused
+      bounded_map_pp
+      branch_refused
+      bounded_map_pp
+      branch_delayed
+      applied_pp
+      applied
+      in_mempool_pp
+      in_mempool
+end
