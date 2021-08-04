@@ -1992,7 +1992,7 @@ module Chain = struct
             Block.protocol_hash_exn chain_store block >>= fun next_protocol ->
             Lwt.return (Protocol_hash.Map.find next_protocol map))
 
-  let set_rpc_directory chain_store protocol_hash dir =
+  let set_rpc_directory chain_store ~protocol_hash ~next_protocol_hash dir =
     let map =
       Option.value
         ~default:Protocol_hash.Map.empty
@@ -2003,7 +2003,7 @@ module Chain = struct
     Protocol_hash.Table.replace
       chain_store.block_rpc_directories
       protocol_hash
-      (Protocol_hash.Map.add protocol_hash dir map) ;
+      (Protocol_hash.Map.add next_protocol_hash dir map) ;
     Lwt.return_unit
 end
 
