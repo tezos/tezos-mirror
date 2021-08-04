@@ -80,41 +80,6 @@ build_release:docker_arm64:
   tags:
     - arm64
 
-.build_static_binaries_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_dependencies_template
-    - .rules_template__master_and_releases
-  stage: build_release
-  needs: []
-  before_script:
-    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
-    # dune build @install make ocamlopt stack overflow when compiling
-    # protocol functor with static linking (because of
-    # liquidity_baking_cpmm.ml).
-    # Let's skip protocol functors, they are not needed for the release
-    - dune build $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done) --profile static
-    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
-    # Strip debug symbols in binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
-  artifacts:
-    paths:
-      - tezos-binaries/*
-
-build_release:static-x86_64-linux-binaries:
-  extends: .build_static_binaries_template
-  script:
-    - sudo apk --no-cache --virtual add upx
-    # Compress resulting binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
-
-build_release:static-arm64-linux-binaries:
-  extends: .build_static_binaries_template
-  script:
-    - echo "No compression for now"
-  tags:
-    - arm64
-
 .release_static_binaries_template:
   extends:
     - .rules_template__release_tag
@@ -132,14 +97,14 @@ release-static-x86_64-binaries:
   variables:
     ARCH_PREFIX: "x86_64-"
   dependencies:
-    - build_release:static-x86_64-linux-binaries
+    - build:static-x86_64-linux-binaries
 
 release-static-arm64-binaries:
   extends: .release_static_binaries_template
   variables:
     ARCH_PREFIX: "arm64-"
   dependencies:
-    - build_release:static-arm64-linux-binaries
+    - build:static-arm64-linux-binaries
 
 release-on-gitlab:
   extends:

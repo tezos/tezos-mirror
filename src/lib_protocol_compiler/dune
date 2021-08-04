@@ -1,4 +1,6 @@
 ; build static executable with --profile static
+; notice that the libraries are compiled with
+; "\ -ccopt -static" is a temporary solution
 (env
  (static (flags (:standard -ccopt -static)) (ocamlopt_flags (:standard -O3)))
  (release (ocamlopt_flags (:standard -O3))))
@@ -10,7 +12,7 @@
  (libraries
   tezos-base
   tezos-protocol-environment-sigs)
- (flags (:standard -opaque -open Tezos_base__TzPervasives))
+ (flags (:standard -opaque -open Tezos_base__TzPervasives  \ -ccopt -static ))
  (modules Registerer))
 
 (rule
@@ -45,7 +47,8 @@
   (:standard
    -open Tezos_base__TzPervasives
    -open Tezos_base_unix
-   -open Tezos_stdlib_unix))
+   -open Tezos_stdlib_unix
+    \ -ccopt -static ))
  (modules Embedded_cmis Packer Compiler))
 
 (library
@@ -57,7 +60,10 @@
   tezos-protocol-compiler
   compiler-libs.optcomp)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_protocol_compiler))
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_protocol_compiler
+   \ -ccopt -static ))
  (modules Native))
 
 (executable
