@@ -49,46 +49,53 @@ type t = private {
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
-   at most [parameters.map_size_limit] values. The
-   [on_discarded_operation] is called when a new operation is added
-   and an old one is discarded because the limit was reached.
+    at most [parameters.map_size_limit] values. The
+    [on_discarded_operation] is called when a new operation is added
+    and an old one is discarded because the limit was reached.
 
-   {!Invalid_argument} is raised if [ring_size] is [0] or less.
-   *)
+    {!Invalid_argument} is raised if [ring_size] is [0] or less.
+    *)
 val create : parameters -> t
 
-(** [clear classes] resets the state of all fields of [classes],
-    * except for [refused] *)
+(** [clear classes] resets fields of [classes]; except for
+    the [refused] field which is never reset, to avoid revalidating
+    operations that will never be valid. *)
 val clear : t -> unit
 
 (** [is_in_mempool oph classes] indicates whether [oph] is present
-      in field [in_mempool] of [classes]. *)
+    in field [in_mempool] of [classes]. *)
 val is_in_mempool : Operation_hash.t -> t -> bool
 
 (** [is_applied oph classes] indicates whether [oph] is present
-      in field [applied] of [classes]. *)
+    in field [applied] of [classes]. *)
 val is_applied : Operation_hash.t -> t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all
-   fields of [classes].
+    fields of [classes].
 
     {b Warning:} If an operation is removed from the [applied] field,
-   this may invalidate the classification of all the other
-   operations. It is left to the caller to restore a consistent
-   state. *)
+    this may invalidate the classification of all the other
+    operations. It is left to the caller to restore a consistent
+    state. *)
 val remove : Operation_hash.t -> t -> unit
 
-(** [add ~notify class oph op classes] adds the operation [op] with
-   hash [oph] classified as [class] to the classifier [classes]. The
-   [on_discarded_operation] callback (given as a parameter of
-   [classes]) is called for any operation discarded in this
-   process. Currently, an operation is discarded if the corresponding
-   class field is full. In that case, the new operation is added to
-   the class, and the one removed is discarded. An operation is also
-   discarded when it is classified as [Refused]. The callback
-   [on_discarded_operation] which was given by the function [create]
-   when the value [classes] was created is called on each discarded
-   operation. *)
+(** [add ~notify classification oph op classes] adds the operation [op] with
+    hash [oph] classified as [classification] to the classifier [classes]. The
+    [classes.parameters.on_discarded_operation] callback is called for any operation discarded in this
+    process. Currently, an operation is discarded in the following cases:
+
+    - the corresponding error class field is full. In that case, the new operation is added to the class, and the removed one is discarded.
+    - an operation is classified as [Refused].
+
+    Note that a [Refused] operation may thus be passed twice to [on_discarded_operation]: as soon as it is added, and if it is removed because the [classes.refused] bounded map is full.
+
+    As a summary:
+
+    - [Applied] is never discarded
+    - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time (if the corresponding bounded_map is full)
+    - [Refused] is discarded 1 or 2 times (if the corresponding bounded_map is full)
+
+    [notify] is called at the very beginning of [add]. Its goal is to remind call sites that classifying an operation should send a notification somewhere. Its presence in this API is arguable, and may change/move in the future. *)
 val add :
   notify:(unit -> unit) ->
   classification ->

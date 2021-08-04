@@ -29,6 +29,13 @@ type classification =
   | `Branch_refused of tztrace
   | `Refused of tztrace ]
 
+(** This type wraps together:
+
+    - a bounded ring of keys (size book-keeping)
+    - a regular (unbounded) map of key/values (efficient read)
+
+    All operations must maintain integrity between the 2!
+*)
 type bounded_map = {
   ring : Operation_hash.t Ringo.Ring.t;
   mutable map : (Operation.t * error list) Operation_hash.Map.t;
@@ -37,8 +44,8 @@ type bounded_map = {
 let map bounded_map = bounded_map.map
 
 (** [mk_empty_bounded_map ring_size] returns a {!bounded_map} whose ring
-    *  holds at mosts [ring_size] values. {!Invalid_argument} is raised
-    *  if [ring_size] is [0] or less. *)
+    holds at most [ring_size] values. {!Invalid_argument} is raised
+    if [ring_size <= 0]. *)
 let mk_empty_bounded_map ring_size =
   {ring = Ringo.Ring.create ring_size; map = Operation_hash.Map.empty}
 
@@ -47,6 +54,7 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
+(** Note that [applied] and [in_mempool] are intentionally unbounded. *)
 type t = {
   parameters : parameters;
   refused : bounded_map;

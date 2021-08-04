@@ -164,9 +164,7 @@ let test_is_in_mempool_remove =
     op
     t ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  (* Remove from both applied and unapplied as we don't know if it was applied or not *)
-  let _ = Prevalidator_classification.remove_applied oph t in
-  Prevalidator_classification.remove_not_applied oph t ;
+  Prevalidator_classification.remove oph t ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
   true
 
@@ -179,7 +177,7 @@ let test_is_applied =
   Prevalidator_classification.add ~notify:(fun () -> ()) `Applied oph op t ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_applied oph t) ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  let _ = Prevalidator_classification.remove_applied oph t in
+  Prevalidator_classification.remove oph t ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_applied oph t) ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
   true
@@ -365,7 +363,7 @@ module Bounded = struct
     in
     let () =
       Operation_hash.Map.iter
-        (fun oph _op -> Prevalidator_classification.remove_not_applied oph t)
+        (fun oph _op -> Prevalidator_classification.remove oph t)
         (Prevalidator_classification.map bounded_map)
     in
     discarded_operations_rev := [] ;
