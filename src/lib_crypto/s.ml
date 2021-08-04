@@ -49,6 +49,10 @@ module type MINIMAL_HASH = sig
 
   val hash_bytes : ?key:Bytes.t -> Bytes.t list -> t
 
+  (** [hash_string ?key inputs] returns a hash.
+
+      Raises an [Assert_failure] if [String.length key > 64].
+  *)
   val hash_string : ?key:string -> string list -> t
 
   val zero : t
