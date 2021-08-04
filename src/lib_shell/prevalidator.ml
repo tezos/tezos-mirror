@@ -616,7 +616,7 @@ module Make
                 (* Using List.rev_map is ok since the size of pv.shell.classification.applied
                    cannot be too big. *)
                 Mempool.known_valid =
-                  List.rev_map fst pv.shell.classification.applied;
+                  List.rev_map fst pv.shell.classification.applied_rev;
                 pending = remaining_pendings;
               }
             in
@@ -704,7 +704,7 @@ module Make
                    match map_op op with
                    | Some op -> Some (hash, op)
                    | None -> None)
-                 pv.shell.classification.applied
+                 pv.shell.classification.applied_rev
              in
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
@@ -758,7 +758,7 @@ module Make
                shell =
                  {
                    classification =
-                     {applied; refused; branch_refused; branch_delayed; _};
+                     {applied_rev; refused; branch_refused; branch_delayed; _};
                    _;
                  };
                operation_stream;
@@ -783,7 +783,7 @@ module Make
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
                if params#applied then
-                 List.filter_map map_op (List.map snd applied)
+                 List.filter_map map_op (List.map snd applied_rev)
                else []
              in
              let refused =
@@ -1283,7 +1283,7 @@ let operations (t : t) =
   let pv = Prevalidator.Worker.state w in
   ( {
       (Classification.validation_result pv.shell.classification) with
-      applied = List.rev pv.shell.classification.applied;
+      applied = List.rev pv.shell.classification.applied_rev;
     },
     pv.shell.pending )
 

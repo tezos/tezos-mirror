@@ -44,7 +44,7 @@ type t = private {
   refused : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
-  mutable applied : (Operation_hash.t * Operation.t) list;
+  mutable applied_rev : (Operation_hash.t * Operation.t) list;
   mutable in_mempool : Operation_hash.Set.t;
 }
 
@@ -67,7 +67,7 @@ val clear : t -> unit
 val is_in_mempool : Operation_hash.t -> t -> bool
 
 (** [is_applied oph classes] indicates whether [oph] is present
-    in field [applied] of [classes]. *)
+    in field [applied_rev] of [classes]. *)
 val is_applied : Operation_hash.t -> t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all

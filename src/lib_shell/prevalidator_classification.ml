@@ -60,7 +60,7 @@ type t = {
   refused : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
-  mutable applied : (Operation_hash.t * Operation.t) list;
+  mutable applied_rev : (Operation_hash.t * Operation.t) list;
   mutable in_mempool : Operation_hash.Set.t;
 }
 
@@ -71,7 +71,7 @@ let create parameters =
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
     in_mempool = Operation_hash.Set.empty;
-    applied = [];
+    applied_rev = [];
   }
 
 let clear (classes : t) =
@@ -79,13 +79,13 @@ let clear (classes : t) =
   classes.branch_refused.map <- Operation_hash.Map.empty ;
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
-  classes.applied <- [] ;
+  classes.applied_rev <- [] ;
   classes.in_mempool <- Operation_hash.Set.empty
 
 let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 
 let is_applied oph classes =
-  List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied
+  List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied_rev
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
@@ -104,11 +104,11 @@ let remove oph classes =
   classes.branch_delayed.map <-
     Operation_hash.Map.remove oph classes.branch_delayed.map ;
   classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool ;
-  classes.applied <-
-    List.filter (fun (op, _) -> Operation_hash.(op <> oph)) classes.applied
+  classes.applied_rev <-
+    List.filter (fun (op, _) -> Operation_hash.(op <> oph)) classes.applied_rev
 
 let handle_applied oph op classes =
-  classes.applied <- (oph, op) :: classes.applied ;
+  classes.applied_rev <- (oph, op) :: classes.applied_rev ;
   classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 
 (* 1. Add the operation to the ring underlying the corresponding
@@ -153,11 +153,12 @@ let add ~notify classification oph op classes =
 
 let validation_result classes =
   {
-    Preapply_result.applied = List.rev classes.applied;
+    Preapply_result.applied = List.rev classes.applied_rev;
     branch_delayed = classes.branch_delayed.map;
     branch_refused = classes.branch_refused.map;
     refused = Operation_hash.Map.empty;
   }
+
 module Internal_for_tests = struct
   let bounded_map_pp ppf bounded_map =
     bounded_map.map |> Operation_hash.Map.bindings
@@ -165,8 +166,14 @@ module Internal_for_tests = struct
     |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
 
   let pp ppf
-      {parameters; refused; branch_refused; branch_delayed; applied; in_mempool}
-      =
+      {
+        parameters;
+        refused;
+        branch_refused;
+        branch_delayed;
+        applied_rev;
+        in_mempool;
+      } =
     let applied_pp ppf applied =
       applied
       |> List.map (fun (key, _value) -> key)
@@ -189,7 +196,7 @@ module Internal_for_tests = struct
       bounded_map_pp
       branch_delayed
       applied_pp
-      applied
+      applied_rev
       in_mempool_pp
       in_mempool
 end

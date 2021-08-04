@@ -136,7 +136,7 @@ let test_clear_empties_all =
   in
   qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_refused) ;
   qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_delayed) ;
-  qcheck_eq_true ~actual:(t.applied = []) ;
+  qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
   qcheck_eq'
     ~pp:Operation_map.pp
@@ -194,7 +194,7 @@ let test_validation_result =
       ~eq:
         (List.equal (fun (oph1, op1) (oph2, op2) ->
              Operation_hash.equal oph1 oph2 && Operation.equal op1 op2))
-      ~expected:(List.rev t.applied)
+      ~expected:(List.rev t.applied_rev)
       ~actual:applied
       ()
   in
