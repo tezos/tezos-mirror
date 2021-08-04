@@ -342,7 +342,13 @@ module type MACHINE = sig
 
   val get_cpmm_total_liquidity : contract env -> t -> liquidity m
 
-  val bake : baker:contract -> operation list -> contract env -> t -> t m
+  val bake :
+    invariant:(contract env -> t -> bool m) ->
+    baker:contract ->
+    operation list ->
+    contract env ->
+    t ->
+    t m
 
   val transaction : src:contract -> contract -> xtz -> t -> operation m
 
@@ -406,29 +412,29 @@ module Machine = struct
   module Make (S : MACHINE) = struct
     open S
 
-    let mint_tzbtc destination amount env state =
+    let mint_tzbtc destination ~invariant amount env state =
       mint_or_burn_tzbtc destination amount env state >>= fun op ->
-      bake ~baker:env.holder [op] env state
+      bake ~invariant ~baker:env.holder [op] env state
 
-    let add_liquidity src dst xtz_deposit tzbtc_deposit env state =
+    let add_liquidity ~invariant src dst xtz_deposit tzbtc_deposit env state =
       approve_tzbtc src tzbtc_deposit env state >>= fun lqt_op ->
-      bake ~baker:env.holder [lqt_op] env state >>= fun state ->
+      bake ~invariant ~baker:env.holder [lqt_op] env state >>= fun state ->
       add_liquidity ~src dst xtz_deposit tzbtc_deposit env state
-      >>= fun cpmm_op -> bake ~baker:env.holder [cpmm_op] env state
+      >>= fun cpmm_op -> bake ~invariant ~baker:env.holder [cpmm_op] env state
 
-    let remove_liquidity src dst lqt_burned env state =
+    let remove_liquidity ~invariant src dst lqt_burned env state =
       remove_liquidity ~src dst lqt_burned env state >>= fun cpmm_op ->
-      bake ~baker:env.holder [cpmm_op] env state
+      bake ~invariant ~baker:env.holder [cpmm_op] env state
 
-    let sell_tzbtc src dst tzbtc_deposit env state =
+    let sell_tzbtc ~invariant src dst tzbtc_deposit env state =
       approve_tzbtc src tzbtc_deposit env state >>= fun tzbtc_op ->
-      bake ~baker:env.holder [tzbtc_op] env state >>= fun state ->
+      bake ~invariant ~baker:env.holder [tzbtc_op] env state >>= fun state ->
       token_to_xtz ~src dst tzbtc_deposit env state >>= fun cpmm_op ->
-      bake ~baker:env.holder [cpmm_op] env state
+      bake ~invariant ~baker:env.holder [cpmm_op] env state
 
-    let buy_tzbtc src dst xtz_deposit env state =
+    let buy_tzbtc ~invariant src dst xtz_deposit env state =
       xtz_to_token ~src dst xtz_deposit env state >>= fun cpmm_op ->
-      bake ~baker:env.holder [cpmm_op] env state
+      bake ~invariant ~baker:env.holder [cpmm_op] env state
 
     let check_state_satisfies_specs (env : S.contract env) (state : S.t)
         (specs : specs) =
@@ -481,21 +487,31 @@ module Machine = struct
       in
       pure (Z.to_int tokens_deposited)
 
-    let step s env state =
+    let step ?(invariant = fun _ _ -> pure true) s env state =
       match s with
       | SellTzBTC {source; destination; tzbtc_deposit} ->
-          sell_tzbtc source destination tzbtc_deposit env state
+          sell_tzbtc ~invariant source destination tzbtc_deposit env state
       | BuyTzBTC {source; destination; xtz_deposit} ->
-          buy_tzbtc source destination xtz_deposit env state
+          buy_tzbtc ~invariant source destination xtz_deposit env state
       | AddLiquidity {source; destination; xtz_deposit} ->
           predict_required_tzbtc_deposit xtz_deposit env state
           >>= fun tzbtc_deposit ->
-          add_liquidity source destination xtz_deposit tzbtc_deposit env state
+          add_liquidity
+            ~invariant
+            source
+            destination
+            xtz_deposit
+            tzbtc_deposit
+            env
+            state
       | RemoveLiquidity {source; destination; lqt_burned} ->
-          remove_liquidity source destination lqt_burned env state
+          remove_liquidity ~invariant source destination lqt_burned env state
 
-    let run scenario env state =
-      fold_m (fun state s -> step (refine_step env s) env state) state scenario
+    let run ?(invariant = fun _ _ -> pure true) scenario env state =
+      fold_m
+        (fun state s -> step ~invariant (refine_step env s) env state)
+        state
+        scenario
   end
 end
 
@@ -521,7 +537,11 @@ module type MACHINE_WITH_INIT = sig
       to be equal to [total_xtz]).  [init] also accepts an optional
       argument [subsidy] to modify the default value of the subsidy
       minted by the protocol in favor of the CPMM. *)
-  val init : ?subsidy:xtz -> xtz list -> (t * contract env) m
+  val init :
+    invariant:(contract env -> t -> bool m) ->
+    ?subsidy:xtz ->
+    xtz list ->
+    (t * contract env) m
 end
 
 (** [initial_xtz_pool] balances predicts the value of the CPMM’s xtz
@@ -620,8 +640,13 @@ module MachineBuilder = struct
     open S
     include Machine.Make (S)
 
-    let build : ?subsidy:xtz -> specs -> (S.t * S.contract env) m =
-     fun ?(subsidy = default_subsidy)
+    let build :
+        ?invariant:(S.contract env -> S.t -> bool m) ->
+        ?subsidy:xtz ->
+        specs ->
+        (S.t * S.contract env) m =
+     fun ?(invariant = fun _ _ -> pure true)
+         ?(subsidy = default_subsidy)
          ({cpmm_min_xtz_balance; accounts_balances; cpmm_min_tzbtc_balance} as
          specs) ->
       let accounts_balances_with_extra =
@@ -629,7 +654,9 @@ module MachineBuilder = struct
       in
       let xtz_balances_with_extra = List.map xtz accounts_balances_with_extra in
       (* 1. Create an initial context *)
-      init ~subsidy xtz_balances_with_extra >>= fun (state, env) ->
+      init ~invariant ~subsidy xtz_balances_with_extra >>= fun (state, env) ->
+      invariant env state >>= fun cond ->
+      assert cond ;
       (* 2. Provide the initial tzBTC liquidities to implicit accounts *)
       let accounts =
         List_helpers.zip
@@ -638,7 +665,7 @@ module MachineBuilder = struct
       in
       fold_m
         (fun state (address, (_, balances)) ->
-          mint_tzbtc address balances.tzbtc env state)
+          mint_tzbtc ~invariant address balances.tzbtc env state)
         state
         accounts
       >>= fun state ->
@@ -647,7 +674,7 @@ module MachineBuilder = struct
         (fun state (address, (target_balances, balances_with_extra)) ->
           let xtz = Int64.sub balances_with_extra.xtz target_balances.xtz in
           let tzbtc = balances_with_extra.tzbtc - target_balances.tzbtc in
-          add_liquidity address address xtz tzbtc env state)
+          add_liquidity ~invariant address address xtz tzbtc env state)
         state
         accounts
       >>= fun state ->
@@ -658,10 +685,10 @@ module MachineBuilder = struct
       (if 0 < tzbtc_missing then
        (* 4.1. Provide the tokens to the [bootstrap1] account, as a
           temporary holder for CPMM missing tzBTC balance *)
-       mint_tzbtc env.holder tzbtc_missing env state >>= fun state ->
+       mint_tzbtc ~invariant env.holder tzbtc_missing env state >>= fun state ->
        (* 4.1. Make [bootstrap1] buy some xtz against the appropriate
           amount of tzbtc *)
-       sell_tzbtc env.holder env.holder tzbtc_missing env state
+       sell_tzbtc ~invariant env.holder env.holder tzbtc_missing env state
       else pure state)
       >>= fun state ->
       (* 5. Provide any missing xtz tokens to [cpmm_contract], if necessary *)
@@ -672,7 +699,7 @@ module MachineBuilder = struct
       in
       (if 0L < xtz_missing then
        transaction ~src:env.holder env.cpmm_contract xtz_missing state
-       >>= fun op -> bake ~baker:env.holder [op] env state
+       >>= fun op -> bake ~invariant ~baker:env.holder [op] env state
       else pure state)
       >>= fun state ->
       check_state_satisfies_specs env state specs >>= fun _ -> pure (state, env)
@@ -732,13 +759,16 @@ module ConcreteBaseMachine :
     get_liquidity_balance contract env blk >>= fun liquidity ->
     pure {xtz; tzbtc; liquidity}
 
-  let bake ~baker ops _env blk =
+  let bake ~invariant ~baker ops env blk =
     Incremental.begin_construction
       ~policy:(Block.By_account (is_implicit_exn baker))
       blk
     >>= fun incr ->
     fold_m Incremental.add_operation incr ops >>= fun incr ->
-    Incremental.finalize_block incr
+    Incremental.finalize_block incr >>= fun blk ->
+    invariant env blk >>= fun cond ->
+    assert cond ;
+    return blk
 
   let reveal (account : Account.t) blk = Op.revelation (B blk) account.pk
 
@@ -816,14 +846,14 @@ module ConcreteBaseMachine :
            deadline = far_future;
          })
 
-  let reveal_tzbtc_admin env state =
+  let reveal_tzbtc_admin ~invariant env state =
     Account.add_account tzbtc_admin_account ;
     transaction ~src:env.holder env.tzbtc_admin 1L state >>= fun op1 ->
-    bake ~baker:env.holder [op1] env state >>= fun state ->
+    bake ~invariant ~baker:env.holder [op1] env state >>= fun state ->
     reveal tzbtc_admin_account state >>= fun op2 ->
-    bake ~baker:env.holder [op2] env state
+    bake ~invariant ~baker:env.holder [op2] env state
 
-  let init ?subsidy accounts_balances =
+  let init ~invariant ?subsidy accounts_balances =
     let liquidity_baking_subsidy = Option.map Tez.of_mutez_exn subsidy in
     let (n, initial_balances) = initial_xtz_repartition accounts_balances in
     Context.init
@@ -862,14 +892,24 @@ module ConcreteBaseMachine :
             subsidy = Tez.to_mutez subsidy;
           }
         in
-        reveal_tzbtc_admin env blk >>= fun blk ->
+        reveal_tzbtc_admin ~invariant:(fun _ _ -> pure true) env blk
+        >>= fun blk ->
         mint_or_burn_tzbtc env.cpmm_contract cpmm_initial_balance.tzbtc env blk
         >>= fun op ->
-        bake ~baker:env.holder [op] env blk >>= fun blk -> pure (blk, env)
+        bake ~invariant:(fun _ _ -> pure true) ~baker:env.holder [op] env blk
+        >>= fun blk ->
+        (* We did not check the invariant before, because the CPMM
+           contract was in an inconsistent state. More precisely, it
+           was supposed to hold tzbtc tokens, while in practice it was
+           not. This was solved by the last call to [bake]. *)
+        invariant env blk >>= fun cond ->
+        assert cond ;
+        pure (blk, env)
     | _ -> assert false
 end
 
 module ConcreteMachine = struct
+  include ConcreteBaseMachine
   include Machine.Make (ConcreteBaseMachine)
   include MachineBuilder.Make (ConcreteBaseMachine)
 end
@@ -1075,10 +1115,14 @@ module AbstractMachine = struct
     (* Ideally, we should also deal with the release of security
        deposit, but since our tests are not long enough for this to
        happen, we omit this aspect of the simulation. *)
-    let bake ~baker operations env state =
-      update_xtz_balance env.cpmm_contract (Int64.add env.subsidy) state
-      |> (fun state -> List.fold_left ( |> ) state operations)
-      |> update_xtz_balance baker (fun b -> Int64.sub b security_deposit)
+    let bake ~invariant ~baker operations env state =
+      let state =
+        update_xtz_balance env.cpmm_contract (Int64.add env.subsidy) state
+        |> (fun state -> List.fold_left ( |> ) state operations)
+        |> update_xtz_balance baker (fun b -> Int64.sub b security_deposit)
+      in
+      assert (invariant env state) ;
+      state
   end
 end
 
@@ -1097,7 +1141,7 @@ module SymbolicBaseMachine :
     let pp = pp_contract_id
   end)
 
-  let init ?(subsidy = default_subsidy) accounts_balances =
+  let init ~invariant:_ ?(subsidy = default_subsidy) accounts_balances =
     let (_, initial_balances) = initial_xtz_repartition accounts_balances in
     match initial_balances with
     | holder_xtz :: accounts ->
@@ -1184,100 +1228,18 @@ module ValidationBaseMachine :
   let get_cpmm_total_liquidity env (_, state) =
     pure (GhostMachine.get_cpmm_total_liquidity env state)
 
-  let validate_xtz_balance :
-      Contract.t ->
-      ConcreteBaseMachine.t ->
-      GhostMachine.t ->
-      unit ConcreteBaseMachine.m =
-   fun contract blk state ->
-    let expected = GhostMachine.get_xtz_balance contract state in
-    ConcreteBaseMachine.get_xtz_balance contract blk >>= fun amount ->
-    assert (amount = expected) ;
-    pure ()
-
-  let validate_tzbtc_balance :
-      Contract.t ->
-      Contract.t env ->
-      ConcreteBaseMachine.t ->
-      GhostMachine.t ->
-      unit ConcreteBaseMachine.m =
-   fun contract env blk state ->
-    let expected = GhostMachine.get_tzbtc_balance contract env state in
-    ConcreteBaseMachine.get_tzbtc_balance contract env blk >>= fun amount ->
-    assert (expected = amount) ;
-    pure ()
-
-  let validate_liquidity_balance :
-      Contract.t ->
-      Contract.t env ->
-      ConcreteBaseMachine.t ->
-      GhostMachine.t ->
-      unit ConcreteBaseMachine.m =
-   fun contract env blk state ->
-    let expected = GhostMachine.get_liquidity_balance contract env state in
-    ConcreteBaseMachine.get_liquidity_balance contract env blk >>= fun amount ->
-    assert (expected = amount) ;
-    pure ()
-
-  let validate_balances :
-      Contract.t ->
-      Contract.t env ->
-      ConcreteBaseMachine.t ->
-      GhostMachine.t ->
-      unit ConcreteBaseMachine.m =
-   fun contract env blk state ->
-    validate_xtz_balance contract blk state >>= fun _ ->
-    validate_tzbtc_balance contract env blk state >>= fun _ ->
-    validate_liquidity_balance contract env blk state
-
-  let validate_storage :
-      Contract.t env -> ConcreteBaseMachine.t -> unit ConcreteBaseMachine.m =
-   fun env blk ->
-    (* 1. Check the CPMM's [xtzPool] is equal to the actual CPMM balance *)
-    ConcreteBaseMachine.get_xtz_balance env.cpmm_contract blk
-    >>= fun cpmm_xtz ->
-    Cpmm_repr.Storage.get (B blk) ~contract:env.cpmm_contract
-    >>=? fun cpmm_storage ->
-    assert (cpmm_xtz = Tez.to_mutez cpmm_storage.xtzPool) ;
-    (* 2. Check the CPMM’s [lqtTotal] is correct wrt. liquidity contract *)
-    Lqt_fa12_repr.Storage.get (B blk) ~contract:env.liquidity_contract
-    >>=? fun liquidity_storage ->
-    assert (cpmm_storage.lqtTotal = liquidity_storage.totalSupply) ;
-    (* 3. Check the CPMM’s [tokenPool] is correct *)
-    ConcreteBaseMachine.get_tzbtc_balance env.cpmm_contract env blk
-    >>= fun cpmm_tzbtc ->
-    assert (Z.to_int cpmm_storage.tokenPool = cpmm_tzbtc) ;
-    pure ()
-
-  let validate :
-      Contract.t env ->
-      ConcreteBaseMachine.t ->
-      GhostMachine.t ->
-      unit ConcreteBaseMachine.m =
-   (* We do not try to validate the xtz balance of [holder] in this
-      function.  Indeed, they are hard to predict due to allocation
-      fees, and security deposits. *)
-   fun env blk state ->
-    validate_balances env.cpmm_contract env blk state >>=? fun _ ->
-    List.iter_es
-      (fun account -> validate_balances account env blk state)
-      env.implicit_accounts
-    >>=? fun _ ->
-    ConcreteBaseMachine.get_cpmm_total_liquidity env blk
-    >>= fun concrete_cpmm_total_liquidity ->
-    let ghost_cpmm_total_liquidity =
-      GhostMachine.get_cpmm_total_liquidity env state
-    in
-    assert (concrete_cpmm_total_liquidity = ghost_cpmm_total_liquidity) ;
-    validate_storage env blk >>= fun _ -> pure ()
-
-  let bake ~baker ops env (blk, state) =
+  let bake ~invariant ~baker ops env (blk, state) =
     let cops = List.map fst ops in
     let rops = List.map snd ops in
-    ConcreteBaseMachine.bake ~baker cops env blk >>= fun blk ->
-    let _ = GhostMachine.get_balances env.cpmm_contract env state in
-    let state = GhostMachine.bake ~baker rops env state in
-    validate env blk state >>= fun _ -> pure (blk, state)
+    ConcreteBaseMachine.(
+      bake ~invariant:(fun _ _ -> pure true) ~baker cops env blk)
+    >>= fun blk ->
+    let state =
+      GhostMachine.bake ~invariant:(fun _ _ -> true) ~baker rops env state
+    in
+    invariant env (blk, state) >>= fun cond ->
+    assert cond ;
+    pure (blk, state)
 
   let transaction ~src dst xtz (blk, state) =
     ConcreteBaseMachine.transaction ~src dst xtz blk >>= fun cop ->
@@ -1316,14 +1278,47 @@ module ValidationBaseMachine :
     ConcreteBaseMachine.reveal account blk >>= fun cop ->
     pure (cop, GhostMachine.reveal account state)
 
-  let init ?subsidy balances =
-    ConcreteBaseMachine.init ?subsidy balances >>= fun (blk, env) ->
-    let (state, _) = SymbolicBaseMachine.init ?subsidy balances in
-    pure ((blk, refine_state env state), env)
+  let init ~invariant ?subsidy balances =
+    ConcreteBaseMachine.init
+      ~invariant:(fun _ _ -> return true)
+      ?subsidy
+      balances
+    >>= fun (blk, env) ->
+    let (state, _) =
+      SymbolicBaseMachine.init ~invariant:(fun _ _ -> true) ?subsidy balances
+    in
+    let state = refine_state env state in
+    invariant env (blk, state) >>= fun cond ->
+    assert cond ;
+    pure ((blk, state), env)
 end
 
 module ValidationMachine = struct
   include ValidationBaseMachine
   include Machine.Make (ValidationBaseMachine)
   include MachineBuilder.Make (ValidationBaseMachine)
+
+  module Symbolic = struct
+    let get_xtz_balance = get_xtz_balance
+
+    let get_tzbtc_balance = get_tzbtc_balance
+
+    let get_liquidity_balance = get_liquidity_balance
+
+    let get_cpmm_total_liquidity = get_cpmm_total_liquidity
+  end
+
+  module Concrete = struct
+    let get_xtz_balance contract (blk, _) =
+      ConcreteMachine.get_xtz_balance contract blk
+
+    let get_tzbtc_balance contract env (blk, _) =
+      ConcreteMachine.get_tzbtc_balance contract env blk
+
+    let get_liquidity_balance contract env (blk, _) =
+      ConcreteMachine.get_liquidity_balance contract env blk
+
+    let get_cpmm_total_liquidity env (blk, _) =
+      ConcreteMachine.get_cpmm_total_liquidity env blk
+  end
 end

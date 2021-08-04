@@ -34,18 +34,18 @@ open Alpha_context
     contracts, and to assert these scenarios do not yield any
     undesirable behaviors.
 
-    To that end, two “machines” are provided.
+    To that end, three “machines” are provided.
 
     - The {! SymbolicMachine} allows to simulate scenarios involving
       the LB feature completely off-chain. It can be seen as an
       abstraction of the concrete implementation provided by the Tezos
       node.
-    - The {! ValidationMachine } combines the previously mentioned
-      machine with a [ConcreteMachine] that uses the Tezos blockchain
-      to execute scenarios. In other words, the {!  ValidationMachine}
-      makes the {! SymbolicMachine} and the [ConcreteMachine] execute
-      the same scenarios, and asserts they remain synchronized after
-      each baked block.
+    - The {! ConcreteMachine } allows to execute scenarios on-chain.
+    - The {! ValidationMachine } combines the two previously mentioned
+      machines. In other words, the {! ValidationMachine} makes the {!
+      SymbolicMachine} and the [ConcreteMachine] execute the same
+      scenarios, and asserts they remain synchronized after each baked
+      block.
 
     The {! ValidationMachine} allows to (1) validate the {!
     SymbolicMachine} ({i i.e.,} the reimplementation of the LB
@@ -118,6 +118,13 @@ type 'a step =
 val pp_step :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a step -> unit
 
+(** A summary of the state of a machine, parameterized by the type of
+    contract identifier. *)
+type 'a state = {
+  cpmm_total_liquidity : liquidity;
+  accounts_balances : ('a * balances) list;
+}
+
 (** {1 The Symbolic Machine} *)
 
 (** In the {! SymbolicMachine}, a contract is identified by a symbolic
@@ -138,7 +145,7 @@ val pp_contract_id : Format.formatter -> contract_id -> unit
 
 module SymbolicMachine : sig
   (** The state of the {! SymbolicMachine}. *)
-  type t
+  type t = contract_id state
 
   (** [get_xtz_balance c state] returns the amount of mutez owned by
       [c] in [state]. *)
@@ -174,19 +181,165 @@ module SymbolicMachine : sig
 
       One can use the optional argument [subsidy] to set the subsidy
       amount to a given value (by default, we use the same as the main
-      chain). *)
-  val build : ?subsidy:xtz -> specs -> t * contract_id env
+      chain). Additionally, the [invariant] optional argument can be
+      used to verify that a given invariant holds at the end of the
+      initialization. *)
+  val build :
+    ?invariant:(contract_id env -> t -> bool) ->
+    ?subsidy:xtz ->
+    specs ->
+    t * contract_id env
 
-  (** [step s env state] executes a single step [s] from [state]. *)
-  val step : contract_id step -> contract_id env -> t -> t
+  (** [step s env state] executes a single step [s] from [state].
 
-  (** [run steps env state] executes a list of steps from [state]. *)
-  val run : contract_id step list -> contract_id env -> t -> t
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val step :
+    ?invariant:(contract_id env -> t -> bool) ->
+    contract_id step ->
+    contract_id env ->
+    t ->
+    t
+
+  (** [run steps env state] executes a list of steps from [state].
+
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val run :
+    ?invariant:(contract_id env -> t -> bool) ->
+    contract_id step list ->
+    contract_id env ->
+    t ->
+    t
+end
+
+(** A machine that can execute scenarios onchain. *)
+module ConcreteMachine : sig
+  (** The state of the {! ConcreteMachine}. *)
+  type t = Block.t
+
+  (** [get_xtz_balance c state] returns the amount of mutez owned by
+      [c] in [state]. *)
+  val get_xtz_balance : Contract.t -> t -> xtz tzresult Lwt.t
+
+  (** [get_tzbtc_balance c env state] returns the amount of TzBTC
+      owned by [c] in [state], according to the [TzBTC] contract. *)
+  val get_tzbtc_balance :
+    Contract.t -> Contract.t env -> t -> tzbtc tzresult Lwt.t
+
+  (** [get_liquidity_balance c env state] returns the amount of
+      liquidity token owned by [c] in [state], according to the
+      [Liquidity] contract. *)
+  val get_liquidity_balance :
+    Contract.t -> Contract.t env -> t -> liquidity tzresult Lwt.t
+
+  (** [get_cpmm_total_liquidity env state] fetches the current amount
+      of liquidity tokens distributed by the CPMM contract from the
+      state [state]. *)
+  val get_cpmm_total_liquidity : Contract.t env -> t -> liquidity tzresult Lwt.t
+
+  (** [build specs] asynchronously computes (1) an initial block for
+      the {! ConcreteMachine}, and (2) the environment associated to
+      this block.
+
+      The machine enforces the resulting state is consistent with the
+      [specs] given as inputs, and raises an [Assert_failure]
+      exception if it does not. It also enforces that the machines
+      used underneath remain in sync.
+
+      One can use the optional argument [subsidy] to set the subsidy
+      amount to a given value (by default, we use the same as the main
+      chain). Additionally, the [invariant] optional argument can be
+      used to verify that a given invariant holds at the end of the
+      initialization. *)
+  val build :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    ?subsidy:xtz ->
+    specs ->
+    (t * Contract.t env) tzresult Lwt.t
+
+  (** [step s env state] asynchronously executes a single step [s]
+      from [state].
+
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val step :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    Contract.t step ->
+    Contract.t env ->
+    t ->
+    t tzresult Lwt.t
+
+  (** [run lss env state] asynchronously executes a list of steps from
+      [state].
+
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val run :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    contract_id step list ->
+    Contract.t env ->
+    t ->
+    t tzresult Lwt.t
 end
 
 module ValidationMachine : sig
   (** The state of the {! ValidationMachine}. *)
-  type t
+  type t = ConcreteMachine.t * Contract.t state
+
+  module Symbolic : sig
+    (** A collections of functions to introspect the symbolic part of
+        the [ValidationMachine] state. *)
+
+    (** [get_xtz_balance c state] returns the amount of mutez owned by
+        [c] in the symbolic part of [state]. *)
+    val get_xtz_balance : Contract.t -> t -> xtz tzresult Lwt.t
+
+    (** [get_tzbtc_balance c env state] returns the amount of TzBTC
+        owned by [c] in the symbolic part of [state], according to the
+        [TzBTC] contract. *)
+    val get_tzbtc_balance :
+      Contract.t -> Contract.t env -> t -> tzbtc tzresult Lwt.t
+
+    (** [get_liquidity_balance c env state] returns the amount of
+        liquidity token owned by [c] in the symbolic part of [state],
+        according to the [Liquidity] contract. *)
+    val get_liquidity_balance :
+      Contract.t -> Contract.t env -> t -> liquidity tzresult Lwt.t
+
+    (** [get_cpmm_total_liquidity env state] fetches the   current
+        amount of liquidity tokens distributed by the CPMM   contract
+        using the symbolic part of the state [state]. *)
+    val get_cpmm_total_liquidity :
+      Contract.t env -> t -> liquidity tzresult Lwt.t
+  end
+
+  module Concrete : sig
+    (** A collections of functions to introspect the concrete part of
+        the [ValidationMachine] state. *)
+
+    (** [get_xtz_balance c state] returns the amount of mutez owned by
+        [c] in the concrete part of [state]. *)
+    val get_xtz_balance : Contract.t -> t -> xtz tzresult Lwt.t
+
+    (** [get_tzbtc_balance c env state] returns the amount of TzBTC
+        owned by [c] in the concrete part of [state], according to the
+        [TzBTC] contract. *)
+    val get_tzbtc_balance :
+      Contract.t -> Contract.t env -> t -> tzbtc tzresult Lwt.t
+
+    (** [get_liquidity_balance c env state] returns the amount of
+        liquidity token owned by [c] in the concrete part of [state],
+        according to the [Liquidity] contract. *)
+    val get_liquidity_balance :
+      Contract.t -> Contract.t env -> t -> liquidity tzresult Lwt.t
+
+    (** [get_cpmm_total_liquidity env state] fetches the current
+        amount of liquidity tokens distributed by the CPMM contract
+        using the concrete part of the state [state]. *)
+    val get_cpmm_total_liquidity :
+      Contract.t env -> t -> liquidity tzresult Lwt.t
+  end
 
   (** [build specs] asynchronously computes (1) an initial state for
       the {! ValidationMachine}, and (2) the environment associated to
@@ -199,20 +352,36 @@ module ValidationMachine : sig
 
       One can use the optional argument [subsidy] to set the subsidy
       amount to a given value (by default, we use the same as the main
-      chain). *)
-  val build : ?subsidy:xtz -> specs -> (t * Contract.t env) tzresult Lwt.t
+      chain). Additionally, the [invariant] optional argument can be
+      used to verify that a given invariant holds at the end of the
+      initialization. *)
+  val build :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    ?subsidy:xtz ->
+    specs ->
+    (t * Contract.t env) tzresult Lwt.t
 
   (** [step s env state] asynchronously executes a single step [s]
       from [state].
 
-      The {! ValidationMachine} enforces the two machines used
-      underneath always remain in sync. *)
-  val step : Contract.t step -> Contract.t env -> t -> t tzresult Lwt.t
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val step :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    Contract.t step ->
+    Contract.t env ->
+    t ->
+    t tzresult Lwt.t
 
   (** [run lss env state] asynchronously executes a list of steps from
       [state].
 
-      The {! ValidationMachine} enforces the two machines used
-      underneath always remain in sync. *)
-  val run : contract_id step list -> Contract.t env -> t -> t tzresult Lwt.t
+      The [invariant] optional argument can be used to verify that a
+      given invariant holds after each baked block. *)
+  val run :
+    ?invariant:(Contract.t env -> t -> bool tzresult Lwt.t) ->
+    contract_id step list ->
+    Contract.t env ->
+    t ->
+    t tzresult Lwt.t
 end
