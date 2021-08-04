@@ -849,11 +849,13 @@ module Chain : sig
     Block.t ->
     (chain_store * Block.t) RPC_directory.t option Lwt.t
 
-  (** [set_rpc_directory chain_store ph rpc_directory] sets a
-      [rpc_directory] for the protocol [ph] in [chain_store]. *)
+  (** [set_rpc_directory chain_store ph next_ph rpc_directory] sets a
+      [rpc_directory] for the protocol [ph] and next protocol [next_ph]
+      in [chain_store]. *)
   val set_rpc_directory :
     chain_store ->
-    Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
+    next_protocol_hash:Protocol_hash.t ->
     (chain_store * Block.t) RPC_directory.t ->
     unit Lwt.t
 end
