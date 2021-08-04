@@ -256,6 +256,14 @@ References:
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
+Long Tests
+""""""""""
+
+Tezt is also used for tests that are too long to run in the CI. Those
+tests are run on dedicated machines and can send data points to an
+InfluxDB instance to produce graphs using Grafana and/or detect
+performance regressions. See :doc:`long-tezts`.
+
 ..
    .. _michelson_unit_tests:
 
@@ -275,7 +283,6 @@ References:
    References:
     - `Merge request defining the Michelson unit test format <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`_
     - `A conformance test suite for Michelson interpreter using the Michelson unit test format <https://github.com/runtimeverification/michelson-semantics/tree/master/tests/unit>`_
-
 
 .. _gitlab_test_ci:
 
