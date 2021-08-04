@@ -27,3 +27,5 @@
 (** A specialized Blake2B implementation for hashing Michelson expressions. *)
 
 include S.HASH
+
+include Path_encoding.S with type t := t

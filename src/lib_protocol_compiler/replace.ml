@@ -92,7 +92,7 @@ let replace ~template ~destination vars =
 let module_name (c : Protocol.component) = String.capitalize_ascii c.name
 
 let sources_name (c : Protocol.component) =
-  let name = String.lowercase_ascii c.name in
+  let name = String.uncapitalize_ascii c.name in
   match c.interface with
   | None -> Printf.sprintf "%s.ml" name
   | Some _ -> Printf.sprintf "%s.mli %s.ml" name name

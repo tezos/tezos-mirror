@@ -36,6 +36,11 @@ module H =
       let size = Some Ed25519.Public_key_hash.size
     end)
 
+module Index = struct
+  include H
+  include Path_encoding.Make_hex (H)
+end
+
 include H
 
 let () = Base58.check_encoded_prefix b58check_encoding "btz1" 37
@@ -53,5 +58,3 @@ let activation_code_of_hex h =
   if Compare.Int.(String.length h <> activation_code_size * 2) then
     invalid_arg "Blinded_public_key_hash.activation_code_of_hex" ;
   Hex.to_bytes (`Hex h)
-
-module Index : Storage_description.INDEX with type t = t = H

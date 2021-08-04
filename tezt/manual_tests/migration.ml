@@ -169,6 +169,8 @@ let migration ?yes_node_path ?yes_wallet context protocol =
 
 let protocol = Protocol.(hash Alpha)
 
-let context = "~/tezos-node-test"
+let context =
+  let home = Sys.getenv "HOME" in
+  home ^ "/tezos-node-test"
 
 let register () = migration context protocol

@@ -25,7 +25,7 @@
 
 let script_expr_hash = "\013\044\064\027" (* expr(54) *)
 
-include
+module H =
   Blake2B.Make
     (Base58)
     (struct
@@ -37,5 +37,8 @@ include
 
       let size = None
     end)
+
+include H
+include Path_encoding.Make_hex (H)
 
 let () = Base58.check_encoded_prefix b58check_encoding "expr" 54

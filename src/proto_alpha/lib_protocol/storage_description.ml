@@ -238,11 +238,7 @@ let create () = {rev_path = []; dir = Empty}
 module type INDEX = sig
   type t
 
-  val path_length : int
-
-  val to_path : t -> string list -> string list
-
-  val of_path : string list -> t option
+  include Path_encoding.S with type t := t
 
   val rpc_arg : t RPC_arg.t
 

@@ -188,11 +188,7 @@ end
 module type INDEX = sig
   type t
 
-  val path_length : int
-
-  val to_path : t -> string list -> string list
-
-  val of_path : string list -> t option
+  include Path_encoding.S with type t := t
 
   type 'a ipath
 

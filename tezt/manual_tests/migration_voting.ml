@@ -32,7 +32,7 @@
     "cycle_position": 0,
     "expected_commitment": false },
   "voting_period_info": {
-    "voting_period": { 
+    "voting_period": {
       "index": 44,
       "kind": "cooldown",
       "start_position": 1404927 },
@@ -284,7 +284,7 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
     expected_period_kind =
   Test.register
     ~__FILE__
-    ~title:"migration test"
+    ~title:"migration voting test"
     ~tags:
       ["node"; "activate"; "user_activated"; "protocol"; "migration"; "voting"]
   @@ fun () ->

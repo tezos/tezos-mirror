@@ -71,19 +71,15 @@ module type ID = sig
 
   val is_temp : t -> bool
 
-  (* To be used in storage: *)
-
-  val path_length : int
-
-  val to_path : t -> string list -> string list
-
-  val of_path : string list -> t option
-
   (* To be removed once legacy big map diff is removed: *)
 
   val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
 
   val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
+
+  (* To be used in storage: *)
+
+  include Path_encoding.S with type t := t
 end
 
 module Big_map : sig

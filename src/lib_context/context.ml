@@ -246,9 +246,9 @@ let raw_commit ~time ?(message = "") context =
   in
   let parents = List.map Store.Commit.hash context.parents in
   unshallow context >>= fun () ->
-  Store.Commit.v context.index.repo ~info ~parents context.tree >|= fun h ->
+  Store.Commit.v context.index.repo ~info ~parents context.tree >|= fun c ->
   Store.Tree.clear context.tree ;
-  h
+  c
 
 let hash ~time ?(message = "") context =
   let info =

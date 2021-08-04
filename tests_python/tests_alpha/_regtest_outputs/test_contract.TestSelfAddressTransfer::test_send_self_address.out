@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestSelfAddressTransfer::test_send_self_address
 
 Node is bootstrapped.
-Estimated gas: 4795.249 units (will add 100 for safety)
+Estimated gas: 4800.249 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000784
+    Fee to the baker: ꜩ0.000785
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 4896
+    Gas limit: 4901
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000784
-      fees(the baker who will include this operation,0) ... +ꜩ0.000784
+      [CONTRACT_HASH] ................ -ꜩ0.000785
+      fees(the baker who will include this operation,0) ... +ꜩ0.000785
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -27,7 +27,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 82 bytes
-      Consumed gas: 2743.457
+      Consumed gas: 2748.457
     Internal operations:
       Transaction:
         Amount: ꜩ0

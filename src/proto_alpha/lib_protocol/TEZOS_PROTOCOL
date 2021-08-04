@@ -3,6 +3,7 @@
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
+        "Path_encoding",
         "Storage_description",
         "State_hash",
         "Nonce_hash",

@@ -115,8 +115,8 @@ let get_voting_power_free ctxt owner =
 let get_voting_power ctxt owner =
   let open Raw_context in
   (* Always consume read access to memory *)
-  (* Accessing an int32 at /votes/listings/pkh *)
-  consume_gas ctxt (Storage_costs.read_access ~path_length:3 ~read_bytes:4)
+  (* Accessing an int32 at /votes/listings/<KeyKind>/<hash> *)
+  consume_gas ctxt (Storage_costs.read_access ~path_length:4 ~read_bytes:4)
   >>?= fun ctxt ->
   Storage.Vote.Listings.find ctxt owner >|=? function
   | None -> (ctxt, 0l)
