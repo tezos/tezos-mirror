@@ -44,6 +44,15 @@ Node
    -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
       all operations, i.e. clear the set of banned operations.
 
+-  Fixed an issue in the store that prevented some blocks from being queried,
+   resulting in "block not found" errors.
+
+-  Store version is now 0.0.6.
+   If you were previously using Octez 10.0~rc1 or 10.0~rc2, you were using
+   store version 0.0.5. If you were previously using Octez 9.x, you were
+   using store version 0.0.4. In both cases, use command
+   ``tezos-node upgrade storage`` to upgrade to 0.0.6.
+
 Client
 ------
 
