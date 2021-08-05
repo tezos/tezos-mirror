@@ -53,6 +53,10 @@ Node
    using store version 0.0.4. In both cases, use command
    ``tezos-node upgrade storage`` to upgrade to 0.0.6.
 
+-  Added an upgrade procedure to upgrade from `v0.0.5` to `v0.0.6`. The
+   procedure is implemented through the ``tezos-node upgrade storage``
+   command.
+
 Client
 ------
 
