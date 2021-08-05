@@ -122,7 +122,7 @@ point. This kind of snapshot can only be created from a ``full`` or an
 
 The ``<BLOCK>`` hint can be given as a *block hash*, a *block level*,
 an alias (*head*, *savepoint* or *checkpoint*) and a relative block
-target using the ``~`` notation (such as ``head~42``).
+target using the ``~``, ``-`` or ``+`` notation (such as ``head~42``).
 
 If no ``--block <BLOCK>`` option is given, the checkpoint level will
 be chosen as the default block to export.
