@@ -91,6 +91,20 @@ type error +=
       Script.location * unparsed_stack_ty * unparsed_stack_ty
       -> error
 
+(* View errors *)
+type error += View_name_too_long of string
+
+type error += Bad_view_name of Script.location
+
+type error +=
+  | Ill_typed_view of {
+      loc : Script.location;
+      actual : unparsed_stack_ty;
+      expected : unparsed_stack_ty;
+    }
+
+type error += Duplicated_view_name of Script.location
+
 type error += Self_in_lambda of Script.location
 
 type error += Bad_stack_length

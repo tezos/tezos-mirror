@@ -620,7 +620,10 @@ class TestContracts:
                 r"big_map or sapling_state type not expected here",
             ),
             # Ticket duplication attempt
-            ("ticket_dup.tz", r'DUP used on the non-dupable type ticket nat'),
+            (
+                "ticket_dup.tz",
+                r'ticket nat cannot be used here because it is not duplicable',
+            ),
             # error message for ticket unpack
             ("ticket_unpack.tz", r'Ticket in unauthorized position'),
             # error message for attempting to use APPLY to capture a ticket
@@ -700,6 +703,196 @@ SECOND_EXPLOSION = '''
 
 
 @pytest.mark.incremental
+@pytest.mark.contract
+class TestView:
+    def test_deploy_view_lib(self, client, session):
+        path = f'{CONTRACT_PATH}/opcodes/view_toplevel_lib.tz'
+        originate(client, session, path, '3', 999)
+        session['lib'] = session['contract']
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+
+    @pytest.mark.parametrize(
+        "contract,init_storage,expected",
+        [
+            ('view_op_id', '(Pair 0 0)', 'Pair 10 3'),
+            ('view_op_add', '42', '13'),
+            ('view_fib', '0', '55'),
+            ('view_mutual_recursion', '0', '20'),
+            ('view_op_nonexistent_func', 'True', 'False'),
+            ('view_op_nonexistent_addr', 'True', 'False'),
+            ('view_op_toplevel_inconsistent_input_type', '5', '0'),
+            ('view_op_toplevel_inconsistent_output_type', 'True', 'False'),
+        ],
+    )
+    def test_runtime(self, client, session, contract, init_storage, expected):
+        path = f'{CONTRACT_PATH}/opcodes/' + contract + '.tz'
+        originate(client, session, path, init_storage, 0)
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                "--arg",
+                "(Pair 10 \"" + session['lib'] + "\")",
+                '--gas-limit',
+                '1000000',
+                "--burn-cap",
+                "0.1",
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        assert client.get_storage(contract) == expected
+
+    def test_step_constants(self, client, session):
+        contract = 'view_op_test_step_contants'
+        path = f'{CONTRACT_PATH}/opcodes/' + contract + '.tz'
+        originate(client, session, path, 'None', 0)
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                "--arg",
+                "\"" + session['lib'] + "\"",
+                '--gas-limit',
+                '5000',
+                "--burn-cap",
+                "0.1",
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+
+        source = IDENTITIES['bootstrap1']['identity']
+        self_address = session['lib']
+        sender = session['contract']
+        expected = (
+            'Some (Pair (Pair 0 999000000)\n'
+            + '           (Pair "'
+            + self_address
+            + '" "'
+            + sender
+            + '")\n'
+            + '           "'
+            + source
+            + '")'
+        )
+
+        assert client.get_storage(contract) == expected
+
+    def test_recursion(self, client, session):
+        contract = 'view_rec'
+        path = f'{CONTRACT_PATH}/opcodes/' + contract + '.tz'
+        originate(client, session, path, 'Unit', 0)
+        with utils.assert_run_failure(
+            "Gas limit exceeded during typechecking or execution."
+        ):
+            client.transfer(
+                0,
+                'bootstrap1',
+                contract,
+                [
+                    "--arg",
+                    "Unit",
+                    '--gas-limit',
+                    '5000',
+                ],
+            )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+
+    @pytest.mark.parametrize(
+        "contract,expected_error",
+        [
+            (
+                'view_toplevel_bad_type',
+                'the return of a view block did not match the expected type.',
+            ),
+            (
+                'view_toplevel_bad_return_type',
+                'the return of a view block did not match the expected type.',
+            ),
+            (
+                'view_toplevel_bad_input_type',
+                'operator ADD is undefined between string',
+            ),
+            (
+                'view_toplevel_invalid_arity',
+                'primitive view expects 4 arguments',
+            ),
+            (
+                'view_toplevel_bad_name_too_long',
+                'exceeds the maximum length of 31 characters',
+            ),
+            (
+                'view_toplevel_bad_name_invalid_type',
+                'only a string can be used here',
+            ),
+            (
+                'view_toplevel_bad_name_non_printable_char',
+                'string \\[a-zA-Z0-9_.%@\\]',
+            ),
+            (
+                'view_toplevel_bad_name_invalid_char_set',
+                'string \\[a-zA-Z0-9_.%@\\]',
+            ),
+            (
+                'view_toplevel_duplicated_name',
+                'the name of view in toplevel should be unique',
+            ),
+            (
+                'view_toplevel_dupable_type_output',
+                'Ticket in unauthorized position',
+            ),
+            (
+                'view_toplevel_dupable_type_input',
+                'Ticket in unauthorized position',
+            ),
+            (
+                'view_toplevel_lazy_storage_input',
+                'big_map or sapling_state type not expected here',
+            ),
+            (
+                'view_toplevel_lazy_storage_output',
+                'big_map or sapling_state type not expected here',
+            ),
+            ('view_op_invalid_arity', 'primitive VIEW expects 2 arguments'),
+            (
+                'view_op_bad_name_invalid_type',
+                'unexpected int, only a string',
+            ),
+            (
+                'view_op_bad_name_too_long',
+                'exceeds the maximum length of 31 characters',
+            ),
+            (
+                'view_op_bad_name_non_printable_char',
+                'string \\[a-zA-Z0-9_.%@\\]',
+            ),
+            (
+                'view_op_bad_name_invalid_char_set',
+                'string \\[a-zA-Z0-9_.%@\\]',
+            ),
+            (
+                'view_op_bad_return_type',
+                'two branches don\'t end with the same stack type',
+            ),
+            (
+                'view_op_dupable_type',
+                'Ticket in unauthorized position',
+            ),
+            (
+                'view_op_lazy_storage',
+                'big_map or sapling_state type not expected here',
+            ),
+        ],
+    )
+    def test_typechecking_error(
+        self, client, session, contract, expected_error
+    ):
+        path = f'{CONTRACT_PATH}/ill_typed/' + contract + '.tz'
+        with utils.assert_run_failure(expected_error):
+            originate(client, session, path, '4', 0)
+
+
 @pytest.mark.contract
 class TestGasBound:
     def test_write_contract(self, tmpdir, session: dict):

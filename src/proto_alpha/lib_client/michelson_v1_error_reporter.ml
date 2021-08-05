@@ -555,6 +555,37 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               sta
               (fun ppf -> print_stack_ty ppf)
               stb
+        | Bad_view_name loc ->
+            Format.fprintf
+              ppf
+              "@[<v 2>%athe name of view should be of type string @]"
+              print_loc
+              loc
+        | Duplicated_view_name loc ->
+            Format.fprintf
+              ppf
+              "@[<v 2>%athe name of view in toplevel should be unique @]"
+              print_loc
+              loc
+        | Ill_typed_view {loc; actual; expected} ->
+            Format.fprintf
+              ppf
+              "@[<v 2>%athe return of a view block did not match the expected \
+               type.@,\
+               - @[<hov>resulted view stack type:@ %a,@]@,\
+               - @[<hov>expected view stack type:@ %a.@]@]"
+              print_loc
+              loc
+              (fun ppf -> print_stack_ty ppf)
+              actual
+              (fun ppf -> print_stack_ty ppf)
+              expected
+        | View_name_too_long name ->
+            Format.fprintf
+              ppf
+              "@[<v 2> A view name, \"%s\", exceeds the maximum length of 31 \
+               characters."
+              name
         | Inconsistent_annotations (annot1, annot2) ->
             Format.fprintf
               ppf
@@ -625,7 +656,9 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         | Non_dupable_type (loc, ty) ->
             Format.fprintf
               ppf
-              "%aDUP used on the non-dupable type %a."
+              "%atype %a cannot be used here because it is not duplicable. \
+               Only duplicable types can be used with the DUP instruction and \
+               as view inputs and outputs."
               print_loc
               loc
               print_ty

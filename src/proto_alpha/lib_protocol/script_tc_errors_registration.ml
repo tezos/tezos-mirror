@@ -489,6 +489,24 @@ let () =
     (function
       | Invalid_constant (loc, expr, ty) -> Some (loc, (ty, expr)) | _ -> None)
     (fun (loc, (ty, expr)) -> Invalid_constant (loc, expr, ty)) ;
+  (* View name too long *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.view_name_too_long"
+    ~title:"View name too long (type error)"
+    ~description:"A view name exceeds the maximum length of 31 characters."
+    (obj1 (req "name" string))
+    (function View_name_too_long name -> Some name | _ -> None)
+    (fun name -> View_name_too_long name) ;
+  (* Duplicated view name *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.duplicated_view_name"
+    ~title:"Duplicated view name"
+    ~description:"The name of view in toplevel should be unique."
+    (obj1 (req "location" Script.location_encoding))
+    (function Duplicated_view_name loc -> Some loc | _ -> None)
+    (fun loc -> Duplicated_view_name loc) ;
   (* Invalid syntactic constant *)
   register_error_kind
     `Permanent
@@ -566,6 +584,29 @@ let () =
       | Inconsistent_memo_sizes (msa, msb) -> Some (msa, msb) | _ -> None)
     (fun (msa, msb) -> Inconsistent_memo_sizes (msa, msb)) ;
   (* -- Instruction typing errors ------------------- *)
+  (* Bad view name *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.bad_view_name"
+    ~title:"Bad view name"
+    ~description:"In a view declaration, the view name must be a string"
+    (obj1 (req "loc" Script.location_encoding))
+    (function Bad_view_name loc -> Some loc | _ -> None)
+    (fun loc -> Bad_view_name loc) ;
+  (* Invalid view body *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.ill_typed_view"
+    ~title:"Ill typed view"
+    ~description:"The return of a view block did not match the expected type"
+    (obj3
+       (req "loc" Script.location_encoding)
+       (req "resulted_view_stack" stack_ty_enc)
+       (req "expected_view_stack" stack_ty_enc))
+    (function
+      | Ill_typed_view {loc; actual; expected} -> Some (loc, actual, expected)
+      | _ -> None)
+    (fun (loc, actual, expected) -> Ill_typed_view {loc; actual; expected}) ;
   (* Invalid map body *)
   register_error_kind
     `Permanent

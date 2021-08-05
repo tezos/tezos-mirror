@@ -979,6 +979,100 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let contract = Contract.implicit_contract key in
           let res = (Unit_t None, (contract, "default")) in
           (step [@ocaml.tailcall]) g gas k ks res stack
+      | IView (_, View_signature {name; input_ty; output_ty}, k) -> (
+          let input = accu in
+          let ((c, _entrypoint_is_ignored), stack) = stack in
+          let ctxt = update_context gas ctxt in
+          Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
+          let return_none ctxt =
+            (step [@ocaml.tailcall])
+              (outdated ctxt, sc)
+              (update_local_gas_counter ctxt)
+              k
+              ks
+              None
+              stack
+          in
+          match script_opt with
+          | None -> (return_none [@ocaml.tailcall]) ctxt
+          | Some script -> (
+              parse_script
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                ctxt
+                script
+              >>=? fun (Ex_script {storage; storage_type; views; _}, ctxt) ->
+              Gas.consume ctxt (Interp_costs.view_get name views)
+              >>?= fun ctxt ->
+              match SMap.find name views with
+              | None -> (return_none [@ocaml.tailcall]) ctxt
+              | Some view -> (
+                  let view_result =
+                    Script_ir_translator.parse_view_returning
+                      ctxt
+                      ~legacy:true
+                      storage_type
+                      view
+                  in
+                  trace_eval
+                    (fun () ->
+                      return
+                      @@ Script_tc_errors.Ill_typed_contract
+                           (Micheline.strip_locations view.view_code, []))
+                    view_result
+                  >>=? fun (Ex_view f, ctxt) ->
+                  match f with
+                  | Lam
+                      ( {
+                          kloc;
+                          kaft = Item_t (aft_ty, Bot_t, _);
+                          kbef = Item_t (bef_ty, Bot_t, _);
+                          kinstr;
+                        },
+                        _script_view ) -> (
+                      let open Gas_monad in
+                      let io_ty =
+                        Script_ir_translator.merge_types
+                          ~merge_type_error_flag:Default_merge_type_error
+                          ~legacy:true
+                          kloc
+                          aft_ty
+                          output_ty
+                        >>$ fun (out_eq, _ty) ->
+                        merge_types
+                          ~merge_type_error_flag:Default_merge_type_error
+                          ~legacy:true
+                          kloc
+                          bef_ty
+                          (Pair_t
+                             ( (input_ty, None, None),
+                               (storage_type, None, None),
+                               None ))
+                        >|$ fun (in_eq, _ty) -> (out_eq, in_eq)
+                      in
+                      Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->
+                      match eq with
+                      | Error _ -> (return_none [@ocaml.tailcall]) ctxt
+                      | Ok (Eq, Eq) -> (
+                          let kkinfo = kinfo_of_kinstr k in
+                          match kkinfo.kstack_ty with
+                          | Item_t (_, s, a) ->
+                              let kstack_ty = Item_t (output_ty, s, a) in
+                              let kkinfo = {kkinfo with kstack_ty} in
+                              let ks = KCons (ICons_some (kkinfo, k), ks) in
+                              (step [@ocaml.tailcall])
+                                ( outdated ctxt,
+                                  {
+                                    sc with
+                                    source = sc.self;
+                                    self = c;
+                                    amount = Tez.zero;
+                                  } )
+                                (update_local_gas_counter ctxt)
+                                kinstr
+                                (KReturn (stack, ks))
+                                (input, storage)
+                                (EmptyCell, EmptyCell))))))
       | ICreate_contract
           {storage_type; arg_type; lambda = Lam (_, code); root_name; k; _} ->
           (* Removed the instruction's arguments manager, spendable and delegatable *)
@@ -1533,8 +1627,8 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     tzresult
     Lwt.t =
   parse_script ctxt unparsed_script ~legacy:true ~allow_forged_in_storage:true
-  >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
-    ->
+  >>=? fun ( Ex_script {code; arg_type; storage; storage_type; root_name; _},
+             ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
     (find_entrypoint arg_type ~root_name entrypoint)

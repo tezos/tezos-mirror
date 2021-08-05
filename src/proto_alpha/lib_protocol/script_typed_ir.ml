@@ -120,11 +120,20 @@ type ('key, 'value) big_map_overlay = {
 
 type 'elt boxed_list = {elements : 'elt list; length : int}
 
+module SMap = Map.Make (Script_string)
+
+type view = {
+  input_ty : Script.node;
+  output_ty : Script.node;
+  view_code : Script.node;
+}
+
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
+  views : view SMap.t;
   root_name : field_annot option;
 }
 
@@ -675,6 +684,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * string
       * ('a typed_contract option, 's, 'r, 'f) kinstr
       -> (address, 's, 'r, 'f) kinstr
+  | IView :
+      ('a, address * 's) kinfo
+      * ('a, 'b) view_signature
+      * ('b option, 's, 'r, 'f) kinstr
+      -> ('a, address * 's, 'r, 'f) kinstr
   | ITransfer_tokens :
       ('a, Tez.t * ('a typed_contract * 's)) kinfo
       * (operation, 's, 'r, 'f) kinstr
@@ -1261,6 +1275,13 @@ and (_, _) dup_n_gadt_witness =
       ('stack, 'b) dup_n_gadt_witness
       -> ('a * 'stack, 'b) dup_n_gadt_witness
 
+and ('a, 'b) view_signature =
+  | View_signature of {
+      name : Script_string.t;
+      input_ty : 'a ty;
+      output_ty : 'b ty;
+    }
+
 let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
  fun i ->
   match i with
@@ -1368,6 +1389,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IAddress (kinfo, _) -> kinfo
   | IContract (kinfo, _, _, _) -> kinfo
   | ITransfer_tokens (kinfo, _) -> kinfo
+  | IView (kinfo, _, _) -> kinfo
   | IImplicit_account (kinfo, _) -> kinfo
   | ICreate_contract {kinfo; _} -> kinfo
   | ISet_delegate (kinfo, _) -> kinfo
@@ -1554,6 +1576,7 @@ let kinstr_rewritek :
   | IAddress (kinfo, k) -> IAddress (kinfo, f.apply k)
   | IContract (kinfo, ty, code, k) -> IContract (kinfo, ty, code, f.apply k)
   | ITransfer_tokens (kinfo, k) -> ITransfer_tokens (kinfo, f.apply k)
+  | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
   | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
   | ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k} ->
       let k = f.apply k in

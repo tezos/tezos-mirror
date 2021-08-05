@@ -29,6 +29,30 @@ let ( >>=?? ) x y =
 
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
+(* Test for Script_ir_translator.unparse_script on a script declaring views. *)
+let test_unparse_view () =
+  let dummy_contract =
+    "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }; view \
+     \"v0\" unit unit { DROP; UNIT }; view \"v1\" nat nat {CAR}}"
+  in
+  let contract_expr = Expr.from_string dummy_contract in
+  let storage_expr = Expr.from_string "Unit" in
+  let bef = Script.lazy_expr contract_expr |> Data_encoding.force_bytes in
+  let script =
+    Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
+  in
+  Test_interpretation.test_context () >>=? fun ctx ->
+  Script_ir_translator.parse_script
+    ctx
+    ~legacy:true
+    ~allow_forged_in_storage:false
+    script
+  >>=?? fun (Ex_script script, ctx) ->
+  Script_ir_translator.unparse_script ctx Readable script
+  >>=?? fun (unparse_script, _ctx) ->
+  let aft = Data_encoding.force_bytes unparse_script.code in
+  Alcotest.(check bytes) "didn't match" bef aft |> return
+
 let test_context () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
@@ -775,6 +799,7 @@ let test_optimal_comb () =
 
 let tests =
   [
+    Tztest.tztest "test unparse view" `Quick test_unparse_view;
     Tztest.tztest
       "test typecheck stack overflow error"
       `Quick

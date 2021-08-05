@@ -38,6 +38,7 @@ type prim =
   | K_parameter
   | K_storage
   | K_code
+  | K_view
   | D_False
   | D_Elt
   | D_Left
@@ -70,6 +71,7 @@ type prim =
   | I_DIP
   | I_DROP
   | I_DUP
+  | I_VIEW
   | I_EDIV
   | I_EMPTY_BIG_MAP
   | I_EMPTY_MAP
@@ -189,14 +191,14 @@ type namespace =
   | (* prefix "K" *) Keyword_namespace
 
 let namespace = function
-  | K_code | K_parameter | K_storage -> Keyword_namespace
+  | K_code | K_view | K_parameter | K_storage -> Keyword_namespace
   | D_Elt | D_False | D_Left | D_None | D_Pair | D_Right | D_Some | D_True
   | D_Unit ->
       Constant_namespace
   | I_ABS | I_ADD | I_ADDRESS | I_AMOUNT | I_AND | I_APPLY | I_BALANCE
   | I_BLAKE2B | I_CAR | I_CAST | I_CDR | I_CHAIN_ID | I_CHECK_SIGNATURE
   | I_COMPARE | I_CONCAT | I_CONS | I_CONTRACT | I_CREATE_ACCOUNT
-  | I_CREATE_CONTRACT | I_DIG | I_DIP | I_DROP | I_DUG | I_DUP | I_EDIV
+  | I_CREATE_CONTRACT | I_DIG | I_DIP | I_DROP | I_DUG | I_DUP | I_VIEW | I_EDIV
   | I_EMPTY_BIG_MAP | I_EMPTY_MAP | I_EMPTY_SET | I_EQ | I_EXEC | I_FAILWITH
   | I_GE | I_GET | I_GET_AND_UPDATE | I_GT | I_HASH_KEY | I_IF | I_IF_CONS
   | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_INT | I_ISNAT | I_ITER
@@ -236,6 +238,7 @@ let string_of_prim = function
   | K_parameter -> "parameter"
   | K_storage -> "storage"
   | K_code -> "code"
+  | K_view -> "view"
   | D_False -> "False"
   | D_Elt -> "Elt"
   | D_Left -> "Left"
@@ -345,6 +348,7 @@ let string_of_prim = function
   | I_SPLIT_TICKET -> "SPLIT_TICKET"
   | I_JOIN_TICKETS -> "JOIN_TICKETS"
   | I_OPEN_CHEST -> "OPEN_CHEST"
+  | I_VIEW -> "VIEW"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -382,6 +386,7 @@ let prim_of_string = function
   | "parameter" -> ok K_parameter
   | "storage" -> ok K_storage
   | "code" -> ok K_code
+  | "view" -> ok K_view
   | "False" -> ok D_False
   | "Elt" -> ok D_Elt
   | "Left" -> ok D_Left
@@ -414,6 +419,7 @@ let prim_of_string = function
   | "DIP" -> ok I_DIP
   | "DROP" -> ok I_DROP
   | "DUP" -> ok I_DUP
+  | "VIEW" -> ok I_VIEW
   | "EDIV" -> ok I_EDIV
   | "EMPTY_BIG_MAP" -> ok I_EMPTY_BIG_MAP
   | "EMPTY_MAP" -> ok I_EMPTY_MAP
@@ -724,9 +730,12 @@ let prim_encoding =
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
          ("GET_AND_UPDATE", I_GET_AND_UPDATE);
+         (* Alpha_011 addition *)
          ("chest", T_chest);
          ("chest_key", T_chest_key);
          ("OPEN_CHEST", I_OPEN_CHEST);
+         ("VIEW", I_VIEW);
+         ("view", K_view);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]
