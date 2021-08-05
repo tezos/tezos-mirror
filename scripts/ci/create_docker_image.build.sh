@@ -15,6 +15,7 @@ base_image="${3:-registry.gitlab.com/tezos/opam-repository}"
 base_image_version="${4:-runtime-build-dependencies--${opam_repository_tag}}"
 commit_short_sha="${5:-$(git rev-parse --short HEAD)}"
 commit_datetime="${6:-$(git show -s --pretty=format:%ci HEAD)}"
+commit_tag="${7:-$(git describe --tags --always)}"
 
 echo
 echo "### Building tezos..."
@@ -29,6 +30,7 @@ docker build \
   --build-arg "BUILD_IMAGE_VERSION=${base_image_version}" \
   --build-arg "GIT_SHORTREF=${commit_short_sha}" \
   --build-arg "GIT_DATETIME=${commit_datetime}" \
+  --build-arg "GIT_VERSION=${commit_tag}" \
   "$src_dir"
 
 echo
