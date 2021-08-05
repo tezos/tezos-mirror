@@ -40,6 +40,15 @@ let get_chain_id ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "chain_id"] in
   Client.rpc ?endpoint ?hooks GET path client
 
+let get_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
+  let path = ["chains"; chain; "blocks"; block] in
+  Client.rpc ?endpoint ?hooks GET path client
+
+let get_block_metadata ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    client =
+  let path = ["chains"; chain; "blocks"; block; "metadata"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
 let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
     client =
   let path = ["chains"; chain] in
