@@ -515,7 +515,11 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
                 (module Proto)
                 (module Next_proto)
             in
-            Store.Chain.set_rpc_directory chain_store Proto.hash dir
+            Store.Chain.set_rpc_directory
+              chain_store
+              ~protocol_hash:Proto.hash
+              ~next_protocol_hash:Next_proto.hash
+              dir
             >>= fun () -> Lwt.return dir)
 
 let get_block chain_store = function
