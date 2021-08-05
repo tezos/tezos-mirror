@@ -15,6 +15,7 @@ base_image="${3:-registry.gitlab.com/tezos/opam-repository}"
 base_image_version="${4:-runtime-build-dependencies--${opam_repository_tag}}"
 commit_short_sha="${5:-$(git rev-parse --short HEAD)}"
 commit_datetime="${6:-$(git show -s --pretty=format:%ci HEAD)}"
+commit_tag="${7:-$(git describe --tags)}"
 
 echo
 echo "### Building tezos..."
