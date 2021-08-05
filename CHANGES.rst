@@ -57,6 +57,10 @@ Node
    procedure is implemented through the ``tezos-node upgrade storage``
    command.
 
+-  Fixed an RPC inconsistency where, after a migration occured, the
+   metadata from blocks returned by RPCs would return inconsistent
+   data.
+
 Client
 ------
 
