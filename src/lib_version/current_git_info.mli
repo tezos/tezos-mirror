@@ -28,3 +28,5 @@ val commit_hash : string
 val abbreviated_commit_hash : string
 
 val committer_date : string
+
+val tag_version : int * int * int * (string * int)

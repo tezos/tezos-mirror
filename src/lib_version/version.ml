@@ -28,6 +28,14 @@
 
 type additional_info = Dev | RC of int | Release
 
+let additional_info_of_string = function
+  | ("dev", _) -> Dev
+  | ("", _) -> Release
+  | ("rc", n) -> RC n
+  | _ -> assert false
+(* This should not happen because the extra string
+   is parsed and not directly user provided *)
+
 let string_of_additional_info = function
   | Dev -> "+dev"
   | RC n -> "~rc" ^ string_of_int n
@@ -35,10 +43,16 @@ let string_of_additional_info = function
 
 type t = {major : int; minor : int; additional_info : additional_info}
 
-let to_string {major; minor; additional_info} =
-  string_of_int major ^ "." ^ string_of_int minor
-  ^ string_of_additional_info additional_info
+let to_string = function
+  | {major = 0; minor = 0; additional_info = Dev} -> "DEV"
+  | {major; minor; additional_info} ->
+      Format.sprintf
+        "%d.%d%s"
+        major
+        minor
+        (string_of_additional_info additional_info)
 
-let current = {major = 9; minor = 7; additional_info = Dev}
+let make_current (major, minor, _, extra) =
+  {major; minor; additional_info = additional_info_of_string extra}
 
-let current_string = to_string current
+let current_string current = to_string (make_current current)

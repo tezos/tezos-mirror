@@ -21,7 +21,12 @@ from . import protocol
 
 
 def _get_tezos_node_version() -> str:
-    cmd = ["ocaml", "../scripts/print_version.ml"]
+    cmd = ["git", "describe", "--tags"]
+    process_ret = subprocess.run(
+        cmd, check=True, capture_output=True, text=True
+    )
+    tag = process_ret.stdout.strip()
+    cmd = ["ocaml", "../scripts/print_version.ml", tag]
     process_ret = subprocess.run(
         cmd, check=True, capture_output=True, text=True
     )
