@@ -27,7 +27,7 @@ def restart(sandbox, node_id):
 
 
 def expect_wrong_version(sandbox, node):
-    pattern = 'Found \'0.0.4\', expected \'0.0.5\''
+    pattern = 'Found \'0.0.4\', expected \'0.0.6\''
     with utils.assert_run_failure(pattern):
         sandbox.init_node(node, snapshot=None, reconstruct=False)
 
