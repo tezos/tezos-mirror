@@ -66,6 +66,9 @@ let upgradable_data_version =
           Patch_context.patch_context genesis sandbox_parameters
         in
         Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis );
+    ( "0.0.5",
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        Legacy.upgrade_0_0_5 ~data_dir genesis );
   ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
