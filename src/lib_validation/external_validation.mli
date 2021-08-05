@@ -51,7 +51,6 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
-  | Restore_context_integrity
 
 val request_pp : Format.formatter -> request -> unit
 
