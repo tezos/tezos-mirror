@@ -321,38 +321,3 @@ def legacy_stores(request):
 
     yield session
     shutil.rmtree(data_dir)
-
-
-@pytest.fixture(scope="class")
-def nodes_legacy_store(sandbox, legacy_stores):
-    nodes = {}
-
-    # TODO would be cleaner to return couples (node, client) in order to
-    #      avoid relying on the invariant that nodes are numbered 1, 2, 3
-    #      or just return the id?
-    i = 1
-    for history_mode in ['archive', 'full', 'rolling']:
-        node_dir = legacy_stores[f'{history_mode}_path']
-        # init config with up to date version
-        params = constants.NODE_PARAMS + ['--history-mode', history_mode]
-        node = sandbox.register_node(i, node_dir=node_dir, params=params)
-        # Workaround to allow generating an identity on an
-        # old 0.0.4 storage with a 0.0.5 node
-        version = open(node_dir + "/version.json", "w")
-        version.write('{ "version": "0.0.5" }')
-        version.close()
-        node.init_config()
-        # write version to upgrade
-        version = open(node_dir + "/version.json", "w")
-        version.write('{ "version": "0.0.4" }')
-        version.close()
-
-        nodes[history_mode] = node
-        i += 1
-
-    yield nodes
-
-    # TODO think of case of failure before `yield`
-    for history_mode in ['archive', 'full', 'rolling']:
-        node_dir = legacy_stores[f'{history_mode}_path']
-        shutil.rmtree(node_dir)
