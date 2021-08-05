@@ -181,6 +181,56 @@ module Config_file = struct
     output_string chan (JSON.encode config)
 
   let update node update = read node |> update |> write node
+
+  let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
+    let network_json =
+      `O
+        [
+          ( "genesis",
+            `O
+              [
+                ("timestamp", `String "2018-06-30T16:07:32Z");
+                ( "block",
+                  `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+                );
+                ( "protocol",
+                  `String "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                );
+              ] );
+          ( "genesis_parameters",
+            `O
+              [
+                ( "values",
+                  `O
+                    [
+                      ( "genesis_pubkey",
+                        `String
+                          "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
+                      );
+                    ] );
+              ] );
+          ("chain_name", `String "TEZOS");
+          ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+          ( "user_activated_upgrades",
+            `A
+              (List.map
+                 (fun (level, protocol) ->
+                   `O
+                     [
+                       ("level", `Float (float level));
+                       ("replacement_protocol", `String (Protocol.hash protocol));
+                     ])
+                 upgrade_points) );
+        ]
+    in
+    update node @@ fun json ->
+    JSON.update
+      "network"
+      (fun _ ->
+        JSON.annotate
+          ~origin:"set_sandbox_network_with_user_activated_upgrades"
+          network_json)
+      json
 end
 
 let trigger_ready node value =

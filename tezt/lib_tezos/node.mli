@@ -218,6 +218,11 @@ module Config_file : sig
 
       Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
+
+  (** Set the network config to a sandbox with the given user
+      activated upgrades. *)
+  val set_sandbox_network_with_user_activated_upgrades :
+    t -> (int * Protocol.t) list -> unit
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)

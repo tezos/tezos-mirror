@@ -54,6 +54,7 @@ let () =
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
+  User_activated_upgrade.register ~migrate_from:Edo ~migrate_to:Florence ;
   (* TODO: the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run
