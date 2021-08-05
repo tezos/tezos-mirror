@@ -63,8 +63,7 @@ type t = {major : int; minor : int; additional_info : additional_info}
     - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"] *)
 val to_string : t -> string
 
-(** Current version. *)
-val current : t
+val make_current : int * int * int * (string * int) -> t
 
 (** Same as [to_string current]. *)
-val current_string : string
+val current_string : int * int * int * (string * int) -> string
