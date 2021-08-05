@@ -19,8 +19,32 @@ let hash = query ~env:"GIT_SHORTREF" ~default:"unknown" "git show -s --pretty=fo
 
 let date = query ~env:"GIT_DATETIME" ~default:"not-available" "git show -s --pretty=format:%ci"
 
+(* find the most recent tag. If one commit is associated with two or more tags,
+   output always the most recently added tag *)
+let version =
+  let extract s =
+    try Scanf.sscanf s "v%d.%d%s" (fun major minor s ->
+          let tag =
+            try Scanf.sscanf s "-%s" (fun x -> x)
+            with End_of_file  -> "dev" (* empty tag *)
+            | Scanf.Scan_failure s -> (* malformed tag reporting error *)
+                (Format.eprintf "Malformed release tag: %s" s;
+                exit 1
+                )
+          in
+          (major, minor, tag)
+        )
+    with End_of_file -> (0, 0, "dev") (* empty version *)
+    | Scanf.Scan_failure s -> (0, 0, "dev") (* malformed version, assume not a version *)
+  in
+  extract (query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags")
+
 let () =
+  let (major, minor, tag) = version in
   Format.printf
-    "@[<v>let commit_hash = \"%s\"@,let committer_date = \"%s\"@]@."
+    "@[<v>let commit_hash = \"%s\"@,let committer_date = \"%s\"@,let tag_version = (%d,%d,\"%s\")@]@."
     hash
     date
+    major
+    minor
+    tag
