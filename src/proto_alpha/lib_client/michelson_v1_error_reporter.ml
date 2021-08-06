@@ -615,6 +615,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               ty1
               print_ty
               ty2
+        | Inconsistent_type_sizes (size1, size2) ->
+            Format.fprintf
+              ppf
+              "@[<v 2>The two types have different sizes, the first one is of \
+               size %d while the other one is of size %d@]"
+              size1
+              size2
         | Unexpected_annotation loc ->
             Format.fprintf ppf "@[<v 2>%aunexpected annotation." print_loc loc
         | Ungrouped_annotations loc ->
