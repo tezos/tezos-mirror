@@ -373,6 +373,7 @@ module Baking_forge = struct
       ~msg:
         "found {valid_count} valid operations ({refused_count} refused) for \
          timestamp {timestamp} (fitness {fitness})"
+      ~pp4:Fitness.pp
       ("valid_count", Data_encoding.int31)
       ("refused_count", Data_encoding.int31)
       ("timestamp", Time.System.encoding)
@@ -474,6 +475,7 @@ module Baking_forge = struct
       ~msg:
         "injecting block (priority {priority}, fitness {fitness}) for {client} \
          after {predecessor}"
+      ~pp2:Fitness.pp
       ("priority", Data_encoding.int31)
       ("fitness", Fitness.encoding)
       ("client", Data_encoding.string)
@@ -489,6 +491,7 @@ module Baking_forge = struct
         "injected block {block_hash} for {client} after {predecessor} (level \
          {level}, priority {priority}, fitness {fitness}, operations \
          {operations})"
+      ~pp6:Fitness.pp
       ~pp7:Format.(pp_print_list Operation.pp)
       ("block_hash", Block_hash.encoding)
       ("client", Data_encoding.string)
