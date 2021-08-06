@@ -38,11 +38,13 @@ module type S = sig
   val path_length : int
 end
 
-(** Path encoding in hex: /[0-9a-f]{2}+/ *)
-module Make_hex (H : sig
+module type ENCODING = sig
   type t
 
   val to_bytes : t -> bytes
 
   val of_bytes_opt : bytes -> t option
-end) : S with type t := H.t
+end
+
+(** Path encoding in hex: /[0-9a-f]{2}+/ *)
+module Make_hex (H : ENCODING) : S with type t := H.t
