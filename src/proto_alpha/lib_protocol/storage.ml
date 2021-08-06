@@ -924,7 +924,7 @@ end
 
 module Public_key_hash_index = Make_index (Public_key_hash)
 
-module Protocol_hash = struct
+module Protocol_hash_with_path_encoding = struct
   include Protocol_hash
   include Path_encoding.Make_hex (Protocol_hash)
 end
@@ -1364,7 +1364,10 @@ module Vote = struct
          (struct
            let name = ["proposals"]
          end))
-         (Pair (Make_index (Protocol_hash)) (Public_key_hash_index))
+         (Pair
+            (Make_index
+               (Protocol_hash_with_path_encoding))
+               (Public_key_hash_index))
 
   module Proposals_count =
     Make_indexed_data_storage
