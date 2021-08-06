@@ -158,7 +158,10 @@ type error += Comparable_type_expected : Script.location * Script.expr -> error
 
 type error += Inconsistent_type_sizes : int * int -> error
 
-type error += Inconsistent_types : Script.expr * Script.expr -> error
+type error +=
+  | Inconsistent_types :
+      Script.location option * Script.expr * Script.expr
+      -> error
 
 type error +=
   | Inconsistent_memo_sizes : Sapling.Memo_size.t * Sapling.Memo_size.t -> error

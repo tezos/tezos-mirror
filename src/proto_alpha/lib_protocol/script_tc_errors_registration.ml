@@ -578,11 +578,13 @@ let () =
       "This is the basic type clash error, that appears in several places \
        where the equality of two types have to be proven, it is always \
        accompanied with another error that provides more context."
-    (obj2
+    (obj3
+       (opt "loc" Script.location_encoding)
        (req "first_type" Script.expr_encoding)
        (req "other_type" Script.expr_encoding))
-    (function Inconsistent_types (tya, tyb) -> Some (tya, tyb) | _ -> None)
-    (fun (tya, tyb) -> Inconsistent_types (tya, tyb)) ;
+    (function
+      | Inconsistent_types (loc, tya, tyb) -> Some (loc, tya, tyb) | _ -> None)
+    (fun (loc, tya, tyb) -> Inconsistent_types (loc, tya, tyb)) ;
   (* Inconsistent memo_sizes *)
   register_error_kind
     `Permanent

@@ -717,11 +717,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
               print_ty
               ty
-        | Inconsistent_types (tya, tyb) ->
+        | Inconsistent_types (opt_loc, tya, tyb) ->
             Format.fprintf
               ppf
-              "@[<hov 0>@[<hov 2>Type@ %a@]@ @[<hov 2>is not compatible with \
+              "@[<hov 0>@[<hov 2>%aType@ %a@]@ @[<hov 2>is not compatible with \
                type@ %a.@]@]"
+              (fun fmt -> function None -> () | Some loc -> print_loc fmt loc)
+              opt_loc
               print_ty
               tya
               print_ty

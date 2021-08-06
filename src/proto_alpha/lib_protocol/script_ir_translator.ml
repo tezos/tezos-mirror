@@ -776,11 +776,11 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent_type_annotations ctxt loc ta tb =
+let record_inconsistent_types ctxt loc ta tb =
   record_trace_eval (fun () ->
       serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
       serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
-      Inconsistent_type_annotations (loc, ta, tb))
+      Inconsistent_types (Some loc, ta, tb))
 
 module type GAS_MONAD = sig
   type 'a t
@@ -947,7 +947,7 @@ let rec merge_comparable_types :
     | (_, _) ->
         serialize_ty_for_error_carbonated (ty_of_comparable_ty ta) >>$ fun ta ->
         serialize_ty_for_error_carbonated (ty_of_comparable_ty tb) >?$ fun tb ->
-        error (Inconsistent_types (ta, tb))
+        error (Inconsistent_types (None, ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -974,7 +974,7 @@ let default_merge_type_error ty1 ty2 =
   let open Gas_monad in
   serialize_ty_for_error_carbonated ty1 >>$ fun ty1 ->
   serialize_ty_for_error_carbonated ty2 >?$ fun ty2 ->
-  ok (Inconsistent_types (ty1, ty2))
+  ok (Inconsistent_types (None, ty1, ty2))
 
 type error += Inconsistent_types_fast
 
@@ -989,7 +989,7 @@ let record_inconsistent_carbonated ctxt ta tb =
   Gas_monad.record_trace_eval (fun () ->
       serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
       serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
-      Inconsistent_types (ta, tb))
+      Inconsistent_types (None, ta, tb))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
@@ -1006,7 +1006,7 @@ let merge_types :
     let merge_type_metadata tn1 tn2 =
       from_tzresult
         (merge_type_metadata ~legacy tn1 tn2
-        |> record_inconsistent_type_annotations initial_ctxt loc ty1 ty2)
+        |> record_inconsistent_types initial_ctxt loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
       from_tzresult (merge_field_annot ~legacy tn1 tn2)
