@@ -1,5 +1,3 @@
-.. _error_monad:
-
 The Error Monad
 ===============
 
@@ -148,7 +146,7 @@ variant type to do this. Extensible variants allow us to add a new case
 to a variant type at the cost of exhaustivity checking. We’re going to
 need two new mechanisms to make this work well. The first is an error
 registration scheme. In the actual error monad, this involves the
-:ref:`data encoding module<data_encoding>`,
+:doc:`data encoding module <data_encoding>`,
 which is how all data is encoded/decoded in Tezos. Since you can declare
 arbitrary new errors, we’ll have a way of adding a printer for each error.
 

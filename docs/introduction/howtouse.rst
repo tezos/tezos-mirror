@@ -129,7 +129,7 @@ Node Synchronization
 Whenever a node starts, it tries to retrieve the most current head of the chain
 from its peers. This can be a long process if there are many blocks to retrieve
 (e.g. when a node is launched for the first time or has been out of sync for a
-while), or on a slow network connection. The mechanism of :ref:`snapshots` can
+while), or on a slow network connection. The mechanism of :doc:`../user/snapshots` can
 help in reducing the synchronization time.
 
 Once the synchronization is complete, the node is said to be *bootstrapped*.
@@ -149,7 +149,7 @@ finally switches to the current protocol.
 Throughout the documentation, `Alpha` refers to the protocol in the
 ``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
 for the currently active protocol. The Alpha protocol is used by
-default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
+default in :doc:`sandbox mode <../user/sandbox>` and in the various test
 suites.
 
 
@@ -174,8 +174,8 @@ RPC Interface
 ~~~~~~~~~~~~~
 
 The only programming interface to the node is through JSON RPC calls and it is disabled by
-default.  More detailed documentation can be found in the :ref:`RPC index.
-<rpc>` The RPC interface must be enabled for the clients
+default.  More detailed documentation can be found in the :doc:`RPC index
+<../active/rpc>`. The RPC interface must be enabled for the clients
 to communicate with the node but it should not be publicly accessible on the
 internet. With the following command, it is available uniquely on the
 `localhost` address of your machine, on the default port ``8732``.
@@ -199,7 +199,7 @@ The list of configurable options can be obtained using the following command::
 
     tezos-node run --help
 
-You can read more about the :ref:`node configuration <node-conf>` and its :ref:`private mode <private-mode>`.
+You can read more about the :doc:`node configuration <../user/node-configuration>` and its :ref:`private mode <private-mode>`.
 
 Besides listening from requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
@@ -575,7 +575,7 @@ and storage based on those indicated by the node.
 This is why we were able to submit transactions without specifying
 these limits: they were computed for us.
 
-More information on validation can be found :ref:`here. <validation>`
+More information on validation can be found :doc:`here <../shell/validation>`.
 
 
 It's RPCs all the Way Down
@@ -642,7 +642,7 @@ An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.
 
 
-You can find more info in the :ref:`RPCs' page. <rpc>`
+You can find more info in the :doc:`RPCs' page <../active/rpc>`.
 
 Environment variables for the client
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

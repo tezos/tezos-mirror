@@ -24,7 +24,7 @@ Octez is an implementation of Tezos software, including a node, a client, a bake
 This implementation is available at https://gitlab.com/tezos/tezos.
 The source code is placed under the MIT Open Source License.
 
-The current release of Octez is :ref:`version-9`.
+The current release of Octez is :doc:`../releases/version-9`.
 
 This website
 ------------
@@ -59,7 +59,7 @@ The Community
     - https://www.tezos.help
     - https://tezos.rocks
 
-- More resources can be found in the :ref:`support` page.
+- More resources can be found in the :doc:`introduction/support` page.
 
 
 The Networks

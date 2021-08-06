@@ -1,5 +1,3 @@
-.. _p2p:
-
 The peer-to-peer layer
 ======================
 

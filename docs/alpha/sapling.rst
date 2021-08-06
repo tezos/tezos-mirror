@@ -436,7 +436,7 @@ Sandbox tutorial
 ~~~~~~~~~~~~~~~~
 
 As usual it's possible to test the system end-to-end using the
-:ref:`sandboxed-mode`.
+:doc:`../user/sandbox`.
 After having set up the sandbox and originated the contract, a good
 way to get familiar with the system is to generate keys and then
 perform the full cycle of shielding, shielded transfer and

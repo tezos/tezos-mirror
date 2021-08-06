@@ -1,5 +1,3 @@
-.. _validation:
-
 The validation subsystem
 ========================
 

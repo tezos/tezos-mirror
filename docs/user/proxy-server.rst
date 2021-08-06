@@ -1,12 +1,10 @@
-.. _proxy-server:
-
 Proxy server
 ------------
 
 This page describes the *proxy server*, a readonly frontend to ``tezos-node``
 which is designed to lower the load of nodes. It is named after two things:
 
-* The :ref:`proxy mode<proxy-mode>` of the client on which it builds upon.
+* The :doc:`proxy mode<proxy>` of the client on which it builds upon.
 * Regular HTTP proxies, as proxy servers are meant to be deployed
   in front of a node, to lower the node's load.
 
@@ -25,7 +23,7 @@ Example with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this section, we show examples of usage of a proxy server when using
-the :ref:`sandboxed node<sandboxed-mode>`. For convenience we repeat
+the :doc:`sandboxed node<sandbox>`. For convenience we repeat
 instructions for the sandboxed mode here, but refer the reader to the
 sandboxed mode page for further details. First, edit
 ``src/proto_alpha/parameters/sandbox-parameters.json``
@@ -69,7 +67,7 @@ To avoid warnings being printed in upcoming commands (optional):
 You're now ready to use a proxy server. Open a third terminal, and
 launch a proxy server as shown below. We specify debug variables
 in ``TEZOS_LOG`` to have debug output showing what the proxy server
-is doing (see the :ref:`proxy mode<proxy-mode>` page for more details).
+is doing (see the :doc:`proxy mode<proxy>` page for more details).
 
 ::
 

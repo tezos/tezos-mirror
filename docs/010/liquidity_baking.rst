@@ -1,5 +1,3 @@
-.. _liquidity_baking_010:
-
 Liquidity Baking
 ================
 

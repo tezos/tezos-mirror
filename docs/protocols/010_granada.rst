@@ -1,5 +1,3 @@
-.. _010_granada:
-
 Protocol Granada
 ================
 

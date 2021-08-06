@@ -16,7 +16,7 @@ Reporting issues
 The simplest way to contribute to Tezos is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
-consult the :ref:`technical support sources <support>`
+consult the :doc:`technical support sources <../introduction/support>`
 first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
@@ -50,13 +50,13 @@ chapter on concurrency of the `Real World OCaml <https://dev.realworldocaml.org/
 has also been `ported to Lwt <https://github.com/dkim/rwo-lwt>`__.
 
 After that, it is a good idea to read the tutorials for
-:ref:`error_monad<error_monad>` and
-:ref:`data_encoding <data_encoding>`, two homegrown
+:doc:`error_monad <error_monad>` and
+:doc:`data_encoding <data_encoding>`, two homegrown
 libraries that we use pervasively.
 
 While you familiarize yourself with the basics as suggested above, you
-can have a look at the :ref:`software architecture
-<software_architecture>` of Tezos. It will
+can have a look at the :doc:`software architecture
+<../shell/the_big_picture>` of Tezos. It will
 give you the main components and their interactions, and links to the
 documentation for the various parts.
 
@@ -165,7 +165,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
    Use multilines commit messages for important commits.
--  Adhere to the :ref:`coding guidelines <coding_guidelines>`.
+-  Adhere to the :doc:`coding guidelines <guidelines>`.
 -  Document your changes, in the MR description and commit messages.
    Imagine if somebody asked what your change was about in front of the
    coffee machine, write down your answer and put it in the MR.
@@ -226,7 +226,7 @@ Therefore, when creating your MR, observe the following rules:
   - Merge requests should include automated tests for new
     functionality and bug fixes.
 
-    - Refer to the :ref:`testing guide <testing>` for more information.
+    - Refer to the :doc:`testing guide <testing>` for more information.
 
     - Bug fixes should include a test that demonstrates that the bug has been fixed
       (i.e. that fails before the supplied fix).
@@ -383,7 +383,7 @@ useless otherwise.
 For this reason after the activation of a protocol the first step to
 start a new development cycle is to remove the migration code.
 In order to facilitate this, *migration code is always in a different commit* with respect to the protocol features it migrates.
-When submitting an MR which contains migration code, **the author must also have tested the migration** (see :ref:`proposal_testing`) and write in the
+When submitting an MR which contains migration code, **the author must also have tested the migration** (see :doc:`proposal_testing`) and write in the
 description what was tested and how so that **reviewers can reproduce it**.
 
 
@@ -393,7 +393,7 @@ Code Review
 -----------
 
 At Tezos all the code is peer reviewed before getting committed in the
-master branch by the :ref:`merge team <merge_team>`.
+master branch by the :doc:`merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
 

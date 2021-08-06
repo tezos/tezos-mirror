@@ -1,11 +1,9 @@
-.. _snapshots:
-
 Snapshots
 =========
 
 As the chain invariably grows every day, retrieving a full chain from
 the peer-to-peer network can be a very long process.  Thanks to the
-implementation of :ref:`history modes<history-modes>`, it is now possible to propose an
+implementation of :doc:`history modes <history_modes>`, it is now possible to propose an
 import/export feature: snapshots.  This procedure allows to gather all
 the data necessary to bootstrap a node from a single file within few
 minutes.
@@ -89,7 +87,7 @@ The command can be used as following:
 
 As can be seen in the snapshot information, a snapshot contains
 historical data corresponding to a given history mode, which can be:
-Full, Archive, or Rolling (see :ref:`history modes<history-modes>`).
+Full, Archive, or Rolling (see :doc:`history modes <history_modes>`).
 
 Storage reconstruction from a snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

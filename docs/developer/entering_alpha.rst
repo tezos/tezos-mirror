@@ -1,5 +1,3 @@
-.. _entering_alpha:
-
 How to start reading protocol Alpha
 ===================================
 
@@ -87,12 +85,12 @@ The representation layer
 
 This layer is implemented by modules named ``*_repr``.
 These modules abstract the values of the raw key-value context by using
-:ref:`Data_encoding<data_encoding>`.
+:doc:`Data_encoding <data_encoding>`.
 
 These modules define the data types used by the protocol that need to be
 serialized (amounts, contract handles, script expressions, etc.). For
 each type, it also defines its serialization format using
-:ref:`Data_encoding<data_encoding>`.
+:doc:`Data_encoding <data_encoding>`.
 
 Above this layer, the code should never see the byte sequences in the
 database, the ones of transmitted blocks and operations, or the raw JSON

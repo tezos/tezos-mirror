@@ -1,5 +1,3 @@
-.. _coding_guidelines:
-
 Coding guidelines
 =================
 
@@ -256,7 +254,7 @@ Example:
    let f t =
      let w = g t in
      ...
-   
+
    module Internal_for_tests = struct
      type t_raw = t = {bar : string; baz : int}
 

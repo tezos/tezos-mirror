@@ -1,5 +1,3 @@
-.. _tezt:
-
 Tezt: OCaml Tezos Test Framework
 ================================
 

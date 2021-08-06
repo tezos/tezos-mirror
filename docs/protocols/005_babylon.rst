@@ -1,5 +1,3 @@
-.. _005_babylon:
-
 Protocol 005_PsBabyM1 Babylon
 =============================
 

@@ -1,6 +1,3 @@
-.. _rpc:
-
-
 JSON/RPC interface
 ==================
 

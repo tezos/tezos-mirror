@@ -1,5 +1,3 @@
-.. _python_testing_framework:
-
 Python Execution and Testing Environment
 ========================================
 

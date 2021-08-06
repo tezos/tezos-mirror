@@ -1,5 +1,3 @@
-.. _data_encoding:
-
 The ``data_encoding`` library
 =============================
 

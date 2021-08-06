@@ -1,12 +1,10 @@
-.. _light-mode: are done locally by the light client,
-
 Light mode
 ----------
 
 The ``tezos-client`` described in
 :ref:`its own tutorial <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *light* mode, a mode where the client
-performs protocol RPCs locally; like the :ref:`proxy mode<proxy-mode>`.
+performs protocol RPCs locally; like the :doc:`proxy mode<proxy>`.
 However, contrary to the proxy mode, the light mode provides
 a high level of security. For that it obtains data from multiple
 (hopefully unrelated) endpoints and makes sure all endpoints send
@@ -73,7 +71,7 @@ Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this section, we show examples of usage of the light mode when using
-the :ref:`sandboxed node<sandboxed-mode>`. For convenience we repeat
+the :doc:`sandboxed node<sandbox>`. For convenience we repeat
 instructions for the sandboxed mode here, but refer the reader to the
 sandboxed mode page for further details. In a terminal,
 start a sandboxed node:
@@ -189,7 +187,7 @@ Here's the meaning of these lines:
   for ``v1;first_level``.
 
 To see that computations are done locally by the light client,
-we refer to the :ref:`proxy mode<proxy-mode>`'s documentation. Debug
+we refer to the :doc:`proxy mode<proxy>`'s documentation. Debug
 variables of the proxy mode apply to the light mode, as internally, the light
 mode is a more complex instance of the proxy mode.
 
@@ -197,5 +195,5 @@ How to deploy to relieve nodes from some RPCs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Again, we refer to the corresponding section in the page of
-the proxy mode :ref:`proxy mode<proxy-mode>`. The exact same recommendations
+the proxy mode :doc:`proxy mode<proxy>`. The exact same recommendations
 apply for the light mode.

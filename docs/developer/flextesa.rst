@@ -1,5 +1,3 @@
-.. _flexible_network_sandboxes:
-
 Flexible Network Sandboxes
 ==========================
 
@@ -292,4 +290,3 @@ See ``./vendor/lib_flextesa/internal_pervasives.ml``:
    everywhere needed. To simplify the dependency management the state
    variables are objects (cf. ``Base_state``, then ``Paths``,
    ``Console``, etc).
-

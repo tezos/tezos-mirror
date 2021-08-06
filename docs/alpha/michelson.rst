@@ -2295,7 +2295,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
 
-:ref:`005_babylon` deprecated the following instructions. Because no smart
+:doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
@@ -2344,7 +2344,7 @@ Views are a mechanism for contract calls that:
 - are synchronous: the result is immediately available on the stack of the caller contract.
 
 In other words, the execution of a view is included in the operation of caller's contract, but accesses the storage of the declarer's contract, in read-only mode.
-Thus, in terms of execution, views are more like lambda functions rather than contract entrypoints, 
+Thus, in terms of execution, views are more like lambda functions rather than contract entrypoints,
 Here is an example:
 
 ::
@@ -2657,7 +2657,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called :ref:`Micheline`.
+This simple five cases notation is called :doc:`../shell/micheline`.
 
 Constants
 ~~~~~~~~~

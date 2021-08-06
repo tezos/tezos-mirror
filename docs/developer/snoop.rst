@@ -1,5 +1,3 @@
-.. _snoop:
-
 Benchmarking with Snoop
 =======================
 

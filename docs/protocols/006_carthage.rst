@@ -1,4 +1,3 @@
-.. _006_carthage:
 .. _proto-006: https://gitlab.com/nomadic-labs/tezos/-/tree/proto-006
 
 Protocol 006_PsCARTHA Carthage

@@ -1,5 +1,3 @@
-.. _mainnet-january-2020:
-
 Mainnet January 2020
 ====================
 
@@ -24,7 +22,7 @@ Update Instructions
 -------------------
 
 These instructions assume that you are running
-the :ref:`December 2019 release<mainnet-december-2019>`, i.e. that
+the :doc:`December 2019 release<december-2019>`, i.e. that
 you are already using the new storage backend.
 
 If you are running Tezos using Docker, new Docker images are available.

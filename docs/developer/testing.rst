@@ -1,5 +1,3 @@
-.. _testing:
-
 Overview of Testing in Tezos
 ============================
 
@@ -154,7 +152,7 @@ Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Tezos project uses `pytest <http://pytest.org/>`_, a Python testing
-framework, combined with :ref:`tezos-launchers <python_testing_framework>`, a Python wrapper
+framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
 ``tezos-node`` and ``tezos-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
@@ -190,7 +188,7 @@ Example tests:
 
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
- - :ref:`python_testing_framework`
+ - :doc:`python_testing_framework`
  - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
  - :ref:`Section in Tezos Developer Documentation on pytest-regtest <pytest_regression_testing>`
@@ -215,7 +213,7 @@ Example test:
    scenarios (in :src:`src/bin_sandbox/command_accusations.ml`)
 
 References:
- - :ref:`Section in Tezos Developer Documentation on Flextesa <flexible_network_sandboxes>`
+ - :doc:`Section in Tezos Developer Documentation on Flextesa <flextesa>`
  - `Blog post introducing Flextesa
    <https://medium.com/@obsidian.systems/introducing-flextesa-robust-testing-tools-for-tezos-and-its-applications-edc1e336a209>`_
  - `GitLab repository <https://gitlab.com/tezos/flextesa>`_
@@ -227,13 +225,13 @@ References:
 Tezt
 ~~~~
 
-:ref:`Tezt <tezt>` is a system testing framework for Tezos. It is
+:doc:`Tezt <tezt>` is a system testing framework for Tezos. It is
 intended as a replacement to Flextesa and as an OCaml-based alternative
 to :ref:`Python testing and execution framework
 <pytest_section>`. Like the latter, Tezt is also capable of regression
 testing. Tezt focuses on tests that run in the CI, although it is also
 used for some manual tests (see the :src:`tezt/manual_tests`
-folder). Its main strengths are summarized in its :ref:`section in the
+folder). Its main strengths are summarized in its :doc:`section in the
 Tezos Developer Documentation <tezt>`. Conceptually Tezt consists of a
 generic framework for writing tests interacting with external
 processes, and a set of Tezos-specific modules for interacting with
@@ -254,7 +252,7 @@ Example tests:
  - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
 
 References:
- - :ref:`Section in Tezos Developer Documentation on Tezt <tezt>`
+ - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 

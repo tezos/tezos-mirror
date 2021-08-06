@@ -1,5 +1,3 @@
-.. _007_delphi:
-
 Protocol 007_PsDELPH1 Delphi
 ============================
 
