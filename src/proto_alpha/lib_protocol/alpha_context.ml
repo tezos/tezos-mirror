@@ -184,6 +184,8 @@ module Contract = struct
   let unset_origination_nonce = Raw_context.unset_origination_nonce
 end
 
+module Global_constants_storage = Global_constants_storage
+
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map
 

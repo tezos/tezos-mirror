@@ -93,6 +93,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_migration.mli liquidity_baking_migration.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
+   global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -192,6 +193,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_migration.mli liquidity_baking_migration.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
+   global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -291,6 +293,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_migration.mli liquidity_baking_migration.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
+   global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml
@@ -412,6 +415,7 @@ include Tezos_raw_protocol_alpha.Main
    Liquidity_baking_migration
    Init_storage
    Sapling_validator
+   Global_constants_storage
    Alpha_context
    Script_typed_ir
    Script_tc_errors
@@ -550,6 +554,7 @@ include Tezos_raw_protocol_alpha.Main
    liquidity_baking_migration.mli liquidity_baking_migration.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
+   global_constants_storage.mli global_constants_storage.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
    script_tc_errors.ml

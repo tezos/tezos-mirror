@@ -181,6 +181,7 @@ type prim =
   | T_ticket
   | T_chest_key
   | T_chest
+  | H_constant
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -189,6 +190,7 @@ type namespace =
   | (* prefix "D" *) Constant_namespace
   | (* prefix "I" *) Instr_namespace
   | (* prefix "K" *) Keyword_namespace
+  | (* prefix "H" *) Constant_hash_namespace
 
 let namespace = function
   | K_code | K_view | K_parameter | K_storage -> Keyword_namespace
@@ -219,6 +221,7 @@ let namespace = function
   | T_unit | T_bls12_381_fr | T_bls12_381_g1 | T_bls12_381_g2 | T_ticket
   | T_chest_key | T_chest ->
       Type_namespace
+  | H_constant -> Constant_hash_namespace
 
 let valid_case name =
   let is_lower = function '_' | 'a' .. 'z' -> true | _ -> false in
@@ -381,6 +384,7 @@ let string_of_prim = function
   | T_ticket -> "ticket"
   | T_chest_key -> "chest_key"
   | T_chest -> "chest"
+  | H_constant -> "constant"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
@@ -529,6 +533,7 @@ let prim_of_string = function
   | "ticket" -> ok T_ticket
   | "chest_key" -> ok T_chest_key
   | "chest" -> ok T_chest
+  | "constant" -> ok H_constant
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -730,12 +735,14 @@ let prim_encoding =
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
          ("GET_AND_UPDATE", I_GET_AND_UPDATE);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_011 addition *)
          ("chest", T_chest);
          ("chest_key", T_chest_key);
          ("OPEN_CHEST", I_OPEN_CHEST);
          ("VIEW", I_VIEW);
          ("view", K_view);
+         ("constant", H_constant);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]
@@ -784,3 +791,4 @@ let string_of_namespace = function
   | Constant_namespace -> "D"
   | Instr_namespace -> "I"
   | Keyword_namespace -> "K"
+  | Constant_hash_namespace -> "H"

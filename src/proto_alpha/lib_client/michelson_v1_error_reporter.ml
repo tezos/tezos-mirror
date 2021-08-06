@@ -421,6 +421,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               | Type_namespace -> ("a", "type name")
               | Constant_namespace -> ("a", "constant constructor")
               | Keyword_namespace -> ("a", "keyword")
+              | Constant_hash_namespace -> ("a", "constant hash")
             in
             Format.fprintf
               ppf
