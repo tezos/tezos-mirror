@@ -76,9 +76,14 @@ let do_compile hash p =
       try
         Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
         Lwt.return_true
-      with Dynlink.Error err ->
-        Events.(emit dynlink_error) (plugin_file, Dynlink.error_message err)
-        >>= then_false)
+      with
+      | Dynlink.(Error (Cannot_open_dynamic_library exn)) ->
+          Events.(emit dynlink_error_static)
+            (plugin_file, Printexc.to_string exn)
+          >>= then_false
+      | Dynlink.(Error err) ->
+          Events.(emit dynlink_error) (plugin_file, Dynlink.error_message err)
+          >>= then_false)
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true
