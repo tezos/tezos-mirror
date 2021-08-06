@@ -79,7 +79,7 @@ minimal block delay function as follows:
 .. math::
    delay^*(p, e) = \begin{cases}
    md & \text{ if } p = 0 \wedge w \geq \frac{3}{5} te\\
-   delay+(p, e) & \text{ otherwise}
+   delay^+(p, e) & \text{ otherwise}
    \end{cases}
 
 where
