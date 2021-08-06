@@ -36,7 +36,7 @@ module H =
       let size = Some Ed25519.Public_key_hash.size
     end)
 
-module Index = struct
+module Index : Storage_description.INDEX with type t = H.t = struct
   include H
   include Path_encoding.Make_hex (H)
 end
