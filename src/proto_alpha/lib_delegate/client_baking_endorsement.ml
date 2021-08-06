@@ -336,8 +336,13 @@ let compute_timeout state =
               -% a timespan_tag timespan)
         >>= fun () -> timeout >>= fun () -> Lwt.return (block, delegates) )
 
-let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
-    delegates block_stream =
+(* Refuse to endorse block that are more than 20min old.
+   1200 is greater than 60 + 40*(p - 1) + 192*4 with p = 10, i.e.
+   we wait at least for the maximum delay for blocks with priority 10. *)
+let default_max_past = 1200L
+
+let create (cctxt : #Protocol_client_context.full)
+    ?(max_past = default_max_past) ~delay delegates block_stream =
   let state_maker _ =
     let state = create_state delegates (Int64.of_int delay) in
     return state
