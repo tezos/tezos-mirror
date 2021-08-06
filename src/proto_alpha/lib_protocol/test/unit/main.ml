@@ -53,5 +53,8 @@ let () =
       Unit_test.spec "Tez_repr.ml" Test_tez_repr.tests;
       Unit_test.spec "Contract_repr.ml" Test_contract_repr.tests;
       Unit_test.spec "Operation_repr.ml" Test_operation_repr.tests;
+      Unit_test.spec
+        "Global_constants_storage.ml"
+        Test_global_constants_storage.tests;
     ]
   |> Lwt_main.run

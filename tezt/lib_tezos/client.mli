@@ -431,6 +431,37 @@ val spawn_stresstest :
   t ->
   Process.t
 
+(** Run [tezos-client run script .. on storage .. and input ..].
+
+    Returns the new storage as a string.
+
+    Fails if the new storage cannot be extracted from the output. *)
+val run_script :
+  src:string -> storage:string -> input:string -> t -> string Lwt.t
+
+(** Same as [run_script] but do not wait for the process to exit. *)
+val spawn_run_script :
+  src:string -> storage:string -> input:string -> t -> Process.t
+
+(** Run [tezos-client register global constant value from src].
+    Returns the address hash of the new constant. *)
+val register_global_constant :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  value:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [register_global_constant] but do not wait for the process to exit. *)
+val spawn_register_global_constant :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  value:string ->
+  src:string ->
+  t ->
+  Process.t
+
 (** Run [tezos-client hash data .. of type ...]
 
     Given that the output of [tezos-client] is:

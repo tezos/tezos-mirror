@@ -134,6 +134,26 @@ let mul () =
       (valid r && r = ok_int ((n |> to_int) * (m |> to_int)))
       (err "mul does not behave like * on small numbers."))
 
+let shift_left () =
+  Saturation_repr.(
+    let must_saturate flag (k, v) =
+      fail_unless
+        (Bool.equal flag (shift_left k v = saturated))
+        (err
+           (Printf.sprintf
+              "shift_left %d %d %s saturated"
+              (k |> to_int)
+              v
+              (if flag then "<>" else "=")))
+    in
+    List.iter_es
+      (must_saturate true)
+      [(saturated, 1); (shift_right saturated 1, 2); (ok_int 1, 63)]
+    >>=? fun () ->
+    List.iter_es
+      (must_saturate false)
+      [(ok_int 1, 0); (ok_int 1, 31); (ok_int 1, 61)])
+
 let of_z_opt () =
   fail_unless
     (Saturation_repr.(of_z_opt (Z.succ (Z.of_int max_int))) = None)
@@ -177,6 +197,7 @@ let tests =
     Tztest.tztest "Subtraction" `Quick sub;
     Tztest.tztest "Multiplication" `Quick mul;
     Tztest.tztest "Multiplication (fast version)" `Quick mul_fast;
+    Tztest.tztest "Shift left" `Quick shift_left;
     Tztest.tztest "Scale fast" `Quick scale_fast;
     Tztest.tztest "Conversion from Z" `Quick of_z_opt;
     Tztest.tztest

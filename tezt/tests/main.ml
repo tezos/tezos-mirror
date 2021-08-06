@@ -41,6 +41,7 @@ let () =
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
+  Global_constants.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
@@ -49,6 +50,7 @@ let () =
   Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
+  Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   Proxy_server_test.register ~protocols:[Alpha] ;
