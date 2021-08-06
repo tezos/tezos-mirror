@@ -129,6 +129,19 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Signature.Public_key_hash.pp
         delegate
         pp_result
+        result
+  | Register_global_constant {value = lazy_value} ->
+      let value =
+        WithExceptions.Option.to_exn
+          ~none:(Failure "ill-serialized value")
+          (Data_encoding.force_decode lazy_value)
+      in
+      Format.fprintf
+        ppf
+        "Register Global:@,@[<v 2>  Value: %a%a@]"
+        Michelson_v1_printer.print_expr
+        value
+        pp_result
         result) ;
   Format.fprintf ppf "@]"
 
@@ -292,6 +305,24 @@ let pp_manager_operation_contents_and_result ppf
           pp_balance_updates
           balance_updates
   in
+  let pp_register_global_constant_result
+      (Register_global_constant_result
+        {balance_updates; consumed_gas; size_of_constant; global_address}) =
+    (match balance_updates with
+    | [] ->
+        (* Not possible - register global constant operation always returns
+           balance updates. *)
+        assert false
+    | balance_updates ->
+        Format.fprintf
+          ppf
+          "@,Balance updates:@,  %a"
+          pp_balance_updates
+          balance_updates) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size_of_constant) ;
+    Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -331,6 +362,17 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This origination was BACKTRACKED, its expected effects (as \
            follow) were NOT applied.@]" ;
         pp_origination_result op
+    | Applied (Register_global_constant_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This global constant registration was successfully applied" ;
+        pp_register_global_constant_result op
+    | Backtracked ((Register_global_constant_result _ as op), _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This registration of a global constant was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_register_global_constant_result op
   in
   Format.fprintf
     ppf

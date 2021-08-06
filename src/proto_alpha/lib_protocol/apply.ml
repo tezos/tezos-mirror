@@ -738,6 +738,40 @@ let apply_manager_operation_content :
         Delegation_result
           {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
         [] )
+  | Register_global_constant {value} ->
+      (* Decode the value and consume gas appropriately *)
+      ( Script.force_decode_in_context ctxt value >|? fun (value_expr, ctxt) ->
+        (ctxt, value_expr) )
+      >>?= fun (ctxt, expr) ->
+      (* Set the key to the type and value in storage. *)
+      Global_constants_storage.register ctxt expr
+      >>=? fun (ctxt, address, size) ->
+      (* The burn and the reporting of the burn are calculated differently.
+
+         [Fees.record_global_constant_storage_space] does the actual burn
+         based on the size of the constant registered, and this causes a
+         change in account balance.
+
+         On the other hand, the receipt is calculated
+         with the help of [Fees.cost_of_bytes], and is included in block metadata
+         and the client output. The receipt is also used during simulation,
+         letting the client automatically set an appropriate storage limit. *)
+      let (ctxt, paid_size) =
+        Fees.record_global_constant_storage_space ctxt size
+      in
+      Fees.cost_of_bytes ctxt paid_size >>?= fun fees ->
+      let result =
+        Register_global_constant_result
+          {
+            balance_updates =
+              Receipt.cleanup_balance_updates
+                [(Contract payer, Debited fees, Block_application)];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            size_of_constant = paid_size;
+            global_address = address;
+          }
+      in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -814,6 +848,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       ( Script.force_decode_in_context ctxt script.code >>? fun (_code, ctxt) ->
         Script.force_decode_in_context ctxt script.storage
         >|? fun (_storage, ctxt) -> ctxt )
+  | Register_global_constant {value} ->
+      Lwt.return
+      @@ record_trace Gas_quota_exceeded_init_deserialize
+      @@ (Script.force_decode_in_context ctxt value >|? fun (_, ctxt) -> ctxt)
   | _ -> return ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->

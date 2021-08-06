@@ -73,11 +73,14 @@ module Kind : sig
 
   type failing_noop = Failing_noop_kind
 
+  type register_global_constant = Register_global_constant_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Register_global_constant_manager_kind : register_global_constant manager
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -171,6 +174,10 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Register_global_constant : {
+      value : Script_repr.lazy_expr;
+    }
+      -> Kind.register_global_constant manager_operation
 
 and counter = Z.t
 
@@ -279,6 +286,9 @@ module Encoding : sig
 
   val delegation_case : Kind.delegation Kind.manager case
 
+  val register_global_constant_case :
+    Kind.register_global_constant Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -298,5 +308,7 @@ module Encoding : sig
     val origination_case : Kind.origination case
 
     val delegation_case : Kind.delegation case
+
+    val register_global_constant_case : Kind.register_global_constant case
   end
 end

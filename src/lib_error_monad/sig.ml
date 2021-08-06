@@ -293,7 +293,7 @@ module type TRACE = sig
 end
 
 module type MONAD = sig
-  (** To be subsituted/constrained *)
+  (** To be substituted/constrained *)
   type 'err trace
 
   (** Successful result *)

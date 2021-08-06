@@ -5766,6 +5766,7 @@ let parse_code :
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
+  Global_constants_storage.substitute ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in

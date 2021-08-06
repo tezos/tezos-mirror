@@ -1437,11 +1437,14 @@ module Kind : sig
 
   type failing_noop = Failing_noop_kind
 
+  type register_global_constant = Register_global_constant_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Register_global_constant_manager_kind : register_global_constant manager
 end
 
 type 'kind operation = {
@@ -1531,6 +1534,10 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Register_global_constant : {
+      value : Script.lazy_expr;
+    }
+      -> Kind.register_global_constant manager_operation
 
 and counter = Z.t
 
@@ -1564,11 +1571,15 @@ val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 module Fees : sig
   val origination_burn : context -> (context * Tez.t) tzresult
 
+  val cost_of_bytes : context -> Z.t -> Tez.t tzresult
+
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
   val record_paid_storage_space_subsidy :
     context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
+  val record_global_constant_storage_space : context -> Z.t -> context * Z.t
 
   val start_counting_storage_fees : context -> context
 
@@ -1677,6 +1688,9 @@ module Operation : sig
 
     val delegation_case : Kind.delegation Kind.manager case
 
+    val register_global_constant_case :
+      Kind.register_global_constant Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -1696,6 +1710,8 @@ module Operation : sig
       val origination_case : Kind.origination case
 
       val delegation_case : Kind.delegation case
+
+      val register_global_constant_case : Kind.register_global_constant case
     end
   end
 

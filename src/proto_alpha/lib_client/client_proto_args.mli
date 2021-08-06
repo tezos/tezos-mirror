@@ -99,6 +99,12 @@ val tez_param :
   ('a, full) Clic.params ->
   (Tez.t -> 'a, full) Clic.params
 
+val global_constant_param :
+  name:string ->
+  desc:string ->
+  ('a, full) Clic.params ->
+  (string -> 'a, full) Clic.params
+
 val signature_parameter : (Signature.t, full) Clic.parameter
 
 module Daemon : sig
