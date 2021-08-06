@@ -108,7 +108,7 @@ endorsing power :math:`e` is *valid* at level :math:`\ell` if:
 
 - the endorsements in the block are valid for level :math:`\ell-1`,
 - it is signed by the baker that has baking slot :math:`p`, and
-- :math:`t' \geq t + delay(p,e)`, where :math:`t` is the timestamp of the
+- :math:`t' \geq t + delay^+(p,e)`, where :math:`t` is the timestamp of the
   previous block.
 
 We note that, by the definition of the delay function, the higher the priority
