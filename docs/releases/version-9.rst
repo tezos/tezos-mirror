@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.5
+Version 9.6
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -34,23 +34,29 @@ node running out of memory.
 Version 9.5 fixes a bug that could result in a corrupted storage
 and in assert failure errors.
 
+Version 9.6 increases the delay after which the endorser gives up on
+endorsing to 1200 seconds (previously 110 seconds), to prevent an
+issue where blocks that arrived too late were not endorsed at all,
+causing the next block to also be produced late.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.5
+  git checkout v9.6
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.5`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.6`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.6 <../CHANGES.html#version-9-6>`_
 - `Version 9.5 <../CHANGES.html#version-9-5>`_
 - `Version 9.4 <../CHANGES.html#version-9-4>`_
 - `Version 9.3 <../CHANGES.html#version-9-3>`_
