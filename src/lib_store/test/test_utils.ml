@@ -592,10 +592,10 @@ module Example_tree = struct
 
   let vblock tbl k = Nametbl.find tbl k
 
-  let wrap_test ?keep_dir (name, g) =
+  let wrap_test ?keep_dir ?history_mode (name, g) =
     let f _ store =
       let chain_store = Store.main_chain_store store in
       build_example_tree store >>=? fun tbl -> g chain_store tbl
     in
-    wrap_test ?keep_dir (name, f)
+    wrap_test ?keep_dir ?history_mode (name, f)
 end

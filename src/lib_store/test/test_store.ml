@@ -552,6 +552,150 @@ let test_not_may_update_target chain_store table =
       Assert.fail_msg "Unexpected target update")
     (function _ -> return_unit)
 
+(****************************************************************************)
+
+(** Store.Chain.block_of_identifier *)
+
+let testable_hash =
+  Alcotest.testable
+    (fun fmt h -> Format.fprintf fmt "%s" (Block_hash.to_b58check h))
+    Block_hash.equal
+
+let init_block_of_identifier_test chain_store table =
+  vblock table "A8" |> Store.Chain.set_head chain_store >|=? fun _ -> ()
+
+let vblock_hash table name = vblock table name |> Store.Block.hash
+
+let assert_successful_block_of_identifier
+    ?(init = init_block_of_identifier_test) ~input ~expected chain_store table =
+  init chain_store table >>=? fun _ ->
+  Store.Chain.block_of_identifier chain_store input >|=? fun found ->
+  Alcotest.check
+    testable_hash
+    "same block hash"
+    expected
+    (Store.Block.hash found)
+
+let assert_failing_block_of_identifier ?(init = init_block_of_identifier_test)
+    ~input chain_store table =
+  init chain_store table >>=? fun _ ->
+  Store.Chain.block_of_identifier chain_store input >>= function
+  | Ok b ->
+      Assert.fail_msg
+        ~given:(Store.Block.hash b |> Block_hash.to_b58check)
+        "retrieving the block did not failed as expected"
+  | _ -> return_unit
+
+let test_block_of_identifier_success_block_from_level chain_store table =
+  let a5 = vblock table "A5" in
+  assert_successful_block_of_identifier
+    ~input:(`Level (Store.Block.level a5))
+    ~expected:(Store.Block.hash a5)
+    chain_store
+    table
+
+let test_block_of_identifier_success_block_from_hash chain_store table =
+  let a5_hash = vblock_hash table "A5" in
+  assert_successful_block_of_identifier
+    ~input:(`Hash (a5_hash, 0))
+    ~expected:a5_hash
+    chain_store
+    table
+
+let test_block_of_identifier_success_block_from_hash_predecessor chain_store
+    table =
+  assert_successful_block_of_identifier
+    ~input:(`Hash (vblock_hash table "A5", 2))
+    ~expected:(vblock_hash table "A3")
+    chain_store
+    table
+
+let test_block_of_identifier_success_block_from_hash_successor chain_store table
+    =
+  assert_successful_block_of_identifier
+    ~input:(`Hash (vblock_hash table "A5", -2))
+    ~expected:(vblock_hash table "A7")
+    chain_store
+    table
+
+let test_block_of_identifier_success_caboose chain_store table =
+  assert_successful_block_of_identifier
+    ~input:(`Alias (`Caboose, 0))
+    ~expected:(vblock_hash table "Genesis")
+    chain_store
+    table
+
+let test_block_of_identifier_success_caboose_successor chain_store table =
+  assert_successful_block_of_identifier
+    ~input:(`Alias (`Caboose, -2))
+    ~expected:(vblock_hash table "A2")
+    chain_store
+    table
+
+let test_block_of_identifier_failure_caboose_predecessor chain_store table =
+  assert_failing_block_of_identifier
+    ~input:(`Alias (`Caboose, 2))
+    chain_store
+    table
+
+let test_block_of_identifier_success_checkpoint chain_store table =
+  let a5 = vblock table "A5" in
+  let a5_hash = Store.Block.hash a5 in
+  let a5_descriptor = (a5_hash, Store.Block.level a5) in
+  assert_successful_block_of_identifier
+    ~init:(fun cs t ->
+      init_block_of_identifier_test cs t >>=? fun _ ->
+      Store.Unsafe.set_checkpoint cs a5_descriptor)
+    ~input:(`Alias (`Checkpoint, 0))
+    ~expected:a5_hash
+    chain_store
+    table
+
+let test_block_of_identifier_success_checkpoint_predecessor chain_store table =
+  let a5 = vblock table "A5" in
+  let a5_hash = Store.Block.hash a5 in
+  let a5_descriptor = (a5_hash, Store.Block.level a5) in
+  assert_successful_block_of_identifier
+    ~init:(fun cs t ->
+      init_block_of_identifier_test cs t >>=? fun _ ->
+      Store.Unsafe.set_checkpoint cs a5_descriptor)
+    ~input:(`Alias (`Checkpoint, 2))
+    ~expected:(vblock_hash table "A3")
+    chain_store
+    table
+
+let test_block_of_identifier_success_checkpoint_successor chain_store table =
+  let a5 = vblock table "A5" in
+  let a5_hash = Store.Block.hash a5 in
+  let a5_descriptor = (a5_hash, Store.Block.level a5) in
+  assert_successful_block_of_identifier
+    ~init:(fun cs t ->
+      init_block_of_identifier_test cs t >>=? fun _ ->
+      Store.Unsafe.set_checkpoint cs a5_descriptor)
+    ~input:(`Alias (`Checkpoint, -2))
+    ~expected:(vblock_hash table "A7")
+    chain_store
+    table
+
+let test_block_of_identifier_failure_checkpoint_successor chain_store table =
+  let a5 = vblock table "A5" in
+  let a5_hash = Store.Block.hash a5 in
+  let a5_descriptor = (a5_hash, Store.Block.level a5) in
+  assert_failing_block_of_identifier
+    ~init:(fun cs t ->
+      init_block_of_identifier_test cs t >>=? fun _ ->
+      Store.Unsafe.set_checkpoint cs a5_descriptor)
+    ~input:(`Alias (`Checkpoint, -4))
+    chain_store
+    table
+
+let test_block_of_identifier_success_savepoint chain_store table =
+  assert_successful_block_of_identifier
+    ~input:(`Alias (`Savepoint, 0))
+    ~expected:(vblock_hash table "Genesis")
+    chain_store
+    table
+
 let tests =
   let test_tree_cases =
     List.map
@@ -571,6 +715,34 @@ let tests =
         ("future target", test_future_target);
         ("reach target", test_reach_target);
         ("update target in node", test_not_may_update_target);
+        ( "block_of_identifier should succeed to retrieve block from level",
+          test_block_of_identifier_success_block_from_level );
+        ( "block_of_identifier should succeed to retrieve block from hash",
+          test_block_of_identifier_success_block_from_hash );
+        ( "block_of_identifier should succeed to retrieve block from hash \
+           predecessor",
+          test_block_of_identifier_success_block_from_hash_predecessor );
+        ( "block_of_identifier should succeed to retrieve block from hash \
+           successor",
+          test_block_of_identifier_success_block_from_hash_successor );
+        ( "block_of_identifier should succeed to retrieve the caboose",
+          test_block_of_identifier_success_caboose );
+        ( "block_of_identifier should succeed to retrieve caboose successor",
+          test_block_of_identifier_success_caboose_successor );
+        ( "block_of_identifier should fail to retrieve caboose predecessor",
+          test_block_of_identifier_failure_caboose_predecessor );
+        ( "block_of_identifier should succeed to retrieve the checkpoint",
+          test_block_of_identifier_success_checkpoint );
+        ( "block_of_identifier should succeed to retrieve checkpoint predecessor",
+          test_block_of_identifier_success_checkpoint_predecessor );
+        ( "block_of_identifier should succeed to retrieve the checkpoint \
+           successor",
+          test_block_of_identifier_success_checkpoint_successor );
+        ( "block_of_identifier should fail to retrieve the checkpoint \
+           successor after the head",
+          test_block_of_identifier_failure_checkpoint_successor );
+        ( "block_of_identifier should succeed to retrieve the savepoint",
+          test_block_of_identifier_success_savepoint );
       ]
   in
   ("store", test_cases @ test_tree_cases)

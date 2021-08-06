@@ -36,12 +36,24 @@ val chain_to_string : chain -> string
 
 val chain_arg : chain RPC_arg.t
 
+(** A representation of a block's position relatively to a known
+    block of a chain. *)
 type block =
-  [ `Genesis
+  [ `Genesis  (** The genesis block *)
   | `Head of int
+    (** The [n]th predecessor of the [current_head] block if [n > 0].
+      If [n = 0], represents the [current_head]. [n] should
+      not be negative since the [current_head] does not have
+      successors. *)
   | `Alias of [`Caboose | `Checkpoint | `Savepoint] * int
+    (** The [n]th predecessor of the [caboose], the [checkpoint]
+      or the [savepoint] if [n > 0]. If [n = 0], represents the block itself.
+      If [n < 0], represents the [n]th successor.  *)
   | `Hash of Block_hash.t * int
-  | `Level of Int32.t ]
+    (** The [n]th predecessor of the block of given [hash] if [n > 0].
+      If [n = 0], represents the block itself.
+      Otherwise, if [n < 0], represents the [n]th successor.*)
+  | `Level of Int32.t  (** The block at a given [level] *) ]
 
 val parse_block : string -> (block, string) result
 

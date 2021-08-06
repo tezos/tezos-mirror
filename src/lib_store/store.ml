@@ -240,7 +240,7 @@ module Block = struct
       block_store
       (Block (hash, distance))
     >>=? function
-    | None -> fail (Block_not_found hash)
+    | None -> fail @@ Block_not_found {hash; distance}
     | Some block -> return block
 
   let read_block_metadata ?(distance = 0) chain_store hash =
@@ -298,7 +298,7 @@ module Block = struct
   let read_predecessor_of_hash chain_store hash =
     read_predecessor_of_hash_opt chain_store hash >>= function
     | Some b -> return b
-    | None -> fail (Block_not_found hash)
+    | None -> fail @@ Block_not_found {hash; distance = 0}
 
   let locked_read_block_by_level chain_store head level =
     let distance = Int32.(to_int (sub (Block_repr.level head) level)) in
@@ -333,7 +333,7 @@ module Block = struct
   let read_prechecked_block chain_store hash =
     read_prechecked_block_opt chain_store hash >>= function
     | Some b -> return b
-    | None -> fail (Block_not_found hash)
+    | None -> fail (Block_not_found {hash; distance = 0})
 
   let store_block chain_store ~block_header ~operations validation_result =
     let {
@@ -759,6 +759,8 @@ module Chain = struct
 
   type nonrec testchain = testchain
 
+  type block_identifier = Block_services.block
+
   let global_store {global_store; _} = global_store
 
   let chain_id chain_store = chain_store.chain_id
@@ -797,6 +799,42 @@ module Chain = struct
 
   let mempool chain_store =
     Shared.use chain_store.chain_state (fun {mempool; _} -> Lwt.return mempool)
+
+  let block_of_identifier chain_store =
+    let not_found () = fail_with_exn Not_found in
+    function
+    | `Genesis -> genesis_block chain_store >>= return
+    | `Head n ->
+        current_head chain_store >>= fun current_head ->
+        if n < 0 then not_found ()
+        else if n = 0 then return current_head
+        else Block.read_block chain_store ~distance:n (Block.hash current_head)
+    | (`Alias (_, n) | `Hash (_, n)) as b ->
+        (match b with
+        | `Alias (`Checkpoint, _) -> checkpoint chain_store >|= fst
+        | `Alias (`Savepoint, _) -> savepoint chain_store >|= fst
+        | `Alias (`Caboose, _) -> caboose chain_store >|= fst
+        | `Hash (h, _) -> Lwt.return h)
+        >>= fun hash ->
+        if n < 0 then
+          Block.read_block chain_store hash >>=? fun block ->
+          current_head chain_store >>= fun current_head ->
+          let head_level = Block.level current_head in
+          let block_level = Block.level block in
+          let distance =
+            Int32.(to_int (sub head_level (sub block_level (of_int n))))
+          in
+          if distance < 0 then not_found ()
+          else Block.read_block chain_store ~distance (Block.hash current_head)
+        else Block.read_block chain_store ~distance:n hash
+    | `Level i ->
+        if Compare.Int32.(i < 0l) then not_found ()
+        else Block.read_block_by_level chain_store i
+
+  let block_of_identifier_opt chain_store identifier =
+    block_of_identifier chain_store identifier >>= function
+    | Ok block -> Lwt.return_some block
+    | Error _ -> Lwt.return_none
 
   let set_mempool chain_store ~head mempool =
     Shared.update_with chain_store.chain_state (fun chain_state ->
