@@ -359,15 +359,55 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Worker.log_event w Invalid_mempool_filter_configuration
       >>= fun () -> Lwt.return Filter.Mempool.default_config
 
-  let pre_filter w pv oph op =
-    match decode_operation_data op.Operation.proto with
+  let handle_refused pv op oph errors =
+    notify_operation pv `Refused op ;
+    Option.iter
+      (fun e ->
+        pv.refusals <- Operation_hash.Map.remove e pv.refusals ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+      (Ringo.Ring.add_and_return_erased pv.refused oph) ;
+    Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
+    pv.refusals <- Operation_hash.Map.add oph (op, errors) pv.refusals
+
+  let handle_branch_refused pv op oph errors =
+    notify_operation pv `Branch_refused op ;
+    Option.iter
+      (fun e ->
+        pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
+        Distributed_db.Operation.clear_or_cancel pv.chain_db e ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+      (Ringo.Ring.add_and_return_erased pv.branch_refused oph) ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
+    pv.branch_refusals <-
+      Operation_hash.Map.add oph (op, errors) pv.branch_refusals
+
+  let handle_branch_delayed pv op oph errors =
+    notify_operation pv `Branch_delayed op ;
+    Option.iter
+      (fun e ->
+        pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
+        Distributed_db.Operation.clear_or_cancel pv.chain_db e ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+      (Ringo.Ring.add_and_return_erased pv.branch_delayed oph) ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
+    pv.branch_delays <-
+      Operation_hash.Map.add oph (op, errors) pv.branch_delays
+
+  (* [pre_filter w pv oph raw] calls the mempool filter defined by the
+     corresponding economic protocol. The filter classifies the
+     operations using light checks which are less costly than calling
+     [Proto.apply_operation]. This allows to reject bad operations
+     quickly. *)
+  let pre_filter w pv oph raw =
+    match decode_operation_data raw.Operation.proto with
     | None ->
         Worker.log_event w (Unparsable_operation oph)
         >>= fun () ->
         Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
         Lwt.return false
-    | Some protocol_data ->
-        let op = {Filter.Proto.shell = op.shell; protocol_data} in
+    | Some protocol_data -> (
+        let op = {Filter.Proto.shell = raw.shell; protocol_data} in
         filter_config w pv
         >>= fun config ->
         let validation_state_before =
@@ -375,15 +415,23 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             Prevalidation.validation_state
             (Option.of_result pv.validation_state)
         in
-        if
+        match
           Filter.Mempool.pre_filter
             ?validation_state_before
             config
             op.Filter.Proto.protocol_data
-        then Lwt.return_true
-        else (
-          Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
-          Lwt.return_false )
+        with
+        | `Refused errors ->
+            handle_refused pv raw oph errors ;
+            Lwt.return_false
+        | `Branch_delayed errors ->
+            handle_branch_delayed pv raw oph errors ;
+            Lwt.return_false
+        | `Branch_refused errors ->
+            handle_branch_refused pv raw oph errors ;
+            Lwt.return_false
+        | `Undecided ->
+            Lwt.return_true )
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
@@ -394,17 +442,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       ~validation_state_before
       ~validation_state_after
       (op, receipt)
-
-  let handle_branch_refused pv op oph errors =
-    notify_operation pv `Branch_refused op ;
-    Option.iter
-      (fun e ->
-        pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
-        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
-      (Ringo.Ring.add_and_return_erased pv.branch_refused oph) ;
-    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
-    pv.branch_refusals <-
-      Operation_hash.Map.add oph (op, errors) pv.branch_refusals
 
   let handle_unprocessed w pv =
     match pv.validation_state with

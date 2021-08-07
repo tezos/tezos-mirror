@@ -113,12 +113,33 @@ module Mempool = struct
       (Ok (Tez.zero, Gas.Arith.zero))
       l
 
+  type Environment.Error_monad.error += Fees_too_low
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"prefilter.fees_too_low"
+      ~title:"Operation fees are too low"
+      ~description:"Operation fees are too low"
+      ~pp:(fun ppf () -> Format.fprintf ppf "Operation fees are too low")
+      Data_encoding.unit
+      (function Fees_too_low -> Some () | _ -> None)
+      (fun () -> Fees_too_low)
+
   let pre_filter_manager :
-      type t. config -> t Kind.manager contents_list -> int -> bool =
+      type t.
+      config ->
+      t Kind.manager contents_list ->
+      int ->
+      [ `Undecided
+      | `Branch_refused of tztrace
+      | `Branch_delayed of tztrace
+      | `Refused of tztrace ] =
    fun config op size ->
     match get_manager_operation_gas_and_fee op with
-    | Error _ ->
-        false
+    | Error err ->
+        let err = List.map (fun x -> Environment.Ecoproto_error x) err in
+        `Refused err
     | Ok (fee, gas) ->
         let fees_in_nanotez =
           Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
@@ -134,14 +155,17 @@ module Mempool = struct
         let minimal_fees_for_size_in_nanotez =
           Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
         in
-        Q.compare
-          fees_in_nanotez
-          (Q.add
-             minimal_fees_in_nanotez
-             (Q.add
-                minimal_fees_for_gas_in_nanotez
-                minimal_fees_for_size_in_nanotez))
-        >= 0
+        if
+          Q.compare
+            fees_in_nanotez
+            (Q.add
+               minimal_fees_in_nanotez
+               (Q.add
+                  minimal_fees_for_gas_in_nanotez
+                  minimal_fees_for_size_in_nanotez))
+          >= 0
+        then `Undecided
+        else `Refused [Environment.Ecoproto_error Fees_too_low]
 
   let pre_filter config ?validation_state_before:_
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
@@ -152,20 +176,14 @@ module Mempool = struct
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
     match contents with
-    | Single (Endorsement _) ->
-        true
-    | Single (Seed_nonce_revelation _) ->
-        true
-    | Single (Double_endorsement_evidence _) ->
-        true
-    | Single (Double_baking_evidence _) ->
-        true
-    | Single (Activate_account _) ->
-        true
-    | Single (Proposals _) ->
-        true
+    | Single (Endorsement _)
+    | Single (Seed_nonce_revelation _)
+    | Single (Double_endorsement_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Activate_account _)
+    | Single (Proposals _)
     | Single (Ballot _) ->
-        true
+        `Undecided
     | Single (Manager_operation _) as op ->
         pre_filter_manager config op bytes
     | Cons (Manager_operation _, _) as op ->
