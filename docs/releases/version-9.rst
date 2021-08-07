@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.6
+Version 9.7
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -39,23 +39,27 @@ endorsing to 1200 seconds (previously 110 seconds), to prevent an
 issue where blocks that arrived too late were not endorsed at all,
 causing the next block to also be produced late.
 
+Version 9.7 improves how the node handles pending consensus operations
+to remove costly computations in cases where they are not needed.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.6
+  git checkout v9.7
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.6`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.7`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.7 <../CHANGES.html#version-9-7>`_
 - `Version 9.6 <../CHANGES.html#version-9-6>`_
 - `Version 9.5 <../CHANGES.html#version-9-5>`_
 - `Version 9.4 <../CHANGES.html#version-9-4>`_
