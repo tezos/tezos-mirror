@@ -469,40 +469,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Worker.log_event w Invalid_mempool_filter_configuration >>= fun () ->
       Lwt.return Filter.Mempool.default_config
 
-  let pre_filter w pv oph op =
-    match decode_operation_data op.Operation.proto with
-    | None ->
-        Worker.log_event w (Unparsable_operation oph) >>= fun () ->
-        Lwt.return false
-    | Some protocol_data ->
-        let op = {Filter.Proto.shell = op.shell; protocol_data} in
-        filter_config w pv >>= fun config ->
-        let validation_state_before =
-          Option.map
-            Prevalidation.validation_state
-            (Option.of_result pv.validation_state)
-        in
-        if
-          Filter.Mempool.pre_filter
-            ?validation_state_before
-            config
-            op.Filter.Proto.protocol_data
-        then Lwt.return_true
-        else (
-          Distributed_db.Operation.clear_or_cancel
-            pv.shell.parameters.chain_db
-            oph ;
-          Lwt.return_false)
-
-  let post_filter w pv ~validation_state_before ~validation_state_after op
-      receipt =
-    filter_config w pv >>= fun config ->
-    Filter.Mempool.post_filter
-      config
-      ~validation_state_before
-      ~validation_state_after
-      (op, receipt)
-
   let handle_branch_refused pv op oph errors =
     notify_operation pv `Branch_refused op ;
     Option.iter
@@ -546,6 +512,50 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     notify_operation pv `Applied op.raw ;
     pv.applied <- (op.hash, op.raw) :: pv.applied ;
     pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool
+
+  let pre_filter w pv oph raw =
+    match Prevalidation.parse raw with
+    | Error _ ->
+        Worker.log_event w (Unparsable_operation oph) >>= fun () ->
+        Lwt.return false
+    | Ok parsed_op -> (
+        let op =
+          {
+            Filter.Proto.shell = raw.shell;
+            protocol_data = parsed_op.protocol_data;
+          }
+        in
+        filter_config w pv >>= fun config ->
+        let validation_state_before =
+          Option.map
+            Prevalidation.validation_state
+            (Option.of_result pv.validation_state)
+        in
+        match
+          Filter.Mempool.pre_filter
+            ?validation_state_before
+            config
+            op.Filter.Proto.protocol_data
+        with
+        | `Branch_delayed errors ->
+            handle_branch_delayed pv raw oph errors ;
+            Lwt.return_false
+        | `Branch_refused errors ->
+            handle_branch_refused pv raw oph errors ;
+            Lwt.return_false
+        | `Refused errors ->
+            handle_refused pv raw oph errors ;
+            Lwt.return_false
+        | `Undecided -> Lwt.return_true)
+
+  let post_filter w pv ~validation_state_before ~validation_state_after op
+      receipt =
+    filter_config w pv >>= fun config ->
+    Filter.Mempool.post_filter
+      config
+      ~validation_state_before
+      ~validation_state_after
+      (op, receipt)
 
   let classify_operation w pv validation_state mempool op oph =
     match Prevalidation.parse op with
