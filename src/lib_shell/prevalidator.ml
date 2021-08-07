@@ -458,6 +458,9 @@ module Make
     match Prevalidation.parse raw with
     | Error _ ->
         Worker.log_event w (Unparsable_operation oph) >>= fun () ->
+        Distributed_db.Operation.clear_or_cancel
+          pv.shell.parameters.chain_db
+          oph ;
         Lwt.return_false
     | Ok parsed_op -> (
         let op =
