@@ -281,6 +281,16 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
+Version 9.7
+===========
+
+-  The mempool plugin now avoids some costly operations on outdated
+   consensus operations such as endorsements for old blocks.
+
+-  The mempool now filters out old consensus operations to avoid
+   reevaluating them again after flushing when the node receives a new
+   head.
+
 Version 9.6
 ===========
 
