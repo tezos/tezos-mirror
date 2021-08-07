@@ -154,7 +154,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         "@[<v 0>%a@]"
         (Format.pp_print_list (fun ppf (i, l) ->
              Format.fprintf ppf "%0*d: %s" cols i l))
-        (List.rev_mapi (fun i l -> (i + 1, l)) (List.rev lines))
+        (List.rev_mapi (fun i x -> (i + 1, x)) lines |> List.rev)
     in
     match errs with
     | [] -> ()

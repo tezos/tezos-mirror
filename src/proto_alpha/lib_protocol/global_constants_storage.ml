@@ -65,11 +65,6 @@ module Gas_model = struct
     Gas_limit_repr.atomic_step_cost
     @@ ((v0 lsl 4) + (v0 lsl 3) + (v0 lsl 2) + (v0 lsl 1) + v0 + (v0 lsr 1))
 
-  (* Approximating 4470.04017319 * number of nodes *)
-  let register_cost node =
-    let size = Script_repr.micheline_nodes node |> safe_int in
-    Gas_limit_repr.atomic_step_cost @@ (shift_left size 12 + shift_left size 8)
-
   (* Approximating 4156.4530516 *)
   let substitute_constants_branch_cost =
     Gas_limit_repr.atomic_step_cost @@ safe_int 4156
@@ -81,7 +76,6 @@ module Gas_model = struct
     @@ (shift_left size 4 + shift_left size 3 + shift_right size 1)
 end
 
-module Expr_hash_set = Set.Make (Script_expr_hash)
 module Expr_hash_map = Map.Make (Script_expr_hash)
 
 type error += Expression_too_deep
@@ -173,26 +167,6 @@ let expr_to_address_in_context context expr =
   Script_repr.force_bytes lexpr >>? fun b ->
   Raw_context.consume_gas context @@ Gas_model.expr_to_address_in_context_cost b
   >|? fun context -> (context, Script_expr_hash.hash_bytes [b])
-
-(** Traverses an expression, collecting all the constant hashes
-    into a set. Does not expand those references. *)
-let get_constant_subexpressions node =
-  bottom_up_fold_cps
-    Expr_hash_set.empty
-    node
-    (fun set node -> Ok (node, set))
-    (fun k (set as accu) node ->
-      match node with
-      | Prim (_, H_constant, args, _) -> (
-          match args with
-          (* A constant Prim should always have a single String argument,
-             being a properly formatted hash. *)
-          | [String (_, address)] -> (
-              match Script_expr_hash.of_b58check_opt address with
-              | None -> error Badly_formed_constant_expression
-              | Some address -> k (Expr_hash_set.add address set) node)
-          | _ -> error Badly_formed_constant_expression)
-      | Int _ | String _ | Bytes _ | Prim _ | Seq _ -> k accu node)
 
 let node_too_large node =
   let node_size = Script_repr.Micheline_size.of_node node in

@@ -746,8 +746,7 @@ module Global_constants_storage : sig
         Notice that a common source of bug is to forget to properly call the
         continuation in `f`.
    
-        See [Global_constants_storage.get_constant_subexpressions]
-        and [Global_constants_storage.substitute] for examples.
+        See [Global_constants_storage.substitute] for an example.
 
         TODO: https://gitlab.com/tezos/tezos/-/issues/1609
         Move function to lib_micheline.
