@@ -438,30 +438,56 @@ module Make
       Worker.log_event w Invalid_mempool_filter_configuration >>= fun () ->
       Lwt.return Filter.Mempool.default_config
 
-  let pre_filter w pv oph op =
-    match Prevalidation.parse_unsafe op.Operation.proto with
+  (* Each classified operation should be notified exactly ONCE for a
+     given stream. The flag [should_notify] is used to avoid notifying
+     multiple times on the same operation, e.g. an operation that is
+     reclassified upon banning an applied operation. *)
+  let handle ~notify pv op kind =
+    let notify () =
+      match op with
+      | `Parsed ({raw; protocol_data; _} : Proto.operation_data operation)
+        when notify ->
+          Lwt_watcher.notify pv.operation_stream (kind, raw.shell, protocol_data)
+      | _ -> ()
+    in
+    match op with
+    | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
+        Classification.add ~notify kind hash raw pv.shell.classification
+
+  let pre_filter w pv oph raw =
+    match Prevalidation.parse raw with
     | Error _ ->
         Worker.log_event w (Unparsable_operation oph) >>= fun () ->
-        Lwt.return false
-    | Ok protocol_data ->
-        let op = {Filter.Proto.shell = op.shell; protocol_data} in
+        Lwt.return_false
+    | Ok parsed_op -> (
+        let op =
+          {
+            Filter.Proto.shell = raw.shell;
+            protocol_data = parsed_op.protocol_data;
+          }
+        in
         filter_config w pv.shell >>= fun config ->
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
             (Option.of_result pv.validation_state)
         in
-        if
+        match
           Filter.Mempool.pre_filter
             ?validation_state_before
             config
             op.Filter.Proto.protocol_data
-        then Lwt.return_true
-        else (
-          Distributed_db.Operation.clear_or_cancel
-            pv.shell.parameters.chain_db
-            oph ;
-          Lwt.return_false)
+        with
+        | `Branch_delayed errors ->
+            handle ~notify:true pv (`Parsed parsed_op) (`Branch_delayed errors) ;
+            Lwt.return_false
+        | `Branch_refused errors ->
+            handle ~notify:true pv (`Parsed parsed_op) (`Branch_refused errors) ;
+            Lwt.return_false
+        | `Refused errors ->
+            handle ~notify:true pv (`Parsed parsed_op) (`Refused errors) ;
+            Lwt.return_false
+        | `Undecided -> Lwt.return_true)
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
@@ -479,22 +505,6 @@ module Make
       chain_store
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
-
-  (* Each classified operation should be notified exactly ONCE for a
-     given stream. The flag [should_notify] is used to avoid notifying
-     multiple times on the same operation, e.g. an operation that is
-     reclassified upon banning an applied operation. *)
-  let handle ~notify pv op kind =
-    let notify () =
-      match op with
-      | `Parsed ({raw; protocol_data; _} : Proto.operation_data operation)
-        when notify = true ->
-          Lwt_watcher.notify pv.operation_stream (kind, raw.shell, protocol_data)
-      | _ -> ()
-    in
-    match op with
-    | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
-        Classification.add ~notify kind hash raw pv.shell.classification
 
   let classify_operation ~notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with

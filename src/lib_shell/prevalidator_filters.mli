@@ -38,7 +38,10 @@ module type FILTER = sig
       config ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      bool
+      [ `Undecided
+      | `Branch_delayed of tztrace
+      | `Branch_refused of Error_monad.tztrace
+      | `Refused of Error_monad.tztrace ]
 
     val post_filter :
       config ->
