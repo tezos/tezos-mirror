@@ -70,8 +70,9 @@ Some ad-hoc reference kinds are supported.
   exists
 - ``:src:`/path/to/file/or/dir``` or
   ``:src:`text</path/to/file/or/dir>``` points to the gitlab source
-  tree viewer. It is possible to refer to a particular line in a file by adding
-  a line number suffix of the form ``#Lnnn``.
+  tree viewer. It is not possible to refer to a particular line in a file using
+  a line number suffix of the form ``#Lnnn``, because such links are usually
+  too fragile to be used in documentation.
 - ``:opam:`package``` or ``:opam:`text<package>``` points to the
   package page on ``opam.ocaml.org``, version number is supported
   (``package.version``)
