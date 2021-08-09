@@ -50,7 +50,7 @@ val mk_readable :
     [length_to_copy] bytes into [bytes] starting at position [pos].
 
     - [pos] defaults to [0].
-    - [length_to_copy] defaults to [Bytes.length buf - pos].
+    - [length_to_copy] defaults to [Bytes.length bytes - pos].
 
     If you neither specify [pos] nor [length_to_copy], prefer using
     {!mk_buffer_safe} which cannot fail.
