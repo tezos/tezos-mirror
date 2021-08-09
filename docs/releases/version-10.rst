@@ -1,9 +1,10 @@
 .. _version-10:
 
-Version 10.0~rc2
+Version 10.0~rc3
 ================
 
-**This release candidate changes the storage backend and requires specific care when updating.**
+**This release candidate changes the storage backend and requires
+specific care when updating.**
 
 The new storage backend uses a different file format for storing
 files, which contain the block history. This new storage layer
@@ -14,10 +15,21 @@ than 22GB before that. In archive mode, it drops from 30 to 60GB down
 to 9GB. It also reduces by a factor of more than 2 the time needed to
 export and import snapshots.
 
-This version also notably introduces an Access Control List (ACL) feature for RPCs,
-a new *light* mode for the client, and a new executable
-:doc:`tezos-proxy-server<../user/proxy-server>`.
-See full `Changelog`_ for more details.
+**This release candidate also introduces a significant breaking change
+for public nodes: by default, many RPCs are no longer available
+unless you activate them using the new Access Control List (ACL)
+feature.**
+
+If you are running a public node, you will probably want to configure
+your node to make the Access Control List less restrictive. Note that
+this only impacts RPC calls from remote hosts, not RPCs calls on the
+``localhost`` network interface. See the `Changelog`_ for more details
+about ACLs.
+
+This version also notably introduces a new *light* mode for the
+client, and a new executable
+:doc:`tezos-proxy-server<../user/proxy-server>`.  See full
+`Changelog`_ for more details.
 
 Update Instructions
 -------------------
@@ -25,17 +37,18 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v10.0-rc2
+  git checkout v10.0-rc3
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v10.0-rc2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v10.0-rc3`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 10.0~rc3 <../CHANGES.html#version-10-0-rc3>`_
 - `Version 10.0~rc2 <../CHANGES.html#version-10-0-rc2>`_
 - `Version 10.0~rc1 <../CHANGES.html#version-10-0-rc1>`_
 
@@ -45,11 +58,12 @@ Storage Upgrade
 To upgrade your node, you have two choices.
 
 - You can use the ``storage upgrade`` command to convert your storage
-  data from ``v0.0.4`` to ``v0.0.5``. This method is suitable for any
-  kind of history modes. See `Upgrade Using the Upgrade Command`_
+  data from ``v0.0.4`` (or ``v0.0.5`` if you were running v10.0~rc1 or
+  v10.0~rc2) to ``v0.0.6``. This method is suitable for any kind of
+  history mode. See `Upgrade Using the Upgrade Command`_
 
 - You can import a recent snapshot to get a fresh data directory based
-  on the ``v0.0.5`` storage. This method is not suitable for
+  on the ``v0.0.6`` storage. This method is not suitable for
   ``archive`` history modes and is recommended for ``full`` and
   ``rolling`` modes. This method is about twice as fast as using the
   upgrade command. See `Upgrade Using a Snapshot`_
@@ -79,7 +93,7 @@ Upgrade Using a Snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Export or download a snapshot (see `How to Export a Snapshot`_). No
-  need to care about the snapshot's version as the ``v0.0.5`` storage
+  need to care about the snapshot's version as the ``v0.0.6`` storage
   can import legacy (``v1``) snapshots.
 
 - Stop your node.
@@ -126,7 +140,7 @@ Docker users can run the upgrade procedure using the
 ``tezos-upgrade-storage`` command as follows (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc1 tezos-upgrade-tezos
+    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc3 tezos-upgrade-tezos
 
 Users who use ``storage-docker-manager.sh`` can simply execute the built-in
 upgrade command, such as (for Mainnet): ``./mainnet.sh node upgrade``
@@ -136,7 +150,7 @@ now safely remove the backup of the previous store version.
 To do so, start a shell using (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.0-rc1
+    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.0-rc3
 
 Once you have a shell, remove the backup using::
 
