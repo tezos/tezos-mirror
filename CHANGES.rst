@@ -113,6 +113,11 @@ Node
    return that their current protocol is A and next protocol is B
    instead of A and A).
 
+Baker
+-----
+
+-  Improved error reporting for ill-formed liquidity-baking escape vote files.
+
 Version 10.0~rc2
 ================
 
