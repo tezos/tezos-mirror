@@ -80,7 +80,7 @@ let mk_readable ~read_buffer ~read_queue =
     the type being abstract. *)
 type buffer = {length_to_copy : int; pos : int; buf : Bytes.t}
 
-let mk_buffer ?pos ?length_to_copy buf : (buffer, tztrace) result =
+let mk_buffer ?pos ?length_to_copy buf : buffer tzresult =
   let buflen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
   let length_to_copy = Option.value ~default:(buflen - pos) length_to_copy in
