@@ -53,6 +53,16 @@ _`Baking`/_`Endorsing rights`
     For each block_ height, there are several accounts that are allowed to
     endorse. There can be multiple endorsements per block_.
 
+_`Burn`
+    To ensure responsible use of the storage space on the public blockchain,
+    there are some costs charged to users for consuming storage. These
+    costs are burnt (i.e., the amount of tez is destroyed). For example,
+    a per-byte storage cost is burnt for increasing the storage space of a
+    smart contract; a fixed amount is burnt for allocating a new contract
+    (which consumes space by storing its address on the blockchain).
+
+    See also `Fee`_.
+
 _`Constants`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
@@ -94,6 +104,13 @@ _`Endorser`
 
     Using the tools provided by Nomadic Labs, endorsement is handled by a
     separate binary.
+
+_`Fee`
+    To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol, there are some
+    fees that users pay to bakers for including their operations in blocks.
+    For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
+
+    See also `Burn`_.
 
 _`Gas`
     A measure of the number of elementary operations_ performed during
