@@ -107,6 +107,12 @@ Node
    procedure is implemented through the ``tezos-node upgrade storage``
    command.
 
+-  Added an ``integrity-check-index`` subcommand to ``tezos-node
+   storage``, which can be used to check for corruptions (missing
+   entries) in the index of the store. This command also accepts an
+   optional flag ``--auto-repair`` to fix those specific corruptions
+   by adding back missing entries.
+
 -  Fixed an RPC inconsistency where, after a migration occured, the
    metadata from blocks returned by RPCs would return inconsistent
    data (blocks prior to a migration from a protocol A to B would
