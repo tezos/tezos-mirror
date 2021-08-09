@@ -25,7 +25,7 @@ def _get_tezos_node_version() -> str:
     process_ret = subprocess.run(
         cmd, check=True, capture_output=True, text=True
     )
-    tag = process_ret.stdout.strip()
+    tag = process_ret.stdout.strip() if process_ret.returncode == 0 else "DEV"
     cmd = ["ocaml", "../scripts/print_version.ml", tag]
     process_ret = subprocess.run(
         cmd, check=True, capture_output=True, text=True
