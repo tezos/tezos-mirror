@@ -91,8 +91,8 @@ let per_block_vote_file_arg =
   Clic.arg
     ~doc:
       "Read per block votes as json file. The content of the file should be \
-       either \"{'liquidity_baking_escape_vote':'false'}\" or \
-       \"{'liquidity_baking_escape_vote':'true'}\"."
+       either {\"liquidity_baking_escape_vote\": false} or \
+       {\"liquidity_baking_escape_vote\": true}."
     ~short:'V'
     ~long:"votefile"
     ~placeholder:"filename"

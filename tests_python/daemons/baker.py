@@ -20,6 +20,7 @@ class Baker(subprocess.Popen):
         account: str,
         params: List[str] = None,
         log_file: str = None,
+        run_params: List[str] = None,
     ):
         """Create a new Popen instance for the baker process.
 
@@ -39,10 +40,13 @@ class Baker(subprocess.Popen):
         assert os.path.isdir(base_dir), f'{base_dir} not a dir'
         if params is None:
             params = []
+        if run_params is None:
+            run_params = []
         endpoint = f'http://127.0.0.1:{rpc_port}'
         cmd = [baker, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
         cmd.extend(['run', 'with', 'local', 'node', node_dir, account])
+        cmd.extend(run_params)
         cmd_string = process_utils.format_command(cmd)
         print(cmd_string)
         stdout, stderr = process_utils.prepare_log(cmd, log_file)

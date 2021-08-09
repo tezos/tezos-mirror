@@ -1260,33 +1260,129 @@ let per_block_votes_encoding =
        (fun liquidity_baking_escape_vote -> {liquidity_baking_escape_vote})
        (obj1 (opt "liquidity_baking_escape_vote" Data_encoding.bool))
 
-let read_liquidity_baking_escape_vote per_block_vote_file =
-  match per_block_vote_file with
-  | None -> return false
-  | Some vote_file -> (
-      Events.(emit reading_per_block) vote_file >>= fun () ->
-      Lwt_utils_unix.Json.read_file vote_file >|= Result.to_option >>= function
-      | Some votes_json -> (
-          Events.(emit per_block_vote_file_notice) "found" >>= fun () ->
-          match
-            Data_encoding.Json.destruct per_block_votes_encoding votes_json
-          with
-          | exception _ ->
-              Events.(emit per_block_vote_file_notice) "JSON malformed"
-              >>= fun () -> return false
-          | votes -> (
-              Events.(emit per_block_vote_file_notice) "JSON decoded"
-              >>= fun () ->
-              match votes.liquidity_baking_escape_vote with
-              | None -> return false
-              | Some liquidity_baking_escape_vote ->
-                  Events.(emit reading_liquidity_baking) () >>= fun () ->
-                  Events.(emit liquidity_baking_escape_vote)
-                    liquidity_baking_escape_vote
-                  >>= fun () -> return liquidity_baking_escape_vote))
-      | None ->
-          Events.(emit per_block_vote_file_notice) "not found" >>= fun () ->
-          return false)
+type error += Block_vote_file_not_found of string
+
+type error += Block_vote_file_invalid of string
+
+type error += Block_vote_file_wrong_content of string
+
+type error += Block_vote_file_missing_liquidity_baking_escape_vote of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_not_found"
+    ~title:
+      "The provided block vote file path does not point to an existing file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to an existing file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to an \
+         existing file.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_not_found file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_not_found file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_invalid"
+    ~title:
+      "The provided block vote file path does not point to a valid JSON file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to a valid JSON file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to a valid \
+         JSON file. The file exists but its content is not valid JSON.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function Block_vote_file_invalid file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_invalid file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_wrong_content"
+    ~title:"The content of the provided block vote file is unexpected."
+    ~description:
+      "The block vote file is valid JSON but its content is not the expected \
+       one."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file \"%s\" is a valid JSON file but its \
+         content is unexpected. Expecting a JSON file containing either \
+         '{\"liquidity_baking_escape_vote\": true}' or \
+         '{\"liquidity_baking_escape_vote\": false}'.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_wrong_content file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_wrong_content file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "Client_baking_forge.block_vote_file_missing_liquidity_baking_escape_vote"
+    ~title:
+      "In the provided block vote file, no entry for liquidity baking escape \
+       vote was found"
+    ~description:
+      "In the provided block vote file, no entry for liquidity baking escape \
+       vote was found."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[In the provided block vote file \"%s\", the \
+         \"liquidity_baking_escape_vote\" boolean field is missing. Expecting \
+         a JSON file containing either '{\"liquidity_baking_escape_vote\": \
+         true}' or '{\"liquidity_baking_escape_vote\": false}'.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_missing_liquidity_baking_escape_vote file_path ->
+          Some file_path
+      | _ -> None)
+    (fun file_path ->
+      Block_vote_file_missing_liquidity_baking_escape_vote file_path)
+
+let traced_option_to_result ~error =
+  Option.fold ~some:ok ~none:(Error_monad.error error)
+
+let check_file_exists file =
+  if Sys.file_exists file then ok_unit
+  else error (Block_vote_file_not_found file)
+
+let read_liquidity_baking_escape_vote ~per_block_vote_file =
+  Events.(emit reading_per_block) per_block_vote_file >>= fun () ->
+  check_file_exists per_block_vote_file >>?= fun () ->
+  trace (Block_vote_file_invalid per_block_vote_file)
+  @@ Lwt_utils_unix.Json.read_file per_block_vote_file
+  >>=? fun votes_json ->
+  Events.(emit per_block_vote_file_notice) "found" >>= fun () ->
+  trace (Block_vote_file_wrong_content per_block_vote_file)
+  @@ Error_monad.protect (fun () ->
+         return
+         @@ Data_encoding.Json.destruct per_block_votes_encoding votes_json)
+  >>=? fun votes ->
+  Events.(emit per_block_vote_file_notice) "JSON decoded" >>= fun () ->
+  traced_option_to_result
+    ~error:
+      (Block_vote_file_missing_liquidity_baking_escape_vote per_block_vote_file)
+    votes.liquidity_baking_escape_vote
+  >>?= fun liquidity_baking_escape_vote ->
+  Events.(emit reading_liquidity_baking) () >>= fun () ->
+  Events.(emit liquidity_baking_escape_vote) liquidity_baking_escape_vote
+  >>= fun () -> return liquidity_baking_escape_vote
+
+let read_liquidity_baking_escape_vote_no_fail ~per_block_vote_file =
+  read_liquidity_baking_escape_vote ~per_block_vote_file >>= function
+  | Ok vote -> Lwt.return vote
+  | Error errs ->
+      Events.(emit per_block_vote_file_fail) errs >>= fun () -> Lwt.return false
 
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
@@ -1299,8 +1395,12 @@ let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
   >>=? fun slot ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  read_liquidity_baking_escape_vote per_block_vote_file
-  >>=? fun liquidity_baking_escape_vote ->
+  Option.fold
+    ~none:(Lwt.return false)
+    ~some:(fun per_block_vote_file ->
+      read_liquidity_baking_escape_vote_no_fail ~per_block_vote_file)
+    per_block_vote_file
+  >>= fun liquidity_baking_escape_vote ->
   build_block
     cctxt
     ~user_activated_upgrades
@@ -1533,6 +1633,17 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         return_unit
   in
   let finalizer state = Context.close state.index in
+  Option.fold
+    ~none:return_unit
+    ~some:(fun per_block_vote_file ->
+      read_liquidity_baking_escape_vote ~per_block_vote_file
+      >>=? fun liquidity_baking_escape_vote ->
+      (if liquidity_baking_escape_vote then
+       Events.(emit liquidity_baking_escape) ()
+      else Events.(emit liquidity_baking_continue) ())
+      >>= fun () -> return_unit)
+    per_block_vote_file
+  >>=? fun () ->
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt
