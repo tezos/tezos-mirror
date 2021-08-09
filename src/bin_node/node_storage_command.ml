@@ -53,6 +53,7 @@ module Term = struct
     | Integrity_check
     | Reconstruct_index
     | Integrity_check_inodes
+    | Integrity_check_index
 
   let read_config_file config_file =
     Option.filter Sys.file_exists config_file
@@ -148,6 +149,11 @@ module Term = struct
     Context.Checks.Pack.Integrity_check_inodes.run ~root ~heads:(Some [head])
     >>= fun () -> return_unit
 
+  let check_index config_file data_dir auto_repair =
+    root config_file data_dir >>=? fun root ->
+    Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
+    return_unit
+
   let dispatch_subcommand subcommand config_file data_dir auto_repair dest head
       log_size =
     let run =
@@ -159,6 +165,7 @@ module Term = struct
           reconstruct_index config_file data_dir dest log_size
       | Integrity_check_inodes ->
           integrity_check_inodes config_file data_dir head
+      | Integrity_check_index -> check_index config_file data_dir auto_repair
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
@@ -171,6 +178,7 @@ module Term = struct
       | "integrity-check" -> `Ok Integrity_check
       | "reconstruct-index" -> `Ok Reconstruct_index
       | "integrity-check-inodes" -> `Ok Integrity_check_inodes
+      | "integrity-check-index" -> `Ok Integrity_check_index
       | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
       | Stat_index -> Format.fprintf ppf "stat-index"
@@ -178,12 +186,13 @@ module Term = struct
       | Integrity_check -> Format.fprintf ppf "integrity-check"
       | Reconstruct_index -> Format.fprintf ppf "reconstruct-index"
       | Integrity_check_inodes -> Format.fprintf ppf "integrity-check-inodes"
+      | Integrity_check_index -> Format.fprintf ppf "integrity-check-index"
     in
     let open Cmdliner.Arg in
     let doc =
       "Operation to perform. Possible values: $(b,stat-index), $(b,stat-pack), \
        $(b,integrity-check), $(b,reconstruct-index), \
-       $(b,integrity-check-inodes)."
+       $(b,integrity-check-inodes), $(b,integrity-check-index)."
     in
     required
     & pos 0 (some (parser, printer)) None
@@ -194,7 +203,9 @@ module Term = struct
     value
     & flag
       @@ info
-           ~doc:"Automatically repair issues; option for integrity-check."
+           ~doc:
+             "Automatically repair issues; option for integrity-check and \
+              integrity-check-index."
            ["auto-repair"]
 
   let dest =
@@ -273,6 +284,9 @@ module Manpage = struct
         "$(b,integrity-check-inodes) search the store for corrupted inodes. If \
          no block hash is provided (through the $(b,--head) argument) then the \
          current head is chosen as the default context to start with.";
+      `P
+        "$(b,integrity-check-index) checks the index for corruptions. If \
+         $(b,--auto-repair) flag is set it also tries to repair the index.";
       `P
         "$(b,WARNING): this API is experimental and may change in future \
          versions.";
