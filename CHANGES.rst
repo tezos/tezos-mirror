@@ -1,3 +1,6 @@
+Changelog
+'''''''''
+
 This file lists the changes added to each version of tezos-node,
 tezos-client, and the other Tezos binaries. The changes to the Tezos
 protocol are documented in the ``docs/protocols/`` directory; in
