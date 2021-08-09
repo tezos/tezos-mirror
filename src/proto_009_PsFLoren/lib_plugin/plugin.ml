@@ -173,7 +173,7 @@ module Mempool = struct
   let () =
     Environment.Error_monad.register_error_kind
       `Temporary
-      ~id:"prefilter.outdated_endorement"
+      ~id:"prefilter.outdated_endorsement"
       ~title:"Endorsement is outdated"
       ~description:"Endorsement is outdated"
       ~pp:(fun ppf () -> Format.fprintf ppf "Endorsement is outdated")
