@@ -36,10 +36,10 @@ module Block_info = struct
     assert (r < 1 lsl 16) ;
     r
 
-  let encoded_size = 4 + 1 + encoded_list_size
+  let encoded_size = 8 + 1 + encoded_list_size
 
   (* Format:
-     <file_offset>(4) + <list size>(1) + <list>(list_size * Block_hash.size) *)
+     <file_offset>(8) + <list_size>(1) + <list>(list_size * Block_hash.size) *)
 
   let t =
     let open Repr in
@@ -50,16 +50,18 @@ module Block_info = struct
 
   let encode v =
     let bytes = Bytes.create encoded_size in
-    Bytes.set_int32_be bytes 0 (Int32.of_int v.offset) ;
+    Bytes.set_int64_be bytes 0 (Int64.of_int v.offset) ;
     let len = List.length v.predecessors in
-    Bytes.set_int8 bytes 4 len ;
+    (* Start reading after the <file_offset>(8) *)
+    Bytes.set_int8 bytes 8 len ;
     List.iteri
       (fun i h ->
+        (* Start reading after the <file_offset>(8) + <list_lize>(1) *)
         Bytes.blit
           (Block_hash.to_bytes h)
           0
           bytes
-          (5 + (i * Block_hash.size))
+          (8 + 1 + (i * Block_hash.size))
           Block_hash.size)
       v.predecessors ;
     Bytes.unsafe_to_string bytes
@@ -67,8 +69,12 @@ module Block_info = struct
   let decode str i =
     let bytes = Bytes.unsafe_of_string str in
     let current_offset = ref i in
-    let offset = Bytes.get_int32_be bytes !current_offset |> Int32.to_int in
-    current_offset := !current_offset + 4 ;
+    (* The Int64.to_int conversion is not likely to fail as it was
+       written based on Int64.of_int and the encoded offset won't
+       reach the int64 max value. *)
+    let offset = Bytes.get_int64_be bytes !current_offset |> Int64.to_int in
+    (* Setting current_offset right after the <file_offset>(8)*)
+    current_offset := !current_offset + 8 ;
     let list_size = Bytes.get_int8 bytes !current_offset in
     current_offset := !current_offset + 1 ;
     let predecessors = ref [] in

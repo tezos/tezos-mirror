@@ -337,9 +337,9 @@ def nodes_legacy_store(sandbox, legacy_stores):
         params = constants.NODE_PARAMS + ['--history-mode', history_mode]
         node = sandbox.register_node(i, node_dir=node_dir, params=params)
         # Workaround to allow generating an identity on an
-        # old 0.0.4 storage with a 0.0.5 node
+        # old 0.0.4 storage with a 0.0.6 node
         version = open(node_dir + "/version.json", "w")
-        version.write('{ "version": "0.0.5" }')
+        version.write('{ "version": "0.0.6" }')
         version.close()
         node.init_config()
         # write version to upgrade

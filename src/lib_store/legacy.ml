@@ -264,7 +264,7 @@ let import_floating legacy_chain_state legacy_chain_store chain_store
       let rec aux ~pred_block block =
         Block_store.store_block block_store block >>=? fun () ->
         let level = Block_repr.level block in
-        if level >= end_limit then return_unit
+        if level >= end_limit then notify () >>= fun () -> return_unit
         else
           (* At protocol change, update the protocol_table *)
           (match pred_block with
@@ -797,3 +797,85 @@ let upgrade_0_0_4 ~data_dir ?patch_context
     (fun exn ->
       upgrade_cleaner data_dir ~upgraded_store:new_store_tmp >>= fun () ->
       Lwt.return (error_exn exn))
+
+let upgrade_0_0_5 ~data_dir genesis =
+  let floating_stores_to_upgrade = Floating_block_store.[RO; RW; RW_TMP] in
+  let store_dir =
+    Naming.store_dir ~dir_path:Filename.Infix.(data_dir // "store")
+  in
+  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_dir = Naming.chain_dir store_dir chain_id in
+  (* Remove the potential RO_TMP floating stores *)
+  (let path = Naming.dir_path (Naming.floating_blocks_dir chain_dir RO_TMP) in
+   Lwt_unix.file_exists path >>= fun exists ->
+   if exists then Lwt_utils_unix.remove_dir path else Lwt.return_unit)
+  >>= fun () ->
+  (* Move the floating stores to upgrade in "_broken" suffixed
+     directory *)
+  let broken_floating_blocks_dir floating_blocks_dir =
+    Naming.dir_path floating_blocks_dir ^ "_broken"
+  in
+  List.iter_s
+    (fun kind ->
+      let floating_blocks_dir = Naming.floating_blocks_dir chain_dir kind in
+      let path = Naming.dir_path floating_blocks_dir in
+      Lwt_unix.file_exists path >>= function
+      | false ->
+          (* Nothing to do: should only happen with RW_TMP *)
+          Lwt.return_unit
+      | true ->
+          Lwt_unix.rename
+            (Naming.dir_path floating_blocks_dir)
+            (broken_floating_blocks_dir floating_blocks_dir))
+    floating_stores_to_upgrade
+  >>= fun () ->
+  Stored_data.load (Naming.genesis_block_file chain_dir)
+  >>=? fun genesis_block_data ->
+  Stored_data.get genesis_block_data >>= fun genesis_block ->
+  Block_store.load chain_dir ~genesis_block ~readonly:false
+  >>=? fun block_store ->
+  (* Set the merge status as Idle: we are overriding the merge *)
+  Block_store.write_status block_store Idle >>=? fun () ->
+  (* Iter through the blocks and add then into the new floating stores *)
+  List.iter_es
+    (fun kind ->
+      let kind_str =
+        (function
+          | Floating_block_store.RO -> "RO"
+          | RW -> "RW"
+          | RW_TMP -> "RW_TMP"
+          | _ -> assert false)
+          kind
+      in
+      let floating_blocks_dir = Naming.floating_blocks_dir chain_dir kind in
+      Lwt_unix.file_exists (Naming.dir_path floating_blocks_dir) >>= function
+      | false ->
+          (* Nothing to do: should only happen with RW_TMP *)
+          return_unit
+      | true ->
+          Animation.display_progress
+            ~pp_print_step:(fun fmt i ->
+              Format.fprintf fmt "upgrading %s floating store %d" kind_str i)
+            (fun notify ->
+              Lwt_unix.openfile
+                Filename.Infix.(
+                  broken_floating_blocks_dir floating_blocks_dir // "blocks")
+                [Unix.O_CREAT; O_CLOEXEC; Unix.O_RDONLY]
+                0o444
+              >>= fun fd ->
+              Floating_block_store.iter_s_raw_fd
+                (fun block ->
+                  notify () >>= fun () ->
+                  Block_store.store_block block_store block)
+                fd
+              >>=? fun () ->
+              Lwt_unix.close fd >>= fun () -> return_unit))
+    floating_stores_to_upgrade
+  >>=? fun () ->
+  (* Remove the former broken floating stores *)
+  List.iter_s
+    (fun kind ->
+      let floating_blocks_dir = Naming.floating_blocks_dir chain_dir kind in
+      Lwt_utils_unix.remove_dir (broken_floating_blocks_dir floating_blocks_dir))
+    floating_stores_to_upgrade
+  >>= fun () -> return_unit
