@@ -282,6 +282,21 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   let op = sign account.sk ctxt sop in
   (op, originated_contract op)
 
+let register_global_constant ?counter ?public_key ?fee ?gas_limit ?storage_limit
+    ctxt ~source ~value =
+  Context.Contract.manager ctxt source >>=? fun account ->
+  let operation = Register_global_constant {value} in
+  manager_operation
+    ?counter
+    ?public_key
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    operation
+  >|=? fun sop -> sign account.sk ctxt sop
+
 let miss_signed_endorsement ?level ctxt =
   (match level with None -> Context.get_level ctxt | Some level -> ok level)
   >>?= fun level ->

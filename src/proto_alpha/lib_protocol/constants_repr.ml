@@ -37,12 +37,21 @@ let max_proposals_per_delegate = 20
 
 let max_operation_data_length = 32 * 1024 (* 32kB *)
 
+let max_micheline_node_count = 50_000
+
+let max_micheline_bytes_limit = 50_000
+
+let max_allowed_global_constant_depth = 10_000
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
   max_anon_ops_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
+  max_micheline_node_count : int;
+  max_micheline_bytes_limit : int;
+  max_allowed_global_constant_depth : int;
 }
 
 let fixed_encoding =
@@ -53,25 +62,37 @@ let fixed_encoding =
         c.nonce_length,
         c.max_anon_ops_per_block,
         c.max_operation_data_length,
-        c.max_proposals_per_delegate ))
+        c.max_proposals_per_delegate,
+        c.max_micheline_node_count,
+        c.max_micheline_bytes_limit,
+        max_allowed_global_constant_depth ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
            max_anon_ops_per_block,
            max_operation_data_length,
-           max_proposals_per_delegate ) ->
+           max_proposals_per_delegate,
+           max_micheline_node_count,
+           max_micheline_bytes_limit,
+           max_allowed_global_constant_depth ) ->
       {
         proof_of_work_nonce_size;
         nonce_length;
         max_anon_ops_per_block;
         max_operation_data_length;
         max_proposals_per_delegate;
+        max_micheline_node_count;
+        max_micheline_bytes_limit;
+        max_allowed_global_constant_depth;
       })
-    (obj5
+    (obj8
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
        (req "max_anon_ops_per_block" uint8)
        (req "max_operation_data_length" int31)
-       (req "max_proposals_per_delegate" uint8))
+       (req "max_proposals_per_delegate" uint8)
+       (req "max_micheline_node_count" int31)
+       (req "max_micheline_bytes_limit" int31)
+       (req "max_allowed_global_constants_depth" int31))
 
 let fixed =
   {
@@ -80,6 +101,9 @@ let fixed =
     max_anon_ops_per_block;
     max_operation_data_length;
     max_proposals_per_delegate;
+    max_micheline_node_count;
+    max_micheline_bytes_limit;
+    max_allowed_global_constant_depth;
   }
 
 (* The encoded representation of this type is stored in the context as

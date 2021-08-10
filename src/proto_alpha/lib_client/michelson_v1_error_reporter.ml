@@ -154,7 +154,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         "@[<v 0>%a@]"
         (Format.pp_print_list (fun ppf (i, l) ->
              Format.fprintf ppf "%0*d: %s" cols i l))
-        (List.mapi (fun i l -> (i + 1, l)) lines)
+        (List.rev_mapi (fun i x -> (i + 1, x)) lines |> List.rev)
     in
     match errs with
     | [] -> ()
@@ -421,6 +421,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               | Type_namespace -> ("a", "type name")
               | Constant_namespace -> ("a", "constant constructor")
               | Keyword_namespace -> ("a", "keyword")
+              | Constant_hash_namespace -> ("a", "constant hash")
             in
             Format.fprintf
               ppf

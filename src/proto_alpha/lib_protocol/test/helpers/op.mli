@@ -87,6 +87,19 @@ val origination :
 
 val originated_contract : Operation.packed -> Contract.contract
 
+val register_global_constant :
+  ?counter:Z.t ->
+  ?public_key:Signature.public_key ->
+  ?fee:Test_tez.Tez.tez ->
+  ?gas_limit:Tezos_raw_protocol_alpha.Alpha_context.Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  (* Account doing the registration *)
+  source:Contract.t ->
+  (* Micheline value to be registered *)
+  value:Protocol.Alpha_context.Script.lazy_expr ->
+  (Protocol.operation, tztrace) result Lwt.t
+
 val double_endorsement :
   Context.t ->
   Kind.endorsement Operation.t ->

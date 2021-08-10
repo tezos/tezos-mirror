@@ -586,6 +586,46 @@ let spawn_stresstest ?endpoint ?tps ~sources ~transfers client =
 let stresstest ?endpoint ?tps ~sources ~transfers client =
   spawn_stresstest ?endpoint ?tps ~sources ~transfers client |> Process.check
 
+let spawn_run_script ~src ~storage ~input client =
+  spawn_command
+    client
+    ["run"; "script"; src; "on"; "storage"; storage; "and"; "input"; input]
+
+let run_script ~src ~storage ~input client =
+  let* client_output =
+    spawn_run_script ~src ~storage ~input client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "storage\n(.*)" with
+  | None ->
+      Test.fail
+        "Cannot extract new storage from client_output: %s"
+        client_output
+  | Some storage -> return @@ String.trim storage
+
+let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
+    =
+  spawn_command
+    client
+    (["--wait"; wait]
+    @ ["register"; "global"; "constant"; value; "from"; src]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+        burn_cap)
+
+let register_global_constant ?wait ?burn_cap ~src ~value client =
+  let* client_output =
+    spawn_register_global_constant ?wait ?burn_cap ~src ~value client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "Global address: (expr\\w{50})" with
+  | None ->
+      Test.fail
+        "Cannot extract constant hash from client_output: %s"
+        client_output
+  | Some hash -> return hash
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd

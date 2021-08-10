@@ -89,3 +89,15 @@ val is_unit_parameter : lazy_expr -> bool
 val strip_annotations : node -> node
 
 val strip_locations_cost : node -> Gas_limit_repr.cost
+
+module Micheline_size : sig
+  type t = {
+    nodes : Saturation_repr.may_saturate Saturation_repr.t;
+    string_bytes : Saturation_repr.may_saturate Saturation_repr.t;
+    z_bytes : Saturation_repr.may_saturate Saturation_repr.t;
+  }
+
+  val of_node : node -> t
+end
+
+val micheline_nodes : node -> int

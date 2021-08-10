@@ -69,6 +69,16 @@ let origination_burn c =
 
 let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1615
+   Refactor other functions in module to use this one.
+ 
+   This function was added when adding the table
+   of globals feature. In principle other parts of this module
+   could be refactored to use this function. *)
+let cost_of_bytes c n =
+  let cost_per_byte = Constants_storage.cost_per_byte c in
+  Tez_repr.(cost_per_byte *? Z.to_int64 n)
+
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract >>=? fun size ->
   Contract_storage.set_paid_storage_space_and_return_fees_to_pay c contract size
@@ -78,6 +88,14 @@ let record_paid_storage_space c contract =
   Lwt.return
     ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid) >|? fun to_burn ->
       (c, size, to_be_paid, to_burn) )
+
+let record_global_constant_storage_space context size =
+  (* Following the precedent of big_map, a key in the
+     global table of constants costs 65 bytes (see
+     [Lazy_storage_diff.Big_map.bytes_size_for_big_map_key])*)
+  let cost_of_key = Z.of_int 65 in
+  let to_be_paid = Z.add size cost_of_key in
+  (Raw_context.update_storage_space_to_pay context to_be_paid, to_be_paid)
 
 let record_paid_storage_space_subsidy c contract =
   let c = start_counting_storage_fees c in

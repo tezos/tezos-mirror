@@ -151,6 +151,9 @@ let init_arg =
     ~default:"Unit"
     string_parameter
 
+let global_constant_param ~name ~desc next =
+  Clic.param ~name ~desc string_parameter next
+
 let arg_arg =
   arg
     ~long:"arg"

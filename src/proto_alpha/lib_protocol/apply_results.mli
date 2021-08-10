@@ -129,6 +129,25 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_manager_operation_result
+  | Register_global_constant_result : {
+      (* The manager submitting the operation must pay
+          the cost of storage for the registered value.
+          We include the balance update here. *)
+      balance_updates : Receipt.balance_updates;
+      (* Gas consumed while validating and storing the registered
+          value. *)
+      consumed_gas : Gas.Arith.fp;
+      (* The size of the registered value in bytes.
+          Currently, this is simply the number of bytes in the binary
+          serialization of the Micheline value. *)
+      size_of_constant : Z.t;
+      (* The address of the newly registered value, being
+          the hash of its binary serialization. This could be
+          calulated on demand but we include it here in the
+          receipt for flexibility in the future. *)
+      global_address : Script_expr_hash.t;
+    }
+      -> Kind.register_global_constant successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

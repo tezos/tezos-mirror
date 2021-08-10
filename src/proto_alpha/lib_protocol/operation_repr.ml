@@ -52,11 +52,14 @@ module Kind = struct
 
   type failing_noop = Failing_noop_kind
 
+  type register_global_constant = Register_global_constant_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Register_global_constant_manager_kind : register_global_constant manager
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -150,6 +153,10 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Register_global_constant : {
+      value : Script_repr.lazy_expr;
+    }
+      -> Kind.register_global_constant manager_operation
 
 and counter = Z.t
 
@@ -159,6 +166,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Transaction _ -> Kind.Transaction_manager_kind
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
+  | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -360,6 +368,19 @@ module Encoding = struct
           inj = (fun key -> Delegation key);
         }
 
+    let[@coq_axiom_with_reason "gadt"] register_global_constant_case =
+      MCase
+        {
+          tag = 4;
+          name = "register_global_constant";
+          encoding = obj1 (req "value" Script_repr.lazy_expr_encoding);
+          select =
+            (function
+            | Manager (Register_global_constant _ as op) -> Some op | _ -> None);
+          proj = (function Register_global_constant {value} -> value);
+          inj = (fun value -> Register_global_constant {value});
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -377,6 +398,7 @@ module Encoding = struct
           make transaction_case;
           make origination_case;
           make delegation_case;
+          make register_global_constant_case;
         ]
   end
 
@@ -621,6 +643,9 @@ module Encoding = struct
 
   let delegation_case = make_manager_case 110 Manager_operations.delegation_case
 
+  let register_global_constant_case =
+    make_manager_case 111 Manager_operations.register_global_constant_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -646,6 +671,7 @@ module Encoding = struct
            make origination_case;
            make delegation_case;
            make failing_noop_case;
+           make register_global_constant_case;
          ]
 
   let contents_list_encoding =
@@ -821,6 +847,8 @@ let equal_manager_operation_kind :
   | (Origination _, _) -> None
   | (Delegation _, Delegation _) -> Some Eq
   | (Delegation _, _) -> None
+  | (Register_global_constant _, Register_global_constant _) -> Some Eq
+  | (Register_global_constant _, _) -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

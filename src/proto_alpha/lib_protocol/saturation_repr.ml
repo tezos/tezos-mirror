@@ -119,6 +119,9 @@ let mul_safe_of_int_exn x =
    which is positive and is less than [x]. *)
 let shift_right x y = (x :> int) lsr y
 
+let shift_left x y =
+  if shift_right saturated y < x then saturated else (x :> int) lsl y
+
 let mul x y =
   (* assert (x >= 0 && y >= 0); *)
   match x with

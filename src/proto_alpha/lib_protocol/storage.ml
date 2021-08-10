@@ -318,6 +318,21 @@ module type NEXT = sig
   val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
 end
 
+module Global_constants = struct
+  module Map =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["global_constant"]
+         end))
+         (Make_index (Script_expr_hash))
+         (struct
+           type t = Script_repr.expr
+
+           let encoding = Script_repr.expr_encoding
+         end)
+end
+
 (** Big maps handling *)
 
 module Big_map = struct

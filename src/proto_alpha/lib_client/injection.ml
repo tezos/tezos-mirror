@@ -310,6 +310,8 @@ let estimated_gas_single (type kind)
     | Applied (Origination_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Reveal_result {consumed_gas}) -> Ok consumed_gas
     | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
+    | Applied (Register_global_constant_result {consumed_gas; _}) ->
+        Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
@@ -338,6 +340,8 @@ let estimated_storage_single (type kind) origination_size
         Ok (Z.add paid_storage_size_diff origination_size)
     | Applied (Reveal_result _) -> Ok Z.zero
     | Applied (Delegation_result _) -> Ok Z.zero
+    | Applied (Register_global_constant_result {size_of_constant; _}) ->
+        Ok size_of_constant
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Z.zero (* there must be another error for this to happen *)
@@ -373,6 +377,7 @@ let originated_contracts_single (type kind)
         Ok originated_contracts
     | Applied (Origination_result {originated_contracts; _}) ->
         Ok originated_contracts
+    | Applied (Register_global_constant_result _) -> Ok []
     | Applied (Reveal_result _) -> Ok []
     | Applied (Delegation_result _) -> Ok []
     | Skipped _ -> assert false

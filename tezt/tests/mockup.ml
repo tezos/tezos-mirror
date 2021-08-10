@@ -112,6 +112,100 @@ let test_transfer =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
+let test_calling_contract_with_global_constant_success ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Calling a contract with a global constant success"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let (src, _, _) = transfer_data in
+  let* client = Client.init_mockup ~protocol () in
+  let value = "999" in
+  let burn_cap = Some (Tez.of_int 1) in
+  let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
+  let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
+  let storage = "0" in
+  let input = "Unit" in
+  let* result = Client.run_script ~src:script ~storage ~input client in
+  let result = String.trim result in
+  Log.info "Contract with constant output storage %s" result ;
+  if result = value then return ()
+  else Test.fail "Expected storage '%s' but got '%s'" value result
+
+let test_calling_contract_with_global_constant_failure ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Calling a contract with a global constant failure"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
+  let storage = "0" in
+  let input = "Unit" in
+  let process = Client.spawn_run_script ~src:script ~storage ~input client in
+  Process.check_error ~exit_code:1 ~msg:(rex "No global was found") process
+
+let test_register_global_constant_success ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Register Global Constant success"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let (src, _, _) = transfer_data in
+  let* client = Client.init_mockup ~protocol () in
+  let value = "999" in
+  let burn_cap = Some (Tez.of_int 1) in
+  let* result = Client.register_global_constant ~src ~value ?burn_cap client in
+  Log.info "Registered Global Connstant %s with hash %s" value result ;
+  return ()
+
+let test_register_global_constant_failure ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Register Global Constant failure"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let (src, _, _) = transfer_data in
+  let* client = Client.init_mockup ~protocol () in
+  let value = "Pair 1 (constant \"foobar\")" in
+  let burn_cap = Some (Tez.of_int 1) in
+  let proccess =
+    Client.spawn_register_global_constant ~src ~value ?burn_cap client
+  in
+  Process.check_error
+    ~exit_code:1
+    ~msg:(rex "register global constant simulation failed")
+    proccess
+
+let test_originate_contract_with_global_constant_success ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Originate Contract with Global Constant success"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let (src, _, _) = transfer_data in
+  let* client = Client.init_mockup ~protocol () in
+  let value = "999" in
+  let burn_cap = Some (Tez.of_int 1) in
+  let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
+  let* result =
+    Client.originate_contract
+      ~alias:"with_global_constant"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/constant_999.tz"
+      ~init:"0"
+      ~burn_cap:(Tez.of_int 2)
+      client
+  in
+  Log.info "result %s" result ;
+  return ()
+
 let test_simple_baking_event =
   Protocol.register_test
     ~__FILE__
@@ -508,6 +602,13 @@ let register ~protocols =
   test_multiple_baking ~protocols ;
   test_rpc_header_shell ~protocols ;
   test_origination_from_unrevealed_fees ~protocols
+
+let register_global_constants ~protocols =
+  test_register_global_constant_success ~protocols ;
+  test_register_global_constant_failure ~protocols ;
+  test_calling_contract_with_global_constant_success ~protocols ;
+  test_calling_contract_with_global_constant_failure ~protocols ;
+  test_originate_contract_with_global_constant_success ~protocols
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to

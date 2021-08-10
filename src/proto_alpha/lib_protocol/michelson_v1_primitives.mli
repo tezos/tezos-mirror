@@ -185,7 +185,10 @@ type prim =
   | T_ticket
   | T_chest_key
   | T_chest
-      (** Auxiliary types for error documentation.
+  (* See the interface of [Global_constants_storage]. *)
+  | H_constant
+
+(** Auxiliary types for error documentation.
     All the prim constructor prefixes must match their namespace. *)
 
 type namespace =
@@ -193,6 +196,11 @@ type namespace =
   | (* prefix "D" *) Constant_namespace
   | (* prefix "I" *) Instr_namespace
   | (* prefix "K" *) Keyword_namespace
+  (* The Constant Hash namespace is a singleton reserved
+     for the constant keyword. Unlike other primitives,
+     constants have no representation in the typed IR,
+     being fully substituted away before typechecking. *)
+  | (* prefix "H" *) Constant_hash_namespace
 
 val namespace : prim -> namespace
 

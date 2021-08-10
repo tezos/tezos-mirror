@@ -519,3 +519,14 @@ module Liquidity_baking : sig
       with type t := Raw_context.t
        and type value = Contract_repr.t
 end
+
+(** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).
+    Values from this map can be incorporated by any contract via the primitive
+    [Michelson_v1_primitives.H_constant]. *)
+module Global_constants : sig
+  module Map :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Script_repr.expr
+end

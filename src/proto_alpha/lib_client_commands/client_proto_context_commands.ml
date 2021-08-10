@@ -970,6 +970,87 @@ let commands network () =
             entrypoint ));
     command
       ~group
+      ~desc:"Register a global constant"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["register"; "global"; "constant"]
+      @@ global_constant_param
+           ~name:"expression"
+           ~desc:
+             "Michelson expression to register. Note the value is not \
+              typechecked before registration."
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account registering the global constant"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           global_constant_str
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith "Only implicit accounts can register global constants"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            register_global_constant
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~constant:global_constant_str
+              ()
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source:false
+              ~msg:"register global constant simulation failed"
+              cctxt
+              errors
+            >>= fun _ -> return_unit);
+    command
+      ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
       (args16
          fee_arg

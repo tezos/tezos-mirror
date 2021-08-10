@@ -7,42 +7,42 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039992.668 units remaining)
+  - location: 7 (remaining gas: 1039992.007 units remaining)
     [ (Pair "test" "?")  	 ]
-  - location: 7 (remaining gas: 1039992.658 units remaining)
+  - location: 7 (remaining gas: 1039991.997 units remaining)
     [ "test"  	@parameter ]
-  - location: 8 (remaining gas: 1039992.648 units remaining)
+  - location: 8 (remaining gas: 1039991.987 units remaining)
     [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	
       "test"  	@parameter ]
-  - location: 22 (remaining gas: 1039992.638 units remaining)
+  - location: 22 (remaining gas: 1039991.977 units remaining)
     [ "test"  	@parameter
       { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
-  - location: 12 (remaining gas: 1039992.628 units remaining)
+  - location: 12 (remaining gas: 1039991.967 units remaining)
     [ "_abc"  	
       "test"  	@arg ]
-  - location: 15 (remaining gas: 1039992.613 units remaining)
+  - location: 15 (remaining gas: 1039991.952 units remaining)
     [ {}  	
       "_abc"  	
       "test"  	@arg ]
-  - location: 17 (remaining gas: 1039992.603 units remaining)
+  - location: 17 (remaining gas: 1039991.942 units remaining)
     [ "_abc"  	
       {}  	
       "test"  	@arg ]
-  - location: 18 (remaining gas: 1039992.588 units remaining)
+  - location: 18 (remaining gas: 1039991.927 units remaining)
     [ { "_abc" }  	
       "test"  	@arg ]
-  - location: 19 (remaining gas: 1039992.578 units remaining)
+  - location: 19 (remaining gas: 1039991.917 units remaining)
     [ "test"  	@arg
       { "_abc" }  	 ]
-  - location: 20 (remaining gas: 1039992.563 units remaining)
+  - location: 20 (remaining gas: 1039991.902 units remaining)
     [ { "test" ; "_abc" }  	 ]
-  - location: 21 (remaining gas: 1039992.443 units remaining)
+  - location: 21 (remaining gas: 1039991.782 units remaining)
     [ "test_abc"  	 ]
-  - location: 23 (remaining gas: 1039992.413 units remaining)
+  - location: 23 (remaining gas: 1039991.752 units remaining)
     [ "test_abc"  	 ]
-  - location: 24 (remaining gas: 1039992.398 units remaining)
+  - location: 24 (remaining gas: 1039991.737 units remaining)
     [ {}  	
       "test_abc"  	 ]
-  - location: 26 (remaining gas: 1039992.383 units remaining)
+  - location: 26 (remaining gas: 1039991.722 units remaining)
     [ (Pair {} "test_abc")  	 ]
 

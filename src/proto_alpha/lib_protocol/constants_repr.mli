@@ -38,12 +38,43 @@ val max_proposals_per_delegate : int
 
 val max_operation_data_length : int
 
+(** A global size limit on the size of Micheline expressions
+    after substitution.
+    
+    We want to prevent constants from being
+    used to create huge values that could potentially do damage
+    if ever printed or sent over the network. We arrived at this
+    number by finding the largest possible contract in terms of
+    number of nodes. The number of nodes is constrained by the
+    current "max_operation_data_length" (32768) to be ~10,000 (
+    see "largest_flat_contract.tz" in the tezt suite for the largest
+    contract with constants that can be originated). As a first
+    approximation, we set the node size limit to 5 times this amount. *)
+val max_micheline_node_count : int
+
+(** Same as [max_micheline_node_count] but for limiting the combined
+    bytes of the strings, ints and bytes in a substituted Micheline
+    expression.  *)
+val max_micheline_bytes_limit : int
+
+(** Represents the maximum depth of an expression stored
+    in the table after all references to other constants have
+    (recursively) been expanded, where depth refers to the
+    nesting of [Prim] and/or [Seq] nodes.
+
+    The size was chosen arbitrarily to match the typechecker
+    in [Script_ir_translator]. *)
+val max_allowed_global_constant_depth : int
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
   max_anon_ops_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
+  max_micheline_node_count : int;
+  max_micheline_bytes_limit : int;
+  max_allowed_global_constant_depth : int;
 }
 
 val fixed_encoding : fixed Data_encoding.encoding

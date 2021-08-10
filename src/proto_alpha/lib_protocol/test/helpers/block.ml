@@ -614,7 +614,9 @@ let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
             | Successful_manager_result
                 (Transaction_result {balance_updates; _})
             | Successful_manager_result
-                (Origination_result {balance_updates; _}) ->
+                (Origination_result {balance_updates; _})
+            | Successful_manager_result
+                (Register_global_constant_result {balance_updates; _}) ->
                 List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
@@ -635,7 +637,8 @@ let bake_n_with_origination_results ?policy n b =
             function
             | Successful_manager_result (Reveal_result _)
             | Successful_manager_result (Delegation_result _)
-            | Successful_manager_result (Transaction_result _) ->
+            | Successful_manager_result (Transaction_result _)
+            | Successful_manager_result (Register_global_constant_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)
