@@ -109,4 +109,5 @@ let add_operation st (op : Operation.packed) =
   Protocol.apply_operation st.state op >>=?? fun (state, receipt) ->
   return ({st with state; rev_operations = op :: st.rev_operations}, receipt)
 
-let finalize_construction inc = Protocol.finalize_block inc.state >>=?? return
+let finalize_construction inc =
+  Protocol.finalize_block inc.state (Some inc.header) >>=?? return

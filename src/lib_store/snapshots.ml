@@ -3234,7 +3234,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         user_activated_protocol_overrides;
       }
     in
-    (Block_validation.apply apply_environment block_header operations
+    (Block_validation.apply
+       apply_environment
+       block_header
+       operations
+       ~cache:`Lazy
      >>= function
      | Ok block_validation_result -> return block_validation_result
      | Error errs ->
@@ -3246,7 +3250,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
            "%a"
            pp_print_error
            errs)
-    >>=? fun block_validation_result ->
+    >>=? fun (block_validation_result, _) ->
     check_context_hash_consistency
       block_validation_result.validation_store
       block_header
@@ -3767,7 +3771,11 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
           user_activated_protocol_overrides;
         }
       in
-      (Block_validation.apply apply_environment block_header operations
+      (Block_validation.apply
+         apply_environment
+         block_header
+         operations
+         ~cache:`Lazy
        >>= function
        | Ok block_validation_result -> return block_validation_result
        | Error errs ->
@@ -3779,7 +3787,7 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
              "%a"
              pp_print_error
              errs)
-      >>=? fun block_validation_result ->
+      >>=? fun (block_validation_result, _) ->
       check_context_hash_consistency_legacy
         block_validation_result.validation_store
         block_header

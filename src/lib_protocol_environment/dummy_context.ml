@@ -87,5 +87,4 @@ open Tezos_protocol_environment
 include Environment_context.Register (M)
 
 let empty =
-  Context.Context
-    {ops; ctxt = (); kind = Context; equality_witness; impl_name = "dummy"}
+  Context.make ~ops ~ctxt:() ~kind:Context ~equality_witness ~impl_name:"dummy"

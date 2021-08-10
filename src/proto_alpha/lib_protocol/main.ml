@@ -271,7 +271,7 @@ let finalize_block
       liquidity_baking_escape_ema;
       implicit_operations_results;
       _;
-    } =
+    } _ =
   match mode with
   | Partial_construction _ ->
       Alpha_context.Voting_period.get_rpc_current_info ctxt
@@ -430,5 +430,9 @@ let init ctxt block_header =
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
   >|=? fun ctxt -> Alpha_context.finalize ctxt
+
+let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+    ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+  return (fun _ -> failwith "DEFINED IN NEXT COMMIT")
 
 (* Vanity nonce: TBD *)

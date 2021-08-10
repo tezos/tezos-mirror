@@ -68,7 +68,7 @@ module type T = sig
     block_metadata : Proto.block_header_metadata;
   }
 
-  val status : t -> status tzresult Lwt.t
+  val status : t -> Block_header.shell_header option -> status tzresult Lwt.t
 
   val validation_state : t -> Proto.validation_state
 
@@ -160,6 +160,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       ~predecessor:predecessor_hash
       ~timestamp
       ?protocol_data
+      ~cache:`Lazy
       ()
     >>=? fun state ->
     (* FIXME arbitrary value, to be customisable *)
@@ -208,8 +209,11 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     block_metadata : Proto.block_header_metadata;
   }
 
-  let status pv =
-    Proto.finalize_block pv.state >>=? fun (block_result, block_metadata) ->
+  let status pv shell_header =
+    (* A pre-application should not commit into the protocol
+       caches. For this reason, [cache_nonce] is [None]. *)
+    Proto.finalize_block pv.state shell_header
+    >>=? fun (block_result, block_metadata) ->
     return {block_metadata; block_result; applied_operations = pv.applied}
 
   let validation_state {state; _} = state
@@ -314,9 +318,23 @@ let preapply chain_store ~user_activated_upgrades
            Operation_list_hash.compute (List.map fst r.Preapply_result.applied))
          validation_result_list_rev)
   in
-  Prevalidation.status validation_state >>=? fun {block_result; _} ->
   let pred_shell_header = Store.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
+  let pred_block_hash = Store.Block.hash predecessor in
+  let shell_header : Block_header.shell_header =
+    {
+      level;
+      proto_level = pred_shell_header.proto_level;
+      predecessor = pred_block_hash;
+      timestamp;
+      validation_passes;
+      operations_hash;
+      context = Context_hash.zero (* place holder *);
+      fitness = [];
+    }
+  in
+  Prevalidation.status validation_state (Some shell_header)
+  >>=? fun {block_result; _} ->
   Block_validation.may_patch_protocol
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
@@ -324,26 +342,17 @@ let preapply chain_store ~user_activated_upgrades
     block_result
   >>= fun {fitness; context; message; _} ->
   Store.Block.protocol_hash chain_store predecessor >>=? fun pred_protocol ->
-  let context = Shell_context.unwrap_disk_context context in
-  Context.get_protocol context >>= fun protocol ->
+  Context.get_protocol (Shell_context.unwrap_disk_context context)
+  >>= fun protocol ->
   let proto_level =
     if Protocol_hash.equal protocol pred_protocol then
       pred_shell_header.proto_level
     else (pred_shell_header.proto_level + 1) mod 256
   in
-  let pred_block_hash = Store.Block.hash predecessor in
   let shell_header : Block_header.shell_header =
-    {
-      level;
-      proto_level;
-      predecessor = pred_block_hash;
-      timestamp;
-      validation_passes;
-      operations_hash;
-      fitness;
-      context = Context_hash.zero (* place holder *);
-    }
+    {shell_header with proto_level; fitness}
   in
+  let context = Shell_context.unwrap_disk_context context in
   (if Protocol_hash.equal protocol pred_protocol then return (context, message)
   else
     match Registered_protocol.get protocol with

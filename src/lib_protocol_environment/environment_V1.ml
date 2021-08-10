@@ -962,9 +962,13 @@ struct
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
-    include Environment_protocol_T.V0toV3 (LiftV1 (P))
+    include LiftV1 (P)
 
-    let environment_version = Protocol.V1
+    include IgnoreCaches (struct
+      let environment_version = Protocol.V1
+
+      include Environment_protocol_T.V0toV3 (LiftV1 (P))
+    end)
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

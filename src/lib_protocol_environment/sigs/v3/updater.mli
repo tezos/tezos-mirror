@@ -245,6 +245,7 @@ module type PROTOCOL = sig
      validation of its successor blocks. *)
   val finalize_block :
     validation_state ->
+    Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** [rpc_services] provides the list of remote procedures exported
@@ -260,6 +261,29 @@ module type PROTOCOL = sig
      activated, has not been implemented. *)
   val init :
     Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
+
+  (** [value_of_key chain_id predecessor_context
+     predecessor_timestamp predecessor_level predecessor_fitness
+     predecessor timestamp] returns a function to build one value of
+     the cache from its key.
+
+     This function is used to restore all or part of the cache, for
+     instance when booting a validator to preheat the cache, or when a
+     reorganization happens. This function should never fail, returned
+     errors are fatal.
+
+     The generated function is passed to [Context.Cache.load_caches]
+     which will use it either immediately a cache-loading time or
+     on-demand, when a given cached value is accessed. *)
+  val value_of_key :
+    chain_id:Chain_id.t ->
+    predecessor_context:Context.t ->
+    predecessor_timestamp:Time.t ->
+    predecessor_level:Int32.t ->
+    predecessor_fitness:Fitness.t ->
+    predecessor:Block_hash.t ->
+    timestamp:Time.t ->
+    (Context.Cache.key -> Context.Cache.value tzresult Lwt.t) tzresult Lwt.t
 end
 
 (** [activate ctxt ph] activates an economic protocol (given by its

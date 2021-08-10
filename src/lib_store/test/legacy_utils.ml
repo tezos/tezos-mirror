@@ -338,7 +338,8 @@ let build_new_store nb_blocks ~base_dir ~patch_context ~history_mode =
         user_activated_protocol_overrides = [];
       }
     in
-    Block_validation.apply apply_environment activation_block [] >>=? fun bv ->
+    Block_validation.apply apply_environment activation_block [] ~cache:`Lazy
+    >>=? fun (bv, _) ->
     (Store.Block.store_block
        chain_store
        ~block_header:activation_block

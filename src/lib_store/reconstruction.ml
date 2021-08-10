@@ -179,9 +179,17 @@ let apply_context chain_store context_index chain_id ~user_activated_upgrades
       user_activated_protocol_overrides;
     }
   in
-  Block_validation.apply apply_environment block_header operations
-  >>=? fun ({validation_store; block_metadata; ops_metadata; _} :
-             Block_validation.result) ->
+  Block_validation.apply apply_environment block_header operations ~cache:`Lazy
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1570
+     Reuse in-memory caches along reconstruction
+     Since the reconstruction follows the history in a linear way, we
+     could do a better usage of in-memory caches by reusing them from one
+     block to the next one.
+  *)
+  >>=?
+  fun ( ({validation_store; block_metadata; ops_metadata; _} :
+          Block_validation.result),
+        _ ) ->
   check_context_hash_consistency validation_store block_header >>=? fun () ->
   return
     {

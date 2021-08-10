@@ -258,7 +258,11 @@ let run () =
                   user_activated_protocol_overrides;
                 }
               in
-              Block_validation.apply apply_environment block_header operations
+              Block_validation.apply
+                apply_environment
+                block_header
+                operations
+                ~cache:`Lazy
               >>= function
               | Error
                   [Block_validator_errors.Unavailable_protocol {protocol; _}] as
@@ -271,15 +275,17 @@ let run () =
                       Block_validation.apply
                         apply_environment
                         block_header
-                        operations)
+                        operations
+                        ~cache:`Lazy)
               | result -> Lwt.return result )
-            >>=? fun ({
-                        validation_store;
-                        block_metadata;
-                        ops_metadata;
-                        block_metadata_hash;
-                        ops_metadata_hashes;
-                      } as res) ->
+            >>=? fun ( ({
+                          validation_store;
+                          block_metadata;
+                          ops_metadata;
+                          block_metadata_hash;
+                          ops_metadata_hashes;
+                        } as res),
+                       _ ) ->
             (Context.checkout context_index validation_store.context_hash
              >>= function
              | Some context -> return context

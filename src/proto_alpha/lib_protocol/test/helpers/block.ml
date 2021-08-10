@@ -543,8 +543,8 @@ let apply_with_metadata header ?(operations = []) pred =
     vstate
     operations
   >>=? fun vstate ->
-  Main.finalize_block vstate >|=? fun (validation, result) ->
-  (validation.context, result))
+  Main.finalize_block vstate (Some header.shell)
+  >|=? fun (validation, result) -> (validation.context, result))
   >|= Environment.wrap_tzresult
   >|=? fun (context, result) ->
   let hash = Block_header.hash header in

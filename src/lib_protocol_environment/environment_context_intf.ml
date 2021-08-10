@@ -65,3 +65,40 @@ module type S = sig
 
   val get_hash_version : t -> Context_hash.Version.t
 end
+
+(* Copy of sigs/v3/context.mli:CACHE *)
+module type CACHE = sig
+  type t
+
+  type size
+
+  type index
+
+  type identifier
+
+  type key
+
+  type value = ..
+
+  val key_of_identifier : cache_index:index -> identifier -> key
+
+  val identifier_of_key : key -> identifier
+
+  val pp : Format.formatter -> t -> unit
+
+  val find : t -> key -> value option Lwt.t
+
+  val set_cache_layout : t -> size list -> t Lwt.t
+
+  val update : t -> key -> (value * size) option -> t
+
+  val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
+
+  val clear : t -> t
+
+  val list_keys : t -> cache_index:index -> (identifier * size) list
+
+  val key_rank : t -> key -> int option
+
+  val future_cache_expectation : t -> time_in_blocks:int -> t
+end

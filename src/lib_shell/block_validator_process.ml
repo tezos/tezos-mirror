@@ -117,6 +117,14 @@ module Internal_validator_process = struct
     chain_store : Store.chain_store;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
+    (*
+       The cache must be updated by the component that owns the
+       context, i.e., the component that has the writing permissions
+       on the context. In the shell, this component is the block
+       validator process. For this reason, we maintain the collection
+       of caches passed from one block to the next one here.
+    *)
+    mutable cache : Environment_context.Context.block_cache option;
   }
 
   let init
@@ -124,7 +132,12 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     Events.(emit init ()) >>= fun () ->
     return
-      {chain_store; user_activated_upgrades; user_activated_protocol_overrides}
+      {
+        chain_store;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+        cache = None;
+      }
 
   let close _ = Events.(emit close ())
 
@@ -168,11 +181,18 @@ module Internal_validator_process = struct
     let now = Systime_os.now () in
     let block_hash = Block_header.hash block_header in
     Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
-    Block_validation.apply env block_header operations >>=? fun result ->
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache -> `Inherited (block_cache, block_hash)
+    in
+    Block_validation.apply env block_header operations ~cache
+    >>=? fun (result, cache) ->
     let timespan =
       let then_ = Systime_os.now () in
       Ptime.diff then_ now
     in
+    validator.cache <- Some {block_hash; cache} ;
     Events.(emit validation_success (block_hash, timespan)) >>= fun () ->
     return result
 

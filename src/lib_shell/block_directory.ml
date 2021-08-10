@@ -420,6 +420,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
         ~predecessor_fitness:header.fitness
         ~predecessor
         ~timestamp:(Time.System.to_protocol (Systime_os.now ()))
+        ~cache:`Lazy
         ()
       >>=? fun state ->
       List.fold_left_es
@@ -429,7 +430,9 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (state, [])
         ops
       >>=? fun (state, acc) ->
-      Next_proto.finalize_block state >>=? fun _ -> return (List.rev acc)) ;
+      (* A pre application must not commit into the protocol caches.
+         Hence, we set [cache_nonce] to None. *)
+      Next_proto.finalize_block state None >>=? fun _ -> return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       Store.Block.context chain_store block >>=? fun ctxt ->
       Base58.complete prefix >>= fun l1 ->
@@ -451,13 +454,49 @@ let build_raw_rpc_directory ~user_activated_upgrades
   merge
     (RPC_directory.map
        (fun (chain_store, block) ->
-         Store.Block.context_exn chain_store block >|= fun context ->
-         let context = Shell_context.wrap_disk_context context in
-         {
-           Tezos_protocol_environment.block_hash = Store.Block.hash block;
-           block_header = Store.Block.shell_header block;
-           context;
-         })
+         ( Store.Block.context_exn chain_store block >>= fun context ->
+           let predecessor_context = Shell_context.wrap_disk_context context in
+           let chain_id = Store.Chain.chain_id chain_store in
+           let Block_header.
+                 {
+                   timestamp = predecessor_timestamp;
+                   level = predecessor_level;
+                   fitness = predecessor_fitness;
+                   _;
+                 } =
+             Store.Block.shell_header block
+           in
+           (*
+             Reactivity is important when executing RPCs and there are
+             no constraints to be consistent with other nodes. For this
+             reason, the RPC directory loads the cache lazily.
+             See {!Environment_context.source_of_cache}.
+           *)
+           let predecessor = Store.Block.hash block in
+           let timestamp = Time.System.to_protocol (Systime_os.now ()) in
+           Next_proto.value_of_key
+             ~chain_id
+             ~predecessor_context
+             ~predecessor_timestamp
+             ~predecessor_level
+             ~predecessor_fitness
+             ~predecessor
+             ~timestamp
+           >>=? fun value_of_key ->
+           Tezos_protocol_environment.Context.load_cache
+             predecessor_context
+             `Lazy
+             value_of_key
+           >>=? fun context ->
+           return
+             {
+               Tezos_protocol_environment.block_hash = Store.Block.hash block;
+               block_header = Store.Block.shell_header block;
+               context;
+             } )
+         >>= function
+         | Ok result -> Lwt.return result
+         | Error _ -> Lwt.fail Not_found)
        proto_services) ;
   !dir
 

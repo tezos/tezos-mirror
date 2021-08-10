@@ -66,9 +66,3 @@ type _ Context.kind += Context : M.t Context.kind
     querying the endpoint) right away.
     Otherwise set it later with [set delegate] *)
 val empty : M.proxy_delegate option -> Context.t
-
-(** Sets the delegate (the function querying the endpoint) in the context,
-    hereby making this context behave
-    as a proxy instead of as a [Memory_context]. Doesn't take an option,
-    because it's never required to put [None]. *)
-val set_delegate : M.proxy_delegate -> Context.t -> Context.t

@@ -85,7 +85,7 @@ module type T = sig
     block_metadata : Proto.block_header_metadata;
   }
 
-  val status : t -> status tzresult Lwt.t
+  val status : t -> Block_header.shell_header option -> status tzresult Lwt.t
 
   val validation_state : t -> Proto.validation_state
 

@@ -434,10 +434,38 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   | None -> Lwt.return context
   | Some hash -> Context.add_predecessor_ops_metadata_hash context hash)
   >>= fun ctxt ->
+  let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+    Main.value_of_key
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+    >|= Environment.wrap_tzresult
+    >>=? fun f -> return (fun x -> f x >|= Environment.wrap_tzresult)
+  in
+  let predecessor_context = Shell_context.wrap_disk_context ctxt in
+  element_of_key
+    ~chain_id
+    ~predecessor_context
+    ~predecessor_timestamp:(Store.Block.timestamp pred)
+    ~predecessor_level:(Store.Block.level pred)
+    ~predecessor_fitness:(Store.Block.fitness pred)
+    ~predecessor:(Store.Block.hash pred)
+    ~timestamp:shell.timestamp
+  >>=? fun element_of_key ->
+  Environment_context.Context.load_cache
+    predecessor_context
+    `Lazy
+    element_of_key
+  >>=? fun predecessor_context ->
   (let open Environment.Error_monad in
   Main.begin_construction
     ~chain_id
-    ~predecessor_context:(Shell_context.wrap_disk_context ctxt)
+    ~predecessor_context
     ~predecessor_timestamp:(Store.Block.timestamp pred)
     ~predecessor_level:(Store.Block.level pred)
     ~predecessor_fitness:(Store.Block.fitness pred)
@@ -451,7 +479,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       apply_operation vstate op >>=? fun (state, _result) -> return state)
     vstate
     (List.concat operations)
-  >>=? fun vstate -> Main.finalize_block vstate)
+  >>=? fun vstate -> Main.finalize_block vstate (Some shell))
   >|= Environment.wrap_tzresult
   >>=? fun (validation, block_header_metadata) ->
   let max_operations_ttl =

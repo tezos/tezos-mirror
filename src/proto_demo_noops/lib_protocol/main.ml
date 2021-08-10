@@ -116,7 +116,7 @@ let () =
 
 let apply_operation _state _op = fail No_error
 
-let finalize_block state =
+let finalize_block state _ =
   let fitness = state.fitness in
   return
     ( {
@@ -139,5 +139,9 @@ let init context block_header =
       max_operations_ttl = 0;
       last_allowed_fork_level = 0l;
     }
+
+let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+    ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+  return (fun _ -> fail No_error)
 
 let rpc_services = RPC_directory.empty

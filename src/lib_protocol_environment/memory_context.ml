@@ -42,7 +42,7 @@ let impl_name = "memory"
 
 let empty =
   let ctxt = M.empty in
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
+  Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
 let project : Context.t -> t =
  fun (Context.Context t) ->
@@ -54,8 +54,7 @@ let project : Context.t -> t =
         ~got:t.impl_name
 
 let inject : t -> Context.t =
- fun ctxt ->
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
+ fun ctxt -> Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
 let encoding : Context.t Data_encoding.t =
   let open Data_encoding in
