@@ -49,9 +49,7 @@ let tztest_qcheck ~name generator f =
         | Ok _ -> true
         | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_error err )
   in
-  Alcotest_lwt.test_case name speed (fun _sw () ->
-      run () ;
-      Lwt.return ())
+  Alcotest_lwt.test_case name speed (fun _sw () -> Lwt.return @@ run ())
 
 let mock_sink : Mock_sink.t Internal_event.sink_definition =
   (module Mock_sink : Internal_event.SINK with type t = Mock_sink.t)
