@@ -56,3 +56,8 @@ let rec do_n_times n f =
   else (
     f () ;
     do_n_times (n - 1) f)
+
+let rec fold_n_times n f x =
+  if n < 0 then invalid_arg "fold_n_times"
+  else if n = 0 then x
+  else fold_n_times (n - 1) f (f x)
