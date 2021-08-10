@@ -297,7 +297,7 @@ let test_read_full_waits =
   let reader_buffer = P2p_buffer_reader.mk_buffer_safe buffer in
   (* Wrap in a timeout in case reading hangs - which can happen if the
      test is not well written or if a bug is introduced. Better safe than sorry. *)
-  Lwt_unix.with_timeout 1. @@ fun () ->
+  Lwt_unix.with_timeout 10. @@ fun () ->
   let+ res = P2p_buffer_reader.read_full readable reader_buffer
   and+ () =
     (* Sleep a bit, to ensure [read_full] starts before there are available data in the [readable] *)
