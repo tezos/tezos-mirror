@@ -40,7 +40,7 @@ val max_operation_data_length : int
 
 (** A global size limit on the size of Micheline expressions
     after substitution.
-    
+
     We want to prevent constants from being
     used to create huge values that could potentially do damage
     if ever printed or sent over the network. We arrived at this
@@ -65,6 +65,10 @@ val max_micheline_bytes_limit : int
     The size was chosen arbitrarily to match the typechecker
     in [Script_ir_translator]. *)
 val max_allowed_global_constant_depth : int
+
+(** Each protocol defines the number of subcaches and their respective
+    limit size using [cache_layout]. *)
+val cache_layout : int list
 
 type fixed = {
   proof_of_work_nonce_size : int;

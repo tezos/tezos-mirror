@@ -92,7 +92,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
             operations_hash = Operation_list_list_hash.zero;
           }
       in
-      Protocol.begin_construction
+      Lifted_protocol.begin_construction
         ~chain_id:predecessor.chain_id
         ~predecessor_context:context
         ~predecessor_timestamp:predecessor.timestamp
@@ -101,8 +101,9 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
         ~predecessor:predecessor.hash
         ?protocol_data
         ~timestamp
+        ~cache:`Load
         ()
-      >>=?? fun state ->
+      >>=? fun state ->
       return {predecessor; context; state; rev_operations = []; header}
 
 let add_operation st (op : Operation.packed) =

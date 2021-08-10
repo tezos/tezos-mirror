@@ -357,8 +357,6 @@ let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
-<<<<<<< HEAD
-=======
 
 module Cache = struct
   type identifier = {namespace : string; id : string}
@@ -432,4 +430,3 @@ module Cache = struct
 
   let key_rank context key = Raw_context.Cache.key_rank context key
 end
->>>>>>> ab83d67c34 (fixup! Env: Offer a cache mechanism in the environment)

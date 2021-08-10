@@ -1619,15 +1619,24 @@ let step logger ctxt step_constants descr stack =
 
 *)
 let execute logger ctxt mode step_constants ~entrypoint ~internal
-    unparsed_script arg :
+    unparsed_script cached_script arg :
     (Script.expr
     * packed_internal_operation list
     * context
-    * Lazy_storage.diffs option)
+    * Lazy_storage.diffs option
+    * ex_script
+    * int)
     tzresult
     Lwt.t =
-  parse_script ctxt unparsed_script ~legacy:true ~allow_forged_in_storage:true
-  >>=? fun ( Ex_script {code; arg_type; storage; storage_type; root_name; _},
+  (match cached_script with
+  | None ->
+      parse_script
+        ctxt
+        unparsed_script
+        ~legacy:true
+        ~allow_forged_in_storage:true
+  | Some ex_script -> return (ex_script, ctxt))
+  >>=? fun ( Ex_script {code; arg_type; storage; storage_type; root_name; views},
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
@@ -1658,11 +1667,13 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
   trace
     Cannot_serialize_storage
-    ( unparse_data ctxt mode storage_type storage >>=? fun (storage, ctxt) ->
+    ( unparse_data ctxt mode storage_type storage
+    >>=? fun (unparsed_storage, ctxt) ->
       Lwt.return
-        ( Gas.consume ctxt (Script.strip_locations_cost storage) >>? fun ctxt ->
-          ok (Micheline.strip_locations storage, ctxt) ) )
-  >|=? fun (storage, ctxt) ->
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_storage)
+        >>? fun ctxt -> ok (Micheline.strip_locations unparsed_storage, ctxt) )
+    )
+  >|=? fun (unparsed_storage, ctxt) ->
   let (ops, op_diffs) = List.split ops.elements in
   let lazy_storage_diff =
     match
@@ -1672,7 +1683,15 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     | [] -> None
     | diff -> Some diff
   in
-  (storage, ops, ctxt, lazy_storage_diff)
+  let approx_size =
+    Script_repr.micheline_nodes (Micheline.root unparsed_storage)
+  in
+  ( unparsed_storage,
+    ops,
+    ctxt,
+    lazy_storage_diff,
+    Ex_script {code; arg_type; storage; storage_type; root_name; views},
+    approx_size )
 
 type execution_result = {
   ctxt : context;
@@ -1681,8 +1700,8 @@ type execution_result = {
   operations : packed_internal_operation list;
 }
 
-let execute ?logger ctxt mode step_constants ~script ~entrypoint ~parameter
-    ~internal =
+let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
+    ~parameter ~internal =
   execute
     logger
     ctxt
@@ -1691,9 +1710,10 @@ let execute ?logger ctxt mode step_constants ~script ~entrypoint ~parameter
     ~entrypoint
     ~internal
     script
+    cached_script
     (Micheline.root parameter)
-  >|=? fun (storage, operations, ctxt, lazy_storage_diff) ->
-  {ctxt; storage; lazy_storage_diff; operations}
+  >|=? fun (storage, operations, ctxt, lazy_storage_diff, ex_script, approx_size)
+    -> ({ctxt; storage; lazy_storage_diff; operations}, (ex_script, approx_size))
 
 (*
 

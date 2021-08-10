@@ -167,4 +167,5 @@ let register () =
   Nonce.register () ;
   Voting.register () ;
   Sapling.register () ;
-  Liquidity_baking.register ()
+  Liquidity_baking.register () ;
+  Cache.register ()

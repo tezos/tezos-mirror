@@ -171,3 +171,12 @@ val apply_contents_list :
 
 val check_minimal_valid_time :
   t -> priority:int -> endorsing_power:int -> (unit, error trace) result
+
+(** [value_of_key ctxt k] builds a value identified by key [k]
+    so that it can be put into the cache. *)
+val value_of_key : t -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+
+(** [cache_layout] describes how the caches needed by the protocol.
+   The length of the list defines the number of caches while each
+   element of this list corresponds to the size limit of each cache. *)
+val cache_layout : int list

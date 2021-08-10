@@ -74,16 +74,38 @@ val step :
   's ->
   ('r * 'f * context) tzresult Lwt.t
 
+(** [execute ?logger ctxt ~cached_script mode step_constant ~script
+   ~entrypoint ~parameter ~internal] interprets the [script]'s
+   [entrypoint] for a given [parameter].
+
+   This will update the local storage of the contract
+   [step_constants.self]. Other pieces of contextual information
+   ([source], [payer], [amount], and [chaind_id]) are also passed in
+   [step_constant].
+
+   [internal] is [true] if and only if the execution happens within an
+   internal operation.
+
+   [mode] is the unparsing mode, as declared by
+   {!Script_ir_translator}.
+
+   [cached_script] is the cached elaboration of [script], that is the
+   well typed abstract syntax tree produced by the type elaboration of
+   [script] during a previous execution and stored in the in-memory
+   cache.
+
+*)
 val execute :
   ?logger:logger ->
   Alpha_context.t ->
+  cached_script:Script_ir_translator.ex_script option ->
   Script_ir_translator.unparsing_mode ->
   step_constants ->
   script:Script.t ->
   entrypoint:string ->
   parameter:Script.expr ->
   internal:bool ->
-  execution_result tzresult Lwt.t
+  (execution_result * (Script_ir_translator.ex_script * int)) tzresult Lwt.t
 
 (** [kstep logger ctxt step_constants kinstr accu stack] interprets the
     script represented by [kinstr] under the context [ctxt]. This will

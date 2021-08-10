@@ -26,6 +26,10 @@
 open Protocol
 open Alpha_context
 
+(** The assumed number of blocks between operation-creation time and
+    the actual time when the operation is included in a block. *)
+let default_operation_inclusion_latency = 3
+
 type Environment.Error_monad.error += Cannot_parse_operation (* `Branch *)
 
 type Environment.Error_monad.error += Cannot_serialize_log
@@ -700,6 +704,18 @@ module RPC = struct
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "run_operation")
 
+      let simulate_operation =
+        RPC_service.post_service
+          ~description:"Simulate an operation"
+          ~query:RPC_query.empty
+          ~input:
+            (obj3
+               (req "operation" Operation.encoding)
+               (req "chain_id" Chain_id.encoding)
+               (dft "latency" int16 default_operation_inclusion_latency))
+          ~output:Apply_results.operation_data_and_metadata_encoding
+          RPC_path.(path / "simulate_operation")
+
       let entrypoint_type =
         RPC_service.post_service
           ~description:"Return the type of the given entrypoint"
@@ -796,6 +812,7 @@ module RPC = struct
         let logger = trace_logger () in
         execute
           ~logger
+          ~cached_script:None
           ctxt
           Unparsing_mode.unparsing_mode
           step_constants
@@ -803,7 +820,7 @@ module RPC = struct
           ~entrypoint
           ~parameter
           ~internal:true
-        >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
+        >>=? fun ({ctxt; storage; lazy_storage_diff; operations}, _) ->
         logger.get_log () >|=? fun trace ->
         let trace = Option.value ~default:[] trace in
         ({ctxt; storage; lazy_storage_diff; operations}, trace)
@@ -967,6 +984,130 @@ module RPC = struct
         | Chest_key_t tname -> return (T_chest_key, [], unparse_type_annot tname)
     end
 
+    let run_operation_service ctxt ()
+        ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
+      (* this code is a duplicate of Apply without signature check *)
+      let partial_precheck_manager_contents (type kind) ctxt
+          (op : kind Kind.manager contents) : context tzresult Lwt.t =
+        let (Manager_operation
+              {source; fee; counter; operation; gas_limit; storage_limit}) =
+          op
+        in
+        Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
+        let ctxt = Gas.set_limit ctxt gas_limit in
+        Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
+        Contract.must_be_allocated ctxt (Contract.implicit_contract source)
+        >>=? fun () ->
+        Contract.check_counter_increment ctxt source counter >>=? fun () ->
+        (match operation with
+        | Reveal pk -> Contract.reveal_manager_key ctxt source pk
+        | Transaction {parameters; _} ->
+            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+            let arg_bytes =
+              Data_encoding.Binary.to_bytes_exn
+                Script.lazy_expr_encoding
+                parameters
+            in
+            let arg =
+              match
+                Data_encoding.Binary.of_bytes_opt
+                  Script.lazy_expr_encoding
+                  arg_bytes
+              with
+              | Some arg -> arg
+              | None -> assert false
+            in
+            Lwt.return
+            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
+            @@ (* Fail if not enough gas for complete deserialization cost *)
+            ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
+              ctxt )
+        | Origination {script; _} ->
+            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+            let script_bytes =
+              Data_encoding.Binary.to_bytes_exn Script.encoding script
+            in
+            let script =
+              match
+                Data_encoding.Binary.of_bytes_opt Script.encoding script_bytes
+              with
+              | Some script -> script
+              | None -> assert false
+            in
+            Lwt.return
+            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
+            @@ (* Fail if not enough gas for complete deserialization cost *)
+            ( Script.force_decode_in_context ctxt script.code
+            >>? fun (_code, ctxt) ->
+              Script.force_decode_in_context ctxt script.storage
+              >|? fun (_storage, ctxt) -> ctxt )
+        | _ -> return ctxt)
+        >>=? fun ctxt ->
+        Contract.get_manager_key ctxt source >>=? fun _public_key ->
+        (* signature check unplugged from here *)
+        Contract.increment_counter ctxt source >>=? fun ctxt ->
+        Contract.spend ctxt (Contract.implicit_contract source) fee
+      in
+      let rec partial_precheck_manager_contents_list :
+          type kind.
+          Alpha_context.t ->
+          kind Kind.manager contents_list ->
+          context tzresult Lwt.t =
+       fun ctxt contents_list ->
+        match contents_list with
+        | Single (Manager_operation _ as op) ->
+            partial_precheck_manager_contents ctxt op
+        | Cons ((Manager_operation _ as op), rest) ->
+            partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
+            partial_precheck_manager_contents_list ctxt rest
+      in
+      let ret contents =
+        ( Operation_data protocol_data,
+          Apply_results.Operation_metadata {contents} )
+      in
+      let operation : _ operation = {shell; protocol_data} in
+      let hash = Operation.hash {shell; protocol_data} in
+      let ctxt = Contract.init_origination_nonce ctxt hash in
+      let baker = Signature.Public_key_hash.zero in
+      match protocol_data.contents with
+      | Single (Manager_operation _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
+          >|= fun (_ctxt, result) -> ok @@ ret result
+      | Cons (Manager_operation _, _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
+          >|= fun (_ctxt, result) -> ok @@ ret result
+      | _ ->
+          Apply.apply_contents_list
+            ctxt
+            chain_id
+            Optimized
+            shell.branch
+            baker
+            operation
+            operation.protocol_data.contents
+          >|=? fun (_ctxt, result) -> ret result
+
+    (*
+
+       The execution of an operation depends on the state of the
+       cache. In particular, gas consumption is usually impacted by
+       cache hits and misses.
+
+       Unfortunately, the state of the cache is different between the
+       context at operation-creation time and the context when is
+       included in a block.
+
+       Therefore, the simulation tries to predict the state of the
+       cache in a [time_in_blocks] assumed to be close to the inclusion
+       time of the operation.
+
+    *)
+    let simulate_operation_service ctxt () (op, chain_id, time_in_blocks) =
+      let ctxt = Cache.future_cache_expectation ctxt ~time_in_blocks in
+      run_operation_service ctxt () (op, chain_id)
+
     let register () =
       let originate_dummy_contract ctxt script balance =
         let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
@@ -1041,16 +1182,18 @@ module RPC = struct
             ctxt
             unparsing_mode
             step_constants
+            ~cached_script:None
             ~script:{storage; code}
             ~entrypoint
             ~parameter
             ~internal:true
-          >|=? fun {
-                     Script_interpreter.storage;
-                     operations;
-                     lazy_storage_diff;
-                     _;
-                   } -> (storage, operations, lazy_storage_diff)) ;
+          >|=? fun ( {
+                       Script_interpreter.storage;
+                       operations;
+                       lazy_storage_diff;
+                       _;
+                     },
+                     _ ) -> (storage, operations, lazy_storage_diff)) ;
       Registration.register0
         ~chunked:true
         S.trace_code
@@ -1167,10 +1310,11 @@ module RPC = struct
             unparsing_mode
             step_constants
             ~script
+            ~cached_script:None
             ~entrypoint
             ~parameter
             ~internal:true
-          >>=? fun {Script_interpreter.operations; _} ->
+          >>=? fun ({Script_interpreter.operations; _}, (_, _)) ->
           View_helpers.extract_parameter_from_operations
             entrypoint
             operations
@@ -1258,118 +1402,11 @@ module RPC = struct
           >>?= fun (Ex_ty typ, _ctxt) ->
           let normalized = Unparse_types.unparse_ty typ in
           return @@ Micheline.strip_locations normalized) ;
+      Registration.register0 ~chunked:true S.run_operation run_operation_service ;
       Registration.register0
         ~chunked:true
-        S.run_operation
-        (fun
-          ctxt
-          ()
-          ({shell; protocol_data = Operation_data protocol_data}, chain_id)
-        ->
-          (* this code is a duplicate of Apply without signature check *)
-          let partial_precheck_manager_contents (type kind) ctxt
-              (op : kind Kind.manager contents) : context tzresult Lwt.t =
-            let (Manager_operation
-                  {source; fee; counter; operation; gas_limit; storage_limit}) =
-              op
-            in
-            Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
-            let ctxt = Gas.set_limit ctxt gas_limit in
-            Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
-            Contract.must_be_allocated ctxt (Contract.implicit_contract source)
-            >>=? fun () ->
-            Contract.check_counter_increment ctxt source counter >>=? fun () ->
-            (match operation with
-            | Reveal pk -> Contract.reveal_manager_key ctxt source pk
-            | Transaction {parameters; _} ->
-                (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-                let arg_bytes =
-                  Data_encoding.Binary.to_bytes_exn
-                    Script.lazy_expr_encoding
-                    parameters
-                in
-                let arg =
-                  match
-                    Data_encoding.Binary.of_bytes_opt
-                      Script.lazy_expr_encoding
-                      arg_bytes
-                  with
-                  | Some arg -> arg
-                  | None -> assert false
-                in
-                Lwt.return
-                @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ (* Fail if not enough gas for complete deserialization cost *)
-                ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
-                  ctxt )
-            | Origination {script; _} ->
-                (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-                let script_bytes =
-                  Data_encoding.Binary.to_bytes_exn Script.encoding script
-                in
-                let script =
-                  match
-                    Data_encoding.Binary.of_bytes_opt
-                      Script.encoding
-                      script_bytes
-                  with
-                  | Some script -> script
-                  | None -> assert false
-                in
-                Lwt.return
-                @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ (* Fail if not enough gas for complete deserialization cost *)
-                ( Script.force_decode_in_context ctxt script.code
-                >>? fun (_code, ctxt) ->
-                  Script.force_decode_in_context ctxt script.storage
-                  >|? fun (_storage, ctxt) -> ctxt )
-            | _ -> return ctxt)
-            >>=? fun ctxt ->
-            Contract.get_manager_key ctxt source >>=? fun _public_key ->
-            (* signature check unplugged from here *)
-            Contract.increment_counter ctxt source >>=? fun ctxt ->
-            Contract.spend ctxt (Contract.implicit_contract source) fee
-          in
-          let rec partial_precheck_manager_contents_list :
-              type kind.
-              Alpha_context.t ->
-              kind Kind.manager contents_list ->
-              context tzresult Lwt.t =
-           fun ctxt contents_list ->
-            match contents_list with
-            | Single (Manager_operation _ as op) ->
-                partial_precheck_manager_contents ctxt op
-            | Cons ((Manager_operation _ as op), rest) ->
-                partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
-                partial_precheck_manager_contents_list ctxt rest
-          in
-          let ret contents =
-            ( Operation_data protocol_data,
-              Apply_results.Operation_metadata {contents} )
-          in
-          let operation : _ operation = {shell; protocol_data} in
-          let hash = Operation.hash {shell; protocol_data} in
-          let ctxt = Contract.init_origination_nonce ctxt hash in
-          let baker = Signature.Public_key_hash.zero in
-          match protocol_data.contents with
-          | Single (Manager_operation _) as op ->
-              partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-              Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-              >|= fun (_ctxt, result) -> ok @@ ret result
-          | Cons (Manager_operation _, _) as op ->
-              partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-              Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
-              >|= fun (_ctxt, result) -> ok @@ ret result
-          | _ ->
-              Apply.apply_contents_list
-                ctxt
-                chain_id
-                Optimized
-                shell.branch
-                baker
-                operation
-                operation.protocol_data.contents
-              >|=? fun (_ctxt, result) -> ret result) ;
+        S.simulate_operation
+        simulate_operation_service ;
       Registration.register0
         ~chunked:true
         S.entrypoint_type
@@ -1383,7 +1420,7 @@ module RPC = struct
           let legacy = false in
           let open Script_ir_translator in
           Lwt.return
-            ( parse_toplevel ctxt ~legacy expr
+            ( parse_toplevel ~legacy ctxt expr
             >>? fun ({arg_type; root_name; _}, ctxt) ->
               parse_parameter_ty ctxt ~legacy arg_type
               >>? fun (Ex_ty arg_type, _) ->
@@ -1485,6 +1522,14 @@ module RPC = struct
 
     let run_operation ~op ~chain_id ctxt block =
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
+
+    let simulate_operation ~op ~chain_id ~latency ctxt block =
+      RPC_context.make_call0
+        S.simulate_operation
+        ctxt
+        block
+        ()
+        (op, chain_id, latency)
 
     let entrypoint_type ~script ~entrypoint ctxt block =
       RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)

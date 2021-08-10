@@ -554,6 +554,8 @@ module Script : sig
   val unit_parameter : lazy_expr
 
   val strip_locations_cost : node -> Gas.cost
+
+  val node_size : node -> int
 end
 
 module Constants : sig
@@ -756,7 +758,7 @@ module Global_constants_storage : sig
       'return) ->
       'return
 
-    (* [expr_to_address_in_context context expr] converts [expr]
+    (** [expr_to_address_in_context context expr] converts [expr]
        into a unique hash represented by a [Script_expr_hash.t].
 
        Consumes gas corresponding to the cost of converting [expr]
@@ -764,6 +766,37 @@ module Global_constants_storage : sig
     val expr_to_address_in_context :
       t -> Script.expr -> (t * Script_expr_hash.t) tzresult
   end
+
+module Cache : sig
+  type identifier = private {namespace : string; id : string}
+
+  val identifier_encoding : identifier Data_encoding.t
+
+  val pp_identifier : Format.formatter -> identifier -> unit
+
+  include
+    Context.CACHE
+      with type t := t
+       and type size := int
+       and type index := int
+       and type identifier := identifier
+       and type key := Context.Cache.key
+       and type value := Context.Cache.value
+
+  (** A key is identified by a string but to avoid collisions between
+      keys issued from distinct modules of the protocol, we introduce
+      a notion of [namespace] for cache keys
+
+      Typically, a protocol module creates a domain to get the
+      guarantee that no other module can create a key that collides
+      with one of its key. *)
+  type key_maker = private KeyMaker of (id:string -> Context.Cache.key)
+
+  (** [key_maker ~cache_handle ~namespace] produces key for a given
+      namespace and cache indexed by [cache_handle].
+      If [namespace] already exists, the program stops. *)
+  val key_maker : cache_index:int -> namespace:string -> key_maker
+
 end
 
 module Level : sig

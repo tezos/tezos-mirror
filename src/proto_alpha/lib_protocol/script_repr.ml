@@ -277,24 +277,44 @@ let[@coq_struct "node"] rec strip_annotations node =
       Prim (loc, name, List.map strip_annotations args, [])
   | Seq (loc, args) -> Seq (loc, List.map strip_annotations args)
 
-let rec micheline_nodes_aux node acc k =
+let rec micheline_fold_aux node f acc k =
   match node with
-  | Micheline.Int (_, _) -> k (acc + 1)
-  | Micheline.String (_, _) -> k (acc + 1)
-  | Micheline.Bytes (_, _) -> k (acc + 1)
+  | Micheline.Int (_, _) -> k (f acc node)
+  | Micheline.String (_, _) -> k (f acc node)
+  | Micheline.Bytes (_, _) -> k (f acc node)
   | Micheline.Prim (_, _, subterms, _) ->
-      micheline_nodes_list subterms (acc + 1) k
-  | Micheline.Seq (_, subterms) -> micheline_nodes_list subterms (acc + 1) k
+      micheline_fold_nodes subterms f (f acc node) k
+  | Micheline.Seq (_, subterms) ->
+      micheline_fold_nodes subterms f (f acc node) k
 
-and[@coq_mutual_as_notation] [@coq_struct "subterms"] micheline_nodes_list
-    subterms acc k =
+and[@coq_mutual_as_notation] [@coq_struct "subterms"] micheline_fold_nodes
+    subterms f acc k =
   match subterms with
   | [] -> k acc
-  | n :: nodes ->
-      micheline_nodes_list nodes acc (fun acc -> micheline_nodes_aux n acc k)
+  | node :: nodes ->
+      micheline_fold_nodes nodes f acc @@ fun acc ->
+      micheline_fold_aux node f acc k
 
-let micheline_nodes node = micheline_nodes_aux node 0 (fun x -> x)
+let micheline_fold node init f = micheline_fold_aux node f init (fun x -> x)
+
+let micheline_nodes node = micheline_fold node 0 @@ fun n _ -> n + 1
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in
   cost_micheline_strip_locations nodes
+
+let node_size =
+  let open Micheline in
+  let location_size = 8
+  and word_size = 8
+  and prim_size = 8
+  and annotation_size a = List.fold_left (fun n s -> n + String.length s) 0 a in
+  let internal_node_size = function
+    | Int (_, z) -> location_size + (Z.size z * word_size)
+    | String (_, s) -> String.length s
+    | Bytes (_, s) -> Bytes.length s
+    | Prim (_, _, _, a) -> location_size + prim_size + annotation_size a
+    | Seq (_, _) -> location_size
+  in
+  fun node ->
+    micheline_fold node 0 @@ fun size node -> size + internal_node_size node

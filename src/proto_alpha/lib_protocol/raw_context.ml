@@ -1036,3 +1036,38 @@ let map_temporary_lazy_storage_ids_s ctxt f =
   f (temporary_lazy_storage_ids ctxt)
   >|= fun (ctxt, temporary_lazy_storage_ids) ->
   update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids
+
+module Cache = struct
+  type key = Context.Cache.key
+
+  type value = Context.Cache.value = ..
+
+  let key_of_identifier = Context.Cache.key_of_identifier
+
+  let identifier_of_key = Context.Cache.identifier_of_key
+
+  let pp fmt ctxt = Context.Cache.pp fmt (context ctxt)
+
+  let find c k = Context.Cache.find (context c) k
+
+  let set_cache_layout c layout =
+    Context.Cache.set_cache_layout (context c) layout >>= fun ctxt ->
+    Lwt.return (update_context c ctxt)
+
+  let update c k v = Context.Cache.update (context c) k v |> update_context c
+
+  let sync c ~cache_nonce =
+    Context.Cache.sync (context c) ~cache_nonce >>= fun ctxt ->
+    Lwt.return (update_context c ctxt)
+
+  let clear c = Context.Cache.clear (context c) |> update_context c
+
+  let list_keys c ~cache_index =
+    Context.Cache.list_keys (context c) ~cache_index
+
+  let key_rank c key = Context.Cache.key_rank (context c) key
+
+  let future_cache_expectation c ~time_in_blocks =
+    Context.Cache.future_cache_expectation (context c) ~time_in_blocks
+    |> update_context c
+end

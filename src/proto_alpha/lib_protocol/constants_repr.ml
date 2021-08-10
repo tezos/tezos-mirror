@@ -43,6 +43,11 @@ let max_micheline_bytes_limit = 50_000
 
 let max_allowed_global_constant_depth = 10_000
 
+(* In this version of the protocol, there is a single cache for
+   contract source code and storage. Its size has been chosen
+   not too exceed 100 000 000 bytes. *)
+let cache_layout = [100_000_000]
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
