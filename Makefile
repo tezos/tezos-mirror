@@ -21,7 +21,7 @@ COVERAGE_REPORT := _coverage_report
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
-$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+	$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
@@ -125,9 +125,29 @@ test-protocol-compile:
 	@dune build $(COVERAGE_OPTIONS) @runtest_compile_protocol
 	@dune build $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
+PROTO_LIBS := $(shell find src -name test -type d 2>/dev/null | grep src/proto_ | LC_COLLATE=C sort)
+PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
+PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
+
+$(PROTO_TARGETS): %.test_proto:
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*))
+
+.PHONY: test-proto-unit
+test-proto-unit: $(PROTO_TARGETS)
+
+# We do not run vendor tests because they are a no-op from dune
+NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -print | LC_COLLATE=C sort)
+NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
+NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
+
+$(NONPROTO_TARGETS): %.test_nonproto:
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*)))
+
+.PHONY: test-nonproto-unit
+test-nonproto-unit: $(NONPROTO_TARGETS)
+
 .PHONY: test-unit
-test-unit:
-	@dune build $(COVERAGE_OPTIONS) @runtest
+test-unit: test-nonproto-unit test-proto-unit
 
 .PHONY: test-python
 test-python: all
