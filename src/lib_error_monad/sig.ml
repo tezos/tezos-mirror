@@ -192,88 +192,8 @@ module type TRACE = sig
       Eventually, we can make the trace abstract in the instantiated error
       monad, we can have different notions of traces for the protocol and the
       shell, etc. *)
-  type 'err trace
 
-  (** [make e] makes a singleton trace, the simplest of traces that carries a
-      single error. *)
-  val make : 'error -> 'error trace
-
-  (** [cons e t] (construct sequential) constructs a sequential trace. This is
-      for tracing events/failures/things that happen one after the other,
-      generally one as a consequence of the other. E.g.,
-
-      [let file_handle =
-         match attempt_open name with
-         | Ok handle -> Ok handle
-         | Error error ->
-               let trace = make error in
-               match attempt_create name with
-               | Ok handle -> Ok handle
-               | Error error -> Error (cons error trace)
-      ]
-
-      When you are within the error monad itself, you should build traces using
-      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
-      functions directly. You should rarely need to build traces manually using
-      [cons]. This here function can be useful in the case where you are at the
-      interface of the error monad. *)
-  val cons : 'error -> 'error trace -> 'error trace
-
-  (** [cons_list error errors] is the sequential composition of all the errors
-      passed as parameters. It is equivalent to folding [cons] over
-      [List.rev error :: errors] but more efficient.
-
-      Note that [error] and [errors] are separated as parameters to enforce that
-      empty traces cannot be constructed. The recommended use is:
-{[
-   match all_errors with
-   | [] -> Ok () (* or something else depending on the context *)
-   | error :: errors -> Error (cons_list error errors)
-]}
-
-      When you are within the error monad itself, you should build traces using
-      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
-      functions directly. You should rarely need to build traces manually using
-      [cons_list]. This here function can be useful in the case where you are at
-      the interface of the error monad. *)
-  val cons_list : 'error -> 'error list -> 'error trace
-
-  (** [conp t1 t2] (construct parallel) construct a parallel trace. This is for
-      tracing events/failure/things that happen concurrently, in parallel, or
-      simply independently of each other. E.g.,
-
-      [let fetch_density () =
-         let area = fetch_area () in
-         let population = fetch_population () in
-         match area, population with
-         | Ok area, Ok population -> Ok (population / area)
-         | Error trace, Ok _ | Ok _, Error trace -> Error trace
-         | Error trace1, Error trace2 -> Error (conp trace1 trace2)
-      ]
-
-      When you are within the error monad itself, you should rarely need to
-      build traces manually using [conp]. The result-concurrent traversors will
-      return parallel traces when appropriate, and so will [join_e], [join_ep],
-      [both_e], [both_ep], [all_e] and [all_ep]. *)
-  val conp : 'error trace -> 'error trace -> 'error trace
-
-  (** [conp_list trace traces] is the parallel composition of all the traces
-      passed as parameters. It is equivalent to [List.fold_left conp trace traces]
-      but more efficient.
-
-      Note that [trace] and [traces] are separated as parameters to enforce that
-      empty traces cannot be constructed. The recommended use is:
-{[
-   match all_traces with
-   | [] -> Ok () (* or something else depending on the context *)
-   | trace :: traces -> Error (conp_list trace traces)
-]}
-
-      When you are within the error monad itself, you should rarely need to
-      build traces manually using [conp]. The result-concurrent traversors will
-      return parallel traces when appropriate, and so will [join_e], [join_ep],
-      [both_e], [both_ep], [all_e] and [all_ep]. *)
-  val conp_list : 'err trace -> 'err trace list -> 'err trace
+  include Tezos_lwt_result_stdlib.Lwtreslib.TRACE
 
   (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :
@@ -292,101 +212,36 @@ module type TRACE = sig
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 end
 
-module type MONAD = sig
-  (** To be substituted/constrained *)
-  type 'err trace
+module type MONAD_EXT = sig
+  (** for substitution *)
+  type error
 
-  (** Successful result *)
-  val ok : 'a -> ('a, 'trace) result
+  (** for substitution *)
+  type 'error trace
 
-  val ok_unit : (unit, 'trace) result
+  type tztrace = error trace
 
-  val ok_none : ('a option, 'trace) result
+  type 'a tzresult = ('a, tztrace) result
 
-  val ok_some : 'a -> ('a option, 'trace) result
+  val classify_errors : tztrace -> error_category
 
-  val ok_nil : ('a list, 'trace) result
+  val fail : 'error -> ('a, 'error trace) result Lwt.t
 
-  val ok_true : (bool, 'trace) result
+  val error : 'error -> ('a, 'error trace) result
 
-  val ok_false : (bool, 'trace) result
+  (* This is for legacy, for backwards compatibility, there are old names *)
 
-  (** Successful return *)
-  val return : 'a -> ('a, 'trace) result Lwt.t
+  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
+     might rename it to [pp_print_trace]. *)
+  val pp_print_error : Format.formatter -> error trace -> unit
 
-  (** Successful return of [()] *)
-  val return_unit : (unit, 'trace) result Lwt.t
+  (** Pretty prints a trace as the message of its first error *)
+  val pp_print_error_first : Format.formatter -> error trace -> unit
 
-  (** Successful return of [None] *)
-  val return_none : ('a option, 'trace) result Lwt.t
+  val trace_encoding : error trace Data_encoding.t
 
-  (** [return_some x] is a successful return of [Some x] *)
-  val return_some : 'a -> ('a option, 'trace) result Lwt.t
-
-  (** Successful return of [[]] *)
-  val return_nil : ('a list, 'trace) result Lwt.t
-
-  (** Successful return of [true] *)
-  val return_true : (bool, 'trace) result Lwt.t
-
-  (** Successful return of [false] *)
-  val return_false : (bool, 'trace) result Lwt.t
-
-  (** Erroneous result *)
-  val error : 'err -> ('a, 'err trace) result
-
-  (** Erroneous return *)
-  val fail : 'err -> ('a, 'err trace) result Lwt.t
-
-  (** Infix operators for monadic binds/maps. All operators follow this naming
-      convention:
-      - the first character is [>]
-      - the second character is [>] for [bind] and [|] for [map]
-      - the next character is [=] for Lwt or [?] for Error
-      - the next character (if present) is [=] for Lwt or [?] for Error, it is
-      only used for operator that are within both monads.
-  *)
-
-  (** Lwt's bind reexported. Following Lwt's convention, in this operator and
-      the ones below, [=] indicate we operate within Lwt. *)
-  val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-  (** Lwt's map reexported. The [|] indicates a map rather than a bind. *)
-  val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-
-  (** Non-Lwt bind operator. In this operator and the ones below, [?] indicates
-      that we operate within the error monad. *)
-  val ( >>? ) :
-    ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
-
-  (** Non-Lwt map operator. *)
-  val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
-
-  (** Combined bind operator. The [=?] indicates that the operator acts within
-      the combined error-lwt monad. *)
-  val ( >>=? ) :
-    ('a, 'trace) result Lwt.t ->
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    ('b, 'trace) result Lwt.t
-
-  (** Combined map operator. *)
-  val ( >|=? ) :
-    ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
-
-  (** Injecting bind operator. This is for transitioning from the simple Error
-      monad to the combined Error-Lwt monad.
-
-      Note the order of the character: it starts with the error monad marker [?]
-      and has the Lwt monad marker later. This hints at the role of the operator
-      to transition into Lwt. *)
-  val ( >>?= ) :
-    ('a, 'trace) result ->
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    ('b, 'trace) result Lwt.t
-
-  (** Injecting map operator. *)
-  val ( >|?= ) :
-    ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
+  (** A serializer for result of a given type *)
+  val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
   (** Enrich an error report (or do nothing on a successful result) manually *)
   val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
@@ -429,60 +284,4 @@ module type MONAD = sig
     ('trace -> unit) ->
     (exn -> unit) ->
     unit
-
-  (** A few aliases for Lwt functions *)
-  val join_p : unit Lwt.t list -> unit Lwt.t
-
-  val all_p : 'a Lwt.t list -> 'a list Lwt.t
-
-  val both_p : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
-
-  (** Similar functions in the error monad *)
-  val join_e : (unit, 'err trace) result list -> (unit, 'err trace) result
-
-  val all_e : ('a, 'err trace) result list -> ('a list, 'err trace) result
-
-  val both_e :
-    ('a, 'err trace) result ->
-    ('b, 'err trace) result ->
-    ('a * 'b, 'err trace) result
-
-  (** Similar functions in the combined monad *)
-  val join_ep :
-    (unit, 'err trace) result Lwt.t list -> (unit, 'err trace) result Lwt.t
-
-  val all_ep :
-    ('a, 'err trace) result Lwt.t list -> ('a list, 'err trace) result Lwt.t
-
-  val both_ep :
-    ('a, 'err trace) result Lwt.t ->
-    ('b, 'err trace) result Lwt.t ->
-    ('a * 'b, 'err trace) result Lwt.t
-end
-
-module type MONAD_EXT = sig
-  (** for substitution *)
-  type error
-
-  type 'error trace
-
-  type tztrace = error trace
-
-  type 'a tzresult = ('a, tztrace) result
-
-  val classify_errors : tztrace -> error_category
-
-  (* This is for legacy, for backwards compatibility, there are old names *)
-
-  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
-     might rename it to [pp_print_trace]. *)
-  val pp_print_error : Format.formatter -> error trace -> unit
-
-  (** Pretty prints a trace as the message of its first error *)
-  val pp_print_error_first : Format.formatter -> error trace -> unit
-
-  val trace_encoding : error trace Data_encoding.t
-
-  (** A serializer for result of a given type *)
-  val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 end

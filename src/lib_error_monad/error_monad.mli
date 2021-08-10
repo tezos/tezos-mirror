@@ -44,7 +44,7 @@ module TzTrace : Sig.TRACE with type 'error trace = 'error list
 
 type 'error trace = 'error TzTrace.trace
 
-include Sig.MONAD with type 'error trace := 'error TzTrace.trace
+include module type of TzLwtreslib.Monad with type 'error trace := 'error trace
 
 include
   Sig.MONAD_EXT

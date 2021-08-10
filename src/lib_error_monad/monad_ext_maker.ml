@@ -31,10 +31,17 @@ module Make (Error : sig
   include Sig.EXT with type error := error
 end)
 (Trace : Sig.TRACE)
-(Monad : Sig.MONAD with type 'error trace := 'error Trace.trace) :
+(Monad : Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
+           with type 'error trace := 'error Trace.trace) :
   Sig.MONAD_EXT
     with type error := Error.error
      and type 'error trace := 'error Trace.trace = struct
+  open Monad
+
+  let fail e = Lwt.return_error (Trace.make e)
+
+  let error e = Error (Trace.make e)
+
   type tztrace = Error.error Trace.trace
 
   type 'a tzresult = ('a, tztrace) result
@@ -71,4 +78,46 @@ end)
       (fun c e -> Sig.combine_category c (Error.classify_error e))
       `Temporary
       trace
+
+  let record_trace err result =
+    match result with
+    | Ok _ as res -> res
+    | Error trace -> Error (Trace.cons err trace)
+
+  let trace err f =
+    f >>= function
+    | Error trace -> Lwt.return_error (Trace.cons err trace)
+    | ok -> Lwt.return ok
+
+  let record_trace_eval mk_err = function
+    | Error trace -> mk_err () >>? fun err -> Error (Trace.cons err trace)
+    | ok -> ok
+
+  let trace_eval mk_err f =
+    f >>= function
+    | Error trace ->
+        mk_err () >>=? fun err -> Lwt.return_error (Trace.cons err trace)
+    | ok -> Lwt.return ok
+
+  let error_unless cond exn = if cond then ok_unit else error exn
+
+  let error_when cond exn = if cond then error exn else ok_unit
+
+  let fail_unless cond exn = if cond then return_unit else fail exn
+
+  let fail_when cond exn = if cond then fail exn else return_unit
+
+  let unless cond f = if cond then return_unit else f ()
+
+  let when_ cond f = if cond then f () else return_unit
+
+  let dont_wait f err_handler exc_handler =
+    Lwt.dont_wait
+      (fun () ->
+        f () >>= function
+        | Ok () -> Lwt.return_unit
+        | Error trace ->
+            err_handler trace ;
+            Lwt.return_unit)
+      exc_handler
 end

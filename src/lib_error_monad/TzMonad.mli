@@ -26,7 +26,7 @@
 
 type error = TzCore.error = ..
 
-include Sig.MONAD with type 'error trace := 'error TzTrace.trace
+include module type of TzLwtreslib.Monad
 
 include
   Sig.MONAD_EXT

@@ -629,11 +629,10 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
-    include Local_monad
+    include Tezos_error_monad.TzLwtreslib.Monad
     include
       Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
-        (Local_monad)
+        (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
     let dont_wait ex er f = dont_wait f er ex

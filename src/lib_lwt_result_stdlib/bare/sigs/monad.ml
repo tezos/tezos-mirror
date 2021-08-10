@@ -200,6 +200,26 @@ module type S = sig
 
   val return_unit : (unit, 'error) result Lwt.t
 
+  val ok_none : ('a option, 'trace) result
+
+  val return_none : ('a option, 'trace) result Lwt.t
+
+  val ok_some : 'a -> ('a option, 'trace) result
+
+  val return_some : 'a -> ('a option, 'trace) result Lwt.t
+
+  val ok_nil : ('a list, 'trace) result
+
+  val return_nil : ('a list, 'trace) result Lwt.t
+
+  val ok_true : (bool, 'trace) result
+
+  val return_true : (bool, 'trace) result Lwt.t
+
+  val ok_false : (bool, 'trace) result
+
+  val return_false : (bool, 'trace) result Lwt.t
+
   (** joins *)
 
   val join_p : unit Lwt.t list -> unit Lwt.t
