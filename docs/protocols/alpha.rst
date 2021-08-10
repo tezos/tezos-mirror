@@ -63,3 +63,18 @@ There are two added Michelson primitives: ``VIEW`` (instruction) and ``view`` (t
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/169>`__
 - `MR <https://gitlab.com/tezos/tezos/-/merge_requests/2359>`__
+
+Global constants
+----------------
+
+- A new manager operation and corresponding CLI command have been added
+  allowing users to register Micheline expressions in a global table of
+  constants, returning an index to the expression. A new primitive
+  `constant <string>` has been added that allows contracts to reference
+  these constants by their index. When a contract is called, any
+  constants are expanded into their registered values. The result is
+  that users can use constants to originate larger contracts, as well as
+  share code between contracts.
+
+- `TZIP: <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
+- `MR: <https://gitlab.com/tezos/tezos/-/merge_requests/2962>`__
