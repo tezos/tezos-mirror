@@ -120,7 +120,8 @@ let test_read_waits_for_data =
     Lwt_unix.sleep 0.3 >>= fun () -> cancel_and_assert_success canceler
   in
   Lwt_main.run
-    (Lwt.async schedule ;
+    (Lwt.dont_wait schedule (fun exn ->
+         Alcotest.failf "Schedule execution failed: %s" (Printexc.to_string exn)) ;
      P2p_buffer_reader.read ~canceler readable buffer >>= fun res ->
      assert (Result.is_error res) ;
      Lwt.return_unit) ;
