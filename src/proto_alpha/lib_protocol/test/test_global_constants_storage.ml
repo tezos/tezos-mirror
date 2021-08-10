@@ -54,22 +54,12 @@ let expr_to_hash expr =
   let lexpr = Script_repr.lazy_expr @@ Expr.from_string expr in
   Script_repr.force_bytes lexpr >|? fun b -> Script_expr_hash.hash_bytes [b]
 
-(* This test has a long wind-up, but is very simple:
-it just asserts that values written to the global
-table of constants persist across blocks. *)
+(* This test has a long wind-up, but is very simple: it just asserts
+   that values written to the global table of constants persist across
+   blocks. *)
 let get_happy_path () =
-  (* Set up a block with two contracts, alice and bob,
-     to perform the operations.
-
-     DH 5/18/2021 - I tried to save some typing
-     by lifting b, alice, and bob to the top level
-     and referencing them via closures, but this caused
-     Incremental.begin_construction to fail with "missing accounts"
-     There must be some hidden side effects to
-     `register_two_contracts`.*)
   register_two_contracts () >>=? fun (b, alice, bob) ->
   Incremental.begin_construction b >>=? fun b ->
-  (* Add the operation that writes the constant *)
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in
   Environment.wrap_tzresult @@ expr_to_hash expr_str >>?= fun hash ->
@@ -78,12 +68,8 @@ let get_happy_path () =
     ~source:alice
     ~value:(Script_repr.lazy_expr expr)
   >>=? fun op ->
-  Incremental.add_operation b op (* Finalize the new block. *) >>=? fun b ->
-  Incremental.finalize_block b
-  (* Read the contents of the new block
-     and assert they're unchanged. *)
-  >>=?
-  fun b ->
+  Incremental.add_operation b op >>=? fun b ->
+  Incremental.finalize_block b >>=? fun b ->
   let assert_unchanged b =
     get_next_context b >>=? fun context ->
     Global_constants_storage.get context hash >|= Environment.wrap_tzresult
@@ -91,7 +77,6 @@ let get_happy_path () =
     assert_expr_equal __LOC__ expr result_expr >|=? fun _ -> b
   in
   assert_unchanged b >>=? fun b ->
-  (* Fill the block with a bunch of transactions. *)
   let do_many_transfers b =
     Incremental.begin_construction b >>=? fun b ->
     n_transactions 10 b alice bob (Tez.of_mutez_exn 1000L) >>=? fun b ->
@@ -100,8 +85,8 @@ let get_happy_path () =
   do_many_transfers b >>=? do_many_transfers >>=? do_many_transfers >>= fun _ ->
   Lwt.return_ok ()
 
-(* Blocks that include a registration of a bad expression
-   should fail. *)
+(* Blocks that include a registration of a bad expression should
+   fail. *)
 let test_registration_of_bad_expr_fails () =
   register_two_contracts () >>=? fun (b, alice, _) ->
   Incremental.begin_construction b >>=? fun b ->

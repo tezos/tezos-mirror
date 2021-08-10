@@ -690,11 +690,11 @@ module Global_constants_storage : sig
   type error += Nonexistent_global
 
   (** [get context hash] retrieves the Micheline value with the given hash.
-     
+
     Fails with [Nonexistent_global] if no value is found at the given hash.
 
     Fails with [Storage_error Corrupted_data] if the deserialisation fails.
-      
+
     Consumes [Gas_repr.read_bytes_cost <size of the value>]. *)
   val get : t -> Script_expr_hash.t -> (t * Script.expr) tzresult Lwt.t
 
@@ -705,7 +705,8 @@ module Global_constants_storage : sig
     ill-typed Michelson values (see note at top of module).
 
     Fails with [Expression_too_deep] if, after fully, expanding all constants,
-    the expression would contain too many nested levels (see implementation).
+    the expression would contain too many nested levels, that is more than
+    [Constants_repr.max_allowed_global_constant_depth].
 
     Fails with [Badly_formed_constant_expression] if constants are not
     well-formed (see declaration of [Badly_formed_constant_expression]) or with
@@ -727,12 +728,12 @@ module Global_constants_storage : sig
 
   module Internal_for_tests : sig
     (** [node_too_large node] returns true if:
-      - The number of sub-nodes in the [node] 
+      - The number of sub-nodes in the [node]
         exceeds [Global_constants_storage.node_size_limit].
       - The sum of the bytes in String, Int,
         and Bytes sub-nodes of [node] exceeds
         [Global_constants_storage.bytes_size_limit].
-      
+
       Otherwise returns false.  *)
     val node_too_large : Script.node -> bool
 
@@ -744,15 +745,7 @@ module Global_constants_storage : sig
         is typically useful to short-circuit.
 
         Notice that a common source of bug is to forget to properly call the
-        continuation in `f`.
-   
-        See [Global_constants_storage.substitute] for an example.
-
-        TODO: https://gitlab.com/tezos/tezos/-/issues/1609
-        Move function to lib_micheline.
-
-        On our next opportunity to update the environment, we
-        should move this function to lib_micheline. *)
+        continuation in `f`. *)
     val bottom_up_fold_cps :
       'accumulator ->
       Script.node ->

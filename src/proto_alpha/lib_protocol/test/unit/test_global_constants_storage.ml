@@ -261,8 +261,7 @@ module Generators = struct
     let open Michelson_v1_primitives in
     let open Micheline in
     let rec loop : Script.node list -> Script.node list * Script.node option =
-     fun node_list ->
-      match node_list with
+      function
       | [] -> ([], None)
       | hd :: tl -> (
           match replace_with_constant hd loc with

@@ -46,8 +46,7 @@ let assert_ok_lwt x =
       Format.eprintf "%a" pp_print_error errs ;
       exit 1
 
-let assert_ok x =
-  match x with
+let assert_ok = function
   | Ok x -> x
   | Error errs ->
       Format.eprintf "%a" pp_print_error errs ;

@@ -25,7 +25,17 @@
 open Micheline
 open Michelson_v1_primitives
 
-(* See notes in interface. *)
+(*
+
+   See [substitute] for an example.
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/1609
+   Move function to lib_micheline.
+
+   On our next opportunity to update the environment, we
+   should move this function to lib_micheline.
+
+*)
 let bottom_up_fold_cps initial_accumulator node initial_k f =
   let rec traverse_node accu node k =
     match node with
