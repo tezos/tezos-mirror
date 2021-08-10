@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**
+(** Testing
+    -------
+    Component:    stdlib
+    Invocation:   dune build @src/lib_stdlib/test/runtest_functionalArray
+    Subject:      Functional arrays
+ *)
 
-   This module implements arrays equipped with accessors that cannot
-   raise exceptions. Reading out of the bounds of the arrays return a
-   fallback value fixed at array construction time, writing out of the
-   bounds of the arrays is ignored.
+module Tests = Test_arrays.Make (FunctionalArray)
 
-*)
-
-(** The type for array containing values of type ['a]. *)
-type 'a t
-
-(** [make len v] builds an array [a] initialized [len] cells with
-   [v]. The value [v] is the fallback value for [a]. *)
-val make : int -> 'a -> 'a t
-
-(** [fallback a] returns the fallback value for [a]. *)
-val fallback : 'a t -> 'a
-
-(** [length a] returns the length of [a]. *)
-val length : 'a t -> int
-
-(** [get a idx] returns the contents of the cell of index [idx] in
-   [a]. If [idx] < 0 or [idx] >= [length a], [get a idx] =
-   [fallback a]. *)
-val get : 'a t -> int -> 'a
-
-(** [set a idx value] updates the cell of index [idx] with [value].
-    If [idx] < 0 or [idx] >= [length a], [a] is unchanged. *)
-val set : 'a t -> int -> 'a -> unit
-
-(** [iter f a] iterates [f] over the cells of [a] from the
-   cell indexed [0] to the cell indexed [length a - 1]. *)
-val iter : ('a -> unit) -> 'a t -> unit
-
-(** [map f a] computes a new array obtained by applying [f] to each
-   cell contents of [a]. Notice that the fallback value of the new
-   array is [f (fallback a)]. *)
-val map : ('a -> 'b) -> 'a t -> 'b t
-
-(** [fold f a init] traverses [a] from the cell indexed [0] to the
-   cell indexed [length a - 1] and transforms [accu] into [f accu x]
-   where [x] is the content of the cell under focus. [accu] is
-   [init] on the first iteration. *)
-val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+let () = Alcotest.run "stdlib" [("FunctionalArray", Tests.tests)]

@@ -25,19 +25,35 @@
 
 (**
 
-   This module implements arrays equipped with accessors that cannot
-   raise exceptions. Reading out of the bounds of the arrays return a
-   fallback value fixed at array construction time, writing out of the
-   bounds of the arrays is ignored.
+   This module implements functional arrays equipped with accessors
+   that cannot raise exceptions following the same design principles
+   as {!FallbackArray}:
+
+   Reading out of the bounds of the arrays return a fallback value
+   fixed at array construction time, writing out of the bounds of the
+   arrays is ignored.
+
+   Contrary to {!FallbackArray}, writing generates a fresh array.
+
+   Please notice that this implementation is naive and should only
+   be used for small arrays. If there is a need for large functional
+   arrays, it is recommended to implement Backer's trick to get
+   constant-time reads and writes for sequences of mutations applied
+   to the same array.
 
 *)
 
 (** The type for array containing values of type ['a]. *)
 type 'a t
 
-(** [make len v] builds an array [a] initialized [len] cells with
+(** [make len v] builds an array [a] initializing [len] cells with
    [v]. The value [v] is the fallback value for [a]. *)
 val make : int -> 'a -> 'a t
+
+(** [init len v make] builds an array [a] initializing [len] cells
+    where the [i]-th cell value is [make i]. The value [v] is the
+    fallback value for [a]. *)
+val init : int -> 'a -> (int -> 'a) -> 'a t
 
 (** [fallback a] returns the fallback value for [a]. *)
 val fallback : 'a t -> 'a
@@ -50,18 +66,29 @@ val length : 'a t -> int
    [fallback a]. *)
 val get : 'a t -> int -> 'a
 
-(** [set a idx value] updates the cell of index [idx] with [value].
-    If [idx] < 0 or [idx] >= [length a], [a] is unchanged. *)
-val set : 'a t -> int -> 'a -> unit
+(** [set a idx value] returns a new array identical to [a] except
+   that the cell of index [idx] with [value].
+   If [idx] < 0 or [idx] >= [length a], returns a copy of [a]. *)
+val set : 'a t -> int -> 'a -> 'a t
 
 (** [iter f a] iterates [f] over the cells of [a] from the
    cell indexed [0] to the cell indexed [length a - 1]. *)
 val iter : ('a -> unit) -> 'a t -> unit
 
-(** [map f a] computes a new array obtained by applying [f] to each
+(** [iteri f a] iterates [f] over the cells of [a] from the
+   cell indexed [0] to the cell indexed [length a - 1] passing
+   the cell index to [f]. *)
+val iteri : (int -> 'a -> unit) -> 'a t -> unit
+
+(** [map a] computes a new array obtained by applying [f] to each
    cell contents of [a]. Notice that the fallback value of the new
    array is [f (fallback a)]. *)
 val map : ('a -> 'b) -> 'a t -> 'b t
+
+(** [mapi f a] computes a new array obtained by applying [f] to each
+   cell contents of [a] passing the index of this cell to [i].
+    Notice that the fallback value of the new array is [f (-1) (fallback a)]. *)
+val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
 
 (** [fold f a init] traverses [a] from the cell indexed [0] to the
    cell indexed [length a - 1] and transforms [accu] into [f accu x]

@@ -25,46 +25,69 @@
 
 (**
 
-   This module implements arrays equipped with accessors that cannot
-   raise exceptions. Reading out of the bounds of the arrays return a
-   fallback value fixed at array construction time, writing out of the
-   bounds of the arrays is ignored.
+   This is an internal module used to factorize code between {!FallbackArray}
+   and {!FunctionalArray}.
 
 *)
 
-(** The type for array containing values of type ['a]. *)
-type 'a t
+type 'a t = 'a Array.t
 
-(** [make len v] builds an array [a] initialized [len] cells with
-   [v]. The value [v] is the fallback value for [a]. *)
-val make : int -> 'a -> 'a t
+(**
 
-(** [fallback a] returns the fallback value for [a]. *)
-val fallback : 'a t -> 'a
+    [make length fallback] creates an array of [length] + 1
+    elements. The final cell is reserved to store the [fallback]
+    value.
 
-(** [length a] returns the length of [a]. *)
-val length : 'a t -> int
+*)
+let make length fallback =
+  let length = 1 + max 0 length in
+  Array.make length fallback
 
-(** [get a idx] returns the contents of the cell of index [idx] in
-   [a]. If [idx] < 0 or [idx] >= [length a], [get a idx] =
-   [fallback a]. *)
-val get : 'a t -> int -> 'a
+let init length fallback make_cell =
+  let a = make length fallback in
+  for i = 0 to length - 1 do
+    Array.unsafe_set a i (make_cell i)
+  done ;
+  a
 
-(** [set a idx value] updates the cell of index [idx] with [value].
-    If [idx] < 0 or [idx] >= [length a], [a] is unchanged. *)
-val set : 'a t -> int -> 'a -> unit
+let fallback array =
+  let len = Array.length array in
+  Array.unsafe_get array (len - 1)
 
-(** [iter f a] iterates [f] over the cells of [a] from the
-   cell indexed [0] to the cell indexed [length a - 1]. *)
-val iter : ('a -> unit) -> 'a t -> unit
+let get array idx =
+  let len = Array.length array in
+  if idx >= 0 && idx < len then Array.unsafe_get array idx
+  else Array.unsafe_get array (len - 1)
 
-(** [map f a] computes a new array obtained by applying [f] to each
-   cell contents of [a]. Notice that the fallback value of the new
-   array is [f (fallback a)]. *)
-val map : ('a -> 'b) -> 'a t -> 'b t
+let length array = Array.length array - 1
 
-(** [fold f a init] traverses [a] from the cell indexed [0] to the
-   cell indexed [length a - 1] and transforms [accu] into [f accu x]
-   where [x] is the content of the cell under focus. [accu] is
-   [init] on the first iteration. *)
-val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+let iter f array =
+  for idx = 0 to length array - 1 do
+    f (Array.unsafe_get array idx)
+  done
+
+let iteri f array =
+  for idx = 0 to length array - 1 do
+    f idx (Array.unsafe_get array idx)
+  done
+
+let map f array =
+  let out = make (length array) (f (fallback array)) in
+  for idx = 0 to length array - 1 do
+    Array.unsafe_set out idx (f (Array.unsafe_get array idx))
+  done ;
+  out
+
+let mapi f array =
+  let out = make (length array) (f (-1) (fallback array)) in
+  for idx = 0 to length array - 1 do
+    Array.unsafe_set out idx (f idx (Array.unsafe_get array idx))
+  done ;
+  out
+
+let fold f array init =
+  let rec aux accu idx =
+    if idx > length array - 1 then accu
+    else aux (f accu (Array.unsafe_get array idx)) (idx + 1)
+  in
+  aux init 0
