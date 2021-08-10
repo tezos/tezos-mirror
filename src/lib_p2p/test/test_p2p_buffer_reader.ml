@@ -87,6 +87,10 @@ let test_mk_buffer_safe =
       let (pos, length_to_copy, buf) =
         P2p_buffer_reader.Internal_for_tests.destruct_buffer safe_buffer
       in
+      Alcotest.(check int "pos is always 0") 0 pos ;
+      Alcotest.(check int "length_to_copy is always the buffer length")
+        buf_len
+        length_to_copy ;
       Lib_test.Assert.assert_true
         "A destructed mk_buffer_safe buffer correctly reconstructs"
         (P2p_buffer_reader.mk_buffer ~pos ~length_to_copy buf |> Result.is_ok))
