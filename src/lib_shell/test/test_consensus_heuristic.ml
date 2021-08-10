@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Shell
-   Invocation:   dune exec src/lib_shell/test/test.exe test "consensus heuristic"
+   Invocation:   dune exec src/lib_shell/runtest
    Subject:      Test the consensus heuristic
  *)
 

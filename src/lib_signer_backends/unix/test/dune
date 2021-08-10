@@ -1,24 +1,11 @@
-(executables
+(tests
  (names test_crouching)
  (libraries tezos-signer-backends.unix
             alcotest-lwt)
+ (package tezos-signer-backends)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_client_base
                    -open Tezos_signer_backends_unix)))
 
-(rule
- (alias buildtest)
- (deps test_crouching.exe)
- (action (progn)))
-
-(rule
- (alias runtest_crouching)
- (action (run %{exe:test_crouching.exe})))
-
-(rule
- (alias runtest)
- (package tezos-signer-backends)
- (deps (alias runtest_crouching))
- (action (progn)))

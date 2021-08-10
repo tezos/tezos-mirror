@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Mockup wallet library
-    Invocation:   dune build @runtest_mockup_wallet
+    Invocation:   dune build @src/lib_client_base_unix/runtest
     Subject:      Unit tests of the Mockup wallet library
 *)
 

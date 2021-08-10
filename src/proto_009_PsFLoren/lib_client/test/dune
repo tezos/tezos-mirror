@@ -1,27 +1,12 @@
-(executables
+(tests
  (names test_michelson_v1_macros)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-009-PsFLoren
             tezos-client-009-PsFLoren
             alcotest-lwt)
+ (package tezos-client-009-PsFLoren)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_009_PsFLoren
                    -open Tezos_protocol_009_PsFLoren)))
-
-
-(rule
-(alias buildtest)
-(deps test_michelson_v1_macros.exe)
-(action (progn)))
-
-(rule
-(alias runtest_michelson_v1_macros)
-(action (run %{exe:test_michelson_v1_macros.exe})))
-
-(rule
-(alias runtest)
-(package tezos-client-009-PsFLoren)
-(deps (alias runtest_michelson_v1_macros))
-(action (progn)))

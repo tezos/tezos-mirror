@@ -89,8 +89,3 @@
    (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-baking-009-PsFLoren.empty "")
 )))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

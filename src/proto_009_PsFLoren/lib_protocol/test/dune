@@ -22,12 +22,6 @@
                    -open Tezos_base_test_helpers)))
 
 (rule
- (alias buildtest)
- (package tezos-protocol-009-PsFLoren-tests)
- (deps main.exe)
- (action (progn)))
-
-(rule
  (copy %{lib:tezos-protocol-009-PsFLoren-parameters:test-parameters.json}
        protocol_parameters.json))
 

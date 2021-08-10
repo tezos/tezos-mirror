@@ -31,12 +31,6 @@
                    -open Tezos_base_test_helpers)))
 
 (rule
- (alias buildtest)
- (package tezos-protocol-alpha-tests)
- (deps main.exe)
- (action (progn)))
-
-(rule
  (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
        protocol_parameters.json))
 

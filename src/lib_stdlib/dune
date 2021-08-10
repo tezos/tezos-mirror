@@ -6,5 +6,4 @@
             zarith
             lwt)
  (inline_tests)
- (preprocess (pps ppx_inline_test))
- (flags :standard))
+ (preprocess (pps ppx_inline_test)))

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell
-    Invocation:   dune exec src/lib_shell/test/test.exe test "protocol validator"
+    Invocation:   dune exec src/lib_shell/runtest
     Subject:      Unit tests for protocol_validator. Currently only tests that
                   events are emitted.
 *)

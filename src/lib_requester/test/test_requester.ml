@@ -26,11 +26,11 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest_requester
+    Invocation:   dune build @src/lib_requester/runtest
     Subject:      Basic behaviors of the API for generic resource
                   fetching/requesting service. Instantiating the [Requester]
                   functor with simple mocks.
-   
+
                   [Memory_table] and [Disk_table] are hash tables from string
                   to int.
                   [Probe] either accepts or reject notified values based on

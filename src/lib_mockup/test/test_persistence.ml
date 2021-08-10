@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Persistence library
-    Invocation:   dune build @runtest_persistence
+    Invocation:   dune build @src/lib_mockup/runtest
     Subject:      Unit tests of the Persistence library
 *)
 

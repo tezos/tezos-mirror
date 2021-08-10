@@ -1,5 +1,5 @@
-(executables
- (names main main_ci)
+(tests
+ (names main_ci)
  (libraries alcotest-lwt
             tezos-base
             tezos-base.unix
@@ -8,19 +8,5 @@
             tezos-crypto
             tezos-benchmark
             tezos-benchmark-examples)
- (flags (:standard -open Tezos_base__TzPervasives)))
-
-(rule
- (alias buildtest)
- (deps main.exe main_ci.exe)
- (action (progn)))
-
-(rule
- (alias runtest_lib_bench)
- (action (run %{exe:main_ci.exe})))
-
-(rule
- (alias runtest)
  (package tezos-benchmark-tests)
- (deps (alias runtest_lib_bench))
- (action (progn)))
+ (flags (:standard -open Tezos_base__TzPervasives)))

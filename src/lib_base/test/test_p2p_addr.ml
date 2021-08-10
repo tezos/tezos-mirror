@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, P2p
-   Invocation:   dune build @src/lib_base/test/runtest_p2p_addr
+   Invocation:   dune build @src/lib_base/runtest
    Subject:      Check the parsing of addresses with domain names
 *)
 

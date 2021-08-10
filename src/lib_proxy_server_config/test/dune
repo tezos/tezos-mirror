@@ -10,8 +10,3 @@
   alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives)))
-
-(rule
- (alias runtest_proxy_server_config)
- (action
-  (run %{exe:test_proxy_server_config.exe})))
