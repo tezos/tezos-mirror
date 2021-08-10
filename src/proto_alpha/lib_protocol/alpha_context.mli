@@ -766,6 +766,7 @@ module Global_constants_storage : sig
     val expr_to_address_in_context :
       t -> Script.expr -> (t * Script_expr_hash.t) tzresult
   end
+end
 
 module Cache : sig
   type identifier = private {namespace : string; id : string}
@@ -796,7 +797,6 @@ module Cache : sig
       namespace and cache indexed by [cache_handle].
       If [namespace] already exists, the program stops. *)
   val key_maker : cache_index:int -> namespace:string -> key_maker
-
 end
 
 module Level : sig

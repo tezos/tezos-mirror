@@ -237,7 +237,7 @@ let update t key entry =
 (* The dean is the oldest entry.
 
    The complexity of this operation is logarithmic in the number of
-   entries in the cache. Along the a given chain, [dean cache] only
+   entries in the cache. Along a given chain, [dean cache] only
    increases. *)
 let dean cache : (int64 * key) option = Int64Map.min_binding cache.lru
 
