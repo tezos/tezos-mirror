@@ -26,8 +26,14 @@ open Protocol
 open Alpha_context
 open Test_transfer
 
-(* This module tests that the global table of constants
-can be written to and read from across blocks. *)
+(** Testing
+    -------
+    Component:  Protocol (global table of constants)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
+                -- test "^global table of constants$"
+    Subject:  This module tests that the global table of constants
+              can be written to and read from across blocks.
+*)
 
 let get_next_context b =
   Incremental.begin_construction b >>=? fun b ->

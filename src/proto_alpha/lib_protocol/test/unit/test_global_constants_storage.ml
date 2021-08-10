@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Global table of constants
+    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- test Global_constants_storage
+    Dependencies: contract_hash.ml
+    Subject:      Test the global table of constants
+*)
+
 open Protocol
 open Alpha_context
 open Tztest
