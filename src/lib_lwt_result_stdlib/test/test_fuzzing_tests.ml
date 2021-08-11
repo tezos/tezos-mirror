@@ -504,6 +504,63 @@ end) : Test = struct
   let tests = [fold_left; fold_left_e; fold_left_s; fold_left_es]
 end
 
+module TestFoldLeftMapAgainstStdlibList (M : sig
+  include BASE with type 'a elt := int
+
+  include FOLDLEFTMAP_SEQUENTIAL with type 'a elt := int and type 'a t := int t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_fold_left_map (accum, init, input) =
+    Stdlib.List.fold_left_map (FoldOf.fn accum) init input
+
+  let accum = fun2 Observable.int Observable.int (pair int int)
+
+  let fold_left_map =
+    Test.make
+      ~name:
+        (Format.asprintf "%s.fold_left_map, Stdlib.List.fold_left_map" M.name)
+      (triple accum one many)
+      (fun (Fun (_, fn), init, input) ->
+        let (a, xs) = M.fold_left_map (FoldOf.fn fn) init (M.of_list input) in
+        eq (a, xs) (with_stdlib_fold_left_map (fn, init, input)))
+
+  let fold_left_map_e =
+    Test.make
+      ~name:
+        (Format.asprintf "%s.fold_left_map_e, Stdlib.List.fold_left_map" M.name)
+      (triple accum one many)
+      (fun (Fun (_, fn), init, input) ->
+        eq_e
+          (M.fold_left_map_e (FoldEOf.fn fn) init (M.of_list input))
+          (Result.ok @@ with_stdlib_fold_left_map (fn, init, input)))
+
+  let fold_left_map_s =
+    Test.make
+      ~name:
+        (Format.asprintf "%s.fold_left_map_s, Stdlib.List.fold_left_map" M.name)
+      (triple accum one many)
+      (fun (Fun (_, fn), init, input) ->
+        eq_s
+          (M.fold_left_map_s (FoldSOf.fn fn) init (M.of_list input))
+          (Lwt.return @@ with_stdlib_fold_left_map (fn, init, input)))
+
+  let fold_left_map_es =
+    Test.make
+      ~name:
+        (Format.asprintf
+           "%s.fold_left_map_es, Stdlib.List.fold_left_map"
+           M.name)
+      (triple accum one many)
+      (fun (Fun (_, fn), init, input) ->
+        eq_es
+          (M.fold_left_map_es (FoldESOf.fn fn) init (M.of_list input))
+          (return @@ with_stdlib_fold_left_map (fn, init, input)))
+
+  let tests =
+    [fold_left_map; fold_left_map_e; fold_left_map_s; fold_left_map_es]
+end
+
 module TestFoldMonotonicAgainstStdlibList (M : sig
   include BASE with type 'a elt := int
 

@@ -133,6 +133,50 @@ let exists2 ~when_different_lengths f xs ys =
   in
   aux xs ys
 
+let fold_left_map f accu l =
+  let rec aux accu rev_list_accu = function
+    | [] -> (accu, rev rev_list_accu)
+    | x :: xs ->
+        let (accu, y) = f accu x in
+        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
+  in
+  aux accu [] l
+
+let fold_left_map_e f accu l =
+  let rec aux accu rev_list_accu = function
+    | [] -> Ok (accu, rev rev_list_accu)
+    | x :: xs ->
+        f accu x >>? fun (accu, y) ->
+        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
+  in
+  aux accu [] l
+
+let fold_left_map_s f accu l =
+  let rec aux accu rev_list_accu = function
+    | [] -> Lwt.return (accu, rev rev_list_accu)
+    | x :: xs ->
+        f accu x >>= fun (accu, y) ->
+        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
+  in
+  match l with
+  | [] -> Lwt.return (accu, [])
+  | x :: xs ->
+      lwt_apply2 f accu x >>= fun (accu, y) ->
+      (aux [@ocaml.tailcall]) accu [y] xs
+
+let fold_left_map_es f accu l =
+  let rec aux accu rev_list_accu = function
+    | [] -> return (accu, rev rev_list_accu)
+    | x :: xs ->
+        f accu x >>=? fun (accu, y) ->
+        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
+  in
+  match l with
+  | [] -> return (accu, [])
+  | x :: xs ->
+      lwt_apply2 f accu x >>=? fun (accu, y) ->
+      (aux [@ocaml.tailcall]) accu [y] xs
+
 let rec mem ~equal x = function
   | [] -> false
   | y :: ys -> equal x y || mem ~equal x ys
