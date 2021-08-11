@@ -694,10 +694,10 @@ let display_receipt_for_operation (cctxt : #full) ~chain ?(predecessors = 10)
   | None -> failwith "Couldn't find operation"
   | Some op -> cctxt#message "%a" pp_operation op >>= fun () -> return_unit
 
-let list_cached_keys cctxt ~chain ~block ~cache_index =
+let cached_contracts cctxt ~chain ~block =
   let cb = (chain, block) in
-  Alpha_services.Cache.list_keys cctxt cb ~cache_index
+  Alpha_services.Cache.cached_contracts cctxt cb
 
-let get_key_rank cctxt ~chain ~block =
+let contract_rank cctxt ~chain ~block contract =
   let cb = (chain, block) in
-  Alpha_services.Cache.key_rank cctxt cb
+  Alpha_services.Cache.contract_rank cctxt cb contract

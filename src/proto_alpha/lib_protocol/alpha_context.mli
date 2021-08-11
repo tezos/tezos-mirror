@@ -768,34 +768,185 @@ module Global_constants_storage : sig
 end
 
 module Cache : sig
-  type identifier = private {namespace : string; id : string}
+  (**
 
-  val identifier_encoding : identifier Data_encoding.t
+     Frequently used data should be kept in memory and persist along a
+     chain of blocks. The caching mechanism allows the economic protocol
+     to declare such data and to rely on a Least Recently Used strategy
+     to keep the cache size under a fixed limit.
 
-  val pp_identifier : Format.formatter -> identifier -> unit
+     Take a look at {!Environment_cache} and {!Environment_context}
+     for additional implementation details about the protocol cache.
 
-  include
-    Context.CACHE
-      with type t := t
-       and type size := int
-       and type index := int
-       and type identifier := identifier
-       and type key := Context.Cache.key
-       and type value := Context.Cache.value
+     The protocol has two main kinds of interaction with the cache:
 
-  (** A key is identified by a string but to avoid collisions between
-      keys issued from distinct modules of the protocol, we introduce
-      a notion of [namespace] for cache keys
+     1. It is responsible for setting up the cache with appropriate
+        parameter values and callbacks. It must also compute cache nonces
+        to give the shell enough information to properly synchronize the
+        in-memory cache with the block contexts and protocol upgrades.
+        A typical place where this happens is {!Apply}.
+        This aspect must be implemented using {!Cache.Admin}.
 
-      Typically, a protocol module creates a domain to get the
-      guarantee that no other module can create a key that collides
-      with one of its key. *)
-  type key_maker = private KeyMaker of (id:string -> Context.Cache.key)
+     2. It can exploit the cache to retrieve, to insert, and to update
+        cached values from the in-memory cache. The basic idea is to
+        avoid recomputing values from scratch at each block when they are
+        frequently used. {!Script_cache} is an example of such usage.
+        This aspect must be implemented using {!Cache.Interface}.
 
-  (** [key_maker ~cache_handle ~namespace] produces key for a given
-      namespace and cache indexed by [cache_handle].
-      If [namespace] already exists, the program stops. *)
-  val key_maker : cache_index:int -> namespace:string -> key_maker
+  *)
+
+  (** Size for subcaches and values of the cache. *)
+  type size = int
+
+  (** Index type to index caches. *)
+  type index = int
+
+  (**
+
+     The following module acts on the whole cache, not on a specific
+     sub-cache, unlike {!Interface}. It is used to administrate the
+     protocol cache, e.g., to maintain the cache in a consistent state
+     with respect to the chain. This module is typically used by
+     low-level layers of the protocol and by the shell.
+
+  *)
+  module Admin : sig
+    (** A key uniquely identifies a cached [value] in some subcache. *)
+    type key
+
+    (** Cached values. *)
+    type value
+
+    (** [pp fmt ctxt] is a pretty printter for the [cache] of [ctxt]. *)
+    val pp : Format.formatter -> context -> unit
+
+    (** [set_cache_layout ctxt layout] sets the caches of [ctxt] to
+     comply with given [layout]. If there was already a cache in
+     [ctxt], it is erased by the new layout.
+
+     In that case, a fresh collection of empty caches is reconstructed
+     from the new [layout]. Notice that cache [key]s are invalidated
+     in that case, i.e., [find t k] will return [None]. *)
+    val set_cache_layout : context -> size list -> context Lwt.t
+
+    (** [sync ctxt ~cache_nonce] updates the context with the domain of
+     the cache computed so far. Such function is expected to be called
+     at the end of the validation of a block, when there is no more
+     accesses to the cache.
+
+     [cache_nonce] identifies the block that introduced new cache
+     entries. The nonce should identify uniquely the block which
+     modifies this value. It cannot be the block hash for circularity
+     reasons: The value of the nonce is stored onto the context and
+     consequently influences the context hash of the very same
+     block. Such nonce cannot be determined by the shell and its
+     computation is delegated to the economic protocol. *)
+    val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
+
+    (** [clear ctxt] removes all cache entries. *)
+    val clear : context -> context
+
+    (** {3 Cache helpers for RPCs} *)
+
+    (** [future_cache_expectation ctxt ~time_in_blocks] returns [ctxt] except
+      that the entries of the caches that are presumably too old to
+      still be in the caches in [n_blocks] are removed.
+
+      This function is based on a heuristic. The context maintains
+      the median of the number of removed entries: this number is
+      multipled by `n_blocks` to determine the entries that are
+      likely to be removed in `n_blocks`. *)
+    val future_cache_expectation : context -> time_in_blocks:int -> context
+
+    (** [value_of_key ctxt k] interprets the functions introduced by
+     [register] to construct a cacheable value for a key [k]. *)
+    val value_of_key :
+      context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+  end
+
+  (** A client uses a unique namespace (represented as a string
+     without '@') to avoid collision with the keys of other
+     clients. *)
+  type namespace = string
+
+  (** A key is fully determined by a namespace and an identifier. *)
+  type identifier = string
+
+  (**
+
+     To use the cache, a client must implement the [CLIENT]
+     interface.
+
+  *)
+  module type CLIENT = sig
+    (** The type of value to be stored in the cache. *)
+    type cached_value
+
+    (** The client must declare the index of the subcache where its
+       values shall live. [cache_index] must be between [0] and
+       [List.length Constants_repr.cache_layout - 1]. *)
+    val cache_index : index
+
+    (** The client must declare a namespace. This namespace must
+        be unique. Otherwise, the program stops.
+        A namespace cannot contain '@'. *)
+    val namespace : namespace
+
+    (** [value_of_identifier id] builds the cached value identified by
+       [id]. This function is called when the subcache is loaded into
+       memory from the on-disk representation of its domain.
+
+       An error during the execution of this function is fatal as
+       witnessed by its type: an error embedded in a [tzresult] is not
+       supposed to be catched by the protocol. *)
+    val value_of_identifier :
+      context -> identifier -> cached_value tzresult Lwt.t
+  end
+
+  (**
+
+     An [INTERFACE] to the subcache where keys live in a given [namespace].
+
+  *)
+  module type INTERFACE = sig
+    (** The type of value to be stored in the cache. *)
+    type cached_value
+
+    (** [update ctxt i (Some (e, size))] returns a context where the
+       value [e] of given [size] is associated to identifier [i] in
+       the subcache. If [i] is already in the subcache, the cache
+       entry is updated.
+
+        [update ctxt i None] removes [i] from the subcache. *)
+    val update :
+      context -> identifier -> (cached_value * size) option -> context
+
+    (** [find ctxt i = Some v] if [v] is the value associated to [i]
+       in the subcache. Returns [None] if there is no such value in
+       the subcache. This function is in the Lwt monad because if the
+       value may have not been constructed (see the lazy loading
+       mode in {!Environment_context}), it is constructed on the fly. *)
+    val find : context -> identifier -> cached_value option Lwt.t
+
+    (** [list_identifiers ctxt] returns the list of the
+       identifiers of the cached values along with their respective
+       age. The returned list is sorted in terms of their age in the
+       cache, the oldest coming first. *)
+    val list_identifiers : context -> (string * int) list
+
+    (** [identifier_rank ctxt identifier] returns the number of cached value
+       older than the one of [identifier]; or, [None] if the [identifier] has
+       no associated value in the subcache. *)
+    val identifier_rank : context -> string -> int option
+  end
+
+  (** [register_exn client] produces an [Interface] specific to a
+     given [client]. This function can fail if [client] does not
+     respect the invariant declared in the documentation of
+     {!CLIENT}. *)
+  val register_exn :
+    (module CLIENT with type cached_value = 'a) ->
+    (module INTERFACE with type cached_value = 'a)
 end
 
 module Level : sig

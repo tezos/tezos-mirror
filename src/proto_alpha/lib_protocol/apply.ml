@@ -515,31 +515,6 @@ let cache_layout = Constants_repr.cache_layout
 
 *)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/1622
-   We should put closer this piece of code with the one in `value_of_key`.
-   The current usage of the cache mechanism on the protocol-side lacks
-   encapsulation. We need a way to register a client of the cache
-   mechanism. *)
-type Context.Cache.value +=
-  | Cached_contract of Script.t * Script_ir_translator.ex_script
-
-let (Cache.KeyMaker contract_cache_key) =
-  Cache.key_maker ~cache_index:0 ~namespace:"contract"
-
-let cached_get_script ctxt addr =
-  let cache_key = contract_cache_key ~id:(Contract.to_b58check addr) in
-  Cache.find ctxt cache_key >>= function
-  | Some (Cached_contract (script, ex_script)) ->
-      return (ctxt, cache_key, Some script, Some ex_script)
-  | Some _ | None ->
-      Contract.get_script ctxt addr >>=? fun (ctxt, script) ->
-      return (ctxt, cache_key, script, None)
-
-let update_script_cache ctxt cache_key updated_script
-    (updated_cached_script, approx_size) =
-  let cached = Cached_contract (updated_script, updated_cached_script) in
-  Cache.update ctxt cache_key (Some (cached, approx_size))
-
 let apply_manager_operation_content :
     type kind.
     Alpha_context.t ->
@@ -598,8 +573,7 @@ let apply_manager_operation_content :
       >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract)
         ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
-      cached_get_script ctxt destination
-      >>=? fun (ctxt, cache_key, script, cached_script) ->
+      Script_cache.find ctxt destination >>=? fun (ctxt, cache_key, script) ->
       match script with
       | None ->
           Lwt.return
@@ -640,14 +614,14 @@ let apply_manager_operation_content :
                   }
               in
               (ctxt, result, []) )
-      | Some script ->
+      | Some (script, script_ir) ->
           let step_constants =
             let open Script_interpreter in
             {source; payer; self = destination; amount; chain_id}
           in
           Script_interpreter.execute
             ctxt
-            ~cached_script
+            ~cached_script:(Some script_ir)
             mode
             step_constants
             ~script
@@ -655,7 +629,7 @@ let apply_manager_operation_content :
             ~entrypoint
             ~internal
           >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
-                     updated_cached_script ) ->
+                     (updated_cached_script, updated_size) ) ->
           Contract.update_script_storage
             ctxt
             destination
@@ -669,11 +643,12 @@ let apply_manager_operation_content :
             ~until:ctxt
           >|=? fun originated_contracts ->
           let ctxt =
-            update_script_cache
+            Script_cache.update
               ctxt
               cache_key
-              {script with storage = Script.lazy_expr storage}
-              updated_cached_script
+              ( {script with storage = Script.lazy_expr storage},
+                updated_cached_script )
+              updated_size
           in
           let result =
             Transaction_result
@@ -1494,11 +1469,11 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
          liquidity_baking_cpmm_contract
          liquidity_baking_subsidy
        >>=? fun ctxt ->
-       cached_get_script ctxt liquidity_baking_cpmm_contract
-       >>=? fun (ctxt, cache_key, script, cached_script) ->
+       Script_cache.find ctxt liquidity_baking_cpmm_contract
+       >>=? fun (ctxt, cache_key, script) ->
        match script with
        | None -> fail (Script_tc_errors.No_such_entrypoint "default")
-       | Some script -> (
+       | Some (script, script_ir) -> (
            let step_constants =
              let open Script_interpreter in
              (* Using dummy values for source, payer, and chain_id
@@ -1533,11 +1508,11 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
              step_constants
              ~script
              ~parameter
-             ~cached_script
+             ~cached_script:(Some script_ir)
              ~entrypoint:"default"
              ~internal:false
            >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
-                      updated_cached_script ) ->
+                      (updated_cached_script, updated_size) ) ->
            match operations with
            | _ :: _ ->
                (* No internal operations are expected here. Something bad may be happening. *)
@@ -1566,11 +1541,12 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                in
                let ctxt =
-                 update_script_cache
+                 Script_cache.update
                    ctxt
                    cache_key
-                   {script with storage = Script.lazy_expr storage}
-                   updated_cached_script
+                   ( {script with storage = Script.lazy_expr storage},
+                     updated_cached_script )
+                   updated_size
                in
                let result =
                  Transaction_result
@@ -1746,40 +1722,4 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
   in
   (ctxt, receipt)
 
-let value_of_key ctxt k =
-  (*
-
-     [value_of_key] is a maintainance operation: it is typically run
-     when a node reboots. For this reason, this operation is not
-     carbonated.
-
-  *)
-  let ctxt = Gas.set_unlimited ctxt in
-
-  match Cache.identifier_of_key k with
-  | {namespace = "contract"; id = b58} -> (
-      (*
-
-         As explained earlier, I/O, deserialization, and elaboration of
-         contracts scripts are cached.
-
-      *)
-      Contract.of_b58check b58
-      >>?= fun addr ->
-      Contract.get_script ctxt addr >>=? fun (ctxt, script) ->
-      match script with
-      | None ->
-          (* [value_of_key ctxt k] is applied to keys stored in the
-             cache. Only script-based contracts that have been executed
-             are in the cache. Hence, [get_script] always succeeds for
-             these keys. *)
-          assert false
-      | Some script ->
-          Script_ir_translator.parse_script
-            ctxt
-            script
-            ~legacy:true
-            ~allow_forged_in_storage:true
-          >>=? fun (ex_script, _) ->
-          return (Cached_contract (script, ex_script)))
-  | _ -> assert false
+let value_of_key ctxt k = Alpha_context.Cache.Admin.value_of_key ctxt k

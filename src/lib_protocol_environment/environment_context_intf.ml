@@ -96,7 +96,7 @@ module type CACHE = sig
 
   val clear : t -> t
 
-  val list_keys : t -> cache_index:index -> (identifier * size) list
+  val list_keys : t -> cache_index:index -> (key * int) list
 
   val key_rank : t -> key -> int option
 

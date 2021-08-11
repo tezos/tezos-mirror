@@ -277,50 +277,33 @@ let commands network () =
         >>= fun () -> return_unit);
     command
       ~group
-      ~desc:"Lists cached keys and their size in LRU ordering."
+      ~desc:"Lists cached contracts and their age in LRU ordering."
       no_options
-      (prefixes ["list"; "cache"; "keys"; "for"; "cache"]
-      @@ Clic.param ~name:"cache" ~desc:"index of the cache" non_negative_param
-      @@ stop)
-      (fun () cache_index (cctxt : Protocol_client_context.full) ->
-        list_cached_keys
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~cache_index
+      (prefixes ["list"; "cached"; "contracts"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        cached_contracts cctxt ~chain:cctxt#chain ~block:cctxt#block
         >>=? fun keys ->
         List.iter_s
           (fun (key, size) ->
-            cctxt#message "%a %d" Alpha_context.Cache.pp_identifier key size)
+            cctxt#message "%a %d" Alpha_context.Contract.pp key size)
           keys
         >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Get the key rank of a cache key."
       no_options
-      (prefixes ["get"; "cache"; "key"; "rank"; "for"; "key"]
-      @@ Clic.param ~name:"key" ~desc:"cache key" string_parameter
-      @@ prefixes ["in"; "cache"]
-      @@ Clic.param ~name:"cache" ~desc:"index of the cache" non_negative_param
+      (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
-      (fun () raw_identifier cache_index (cctxt : Protocol_client_context.full) ->
-        let identifier =
-          ignore raw_identifier ;
-          assert false
-        in
-        get_key_rank
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~cache_index
-          ~identifier
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
         | None ->
             cctxt#error
-              "Invalid key: %a"
-              Alpha_context.Cache.pp_identifier
-              identifier
+              "Invalid contract: %a"
+              Alpha_context.Contract.pp
+              contract
             >>= fun () -> return_unit
         | Some rank -> cctxt#message "%d" rank >>= fun () -> return_unit);
     command

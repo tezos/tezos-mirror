@@ -359,7 +359,17 @@ module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
 
 module Cache = struct
-  type identifier = {namespace : string; id : string}
+  type index = int
+
+  type size = int
+
+  type identifier = string
+
+  type namespace = string
+
+  let compare_namespace = Compare.String.compare
+
+  type internal_identifier = {namespace : namespace; id : identifier}
 
   let separator = '@'
 
@@ -372,43 +382,26 @@ module Cache = struct
            separator)
     else namespace
 
-  let string_of_identifier {namespace; id} =
-    let (namespace : string) = (namespace :> string) in
+  let string_of_internal_identifier {namespace; id} =
     namespace ^ String.make 1 separator ^ id
 
-  let identifier_of_string raw =
-    match String.split_on_char '@' raw with
+  let internal_identifier_of_string raw =
+    match String.split_on_char separator raw with
     | [] -> assert false
     | namespace :: id ->
+        (* An identifier may contain [separator], hence we concatenate
+           possibly splitted parts of [id]. *)
         {namespace = sanitize namespace; id = String.concat "" id}
 
-  let pp_identifier fmt {namespace; id} =
-    Format.fprintf fmt "%s%c%s" (namespace :> string) separator id
-
-  let identifier_encoding =
-    let open Data_encoding in
-    conv_with_guard
-      (fun {namespace; id} -> ((namespace :> string), id))
-      (fun (namespace, id) ->
-        try Ok {namespace = sanitize namespace; id}
-        with Invalid_argument s -> Error s)
-      (obj2
-         (req "namespace" Data_encoding.string)
-         (req "id" Data_encoding.string))
-
-  type key_maker = KeyMaker of (id:string -> Context.Cache.key)
-
-  include Raw_context.Cache
-
-  let identifier_of_key key =
+  let internal_identifier_of_key key =
     let raw = Raw_context.Cache.identifier_of_key key in
-    identifier_of_string raw
+    internal_identifier_of_string raw
 
-  let key_of_identifier ~cache_index identifier =
-    let raw = string_of_identifier identifier in
+  let key_of_internal_identifier ~cache_index identifier =
+    let raw = string_of_internal_identifier identifier in
     Raw_context.Cache.key_of_identifier ~cache_index raw
 
-  let key_maker =
+  let make_key =
     let namespaces = ref [] in
     fun ~cache_index ~namespace ->
       let namespace = sanitize namespace in
@@ -419,14 +412,116 @@ module Cache = struct
              (namespace :> string))
       else (
         namespaces := namespace :: !namespaces ;
-        KeyMaker
-          (fun ~id ->
-            let identifier = {namespace; id} in
-            key_of_identifier ~cache_index identifier))
+        fun ~id ->
+          let identifier = {namespace; id} in
+          key_of_internal_identifier ~cache_index identifier)
 
-  let list_keys context ~cache_index =
-    Raw_context.Cache.list_keys context ~cache_index
-    |> List.map (fun (raw, size) -> (identifier_of_string raw, size))
+  module NamespaceMap = Map.Make (struct
+    type t = namespace
 
-  let key_rank context key = Raw_context.Cache.key_rank context key
+    let compare = compare_namespace
+  end)
+
+  type partial_key_handler = t -> string -> Context.Cache.value tzresult Lwt.t
+
+  let value_of_key_handlers : partial_key_handler NamespaceMap.t ref =
+    ref NamespaceMap.empty
+
+  module Admin = struct
+    include Raw_context.Cache
+
+    let list_keys context ~cache_index =
+      Raw_context.Cache.list_keys context ~cache_index
+
+    let key_rank context key = Raw_context.Cache.key_rank context key
+
+    let value_of_key ctxt key =
+      (* [value_of_key] is a maintainance operation: it is typically run
+         when a node reboots. For this reason, this operation is not
+         carbonated. *)
+      let ctxt = Gas.set_unlimited ctxt in
+      let {namespace; id} = internal_identifier_of_key key in
+      match NamespaceMap.find namespace !value_of_key_handlers with
+      | Some value_of_key -> value_of_key ctxt id
+      | None ->
+          failwith
+            (Format.sprintf
+               "No handler for key `%s%c%s'"
+               namespace
+               separator
+               id)
+  end
+
+  module type CLIENT = sig
+    val cache_index : int
+
+    val namespace : namespace
+
+    type cached_value
+
+    val value_of_identifier : t -> identifier -> cached_value tzresult Lwt.t
+  end
+
+  module type INTERFACE = sig
+    type cached_value
+
+    val update : t -> identifier -> (cached_value * int) option -> t
+
+    val find : t -> identifier -> cached_value option Lwt.t
+
+    val list_identifiers : t -> (identifier * int) list
+
+    val identifier_rank : t -> identifier -> int option
+  end
+
+  let register_exn (type cvalue)
+      (module C : CLIENT with type cached_value = cvalue) :
+      (module INTERFACE with type cached_value = cvalue) =
+    if
+      Compare.Int.(
+        C.cache_index < 0
+        || C.cache_index >= List.length Constants_repr.cache_layout)
+    then invalid_arg "Cache index is invalid" ;
+    let mk = make_key ~cache_index:C.cache_index ~namespace:C.namespace in
+    (module struct
+      type cached_value = C.cached_value
+
+      type Admin.value += K of cached_value
+
+      let () =
+        let voi ctxt i =
+          C.value_of_identifier ctxt i >>=? fun v -> return (K v)
+        in
+        value_of_key_handlers :=
+          NamespaceMap.add C.namespace voi !value_of_key_handlers
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
+         Make sure that this operation is correctly carbonated. *)
+      let update ctxt id v =
+        let v = Option.map (fun (v, size) -> (K v, size)) v in
+        Admin.update ctxt (mk ~id) v
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
+         Make sure that this operation is correctly carbonated. *)
+      let find ctxt id =
+        Admin.find ctxt (mk ~id) >>= function
+        | None -> Lwt.return None
+        | Some (K v) -> Lwt.return (Some v)
+        | _ ->
+            (* This execution path is impossible because all the keys of
+               C's namespace (which is unique to C) are constructed with
+               [K]. This [assert false] could have been pushed into the
+               environment in exchange for extra complexity. The
+               argument that justifies this [assert false] seems
+               simple enough to keep the current design though. *)
+            assert false
+
+      let list_identifiers ctxt =
+        Admin.list_keys ctxt ~cache_index:C.cache_index
+        |> List.filter_map @@ fun (key, age) ->
+           let {namespace; id} = internal_identifier_of_key key in
+           if String.equal namespace C.namespace then Some (id, age) else None
+
+      let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
+    end)
 end

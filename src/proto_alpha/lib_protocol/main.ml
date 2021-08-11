@@ -400,7 +400,7 @@ let finalize_block
           {shell_header with fitness = Alpha_context.Fitness.from_int64 fitness}
           protocol_data
       in
-      Alpha_context.Cache.sync ctxt ~cache_nonce >>= fun ctxt ->
+      Alpha_context.Cache.Admin.sync ctxt ~cache_nonce >>= fun ctxt ->
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
       return (ctxt, receipt)
 

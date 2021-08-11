@@ -277,12 +277,12 @@ module type CACHE = sig
 
   (** [list_keys cache_handle ctxt] returns the list of cached keys in
      cache numbered [cache_handle] along with their respective
-     [size]. The returned list is sorted in terms of their age in the
+     [age]. The returned list is sorted in terms of their age in the
      cache, the oldest coming first. *)
-  val list_keys : t -> cache_index:index -> (identifier * size) list
+  val list_keys : t -> cache_index:index -> (key * int) list
 
   (** [key_rank index ctxt key] returns the number of cached value older
-       than the given [key]; or, [-1] if the [key] is not a cache key. *)
+       than the given [key]; or, [None] if the [key] is not a cache key. *)
   val key_rank : t -> key -> int option
 
   (** {3 Cache helpers for RPCs} *)

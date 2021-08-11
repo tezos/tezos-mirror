@@ -105,6 +105,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_set.mli script_set.ml
    script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
+   script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -205,6 +206,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_set.mli script_set.ml
    script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
+   script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -305,6 +307,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_set.mli script_set.ml
    script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
+   script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -427,6 +430,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_set
    Script_map
    Script_ir_translator
+   Script_cache
    Script_tc_errors_registration
    Script_interpreter_defs
    Script_interpreter
@@ -566,6 +570,7 @@ include Tezos_raw_protocol_alpha.Main
    script_set.mli script_set.ml
    script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
+   script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
