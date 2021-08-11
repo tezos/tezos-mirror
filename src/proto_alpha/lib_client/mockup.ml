@@ -808,7 +808,7 @@ end
 (* ------------------------------------------------------------------------- *)
 (* RPC context *)
 
-let initial_context (header : Block_header.shell_header)
+let initial_context chain_id (header : Block_header.shell_header)
     ({bootstrap_accounts; bootstrap_contracts; constants; _} :
       Protocol_parameters.t) =
   let parameters =
@@ -828,7 +828,48 @@ let initial_context (header : Block_header.shell_header)
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
   Protocol.Main.init ctxt header >|= Protocol.Environment.wrap_tzresult
-  >>=? fun {context; _} -> return context
+  >>=? fun {context; _} ->
+  let ({
+         timestamp = predecessor_timestamp;
+         level = predecessor_level;
+         fitness = predecessor_fitness;
+         _;
+       }
+        : Block_header.shell_header) =
+    header
+  in
+  let timestamp =
+    Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
+  in
+  (*
+
+     We need to forge a predecessor hash to pass it to [value_of_key].
+     This initial context is used for RPC, hence this piece of
+     information is not important and does not have to be meaningful
+
+  *)
+  let predecessor =
+    Tezos_base.Block_header.hash {shell = header; protocol_data = Bytes.empty}
+  in
+  Protocol.Main.value_of_key
+    ~chain_id
+    ~predecessor_context:context
+    ~predecessor_timestamp
+    ~predecessor_level
+    ~predecessor_fitness
+    ~predecessor
+    ~timestamp
+  >|= Protocol.Environment.wrap_tzresult
+  >>=? fun value_of_key ->
+  (*
+      In the mockup mode, reactivity is important and there are
+      no constraints to be consistent with other nodes. For this
+      reason, the mockup mode loads the cache lazily.
+      See {!Environment_context.source_of_cache}.
+  *)
+  Tezos_protocol_environment.Context.load_cache context `Lazy (fun key ->
+      value_of_key key >|= Protocol.Environment.wrap_tzresult)
+  >>=? fun context -> return context
 
 let mem_init :
     cctxt:Tezos_client_base.Client_context.full ->
@@ -900,7 +941,12 @@ let mem_init :
             (Data_encoding.Json.print_error ?print_unknown:None)
             error))
   >>=? fun bootstrap_accounts_custom ->
+  let chain_id =
+    Tezos_mockup_registration.Mockup_args.Chain_id.choose
+      ~from_config_file:protocol_overrides.chain_id
+  in
   initial_context
+    chain_id
     shell_header
     {
       parameters with
@@ -911,10 +957,6 @@ let mem_init :
       constants = protocol_custom;
     }
   >>=? fun context ->
-  let chain_id =
-    Tezos_mockup_registration.Mockup_args.Chain_id.choose
-      ~from_config_file:protocol_overrides.chain_id
-  in
   return
     ( chain_id,
       Tezos_protocol_environment.

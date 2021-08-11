@@ -174,7 +174,19 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
             })
 
 let finalize_block st =
-  finalize_block st.state >|= fun x ->
+  let operations = List.rev st.rev_operations in
+  let operations_hash =
+    Operation_list_list_hash.compute
+      [Operation_list_hash.compute (List.map Operation.hash_packed operations)]
+  in
+  let shell_header =
+    {
+      st.header.shell with
+      level = Int32.succ st.header.shell.level;
+      operations_hash;
+    }
+  in
+  finalize_block st.state (Some shell_header) >|= fun x ->
   Environment.wrap_tzresult x >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =

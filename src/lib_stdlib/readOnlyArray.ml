@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,46 +23,71 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is the location where the proxy tweaks the behavior of a vanilla
-    client. A regular mockup client uses a [Memory_context] in place of this
-    implementation. Compared to [Memory_context], this instance features a
-    [M.ProxyDelegate] which under the hood relies on [Proxy_getter].
+(**
 
-    Whereas [Memory_context] is a regular recursive map, [Proxy_context] obtains
-    values by delegating to endpoints when receiving requests. Hence, right
-    after having created an [empty] value with an instance of [M.ProxyDelegate],
-    this value is as filled as the distant endpoint it delegates to. *)
+   This is an internal module used to factorize code between {!FallbackArray}
+   and {!FunctionalArray}.
 
-open Tezos_protocol_environment
+*)
 
-module M : sig
-  type key = string list (* as in environment_context.mli *)
+type 'a t = 'a Array.t
 
-  type value = Bytes.t (* as in environment_context.mli *)
+(**
 
-  type tree = Tezos_context_memory.Context.tree
+    [make length fallback] creates an array of [length] + 1
+    elements. The final cell is reserved to store the [fallback]
+    value.
 
-  module type ProxyDelegate = sig
-    (** Whether [mem] would return Some Dir _ *)
-    val proxy_dir_mem : key -> bool tzresult Lwt.t
+*)
+let make length fallback =
+  let length = 1 + max 0 length in
+  Array.make length fallback
 
-    (** The value associated to [key] *)
-    val proxy_get : key -> tree option tzresult Lwt.t
+let init length fallback make_cell =
+  let a = make length fallback in
+  for i = 0 to length - 1 do
+    Array.unsafe_set a i (make_cell i)
+  done ;
+  a
 
-    (** Whether [get] would return Some Key _ *)
-    val proxy_mem : key -> bool tzresult Lwt.t
-  end
+let fallback array =
+  let len = Array.length array in
+  Array.unsafe_get array (len - 1)
 
-  type proxy_delegate = (module ProxyDelegate)
+let get array idx =
+  let len = Array.length array in
+  if idx >= 0 && idx < len then Array.unsafe_get array idx
+  else Array.unsafe_get array (len - 1)
 
-  val empty : tree
+let length array = Array.length array - 1
 
-  type t
-end
+let iter f array =
+  for idx = 0 to length array - 1 do
+    f (Array.unsafe_get array idx)
+  done
 
-type _ Context.kind += Context : M.t Context.kind
+let iteri f array =
+  for idx = 0 to length array - 1 do
+    f idx (Array.unsafe_get array idx)
+  done
 
-(** Constructs an empty context, possibly giving the delegate (the function
-    querying the endpoint) right away.
-    Otherwise set it later with [set delegate] *)
-val empty : M.proxy_delegate option -> Context.t
+let map f array =
+  let out = make (length array) (f (fallback array)) in
+  for idx = 0 to length array - 1 do
+    Array.unsafe_set out idx (f (Array.unsafe_get array idx))
+  done ;
+  out
+
+let mapi f array =
+  let out = make (length array) (f (-1) (fallback array)) in
+  for idx = 0 to length array - 1 do
+    Array.unsafe_set out idx (f idx (Array.unsafe_get array idx))
+  done ;
+  out
+
+let fold f array init =
+  let rec aux accu idx =
+    if idx > length array - 1 then accu
+    else aux (f accu (Array.unsafe_get array idx)) (idx + 1)
+  in
+  aux init 0

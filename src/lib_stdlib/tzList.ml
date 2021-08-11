@@ -110,3 +110,12 @@ let index_of ?(compare = Stdlib.compare) item list =
 let rec find_map f = function
   | [] -> None
   | x :: l -> ( match f x with None -> find_map f l | r -> r)
+
+let fold_left_i f init l =
+  List.fold_left
+    (fun (i, accu) x ->
+      let accu = f i accu x in
+      (i + 1, accu))
+    (0, init)
+    l
+  |> snd

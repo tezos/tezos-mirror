@@ -100,7 +100,7 @@ This sequence of operations was run:
 Injected block [BLOCK_HASH]
 { 0xaa ; 0xbb ; 0xcc }
 Node is bootstrapped.
-Estimated gas: 2081.921 units (will add 100 for safety)
+Estimated gas: 1204.982 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -111,13 +111,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.00048
+    Fee to the baker: ꜩ0.000392
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2182
+    Gas limit: 1305
     Storage limit: 38 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.00048
-      fees(the baker who will include this operation,4) ... +ꜩ0.00048
+      [CONTRACT_HASH] ................ -ꜩ0.000392
+      fees(the baker who will include this operation,4) ... +ꜩ0.000392
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -127,7 +127,7 @@ This sequence of operations was run:
       Updated storage: { 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 2081.921
+      Consumed gas: 1204.982
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.0045
 

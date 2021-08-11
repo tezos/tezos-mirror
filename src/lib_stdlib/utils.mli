@@ -37,5 +37,10 @@ end
     [sub] used internally. *)
 val cut : ?copy:bool -> int -> Bytes.t -> Bytes.t list
 
-(** [do_n_times n f] executes [f] [n] times. *)
+(** [do_n_times n f] executes [f] [n] times.
+    If [n] is negative, [invalid_arg "do_n_times"] is executed. *)
 val do_n_times : int -> (unit -> unit) -> unit
+
+(** [fold_n_times n f] composes [f] [n] times.
+    If [n] is negative, [invalid_arg "fold_n_times"] is executed. *)
+val fold_n_times : int -> ('a -> 'a) -> 'a -> 'a

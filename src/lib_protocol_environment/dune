@@ -16,6 +16,7 @@
           Environment_V1
           Environment_V2
           Environment_V3
+          Environment_cache
           Environment_context
           Environment_context_intf
           Environment_protocol_T

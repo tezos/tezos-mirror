@@ -59,4 +59,19 @@ module Liquidity_baking : sig
     Alpha_context.Contract.t shell_tzresult Lwt.t
 end
 
+module Cache : sig
+  val list_keys :
+    'a #RPC_context.simple ->
+    'a ->
+    cache_index:int ->
+    (Alpha_context.Cache.identifier * int) list shell_tzresult Lwt.t
+
+  val key_rank :
+    'a #RPC_context.simple ->
+    'a ->
+    cache_index:int ->
+    identifier:Alpha_context.Cache.identifier ->
+    int option shell_tzresult Lwt.t
+end
+
 val register : unit -> unit

@@ -191,3 +191,118 @@ val get_hash_version : t -> Context_hash.Version.t
     Returns an Error if the hash version is unsupported. *)
 val set_hash_version :
   t -> Context_hash.Version.t -> t Error_monad.shell_tzresult Lwt.t
+
+type cache_key
+
+type cache_value = ..
+
+module type CACHE = sig
+  (** Abstract type of a cache. A cache is made of subcaches. Each
+     subcache has its own size limit. The limit of its subcache is
+     called a layout and can be initialized via the [set_cache_layout]
+     function. *)
+  type t
+
+  (** Size for subcaches and values of the cache. Units are not
+     specified and left to the economic protocol. *)
+  type size
+
+  (** Index type to index caches. *)
+  type index
+
+  (** Identifier type for keys. *)
+  type identifier
+
+  (** A key uniquely identifies a cached [value] in some subcache. *)
+  type key
+
+  (** Cached values inhabit an extensible type. *)
+  type value = ..
+
+  (** [key_of_identifier ~cache_index identifier] builds a key from the
+      [cache_index] and the [identifier].
+
+      No check are made to ensure the validity of the index.  *)
+  val key_of_identifier : cache_index:index -> identifier -> key
+
+  (** [identifier_of_key key] returns the identifier associated to the
+      [key]. *)
+  val identifier_of_key : key -> identifier
+
+  (** [pp fmt cache] is a pretty printter for a [cache]. *)
+  val pp : Format.formatter -> t -> unit
+
+  (** [find ctxt k = Some v] if [v] is the value associated to [k] in
+     in the cache where [k] is. Returns [None] if there is no such
+     value in the cache of [k].  This function is in the Lwt monad
+     because if the value has not been constructed, it is constructed
+     on the fly. *)
+  val find : t -> key -> value option Lwt.t
+
+  (** [set_cache_layout ctxt layout] sets the caches of [ctxt] to
+     comply with given [layout]. If there was already a cache in
+     [ctxt], it is erased by the new layout.
+
+     Otherwise, a fresh collection of empty caches is reconstructed
+     from the new [layout]. Notice that cache [key]s are invalidated
+     in that case, i.e., [get t k] will return [None]. *)
+  val set_cache_layout : t -> size list -> t Lwt.t
+
+  (** [update ctxt k (Some (e, size))] returns a cache where the value
+      [e] of [size] is associated to key [k]. If [k] is already in the
+      cache, the cache entry is updated.
+
+      [update ctxt k None] removes [k] from the cache. *)
+  val update : t -> key -> (value * size) option -> t
+
+  (** [sync ctxt ~cache_nonce] updates the context with the domain of
+     the cache computed so far. Such function is expected to be called
+     at the end of the validation of a block, when there is no more
+     accesses to the cache.
+
+     [cache_nonce] identifies the block that introduced new cache
+     entries. The nonce should identify uniquely the block which
+     modifies this value. It cannot be the block hash for circularity
+     reasons: The value of the nonce is stored onto the context and
+     consequently influences the context hash of the very same
+     block. Such nonce cannot be determined by the shell and its
+     computation is delegated to the economic protocol.
+  *)
+  val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
+
+  (** [clear ctxt] removes all cache entries. *)
+  val clear : t -> t
+
+  (** {3 Cache introspection} *)
+
+  (** [list_keys cache_handle ctxt] returns the list of cached keys in
+     cache numbered [cache_handle] along with their respective
+     [size]. The returned list is sorted in terms of their age in the
+     cache, the oldest coming first. *)
+  val list_keys : t -> cache_index:index -> (identifier * size) list
+
+  (** [key_rank index ctxt key] returns the number of cached value older
+       than the given [key]; or, [-1] if the [key] is not a cache key. *)
+  val key_rank : t -> key -> int option
+
+  (** {3 Cache helpers for RPCs} *)
+
+  (** [future_cache_expectation ctxt ~time_in_blocks] returns [ctxt] except
+      that the entries of the caches that are presumably too old to
+      still be in the caches in [n_blocks] are removed.
+
+      This function is based on a heuristic. The context maintains
+      the median of the number of removed entries: this number is
+      multipled by `n_blocks` to determine the entries that are
+      likely to be removed in `n_blocks`. *)
+  val future_cache_expectation : t -> time_in_blocks:int -> t
+end
+
+module Cache :
+  CACHE
+    with type t := t
+     and type size := int
+     and type index := int
+     and type identifier := string
+     and type key = cache_key
+     and type value = cache_value

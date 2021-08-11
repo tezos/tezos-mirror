@@ -42,6 +42,8 @@ module type V3 = sig
        and type Operation_list_hash.t = Operation_list_hash.t
        and type Operation_list_list_hash.t = Operation_list_list_hash.t
        and type Context.t = Context.t
+       and type Context.cache_key = Environment_context.Context.cache_key
+       and type Context.cache_value = Environment_context.Context.cache_value
        and type Context_hash.t = Context_hash.t
        and type Context_hash.Version.t = Context_hash.Version.t
        and type Protocol_hash.t = Protocol_hash.t
@@ -295,9 +297,7 @@ struct
 
       include ENCODER with type t := t
 
-      module Set : INDEXES_SET with type elt = t
-
-      module Map : INDEXES_MAP with type key = t
+      include INDEXES with type t := t
     end
 
     module type MERKLE_TREE = sig
@@ -953,6 +953,8 @@ struct
     module type PROTOCOL =
       Environment_protocol_T_V3.T
         with type context := Context.t
+         and type cache_value := Environment_context.Context.cache_value
+         and type cache_key := Environment_context.Context.cache_key
          and type quota := quota
          and type validation_result := validation_result
          and type rpc_context := rpc_context
@@ -986,16 +988,30 @@ struct
 
     module type TREE = Environment_context.TREE
 
+    module type CACHE = Environment_context.CACHE
+
     let register_resolver = Base58.register_resolver
 
     let complete ctxt s = Base58.complete ctxt s
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
+    let environment_version = Protocol.V3
+
     include P
 
     let begin_partial_application ~chain_id ~ancestor_context
         ~predecessor_timestamp ~predecessor_fitness raw_block =
+      (*
+
+        [begin_partial_application] is called in the multipass
+        validation process with a context that can be older than
+        the one of the predecessor block. For this reason, values
+        in the in-memory caches can be outdated. Hence, the caches
+        must be cleared.
+
+      *)
+      let ancestor_context = Context.Cache.clear ancestor_context in
       begin_partial_application
         ~chain_id
         ~ancestor_context
@@ -1004,8 +1020,49 @@ struct
         raw_block
       >|= wrap_tzresult
 
+    let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+        ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+      value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      >|= wrap_tzresult
+      >>=? fun f -> return (fun x -> f x >|= wrap_tzresult)
+
+    (*
+       [load_predecessor_cache] ensures that the cache is correctly
+       loaded in memory before running any operations.
+    *)
+    let load_predecessor_cache ~chain_id ~predecessor_context
+        ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
+        ~predecessor ~timestamp ~cache =
+      value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      >>=? fun value_of_key ->
+      Context.load_cache predecessor_context cache value_of_key
+
     let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
-        ~predecessor_fitness raw_block =
+        ~predecessor_fitness ~cache (raw_block : block_header) =
+      load_predecessor_cache
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level:(Int32.pred raw_block.shell.level)
+        ~predecessor_fitness
+        ~predecessor:raw_block.shell.predecessor
+        ~timestamp:raw_block.shell.timestamp
+        ~cache
+      >>=? fun predecessor_context ->
       begin_application
         ~chain_id
         ~predecessor_context
@@ -1016,7 +1073,17 @@ struct
 
     let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
-        ?protocol_data () =
+        ?protocol_data ~cache () =
+      load_predecessor_cache
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+        ~cache
+      >>=? fun predecessor_context ->
       begin_construction
         ~chain_id
         ~predecessor_context
@@ -1031,11 +1098,10 @@ struct
 
     let apply_operation c o = apply_operation c o >|= wrap_tzresult
 
-    let finalize_block c = finalize_block c >|= wrap_tzresult
+    let finalize_block c shell_header =
+      finalize_block c shell_header >|= wrap_tzresult
 
     let init c bh = init c bh >|= wrap_tzresult
-
-    let environment_version = Protocol.V3
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

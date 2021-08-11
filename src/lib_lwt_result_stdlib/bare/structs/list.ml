@@ -475,6 +475,36 @@ let fold_left_es f acc = function
   | [] -> return acc
   | x :: xs -> lwt_apply2 f acc x >>=? fun acc -> fold_left_es f acc xs
 
+let fold_left_i f init l =
+  fold_left
+    (fun (i, accu) x ->
+      let accu = f i accu x in
+      (i + 1, accu))
+    (0, init)
+    l
+  |> snd
+
+let fold_left_i_e f acc l =
+  fold_left_e
+    (fun (i, acc) x -> f i acc x >>? fun acc -> Ok (i + 1, acc))
+    (0, acc)
+    l
+  >>? fun (_, acc) -> Ok acc
+
+let fold_left_i_s f acc l =
+  fold_left_s
+    (fun (i, acc) x -> f i acc x >>= fun acc -> Lwt.return (i + 1, acc))
+    (0, acc)
+    l
+  >>= fun (_, acc) -> Lwt.return acc
+
+let fold_left_i_es f acc l =
+  fold_left_es
+    (fun (i, acc) x -> f i acc x >>=? fun acc -> return (i + 1, acc))
+    (0, acc)
+    l
+  >>=? fun (_, acc) -> return acc
+
 let filter_p f l =
   rev_map_p (fun x -> f x >|= fun b -> if b then Some x else None) l
   >|= rev_filter_some

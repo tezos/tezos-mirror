@@ -68,3 +68,7 @@ val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
     Present in OCaml 4.10: this function can be removed once we catch
     up. *)
 val find_map : ('a -> 'b option) -> 'a list -> 'b option
+
+(** [fold_left_i f init l] is equivalent to [fold_left] except that
+    the index of the element is passed as a first argument to [f]. *)
+val fold_left_i : (int -> 'b -> 'a -> 'b) -> 'b -> 'a list -> 'b

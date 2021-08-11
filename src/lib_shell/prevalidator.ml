@@ -1275,7 +1275,7 @@ module Make
     let w = Lazy.force worker in
     let pv = Worker.state w in
     ( pv.validation_state >>?= fun state ->
-      Prevalidation.status state >>=? fun status ->
+      Prevalidation.status state None >>=? fun status ->
       return status.block_result.fitness )
     >|= function
     | Ok fitness -> fitness

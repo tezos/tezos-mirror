@@ -208,7 +208,7 @@ let apply_with_gas header ?(operations = []) (pred : Block.t) =
     vstate
     operations
   >>=? fun vstate ->
-  finalize_block vstate >|=? fun (validation, result) ->
+  finalize_block vstate (Some header.shell) >|=? fun (validation, result) ->
   (validation.context, result.consumed_gas))
   >|= Environment.wrap_tzresult
   >|=? fun (context, consumed_gas) ->

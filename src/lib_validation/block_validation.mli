@@ -93,7 +93,7 @@ type apply_environment = {
       (** user activated protocol overrides *)
 }
 
-(** [apply env header ops] get the protocol [P] of the context of the predecessor
+(** [apply env header ops] gets the protocol [P] of the context of the predecessor
     block and calls successively:
     1. [P.begin_application]
     2. [P.apply]
@@ -101,6 +101,7 @@ type apply_environment = {
 *)
 val apply :
   apply_environment ->
+  cache:Environment_context.Context.source_of_cache ->
   Block_header.t ->
   Operation.t list list ->
-  result tzresult Lwt.t
+  (result * Environment_context.Context.cache) tzresult Lwt.t

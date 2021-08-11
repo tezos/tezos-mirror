@@ -704,23 +704,39 @@ let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
     inc
     (List.flatten operations)
   >>=? fun final_inc ->
-  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
-  return
-    (final_inc, (validation_result, metadata), operations, expected_validity)
-
-(* Build the block header : mimics node prevalidation *)
-let finalize_block_header shell_header ~timestamp validation_result operations
-    predecessor_block_metadata_hash predecessor_ops_metadata_hash =
-  let {Tezos_protocol_environment.context; fitness; message; _} =
-    validation_result
-  in
-  let validation_passes = List.length Main.validation_passes in
   let operations_hash : Operation_list_list_hash.t =
     Operation_list_list_hash.compute
       (List.map
          (fun sl ->
            Operation_list_hash.compute (List.map Operation.hash_packed sl))
          operations)
+  in
+  let validation_passes = List.length Main.validation_passes in
+  let final_inc =
+    {
+      final_inc with
+      header =
+        {
+          final_inc.header with
+          operations_hash;
+          validation_passes;
+          level = Int32.succ final_inc.header.level;
+        };
+    }
+  in
+  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
+  return
+    (final_inc, (validation_result, metadata), operations, expected_validity)
+
+(* Build the block header : mimics node prevalidation *)
+let finalize_block_header shell_header ~timestamp validation_result
+    predecessor_block_metadata_hash predecessor_ops_metadata_hash =
+  let {Tezos_protocol_environment.context; fitness; message; _} =
+    validation_result
+  in
+  let header =
+    Tezos_base.Block_header.
+      {shell_header with fitness; context = Context_hash.zero}
   in
   let context = Shell_context.unwrap_disk_context context in
   (match predecessor_block_metadata_hash with
@@ -738,18 +754,7 @@ let finalize_block_header shell_header ~timestamp validation_result operations
   | None -> Lwt.return context)
   >>= fun context ->
   let context = Context.hash ~time:timestamp ?message context in
-  let header =
-    Tezos_base.Block_header.
-      {
-        shell_header with
-        level = Int32.succ shell_header.level;
-        validation_passes;
-        operations_hash;
-        fitness;
-        context;
-      }
-  in
-  return header
+  return {header with context}
 
 let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
@@ -883,7 +888,6 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           final_context.header
           ~timestamp:min_valid_timestamp
           validation_result
-          operations
           block_info.predecessor_block_metadata_hash
           block_info.predecessor_operations_metadata_hash
         >>= function
@@ -1225,7 +1229,6 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 final_context.header
                 ~timestamp:valid_timestamp
                 validation_result
-                operations
                 bi.predecessor_block_metadata_hash
                 bi.predecessor_operations_metadata_hash
               >>= function

@@ -74,6 +74,8 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
+val init_context : Context.t -> Context.t Lwt.t
+
 include
   Updater.PROTOCOL
     with type block_header_data = Alpha_context.Block_header.protocol_data

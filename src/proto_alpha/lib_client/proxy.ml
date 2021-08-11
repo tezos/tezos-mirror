@@ -160,6 +160,7 @@ let initial_context
     empty
     ["version"]
     (Bytes.of_string version_value)
+  >>= fun ctxt -> Protocol.Main.init_context ctxt
 
 let time_between_blocks (rpc_context : RPC_context.json)
     (chain : Tezos_shell_services.Block_services.chain)

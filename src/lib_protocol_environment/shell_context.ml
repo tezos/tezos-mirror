@@ -38,19 +38,16 @@ include Environment_context.Register (C)
 let impl_name = "shell"
 
 let checkout index context_hash =
-  Tezos_context.Context.checkout index context_hash >|= function
-  | Some ctxt ->
-      Some
-        (Context.Context
-           {ops; ctxt; kind = Context; equality_witness; impl_name})
-  | None -> None
+  Tezos_context.Context.checkout index context_hash
+  >|= Option.map @@ fun ctxt ->
+      Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
 let checkout_exn index context_hash =
   Tezos_context.Context.checkout_exn index context_hash >|= fun ctxt ->
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
+  Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
 let wrap_disk_context ctxt =
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
+  Context.make ~ops ~ctxt ~kind:Context ~equality_witness ~impl_name
 
 let unwrap_disk_context : t -> Tezos_context.Context.t = function
   | Context.Context {ctxt; kind = Context; _} -> ctxt

@@ -47,6 +47,7 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     Readable
     step_constants
     ~script
+    ~cached_script:None
     ~entrypoint
     ~parameter:parameter_expr
     ~internal:false

@@ -278,18 +278,20 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | _ -> failwith "Unexpected result"
 
 let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?branch (contents : t contents_list) =
+    ?branch ?(latency = Plugin.default_operation_inclusion_latency)
+    (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature = None}}
   in
   let oph = Operation.hash op in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Plugin.RPC.Scripts.run_operation
+  Plugin.RPC.Scripts.simulate_operation
     cctxt
     (chain, block)
     ~op:(Operation.pack op)
     ~chain_id
+    ~latency
   >>=? function
   | (Operation_data op', Operation_metadata result) -> (
       match

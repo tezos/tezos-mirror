@@ -111,6 +111,7 @@ module Config_file = struct
           ; "POST /chains/*/blocks/*/helpers/forge/operations"
           ; "POST /chains/*/blocks/*/helpers/preapply/*"
           ; "POST /chains/*/blocks/*/helpers/scripts/run_operation"
+          ; "POST /chains/*/blocks/*/helpers/scripts/simulate_operation"
           ; "POST /chains/*/mempool/request_operations"; "POST /injection/block"
           ; "POST /injection/protocol" ]
 

@@ -123,6 +123,43 @@ module Liquidity_baking = struct
     RPC_context.make_call0 S.get_cpmm_address ctxt block () ()
 end
 
+module Cache = struct
+  module S = struct
+    let list_keys =
+      RPC_service.get_service
+        ~description:"Return the list of cached keys"
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            list @@ tup2 Alpha_context.Cache.identifier_encoding int31)
+        RPC_path.(custom_root / "context" / "cache" /: RPC_arg.int / "keys")
+
+    let key_rank =
+      RPC_service.post_service
+        ~description:
+          "Return the number of cache keys older than the provided key"
+        ~query:RPC_query.empty
+        ~input:Alpha_context.Cache.identifier_encoding
+        ~output:Data_encoding.(option int31)
+        RPC_path.(custom_root / "context" / "cache" /: RPC_arg.int / "rank")
+  end
+
+  let register () =
+    let open Services_registration in
+    register1 ~chunked:true S.list_keys (fun ctxt cache_index () () ->
+        Alpha_context.Cache.list_keys ctxt ~cache_index |> return) ;
+    register1 ~chunked:false S.key_rank (fun ctxt cache_index () identifier ->
+        Alpha_context.Cache.(
+          let key = key_of_identifier ~cache_index identifier in
+          key_rank ctxt key |> return))
+
+  let list_keys ctxt block ~cache_index =
+    RPC_context.make_call1 S.list_keys ctxt block cache_index () ()
+
+  let key_rank ctxt block ~cache_index ~identifier =
+    RPC_context.make_call1 S.key_rank ctxt block cache_index () identifier
+end
+
 let register () =
   Contract.register () ;
   Constants.register () ;
@@ -130,4 +167,5 @@ let register () =
   Nonce.register () ;
   Voting.register () ;
   Sapling.register () ;
-  Liquidity_baking.register ()
+  Liquidity_baking.register () ;
+  Cache.register ()

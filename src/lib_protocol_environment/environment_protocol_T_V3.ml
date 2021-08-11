@@ -114,10 +114,25 @@ module type T = sig
 
   val finalize_block :
     validation_state ->
+    Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
   val rpc_services : rpc_context RPC_directory.t
 
   val init :
     context -> Block_header.shell_header -> validation_result tzresult Lwt.t
+
+  type cache_value
+
+  type cache_key
+
+  val value_of_key :
+    chain_id:Chain_id.t ->
+    predecessor_context:context ->
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor_level:Int32.t ->
+    predecessor_fitness:Fitness.t ->
+    predecessor:Block_hash.t ->
+    timestamp:Time.Protocol.t ->
+    (cache_key -> cache_value tzresult Lwt.t) tzresult Lwt.t
 end

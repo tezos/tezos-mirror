@@ -113,11 +113,11 @@ module Mock_protocol : Registration.PROTOCOL = struct
 
   let begin_construction ~chain_id:_ ~predecessor_context:_
       ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_
-      ~predecessor:_ ~timestamp:_ ?protocol_data:_ _ =
+      ~predecessor:_ ~timestamp:_ ?protocol_data:_ ~cache:_ _ =
     assert false
 
   let begin_application ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_fitness:_ _ =
+      ~predecessor_timestamp:_ ~predecessor_fitness:_ ~cache:_ _ =
     assert false
 
   let begin_partial_application ~chain_id:_ ~ancestor_context:_
@@ -149,6 +149,10 @@ module Mock_protocol : Registration.PROTOCOL = struct
   let max_block_length = 0
 
   let hash = Protocol_hash.hash_string [""]
+
+  let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+      ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+    assert false
 end
 
 module Mock_mockup : Registration.MOCKUP = struct

@@ -357,3 +357,76 @@ let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
+
+module Cache = struct
+  type identifier = {namespace : string; id : string}
+
+  let separator = '@'
+
+  let sanitize namespace =
+    if String.contains namespace separator then
+      invalid_arg
+        (Format.asprintf
+           "Invalid cache namespace: '%s'. Character %c is forbidden."
+           namespace
+           separator)
+    else namespace
+
+  let string_of_identifier {namespace; id} =
+    let (namespace : string) = (namespace :> string) in
+    namespace ^ String.make 1 separator ^ id
+
+  let identifier_of_string raw =
+    match String.split_on_char '@' raw with
+    | [] -> assert false
+    | namespace :: id ->
+        {namespace = sanitize namespace; id = String.concat "" id}
+
+  let pp_identifier fmt {namespace; id} =
+    Format.fprintf fmt "%s%c%s" (namespace :> string) separator id
+
+  let identifier_encoding =
+    let open Data_encoding in
+    conv_with_guard
+      (fun {namespace; id} -> ((namespace :> string), id))
+      (fun (namespace, id) ->
+        try Ok {namespace = sanitize namespace; id}
+        with Invalid_argument s -> Error s)
+      (obj2
+         (req "namespace" Data_encoding.string)
+         (req "id" Data_encoding.string))
+
+  type key_maker = KeyMaker of (id:string -> Context.Cache.key)
+
+  include Raw_context.Cache
+
+  let identifier_of_key key =
+    let raw = Raw_context.Cache.identifier_of_key key in
+    identifier_of_string raw
+
+  let key_of_identifier ~cache_index identifier =
+    let raw = string_of_identifier identifier in
+    Raw_context.Cache.key_of_identifier ~cache_index raw
+
+  let key_maker =
+    let namespaces = ref [] in
+    fun ~cache_index ~namespace ->
+      let namespace = sanitize namespace in
+      if List.mem ~equal:String.equal namespace !namespaces then
+        invalid_arg
+          (Format.sprintf
+             "Cache key namespace %s already exist."
+             (namespace :> string))
+      else (
+        namespaces := namespace :: !namespaces ;
+        KeyMaker
+          (fun ~id ->
+            let identifier = {namespace; id} in
+            key_of_identifier ~cache_index identifier))
+
+  let list_keys context ~cache_index =
+    Raw_context.Cache.list_keys context ~cache_index
+    |> List.map (fun (raw, size) -> (identifier_of_string raw, size))
+
+  let key_rank context key = Raw_context.Cache.key_rank context key
+end

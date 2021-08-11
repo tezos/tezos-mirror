@@ -139,9 +139,9 @@ let may_force_protocol_upgrade ~user_activated_upgrades ~level
   | None -> Lwt.return validation_result
   | Some hash ->
       let ctxt = Shell_context.unwrap_disk_context validation_result.context in
-      Context.add_protocol ctxt hash >|= fun ctxt ->
+      Context.add_protocol ctxt hash >>= fun ctxt ->
       let context = Shell_context.wrap_disk_context ctxt in
-      {validation_result with context}
+      Lwt.return {validation_result with context}
 
 (** Applies user activated updates based either on block level or on
     voted protocols *)
@@ -266,8 +266,9 @@ module Make (Proto : Registered_protocol.T) = struct
                 >>=? fun () -> return op))
       operations
 
-  let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
-      ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
+  let apply chain_id ~cache ~user_activated_upgrades
+      ~user_activated_protocol_overrides ~max_operations_ttl
+      ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~predecessor_context ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
@@ -297,6 +298,7 @@ module Make (Proto : Registered_protocol.T) = struct
          ~predecessor_timestamp:predecessor_block_header.shell.timestamp
          ~predecessor_fitness:predecessor_block_header.shell.fitness
          block_header
+         ~cache
      >>=? fun state ->
        List.fold_left_es
          (fun (state, acc) ops ->
@@ -312,7 +314,8 @@ module Make (Proto : Registered_protocol.T) = struct
          operations
        >>=? fun (state, ops_metadata) ->
        let ops_metadata = List.rev ops_metadata in
-       Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+       Proto.finalize_block state (Some block_header.shell)
+       >>=? fun (validation_result, block_data) ->
        return (validation_result, block_data, ops_metadata) )
      >>= function
      | Error err -> fail (invalid_block (Economic_protocol_error err))
@@ -398,6 +401,7 @@ module Make (Proto : Registered_protocol.T) = struct
          Validation_errors.Cannot_serialize_operation_metadata
          (fail (Exn exn)))
     >>=? fun ops_metadata ->
+    let (Context {cache; _}) = validation_result.context in
     let context = Shell_context.unwrap_disk_context validation_result.context in
     (match new_protocol_env_version with
     | Protocol.V0 -> return (None, None)
@@ -423,13 +427,14 @@ module Make (Proto : Registered_protocol.T) = struct
       }
     in
     return
-      {
-        validation_store;
-        block_metadata;
-        ops_metadata;
-        block_metadata_hash;
-        ops_metadata_hashes;
-      }
+      ( {
+          validation_store;
+          block_metadata;
+          ops_metadata;
+          block_metadata_hash;
+          ops_metadata_hashes;
+        },
+        cache )
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
@@ -492,7 +497,7 @@ let apply
       predecessor_block_metadata_hash;
       predecessor_ops_metadata_hash;
       predecessor_context;
-    } block_header operations =
+    } ~cache block_header operations =
   let block_hash = Block_header.hash block_header in
   Context.get_protocol predecessor_context >>= fun pred_protocol_hash ->
   (match Registered_protocol.get pred_protocol_hash with
@@ -512,6 +517,7 @@ let apply
     ~predecessor_block_metadata_hash
     ~predecessor_ops_metadata_hash
     ~predecessor_context
+    ~cache
     ~block_header
     operations
   >>= function

@@ -263,19 +263,13 @@ end
 open Tezos_protocol_environment
 include Environment_context.Register (C)
 
-let impl_name = "proxy"
+let proxy_impl_name = "proxy"
 
 let empty proxy =
   let ctxt = M.{proxy; local = Local.empty} in
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let set_delegate : M.proxy_delegate -> Context.t -> Context.t =
- fun proxy (Context.Context t) ->
-  match t.kind with
-  | Context ->
-      let ctxt = {t.ctxt with proxy = Some proxy} in
-      Context.Context {t with ctxt}
-  | _ ->
-      Environment_context.err_implementation_mismatch
-        ~expected:impl_name
-        ~got:t.impl_name
+  Context.make
+    ~ops
+    ~ctxt
+    ~kind:Context
+    ~equality_witness
+    ~impl_name:proxy_impl_name

@@ -50,6 +50,7 @@ open Environment_context
 module type T = sig
   (* Documentation for this interface may be found in
      module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
+
   include Environment_protocol_T_V3.T
 
   val environment_version : Protocol.env_version
@@ -74,18 +75,128 @@ module V0toV3
      and type operation_data = E.operation_data
      and type operation = E.operation
      and type operation_receipt = E.operation_receipt
-     and type validation_state = E.validation_state = struct
+     and type validation_state = E.validation_state
+     and type cache_key = Context.Cache.key
+     and type cache_value = Context.Cache.value = struct
   include E
+
+  let finalize_block vs _ = E.finalize_block vs
 
   (* Add backwards compatibility shadowing here *)
   let relative_position_within_block = compare_operations
+
+  let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+      ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+    return (fun _ ->
+        Lwt.return
+          (Error_monad.generic_error
+             "element_of_key called on environment protocol < V3"))
+
+  type cache_key = Context.Cache.key
+
+  type cache_value = Context.Cache.value
 end
 
-(* [module type PROTOCOL] is protocol signature that the shell can use*)
-module type PROTOCOL =
-  T
-    with type context := Context.t
-     and type quota := quota
-     and type validation_result := validation_result
-     and type rpc_context := rpc_context
-     and type 'a tzresult := 'a Error_monad.tzresult
+(* [module type PROTOCOL] is protocol signature that the shell can use.
+
+   A module of this signature is typically obtained through an adapter
+   (see Lift functors in environment definitions) of the Main module
+   (which complies with the [Updater] signature).
+
+*)
+module type PROTOCOL = sig
+  include
+    T
+      with type context := Context.t
+       and type quota := quota
+       and type validation_result := validation_result
+       and type rpc_context := rpc_context
+       and type 'a tzresult := 'a Error_monad.tzresult
+       and type cache_key := Context.Cache.key
+       and type cache_value := Context.Cache.value
+
+  val environment_version : Protocol.env_version
+
+  val begin_application :
+    chain_id:Chain_id.t ->
+    predecessor_context:Context.t ->
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor_fitness:Fitness.t ->
+    cache:Context.source_of_cache ->
+    block_header ->
+    validation_state Error_monad.tzresult Lwt.t
+
+  val begin_construction :
+    chain_id:Chain_id.t ->
+    predecessor_context:Context.t ->
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor_level:Int32.t ->
+    predecessor_fitness:Fitness.t ->
+    predecessor:Block_hash.t ->
+    timestamp:Time.Protocol.t ->
+    ?protocol_data:block_header_data ->
+    cache:Context.source_of_cache ->
+    unit ->
+    validation_state Error_monad.tzresult Lwt.t
+
+  val finalize_block :
+    validation_state ->
+    Block_header.shell_header option ->
+    (validation_result * block_header_metadata) tzresult Lwt.t
+end
+
+(*
+
+   For environment V where V < V3, the caching mechanism is ignored.
+   The following functor provides a protocol adapter to implement
+   this.
+
+*)
+module IgnoreCaches
+    (P : T
+           with type context := Context.t
+            and type quota := quota
+            and type validation_result := validation_result
+            and type rpc_context := rpc_context
+            and type 'a tzresult := 'a Error_monad.tzresult) =
+struct
+  include P
+
+  let init context header =
+    Context.Cache.set_cache_layout context [] >>= fun context ->
+    init context header
+
+  let begin_partial_application ~chain_id ~ancestor_context
+      ~predecessor_timestamp ~predecessor_fitness raw_block =
+    begin_partial_application
+      ~chain_id
+      ~ancestor_context
+      ~predecessor_timestamp
+      ~predecessor_fitness
+      raw_block
+
+  let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_fitness ~cache:_ raw_block =
+    begin_application
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_fitness
+      raw_block
+
+  let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
+      ?protocol_data ~cache:_ () =
+    begin_construction
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+      ?protocol_data
+      ()
+
+  let finalize_block c shell_header = P.finalize_block c shell_header
+end

@@ -100,4 +100,12 @@ module Micheline_size : sig
   val of_node : node -> t
 end
 
+(** [micheline_nodes root] returns the number of internal nodes in the
+   micheline expression held from [root]. *)
 val micheline_nodes : node -> int
+
+(** [node_size root] returns the size of the in-memory representation
+   of [root] in bytes. This is an over-approximation of the memory
+   actually consumed by [root] since no sharing is taken into
+   account. *)
+val node_size : node -> int

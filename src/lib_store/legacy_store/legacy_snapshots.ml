@@ -939,8 +939,12 @@ let import ?patch_context ~data_dir ~user_activated_upgrades
         }
       in
       (* ... we can now call apply ... *)
-      Tezos_validation.Block_validation.apply env block_header operations
-      >>=? fun block_validation_result ->
+      Tezos_validation.Block_validation.apply
+        env
+        block_header
+        operations
+        ~cache:`Lazy
+      >>=? fun (block_validation_result, _) ->
       check_context_hash_consistency
         block_validation_result.validation_store
         block_header

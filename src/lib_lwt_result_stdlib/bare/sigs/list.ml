@@ -589,6 +589,22 @@ module type S = sig
     'b list ->
     ('a, 'trace) result Lwt.t
 
+  val fold_left_i : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+  val fold_left_i_e :
+    (int -> 'a -> 'b -> ('a, 'trace) result) ->
+    'a ->
+    'b list ->
+    ('a, 'trace) result
+
+  val fold_left_i_s : (int -> 'a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
+
+  val fold_left_i_es :
+    (int -> 'a -> 'b -> ('a, 'trace) result Lwt.t) ->
+    'a ->
+    'b list ->
+    ('a, 'trace) result Lwt.t
+
   (** This function is not tail-recursive *)
   val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 

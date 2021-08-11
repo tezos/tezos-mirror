@@ -165,6 +165,47 @@ module Make (Registration : Registration.S) = struct
       >>=? fun context_json ->
       match Persistent_mockup_environment.of_json context_json with
       | persisted_mockup ->
+          let ({
+                 timestamp = predecessor_timestamp;
+                 level = predecessor_level;
+                 fitness = predecessor_fitness;
+                 _;
+               }
+                : Block_header.shell_header) =
+            persisted_mockup.rpc_context.block_header
+          in
+          let timestamp =
+            Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
+          in
+          let predecessor = persisted_mockup.rpc_context.block_hash in
+          get_registered_mockup (Some persisted_mockup.protocol_hash) printer
+          >>=? fun (module Mockup) ->
+          (*
+             In the mockup mode, reactivity is important and there are
+             no constraints to be consistent with other nodes. For this
+             reason, the mockup mode loads the cache lazily.
+             See {!Environment_context.source_of_cache}.
+          *)
+          Mockup.Protocol.value_of_key
+            ~chain_id:persisted_mockup.chain_id
+            ~predecessor_context:persisted_mockup.rpc_context.context
+            ~predecessor_timestamp
+            ~predecessor_level
+            ~predecessor_fitness
+            ~predecessor
+            ~timestamp
+          >>=? fun value_of_key ->
+          Tezos_protocol_environment.Context.load_cache
+            persisted_mockup.rpc_context.context
+            `Lazy
+            value_of_key
+          >>=? fun context ->
+          let persisted_mockup =
+            {
+              persisted_mockup with
+              rpc_context = {persisted_mockup.rpc_context with context};
+            }
+          in
           mockup_context_from_persisted persisted_mockup printer
           >>=? fun (((module Mockup_environment), _) as res) ->
           (match protocol_hash with
