@@ -78,16 +78,6 @@ type error += Canceled
 let () =
   register_error_kind
     `Temporary
-    ~id:"utils.Canceled"
-    ~title:"Canceled"
-    ~description:"Canceled"
-    Data_encoding.unit
-    (function Canceled -> Some () | _ -> None)
-    (fun () -> Canceled)
-
-let () =
-  register_error_kind
-    `Temporary
     ~id:"canceled"
     ~title:"Canceled"
     ~description:"A promise was unexpectedly canceled"
