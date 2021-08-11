@@ -58,6 +58,9 @@ let () =
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
+  Protocol_migration.register
+    ~migrate_from:Protocol.current_mainnet
+    ~migrate_to:Alpha ;
   User_activated_upgrade.register
     ~migrate_from:Protocol.current_mainnet
     ~migrate_to:Alpha ;
