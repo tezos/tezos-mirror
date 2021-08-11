@@ -411,7 +411,11 @@ module type NEXT = sig
 end
 
 module Global_constants = struct
-  module Map =
+  module Map :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Script_repr.expr =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
