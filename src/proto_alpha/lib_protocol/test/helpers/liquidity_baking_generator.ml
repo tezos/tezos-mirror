@@ -29,6 +29,8 @@ open Lib_test
 
 let total_xtz = 32_000_000_000_000L
 
+let ten_subsidies = 25_000_000L
+
 let rec remove_last_element = function
   | [_] -> []
   | x :: rst -> x :: remove_last_element rst
@@ -60,16 +62,16 @@ let gen_specs : int -> int -> specs QCheck.Gen.t =
         will set-up in the specs. Note that there will be one more
         implicit accounts, the [Holder], that we will use to reach the
         expected balances for the CPMM and the implicit accounts. *)
-  let* accounts_numbers = int_range 1 10 in
+  let* accounts_numbers = int_range 10 20 in
   (* 2. To keep the generator simpler, we do not try to strictly reach
         the [total_tzbtc] and [total_liquidity] value, but rather we
         compute maxima for the implicit accounts balances from
         them. *)
-  (* 2.1. We divide at most the half of the [total_xtz] that we need
-          to share to the implicit accounts. The rationale is to
-          provide a large amount to xtz to [Holder], so that we do not
-          have to worry about it being “rich enough.” *)
-  let max_xtz = Int64.(div total_xtz (of_int (2 * accounts_numbers))) in
+  (* 2.1. We divide a fraction of the [total_xtz] that we need to
+          share to the implicit accounts. The rationale is to provide
+          a large amount to xtz to [Holder], so that we do not have to
+          worry about it being “rich enough.” *)
+  let max_xtz = Int64.(div total_xtz (of_int (50 * accounts_numbers))) in
   (* 2.2. We divide [total_tzbtc] between the implicit accounts *and*
           the CPMM contract. *)
   let max_tzbtc = total_tzbtc / (accounts_numbers + 1) in
@@ -154,7 +156,12 @@ let genopt_step_tzbtc_to_xtz :
     Qcheck_helpers.int_strictly_positive_gen
       (SymbolicMachine.get_tzbtc_balance source env state)
   in
-  pure @@ Some (SellTzBTC {source; destination; tzbtc_deposit})
+  (* See note (2) *)
+  if
+    SymbolicMachine.get_tzbtc_balance env.cpmm_contract env state
+    < Int.max_int - tzbtc_deposit
+  then pure @@ Some (SellTzBTC {source; destination; tzbtc_deposit})
+  else pure None
 
 let genopt_step_xtz_to_tzbtc :
     ?source:contract_id ->
@@ -172,7 +179,12 @@ let genopt_step_xtz_to_tzbtc :
          1
          (Int64.to_int @@ SymbolicMachine.get_xtz_balance source state))
   in
-  pure @@ Some (BuyTzBTC {source; destination; xtz_deposit})
+  (* See note (2) *)
+  if
+    SymbolicMachine.get_xtz_balance env.cpmm_contract state
+    < Int64.(sub max_int (add ten_subsidies xtz_deposit))
+  then pure @@ Some (BuyTzBTC {source; destination; xtz_deposit})
+  else pure None
 
 let genopt_step_add_liquidity :
     ?source:contract_id ->
@@ -190,16 +202,24 @@ let genopt_step_add_liquidity :
   in
   let*? source = genopt_account_with_xtz ?choice:source env state in
   let*? destination = genopt_account ?choice:destination env in
-  let* candidate =
-    Qcheck_helpers.int64_strictly_positive_gen
-      (SymbolicMachine.get_xtz_balance source state)
-  in
-  let xtz_deposit =
-    find_xtz_deposit
-      candidate
-      (SymbolicMachine.get_tzbtc_balance source env state)
-  in
-  pure @@ Some (AddLiquidity {source; destination; xtz_deposit})
+  let source_xtz_pool = SymbolicMachine.get_xtz_balance source state in
+  (* the source needs at least one xtz *)
+  if 1L < source_xtz_pool then
+    let* candidate =
+      Qcheck_helpers.int64_strictly_positive_gen source_xtz_pool
+    in
+    let xtz_deposit =
+      find_xtz_deposit
+        candidate
+        (SymbolicMachine.get_tzbtc_balance source env state)
+    in
+    (* See note (2) *)
+    if
+      SymbolicMachine.get_xtz_balance env.cpmm_contract state
+      < Int64.(sub max_int (add ten_subsidies xtz_deposit))
+    then pure @@ Some (AddLiquidity {source; destination; xtz_deposit})
+    else pure None
+  else pure None
 
 let genopt_step_remove_liquidity :
     ?source:contract_id ->
@@ -322,3 +342,10 @@ let arb_adversary_scenario :
    because a prefix of a valid scenario remains a valid
    scenario. Removing a random element of a scenario could lead to an
    invalid scenario.  *)
+
+(* Note (2)
+
+   If we are not being careful, it is possible to provoke an overflow
+   in the xtzPool and tzbtcPool. We try to avoid that as much as
+   possible by being very careful with the steps that are likely to
+   add xtz to the contract. *)
