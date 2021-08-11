@@ -1,11 +1,12 @@
 TMP=/tmp
 
-CURRENT_PROTO=009-PsFLoren
-CURRENT_PROTO_NAME=Florence
-CURRENT_PROTO_HASH=PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-NEXT_PROTO=010-PtGRANAD
-NEXT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-NEXT_PROTO_NAME=Granada
+CURRENT_PROTO=010-PtGRANAD
+CURRENT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+CURRENT_PROTO_NAME=Granada
+## To be uncommented when protocol H is completed
+# NEXT_PROTO=010-PtGRANAD					      #
+# NEXT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV #
+# NEXT_PROTO_NAME=Granada					      #
 ALPHA_PROTO=alpha
 ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
@@ -13,11 +14,17 @@ ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 all: accusations_simple_double_baking \
 	accusations_simple_double_endorsing \
 	voting_demo_noops \
-	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
-	daemons_upgrade_next \
 	daemons_upgrade_alpha \
 	node_synchronization
+# all: accusations_simple_double_baking \
+# 	accusations_simple_double_endorsing \
+# 	voting_demo_noops \
+# 	user_activated_upgrade_next \
+# 	user_activated_upgrade_alpha \
+# 	daemons_upgrade_next \
+# 	daemons_upgrade_alpha \
+# 	node_synchronization
 
 # The following rules define how to build Tezos binaries if they are
 # missing.

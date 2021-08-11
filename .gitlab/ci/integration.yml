@@ -71,7 +71,7 @@ integration:sandboxes:acc-endorsement:
 integration:sandboxes:u-a-u:
   extends: .integration_template
   script:
-    - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_next
+    # - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_next
     - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_alpha
   artifacts:
     paths:
@@ -83,7 +83,7 @@ integration:sandboxes:u-a-u:
 integration:sandboxes:daemons-upgrade:
   extends: .integration_template
   script:
-    - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_next
+    # - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_next
     - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_alpha
   artifacts:
     paths:

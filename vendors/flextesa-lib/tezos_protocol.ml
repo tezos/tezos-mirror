@@ -510,10 +510,14 @@ module Pretty_print = struct
     let header = field ~k:"header" block_json in
     let level = field ~k:"level" header |> get_int in
     let timestamp = field ~k:"timestamp" header |> get_string in
-    let voting_kind = metadata |> field ~k:"voting_period_kind" |> get_string in
+    let voting_kind =
+      metadata |> field ~k:"voting_period_info"
+      |> field ~k:"voting_period"
+      |> field ~k:"kind"
+      |> get_string in
     let voting_pos =
-      metadata |> field ~k:"level"
-      |> field ~k:"voting_period_position"
+      metadata |> field ~k:"voting_period_info"
+      |> field ~k:"position"
       |> get_int in
     let voting_nth =
       metadata |> field ~k:"level" |> field ~k:"voting_period" |> get_int in
