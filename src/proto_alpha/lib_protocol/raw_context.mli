@@ -64,7 +64,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Florence_009
+type previous_protocol = Genesis of Parameters_repr.t | Granada_010
 
 val prepare_first_block :
   level:int32 ->
