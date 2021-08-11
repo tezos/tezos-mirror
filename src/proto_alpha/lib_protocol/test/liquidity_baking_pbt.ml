@@ -222,7 +222,7 @@ let validate_storage :
 let machine_validation_tests =
   [
     QCheck.Test.make
-      ~count:5
+      ~count:10
       ~name:"Concrete/Symbolic Consistency"
       (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 10)
       (fun (specs, scenario) ->
@@ -232,7 +232,7 @@ let machine_validation_tests =
            ValidationMachine.run ~invariant scenario env state >>=? fun _ ->
            return_unit));
     QCheck.Test.make
-      ~count:5
+      ~count:10
       ~name:"Storage consistency"
       (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 10)
       (fun (specs, scenario) ->
@@ -242,7 +242,7 @@ let machine_validation_tests =
            ConcreteMachine.run ~invariant scenario env state >>=? fun _ ->
            return_unit));
     QCheck.Test.make
-      ~count:1000
+      ~count:100_000
       ~name:"Positive pools"
       (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
@@ -259,12 +259,9 @@ let machine_validation_tests =
 let economic_tests =
   [
     QCheck.Test.make
-      ~count:100
+      ~count:100_000
       ~name:"No global gain"
-      (Liquidity_baking_generator.arb_adversary_scenario
-         1_000_000
-         1_000_000
-         100)
+      (Liquidity_baking_generator.arb_adversary_scenario 1_000_000 1_000_000 50)
       (fun (specs, attacker, scenario) ->
         let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
@@ -272,9 +269,9 @@ let economic_tests =
         in
         true);
     QCheck.Test.make
-      ~count:1000
+      ~count:100_000
       ~name:"Remove liquidities is consistent"
-      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 20)
+      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
         let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
@@ -282,9 +279,9 @@ let economic_tests =
         in
         true);
     QCheck.Test.make
-      ~count:1000
+      ~count:100_000
       ~name:"Share price only increases"
-      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 20)
+      (Liquidity_baking_generator.arb_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
         let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
         let _ =
