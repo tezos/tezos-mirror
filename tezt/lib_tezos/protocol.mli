@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Edo | Florence | Alpha
+type t = Edo | Florence | Granada | Alpha
 
 (** Protocol parameters.
 

@@ -25,11 +25,15 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Edo | Florence | Alpha
+type t = Edo | Florence | Granada | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function Alpha -> "Alpha" | Edo -> "Edo" | Florence -> "Florence"
+let name = function
+  | Alpha -> "Alpha"
+  | Edo -> "Edo"
+  | Florence -> "Florence"
+  | Granada -> "Granada"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -38,6 +42,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Edo -> "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
   | Florence -> "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
+  | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
 
 let default_constants = Constants_sandbox
 
@@ -53,6 +58,7 @@ let parameter_file ?(constants = default_constants) protocol =
     | Alpha -> "proto_alpha"
     | Edo -> "proto_008_PtEdo2Zk"
     | Florence -> "proto_009_PsFLoren"
+    | Granada -> "proto_010_PtGRANAD"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
@@ -60,6 +66,7 @@ let daemon_name = function
   | Alpha -> "alpha"
   | Edo -> "008-PtEdo2Zk"
   | Florence -> "009-PsFLoren"
+  | Granada -> "010-PtGRANAD"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -91,18 +98,20 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   Lwt.return overriden_parameters
 
 let next_protocol = function
+  | Granada -> Some Alpha
   | Edo -> Some Florence
-  | Florence -> Some Alpha
+  | Florence -> Some Granada
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Florence
+  | Alpha -> Some Granada
+  | Granada -> Some Florence
   | Florence -> Some Edo
   | Edo -> None
 
-let all = [Alpha; Edo; Florence]
+let all = [Alpha; Edo; Florence; Granada]
 
-let current_mainnet = Edo
+let current_mainnet = Granada
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
