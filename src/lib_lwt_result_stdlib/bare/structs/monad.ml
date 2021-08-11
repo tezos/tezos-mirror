@@ -25,11 +25,15 @@
 
 (** Lwt monad *)
 
+module Lwt = Lwt
+
 let ( >>= ) = Lwt.( >>= )
 
 let ( >|= ) = Lwt.( >|= )
 
 (** result monad *)
+
+module Result = Result
 
 let ok x = Ok x
 
@@ -41,13 +45,42 @@ let ( >|? ) v f = match v with Ok v -> Ok (f v) | Error _ as error -> error
 
 (** lwt-result combined monad *)
 
-let ok_s v = Lwt.return (Ok v)
+module LwtResult = struct
+  let return x = Lwt.return (Ok x)
 
-let return = ok_s
+  let fail x = Lwt.return (Error x)
 
-let error_s v = Lwt.return (Error v)
+  let return_unit = Lwt.return (Ok ())
 
-let fail = error_s
+  let return_none = Lwt.return (Ok None)
+
+  let return_some x = Lwt.return (Ok (Some x))
+
+  let return_true = Lwt.return (Ok true)
+
+  let return_false = Lwt.return (Ok false)
+
+  let return_nil = Lwt.return (Ok [])
+
+  let bind v f = v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
+
+  let bind_error v f =
+    v >>= function Error e -> f e | Ok _ as ok -> Lwt.return ok
+
+  let map f v =
+    v >>= function
+    | Error _ as err -> Lwt.return err
+    | Ok v -> Lwt.return (Ok (f v))
+
+  let map_error f v =
+    v >>= function
+    | Error e -> Lwt.return (Error (f e))
+    | Ok _ as ok -> Lwt.return ok
+end
+
+let return v = Lwt.return (Ok v)
+
+let fail v = Lwt.return (Error v)
 
 let ( >>=? ) v f =
   v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
@@ -70,46 +103,6 @@ let ( >|?= ) v f =
   | Error _ as e -> Lwt.return e
   | Ok v -> f v >>= fun v -> Lwt.return (Ok v)
 
-let unit_s = Lwt.return_unit
-
-let unit_e = Ok ()
-
-let ok_unit = unit_e
-
-let unit_es = Lwt.return unit_e
-
-let return_unit = unit_es
-
-let none_s = Lwt.return_none
-
-let none_e = Ok None
-
-let none_es = Lwt.return none_e
-
-let some_s x = Lwt.return (Some x)
-
-let some_e x = Ok (Some x)
-
-let some_es x = Lwt.return (Ok (Some x))
-
-let nil_s = Lwt.return_nil
-
-let nil_e = Ok []
-
-let nil_es = Lwt.return nil_e
-
-let true_s = Lwt.return_true
-
-let true_e = Ok true
-
-let true_es = Lwt.return true_e
-
-let false_s = Lwt.return_false
-
-let false_e = Ok false
-
-let false_es = Lwt.return false_e
-
 (* joins *)
 
 let join_p = Lwt.join
@@ -124,7 +117,7 @@ let rec join_e_errors errors = function
   | [] -> Error errors
 
 let rec join_e = function
-  | [] -> unit_e
+  | [] -> Result.return_unit
   | Ok () :: ts -> join_e ts
   | Error error :: ts -> join_e_errors [error] ts
 

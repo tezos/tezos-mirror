@@ -27,6 +27,24 @@ open Lwt.Infix
 
 type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e
 
+(* Monad returns (positive, negative, and pre-allocated) *)
+let return x = Ok x
+
+let fail x = Error x
+
+let return_unit = Ok ()
+
+let return_none = Ok None
+
+let return_some x = Ok (Some x)
+
+let return_nil = Ok []
+
+let return_true = Ok true
+
+let return_false = Ok false
+
+(* constructors as functions, including _s variants *)
 let ok x = Ok x
 
 let ok_s x = Lwt.return (Ok x)

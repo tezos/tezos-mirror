@@ -270,11 +270,11 @@ end
 module IterESOf = struct
   let fn r fn y =
     r := fn !r y ;
-    unit_es
+    LwtResult.return_unit
 
   let monotonous r fn const y =
     r := !r + fn const y ;
-    unit_es
+    LwtResult.return_unit
 
   let fn_e r fn y = Lwt.return @@ fn !r y >|=? fun t -> r := t
 
@@ -289,7 +289,7 @@ end
 module IteriESOf = struct
   let fn r fn i y =
     r := fn !r (fn i y) ;
-    unit_es
+    LwtResult.return_unit
 
   let fn_e r fn i y =
     Lwt.return @@ fn i y >>=? fun z ->
@@ -309,7 +309,7 @@ end
 module Iter2ESOf = struct
   let fn r fn x y =
     r := fn x y ;
-    unit_es
+    LwtResult.return_unit
 
   let fn_e r fn x y = Lwt.return @@ fn x y >|=? fun t -> r := t
 

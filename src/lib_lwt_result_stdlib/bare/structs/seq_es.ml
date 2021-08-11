@@ -103,7 +103,7 @@ let fold_left_es f acc seq = fold_left_es f acc @@ protect seq
 
 let rec iter f seq =
   seq () >>=? function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) ->
       f item ;
       iter f seq
@@ -112,21 +112,21 @@ let iter f seq = iter f @@ protect seq
 
 let rec iter_e f seq =
   seq () >>=? function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 
 let rec iter_s f seq =
   seq () >>=? function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq = iter_s f @@ protect seq
 
 let rec iter_es f seq =
   seq () >>=? function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq = iter_es f @@ protect seq

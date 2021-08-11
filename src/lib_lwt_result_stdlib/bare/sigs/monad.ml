@@ -102,44 +102,106 @@
  *)
 
 module type S = sig
-  (** lwt monad *)
+  (** {1 The tower of monads}
 
+      Each monad is given:
+      - a module that groups returns and binds,
+      - a set of infix operators. *)
+
+  (** {2 The Lwt monad: for concurrency} *)
+
+  module Lwt : module type of struct
+    include Lwt
+  end
+
+  (** [(>>=)] is the monad-global infix alias for [Lwt.bind]. *)
   val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
+  (** [(>|=)] is the monad-global infix alias for [Lwt.map]. *)
   val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
-  (** result monad *)
+  (** Note that there is no monad-global alias for [Lwt.return]. *)
 
-  val ok : 'a -> ('a, 'trace) result
+  (** {2 The (generic) Result monad: for success/failure} *)
 
-  val error : 'error -> ('a, 'error) result
+  module Result : Result.S
 
-  val ( >>? ) :
-    ('a, 'trace) result -> ('a -> ('b, 'trace) result) -> ('b, 'trace) result
+  (** [ok] is the monad-global alias for [Result.return]. *)
+  val ok : 'a -> ('a, 'e) result
 
-  val ( >|? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) result
+  (** [error] is the monad-global alias for [Result.fail]. *)
+  val error : 'e -> ('a, 'e) result
 
-  (** lwt-result combined monad *)
+  (** [(>>?)] is the monad-global infix alias for [Result.bind]. *)
+  val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
 
-  val ok_s : 'a -> ('a, 'trace) result Lwt.t
+  (** [(>|?)] is the monad-global infix alias for [Result.map]. *)
+  val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
 
-  val return : 'a -> ('a, 'trace) result Lwt.t
+  (** {2 The combined Lwt+Result monad: for concurrent successes/failures} *)
 
-  val error_s : 'error -> ('a, 'error) result Lwt.t
+  module LwtResult : sig
+    val return : 'a -> ('a, 'e) result Lwt.t
 
-  val fail : 'error -> ('a, 'error) result Lwt.t
+    val fail : 'e -> ('a, 'e) result Lwt.t
 
+    val return_unit : (unit, 'e) result Lwt.t
+
+    val return_none : ('a option, 'e) result Lwt.t
+
+    val return_some : 'a -> ('a option, 'e) result Lwt.t
+
+    val return_nil : ('a list, 'e) result Lwt.t
+
+    val return_true : (bool, 'e) result Lwt.t
+
+    val return_false : (bool, 'e) result Lwt.t
+
+    (* Unlike [Lwt], we do not provide [return_ok] and [return_error]. They
+              would be as follow and it is not clear they would be useful.
+
+       {[
+       val return_ok : 'a -> (('a, 'e) result, 'f) result Lwt.t
+       val return_error : 'e -> (('a, 'e) result, 'f) result Lwt.t
+       ]}
+
+              Note the availability of [return] and [fail]. *)
+
+    val bind :
+      ('a, 'e) result Lwt.t ->
+      ('a -> ('b, 'e) result Lwt.t) ->
+      ('b, 'e) result Lwt.t
+
+    val bind_error :
+      ('a, 'e) result Lwt.t ->
+      ('e -> ('a, 'f) result Lwt.t) ->
+      ('a, 'f) result Lwt.t
+
+    val map : ('a -> 'b) -> ('a, 'e) result Lwt.t -> ('b, 'e) result Lwt.t
+
+    val map_error : ('e -> 'f) -> ('a, 'e) result Lwt.t -> ('a, 'f) result Lwt.t
+  end
+
+  (** [return] is the monad-global alias for [LwtResult.return]. *)
+  val return : 'a -> ('a, 'e) result Lwt.t
+
+  (** [fail] is the monad-global alias for [LwtResult.fail]. *)
+  val fail : 'e -> ('a, 'e) result Lwt.t
+
+  (** [(>>=?)] is the monad-global infix alias for [LwtResult.bind]. *)
   val ( >>=? ) :
-    ('a, 'trace) result Lwt.t ->
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    ('b, 'trace) result Lwt.t
+    ('a, 'e) result Lwt.t ->
+    ('a -> ('b, 'e) result Lwt.t) ->
+    ('b, 'e) result Lwt.t
 
-  val ( >|=? ) :
-    ('a, 'trace) result Lwt.t -> ('a -> 'b) -> ('b, 'trace) result Lwt.t
+  (** [(>|=?)] is the monad-global infix alias for [LwtResult.map]. *)
+  val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
 
-  (** Mixing operators *)
+  (** {1 Mixing operators}
 
-  (** All operators follow this naming convention:
+      These are helpers to "go from one monad into another". *)
+
+  (** All mixing operators follow this naming convention:
       - the first character is [>]
       - the second character is [>] for [bind] and [|] for [map]
       - the next character is [=] for Lwt or [?] for Error
@@ -147,102 +209,44 @@ module type S = sig
       only used for operator that are within both monads. *)
 
   val ( >>?= ) :
-    ('a, 'trace) result ->
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    ('b, 'trace) result Lwt.t
+    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
 
-  val ( >|?= ) :
-    ('a, 'trace) result -> ('a -> 'b Lwt.t) -> ('b, 'trace) result Lwt.t
+  val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
 
-  (** preallocated in-monad values *)
+  (** Note that more micing operators are possible. However, their use is
+      discouraged because they tend to degrade readability. *)
 
-  val unit_s : unit Lwt.t
+  (** {1 Joins}
 
-  val unit_e : (unit, 'trace) result
+      These functions handle lists (or tuples) of in-monad value. *)
 
-  val unit_es : (unit, 'trace) result Lwt.t
-
-  val none_s : 'a option Lwt.t
-
-  val none_e : ('a option, 'trace) result
-
-  val none_es : ('a option, 'trace) result Lwt.t
-
-  val some_s : 'a -> 'a option Lwt.t
-
-  val some_e : 'a -> ('a option, 'trace) result
-
-  val some_es : 'a -> ('a option, 'trace) result Lwt.t
-
-  val nil_s : 'a list Lwt.t
-
-  val nil_e : ('a list, 'trace) result
-
-  val nil_es : ('a list, 'trace) result Lwt.t
-
-  val true_s : bool Lwt.t
-
-  val true_e : (bool, 'trace) result
-
-  val true_es : (bool, 'trace) result Lwt.t
-
-  val false_s : bool Lwt.t
-
-  val false_e : (bool, 'trace) result
-
-  val false_es : (bool, 'trace) result Lwt.t
-
-  (** additional preallocated in-monad values
-
-     this is for backwards compatibility and for similarity with Lwt *)
-
-  val ok_unit : (unit, 'error) result
-
-  val return_unit : (unit, 'error) result Lwt.t
-
-  val ok_none : ('a option, 'trace) result
-
-  val return_none : ('a option, 'trace) result Lwt.t
-
-  val ok_some : 'a -> ('a option, 'trace) result
-
-  val return_some : 'a -> ('a option, 'trace) result Lwt.t
-
-  val ok_nil : ('a list, 'trace) result
-
-  val return_nil : ('a list, 'trace) result Lwt.t
-
-  val ok_true : (bool, 'trace) result
-
-  val return_true : (bool, 'trace) result Lwt.t
-
-  val ok_false : (bool, 'trace) result
-
-  val return_false : (bool, 'trace) result Lwt.t
-
-  (** joins *)
-
+  (** [join_p] is the joining of concurrent unit values (it is [Lwt.join]). *)
   val join_p : unit Lwt.t list -> unit Lwt.t
 
+  (** [all_p] is the joining of concurrent non-unit values (it is [Lwt.all]). *)
   val all_p : 'a Lwt.t list -> 'a list Lwt.t
 
+  (** [both_p] is the joining of two concurrent non-unit values (it is [Lwt.both]). *)
   val both_p : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
-  val join_e : (unit, 'trace) result list -> (unit, 'trace list) result
+  (** [join_e] is the joining of success/failure unit values. *)
+  val join_e : (unit, 'e) result list -> (unit, 'e list) result
 
-  val all_e : ('a, 'trace) result list -> ('a list, 'trace list) result
+  (** [all_e] is the joining of success/failure non-unit values. *)
+  val all_e : ('a, 'e) result list -> ('a list, 'e list) result
 
-  val both_e :
-    ('a, 'trace) result -> ('b, 'trace) result -> ('a * 'b, 'trace list) result
+  (** [both_e] is the joining of two success/failure non-unit values. *)
+  val both_e : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e list) result
 
-  val join_ep :
-    (unit, 'trace) result Lwt.t list -> (unit, 'trace list) result Lwt.t
+  (** [join_ep] is the joining of concurrent success/failure unit values. *)
+  val join_ep : (unit, 'e) result Lwt.t list -> (unit, 'e list) result Lwt.t
 
-  val all_ep :
-    ('a, 'trace) result Lwt.t list -> ('a list, 'trace list) result Lwt.t
+  (** [all_ep] is the joining of concurrent success/failure non-unit values. *)
+  val all_ep : ('a, 'e) result Lwt.t list -> ('a list, 'e list) result Lwt.t
 
+  (** [both_ep] is the joining of two concurrent success/failure non-unit values. *)
   val both_ep :
-    ('a, 'trace) result Lwt.t ->
-    ('b, 'trace) result Lwt.t ->
-    ('a * 'b, 'trace list) result Lwt.t
+    ('a, 'e) result Lwt.t ->
+    ('b, 'e) result Lwt.t ->
+    ('a * 'b, 'e list) result Lwt.t
 end

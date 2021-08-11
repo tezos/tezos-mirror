@@ -62,27 +62,27 @@ let fold_left_es f acc seq =
 
 let rec iter_e f seq =
   match seq () with
-  | Nil -> unit_e
+  | Nil -> Result.return_unit
   | Cons (item, seq) -> f item >>? fun () -> iter_e f seq
 
 let rec iter_s f seq =
   match seq () with
-  | Nil -> unit_s
+  | Nil -> Lwt.return_unit
   | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq =
   match seq () with
-  | Nil -> unit_s
+  | Nil -> Lwt.return_unit
   | Cons (item, seq) -> Lwt.apply f item >>= fun () -> iter_s f seq
 
 let rec iter_es f seq =
   match seq () with
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq =
   match seq () with
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> Lwt.apply f item >>=? fun () -> iter_es f seq
 
 let iter_ep f seq =

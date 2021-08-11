@@ -225,6 +225,21 @@ module type MONAD_EXT = sig
 
   val classify_errors : tztrace -> error_category
 
+  val return : 'a -> ('a, 'e) result Lwt.t
+
+  val return_unit : (unit, 'e) result Lwt.t
+
+  val return_none : ('a option, 'e) result Lwt.t
+
+  val return_some : 'a -> ('a option, 'e) result Lwt.t
+
+  val return_nil : ('a list, 'e) result Lwt.t
+
+  val return_true : (bool, 'e) result Lwt.t
+
+  val return_false : (bool, 'e) result Lwt.t
+
+  (** more defaulting to trace *)
   val fail : 'error -> ('a, 'error trace) result Lwt.t
 
   val error : 'error -> ('a, 'error trace) result

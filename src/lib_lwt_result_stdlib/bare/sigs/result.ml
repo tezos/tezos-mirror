@@ -29,8 +29,43 @@
 
     See {!Lwtreslib} and {!Seq} for general description of traversors and the
     meaning of [_s], [_e], and [_es] suffixes. *)
-module type S = sig
+
+module type MONAD_S = sig
   type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e (***)
+
+  val return : 'a -> ('a, 'e) result
+
+  val return_unit : (unit, 'e) result
+
+  val return_none : ('a option, 'e) result
+
+  val return_some : 'a -> ('a option, 'e) result
+
+  val return_nil : ('a list, 'e) result
+
+  val return_true : (bool, 'e) result
+
+  val return_false : (bool, 'e) result
+
+  val fail : 'e -> ('a, 'e) result
+
+  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
+
+  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
+
+  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+end
+
+module type S = sig
+  include MONAD_S
+
+  (* We do not provide all of the [_e] and [_es] functions that you might expect
+     based on other modules such as [Option]. This is because the returned
+     values are results within results ([(('a, 'e) result, 'ee) result]) which
+     are often impractical. It is possible to achieve manually in the rare
+     occasions where it might be appropriate. *)
 
   val ok : 'a -> ('a, 'e) result
 
@@ -44,19 +79,13 @@ module type S = sig
 
   val value_f : ('a, 'e) result -> default:(unit -> 'a) -> 'a
 
-  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-
   val bind_s :
     ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
-
-  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
 
   val bind_error_s :
     ('a, 'e) result -> ('e -> ('a, 'f) result Lwt.t) -> ('a, 'f) result Lwt.t
 
   val join : (('a, 'e) result, 'e) result -> ('a, 'e) result
-
-  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
 
   (* NOTE: [map_e] is [bind] *)
   val map_e : ('a -> ('b, 'e) result) -> ('a, 'e) result -> ('b, 'e) result
@@ -66,8 +95,6 @@ module type S = sig
   (* NOTE: [map_es] is [bind_s] *)
   val map_es :
     ('a -> ('b, 'e) result Lwt.t) -> ('a, 'e) result -> ('b, 'e) result Lwt.t
-
-  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
 
   (* NOTE: [map_error_e] is [bind_error] *)
   val map_error_e :
@@ -137,10 +164,7 @@ module type S = sig
       [catch_only] has the same use as with [catch]. The same restriction on
       catching non-deterministic runtime exceptions applies. *)
   val catch_f :
-    ?catch_only:(exn -> bool) ->
-    (unit -> 'a) ->
-    (exn -> 'error) ->
-    ('a, 'error) result
+    ?catch_only:(exn -> bool) -> (unit -> 'a) -> (exn -> 'e) -> ('a, 'e) result
 
   (** [catch_ef f handler] is equivalent to [join @@ map_error (catch f) handler].
       In other words, it catches exceptions in [f ()] and either returns the
