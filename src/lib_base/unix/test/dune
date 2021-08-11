@@ -1,4 +1,5 @@
 (tests
+ (package tezos-base)
  (names test_unix_error)
  (libraries
    tezos-base.unix

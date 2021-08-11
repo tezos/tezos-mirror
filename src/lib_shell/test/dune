@@ -37,20 +37,25 @@
 
 (rule
  (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_shell.exe})))
 
 (rule
  (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_prevalidation.exe})))
 
 (rule
  (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_locator.exe} --no-bench)))
 
 (rule
  (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
 
 (rule
  (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_locator.exe})))
