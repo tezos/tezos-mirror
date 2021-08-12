@@ -1,5 +1,3 @@
-.. _snoop_arch.rst:
-
 Architecture of ``tezos-snoop``
 ===============================
 
@@ -17,7 +15,7 @@ main packages:
 - ``tezos-benchmark`` is a library for performing measurements, writing models
   and infering parameters for these models.
 - ``tezos-micheline-rewriting`` is used to perform rewriting of Micheline terms
-  (documentation available :ref:`here<tezos_micheline_rewriting.rst>`).
+  (documentation available :doc:`here <tezos_micheline_rewriting>`).
   It is mainly used when writing protocol-specific benchmarks but is independent
   from the protocol.
 

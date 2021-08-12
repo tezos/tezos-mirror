@@ -1,5 +1,3 @@
-.. _proposal_testing:
-
 How to Test a Protocol Proposal
 ===============================
 
@@ -52,15 +50,15 @@ This command inserts a new block after which the active protocol is the Alpha
 protocol. From this point on, making the chain progress is straightforward
 because the sandbox contains accounts ``bootstrap1`` to ``bootstrap5`` with
 implicit credentials that allow them to bake blocks by using the usual RPCs in
-the shell (see :ref:`sandboxed-mode`)::
+the shell (see :doc:`../user/sandbox`)::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
 Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Be sure you first read the :ref:`introduction on the testing ecosystem for Tezos <testing>`.
-In addition to system tests written in Python or written in OCaml with :ref:`Tezt <tezt>`,
+Be sure you first read the :doc:`introduction on the testing ecosystem for Tezos <testing>`.
+In addition to system tests written in Python or written in OCaml with :doc:`Tezt <tezt>`,
 unit tests and integration tests for the protocol in OCaml can be found in `src/proto_alpha/lib_protocol/test`.
 It is strongly recommended to write unit tests and integration tests in addition to the
 system tests.
@@ -80,7 +78,7 @@ testing`_ provides detailed indications on how to test a migration, and Section
 `Wrap up the manual migration procedure`_ summarizes these indications by
 collecting all the steps needed to test the migration. Section `Automatic
 migration testing with Tezt`_ describes how to test a migration automatically by
-using a test within the :ref:`Tezt <tezt>` framework, and Section `Wrap up the automatic
+using a test within the :doc:`Tezt <tezt>` framework, and Section `Wrap up the automatic
 migration procedure with Tezt`_ collects all the steps needed to automatically
 test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
 the shell to inspect the context, and Section `Anatomy of migration code`_
@@ -178,11 +176,11 @@ the chain progress.
 When on a context imported from Mainnet, we will use a `snapshot file` (do not
 mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
 which results in a snapshot file like in here) that contains the real status of
-a Mainnet's node at a particular moment in time (see :ref:`snapshots`). Such a
+a Mainnet's node at a particular moment in time (see :doc:`../user/snapshots`). Such a
 snapshot file can be downloaded from several sites on the internet. For
 instance, the site `TulipTools <https://snapshots.tulip.tools/>`_ stores daily
 snapshot files from both Mainnet and Testnet, in both ``full`` and ``rolling``
-mode (see :ref:`history-modes`). For the purposes of testing the migration, a
+mode (see :doc:`../user/history_modes`). For the purposes of testing the migration, a
 snapshot file in ``rolling`` mode is enough. It is important to use a snapshot
 file that is recent enough as to contain the predecessor of the Alpha
 protocol. It is also important to note down the level at which the snapshot file
@@ -742,7 +740,7 @@ Automatic Migration Testing With Tezt
 -------------------------------------
 
 The migration can be automatically tested inside the Tezt framework (see
-:ref:`tezt`) with the test file ``tezt/manual_tests/migration.ml``. The
+:doc:`tezt`) with the test file ``tezt/manual_tests/migration.ml``. The
 automatic migration runs on a context imported from Mainnet, and proceeds as
 follows. First, the migration needs to be prepared by applying steps analogous
 to the steps 1--7 of Section `Prepare the migration`_ above, but with the

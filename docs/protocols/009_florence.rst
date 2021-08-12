@@ -1,5 +1,3 @@
-.. _009_florence:
-
 Protocol 009_PsFLoren Florence
 ==============================
 

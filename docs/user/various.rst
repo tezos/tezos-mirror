@@ -18,7 +18,7 @@ the ``emacs`` folder of the Tezos code base.
 
 Set up the `Michelson mode
 <https://gitlab.com/tezos/tezos/tree/master/emacs>`_ to use the Tezos
-client in :ref:`mockup mode<mockup-mode>` (to typecheck Michelson
+client in :doc:`mockup mode <mockup>` (to typecheck Michelson
 scripts without interacting with a Tezos node) by adding in your
 ``.emacs`` file:
 

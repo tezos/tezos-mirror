@@ -1,5 +1,3 @@
-.. _merge_team:
-
 Merge Team
 ==========
 

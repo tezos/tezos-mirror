@@ -1,5 +1,3 @@
-.. _snoop_example.rst:
-
 Usage example
 =============
 
@@ -22,7 +20,7 @@ Benchmarks correspond to OCaml modules implementing the ``Benchmark.S`` signatur
 These must then be registered via the ``Registration.register`` function.
 Of course, for this registration to happen, the file containing the benchmark
 and the call to ``Registration.register`` should be linked with ``tezos-snoop``.
-See the :ref:`architecture of tezos-snoop <snoop_arch.rst>` for complementary details.
+See the :doc:`architecture of tezos-snoop <snoop_arch>` for complementary details.
 
 We'll define the benchmark module chunk by chunk and describe each part.
 Benchmarks are referenced by ``name``. The ``info`` field is a brief
@@ -41,7 +39,7 @@ the parameters of the samplers used to generate input data to the function
 being benchmarked. This corresponds to the type ``config``. A ``default_config``
 is provided, which can be overridden by specifying a well-formatted JSON file.
 This is made possible by defining a ``config_encoding`` using the
-:ref:`data-encoding<data_encoding>` library.
+:doc:`data-encoding <data_encoding>` library.
 
 .. code-block:: ocaml
 
@@ -56,7 +54,7 @@ This is made possible by defining a ``config_encoding`` using the
 
 Benchmarking involves measuring the execution time of some piece of code
 and using the recorded execution time to fit a model.
-As explained in the :ref:`architecture of tezos-snoop <snoop_arch.rst>`,
+As explained in the :doc:`architecture of tezos-snoop <snoop_arch>`,
 a model is in fact a function of two parameters: a ``workload`` and the
 vector of free parameters to be fitted. The ``workload`` corresponds to
 the information on the input of the function being benchmarked required

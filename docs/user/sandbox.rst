@@ -1,5 +1,3 @@
-.. _sandboxed-mode:
-
 Sandboxed mode
 --------------
 

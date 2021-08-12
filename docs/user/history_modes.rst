@@ -1,5 +1,3 @@
-.. _history-modes:
-
 History modes
 =============
 
@@ -109,7 +107,7 @@ To run a ``full`` node you can either use the command line arguments:
 
    tezos-node run --history-mode full
 
-or use your configuration file as described in :ref:`here <node-conf>`:
+or use your configuration file as described in :doc:`here <node-configuration>`:
 
 .. code-block:: json
 
@@ -145,7 +143,7 @@ To run a ``rolling`` node you can either use the command line arguments:
 
    tezos-node run --history-mode experimental-rolling
 
-or use your configuration file as described in :ref:`here <node-conf>`:
+or use your configuration file as described in :doc:`here <node-configuration>`:
 
 .. code-block:: json
 

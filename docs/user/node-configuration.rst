@@ -1,5 +1,3 @@
-.. _node-conf:
-
 Node Configuration
 ==================
 

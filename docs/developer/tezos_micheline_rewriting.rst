@@ -1,6 +1,3 @@
-.. _tezos_micheline_rewriting.rst:
-
-
 Rewriting Micheline with ``tezos-micheline-rewriting``
 ======================================================
 

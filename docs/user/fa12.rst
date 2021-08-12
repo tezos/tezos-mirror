@@ -1,5 +1,3 @@
-.. _fa12:
-
 FA1.2 asset smart contracts
 ===========================
 

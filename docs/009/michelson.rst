@@ -2295,7 +2295,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
 
-:ref:`005_babylon` deprecated the following instructions. Because no smart
+:doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
@@ -2564,7 +2564,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called :ref:`Micheline`.
+This simple five cases notation is called :doc:`../shell/micheline`.
 
 Constants
 ~~~~~~~~~

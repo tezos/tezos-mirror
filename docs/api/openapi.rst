@@ -1,5 +1,3 @@
-.. _openapi_specification:
-
 OpenAPI Specification
 =====================
 

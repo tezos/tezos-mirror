@@ -1,5 +1,3 @@
-.. _mainnet-october-2019:
-
 Mainnet-Staging October 2019
 ============================
 
@@ -11,8 +9,8 @@ archive mode requires less than 40GB disk space, compared to more than
 200GB before that.
 
 To upgrade a mainnet node which is **in archive mode**, you need to
-bootstrap from scratch (delete the old context and store folders in the 
-``.tezos-node`` data directory, otherwise the node will not start). 
+bootstrap from scratch (delete the old context and store folders in the
+``.tezos-node`` data directory, otherwise the node will not start).
 The synchronization process usually takes a few days. Don't forget to
 run your node with ``--history-mode=archive`` as this setting will be lost.
 

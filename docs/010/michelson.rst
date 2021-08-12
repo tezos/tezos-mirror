@@ -1,5 +1,3 @@
-.. _michelson_010:
-
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
@@ -2205,7 +2203,7 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :ref:`Sapling integration<sapling_dev_010>` page for a more
+Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 
 -  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
@@ -2294,7 +2292,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
 
-:ref:`005_babylon` deprecated the following instructions. Because no smart
+:doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
@@ -2562,7 +2560,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called :ref:`Micheline`.
+This simple five cases notation is called :doc:`../shell/micheline`.
 
 Constants
 ~~~~~~~~~

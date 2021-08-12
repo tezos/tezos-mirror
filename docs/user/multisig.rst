@@ -1,5 +1,3 @@
-.. _multisig:
-
 Multi-signature smart contracts
 ===============================
 
