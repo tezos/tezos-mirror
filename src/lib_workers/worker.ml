@@ -422,11 +422,13 @@ struct
       | Queue_buffer message_queue ->
           List.map
             (function (t, Message (req, _)) -> (t, Request.view req))
-            (Lwt_pipe.Unbounded.peek_all_now message_queue)
+            (try Lwt_pipe.Unbounded.peek_all_now message_queue
+             with Lwt_pipe.Closed -> [])
       | Bounded_buffer message_queue ->
           List.map
             (function (t, Message (req, _)) -> (t, Request.view req))
-            (Lwt_pipe.Bounded.peek_all_now message_queue)
+            (try Lwt_pipe.Bounded.peek_all_now message_queue
+             with Lwt_pipe.Closed -> [])
 
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =

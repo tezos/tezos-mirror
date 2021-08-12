@@ -148,8 +148,10 @@ module Bounded = struct
     else wait_push q >>= fun () -> peek q
 
   let peek_all_now {queue; closed; _} =
-    if closed then []
-    else List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
+    if not (Queue.is_empty queue) then
+      List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
+    else if closed then raise Closed
+    else []
 
   let pop_now ({closed; queue; empty; current_size; _} as q) =
     (* We only check for closed-ness when the queue is empty to allow reading from
@@ -253,8 +255,10 @@ module Unbounded = struct
     else wait_push q >>= fun () -> peek q
 
   let peek_all_now {queue; closed; _} =
-    if closed then []
-    else List.rev (Queue.fold (fun acc e -> e :: acc) [] queue)
+    if not (Queue.is_empty queue) then
+      List.rev (Queue.fold (fun acc e -> e :: acc) [] queue)
+    else if closed then raise Closed
+    else []
 
   let pop_now {closed; queue; empty; _} =
     (* We only check for closed-ness when the queue is empty to allow reading from
