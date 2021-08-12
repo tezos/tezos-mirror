@@ -40,10 +40,11 @@
    shell perspective:
 
    1. The in-memory cache must take chain reorganization into account.
-      (Chain reorganizations occur when the node's preferred chain is
-      not the one that has been chosen by the consensus algorithm.)
+   (Chain reorganizations occur when the node's preferred chain is not
+   the one that has been chosen by the consensus algorithm.)
 
-   2. The in-memory cache must be completely determined by the storage.
+   2. The in-memory cache must be completely determined by the
+   storage.
 
    3. The loading of the cache should not introduce any latency.
 
@@ -51,33 +52,21 @@
    the storage) part. The implementation provided to the protocol is
    implemented in {!module:Environment_context.Cache}.
 
+   The type of a cache is parameterized by the type of the values
+   stored.
+
    When a value is cached, we also stored metadata about the status of
    this value in the cache. The value's key and its metadata are the
-   only data stored in the context. The set of all the keys and metadatas
-   of the cache is called the *domain*.
+   only data stored in the context. The set of all the keys and
+   metadatas of the cache is called the *domain*.
 
-   The actual cached values are introduced at runtime during cache lifetime.
-   When the node needs to load a cache in memory for a specific
-   context, it uses a *builder*, i.e., a function which reconstructs
-   a cached value from a key. We can reconstruct all the values in a
-   cache given its domain. In practice, such builder is provided by
-   the cache mechanism client, i.e., the economic protocol.
-
-   During its loading, a cache can be populated in two different ways:
-
-    - values are computed immediately via the builder and inserted into
-      the cache ; or,
-
-    - the computation of the values is delayed and will be computed
-      only when such value is required.
-
-   The first mode is intended to be used after a rebooting of the
-   node for example. The main benefit being that it does not impact
-   the validation time of a block since the cache's values will be
-   reconstructed beforehand. The second mode is intended to be used
-   for RPCs where reactivity is important: we do not want to recompute
-   the full cache to execute the RPC but only the values which are
-   necessary.
+   The actual cached values are introduced at runtime during cache
+   lifetime.  When the node needs to load a cache in memory for a
+   specific context, it uses a *builder*, i.e., a function which
+   reconstructs a cached value from a key. We can reconstruct all the
+   values in a cache given its domain. In practice, such builder is
+   provided by the cache mechanism client, i.e., the economic
+   protocol.
 
    Finally, notice that the cache is divided into sub-caches which
    have their own size limit. Each sub-cache is referenced by an index
@@ -86,8 +75,8 @@
 
 *)
 
-(** Abstract type for a cache. *)
-type t
+(** Abstract type for a cache parameterized by the value type. *)
+type 'value t
 
 (** {2 Cache layout} *)
 
@@ -124,24 +113,24 @@ type index = int
 (** [uninitialised] is a special value which identify cache without a
    layout. Most functions of this interface will raise
    [Invalid_argument] is they are called on this value. *)
-val uninitialised : t
+val uninitialised : 'value t
 
 (** [from_layout layout] initializes a cache with the [layout]. Such
    function is intended to be called by the [init] function of the
    economic protocol. In particular, this means that the cache's values
    will be reset after stitching of context. *)
-val from_layout : size list -> t
+val from_layout : size list -> 'value t
 
 (** [compatible_layout cache layout] returns [true] if the layout is
    compatible with the one [cache] was initialised with, [false]
    otherwise. By compatible, we mean that the layouts are actually
    precisely the same. *)
-val compatible_layout : t -> size list -> bool
+val compatible_layout : 'value t -> size list -> bool
 
 (** [clear cache] resets the [cache] except the layout. It is
    equivalent to [from_layout layout] where [layout] was the
    [layout] provided to initialise the cache. *)
-val clear : t -> t
+val clear : 'value t -> 'value t
 
 (** {3 Keys} *)
 
@@ -162,35 +151,6 @@ val key_of_identifier : cache_index:index -> identifier -> key
 (** [identifier_of_key key] returns the identifier associated to the
    [key]. *)
 val identifier_of_key : key -> identifier
-
-(** {3 Cached values} *)
-
-(** Abstract type for cached values.
-
-   This type is an extensible type since values stored in the cache
-   are heterogeneous. Notice that the cache must be cleared during
-   during protocol stitching because the data constructors of this
-   type are incompatible between two protocols: if there remains
-   values built with a data constructor of an old protocol, the new
-   protocol will be confused to find that some keys it is interesting
-   in have unexploitable values.
-
-*)
-type value = ..
-
-(** Type of a value which is actually cached.
-
-   Such function allows to delay the computation of the value during
-   lazy loading of the cache as described in {!section:lru-generic}.
-
-   Such a function is not allowed to fail or, in other words,
-   any error during the evaluation of such a function is fatal.
-
-*)
-type delayed_value = unit -> value Lwt.t
-
-(** [delay value] returns [value] when forced. *)
-val delay : value -> delayed_value
 
 (** Metadata associated to a value in the cache. *)
 type value_metadata = {
@@ -223,12 +183,12 @@ type value_metadata = {
     can take time significantly larger than a mere lookup in a table.
     Besides, [find] is in the [Lwt] monad because this computation
     can rely on some I/Os. *)
-val find : t -> key -> value option Lwt.t
+val find : 'value t -> key -> 'value option
 
 (** [lookup cache key] is [Some (v, m)] where [v] is the delayed value
    associated to [key] and [m] is the corresponding metadata. This
    function returns [None] if [key] is not in the cache domain. *)
-val lookup : t -> key -> (delayed_value * value_metadata) option
+val lookup : 'value t -> key -> ('value * value_metadata) option
 
 (** [update cache key request] returns a new version of [cache]
     where a [request]ed change has been applied to the [key].
@@ -248,20 +208,20 @@ val lookup : t -> key -> (delayed_value * value_metadata) option
      The [cache_nonce] of the entry is preserved.
 
 *)
-val update : t -> key -> (value * size) option -> t
+val update : 'value t -> key -> ('value * size) option -> 'value t
 
 (** [update_cache_key caches key value meta] updates the cache to
     associate [key] to the [value] with some [meta]data. *)
-val update_cache_key : t -> key -> delayed_value -> value_metadata -> t
+val update_cache_key : 'value t -> key -> 'value -> value_metadata -> 'value t
 
 (** [insert_entry cache key (v, m)] returns a new version of [cache]
     where [key] is mapped to a new delayed value [v] and metadata [m]. *)
-val insert_entry : t -> key -> delayed_value * value_metadata -> t
+val insert_entry : 'value t -> key -> 'value * value_metadata -> 'value t
 
 (** [future_cache_expectation cache ~time_in_blocks] returns a
    predicted cache that tries to anticipate the state of [cache]
    in [time_in_blocks]. This function is using an heuristic. *)
-val future_cache_expectation : t -> time_in_blocks:int -> t
+val future_cache_expectation : 'value t -> time_in_blocks:int -> 'value t
 
 (** {2 Cache synchronisation} *)
 
@@ -294,24 +254,24 @@ val domain_encoding : domain Data_encoding.t
 
 (** [sync cache ~cache_nonce] computes a new cache with a new domain.
     After the call to [sync] all the layout cache limits are ensured. *)
-val sync : t -> cache_nonce:Bytes.t -> t * domain
+val sync : 'value t -> cache_nonce:Bytes.t -> 'value t * domain
 
 (** Various functions used to introspect the content of the cache. *)
 
 (** [number_of_caches cache] returns the number of sub-caches in the
    cache. *)
-val number_of_caches : t -> int
+val number_of_caches : 'value t -> int
 
 (** [list_keys cache ~cache_index] returns the list of keys (as
    identifier) along with their size recorded into the subcache with
    index [cache_index]. *)
-val list_keys : t -> cache_index:index -> (identifier * size) list
+val list_keys : 'value t -> cache_index:index -> (identifier * size) list
 
 (** [key_rank cache key] returns the rank of the value associated to
    the given [key]. The rank is defined as the number of values older
    than the current one. Returns [None] if the cache does not contain
    the value of if the [key] is not in the cache. *)
-val key_rank : t -> key -> int option
+val key_rank : 'value t -> key -> int option
 
 (** [pp fmt cache] is a pretty printter for a [cache]. *)
-val pp : Format.formatter -> t -> unit
+val pp : Format.formatter -> 'value t -> unit
