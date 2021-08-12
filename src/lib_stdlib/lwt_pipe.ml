@@ -165,14 +165,40 @@ module Bounded = struct
            notify_pop q ;
            elt)
 
-  let rec pop_all_loop q acc =
-    match pop_now q with
-    | None -> List.rev acc
-    | Some e -> pop_all_loop q (e :: acc)
+  let pop_all_queue : type a. a Queue.t -> a list =
+    fun (type a) q ->
+     let exception Local of a list in
+     let rec aux rev_acc =
+       let elt = try Queue.pop q with Queue.Empty -> raise (Local rev_acc) in
+       aux (elt :: rev_acc)
+     in
+     try aux [] with Local rev_acc -> List.rev rev_acc
 
-  let pop_all q = pop q >>= fun e -> Lwt.return (pop_all_loop q [e])
+  let pop_all q =
+    if not (Queue.is_empty q.queue) then (
+      let elements = pop_all_queue q.queue in
+      Lwt_condition.signal q.empty () ;
+      q.current_size <- 0 ;
+      notify_pop q ;
+      Lwt.return (List.map snd elements))
+    else if q.closed then Lwt.fail Closed
+    else
+      wait_push q >>= fun () ->
+      let (_, element) = Queue.pop q.queue in
+      Lwt_condition.signal q.empty () ;
+      q.current_size <- 0 ;
+      notify_pop q ;
+      Lwt.return [element]
 
-  let pop_all_now q = pop_all_loop q []
+  let pop_all_now q =
+    if not (Queue.is_empty q.queue) then (
+      let elements = pop_all_queue q.queue in
+      Lwt_condition.signal q.empty () ;
+      q.current_size <- 0 ;
+      notify_pop q ;
+      List.map snd elements)
+    else if q.closed then raise Closed
+    else []
 
   let close q =
     if not q.closed then (
@@ -270,14 +296,34 @@ module Unbounded = struct
            if Queue.is_empty queue then Lwt_condition.signal empty () ;
            elt)
 
-  let rec pop_all_loop q acc =
-    match pop_now q with
-    | None -> List.rev acc
-    | Some e -> pop_all_loop q (e :: acc)
+  let pop_all_queue : type a. a Queue.t -> a list =
+    fun (type a) q ->
+     let exception Local of a list in
+     let rec aux rev_acc =
+       let elt = try Queue.pop q with Queue.Empty -> raise (Local rev_acc) in
+       aux (elt :: rev_acc)
+     in
+     try aux [] with Local rev_acc -> List.rev rev_acc
 
-  let pop_all q = pop q >>= fun e -> Lwt.return (pop_all_loop q [e])
+  let pop_all q =
+    if not (Queue.is_empty q.queue) then (
+      let elements = pop_all_queue q.queue in
+      Lwt_condition.signal q.empty () ;
+      Lwt.return elements)
+    else if q.closed then Lwt.fail Closed
+    else
+      wait_push q >>= fun () ->
+      let element = Queue.pop q.queue in
+      Lwt_condition.signal q.empty () ;
+      Lwt.return [element]
 
-  let pop_all_now q = pop_all_loop q []
+  let pop_all_now q =
+    if not (Queue.is_empty q.queue) then (
+      let elements = pop_all_queue q.queue in
+      Lwt_condition.signal q.empty () ;
+      elements)
+    else if q.closed then raise Closed
+    else []
 
   let close q =
     if not q.closed then (
