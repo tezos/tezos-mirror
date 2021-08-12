@@ -135,11 +135,11 @@ module Bounded : sig
     is rejected with {!Closed} if [q] is empty and closed. *)
   val peek : 'a t -> 'a Lwt.t
 
-  (** [peek_all q] returns the elements in the [q] (oldest first), or [[]] if
-    empty. It does not remove elements from [q].
+  (** [peek_all_now q] returns the elements in the [q] (oldest first), or [[]]
+      if empty. It does not remove elements from [q].
 
-    @raise {!Closed} if [q] is empty and closed. *)
-  val peek_all : 'a t -> 'a list
+      @raise {!Closed} if [q] is empty and closed. *)
+  val peek_all_now : 'a t -> 'a list
 
   (** [push_now q v] either
       - adds [v] at the ends of [q] immediately and returns [true], or
@@ -262,11 +262,11 @@ module Unbounded : sig
     is rejected with {!Closed} if [q] is empty and closed. *)
   val peek : 'a t -> 'a Lwt.t
 
-  (** [peek_all q] returns the elements in the [q] (oldest first), or [[]] if
-    empty. It does not remove elements from [q].
+  (** [peek_all_now q] returns the elements in the [q] (oldest first), or [[]]
+      if empty. It does not remove elements from [q].
 
-    @raise {!Closed} if [q] is empty and closed. *)
-  val peek_all : 'a t -> 'a list
+      @raise {!Closed} if [q] is empty and closed. *)
+  val peek_all_now : 'a t -> 'a list
 
   (** [pop_now q] may remove and return the first element in [q] if
     [q] contains at least one element.
@@ -391,11 +391,11 @@ module MaybeBounded : sig
     is rejected with {!Closed} if [q] is empty and closed. *)
   val peek : 'a t -> 'a Lwt.t
 
-  (** [peek_all q] returns the elements in the [q] (oldest first), or [[]] if
-    empty. It does not remove elements from [q].
+  (** [peek_all_now q] returns the elements in the [q] (oldest first), or [[]]
+      if empty. It does not remove elements from [q].
 
-    @raise {!Closed} if [q] is empty and closed. *)
-  val peek_all : 'a t -> 'a list
+      @raise {!Closed} if [q] is empty and closed. *)
+  val peek_all_now : 'a t -> 'a list
 
   (** [push_now q v] either
       - adds [v] at the ends of [q] immediately and returns [true], or

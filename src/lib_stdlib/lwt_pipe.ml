@@ -147,7 +147,7 @@ module Bounded = struct
     else if closed then Lwt.fail Closed
     else wait_push q >>= fun () -> peek q
 
-  let peek_all {queue; closed; _} =
+  let peek_all_now {queue; closed; _} =
     if closed then []
     else List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
 
@@ -252,7 +252,7 @@ module Unbounded = struct
     else if closed then Lwt.fail Closed
     else wait_push q >>= fun () -> peek q
 
-  let peek_all {queue; closed; _} =
+  let peek_all_now {queue; closed; _} =
     if closed then []
     else List.rev (Queue.fold (fun acc e -> e :: acc) [] queue)
 
