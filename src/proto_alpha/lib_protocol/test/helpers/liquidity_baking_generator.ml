@@ -152,7 +152,7 @@ let genopt_step_tzbtc_to_xtz :
  fun ?source ?destination env state ->
   let*? source = genopt_account_with_tzbtc ?choice:source env state in
   let*? destination = genopt_account ?choice:destination env in
-  let* tzbtc_deposit =
+  let+ tzbtc_deposit =
     Qcheck_helpers.int_strictly_positive_gen
       (SymbolicMachine.get_tzbtc_balance source env state)
   in
@@ -160,8 +160,8 @@ let genopt_step_tzbtc_to_xtz :
   if
     SymbolicMachine.get_tzbtc_balance env.cpmm_contract env state
     < Int.max_int - tzbtc_deposit
-  then pure @@ Some (SellTzBTC {source; destination; tzbtc_deposit})
-  else pure None
+  then Some (SellTzBTC {source; destination; tzbtc_deposit})
+  else None
 
 let genopt_step_xtz_to_tzbtc :
     ?source:contract_id ->
@@ -172,7 +172,7 @@ let genopt_step_xtz_to_tzbtc :
  fun ?source ?destination env state ->
   let*? source = genopt_account_with_xtz ?choice:source env state in
   let*? destination = genopt_account ?choice:destination env in
-  let* xtz_deposit =
+  let+ xtz_deposit =
     map
       Int64.of_int
       (int_range
@@ -183,8 +183,8 @@ let genopt_step_xtz_to_tzbtc :
   if
     SymbolicMachine.get_xtz_balance env.cpmm_contract state
     < Int64.(sub max_int (add ten_subsidies xtz_deposit))
-  then pure @@ Some (BuyTzBTC {source; destination; xtz_deposit})
-  else pure None
+  then Some (BuyTzBTC {source; destination; xtz_deposit})
+  else None
 
 let genopt_step_add_liquidity :
     ?source:contract_id ->
@@ -205,7 +205,7 @@ let genopt_step_add_liquidity :
   let source_xtz_pool = SymbolicMachine.get_xtz_balance source state in
   (* the source needs at least one xtz *)
   if 1L < source_xtz_pool then
-    let* candidate =
+    let+ candidate =
       Qcheck_helpers.int64_strictly_positive_gen source_xtz_pool
     in
     let xtz_deposit =
@@ -217,8 +217,8 @@ let genopt_step_add_liquidity :
     if
       SymbolicMachine.get_xtz_balance env.cpmm_contract state
       < Int64.(sub max_int (add ten_subsidies xtz_deposit))
-    then pure @@ Some (AddLiquidity {source; destination; xtz_deposit})
-    else pure None
+    then Some (AddLiquidity {source; destination; xtz_deposit})
+    else None
   else pure None
 
 let genopt_step_remove_liquidity :
@@ -232,10 +232,10 @@ let genopt_step_remove_liquidity :
   let*? destination = genopt_account ?choice:destination env in
   let lqt_available = SymbolicMachine.get_liquidity_balance source env state in
   if 1 < lqt_available then
-    let* lqt_burned =
+    let+ lqt_burned =
       int_range 1 (SymbolicMachine.get_liquidity_balance source env state)
     in
-    pure @@ Some (RemoveLiquidity {source; destination; lqt_burned})
+    Some (RemoveLiquidity {source; destination; lqt_burned})
   else return None
 
 let genopt_step :
@@ -276,8 +276,8 @@ let gen_scenario :
  fun total_tzbtc total_liquidity size ->
   let* specs = gen_specs total_tzbtc total_liquidity in
   let (state, env) = SymbolicMachine.build specs in
-  let* scenario = gen_steps env state size in
-  return (specs, scenario)
+  let+ scenario = gen_steps env state size in
+  (specs, scenario)
 
 let pp_scenario fmt (specs, steps) =
   Format.(
@@ -314,8 +314,8 @@ let gen_adversary_scenario :
   let* specs = gen_specs total_tzbtc total_liquidity in
   let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
   let* c = oneofl env.implicit_accounts in
-  let* scenario = gen_steps ~source:c ~destination:c env state size in
-  return (specs, c, scenario)
+  let+ scenario = gen_steps ~source:c ~destination:c env state size in
+  (specs, c, scenario)
 
 let arb_adversary_scenario :
     tzbtc ->
