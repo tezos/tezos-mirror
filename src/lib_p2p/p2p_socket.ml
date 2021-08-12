@@ -73,7 +73,7 @@ module Crypto = struct
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create header_length in
     read_full ?canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
@@ -165,7 +165,7 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create Crypto.header_length in
     read_full ~canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let len = TzEndian.get_uint16 header_buf 0 in
@@ -175,7 +175,8 @@ module Connection_message = struct
     (* This call to [mk_buffer] is safe (it can't [Error] out)
        but we cannot use [mk_buffer_safe], because we need to specify
        ~len and ~pos. *)
-    mk_buffer ~len ~pos buf >>?= read_full ~canceler fd >>=? fun () ->
+    mk_buffer ~length_to_copy:len ~pos buf >>?= read_full ~canceler fd
+    >>=? fun () ->
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
     | Error re -> fail (P2p_errors.Decoding_error re)
@@ -346,7 +347,10 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       version = announced_version;
     }
   >>=? fun sent_msg ->
-  Connection_message.read ~canceler scheduled_conn >>=? fun (msg, recv_msg) ->
+  Connection_message.read
+    ~canceler
+    (P2p_io_scheduler.to_readable scheduled_conn)
+  >>=? fun (msg, recv_msg) ->
   (* TODO: make the below bytes-to-string copy-conversion unnecessary.
      This requires making the consumer of the [recv_msg] value
      ([Crypto_box.generate_nonces]) able to work with strings directly. *)
@@ -382,7 +386,11 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     cryptobox_data
     local_metadata
   >>=? fun () ->
-  Metadata.read ~canceler metadata_config scheduled_conn cryptobox_data
+  Metadata.read
+    ~canceler
+    metadata_config
+    (P2p_io_scheduler.to_readable scheduled_conn)
+    cryptobox_data
   >>=? fun remote_metadata ->
   let info =
     {
@@ -419,7 +427,7 @@ module Reader = struct
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
-            st.conn.scheduled_conn
+            (P2p_io_scheduler.to_readable st.conn.scheduled_conn)
             st.conn.cryptobox_data
           >>=? fun buf ->
           Events.(emit read_event) (Bytes.length buf, st.conn.info.peer_id)
@@ -618,7 +626,11 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
   protect
     (fun () ->
       Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack
-      >>=? fun () -> Ack.read ~canceler conn.scheduled_conn conn.cryptobox_data)
+      >>=? fun () ->
+      Ack.read
+        ~canceler
+        (P2p_io_scheduler.to_readable conn.scheduled_conn)
+        conn.cryptobox_data)
     ~on_error:(fun err ->
       P2p_io_scheduler.close conn.scheduled_conn >>= fun _ ->
       match err with

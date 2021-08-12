@@ -3,6 +3,7 @@
         test_p2p_pool
         test_p2p_io_scheduler
         test_p2p_peerset
+        test_p2p_buffer_reader
         test_p2p_banned_peers
         test_p2p_node
         ; Deactivated because it fails on CI (but not locally)
@@ -74,6 +75,10 @@
  (action (run %{exe:test_p2p_peerset.exe})))
 
 (rule
+ (alias runtest_p2p_buffer_reader)
+ (action (run %{exe:test_p2p_buffer_reader.exe})))
+
+(rule
  (alias runtest_p2p_banned_peers)
  (action (run %{exe:test_p2p_banned_peers.exe})))
 
@@ -89,6 +94,7 @@
        (alias runtest_p2p_pool_ipv4)
        (alias runtest_p2p_io_scheduler_ipv4)
        (alias runtest_p2p_peerset)
+       (alias runtest_p2p_buffer_reader)
        (alias runtest_p2p_banned_peers)
        (alias runtest_p2p_node)
        )

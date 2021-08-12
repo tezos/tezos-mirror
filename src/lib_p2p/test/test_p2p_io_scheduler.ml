@@ -91,7 +91,8 @@ let nb_simple_msgs = Array.length simple_msgs
 let receive conn =
   let buf = Bytes.create (1 lsl 16) in
   let rec loop () =
-    P2p_io_scheduler.mk_buffer buf >>?= P2p_io_scheduler.read conn >>= function
+    let open P2p_buffer_reader in
+    mk_buffer buf >>?= read conn >>= function
     | Ok _ -> loop ()
     | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) ->
         Lwt.return_unit
@@ -120,7 +121,8 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   (* Accept and read message until the connection is closed. *)
   accept_n main_socket n >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  List.iter_p receive conns >>= fun () ->
+  List.iter_p receive (List.map P2p_io_scheduler.to_readable conns)
+  >>= fun () ->
   List.iter_ep P2p_io_scheduler.close conns >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
   return_unit
@@ -259,60 +261,7 @@ let wrap n f =
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
-let test_mk_buffer_1 () =
-  Lib_test.Assert.assert_true
-    "[mk_buffer ?len:-1] fails"
-    (Result.is_error @@ P2p_io_scheduler.mk_buffer ~len:(-1) @@ Bytes.create 8)
-
-let test_mk_buffer_2 () =
-  Lib_test.Assert.assert_true
-    "[mk_buffer ?pos:-1] fails"
-    (Result.is_error @@ P2p_io_scheduler.mk_buffer ~pos:(-1) @@ Bytes.create 8)
-
-let test_mk_buffer_3 () =
-  Lib_test.Assert.assert_true
-    "[mk_buffer ?len ?pos buf] with (len + pos > (Bytes.length buf)) fails"
-    (Result.is_error
-    @@ P2p_io_scheduler.mk_buffer ~pos:14 ~len:3
-    @@ Bytes.create 16)
-
-let test_mk_buffer_4 () =
-  Lib_test.Assert.assert_true
-    "[mk_buffer Bytes.empty] succeeds"
-    (Result.is_ok @@ P2p_io_scheduler.mk_buffer Bytes.empty)
-
-let test_mk_buffer_5 () =
-  let len = 16 in
-  Lib_test.Assert.assert_true
-    "[mk_buffer ?len=max ?pos:0] succeeds"
-    (Result.is_ok @@ P2p_io_scheduler.mk_buffer ~len ~pos:0 @@ Bytes.create len)
-
-let test_mk_buffer_safe () =
-  (* We don't need to use QCheck, because the input data we need
-     is [0..some_not_too_big_int[, so we can just test all the ints
-     until the chosen bound, which we set here to 128. The bound should
-     not be small, because a buffer of the given size is allocated. *)
-  let lengths = Stdlib.List.init 128 Fun.id in
-  let open P2p_io_scheduler in
-  List.iter
-    (fun buf_len ->
-      let safe_buffer = Bytes.create buf_len |> mk_buffer_safe in
-      let (pos, len, buf) = Internal.destruct_buffer safe_buffer in
-      Lib_test.Assert.assert_true
-        "Result.is_ok mk_buffer"
-        (mk_buffer ~pos ~len buf |> Result.is_ok))
-    lengths
-
 let () =
-  let mk_buffer_tests =
-    [
-      test_mk_buffer_1;
-      test_mk_buffer_2;
-      test_mk_buffer_3;
-      test_mk_buffer_4;
-      test_mk_buffer_5;
-    ]
-  in
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
@@ -332,11 +281,4 @@ let () =
                 !delay
                 !clients);
         ] );
-      ( "p2p.io-scheduler.mk_buffer",
-        Stdlib.List.combine (1 -- List.length mk_buffer_tests) mk_buffer_tests
-        |> List.map (fun (i, test) ->
-               Alcotest.test_case (Printf.sprintf "mk_buffer_%d" i) `Quick test)
-      );
-      ( "p2p.io-scheduler.mk_safe_buffer",
-        [Alcotest.test_case "mk_safe_buffer" `Quick test_mk_buffer_safe] );
     ]
