@@ -5763,10 +5763,11 @@ let parse_code :
     context ->
     legacy:bool ->
     code:lazy_expr ->
-    (ex_code * context) tzresult Lwt.t =
+    (ex_code * context * int) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
   Global_constants_storage.substitute ctxt code >>=? fun (ctxt, code) ->
+  let size = Script_repr.(node_size (Micheline.root code)) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in
@@ -5827,7 +5828,7 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt)
+  (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt, size)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5863,7 +5864,9 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     (ex_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt) ->
+  >>=? fun ( Ex_code {code; arg_type; storage_type; views; root_name},
+             ctxt,
+             code_size ) ->
   parse_storage
     ?type_logger
     ctxt
@@ -5872,7 +5875,25 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     storage_type
     ~storage
   >|=? fun (storage, ctxt) ->
-  (Ex_script {code; arg_type; storage; storage_type; views; root_name}, ctxt)
+  let view_size view =
+    Script_repr.(
+      node_size view.view_code + node_size view.input_ty
+      + node_size view.output_ty)
+  in
+  let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
+  let base_size =
+    (*
+
+       We overapproximate the size of the invariant part of a cached
+       script by assuming that the internal representation of the
+       code is smaller than the source code.
+
+    *)
+    2 * (code_size + views_size)
+  in
+  ( Ex_script
+      {base_size; code; arg_type; storage; storage_type; views; root_name},
+    ctxt )
 
 let typecheck_code :
     legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
@@ -6255,7 +6276,7 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 let unparse_script ctxt mode
-    {code; arg_type; storage; storage_type; root_name; views} =
+    {code; arg_type; storage; storage_type; root_name; views; _} =
   let (Lam (_, original_code)) = code in
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage

@@ -1636,7 +1636,16 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
         ~legacy:true
         ~allow_forged_in_storage:true
   | Some ex_script -> return (ex_script, ctxt))
-  >>=? fun ( Ex_script {code; arg_type; storage; storage_type; root_name; views},
+  >>=? fun ( Ex_script
+               {
+                 base_size;
+                 code;
+                 arg_type;
+                 storage;
+                 storage_type;
+                 root_name;
+                 views;
+               },
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
@@ -1683,15 +1692,14 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     | [] -> None
     | diff -> Some diff
   in
-  let approx_size =
-    Script_repr.micheline_nodes (Micheline.root unparsed_storage)
-  in
+  let storage_size = Script_repr.node_size (Micheline.root unparsed_storage) in
   ( unparsed_storage,
     ops,
     ctxt,
     lazy_storage_diff,
-    Ex_script {code; arg_type; storage; storage_type; root_name; views},
-    approx_size )
+    Ex_script
+      {base_size; code; arg_type; storage; storage_type; root_name; views},
+    base_size + storage_size )
 
 type execution_result = {
   ctxt : context;

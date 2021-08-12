@@ -336,7 +336,7 @@ val parse_code :
   context ->
   legacy:bool ->
   code:Script.lazy_expr ->
-  (ex_code * context) tzresult Lwt.t
+  (ex_code * context * int) tzresult Lwt.t
 
 val parse_storage :
   ?type_logger:type_logger ->

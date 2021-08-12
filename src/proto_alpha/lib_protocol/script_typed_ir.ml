@@ -135,6 +135,10 @@ type ('arg, 'storage) script = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
+  base_size : int;
+      (* This is an over-approximation of the value size in memory, in
+         bytes, of the contract permanent part, that is its source
+         code. *)
 }
 
 (* ---- Instructions --------------------------------------------------------*)
