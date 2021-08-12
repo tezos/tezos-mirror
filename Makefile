@@ -21,7 +21,7 @@ COVERAGE_REPORT := _coverage_report
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
-	$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
