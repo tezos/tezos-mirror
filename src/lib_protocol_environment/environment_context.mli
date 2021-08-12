@@ -105,6 +105,18 @@ module Context : sig
   (** A key uniquely identifies a cached [value] in the some subcache. *)
   type cache_key
 
+  (** Abstract type for cached values.
+
+      This type is an extensible type since values stored in the cache
+      are heterogeneous. Notice that the cache must be cleared during
+      during protocol stitching because the data constructors of this
+      type are incompatible between two protocols: if there remains
+      values built with a data constructor of an old protocol, the new
+      protocol will be confused to find that some keys it is interesting
+      in have unexploitable values.
+
+  *)
+
   (** Cached values inhabit an extensible type. *)
   type cache_value = ..
 
@@ -122,6 +134,23 @@ module Context : sig
      be reused or recycled in a given block, we need the block that
      produces it. *)
   type block_cache = {block_hash : Block_hash.t; cache : cache}
+
+  (** During its loading, a cache can be populated in two different
+     ways:
+
+      - values are computed immediately via the builder and inserted
+     into the cache ; or,
+
+      - the computation of the values is delayed and will be computed
+     only when such value is required.
+
+      The first mode is intended to be used after a rebooting of the
+     node for example. The main benefit being that it does not impact
+     the validation time of a block since the cache's values will be
+     reconstructed beforehand. The second mode is intended to be used
+     for RPCs where reactivity is important: we do not want to
+     recompute the full cache to execute the RPC but only the values
+     which are necessary. *)
 
   type source_of_cache =
     [ `Load

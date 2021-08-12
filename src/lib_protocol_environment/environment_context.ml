@@ -95,7 +95,13 @@ module Context = struct
 
   let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
 
-  type cache = Environment_cache.t
+  type cache_value = ..
+
+  type delayed_value = unit -> cache_value Lwt.t
+
+  let delay e () = Lwt.return e
+
+  type cache = delayed_value Environment_cache.t
 
   type t =
     | Context : {
@@ -251,19 +257,17 @@ module Context = struct
 
   type cache_key = Environment_cache.key
 
-  type cache_value = Environment_cache.value = ..
-
   type block_cache = {block_hash : Block_hash.t; cache : cache}
 
   type source_of_cache =
     [`Load | `Lazy | `Inherited of block_cache * Block_hash.t]
 
-  type builder = Environment_cache.key -> Environment_cache.value tzresult Lwt.t
+  type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
   module Cache = struct
     type key = Environment_cache.key
 
-    type value = Environment_cache.value = ..
+    type value = cache_value = ..
 
     type identifier = Environment_cache.identifier
 
@@ -334,7 +338,10 @@ module Context = struct
         (0 -- (n - 1))
 
     let update (Context ctxt) key value =
-      let cache = Environment_cache.update ctxt.cache key value in
+      let delayed_value =
+        Option.map (fun (value, index) -> (delay value, index)) value
+      in
+      let cache = Environment_cache.update ctxt.cache key delayed_value in
       Context {ctxt with cache}
 
     let cache_domain_path = ["domain"]
@@ -382,7 +389,10 @@ module Context = struct
             init
             domain
 
-    let find (Context {cache; _}) = Environment_cache.find cache
+    let find (Context {cache; _}) key =
+      match Environment_cache.find cache key with
+      | None -> Lwt.return_none
+      | Some value -> value () >|= Option.some
 
     let load ctxt initial ~value_of_key =
       let init = Environment_cache.clear initial in

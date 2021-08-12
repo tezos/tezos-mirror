@@ -65,17 +65,13 @@ let pp_entry ppf (entry : value_metadata) =
     Hex.pp
     (Hex.of_bytes entry.cache_nonce)
 
-type value = ..
-
-type delayed_value = unit -> value Lwt.t
-
 module Int64Map = Map.Make (Int64)
 
-type cache = {
+type 'a cache = {
   (* Each cache has a handle in the context caches. *)
   index : index;
   (* [map] collects the cache entries. *)
-  map : (delayed_value * value_metadata) KeyMap.t;
+  map : ('a * value_metadata) KeyMap.t;
   (* [lru] maintains a fast index from [birth] to entries. In
      particular, it provides a logarithmic access to the Least
      Recently Used entry. *)
@@ -102,7 +98,7 @@ type cache = {
   entries_removals : int list;
 }
 
-type t = cache FunctionalArray.t option
+type 'a t = 'a cache FunctionalArray.t option
 
 let string_of_key {identifier; _} = identifier
 
@@ -139,9 +135,7 @@ let cache_of_key caches key = cache_of_index caches key.cache_index
 let lookup_entry cache key = KeyMap.find key cache.map
 
 let lookup_value cache key =
-  match lookup_entry cache key with
-  | Some (e, _) -> e () >|= fun e -> Some e
-  | None -> Lwt.return_none
+  match lookup_entry cache key with Some (e, _) -> Some e | None -> None
 
 let lookup t key = lookup_entry (cache_of_key t key) key
 
@@ -211,14 +205,12 @@ let insert_entry t key (value, entry) =
       let cache = insert_cache_entry cache key (value, entry) in
       update_cache_with t key.cache_index cache)
 
-let delay e () = Lwt.return e
-
 let insert_cache cache key value size cache_nonce =
   (* Conforming to entry size invariant: we need this size to be
      strictly positive. *)
   let size = max 1 size in
   let entry = {size; birth = Int64.add cache.counter 1L; cache_nonce} in
-  insert_cache_entry cache key (delay value, entry)
+  insert_cache_entry cache key (value, entry)
 
 let update_cache cache key entry =
   let cache =
@@ -359,8 +351,8 @@ let finalize_cache ({map; _} as cache) nonce =
   in
   ({cache with map}, metamap)
 
-let sync_cache : cache -> cache_nonce:Bytes.t -> cache * value_metadata KeyMap.t
-    =
+let sync_cache :
+    'a cache -> cache_nonce:Bytes.t -> 'a cache * value_metadata KeyMap.t =
  fun cache ~cache_nonce ->
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
@@ -379,7 +371,7 @@ let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list (dynamic_size subcache_domain_encoding))
 
-let sync : t -> cache_nonce:Bytes.t -> t * domain =
+let sync : 'a t -> cache_nonce:Bytes.t -> 'a t * domain =
  fun t ~cache_nonce ->
   with_caches t (fun caches ->
       let fresh_caches =
