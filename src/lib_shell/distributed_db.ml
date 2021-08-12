@@ -102,7 +102,7 @@ let active_peer_ids p2p () =
     (P2p.connections p2p)
 
 let raw_try_send p2p peer_id msg =
-  match P2p.find_connection p2p peer_id with
+  match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> ()
   | Some conn -> ignore (P2p.try_send p2p conn msg : bool)
 
@@ -222,7 +222,7 @@ let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
 
 let disconnect {global_db = {p2p; _}; _} peer_id =
-  match P2p.find_connection p2p peer_id with
+  match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> Lwt.return_unit
   | Some conn -> P2p.disconnect p2p conn
 

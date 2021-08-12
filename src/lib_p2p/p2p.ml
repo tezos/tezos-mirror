@@ -271,7 +271,7 @@ module Real = struct
   let connections {pool; _} () =
     P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
 
-  let find_connection {pool; _} peer_id =
+  let find_connection_by_peer_id {pool; _} peer_id =
     P2p_pool.Connection.find_by_peer_id pool peer_id
 
   let find_connection_by_point {pool; _} point =
@@ -403,7 +403,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   roll : unit -> unit Lwt.t;
   shutdown : unit -> unit Lwt.t;
   connections : unit -> ('msg, 'peer_meta, 'conn_meta) connection list;
-  find_connection :
+  find_connection_by_peer_id :
     P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
   find_connection_by_point :
     P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
@@ -493,7 +493,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       roll = Real.roll net;
       shutdown = Real.shutdown net;
       connections = Real.connections net;
-      find_connection = Real.find_connection net;
+      find_connection_by_peer_id = Real.find_connection_by_peer_id net;
       find_connection_by_point = Real.find_connection_by_point net;
       disconnect = Real.disconnect;
       connection_info = Real.connection_info net;
@@ -537,7 +537,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     roll = Lwt.return;
     shutdown = Lwt.return;
     connections = (fun () -> []);
-    find_connection = (fun _ -> None);
+    find_connection_by_peer_id = (fun _ -> None);
     find_connection_by_point = (fun _ -> None);
     disconnect = (fun ?wait:_ _ -> Lwt.return_unit);
     connection_info =
@@ -575,7 +575,7 @@ let connections net = net.connections ()
 
 let disconnect net = net.disconnect
 
-let find_connection net = net.find_connection
+let find_connection_by_peer_id net = net.find_connection_by_peer_id
 
 let find_connection_by_point net = net.find_connection_by_point
 

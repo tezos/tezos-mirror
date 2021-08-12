@@ -208,7 +208,7 @@ val connections :
   ('msg, 'peer_meta, 'conn_meta) connection list
 
 (** Return the active peer with identity [peer_id] *)
-val find_connection :
+val find_connection_by_peer_id :
   ('msg, 'peer_meta, 'conn_meta) net ->
   P2p_peer.Id.t ->
   ('msg, 'peer_meta, 'conn_meta) connection option
