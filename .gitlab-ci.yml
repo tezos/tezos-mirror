@@ -33,6 +33,8 @@ variables:
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
   ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
+  # Sets the number of tries before failing opam downloads.
+  OPAMRETRIES: "5"
 
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
