@@ -751,15 +751,6 @@ module Votes : sig
     Client.t ->
     JSON.t Lwt.t
 
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
-  val get_current_period_kind :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
   (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
   val get_current_proposal :
     ?endpoint:Client.endpoint ->
