@@ -156,15 +156,22 @@ module Block_header_storage = struct
 
   type value = Block_header.t
 
-  let known = Store.Block.is_known_valid
+  let known chain_store hash =
+    Store.Block.is_known_valid chain_store hash >>= function
+    | true -> Lwt.return_true
+    | false -> Store.Block.is_known_prechecked chain_store hash
 
   let read chain_store h =
-    Store.Block.read_block chain_store h >>=? fun b ->
-    return (Store.Block.header b)
+    (Store.Block.read_block chain_store h >>= function
+     | Ok b -> return b
+     | Error _ -> Store.Block.read_prechecked_block chain_store h)
+    >>=? fun b -> return (Store.Block.header b)
 
   let read_opt chain_store h =
-    Store.Block.read_block_opt chain_store h >>= fun b ->
-    Lwt.return (Option.map Store.Block.header b)
+    (Store.Block.read_block_opt chain_store h >>= function
+     | Some b -> Lwt.return_some b
+     | None -> Store.Block.read_prechecked_block_opt chain_store h)
+    >>= fun b -> Lwt.return (Option.map Store.Block.header b)
 end
 
 module Raw_block_header =
