@@ -1636,7 +1636,16 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
         ~legacy:true
         ~allow_forged_in_storage:true
   | Some ex_script -> return (ex_script, ctxt))
-  >>=? fun ( Ex_script {code; arg_type; storage; storage_type; root_name; views},
+  >>=? fun ( Ex_script
+               {
+                 code_size;
+                 code;
+                 arg_type;
+                 storage;
+                 storage_type;
+                 root_name;
+                 views;
+               },
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
@@ -1683,15 +1692,28 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     | [] -> None
     | diff -> Some diff
   in
-  let approx_size =
-    Script_repr.micheline_nodes (Micheline.root unparsed_storage)
+  let storage_size = Script_repr.node_size (Micheline.root unparsed_storage) in
+  let cached_contract_code_size =
+    (*
+
+       Notice that a cached contract contains both the source code
+       and the internal representation of this code.
+
+       Under the assumption that the internal representation of a code
+       is smaller than its source code, then the value we compute is
+       an over-approximation.
+
+    *)
+    2 * code_size
   in
+
   ( unparsed_storage,
     ops,
     ctxt,
     lazy_storage_diff,
-    Ex_script {code; arg_type; storage; storage_type; root_name; views},
-    approx_size )
+    Ex_script
+      {code_size; code; arg_type; storage; storage_type; root_name; views},
+    cached_contract_code_size + storage_size )
 
 type execution_result = {
   ctxt : context;
