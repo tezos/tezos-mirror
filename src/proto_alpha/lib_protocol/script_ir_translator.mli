@@ -58,6 +58,11 @@ type ('arg, 'storage) code = {
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
   root_name : Script_typed_ir.field_annot option;
   code_size : int;
+      (** This is an over-approximation of the value size in memory, in
+         bytes, of the contract's static part, that is its source
+         code. This includes the code of the contract as well as the code
+         of the views. The storage size is not taken into account by this
+         field as it has a dynamic size. *)
 }
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
