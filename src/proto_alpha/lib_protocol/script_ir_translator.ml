@@ -1901,6 +1901,7 @@ type ('arg, 'storage) code = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
+  code_size : int;
 }
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
@@ -5763,11 +5764,11 @@ let parse_code :
     context ->
     legacy:bool ->
     code:lazy_expr ->
-    (ex_code * context * int) tzresult Lwt.t =
+    (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
   Global_constants_storage.substitute ctxt code >>=? fun (ctxt, code) ->
-  let size = Script_repr.(node_size (Micheline.root code)) in
+  let code_size = Script_repr.(node_size (Micheline.root code)) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in
@@ -5828,7 +5829,25 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt, size)
+  let view_size view =
+    Script_repr.(
+      node_size view.view_code + node_size view.input_ty
+      + node_size view.output_ty)
+  in
+  let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
+  let code_size = code_size + views_size in
+  let code_size =
+    (*
+
+       We overapproximate the size of the invariant part of a cached
+       script by assuming that the internal representation of the
+       code is proportional to the size of the source code, but smaller.
+       Hence, we multiply [code_size] by 2.
+
+    *)
+    2 * code_size
+  in
+  (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5864,9 +5883,8 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     (ex_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun ( Ex_code {code; arg_type; storage_type; views; root_name},
-             ctxt,
-             code_size ) ->
+  >>=? fun ( Ex_code {code; arg_type; storage_type; views; root_name; code_size},
+             ctxt ) ->
   parse_storage
     ?type_logger
     ctxt
@@ -5875,22 +5893,6 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     storage_type
     ~storage
   >|=? fun (storage, ctxt) ->
-  let view_size view =
-    Script_repr.(
-      node_size view.view_code + node_size view.input_ty
-      + node_size view.output_ty)
-  in
-  let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
-  let code_size =
-    (*
-
-       We overapproximate the size of the invariant part of a cached
-       script by assuming that the internal representation of the
-       code is smaller than the source code.
-
-    *)
-    2 * (code_size + views_size)
-  in
   ( Ex_script
       {code_size; code; arg_type; storage; storage_type; views; root_name},
     ctxt )

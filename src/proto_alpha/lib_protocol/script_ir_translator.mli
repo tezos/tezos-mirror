@@ -57,6 +57,7 @@ type ('arg, 'storage) code = {
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
   root_name : Script_typed_ir.field_annot option;
+  code_size : int;
 }
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
@@ -336,7 +337,7 @@ val parse_code :
   context ->
   legacy:bool ->
   code:Script.lazy_expr ->
-  (ex_code * context * int) tzresult Lwt.t
+  (ex_code * context) tzresult Lwt.t
 
 val parse_storage :
   ?type_logger:type_logger ->
