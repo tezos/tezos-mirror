@@ -279,6 +279,13 @@ let inject_operation chain_db h op =
     h
     op
 
+let inject_prechecked_block chain_db hash block_header operations =
+  Store.Block.store_prechecked_block
+    chain_db.reader_chain_db.chain_store
+    ~hash
+    ~block_header
+    ~operations
+
 let commit_protocol db h p =
   Store.Protocol.store db.disk h p >>= fun res ->
   Distributed_db_requester.Raw_protocol.clear_or_cancel db.protocol_db h ;
@@ -441,6 +448,25 @@ module Advertise = struct
       P2p_peer.Table.iter
         (fun _receiver_id conn -> send_mempool conn)
         chain_db.reader_chain_db.active_connections
+
+  let prechecked_head chain_db ?(mempool = Mempool.empty) header =
+    let p2p = chain_db.global_db.p2p in
+    let acceptable_version conn =
+      let {Network_version.distributed_db_version; _} =
+        P2p.negotiated_version p2p conn
+      in
+      Distributed_db_version.compare
+        distributed_db_version
+        Distributed_db_version.two
+      >= 0
+    in
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
+    let msg = Message.Current_head (chain_id, header, mempool) in
+    P2p_peer.Table.iter
+      (fun _ conn ->
+        if acceptable_version conn then ignore (P2p.try_send p2p conn msg)
+        else ())
+      chain_db.reader_chain_db.active_connections
 
   let current_branch chain_db =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
