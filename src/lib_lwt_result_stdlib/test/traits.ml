@@ -175,6 +175,33 @@ module type FOLDLEFT_SEQUENTIAL = sig
     ('a, 'trace) result Lwt.t
 end
 
+module type FOLDLEFTMAP_VANILLA = sig
+  type 'a elt
+
+  type 'a t
+
+  val fold_left_map : ('a -> 'b elt -> 'a * 'c) -> 'a -> 'b t -> 'a * 'c list
+end
+
+module type FOLDLEFTMAP_SEQUENTIAL = sig
+  include FOLDLEFTMAP_VANILLA
+
+  val fold_left_map_e :
+    ('a -> 'b elt -> ('a * 'c, 'trace) result) ->
+    'a ->
+    'b t ->
+    ('a * 'c list, 'trace) result
+
+  val fold_left_map_s :
+    ('a -> 'b elt -> ('a * 'c) Lwt.t) -> 'a -> 'b t -> ('a * 'c list) Lwt.t
+
+  val fold_left_map_es :
+    ('a -> 'b elt -> ('a * 'c, 'trace) result Lwt.t) ->
+    'a ->
+    'b t ->
+    ('a * 'c list, 'trace) result Lwt.t
+end
+
 module type FOLDRIGHT_VANILLA = sig
   type 'a t
 

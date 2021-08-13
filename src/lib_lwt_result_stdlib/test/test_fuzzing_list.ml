@@ -63,6 +63,7 @@ let () =
       ("Filtermapp", (module TestFiltermappAgainstStdlibList : F));
       ("Fold", (module TestFoldAgainstStdlibList : F));
       ("FoldRight", (module TestFoldRightAgainstStdlibList : F));
+      ("FoldLeftMap", (module TestFoldLeftMapAgainstStdlibList : F));
       ("Iter", (module TestIterAgainstStdlibList : F));
       ("Iteri", (module TestIteriAgainstStdlibList : F));
       ("Iterp", (module TestIterMonotoneAgainstStdlibList : F));
