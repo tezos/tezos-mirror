@@ -1693,13 +1693,27 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     | diff -> Some diff
   in
   let storage_size = Script_repr.node_size (Micheline.root unparsed_storage) in
+  let cached_contract_code_size =
+    (*
+
+       Notice that a cached contract contains both the source code
+       and the internal representation of this code.
+
+       Under the assumption that the internal representation of a code
+       is smaller than its source code, then the value we compute is
+       an over-approximation.
+
+    *)
+    2 * code_size
+  in
+
   ( unparsed_storage,
     ops,
     ctxt,
     lazy_storage_diff,
     Ex_script
       {code_size; code; arg_type; storage; storage_type; root_name; views},
-    code_size + storage_size )
+    cached_contract_code_size + storage_size )
 
 type execution_result = {
   ctxt : context;

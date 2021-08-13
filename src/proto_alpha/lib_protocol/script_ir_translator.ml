@@ -5836,17 +5836,6 @@ let parse_code :
   in
   let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
   let code_size = code_size + views_size in
-  let code_size =
-    (*
-
-       We overapproximate the size of the invariant part of a cached
-       script by assuming that the internal representation of the
-       code is proportional to the size of the source code, but smaller.
-       Hence, we multiply [code_size] by 2.
-
-    *)
-    2 * code_size
-  in
   (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
 
 let parse_storage :
