@@ -3,17 +3,18 @@
 #load "unix.cma"
 
 let query ?env ~default cmd =
-  let default () =
-    match env with
-    |None -> default
-    |Some env -> try Sys.getenv env with Not_found -> default
+  let run_git () =
+    try
+      let chan = Unix.open_process_in cmd in
+      let out = input_line chan in
+      if Unix.close_process_in chan = Unix.WEXITED 0 then out
+      else default
+    with End_of_file -> default
+
   in
-  try
-    let chan = Unix.open_process_in cmd in
-    let out = input_line chan in
-    if Unix.close_process_in chan = Unix.WEXITED 0 then out
-    else default ()
-  with End_of_file -> default ()
+    match env with
+    |None -> run_git ()
+    |Some env -> try Sys.getenv env with Not_found -> run_git ()
 
 let hash = query ~env:"GIT_SHORTREF" ~default:"unknown" "git show -s --pretty=format:%H"
 
