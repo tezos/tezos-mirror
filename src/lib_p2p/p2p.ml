@@ -377,6 +377,8 @@ module Real = struct
 
   let on_new_connection {connect_handler; _} f =
     P2p_connect_handler.on_new_connection connect_handler f
+
+  let negotiated_version _ conn = P2p_conn.negotiated_version conn
 end
 
 module Fake = struct
@@ -448,6 +450,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
   on_new_connection :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit;
+  negotiated_version :
+    ('msg, 'peer_meta, 'conn_meta) connection -> Network_version.t;
   activate : unit -> unit;
   watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
 }
@@ -521,6 +525,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
       iter_connections = Real.iter_connections net;
       on_new_connection = Real.on_new_connection net;
+      negotiated_version = Real.negotiated_version net;
       activate = Real.activate net;
       watcher = net.Real.watcher;
     }
@@ -563,6 +568,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
+    negotiated_version = (fun _ -> announced_version);
     broadcast = ignore;
     pool = None;
     connect_handler = None;
@@ -625,3 +631,5 @@ let greylist_peer net peer_id =
   Option.iter (fun pool -> P2p_pool.greylist_peer pool peer_id) net.pool
 
 let watcher net = Lwt_watcher.create_stream net.watcher
+
+let negotiated_version net = net.negotiated_version
