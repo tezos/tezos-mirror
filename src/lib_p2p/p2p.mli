@@ -240,6 +240,14 @@ val connection_stat :
   ('msg, 'peer_meta, 'conn_meta) connection ->
   P2p_stat.t
 
+(** Returns the network version that will be used for this connection.
+   This network version is the best version compatible with the versions
+   supported by ours and the remote peer. *)
+val negotiated_version :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  Network_version.t
+
 (** Cleanly closes a connection. *)
 val disconnect :
   ('msg, 'peer_meta, 'conn_meta) net ->

@@ -96,6 +96,11 @@ val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
 
 val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
 
+(** Returns the network version that will be used for this connection.
+   This network version is the best version compatible with the versions
+   supported by ours and the remote peer. *)
+val negotiated_version : ('msg, 'peer, 'conn) t -> Network_version.t
+
 (* TODO properly document disconnect/close. Check they are properly used
    and if we really need both. *)
 
