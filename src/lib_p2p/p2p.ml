@@ -147,6 +147,13 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;
       expected_connections = limits.expected_connections;
+      time_between_looking_for_peers =
+        Ptime.Span.of_int_s 5
+        (* Empirical value. Enough to observe changes in the network,
+           and not too long to discover new peers quickly. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/1655
+           Check whether the value is optimal or not through integration tests
+        *);
     }
   in
   let discovery = may_create_discovery_worker limits config pool in
