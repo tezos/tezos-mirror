@@ -1638,7 +1638,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   | Some ex_script -> return (ex_script, ctxt))
   >>=? fun ( Ex_script
                {
-                 base_size;
+                 code_size;
                  code;
                  arg_type;
                  storage;
@@ -1698,8 +1698,8 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     ctxt,
     lazy_storage_diff,
     Ex_script
-      {base_size; code; arg_type; storage; storage_type; root_name; views},
-    base_size + storage_size )
+      {code_size; code; arg_type; storage; storage_type; root_name; views},
+    code_size + storage_size )
 
 type execution_result = {
   ctxt : context;

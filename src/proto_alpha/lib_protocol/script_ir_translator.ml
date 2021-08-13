@@ -5881,7 +5881,7 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
       + node_size view.output_ty)
   in
   let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
-  let base_size =
+  let code_size =
     (*
 
        We overapproximate the size of the invariant part of a cached
@@ -5892,7 +5892,7 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     2 * (code_size + views_size)
   in
   ( Ex_script
-      {base_size; code; arg_type; storage; storage_type; views; root_name},
+      {code_size; code; arg_type; storage; storage_type; views; root_name},
     ctxt )
 
 let typecheck_code :
