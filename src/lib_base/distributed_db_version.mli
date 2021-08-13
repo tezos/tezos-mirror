@@ -53,4 +53,25 @@ val encoding : t Data_encoding.t
 
 val zero : t
 
+(** This version adds the following messages:
+
+    - [Get_checkpoint/Checkpoint] for fetching the checkpoint of a
+   peer.
+
+    - [Get_protocol_branch/Protocol_branch] for fetching the branch of
+   a peer given a protocol level.
+
+    - [Get_predecessor_header/Predecessor_header] for fetching a block
+   header given an offset from a block hash.
+
+    Those messages can help to implement a faster bootstrap. *)
 val one : t
+
+(** This version adds no messages. However, the semantics of the
+   message [Current_head] is changed. In particular, a peer can send a
+   message [Current_head] which was only [prechecked] but the block
+   was not validated yet. This means that a [peer] which sends a
+   [Current_head] message with a block for which the [precheck]
+   function will return [true] but is invalid should not be kicked
+   anymore. *)
+val two : t
