@@ -295,6 +295,16 @@ module P2p_connect_handler = struct
       ~pp7:(pp_first_element P2p_version.pp)
       ("local_p2p_version", Data_encoding.list P2p_version.encoding)
       ("remote_p2p_version", P2p_version.encoding)
+
+  let new_connection =
+    declare_3
+      ~section
+      ~name:"new_connection"
+      ~msg:"new connection to {addr}:{port}#{peer}"
+      ~level:Info
+      ("addr", P2p_addr.encoding)
+      ("port", Data_encoding.option Data_encoding.int16)
+      ("peer", P2p_peer.Id.encoding)
 end
 
 module P2p_conn = struct
