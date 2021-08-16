@@ -585,6 +585,8 @@ module Constants : sig
 
   val max_proposals_per_delegate : int
 
+  val michelson_maximum_type_size : int
+
   (** Constants parameterized by context *)
   type parametric = {
     preserved_cycles : int;
@@ -599,7 +601,6 @@ module Constants : sig
     hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez.t;
-    michelson_maximum_type_size : int;
     seed_nonce_revelation_tip : Tez.t;
     origination_size : int;
     block_security_deposit : Tez.t;
@@ -645,8 +646,6 @@ module Constants : sig
   val proof_of_work_threshold : context -> int64
 
   val tokens_per_roll : context -> Tez.t
-
-  val michelson_maximum_type_size : context -> int
 
   val baking_reward_per_endorsement : context -> Tez.t list
 

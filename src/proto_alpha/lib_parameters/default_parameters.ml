@@ -40,7 +40,6 @@ let constants_mainnet =
       hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
       proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
       tokens_per_roll = Tez.(mul_exn one 8_000);
-      michelson_maximum_type_size = 1000;
       seed_nonce_revelation_tip =
         (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
       origination_size = 257;

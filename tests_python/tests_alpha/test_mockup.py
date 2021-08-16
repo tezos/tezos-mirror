@@ -592,7 +592,6 @@ def _test_create_mockup_init_show_roundtrip(
                 "block_security_deposit": "512000001",
                 "origination_size": 258,
                 "seed_nonce_revelation_tip": "125001",
-                "michelson_maximum_type_size": 1001,
                 "tokens_per_roll": "8000000001",
                 "proof_of_work_threshold": "-2",
                 "hard_gas_limit_per_block": "10400001",

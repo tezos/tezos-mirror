@@ -806,7 +806,6 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
               Gas_limit_repr.Arith.(integral_of_int_exn 5_200_000);
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
-            michelson_maximum_type_size = c.michelson_maximum_type_size;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             block_security_deposit = Tez_repr.(mul_exn one 640);

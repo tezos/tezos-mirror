@@ -46,7 +46,6 @@ module Protocol_constants_overrides = struct
     hard_gas_limit_per_block : Gas.Arith.integral option;
     proof_of_work_threshold : int64 option;
     tokens_per_roll : Tez.t option;
-    michelson_maximum_type_size : int option;
     seed_nonce_revelation_tip : Tez.t option;
     origination_size : int option;
     block_security_deposit : Tez.t option;
@@ -84,7 +83,6 @@ module Protocol_constants_overrides = struct
             c.hard_gas_limit_per_block,
             c.proof_of_work_threshold ),
           ( ( c.tokens_per_roll,
-              c.michelson_maximum_type_size,
               c.seed_nonce_revelation_tip,
               c.origination_size,
               c.block_security_deposit,
@@ -114,7 +112,6 @@ module Protocol_constants_overrides = struct
                hard_gas_limit_per_block,
                proof_of_work_threshold ),
              ( ( tokens_per_roll,
-                 michelson_maximum_type_size,
                  seed_nonce_revelation_tip,
                  origination_size,
                  block_security_deposit,
@@ -145,7 +142,6 @@ module Protocol_constants_overrides = struct
           hard_gas_limit_per_block;
           proof_of_work_threshold;
           tokens_per_roll;
-          michelson_maximum_type_size;
           seed_nonce_revelation_tip;
           origination_size;
           block_security_deposit;
@@ -179,9 +175,8 @@ module Protocol_constants_overrides = struct
             (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding)
             (opt "proof_of_work_threshold" int64))
          (merge_objs
-            (obj10
+            (obj9
                (opt "tokens_per_roll" Tez.encoding)
-               (opt "michelson_maximum_type_size" uint16)
                (opt "seed_nonce_revelation_tip" Tez.encoding)
                (opt "origination_size" int31)
                (opt "block_security_deposit" Tez.encoding)
@@ -232,8 +227,6 @@ module Protocol_constants_overrides = struct
         hard_gas_limit_per_block = Some parametric.hard_gas_limit_per_block;
         proof_of_work_threshold = Some parametric.proof_of_work_threshold;
         tokens_per_roll = Some parametric.tokens_per_roll;
-        michelson_maximum_type_size =
-          Some parametric.michelson_maximum_type_size;
         seed_nonce_revelation_tip = Some parametric.seed_nonce_revelation_tip;
         origination_size = Some parametric.origination_size;
         block_security_deposit = Some parametric.block_security_deposit;
@@ -275,7 +268,6 @@ module Protocol_constants_overrides = struct
       hard_gas_limit_per_block = None;
       proof_of_work_threshold = None;
       tokens_per_roll = None;
-      michelson_maximum_type_size = None;
       seed_nonce_revelation_tip = None;
       origination_size = None;
       block_security_deposit = None;
@@ -388,12 +380,6 @@ module Protocol_constants_overrides = struct
             name = "tokens_per_roll";
             override_value = o.tokens_per_roll;
             pp = Tez.pp;
-          };
-        O
-          {
-            name = "michelson_maximum_type_size";
-            override_value = o.michelson_maximum_type_size;
-            pp = pp_print_int;
           };
         O
           {
@@ -548,10 +534,6 @@ module Protocol_constants_overrides = struct
              o.proof_of_work_threshold;
          tokens_per_roll =
            Option.value ~default:c.tokens_per_roll o.tokens_per_roll;
-         michelson_maximum_type_size =
-           Option.value
-             ~default:c.michelson_maximum_type_size
-             o.michelson_maximum_type_size;
          seed_nonce_revelation_tip =
            Option.value
              ~default:c.seed_nonce_revelation_tip

@@ -3078,7 +3078,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
    fun ctxt number_of_generated_growing_types judgement ->
     match judgement with
     | Typed {loc; aft; _} ->
-        let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+        let maximum_type_size = Constants.michelson_maximum_type_size in
         Script_type_size.check_type_size_of_stack_head
           ~loc
           ~maximum_type_size
@@ -3270,7 +3270,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_var_annot loc annot >>?= fun annot ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      Script_type_size.check_type_size ~legacy ctxt ~loc t >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ~loc t >>?= fun () ->
       parse_data
         ?type_logger
         ~stack_depth:(stack_depth + 1)
@@ -4218,10 +4218,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       >>?= fun (Ex_ty arg, ctxt) ->
-      Script_type_size.check_type_size ~legacy ctxt ~loc arg >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ~loc arg >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       >>?= fun (Ex_ty ret, ctxt) ->
-      Script_type_size.check_type_size ~legacy ctxt ~loc ret >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ~loc ret >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
@@ -4922,7 +4922,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      Script_type_size.check_type_size ~legacy ctxt ~loc arg_type >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ~loc arg_type >>?= fun () ->
       (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
@@ -4933,8 +4933,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
-      Script_type_size.check_type_size ~legacy ctxt ~loc storage_type
-      >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ~loc storage_type >>?= fun () ->
       let arg_annot =
         default_annot
           (type_to_var_annot (name_of_ty arg_type))
@@ -5776,7 +5775,7 @@ let parse_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  Script_type_size.check_type_size ~legacy ~loc:arg_type_loc arg_type
   >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
@@ -5785,11 +5784,7 @@ let parse_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  Script_type_size.check_type_size
-    ~legacy
-    ctxt
-    ~loc:storage_type_loc
-    storage_type
+  Script_type_size.check_type_size ~legacy ~loc:storage_type_loc storage_type
   >>?= fun () ->
   let arg_annot =
     default_annot
@@ -5898,7 +5893,7 @@ let typecheck_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  Script_type_size.check_type_size ~legacy ~loc:arg_type_loc arg_type
   >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
@@ -5907,11 +5902,7 @@ let typecheck_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  Script_type_size.check_type_size
-    ~legacy
-    ctxt
-    ~loc:storage_type_loc
-    storage_type
+  Script_type_size.check_type_size ~legacy ~loc:storage_type_loc storage_type
   >>?= fun () ->
   let arg_annot =
     default_annot

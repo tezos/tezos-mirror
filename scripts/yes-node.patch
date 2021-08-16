@@ -1,20 +1,20 @@
 diff --git a/src/lib_crypto/signature.ml b/src/lib_crypto/signature.ml
-index ba93ab98cc..258c8c606e 100644
+index 5f78095ec6..4549ba1e74 100644
 --- a/src/lib_crypto/signature.ml
 +++ b/src/lib_crypto/signature.ml
 @@ -635,7 +635,7 @@ let pp_watermark ppf =
          "Custom: 0x%s"
          (try String.sub hexed 0 10 ^ "..." with _ -> hexed)
- 
+
 -let sign ?watermark secret_key message =
 +let _sign ?watermark secret_key message =
    let watermark = Option.map bytes_of_watermark watermark in
    match secret_key with
    | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -665,6 +665,25 @@ let check ?watermark public_key signature message =
+@@ -665,4 +665,23 @@ let check ?watermark public_key signature message =
        P256.check ?watermark pk signature message
    | _ -> false
- 
+
 +let fake_sign pk_bytes msg =
 +  let half = size / 2 in
 +  let tmp = Bytes.init size (fun _ -> '0') in
@@ -34,6 +34,5 @@ index ba93ab98cc..258c8c606e 100644
 +
 +let check = fake_check
 +
- let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
- 
- let concat msg signature = Bytes.cat msg (to_bytes signature)
+ (* The following cache is a hack to work around a quadratic algorithm
+    in Tezos Mainnet protocols up to Edo. *)
