@@ -1,3 +1,0 @@
-(executable
-  (name rpc_openapi)
-  (libraries ezjsonm json-data-encoding))

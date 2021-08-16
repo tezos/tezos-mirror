@@ -159,13 +159,14 @@ let url_encode str =
   Buffer.reset buffer ;
   result
 
-type meth = GET | PUT | POST | PATCH
+type meth = GET | PUT | POST | PATCH | DELETE
 
 let string_of_meth = function
   | GET -> "get"
   | PUT -> "put"
   | POST -> "post"
   | PATCH -> "patch"
+  | DELETE -> "delete"
 
 type path = string list
 

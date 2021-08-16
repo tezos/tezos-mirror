@@ -61,7 +61,7 @@ class TestOpenAPI:
         cmd = [
             "dune",
             "exec",
-            "../src/openapi/rpc_openapi.exe",
+            "../src/bin_openapi/rpc_openapi.exe",
             "--",
             version,
             str(json_path.absolute()),

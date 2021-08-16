@@ -6,6 +6,7 @@
             qcheck-alcotest
             tezos-test-helpers
             tezos-base
+            tezos-micheline
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment

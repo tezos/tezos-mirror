@@ -672,6 +672,11 @@ opam:tezos-node:
   variables:
     package: tezos-node
 
+opam:tezos-openapi:
+  extends: .opam_template
+  variables:
+    package: tezos-openapi
+
 opam:tezos-p2p:
   extends: .opam_template
   variables:
