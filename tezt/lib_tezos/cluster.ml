@@ -73,11 +73,11 @@ let star = star_gen Node.add_peer
 
 let meta_star = star_gen connect
 
-let start nodes =
+let start ?(public = false) nodes =
   let start_node node =
     let* () = Node.identity_generate node in
     let* () = Node.config_init node [] in
-    let* () = Node.run node [] in
+    let* () = Node.run node (if public then [] else [Private_mode]) in
     Node.wait_for_ready node
   in
   Lwt_list.iter_p start_node nodes

@@ -123,5 +123,11 @@ val meta_star : Node.t list -> Node.t list list -> unit
 (** Start a cluster of nodes.
 
     This runs [Node.identity_generate], [Node.config_init] and [Node.run] for all nodes.
-    This is similar to iterating [Node.init] except that the node are already created. *)
-val start : Node.t list -> unit Lwt.t
+    This is similar to iterating [Node.init] except that the node are already created.
+
+    If [public] is [false] (which is the default), nodes are started with [--private_mode].
+    Set [public] to [true] to allow the topology to change over time.
+    If you need some nodes to be in private mode, and some nodes not to,
+    set [public] to [true], and give the [Private_mode] argument to [Cluster.create]
+    and/or [Node.create]. *)
+val start : ?public:bool -> Node.t list -> unit Lwt.t
