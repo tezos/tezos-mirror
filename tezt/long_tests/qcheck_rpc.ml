@@ -483,10 +483,11 @@ module Test = struct
 end
 
 let property_test_rpc_server =
-  Tezt.Test.register
+  Long_test.register
     ~__FILE__
     ~title:"property_test_rpc_server"
     ~tags:["node"; "pbt"; "fuzz"; "rpc"]
+    ~timeout:(Hours 1)
     Test.test_rpc_server
 
 let register () = property_test_rpc_server
