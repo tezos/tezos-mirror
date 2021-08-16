@@ -508,3 +508,20 @@ end
 let () =
   Data_encoding.Registration.register ~pp:Id.pp Id.encoding ;
   Data_encoding.Registration.register ~pp:P2p_event.pp P2p_event.encoding
+
+module Internal_for_tests = struct
+  module Info = struct
+    let mock default_metadata =
+      Info.
+        {
+          incoming = false;
+          peer_id = P2p_peer_id.zero;
+          id_point = Id.of_point (P2p_point.Id.of_string_exn "0.0.0.0:0");
+          remote_socket_port = 0;
+          announced_version = Network_version.Internal_for_tests.mock ();
+          private_node = true;
+          local_metadata = default_metadata;
+          remote_metadata = default_metadata;
+        }
+  end
+end

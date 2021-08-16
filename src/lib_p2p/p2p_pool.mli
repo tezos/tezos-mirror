@@ -389,3 +389,11 @@ val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
    is greylisted. *)
 val set_expected_peer_id :
   ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** [create peer_encoding peer] returns a pool. [peer_encoding] and [peer] are needed as some functions of [P2p_pool]
+      return it. *)
+  val create : 'peer Data_encoding.t -> 'peer -> ('msg, 'peer, 'conn) t
+end

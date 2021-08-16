@@ -729,3 +729,54 @@ let close ?(wait = false) st =
   Reader.shutdown st.reader >>= fun () ->
   Writer.shutdown st.writer >>= fun () ->
   P2p_io_scheduler.close st.conn.scheduled_conn >>= fun _ -> Lwt.return_unit
+
+module Internal_for_tests = struct
+  let mock_authenticated_connection default_metadata =
+    let (secret_key, public_key, _pkh) = Crypto_box.random_keypair () in
+    let cryptobox_data =
+      Crypto.
+        {
+          channel_key = Crypto_box.precompute secret_key public_key;
+          local_nonce = Crypto_box.zero_nonce;
+          remote_nonce = Crypto_box.zero_nonce;
+        }
+    in
+    let scheduled_conn =
+      let f2d_t = Lwt_main.run (P2p_fd.socket PF_INET6 SOCK_STREAM 0) in
+      P2p_io_scheduler.register
+        (P2p_io_scheduler.create ~read_buffer_size:0 ())
+        f2d_t
+    in
+    let info = P2p_connection.Internal_for_tests.Info.mock default_metadata in
+    {scheduled_conn; info; cryptobox_data}
+
+  let make_crashing_encoding () : 'a Data_encoding.t =
+    Data_encoding.conv
+      (fun _ -> assert false)
+      (fun _ -> assert false)
+      Data_encoding.unit
+
+  let mock conn =
+    let reader =
+      Reader.
+        {
+          canceler = Lwt_canceler.create ();
+          conn;
+          encoding = make_crashing_encoding ();
+          messages = Lwt_pipe.create ();
+          worker = Lwt.return_unit;
+        }
+    in
+    let writer =
+      Writer.
+        {
+          canceler = Lwt_canceler.create ();
+          conn;
+          encoding = make_crashing_encoding ();
+          messages = Lwt_pipe.create ();
+          worker = Lwt.return_unit;
+          binary_chunks_size = 0;
+        }
+    in
+    {conn; reader; writer}
+end

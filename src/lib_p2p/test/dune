@@ -9,6 +9,7 @@
         ; Deactivated because it fails on CI (but not locally)
         ; See https://gitlab.com/tezos/tezos/-/issues/1184
         ; test_p2p_logging
+        test_p2p_connect_handler
         )
  (libraries tezos-base
             tezos-base.unix
@@ -83,6 +84,10 @@
  (action (run %{exe:test_p2p_banned_peers.exe})))
 
 (rule
+ (alias runtest_p2p_connect_handler)
+ (action (run %{exe:test_p2p_connect_handler.exe})))
+
+(rule
  (alias runtest_p2p_node)
  (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_node.exe})))
@@ -97,5 +102,6 @@
        (alias runtest_p2p_buffer_reader)
        (alias runtest_p2p_banned_peers)
        (alias runtest_p2p_node)
+       (alias runtest_p2p_connect_handler)
        )
  (action (progn)))

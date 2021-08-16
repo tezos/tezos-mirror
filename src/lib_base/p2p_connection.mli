@@ -137,3 +137,11 @@ module P2p_event : sig
 
   val encoding : t Data_encoding.t
 end
+
+(**/**)
+
+module Internal_for_tests : sig
+  module Info : sig
+    val mock : 'meta -> 'meta Info.t
+  end
+end
