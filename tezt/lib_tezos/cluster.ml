@@ -36,15 +36,15 @@ let create ?path ?name count arguments =
     (fun i -> Node.create ?path ~name:(name ^ "." ^ string_of_int i) arguments)
     (range 1 count)
 
-let connect a b = List.iter (fun a -> List.iter (Node.add_peer a) b) a
+let meta_connect connect a b = List.iter (fun a -> List.iter (connect a) b) a
 
-let rec clique_gen connect = function
+let rec meta_clique connect = function
   | [] -> ()
   | head :: tail ->
       List.iter (connect head) tail ;
-      clique_gen connect tail
+      meta_clique connect tail
 
-let ring_gen connect nodes =
+let meta_ring connect nodes =
   match nodes with
   | [] -> ()
   | first :: _ ->
@@ -59,19 +59,16 @@ let ring_gen connect nodes =
       in
       loop nodes
 
-let star_gen connect center other_nodes = List.iter (connect center) other_nodes
+let meta_star connect center other_nodes =
+  List.iter (connect center) other_nodes
 
-let clique = clique_gen Node.add_peer
+let connect = meta_connect Node.add_peer
 
-let meta_clique = clique_gen connect
+let clique = meta_clique Node.add_peer
 
-let ring = ring_gen Node.add_peer
+let ring = meta_ring Node.add_peer
 
-let meta_ring = ring_gen connect
-
-let star = star_gen Node.add_peer
-
-let meta_star = star_gen connect
+let star = meta_star Node.add_peer
 
 let start ?(public = false) nodes =
   let start_node node =

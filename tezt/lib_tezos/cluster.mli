@@ -100,23 +100,47 @@ val star : Node.t -> Node.t list -> unit
 (** {2 Meta-Topologies} *)
 
 (** The following functions are similar to the above functions
-    that create topologies, except that they connect clusters using {!connect}
-    instead of nodes using [Node.add_peer].
+    that create topologies, except that they are parameterized by:
+    - ['a], the type of nodes (usually [Node.t]);
+    - a connection function to create arrows in the graph.
 
-    For instance, a meta-clique [a; b; c] connects:
-    - all nodes of [a] with all nodes of [b] and [c];
-    - all nodes of [b] with all nodes of [c].
-    The result itself is not necessarily a clique since nodes of each sub-cluster
-    are not necessarily connected between themselves. *)
+    All non-meta functions are actually instances of their corresponding
+    meta functions with ['a = Node.t] and [Node.add_peer] as
+    the connection function. For instance, [clique] is the same
+    as [meta_clique Node.add_peer].
 
-(** Meta-version of {!clique}. *)
-val meta_clique : Node.t list list -> unit
+    Here are examples of other useful instantiations:
+    - use a symmetric version of [Node.add_peer] as the connection function,
+      to create symmetric arrows instead of one-way ones (useful if nodes are
+      in private mode);
+    - use [connect] as the connection function to connect clusters
+      together (['a] is then [Node.t list]). *)
 
-(** Meta-version of {!ring}. *)
-val meta_ring : Node.t list list -> unit
+(** Meta-version of {!connect}.
 
-(** Meta-version of {!star}. *)
-val meta_star : Node.t list -> Node.t list list -> unit
+    For each [a] in the first list and [b] in the second list,
+    this calls the connection function on [a] and [b]. *)
+val meta_connect : ('a -> 'a -> unit) -> 'a list -> 'a list -> unit
+
+(** Meta-version of {!clique}.
+
+    For each pair [a, b] where [a] and [b] are part of the list
+    and [a] is before [b] in the list, this calls the connection function
+    on [a] and [b]. *)
+val meta_clique : ('a -> 'a -> unit) -> 'a list -> unit
+
+(** Meta-version of {!ring}.
+
+    For a list [x1; x2; ...; xN], this calls the connection function
+    on the following pairs: [x1, x2], [x2, x3], ..., [x(N-1), xN], and [xN, x1]. *)
+val meta_ring : ('a -> 'a -> unit) -> 'a list -> unit
+
+(** Meta-version of {!star}.
+
+    Usage: [star f center outer]
+
+    This calls [f center x] for all [x] in [outer]. *)
+val meta_star : ('a -> 'b -> unit) -> 'a -> 'b list -> unit
 
 (** {2 Running} *)
 
