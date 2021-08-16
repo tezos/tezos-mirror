@@ -65,36 +65,44 @@ val create :
 
 (** {2 Topologies} *)
 
+(** Connect two nodes together.
+
+    Usage: [symmetric_add_peer a b]
+
+    Same as [Node.add_peer a b; Node.add_peer b a]. *)
+val symmetric_add_peer : Node.t -> Node.t -> unit
+
 (** Connect all nodes of a cluster to all nodes of another cluster.
 
     Usage: [connect a b]
 
-    Add all nodes of [b] as [--peer] arguments to all nodes of [a].
-    This is a generalization of [Node.add_peer] for lists. *)
+    Add all nodes of [b] as [--peer] arguments to all nodes of [a],
+    and all nodes of [a] as [--peer] arguments to all nodes of [b].
+    This is a generalization of [symmetric_add_peer] for lists. *)
 val connect : Node.t list -> Node.t list -> unit
 
 (** Connect all nodes of a cluster together.
 
     For a cluster [node1; node2; ...; nodeN], this adds:
-    - [node2; ...; nodeN] as [--peer]s to [node1];
-    - [node3; ...; nodeN] as [--peer]s to [node2];
+    - [node2; ...; nodeN] as [--peer]s to [node1] and vice-versa;
+    - [node3; ...; nodeN] as [--peer]s to [node2] and vice-versa;
     - etc. *)
 val clique : Node.t list -> unit
 
 (** Connect nodes to form a ring.
 
     For a cluster [node1; node2; ...; nodeN], this adds:
-    - [node2] as [--peer] to [node1];
-    - [node3] as [--peer] to [node2];
+    - [node2] as [--peer] to [node1] and vice-versa;
+    - [node3] as [--peer] to [node2] and vice-versa;
     - ...
-    - and finally [node1] as [--peer] to [nodeN]. *)
+    - and finally [node1] as [--peer] to [nodeN] and vice-versa. *)
 val ring : Node.t list -> unit
 
 (** Connect nodes to form a star.
 
     Usage: [star center other_nodes]
 
-    Add all [other_nodes] as [--peer]s to [center]. *)
+    Add all [other_nodes] as [--peer]s to [center] and vice-versa. *)
 val star : Node.t -> Node.t list -> unit
 
 (** {2 Meta-Topologies} *)
@@ -105,14 +113,14 @@ val star : Node.t -> Node.t list -> unit
     - a connection function to create arrows in the graph.
 
     All non-meta functions are actually instances of their corresponding
-    meta functions with ['a = Node.t] and [Node.add_peer] as
+    meta functions with ['a = Node.t] and [symmetric_add_peer] as
     the connection function. For instance, [clique] is the same
-    as [meta_clique Node.add_peer].
+    as [meta_clique symmetric_add_peer].
 
     Here are examples of other useful instantiations:
-    - use a symmetric version of [Node.add_peer] as the connection function,
-      to create symmetric arrows instead of one-way ones (useful if nodes are
-      in private mode);
+    - use [Node.add_peer] as the connection function,
+      to create one-way arrows instead of summetry ones
+      (not very useful if nodes are in private mode);
     - use [connect] as the connection function to connect clusters
       together (['a] is then [Node.t list]). *)
 

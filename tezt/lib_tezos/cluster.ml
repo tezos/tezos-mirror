@@ -36,6 +36,10 @@ let create ?path ?name count arguments =
     (fun i -> Node.create ?path ~name:(name ^ "." ^ string_of_int i) arguments)
     (range 1 count)
 
+let symmetric_add_peer a b =
+  Node.add_peer a b ;
+  Node.add_peer b a
+
 let meta_connect connect a b = List.iter (fun a -> List.iter (connect a) b) a
 
 let rec meta_clique connect = function
@@ -62,13 +66,13 @@ let meta_ring connect nodes =
 let meta_star connect center other_nodes =
   List.iter (connect center) other_nodes
 
-let connect = meta_connect Node.add_peer
+let connect = meta_connect symmetric_add_peer
 
-let clique = meta_clique Node.add_peer
+let clique = meta_clique symmetric_add_peer
 
-let ring = meta_ring Node.add_peer
+let ring = meta_ring symmetric_add_peer
 
-let star = meta_star Node.add_peer
+let star = meta_star symmetric_add_peer
 
 let start ?(public = false) nodes =
   let start_node node =
