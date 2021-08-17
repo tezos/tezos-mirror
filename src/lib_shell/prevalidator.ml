@@ -414,13 +414,13 @@ module Make
             }
     | `None ->
         pv.advertisement <- `Pending mempool ;
-        Lwt_utils.dont_wait
-          (fun exc ->
-            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+        Lwt.dont_wait
           (fun () ->
             Lwt_unix.sleep advertisement_delay >>= fun () ->
             Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
+          (fun exc ->
+            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
   let is_endorsement (op : Proto.operation_data operation) =
     Proto.acceptable_passes

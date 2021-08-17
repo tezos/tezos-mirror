@@ -78,11 +78,9 @@ end
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
 let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
     'a tzresult =
-  try
-    match Data_encoding.Binary.of_bytes_opt encoding bytes with
-    | None -> error Parse_error
-    | Some protocol_data -> ok protocol_data
-  with _ -> error Parse_error
+  match Data_encoding.Binary.of_bytes_opt encoding bytes with
+  | None -> error Parse_error
+  | Some protocol_data -> ok protocol_data
 
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   T with module Proto = Proto = struct

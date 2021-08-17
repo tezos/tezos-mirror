@@ -28,6 +28,14 @@ open Cmdline
 let lift_opt f opt_arg state =
   match opt_arg with None -> state | Some arg -> f arg state
 
+let parse_parameter f m =
+  Clic.parameter (fun (_ : unit) p ->
+      Lwt.return
+      @@
+      match f p with
+      | Some x -> Ok x
+      | None -> Error (Error_monad.error_of_exn (Failure m)))
+
 module Benchmark_cmd = struct
   (* ----------------------------------------------------------------------- *)
   (* Handling the options of the benchmarker *)
@@ -142,11 +150,10 @@ module Benchmark_cmd = struct
        Parmeter: size in megabytes of the cache. *)
     let flush_cache_arg =
       let flush_cache_arg_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (`Cache_megabytes (int_of_string parsed))
-            with _ ->
-              Printf.eprintf "Error while parsing --flush-cache argument." ;
-              exit 1)
+        parse_parameter
+          (fun p ->
+            Option.map (fun p -> `Cache_megabytes p) (int_of_string_opt p))
+          "Error while parsing --flush-cache argument."
       in
       Clic.arg
         ~doc:"Force flushing the cache before each measurement"
@@ -176,7 +183,9 @@ module Benchmark_cmd = struct
                 in
                 match String.split_on_char '@' s with
                 | ["percentile"; i] ->
-                    let i = try int_of_string i with _ -> error () in
+                    let i =
+                      Option.value_f (int_of_string_opt i) ~default:error
+                    in
                     if i < 1 || i > 100 then error () else return (Percentile i)
                 | _ -> error ()))
       in
@@ -190,11 +199,9 @@ module Benchmark_cmd = struct
        Parameter: Id of the CPU where to preferentially pin the benchmark *)
     let cpu_affinity_arg =
       let cpu_affinity_arg_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (int_of_string parsed)
-            with _ ->
-              Printf.eprintf "Error while parsing --cpu-affinity argument." ;
-              exit 1)
+        parse_parameter
+          int_of_string_opt
+          "Error while parsing --cpu-affinity argument."
       in
       Clic.arg
         ~doc:"Sets CPU affinity"
@@ -205,11 +212,9 @@ module Benchmark_cmd = struct
     (* Integer argument --nsamples *)
     let nsamples_arg =
       let nsamples_arg_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (int_of_string parsed)
-            with _ ->
-              Printf.eprintf "Error while parsing --nsamples argument." ;
-              exit 1)
+        parse_parameter
+          int_of_string_opt
+          "Error while parsing --nsamples argument."
       in
       Clic.arg
         ~doc:"Number of samples per benchmark"
@@ -220,11 +225,7 @@ module Benchmark_cmd = struct
     (* Integer argument --seed *)
     let seed_arg =
       let seed =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (int_of_string parsed)
-            with _ ->
-              Printf.eprintf "Error while parsing --seed argument." ;
-              exit 1)
+        parse_parameter int_of_string_opt "Error while parsing --seed argument."
       in
       Clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
@@ -244,7 +245,9 @@ module Benchmark_cmd = struct
        Parameter: Number of random stacks to generate. *)
     let bench_number_arg =
       let bench_number_param =
-        Clic.parameter (fun (_ : unit) parsed -> return (int_of_string parsed))
+        parse_parameter
+          int_of_string_opt
+          "Error while parsing --bench-num argument."
       in
       Clic.arg
         ~doc:"Number of benchmarks (i.e. random stacks)"
@@ -256,8 +259,9 @@ module Benchmark_cmd = struct
        Parameter: size of minor heap in kb. *)
     let minor_heap_size_arg =
       let minor_heap_size_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            return (`words (int_of_string parsed)))
+        parse_parameter
+          (fun s -> Option.map (fun p -> `words p) (int_of_string_opt s))
+          "Error while parsing --minor-heap-size argument."
       in
       Clic.arg
         ~doc:"Size of minor heap in words"
@@ -416,11 +420,9 @@ module Infer_cmd = struct
     (* Float argument --ridge-alpha *)
     let ridge_alpha_arg =
       let ridge_alpha_arg_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (float_of_string parsed)
-            with _ ->
-              Printf.eprintf "Error while parsing --ridge-alpha argument." ;
-              exit 1)
+        parse_parameter
+          float_of_string_opt
+          "Error while parsing --ridge-alpha argument."
       in
       Clic.arg
         ~doc:"Regularization parameter for ridge regression"
@@ -431,11 +433,9 @@ module Infer_cmd = struct
     (* Float argument --lasso-alpha *)
     let lasso_alpha_arg =
       let lasso_alpha_arg_param =
-        Clic.parameter (fun (_ : unit) parsed ->
-            try return (float_of_string parsed)
-            with _ ->
-              Printf.eprintf "Error while parsing --lasso-alpha argument." ;
-              exit 1)
+        parse_parameter
+          float_of_string_opt
+          "Error while parsing --lasso-alpha argument."
       in
       Clic.arg
         ~doc:"Regularization parameter for lasso regression"
@@ -568,10 +568,11 @@ module Cull_outliers_cmd = struct
 
   let cull_handler () workload_data sigmas save_file () =
     let nsigmas =
-      try float_of_string sigmas
-      with _ ->
-        Printf.eprintf "Could not parse back float value for nsigmas.\n" ;
-        exit 1
+      match float_of_string_opt sigmas with
+      | Some s -> s
+      | None ->
+          Printf.eprintf "Could not parse back float value for nsigmas.\n" ;
+          exit 1
     in
     commandline_outcome_ref :=
       Some (Cull_outliers {workload_data; nsigmas; save_file}) ;

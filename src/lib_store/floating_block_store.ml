@@ -67,8 +67,7 @@ let find_predecessors floating_store hash =
 
 let read_block_and_predecessors floating_store hash =
   Lwt_idle_waiter.task floating_store.scheduler (fun () ->
-      Lwt.catch
-        (fun () ->
+      Option.catch_os (fun () ->
           let {offset; predecessors} =
             Floating_block_index.find floating_store.floating_block_index hash
           in
@@ -77,8 +76,7 @@ let read_block_and_predecessors floating_store hash =
           | Some (block, _) -> Lwt.return_some (block, predecessors)
           | None ->
               (* May be the case when a stored block is corrupted *)
-              Lwt.return_none)
-        (fun _exn -> Lwt.return_none))
+              Lwt.return_none))
 
 let read_block floating_store hash =
   read_block_and_predecessors floating_store hash >>= function
@@ -318,14 +316,12 @@ let full_integrity_check chain_dir kind =
     (function _exn -> Lwt.return_false)
 
 let delete_files floating_store =
-  Lwt.catch
-    (fun () ->
+  Unit.catch_s (fun () ->
       close floating_store >>= fun () ->
       let floating_store_dir_path =
         Naming.dir_path floating_store.floating_blocks_dir
       in
       Lwt_utils_unix.remove_dir floating_store_dir_path)
-    (fun _ignore -> (* ignore errors *) Lwt.return_unit)
 
 let swap ~src ~dst =
   close src >>= fun () ->
@@ -358,32 +354,24 @@ let fix_integrity chain_dir kind =
             (fun () ->
               Lwt.catch
                 (fun () ->
-                  Lwt.catch
-                    (fun () ->
-                      (* This [iter_s] stops reading whenever a block
-                          cannot be read. *)
-                      iter_s
-                        (fun block ->
-                          find_predecessors
-                            inconsistent_floating_store
-                            (Block_repr.hash block)
-                          >>= function
-                          | Some preds ->
-                              (* TODO: should we retrieve info ? e.g. highest_level, highest_fitness ? *)
-                              append_block fresh_floating_store preds block
-                              >>= return
-                          | None -> Lwt.fail Exit)
-                        inconsistent_floating_store)
-                    (function Exit -> return_unit | exn -> Lwt.fail exn)
-                  >>=? fun () ->
-                  swap
-                    ~src:fresh_floating_store
-                    ~dst:inconsistent_floating_store
-                  >>= fun () -> return_unit)
-                (fun exn ->
-                  (* Restoring integrity failed: delete the fresh_floating_store files *)
-                  close inconsistent_floating_store >>= fun () ->
-                  close fresh_floating_store >>= fun () -> Lwt.fail exn))
+                  (* This [iter_s] stops reading whenever a block
+                      cannot be read. *)
+                  iter_s
+                    (fun block ->
+                      find_predecessors
+                        inconsistent_floating_store
+                        (Block_repr.hash block)
+                      >>= function
+                      | Some preds ->
+                          (* TODO: should we retrieve info ? e.g. highest_level, highest_fitness ? *)
+                          append_block fresh_floating_store preds block
+                          >>= return
+                      | None -> Lwt.fail Exit)
+                    inconsistent_floating_store)
+                (function Exit -> return_unit | exn -> Lwt.fail exn)
+              >>=? fun () ->
+              swap ~src:fresh_floating_store ~dst:inconsistent_floating_store
+              >>= fun () -> return_unit)
             (fun () ->
               close inconsistent_floating_store >>= fun () ->
               close fresh_floating_store >>= fun () ->

@@ -262,15 +262,13 @@ let predecessor_n_raw store block_hash distance =
     loop block_hash distance
 
 let predecessor_n block_store block_hash distance =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       predecessor_n_raw block_store block_hash distance >>= function
       | None -> Lwt.return_none
       | Some predecessor -> (
           Header.known (block_store, predecessor) >>= function
           | false -> Lwt.return_none
           | true -> Lwt.return_some predecessor))
-    (fun _exn -> Lwt.return_none)
 
 type t = global_state
 

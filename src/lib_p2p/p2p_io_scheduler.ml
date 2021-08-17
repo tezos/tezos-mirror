@@ -126,9 +126,7 @@ module Scheduler (IO : IO) = struct
   let waiter st conn =
     assert (Lwt.state conn.current_pop <> Sleep) ;
     conn.current_pop <- IO.pop conn.in_param ;
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+    Lwt.dont_wait
       (fun () ->
         (* To ensure that there is no concurrent calls to IO.pop, we
            wait for the promise to be fulfilled. *)
@@ -141,6 +139,8 @@ module Scheduler (IO : IO) = struct
         else Queue.push (conn, res) st.readys_low ;
         if was_empty then Lwt_condition.broadcast st.readys () ;
         Lwt.return_unit)
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
   (* Wait for a connection to be available, with data in one of the
      queues. *)
@@ -531,11 +531,11 @@ let write_size bytes =
 let register st fd =
   if st.closed then (
     Error_monad.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun () -> P2p_fd.close fd)
       (fun trace ->
         Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
-      (fun () -> P2p_fd.close fd) ;
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     raise Closed)
   else
     let id = P2p_fd.id fd in

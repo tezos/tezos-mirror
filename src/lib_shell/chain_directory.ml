@@ -39,9 +39,7 @@ let get_chain_id store =
   | `Hash chain_id -> Lwt.return chain_id
 
 let get_chain_id_opt store chain =
-  Lwt.catch
-    (fun () -> get_chain_id store chain >>= Lwt.return_some)
-    (fun _exn -> Lwt.return_none)
+  Option.catch_s (fun () -> get_chain_id store chain)
 
 let get_chain_store_exn store chain =
   get_chain_id store chain >>= fun chain_id ->

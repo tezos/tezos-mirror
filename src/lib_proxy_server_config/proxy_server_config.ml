@@ -87,7 +87,7 @@ let destruct_config json =
   | cfg -> (
       match sym_block_caching_time_error cfg.sym_block_caching_time with
       | Some err -> Invalid err
-      | _ -> Valid cfg)
+      | None -> Valid cfg)
   | exception _ -> CannotDeserialize
 
 let union_right_bias (t1 : t) (t2 : t) =

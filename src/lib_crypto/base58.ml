@@ -48,7 +48,7 @@ module Alphabet = struct
           i ;
       Bytes.set str char (char_of_int i)
     done ;
-    {encode = alphabet; decode = Bytes.to_string str}
+    {encode = alphabet; decode = Bytes.unsafe_to_string str}
 
   let bitcoin =
     make "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

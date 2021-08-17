@@ -120,15 +120,13 @@ let bson =
   }
 
 let octet_stream =
-  let construct enc v =
-    Bytes.to_string @@ Data_encoding.Binary.to_bytes_exn enc v
-  in
+  let construct enc v = Data_encoding.Binary.to_string_exn enc v in
   {
     name = Cohttp.Accept.MediaType ("application", "octet-stream");
     q = Some 200;
     pp =
       (fun enc ppf raw ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string raw) with
+        match Data_encoding.Binary.of_string enc raw with
         | Error re ->
             Format.fprintf
               ppf
@@ -148,7 +146,7 @@ let octet_stream =
         Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
     destruct =
       (fun enc s ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string s) with
+        match Data_encoding.Binary.of_string enc s with
         | Error re ->
             Error
               (Format.asprintf

@@ -425,9 +425,9 @@ module type MONAD = sig
 
   (** Wrapper around [Lwt_utils.dont_wait] *)
   val dont_wait :
-    (exn -> unit) ->
-    ('trace -> unit) ->
     (unit -> (unit, 'trace) result Lwt.t) ->
+    ('trace -> unit) ->
+    (exn -> unit) ->
     unit
 
   (** A few aliases for Lwt functions *)

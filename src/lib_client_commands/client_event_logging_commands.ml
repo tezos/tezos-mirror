@@ -88,19 +88,15 @@ let commands () =
             ~doc:"Filter on event names"
             ~long:"names"
             ~placeholder:"LIST"
-            (parameter (fun _ s ->
-                 try return (String.split_on_char ',' s)
-                 with _ -> failwith "List of names cannot be parsed")))
+            (parameter (fun _ s -> return (String.split_on_char ',' s))))
          (arg
             ~doc:"Filter on event sections (use '_' for no-section)"
             ~long:"sections"
             ~placeholder:"LIST"
             (parameter (fun _ s ->
-                 try
-                   return
-                     (String.split_on_char ',' s
-                     |> List.map (function "_" -> None | other -> Some other))
-                 with _ -> failwith "List of sections cannot be parsed")))
+                 return
+                   (String.split_on_char ',' s
+                   |> List.map (function "_" -> None | other -> Some other)))))
          (arg
             ~doc:"Filter out events before DATE"
             ~long:"since"
@@ -121,9 +117,7 @@ let commands () =
       @@ param
            ~name:"Sink-Name"
            ~desc:"The URI of the SINK to query"
-           (parameter (fun _ s ->
-                try return (Uri.of_string s)
-                with _ -> failwith "Uri cannot be parsed"))
+           (parameter (fun _ s -> return (Uri.of_string s)))
       @@ stop)
       (fun ( only_names,
              only_sections,

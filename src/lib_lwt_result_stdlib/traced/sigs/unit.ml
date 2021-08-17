@@ -23,20 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [Make] is a functor that takes a [Trace] as argument and instantiates all
-    the Traced modules based on it. *)
-module Make (Trace : Traced_sigs.Trace.S) = struct
-  module Monad = Monad.Make (Trace)
-  module Seq = Seq.Make (Monad)
-  module Hashtbl = Hashtbl.Make (Monad) (Seq)
-  module List = List.Make (Monad)
-  module Map = Map.Make (Monad) (Seq)
-  module Option = Bare_structs.Option
-  module Result = Bare_structs.Result
-  module Set = Set.Make (Monad) (Seq)
-  module Seq_e = Seq_e
-  module Seq_s = Seq_s.Make (Monad)
-  module Seq_es = Seq_es.Make (Monad) (Seq_e) (Seq_s)
-  module Unit = Bare_structs.Unit
-  module WithExceptions = Bare_structs.WithExceptions
-end
+(** A replacement for {!Stdlib.Unit} which
+    - is exception-safe,
+    - includes Lwt-, result-, and Lwt-result-aware traversors.
+
+    See {!Lwtreslib} and {!Seq} for general description of traversors and the
+    meaning of [_s], [_e], and [_es] suffixes. *)
+module type S = Bare_sigs.Unit.S

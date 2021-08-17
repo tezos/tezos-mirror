@@ -169,7 +169,7 @@ let check_tzBTC ~typecheck current_level ctxt f =
 
 let init ctxt ~typecheck =
   (* We use a custom origination nonce because it is unset when stitching from 009 *)
-  let nonce = Operation_hash.hash_bytes [Bytes.of_string "Drip, drip, drip."] in
+  let nonce = Operation_hash.hash_string ["Drip, drip, drip."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   Storage.Liquidity_baking.Escape_ema.init ctxt 0l >>=? fun ctxt ->
   let current_level =

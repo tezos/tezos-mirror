@@ -188,7 +188,7 @@ end = struct
         ~prefix:Base58.Prefix.secp256k1_scalar
         ~length:32
         ~to_raw:to_bits
-        ~of_raw:(fun s -> try Some (of_bits_exn s) with _ -> None)
+        ~of_raw:(fun s -> Option.catch (fun () -> of_bits_exn s))
         ~wrap:(fun x -> Data x)
 
     let title = "Secp256k1_group.Scalar"
@@ -310,7 +310,7 @@ end = struct
         ~prefix:Base58.Prefix.secp256k1_element
         ~length:33
         ~to_raw:to_bits
-        ~of_raw:(fun s -> try Some (of_bits_exn s) with _ -> None)
+        ~of_raw:(fun s -> Option.catch (fun () -> of_bits_exn s))
         ~wrap:(fun x -> Data x)
 
     include Helpers.MakeB58 (struct
@@ -346,12 +346,11 @@ end = struct
 
   let to_bytes pk = to_bits pk |> Bytes.of_string
 
-  let of_bytes_opt s =
-    try Some (Bytes.to_string s |> of_bits_exn) with _ -> None
+  let of_bytes_opt s = Option.catch (fun () -> Bytes.to_string s |> of_bits_exn)
 
   let to_string = to_bits
 
-  let of_string_opt s = try Some (of_bits_exn s) with _ -> None
+  let of_string_opt s = Option.catch (fun () -> of_bits_exn s)
 
   let size = 37
 

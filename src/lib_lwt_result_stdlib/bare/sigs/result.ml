@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -132,11 +132,28 @@ module type S = sig
       In other words, it catches exceptions in [f ()] and either returns the
       value in an [Ok] or passes the exception to [handler] for the [Error].
 
+      No attempt is made to catch the exceptions raised by [handler].
+
       [catch_only] has the same use as with [catch]. The same restriction on
       catching non-deterministic runtime exceptions applies. *)
   val catch_f :
     ?catch_only:(exn -> bool) ->
     (unit -> 'a) ->
+    (exn -> 'error) ->
+    ('a, 'error) result
+
+  (** [catch_ef f handler] is equivalent to [join @@ map_error (catch f) handler].
+      In other words, it catches exceptions in [f ()] and either returns the
+      value as is or passes the exception to [handler] for the [Error]. The
+      handler must return an error of the same type as that carried by [f ()].
+
+      No attempt is made to catch the exceptions raised by [handler].
+
+      [catch_only] has the same use as with [catch]. The same restriction on
+      catching non-deterministic runtime exceptions applies. *)
+  val catch_ef :
+    ?catch_only:(exn -> bool) ->
+    (unit -> ('a, 'error) result) ->
     (exn -> 'error) ->
     ('a, 'error) result
 

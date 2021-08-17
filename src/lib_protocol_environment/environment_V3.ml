@@ -607,6 +607,9 @@ struct
       Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
         (Local_monad)
 
+    (* Backwards compatibility additions (dont_wait, trace helpers) *)
+    let dont_wait ex er f = dont_wait f er ex
+
     let trace_of_error e = TzTrace.make e
 
     let make_trace_encoding e = TzTrace.encoding e

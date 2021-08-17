@@ -84,9 +84,7 @@ let commands () =
              ~desc:"the seed from which to compute the chain id"
         @@ stop)
         (fun () seed_str (cctxt : #Client_context.full) ->
-          let chain_id =
-            Tezos_crypto.Chain_id.hash_bytes [Bytes.of_string seed_str]
-          in
+          let chain_id = Tezos_crypto.Chain_id.hash_string [seed_str] in
           cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id >>= fun () ->
           return_unit);
     ]

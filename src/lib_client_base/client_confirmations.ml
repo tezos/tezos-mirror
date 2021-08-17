@@ -244,20 +244,20 @@ let lookup_operation_in_previous_blocks (ctxt : #Client_context.full) ~chain
 let wait_for_bootstrapped ?(retry = fun f x -> f x)
     (ctxt : #Client_context.full) =
   let display = ref false in
-  Lwt_utils.dont_wait
-    (fun exc ->
-      let (_ : unit Lwt.t) =
-        ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
-        >>= fun () -> ctxt#error "Progress not monitored anymore\n%!"
-      in
-      ())
+  Lwt.dont_wait
     (fun () ->
       ctxt#sleep 0.3 >>= fun () ->
       if not !display then (
         ctxt#answer "Waiting for the node to be bootstrapped..." >>= fun () ->
         display := true ;
         Lwt.return_unit)
-      else Lwt.return_unit) ;
+      else Lwt.return_unit)
+    (fun exc ->
+      let (_ : unit Lwt.t) =
+        ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+        >>= fun () -> ctxt#error "Progress not monitored anymore\n%!"
+      in
+      ()) ;
   retry Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
   Lwt_stream.iter_s
     (fun (hash, time) ->

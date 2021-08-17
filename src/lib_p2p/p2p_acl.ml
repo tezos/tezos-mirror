@@ -95,13 +95,11 @@ let create ~peer_id_size ~ip_size ~ip_cleanup_delay =
     cleanup_loop ()
   in
   let rec cleanup_start () =
-    Lwt_utils.dont_wait
-      (fun exc ->
+    Lwt.dont_wait cleanup_loop (fun exc ->
         Format.eprintf "Exception caught: %s\n%!" (Printexc.to_string exc) ;
         Format.eprintf "Resetting bloomer to an ok state\n%!" ;
         Bloomer.clear bloomer ;
         cleanup_start ())
-      cleanup_loop
   in
   cleanup_start () ;
   {

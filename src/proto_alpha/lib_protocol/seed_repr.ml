@@ -47,7 +47,7 @@ let seed_encoding =
   let open Data_encoding in
   conv (fun (B b) -> b) (fun b -> B b) state_hash_encoding
 
-let empty = B (State_hash.hash_bytes [Bytes.of_string initial_seed])
+let empty = B (State_hash.hash_string [initial_seed])
 
 let nonce (B state) nonce =
   B (State_hash.hash_bytes [State_hash.to_bytes state; nonce])

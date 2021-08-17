@@ -83,7 +83,7 @@ let bits_of_char c =
 
 let bits_of_bytes bytes =
   let acc = ref [] in
-  String.iter bytes ~f:(fun c -> acc := List.rev_append (bits_of_char c) !acc) ;
+  Bytes.iter bytes ~f:(fun c -> acc := List.rev_append (bits_of_char c) !acc) ;
   List.rev !acc
 
 let list_sub l n =
@@ -112,7 +112,7 @@ let of_entropy entropy =
   | Some {bytes; digest_length; _} ->
       let digest = Bytes.get (Hacl.Hash.SHA256.digest entropy) 0 in
       let digest = list_sub (bits_of_char digest) digest_length in
-      let entropy = bits_of_bytes (Bytes.to_string bytes) @ digest in
+      let entropy = bits_of_bytes bytes @ digest in
       List.map (pack entropy 11) ~f:int_of_bits
 
 let to_seed ?(passphrase = Bytes.empty) t =

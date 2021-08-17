@@ -633,7 +633,7 @@ let pp_watermark ppf =
       fprintf
         ppf
         "Custom: 0x%s"
-        (try String.sub hexed 0 10 ^ "..." with _ -> hexed)
+        (try String.sub hexed 0 10 ^ "..." with Invalid_argument _ -> hexed)
 
 let sign ?watermark secret_key message =
   let watermark = Option.map bytes_of_watermark watermark in

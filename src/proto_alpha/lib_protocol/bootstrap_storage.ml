@@ -50,9 +50,7 @@ let init_contract ~typecheck ctxt
     ~delegate:(Some delegate)
 
 let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
-  let nonce =
-    Operation_hash.hash_bytes [Bytes.of_string "Un festival de GADT."]
-  in
+  let nonce = Operation_hash.hash_string ["Un festival de GADT."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   List.fold_left_es init_account ctxt accounts >>=? fun ctxt ->
   List.fold_left_es (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->

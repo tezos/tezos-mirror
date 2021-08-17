@@ -119,8 +119,7 @@ let read_block_header db h =
       Lwt.return_some (chain_id, Store.Block.header block)
 
 let read_predecessor_header {disk; _} h offset =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       let offset = Int32.to_int offset in
       Store.all_chain_stores disk >>= fun chain_stores ->
       Lwt_utils.find_map_s
@@ -129,7 +128,6 @@ let read_predecessor_header {disk; _} h offset =
           | None -> Lwt.return_none
           | Some block -> Lwt.return_some (Store.Block.header block))
         chain_stores)
-    (fun _ -> Lwt.return_none)
 
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
@@ -449,17 +447,17 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   Chain_id.Table.iter
     (fun chain_id _chain_db ->
       Error_monad.dont_wait
-        (fun exc ->
-          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+        (fun () ->
+          let meta = P2p.get_peer_metadata p2p gid in
+          Peer_metadata.incr meta (Sent_request Branch) ;
+          P2p.send p2p conn (Get_current_branch chain_id))
         (fun trace ->
           Format.eprintf
             "Uncaught error: %a\n%!"
             Error_monad.pp_print_error
             trace)
-        (fun () ->
-          let meta = P2p.get_peer_metadata p2p gid in
-          Peer_metadata.incr meta (Sent_request Branch) ;
-          P2p.send p2p conn (Get_current_branch chain_id)))
+        (fun exc ->
+          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
     active_chains ;
   state.worker <-
     Lwt_utils.worker

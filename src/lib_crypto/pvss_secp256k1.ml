@@ -60,7 +60,7 @@ module G : Pvss.CYCLIC_GROUP = struct
 
   let pow x n = Group.mul n x
 
-  let of_bits b = try Some (Group.of_bits_exn b) with _ -> None
+  let of_bits b = Option.catch (fun () -> Group.of_bits_exn b)
 end
 
 include Pvss.MakePvss (G)

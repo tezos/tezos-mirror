@@ -68,12 +68,10 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
         in
         lock () >>= fun (fd, sh) ->
         (* catch might be useless if f always uses the error monad *)
-        Lwt.catch f (function e ->
-            Lwt.return
-              (unlock fd ;
-               raise e))
+        Lwt.finalize f (fun () ->
+            unlock fd ;
+            Lwt.return_unit)
         >>= fun res ->
-        Lwt.return (unlock fd) >>= fun () ->
         Lwt_unix.disable_signal_handler sh ;
         Lwt.return res
 
@@ -98,13 +96,11 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       fun alias_name list encoding ->
-        Lwt.catch
-          (fun () ->
+        Error_monad.catch_es (fun () ->
             Lwt_utils_unix.create_dir base_dir >>= fun () ->
             let filename = self#filename alias_name in
             let json = Data_encoding.Json.construct encoding list in
             Lwt_utils_unix.Json.write_file filename json)
-          (fun exn -> Lwt.return (error_exn exn))
         |> generic_trace "could not write the %s alias file." alias_name
   end
 

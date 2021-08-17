@@ -344,5 +344,7 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
 
   module Set : Traced_sigs.Set.S with type 'error trace := 'error Trace.trace
 
+  module Unit : Traced_sigs.Unit.S
+
   module WithExceptions : Traced_sigs.WithExceptions.S
 end

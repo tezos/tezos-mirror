@@ -64,49 +64,5 @@ val worker :
 val fold_left_s_n :
   n:int -> ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> ('a * 'b list) Lwt.t
 
-(** [dont_wait handler f] calls [f ()] and essentially ignores the returned
-    promise. In particular it does not wait for the promise to resolve.
-
-    [dont_wait] is meant as an alternative to [Lwt.async]. The former requires
-    an explicit, local exception handler whereas the latter uses a global
-    handler that is set by side-effects.
-
-    CAVEAT!
-
-    Note that, because of the semantics of execution in Lwt, the evaluation of
-    [f ()] is immediate and some progress towards the resolution of the promise
-    may happen immediately. Specifically, the progress towards the resolution of
-    the promise [p] returned by [f ()] is made until the point where it yields.
-    At that point, control comes back to the caller of [dont_wait] and
-    continues. More concretely, consider the order of the side-effects in the
-    following piece of code and in particular how the second side-effect in the
-    order of execution is within the promise created by [dont_wait].
-
-    [side_effect (); (* first *)
-     dont_wait
-       (fun exc -> ..)
-       (fun () ->
-          side_effect (); (* second *)
-          Lwt.pause () >>= fun () ->
-          side_effect (); (* delayed *)
-          ..);
-     side_effect (); (* third *)
-    ]
-
-    If you want to delay any progress towards promise resolution being made
-    (e.g., if you need strong guarantees about side-effects because you are in a
-    critical section), then you need to add an explicit cooperation point. You
-    can use [Lwt.pause] at the very beginning of the promise you pass to
-    [dont_wait]:
-    [dont_wait handler (fun () -> Lwt.pause () >>= fun () -> ..)].
-
-    With this pattern, in the expression
-    [dont_wait handler (fun () -> Lwt.pause () >>= f)], the anonymous lambda
-    ([(fun () -> …)]) is called immediately. However, when this call is
-    evaluated, the call to [pause] immediately suspend progress towards the
-    resolution of the promise, delaying the call [f ()].
-*)
-val dont_wait : (exn -> unit) -> (unit -> unit Lwt.t) -> unit
-
 (** Lwt version of [TzList.find_map] *)
 val find_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b option Lwt.t

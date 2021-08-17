@@ -172,9 +172,10 @@ module Secret_key = struct
         let buf = Bytes.create (sk_size + pk_size) in
         blit_to_bytes sk buf ;
         blit_to_bytes pk ~pos:sk_size buf ;
-        Bytes.to_string buf)
+        Bytes.unsafe_to_string buf)
       ~of_raw:(fun buf ->
-        let sk = Bytes.(sub (of_string buf) 0 sk_size) in
+        let sk = Bytes.create sk_size in
+        Bytes.blit_string buf 0 sk 0 sk_size ;
         sk_of_bytes sk)
       ~wrap:(fun x -> Data x)
 

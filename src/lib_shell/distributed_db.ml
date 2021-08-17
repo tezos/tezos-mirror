@@ -175,14 +175,14 @@ let activate
               P2p.send p2p conn (Get_current_branch chain_id) :: acc)
         in
         Error_monad.dont_wait
-          (fun exc ->
-            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+          (fun () -> join_ep sends)
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"
               Error_monad.pp_print_error
               trace)
-          (fun () -> join_ep sends) ;
+          (fun exc ->
+            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
         Chain_id.Table.add active_chains chain_id local_db ;
         local_db
   in
@@ -203,11 +203,11 @@ let deactivate chain_db =
       chain_db.reader_chain_db.active_connections
   in
   Error_monad.dont_wait
-    (fun exc ->
-      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+    (fun () -> sends)
     (fun trace ->
       Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_error trace)
-    (fun () -> sends) ;
+    (fun exc ->
+      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
   Distributed_db_requester.Raw_operation.shutdown
     chain_db.reader_chain_db.operation_db
   >>= fun () ->

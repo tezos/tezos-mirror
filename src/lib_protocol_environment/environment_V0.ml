@@ -375,6 +375,8 @@ struct
     include
       Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
         (Local_monad)
+
+    (* Backwards compatibility additions (traversors, infix op) *)
     include Error_monad_traversors
 
     let ( >>|? ) = ( >|=? ) (* for backward compatibility *)

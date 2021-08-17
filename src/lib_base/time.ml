@@ -123,9 +123,9 @@ module Protocol = struct
       ~destruct:(function
         | "none" | "epoch" -> Ok epoch
         | s -> (
-            match Int64.of_string s with
-            | t -> Ok t
-            | exception _ ->
+            match Int64.of_string_opt s with
+            | Some t -> Ok t
+            | None ->
                 Error (Format.asprintf "failed to parse time (epoch): %S" s)))
       ~construct:Int64.to_string
       ()
@@ -178,11 +178,14 @@ module System = struct
         ~name:"timespan"
         ~descr:"A span of time in seconds"
         ~destruct:(fun s ->
-          match Ptime.Span.of_float_s (float_of_string s) with
-          | Some t -> Ok t
-          | None -> Error (Format.asprintf "failed to parse timespan: %S" s)
-          | exception _ ->
-              Error (Format.asprintf "failed to parse timespan: %S" s))
+          match float_of_string s with
+          | exception Failure _ ->
+              Error (Format.asprintf "failed to parse timespan: %S" s)
+          | f -> (
+              match Ptime.Span.of_float_s f with
+              | Some t -> Ok t
+              | None -> Error (Format.asprintf "failed to parse timespan: %S" s)
+              ))
         ~construct:(fun s -> string_of_float (Ptime.Span.to_float_s s))
         ()
   end
@@ -278,7 +281,7 @@ module System = struct
             | None -> (
                 match of_seconds_exn (Int64.of_string s) with
                 | t -> Ok t
-                | exception _ ->
+                | (exception Failure _) | (exception Invalid_argument _) ->
                     Error (Format.asprintf "failed to parse time (epoch): %S" s)
                 )))
       ~construct:to_notation
