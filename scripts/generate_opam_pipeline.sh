@@ -4,6 +4,8 @@ set -eu
 
 TZ_OPAM_FILES_MODIFIED="${TZ_OPAM_FILES_MODIFIED:-false}"
 
+# shellcheck disable=SC2016
+# We intentionally use single quotes to not allow variable substitution inside the jq query.
 yq -y -n \
    --arg pkgs "$PACKAGES" \
    --arg modified_flag "$TZ_OPAM_FILES_MODIFIED" \
