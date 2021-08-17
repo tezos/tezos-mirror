@@ -1,103 +1,199 @@
-The Voting Process
-==================
+The Amendment (and Voting) Process
+==================================
 
-The design of the Tezos Node allows the consensus protocol to be
-amended, that is replaced by another set of OCaml files which
-implement the API of a valid protocol.
+In the Tezos blockchain, the *economic protocol* can be amended. Specifically,
+there is an on-chain mechanism to propose changes to the economic protocol, to
+vote for-or-against these proposed changes, and, depending on the result of the
+vote, to activate these changes or not.
 
-In the current protocol the amendment procedure is guided by a voting
-procedure where delegates can propose, select and test a candidate
-protocol before activating it.
-Delegates take part in the amendment procedure with an influence
-proportional to their stake, one roll one vote.
+Note that the proposal, voting and activation processes are part of the economic
+protocol itself. Consequently the amendment rules themselves are subject to
+amendments.
 
-The procedure consists of five `voting periods`, each of 40960 blocks
-(5 cycles, or ~two weeks), for a total of approximately 2 months and a half.
-Voting periods align with cycles: a voting period starts at the first
-block of a cycle.
-
+The rest of this page gives more details about the amendment and voting process.
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium <https://medium.com/tezos/amending-tezos-b77949d97e1e>`__.
 
 Periods
 -------
 
-The voting procedure works as follows:
+The amendment process consists of five *periods*. Each period lasts for 40960
+blocks (5 cycles) (or approximately two weeks). The periods (listed below)
+typically succeed one another for a total duration of approximately 2 months and
+a half, after which the whole amendment process starts again.
 
-- `Proposal period`: delegates can submit protocol amendment proposals using
-  the `proposals` operation. At the end of a proposal period, the proposal with
-  most supporters is selected and we move to a exploration period.
-  If there are no proposals, or a tie between proposals, a new proposal
-  period starts. Each delegate can submit a maximum of 20 proposals,
-  including duplicates.
-- `Exploration period`: delegates can cast one vote to pursue the
-  voting process or not with the winning proposal using the `ballot`
-  operation.  At the end of a exploration period if participation
-  reaches the quorum and the proposal has a super-majority in favor,
-  we proceed to a cooldown period. Otherwise we go back to a proposal
-  period.
-- `Cooldown period`: The only purpose of this period is to let some
-  time elapse before the promotion period.
-- `Promotion period`: delegates can cast one vote to promote or not
-  the proposal using the `ballot` operation.  At the end of a
-  promotion period if participation reaches the quorum and the
-  proposal has a super-majority in favor, we proceed to adoption
-  period. Otherwise we go back to a proposal period.
-- `Adoption period`: at the end of the period the proposal is activated
-  as the new protocol and we go back to a proposal period.
+The five periods are as follows:
 
-It is important to note
-that the stake of each delegate is computed at the beginning of each voting
-period, and if the delegate owns one roll or more, its stake in number of rolls is
-stored in a list called the `voting listings`.
+- *Proposal period*: During this period, delegates can
 
-Following the adoption period the protocol is activated. After this step the
-blocks added to the chain are interpreted in the newly activated protocol. As a
-result gas costs (and other such details of operation inclusion) may differ.
+  - submit *protocol amendment proposals* (or, simply, *proposals*) using the
+    ``Proposals`` operation (see below),
+  - support a proposal using the ``Ballot`` operation (see below).
+
+  Each delegate can submit a maximum of 20 proposals. Duplicates count towards
+  this total.
+
+  At the end of a **proposal period**, the proposal with most support is
+  selected and we move to an **exploration period**. Note that support is
+  measured in the cumulated number of rolls that delegates supporting the
+  proposal have. E.g., a proposal supported by a single delegate with 100 rolls
+  has more support than a proposal supported by two delegates with 20 rolls
+  each.
+
+  If there are no proposals, or a tie between two or more proposals, the process
+  moves back to a new **proposal period**.
+
+- *Exploration period*: During this period delegates can cast one
+  Yay, Nay, or Pass ballot on the selected proposal. They do so using the
+  ``Ballot`` operation.
+
+  If the voting participation reaches *quorum* and there is a *super-majority*
+  of Yay, the process moves to the **cooldown period**. (See below for details
+  on participation, quorum, and super-majority.)
+
+  Otherwise the process moves back to the **proposal period**.
+
+- *Cooldown period*: On-chain nothing specific happens during this period.
+  Off-chain the delegates can read the proposal with more scrutiny, the
+  community can discuss finer points of the proposal, the developers can
+  perform additional tests, etc.
+
+  At the end of this period, the process moves to the **promotion period**.
+
+- *Promotion period*: During this period, delegates can cast a Yay, Nay, or Pass
+  ballots using the ``Ballot`` operation.
+
+  If the voting participation reaches *quorum* and there is a super-majority of
+  Yay, the process moves to the **adoption period**.
+
+  Otherwise the process moves back to the **proposal period**.
+
+- *Adoption period*: On-chain nothing specific happens during this period except
+  on the very last block (see below).
+
+  Off-chain the developers release tools that include support for the
+  soon-to-be activated protocol, other actors (bakers, indexers, etc.) update
+  their infrastructure to support the newly released tools, smart-contract
+  developers start working with soon-to-be-available features, etc.
+
+  At the very end of the period, the proposal is *activated*. This means that
+  the last block of the period is still interpreted by the current economic
+  protocol, but the first block after the period is interpreted by the new
+  economic protocol (the one that was voted in).
+
+  And a new **proposal period** starts.
 
 
-The Hash and the Protocol
--------------------------
+Activation
+----------
 
-Note that the voting procedure revolves around the hash of a protocol proposal
-whilst the activation revolves around the protocol itself. Consequently, if the
-protocol that the hash identifies is invalid, the activation step fails.
+After the activation step, the blocks added to the chain are interpreted in the
+newly activated protocol. As a result gas costs may differ, new operations may
+be available, contracts using new opcodes may be injected, etc.
 
-A protocol is invalid if the code cannot be compiled (e.g., if the code is not
-valid source code), if the code uses functions not present in the
-:ref:`protocol environment <protocol_environment>`, or if it downgrades the
-:ref:`protocol environment <protocol_environment>` version.
+Because the amendment process is also part of the economic protocol, the
+amendment process now unfolds according to the rules of the newly activated
+protocol. As a result the periods may be lengthened or shortened, a new period
+might be introduced, a different selection mechanism may be used, the quorum
+requirement might differ, etc.
 
-If the protocol is invalid and the activation fails, the chain becomes stuck.
-Thus, when voting, it is important to vote for hashes that designate a protocol
-with sources that are available and valid.
+
+Voting Power
+------------
+
+When supporting a proposal or casting a Yay, Nay, or Pass ballot, each delegate
+has voting power equal to its *stake*. The stake is always measured in
+**number of rolls**.
+
+Note that the stake of each delegate is computed at the beginning of each
+period.
 
 
 Super-majority and Quorum
 -------------------------
 
-Both voting periods work in the same way, only the subject of the
-vote differs.
-During a vote a delegate can cast a single Yea, Nay or Pass vote.
-A vote is successful if it has super-majority and the participation
-reaches the current quorum.
+As mentioned above, during either of the **proposal** or **promotion** periods,
+delegates can cast ballots using the ``Ballot`` operation (see below).
+In both cases, delegates can cast a single Yay, Nay, or Pass ballot. A ballot
+has a weight equal to the delegate's stake as detailed above.
 
-`Super-majority` means the Yeas are more than 8/10 of Yeas+Nays votes.
-The `participation` is the ratio of all received votes, including
-passes, with respect to the number of possible votes. The `quorum`
-starts at 80% and at each vote it is updated using the old quorum and
-the current participation with the following coefficients::
+For either of these two periods, the process continues to the next period if the
+*vote participation* reaches *quorum* and there is a *super-majority* of
+Yay.
 
-  newQ = oldQ * 8/10 + participation * 2/10
+The *vote participation* is the ratio of all the cumulated stake of cast ballots
+(including Pass ballots) to the total stake.
+
+For the first voting period, the *quorum* started at 80% of stake. The quorum is
+adjusted after each vote as detailed below. This adjustment is necessary to
+ensure that the amendment process can continue even if some delegates stop
+participating. After each vote the new quorum is updated based on the old quorum
+and the **vote participation** with the following coefficients::
+
+  new-quorum = 0.8 × old-quorum + 0.2 × participation
+
+The *super-majority* is reached if the cumulated stake of Yay ballots is
+greater than 8/10 of the cumulated stake of Yay and Nay ballots.
+
+Note that Pass ballots do not count towards or against the super-majority;
+they still counts towards participation and quorum.
 
 More details can be found in the file
 :src:`src/proto_alpha/lib_protocol/amendment.ml`.
 
+
+The Hash and the Protocol
+-------------------------
+
+On the one hand, the voting part of the process revolves around the
+**hash of a protocol**. Specifically, a delegate submits a hash of a
+protocol, and all the delegates cast ballots on the proposed hash.
+The *hash of a protocol* is the hash of the files that constitute the source
+code of the protocol.
+
+On the other hand, the **protocol activation** (at the end of the
+**adoption period**) revolves around the compiled sources of the protocol.
+
+Basically, the voting process works on an identifier of the protocol whilst the
+activation step works on the protocol itself. Consequently, if a protocol hash
+is voted in and the protocol it identifies is invalid, the activation step
+fails.
+
+A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
+valid source code), if its code uses functions not present in the
+:ref:`protocol environment <protocol_environment>`, or if it downgrades the
+:ref:`protocol environment <protocol_environment>` version.
+
+If an invalid protocol is voted in, then the activation fails for all the nodes,
+and then the chain becomes stuck. This is why it is important to vote for hashes
+that designate valid protocols: ones with sources that are available and that
+can be compiled.
+
+.. sidebar:: Checking a hash is of a valid protocol
+
+   When a hash is proposed by a delegate, it is usually accompanied by some
+   blogposts and forum threads on :ref:`community websites <tezos_community>`.
+   These should include directions for testing the proposed protocols. If you
+   cannot find such directions, do not hesitate to ask.
+
+.. sidebar:: Localised failures
+
+   It is possible that the activation step fails on a single node or a few nodes
+   of the network, but succeed on the others. In this case the nodes with the
+   failure are stuck, but the network as a whole continues.
+
+   The most likely cause for this is nodes that have not been updated and do not
+   include a new protocol environment version.
+
+   If your node becomes stuck, you should start a fresh up-to-date node.
+
+
 Operations
 ----------
 
-There are two operations used by the delegates: ``proposals`` and ``ballot``.
-A proposal operation can only be submitted during a proposal period.
+There are two operations used by the delegates: **proposals** and **ballot**.
+
+A *proposals* operation can only be injected during a proposal period.
 
 ::
 
@@ -106,8 +202,8 @@ A proposal operation can only be submitted during a proposal period.
      period: Voting_period_repr.t ;
      proposals: Protocol_hash.t list ; }
 
-Source is the public key hash of the delegate, period is the unique
-identifier of each voting period and proposals is a non-empty list of
+The ``source`` is the public key hash of the delegate, ``period`` is the unique
+identifier of each voting period and ``proposals`` is a non-empty list of
 maximum 20 protocol hashes.
 The operation can be submitted more than once but only as long as the
 cumulative length of the proposals lists is less than 20.
@@ -116,13 +212,13 @@ maximum number of proposals for that delegate.
 However duplicates from the same delegate are not tallied at the end
 of the proposal period.
 
-For example, a delegate submits a ``proposals`` operation for protocols A
+For example, a delegate submits a *proposals* operation for protocols A
 and B early in the proposal period, later a new protocol C is revealed
-and the delegate submits another ``proposals`` operation for protocols B
+and the delegate submits another *proposals* operation for protocols B
 and C.
 The list of submissions that will be tallied is [A,B,C].
 
-A ballot operation can only be submitted during one of the voting
+A *ballot* operation can only be submitted during one of the voting
 periods, and only once per period.
 
 ::
@@ -133,19 +229,28 @@ periods, and only once per period.
      proposal: Protocol_hash.t ;
      ballot: Vote_repr.ballot ; }
 
-Source and period are the same as above, while proposal is the
-currently selected proposal and ballot is one of ``Yea``, ``Nay`` or
+The fields ``source`` and ``period`` are the same as above, while ``proposal``
+is the currently selected proposal and ``ballot`` is one of ``Yay``, ``Nay`` or
 ``Pass``.
-The pass vote allows a delegate to not influence a vote but still
-allowing it to reach quorum.
+The ``Pass`` vote allows a delegate to contribute towards the quorum without
+contributing towards the super-majority. This is important because, as detailed
+above, the quorum is adaptive and that low participation would lower the
+quorum of the next vote.
 
-More details can be found, as for all operations, in
+More details on the operations can be found in
 :src:`src/proto_alpha/lib_protocol/operation_repr.ml`.
-The binary format is described by ``tezos-client describe unsigned
-operation``.
+The binary format is described by
+``tezos-client describe unsigned operation``.
 
 Client Commands
 ---------------
+
+The Octez client, ``tezos-client``, provides commands for basic exploration and
+interaction with the amendment and voting process.
+
+
+Show
+~~~~
 
 Tezos' client provides a command to show the status of a voting period.
 It displays different informations for different kind of periods, as
@@ -170,20 +275,22 @@ in the following samples::
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
 
-It should be noted that the number 400 above is a number of rolls.
-The proposal has a total of 400 rolls, which may come from several
-delegates. The same applies for the ballots, there are 400 rolls in
-favor of testing protocol PsNa6jTt.
+It should be noted that the ballot number 400 above is the stake counted in
+number of rolls.
+The proposal has a total stake of 400 rolls, which may come from a single ballot
+from a delegate having 400 rolls, or it may come from multiple ballots from
+delegates with a combined stake of 400 rolls.
+
 
 Submit proposals
 ~~~~~~~~~~~~~~~~
 
-During a proposal period, the list of proposals can be submitted with::
+During a proposal period, a list of proposals can be submitted with::
 
     tezos-client submit proposals for <delegate> <proposal1> <proposal2> ...
 
 Remember that each delegate can submit a maximum of 20 protocol
-hashes including duplicates.
+hashes and that duplicates count towards this total.
 Moreover each proposal is accepted only if it meets one of the
 following two conditions:
 
@@ -195,10 +302,16 @@ following two conditions:
   its node which performs some checks, compiles and loads the
   protocol.
 
+These are protection measures that the Octez client takes to prevent the
+accidental injection of invalid protocols. As mentioned above, it is still
+important to check the validity of the protocols that you vote for as they may
+have been injected via different means.
+
+
 Submit ballots
 ~~~~~~~~~~~~~~
 
-During a voting period, being it an exploration or a promotion period,
+During either of the **exploration** or **promotion** periods,
 ballots can be submitted once with::
 
     tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
