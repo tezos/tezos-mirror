@@ -96,27 +96,25 @@ let sources_file client =
   | Mockup | Client _ | Proxy _ -> assert false
   | Light _ -> client.base_dir // "sources.json"
 
+(** [mode_to_endpoint mode] returns the {!endpoint} within a {!mode}
+  *  (if any) *)
+let mode_to_endpoint = function
+  | Client None | Mockup | Light (_, []) -> None
+  | Client (Some endpoint) | Light (_, endpoint :: _) | Proxy endpoint ->
+      Some endpoint
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
    that contains a list of endpoints.
 *)
 let endpoint_arg ?(endpoint : endpoint option) client =
-  match (client.mode, endpoint) with
-  | (Mockup, _) | (Client None, None) | (Light (_, []), _) -> []
-  | (Client _, Some endpoint)
-  | (Client (Some endpoint), None)
-  | (Light (_, endpoint :: _), None)
-  | (Light _, Some endpoint)
-  | (Proxy _, Some endpoint)
-  | (Proxy endpoint, None) ->
-      [
-        "--endpoint";
-        Printf.sprintf
-          "http://%s:%d"
-          (address ~hostname:true endpoint)
-          (rpc_port endpoint);
-      ]
+  let either o1 o2 = match (o1, o2) with (Some _, _) -> o1 | _ -> o2 in
+  (* pass [?endpoint] first: it has precedence over client.mode *)
+  match either endpoint (mode_to_endpoint client.mode) with
+  | None -> []
+  | Some e ->
+      ["--endpoint"; sf "http://%s:%d" (address ~hostname:true e) (rpc_port e)]
 
 let mode_arg client =
   match client.mode with
