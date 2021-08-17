@@ -9,8 +9,7 @@ In particular, this includes scripts for:
 * generating the Docker image used by the CI (`create_docker_image.sh`, `ci/`)
   or used by users and developers (`docker/`)
 * launching Tezos software using docker containers (`tezos-docker-manager.sh`, which may be renamed for different networks, e.g. `mainnet.sh`)
-* generating parts of the GitLab CI configuration scripts (`update_integration_test.sh`, `update_opam_test.sh`)
-* sanity check for GitLab CI (`check_opam_test.sh`)
+* generating parts of the GitLab CI configuration scripts (`update_integration_test.sh`)
 * dune files instrumentation for computing test coverage (`instrument_dune_bisect.sh`)
 * maintaining a custom opam repository with all Tezos dependencies
  (`update_opam_repo.sh`, `opam-*.sh`)
