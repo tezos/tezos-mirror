@@ -565,68 +565,70 @@ let check_if_op_is_branch_refused ops oph =
 
    + Check that endorsement is applied on node_1 and refused on node_2 and node_3
 *)
-let endorsement_flushed_branch_refused =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Ensure that branch_refused endorsement are transmited"
-    ~tags:["endorsement"; "mempool"; "branch_refused"]
-  @@ fun protocol ->
-  (* Step 1 *)
-  (* 3 Nodes are started and we activate the protocol and wait the nodes to be synced *)
-  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
-  and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode]
-  and* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in
-  let* client_1 = Client.init ~endpoint:(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:(Node node_2) ()
-  and* client_3 = Client.init ~endpoint:(Node node_3) () in
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1
-  and* () = Client.Admin.trust_address client_2 ~peer:node_3
-  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2
-  and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1
-  and* _ = Node.wait_for_level node_3 1 in
-  Log.info "All nodes are at level %d." 1 ;
-  (* Step 2 *)
-  (* Disconnect node_1 and node_2 and bake on both node. This will force different branches *)
-  let* node_2_id = Node.wait_for_identity node_2
-  and* node_1_id = Node.wait_for_identity node_1 in
-  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
-  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in
-  let bake_waiter_1 = wait_for_flush node_1
-  and bake_waiter_2 = wait_for_flush node_2 in
-  let* () = Client.bake_for client_1
-  and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in
-  let* () = bake_waiter_1 and* () = bake_waiter_2 in
-  (* Step3 *)
-  (* Reconnect node_1 and node_2 *)
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  (* Step 4 *)
-  (* Endorse on node_1 *)
-  let endorser_waiter = wait_for_injection node_1 in
-  let* () = Client.endorse_for client_1 in
-  let* () = endorser_waiter in
-  Log.info "Endorsement on node_1 done" ;
-  (* Step 5 *)
-  (* Check that endorsement is applied on node_1 and refused on node_2 and node_3 *)
-  let* pending_op_1 = RPC.get_mempool_pending_operations client_1 in
-  let oph = get_endorsement_hash pending_op_1 in
-  Log.info "Endorsement found in node_1 applied mempool" ;
-  let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in
-  let () = check_if_op_is_branch_refused pending_op_2 oph in
-  Log.info "Endorsement found in branch_refused of node_2 mempool" ;
-  (* The only way node_3 gets the endorsement is that node_2 has
-     propagated the operation. *)
-  let* pending_op_3 = RPC.get_mempool_pending_operations client_3 in
-  let () = check_if_op_is_branch_refused pending_op_3 oph in
-  Log.info "Endorsement found in branch_refused of node_3 mempool" ;
-  unit
+
+(* This test is no longer correct and cannot be adapated easily. *)
+(* let endorsement_flushed_branch_refused = *)
+(*   Protocol.register_test *)
+(*     ~__FILE__ *)
+(*     ~title:"Ensure that branch_refused endorsement are transmited" *)
+(*     ~tags:["endorsement"; "mempool"; "branch_refused"] *)
+(*   @@ fun protocol -> *)
+(*   (\* Step 1 *\) *)
+(*   (\* 3 Nodes are started and we activate the protocol and wait the nodes to be synced *\) *)
+(*   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode] *)
+(*   and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] *)
+(*   and* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in *)
+(*   let* client_1 = Client.init ~endpoint:(Node node_1) () *)
+(*   and* client_2 = Client.init ~endpoint:(Node node_2) () *)
+(*   and* client_3 = Client.init ~endpoint:(Node node_3) () in *)
+(*   let* () = Client.Admin.trust_address client_1 ~peer:node_2 *)
+(*   and* () = Client.Admin.trust_address client_2 ~peer:node_1 *)
+(*   and* () = Client.Admin.trust_address client_2 ~peer:node_3 *)
+(*   and* () = Client.Admin.trust_address client_3 ~peer:node_2 in *)
+(*   let* () = Client.Admin.connect_address client_1 ~peer:node_2 *)
+(*   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in *)
+(*   let* () = Client.activate_protocol ~protocol client_1 in *)
+(*   Log.info "Activated protocol." ; *)
+(*   let* _ = Node.wait_for_level node_1 1 *)
+(*   and* _ = Node.wait_for_level node_2 1 *)
+(*   and* _ = Node.wait_for_level node_3 1 in *)
+(*   Log.info "All nodes are at level %d." 1 ; *)
+(*   (\* Step 2 *\) *)
+(*   (\* Disconnect node_1 and node_2 and bake on both node. This will force different branches *\) *)
+(*   let* node_2_id = Node.wait_for_identity node_2 *)
+(*   and* node_1_id = Node.wait_for_identity node_1 in *)
+(*   let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id *)
+(*   and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in *)
+(*   let bake_waiter_1 = wait_for_flush node_1 *)
+(*   and bake_waiter_2 = wait_for_flush node_2 in *)
+(*   let* () = Client.bake_for client_1 *)
+(*   and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in *)
+(*   let* () = bake_waiter_1 and* () = bake_waiter_2 in *)
+(*   (\* Step3 *\) *)
+(*   (\* Reconnect node_1 and node_2 *\) *)
+(*   let* () = Client.Admin.trust_address client_1 ~peer:node_2 *)
+(*   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in *)
+(*   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in *)
+(*   (\* Step 4 *\) *)
+(*   (\* Endorse on node_1 *\) *)
+(*   let endorser_waiter = wait_for_injection node_1 in *)
+(*   let* () = Client.endorse_for client_1 in *)
+(*   let* () = endorser_waiter in *)
+(*   Log.info "Endorsement on node_1 done" ; *)
+(*   (\* Step 5 *\) *)
+(*   (\* Check that endorsement is applied on node_1 and refused on node_2 and node_3 *\) *)
+(*   let* pending_op_1 = RPC.get_mempool_pending_operations client_1 in *)
+(*   let oph = get_endorsement_hash pending_op_1 in *)
+(*   Log.info "Endorsement found in node_1 applied mempool" ; *)
+(*   let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in *)
+(*   let () = check_if_op_is_branch_refused pending_op_2 oph in *)
+(*   Log.info "Endorsement found in branch_refused of node_2 mempool" ; *)
+(*   (\* The only way node_3 gets the endorsement is that node_2 has *)
+(*      propagated the operation. *\) *)
+(*   let* pending_op_3 = RPC.get_mempool_pending_operations client_3 in *)
+(*   let () = check_if_op_is_branch_refused pending_op_3 oph in *)
+(*   Log.info "Endorsement found in branch_refused of node_3 mempool" ; *)
+(*   unit *)
 
 let check_empty_operation__ddb ddb =
   let open JSON in
@@ -1498,7 +1500,6 @@ let unban_all_operations =
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
-  endorsement_flushed_branch_refused ~protocols ;
   forge_pre_filtered_operation ~protocols ;
   refetch_failed_operation ~protocols ;
   ban_operation ~protocols ;
