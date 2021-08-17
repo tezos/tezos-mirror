@@ -1059,76 +1059,6 @@ module Make
             ~mempool
             pv.predecessor
 
-    (** Recomputes the [validation_state] by replaying the list of
-       [applied] operations.
-
-        This should be called when the list of [applied] operations is
-       modified in a way that is not easily transmitted to the
-       [validation_state], and/or might make this list invalid.
-       E.g. a banned operation has been removed from this list, but we
-       could not simply revert its effect on the state; moreover
-       operations that were initially applied after the banned
-       operation might no longer be classified as [`Applied].
-
-       [to_reclassify] which are operations applied but reseted by
-       [Classification.remove_applied] are sent back to [pending],
-       except the one banned of course. The [validation_state] is
-       reset to the chain head, and the field [mempool.known_valid] is
-       cleared. Previously applied operations are then classified
-       anew, the order might be a bit different from the one in which
-       they were applied. *)
-    let reclassify_applied_operations w pv to_reclassify =
-      (* List of previously applied operations, in the order they should
-         be reclassified (since [applied] operations are stored in reverse
-         order of application: cf "General description of the mempool"
-         comment). *)
-      let pending =
-        Operation_hash.Map.union
-          (fun _ v _ -> Some v)
-          pv.shell.pending
-          to_reclassify
-      in
-      pv.shell.pending <- pending ;
-      (* The [validation_state] is reset to the chain head. *)
-      Prevalidation.create
-        (Distributed_db.chain_store pv.shell.parameters.chain_db)
-        ~predecessor:pv.shell.predecessor
-        ~live_blocks:pv.shell.live_blocks
-        ~live_operations:pv.shell.live_operations
-        ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
-        ()
-      >>=? fun validation_state ->
-      (* The field [mempool.known_valid] is cleared. *)
-      let mempool =
-        Mempool.{known_valid = []; pending = pv.shell.mempool.pending}
-      in
-      (* Previously applied operations are classified anew. *)
-      let reclassify_operation oph op (acc_validation_state, acc_mempool) =
-        pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-        (* These operations should not be notified again: they have already
-           been notified when they were initially classified. *)
-        classify_operation
-          ~notify:false
-          w
-          pv
-          acc_validation_state
-          acc_mempool
-          op
-          oph
-      in
-      Operation_hash.Map.fold_s
-        reclassify_operation
-        to_reclassify
-        (validation_state, mempool)
-      >>= fun (new_validation_state, new_mempool) ->
-      pv.validation_state <- Ok new_validation_state ;
-      set_mempool
-        pv.shell
-        {
-          known_valid = List.rev new_mempool.known_valid;
-          pending = new_mempool.pending;
-        }
-
     let remove_from_advertisement oph = function
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
       | `None -> `None
@@ -1142,19 +1072,24 @@ module Make
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       if Classification.is_in_mempool oph_to_ban pv.shell.classification then
-        (* To revert the effect of the banned operation's application on the
-           [validation_state], we have to reset it to the chain head and
-           reclassify the other applied operations.
-           Note: [oph_to_ban] has not been removed from
-           [pv.shell.mempool.known_valid], because
-           {!reclassify_applied_operations} will empty it anyway. *)
-        match
-          Classification.remove_applied oph_to_ban pv.shell.classification
-        with
-        | None ->
-            Classification.remove_not_applied oph_to_ban pv.shell.classification ;
-            set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool)
-        | Some to_reclassify -> reclassify_applied_operations w pv to_reclassify
+        if not (Classification.is_applied oph_to_ban pv.shell.classification)
+        then return (Classification.remove oph_to_ban pv.shell.classification)
+        else
+          (* Modifying the list of operations classified as [`Applied]
+             might change the classification of all the operations in
+             the mempool. Hence if the banned operation has been
+             applied we flush the mempool to force the
+             reclassification of all the operations except the one
+             banned. *)
+          on_flush
+            w
+            pv
+            pv.shell.predecessor
+            pv.shell.live_blocks
+            pv.shell.live_operations
+          >|=? fun () ->
+          pv.shell.pending <-
+            Operation_hash.Map.remove oph_to_ban pv.shell.pending
       else (
         pv.shell.pending <-
           Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
