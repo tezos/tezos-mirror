@@ -63,50 +63,35 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_priority priority block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     rpc_ctxt
     ~all:true
     ~max_priority:(priority + 1)
     block
   >|=? fun bakers ->
-  let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
-           p = priority)
+         (fun {Plugin.RPC.Baking_rights.priority = p; _} -> p = priority)
          bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
-  Alpha_services.Delegate.Baking_rights.get
-    rpc_ctxt
-    ~delegates:[pkh]
-    ~max_priority:256
-    block
+  Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] ~max_priority:256 block
   >|=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
-  Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
+  Plugin.RPC.Baking_rights.get rpc_ctxt ~max_priority:256 block
   >|=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+         (fun {Plugin.RPC.Baking_rights.delegate; _} ->
            not
              (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
          bakers

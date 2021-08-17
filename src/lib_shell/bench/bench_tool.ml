@@ -154,7 +154,7 @@ let get_n_endorsements ctxt n =
   Context.get_endorsers ctxt >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
   List.map_es
-    (fun {Delegate_services.Endorsing_rights.delegate; level; _} ->
+    (fun {Plugin.RPC.Endorsing_rights.delegate; level; _} ->
       Op.endorsement ~delegate ~level ctxt ())
     endorsing_rights
 

@@ -38,7 +38,7 @@ open Alpha_context
    using only RPCs, to fabricate them. *)
 let test_baking_rights () =
   Context.init 2 >>=? fun (b, contracts) ->
-  let open Alpha_services.Delegate.Baking_rights in
+  let open Plugin.RPC.Baking_rights in
   (* default max_priority returns 65 results *)
   get Block.rpc_ctxt b ~all:true >>=? fun rights ->
   assert (List.length rights = 65) ;

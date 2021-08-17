@@ -93,7 +93,7 @@ let test_rewards_retrieval () =
                _;
              } ->
   (* find block with endorsers_per_block different endorsers *)
-  let open Alpha_services.Delegate.Endorsing_rights in
+  let open Plugin.RPC.Endorsing_rights in
   let rec find_block b =
     Context.get_endorsers (B b) >>=? fun endorsers ->
     if List.compare_length_with endorsers endorsers_per_block = 0 then return b
