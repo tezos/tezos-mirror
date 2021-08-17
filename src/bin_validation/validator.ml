@@ -113,7 +113,7 @@ let load_protocol proto protocol_root =
     Events.(emit dynload_protocol proto) >|= fun () ->
     try
       Dynlink.loadfile_private cmxs_file ;
-      ok_unit
+      Result.return_unit
     with Dynlink.Error err ->
       Format.ksprintf
         (fun msg ->

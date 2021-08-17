@@ -108,7 +108,7 @@ module Tested_terms () = struct
       ~when_different_lengths:
         (TzTrace.make @@ Exn (Failure "differently sized cost lists"))
       (fun smin full ->
-        if S.(smin <= full) then ok_unit
+        if S.(smin <= full) then Result.return_unit
         else
           generic_error
             "Script_repr: inconsistent costs %a vs %a@."
