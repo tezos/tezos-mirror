@@ -564,6 +564,7 @@ struct
 
     (* Backwards compatibility additions (traversors, dont_wait, trace) *)
     include Error_monad_traversors
+    include Error_monad_preallocated_values
 
     let dont_wait ex er f = dont_wait f er ex
 

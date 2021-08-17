@@ -17,6 +17,7 @@
    v0/error_monad_traversors.ml
    v0/data_encoding.ml
    v1/bls12_381.ml
+   v1/error_monad_preallocated_values.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

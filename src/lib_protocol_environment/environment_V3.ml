@@ -635,6 +635,9 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
+    include
+      Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
+
     let dont_wait ex er f = dont_wait f er ex
 
     let trace_of_error e = TzTrace.make e
