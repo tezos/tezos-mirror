@@ -1,0 +1,35 @@
+opam:list_packages:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+  stage: bootstrap
+  script:
+    - . ./scripts/opam-pin.sh && echo PACKAGES=$(echo $packages | tr '\n' ' ') >> opam.env
+    - ./scripts/detect-opam-changes.sh
+  artifacts:
+    reports:
+      dotenv: opam.env
+
+opam:create_pipeline:
+  image: alpine:3.13
+  stage: bootstrap
+  script:
+    - apk add --no-cache jq py3-pip bash
+    - pip install yq
+    - ./scripts/generate_opam_pipeline.sh > opam-ci.yml
+    - cat opam-ci.yml
+  needs:
+    - "opam:list_packages"
+  artifacts:
+    paths:
+      - opam-ci.yml
+
+opam:trigger:
+  stage: packaging
+  needs:
+    - "opam:create_pipeline"
+  trigger:
+    include:
+      - artifact: opam-ci.yml
+        job: "opam:create_pipeline"
+    strategy: depend
