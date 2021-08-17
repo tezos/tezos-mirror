@@ -27,12 +27,6 @@ open Store_types
 open Block_repr
 open Store_errors
 
-module Block_cache =
-  Ringo_lwt.Functors.Make_opt
-    ((val Ringo.(
-            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Block_hash))
-
 let default_block_cache_limit = 100
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
@@ -49,7 +43,7 @@ type block_store = {
   caboose : block_descriptor Stored_data.t;
   savepoint : block_descriptor Stored_data.t;
   status_data : status Stored_data.t;
-  block_cache : Block_repr.t Block_cache.t;
+  block_cache : Block_repr.t Block_lru_cache.t;
   merge_mutex : Lwt_mutex.t;
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
@@ -247,7 +241,7 @@ let read_block ~read_metadata block_store key_kind =
                   | Ok v -> Lwt.return v
                   | Error _ -> Lwt.return_none)
             in
-            Block_cache.find_or_replace
+            Block_lru_cache.find_or_replace
               block_store.block_cache
               adjusted_hash
               fetch_block
@@ -287,7 +281,7 @@ let store_block block_store block =
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       protect (fun () ->
           compute_predecessors block_store block >>= fun predecessors ->
-          Block_cache.replace
+          Block_lru_cache.replace
             block_store.block_cache
             block.hash
             (Lwt.return_some block) ;
@@ -1236,7 +1230,7 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   Stored_data.init (Naming.block_store_status_file chain_dir) ~initial_data:Idle
   >>=? fun status_data ->
   let block_cache =
-    Block_cache.create
+    Block_lru_cache.create
       (Option.value block_cache_limit ~default:default_block_cache_limit)
   in
   let merge_scheduler = Lwt_idle_waiter.create () in
