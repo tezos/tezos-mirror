@@ -57,6 +57,9 @@ module type CORE = sig
   val pp : Format.formatter -> error -> unit
 end
 
+(** [EXT] is the extensions on top of a [CORE]. The separation is largely
+    artificial and will most likely disappear with the next round of
+    refactoring. See https://gitlab.com/tezos/tezos/-/issues/1579 *)
 module type EXT = sig
   type error = ..
 
@@ -185,14 +188,15 @@ module type WITH_WRAPPED = sig
 end
 
 module type TRACE = sig
-  (** [trace] is abstract in this interface but it is made concrete in the
-      instantiated error monad (see [error_monad.mli]).
+  (** The [trace] type (included as part of the
+      [Tezos_lwt_result_stdlib.Lwtreslib.TRACE] module is abstract in this
+      interface but it is made concrete in the instantiated error monad (see
+      [error_monad.mli]).
 
       The idea of abstracting the trace is so that it can evolve more easily.
       Eventually, we can make the trace abstract in the instantiated error
       monad, we can have different notions of traces for the protocol and the
       shell, etc. *)
-
   include Tezos_lwt_result_stdlib.Lwtreslib.TRACE
 
   (** [pp_print] pretty-prints a trace of errors *)
@@ -212,6 +216,11 @@ module type TRACE = sig
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 end
 
+(** [MONAD_EXT] is the Tezos-specific extension to the generic monad provided by
+    Lwtreslib. It sets some defaults (e.g., it defaults traced failures), it
+    brings some qualified identifiers into the main unqualified part (e.g.,
+    [return_unit]), it provides some tracing helpers and some in-monad assertion
+    checks. *)
 module type MONAD_EXT = sig
   (** for substitution *)
   type error
@@ -243,8 +252,6 @@ module type MONAD_EXT = sig
   val fail : 'error -> ('a, 'error trace) result Lwt.t
 
   val error : 'error -> ('a, 'error trace) result
-
-  (* This is for legacy, for backwards compatibility, there are old names *)
 
   (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
      might rename it to [pp_print_trace]. *)
