@@ -5,6 +5,12 @@
 # Basic configuration to guard against double-pipelines
 workflow:
   rules:
+    # Switch between branch pipelines and merge request pipelines.
+    # https://docs.gitlab.com/13.12/ee/ci/yaml/README.html#switch-between-branch-pipelines-and-merge-request-pipelines
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
     # This workflow entry does two things:
     # - it allows pipelines for push events (including force-push, push of fixup
     # commits, rebase, etc.)

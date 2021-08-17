@@ -3,12 +3,17 @@
 FILES="test"
 
 if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
-  FILES=$(git diff-tree --no-commit-id --name-only -r origin/"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" -r "$CI_COMMIT_SHA")
+  git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  FILES=$(git diff-tree --no-commit-id --name-only -r HEAD..origin/"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME")
 else
   echo "Not part of a merge request. No commits to compare."
 fi
 
-MATCHES=$($FILES | grep -q -E "dune|dune.inc|*.opam|scripts/version.sh|gitlab-ci.yml")
+echo Files changed: "$FILES"
+
+MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune.inc|.*.opam|scripts/version.sh|gitlab-ci.yml")
+
+echo Matches found: "$MATCHES"
 
 if [ -n "$MATCHES" ]; then
   echo "TZ_OPAM_FILES_MODIFIED=true" >> opam.env
