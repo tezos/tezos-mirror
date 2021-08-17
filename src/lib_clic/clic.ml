@@ -868,8 +868,8 @@ let make_args_dict_consume ?command spec args =
             | (1, []) -> fail (Option_expected_argument (arg, None))
             | (_, _) ->
                 Stdlib.failwith
-                  "cli_entries: Arguments with arity not equal to 1 or 0 not \
-                   supported"
+                  "cli_entries: Arguments with arity not equal to 1 or 0 \
+                   unsupported"
           else fail (Unknown_option (arg, None))
         else return (acc, args)
   in
@@ -902,8 +902,8 @@ let make_args_dict_filter ?command spec args =
           | (1, []) -> fail (Option_expected_argument (arg, command))
           | (_, _) ->
               Stdlib.failwith
-                "cli_entries: Arguments with arity not equal to 1 or 0 not \
-                 supported"
+                "cli_entries: Arguments with arity not equal to 1 or 0 \
+                 unsupported"
         else make_args_dict arities (dict, arg :: other_args) tl
   in
   make_args_dict
