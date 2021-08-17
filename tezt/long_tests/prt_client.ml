@@ -41,4 +41,5 @@ let register () =
     ~timeout:(Minutes 2)
   @@ fun () ->
   let client = Client.create () in
-  Long_test.time_lwt "client load time" @@ fun () -> Client.version client
+  Long_test.time_lwt ~repeat:5 "client load time" @@ fun () ->
+  Client.version client
