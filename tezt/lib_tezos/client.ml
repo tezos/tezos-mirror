@@ -749,7 +749,8 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ~min_agreement
       ~uris:
         (List.map
-           (fun node -> sf "http://localhost:%d" (Node.rpc_port node))
+           (fun node ->
+             sf "http://%s:%d" (Node.rpc_host node) (Node.rpc_port node))
            nodes)
       client
   in
