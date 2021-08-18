@@ -41,7 +41,7 @@ then
 
     full_hash=$(jq -r .hash < $1/lib_protocol/TEZOS_PROTOCOL)
 else
-    pred_version_dir=$(find src -name "proto_00*" -printf '%P\n' | sort -r | head -1)
+    pred_version_dir=$(find src -regex "src/proto_[0-9][0-9][0-9]_[^/]*" -printf '%P\n' | sort -r | head -1)
     pred=$(echo $pred_version_dir | cut -d'_' -f2)
     pred_full_hash=$(jq -r .hash < src/proto_${pred}_*/lib_protocol/TEZOS_PROTOCOL)
     pred_short_hash=$(echo $pred_full_hash | head -c 8)
