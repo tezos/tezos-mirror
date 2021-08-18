@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(**
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+   This module provides support for type equalities and runtime type identifiers.
 
-and env_version = V0 | V1 | V2 | V3 | V4
+   For two types [a] and [b], [(a, b) eq] is a witness that [a = b]. This is
+   a standard generalized algebraic datatype on top of which type-level
+   programming techniques can be implemented.
 
-val component_encoding : component Data_encoding.t
+   Given a type [a], an inhabitant of [a t] is a dynamic identifier for [a].
+   Identifiers can be compared for equality. They are also equipped with a
+   hash function.
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+   WARNING: the hash function changes at every run. Therefore, the result
+   of the hash function should never be stored.
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+   Notice that dynamic identifiers are not unique: two identifiers for [a]
+   can have distinct hash and can be physically distinct. Hence, only [eq]
+   can decide if two type identifiers correspond to the same type.
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
+*)
 
-val env_version_encoding : env_version Data_encoding.t
+(** A proof witness that two types are equal. *)
+type (_, _) eq = Refl : ('a, 'a) eq
 
-val pp_ocaml : Format.formatter -> t -> unit
+(** A dynamic representation for ['a]. *)
+type 'a t
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+(** [make ()] is a dynamic representation for ['a]. A fresh identifier
+   is returned each time [make ()] is evaluated. *)
+val make : unit -> 'a t
 
-val of_bytes_exn : Bytes.t -> t
+(** [eq ida idb] returns a proof that [a = b] if [ida] and [idb]
+   identify the same type. *)
+val eq : 'a t -> 'b t -> ('a, 'b) eq option
 
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+(** [hash id] returns a hash for [id]. *)
+val hash : 'a t -> int

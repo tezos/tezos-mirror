@@ -23,47 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
-
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
+type shell_header = {
+  level : Int32.t;
+      (** The number of preceding block in this chain, i.e. the genesis
+      has level 0. *)
+  proto_level : int;
+      (** The number of preceding protocol change in the chain (modulo 256),
+      i.e. the genesis has proto_level 0. *)
+  predecessor : Block_hash.t;
+  timestamp : Time.t;
+  validation_passes : int;
+  operations_hash : Operation_list_list_hash.t;
+  fitness : Bytes.t list;
+  context : Context_hash.t;
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4
+val shell_header_encoding : shell_header Data_encoding.t
 
-val component_encoding : component Data_encoding.t
+type t = {shell : shell_header; protocol_data : bytes}
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
-
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
-
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+include S.HASHABLE with type t := t and type hash := Block_hash.t

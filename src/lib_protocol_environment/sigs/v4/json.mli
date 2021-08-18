@@ -23,47 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** In memory JSON data *)
+type json =
+  [ `O of (string * json) list
+  | `Bool of bool
+  | `Float of float
+  | `A of json list
+  | `Null
+  | `String of string ]
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+(** Read a JSON document from a string. *)
+val from_string : string -> (json, string) result
 
-and env_version = V0 | V1 | V2 | V3 | V4
+(** Write a JSON document to a string. This goes via an intermediate
+    buffer and so may be slow on large documents. *)
+val to_string : json -> string
 
-val component_encoding : component Data_encoding.t
+(** Helpers for [Data_encoding] *)
+val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
-
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
-
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+val wrap_error : ('a -> 'b) -> 'a -> 'b

@@ -1116,7 +1116,8 @@ module Block = struct
               >|= ok
           | None -> (
               match env with
-              | V1 | V2 | V3 -> fail @@ Missing_block_metadata_hash predecessor
+              | V1 | V2 | V3 | V4 ->
+                  fail @@ Missing_block_metadata_hash predecessor
               | V0 -> return_unit))
           >>=? fun () ->
           (match ops_metadata_hashes with

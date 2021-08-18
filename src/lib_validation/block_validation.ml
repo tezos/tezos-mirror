@@ -405,7 +405,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let context = Shell_context.unwrap_disk_context validation_result.context in
     (match new_protocol_env_version with
     | Protocol.V0 -> return (None, None)
-    | Protocol.V1 | Protocol.V2 | Protocol.V3 ->
+    | Protocol.V1 | Protocol.V2 | Protocol.V3 | Protocol.V4 ->
         return
           ( Some
               (List.map
