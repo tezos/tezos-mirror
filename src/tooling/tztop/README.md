@@ -53,6 +53,24 @@ Or, for editor integrations:
 dune exec -- tztop DIR -emacs
 ```
 
+See [Proposal Testing](https://tezos.gitlab.io/developer/proposal_testing.html)
+page for a sample code to run in `tztop`.
+
 ## Troubleshooting
 
 If `tztop` segfaults or throws an OCaml backtrace regarding missing rc files, consider creating empty `.utoprc` and `.lambda-term-inputrc` files in the `$XDG_CONFIG_HOME` directory.
+
+```
+mkdir -p $HOME/.config
+touch $HOME/.config/.lambda-term-inputrc
+touch $HOME/.utoprc
+touch $HOME/.utop-history
+```
+
+On macOS the following command is required
+
+```
+export DYLD_LIBRARY_PATH='_opam/lib/stublibs/'
+```
+
+Also make sure that `utop` is installed (run `make build-dev-deps`).
