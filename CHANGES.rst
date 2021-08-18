@@ -23,6 +23,12 @@ be documented here either.
 Node
 ----
 
+- Bumped the network version to 2.
+
+- Added early block advertisement based on a precheck mechanism to
+  improve the propagation time in the network. This mechanism is only
+  available for nodes with a network version of 2.
+
 - The following RPCs output format changed:
   1. ``/workers/block_validator``,
   2. ``/workers/chain_validators``,
