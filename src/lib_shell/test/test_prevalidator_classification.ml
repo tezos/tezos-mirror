@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator classification)
-    Invocation:   dune build @src/lib_shell/test/test_prevalidator_classification
+    Invocation:   dune build @src/lib_shell/test/runtest
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 

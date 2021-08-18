@@ -47,6 +47,11 @@
 
 (rule
  (alias runtest)
+(package tezos-shell)
+ (action (run %{exe:test_prevalidator_classification.exe})))
+
+(rule
+ (alias runtest)
  (package tezos-shell)
  (action (run %{exe:test_locator.exe} --no-bench)))
 
