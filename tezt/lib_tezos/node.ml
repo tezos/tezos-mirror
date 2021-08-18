@@ -410,6 +410,11 @@ let add_peer_with_id node peer =
   add_argument node (Peer peer) ;
   Lwt.return_unit
 
+let get_peers node =
+  List.filter_map
+    (fun arg -> match arg with Peer s -> Some s | _ -> None)
+    node.persistent_state.arguments
+
 (** [runlike_command_arguments node command arguments]
     evaluates in a list of strings containing all command
     line arguments needed to spawn a [command] like [run]
