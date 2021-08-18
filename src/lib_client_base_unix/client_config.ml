@@ -485,9 +485,6 @@ let endpoint_arg () =
       "HTTP(S) endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
 
-let example_light_mode_sources =
-  {|{"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
-
 let sources_arg () =
   arg
     ~long:"sources"
@@ -495,7 +492,7 @@ let sources_arg () =
     ~placeholder:"path"
     ~doc:
       ("path to JSON file containing sources for --mode light. Example file \
-        content: " ^ example_light_mode_sources)
+        content: " ^ Tezos_proxy.Light.example_sources)
     (sources_parameter ())
 
 let remote_signer_arg () =
@@ -901,7 +898,7 @@ let light_mode_checks mode endpoint sources =
       (* --mode light without --sources: wrong *)
       failwith
         "--mode light requires passing --sources. Example --sources file: %s"
-        example_light_mode_sources
+        Tezos_proxy.Light.example_sources
   | (`Mode_light, Some sources) ->
       let sources_uris = Tezos_proxy.Light.sources_config_to_uris sources in
       if List.mem ~equal:Uri.equal endpoint sources_uris then return_unit

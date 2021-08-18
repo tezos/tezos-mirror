@@ -52,6 +52,9 @@ type sources = private {
           (one for data retrieval, one for check). *)
 }
 
+(** An example content of the [--sources] file *)
+val example_sources : string
+
 (** Ad-hoc type safe JSON parsing function until [json-data-encoding]
     library provides a [result]-returning alternative. *)
 val destruct_sources_config :

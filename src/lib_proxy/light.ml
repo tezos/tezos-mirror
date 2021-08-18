@@ -63,6 +63,9 @@ let mk_sources_config ~min_agreement ~uris =
           uris)
   else Ok {min_agreement; uris}
 
+let example_sources =
+  {|{"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+
 let destruct_sources_config json =
   let {min_agreement; uris} =
     Data_encoding.Json.destruct sources_config_encoding json
