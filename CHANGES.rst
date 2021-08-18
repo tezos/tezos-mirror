@@ -89,6 +89,11 @@ Docker Images
 Miscellaneous
 -------------
 
+Version 10.0
+============
+
+-  Improved some error messages related to P2P initialization.
+
 Version 10.0~rc3
 ================
 
