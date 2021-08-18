@@ -18,6 +18,21 @@ documentation:build:
       - docs
     expire_in: 1 week
 
+documentation:build_all:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_manual
+  stage: manual
+  needs: []
+  script:
+    - make -C docs all
+  artifacts:
+    paths:
+      - docs
+    expire_in: 1 week
+  allow_failure: true
+
 documentation:linkcheck:
   extends:
     - .default_settings_template
