@@ -73,4 +73,20 @@ On macOS the following command is required
 export DYLD_LIBRARY_PATH='_opam/lib/stublibs/'
 ```
 
+Otherwise `tztop` fails with the following error.
+
+```
+Fatal error: cannot load shared library dllocamlevercrypt
+Reason: dlopen(/Users/.../tezos/_opam/lib/stublibs/dllocamlevercrypt.so, 10): Library not loaded: libevercrypt.so
+  Referenced from: /Users/.../tezos/_opam/lib/stublibs/dllocamlevercrypt.so
+  Reason: image not found
+Abort trap: 6
+```
+
 Also make sure that `utop` is installed (run `make build-dev-deps`).
+Otherwise `tztop` fails with the following error.
+
+```
+Tztop failed to load due to an internal error
+Unable to find directive load
+```
