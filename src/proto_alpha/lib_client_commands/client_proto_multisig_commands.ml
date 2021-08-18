@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2019-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +25,8 @@
 
 open Protocol
 open Alpha_context
+open Client_proto_args
+open Tezos_micheline
 
 let group =
   {
@@ -56,6 +58,12 @@ let signature_param () =
     ~desc:"Each signer of the multisig contract"
     Client_proto_args.signature_parameter
 
+let lambda_param () =
+  Clic.param
+    ~name:"lambda"
+    ~desc:"the lambda to execute, of type lambda unit (list operation)"
+    string_parameter
+
 let bytes_only_switch =
   Clic.switch
     ~long:"bytes-only"
@@ -66,6 +74,24 @@ let bytes_param ~name ~desc =
   Clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
+  Clic.args15
+    Client_proto_args.fee_arg
+    Client_proto_context_commands.dry_run_switch
+    Client_proto_context_commands.verbose_signing_switch
+    Client_proto_args.gas_limit_arg
+    Client_proto_args.storage_limit_arg
+    Client_proto_args.counter_arg
+    Client_proto_args.arg_arg
+    Client_proto_args.no_print_source_flag
+    Client_proto_args.minimal_fees_arg
+    Client_proto_args.minimal_nanotez_per_byte_arg
+    Client_proto_args.minimal_nanotez_per_gas_unit_arg
+    Client_proto_args.force_low_fee_arg
+    Client_proto_args.fee_cap_arg
+    Client_proto_args.burn_cap_arg
+    Client_proto_args.entrypoint_arg
+
+let non_transfer_options =
   Clic.args13
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
@@ -114,9 +140,32 @@ let prepare_command_display prepared_command bytes_only =
              Signature.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
+let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
+    ~entrypoint =
+  match Contract.is_implicit destination with
+  | Some _ ->
+      let open Micheline in
+      return @@ strip_locations @@ Prim (0, Script.T_unit, [], [])
+  | None -> (
+      Michelson_v1_entrypoints.contract_entrypoint_type
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ~contract:destination
+        ~entrypoint
+      >>=? function
+      | None ->
+          cctxt#error
+            "Contract %a has no entrypoint named %s"
+            Contract.pp
+            destination
+            entrypoint
+      | Some parameter_type -> return parameter_type)
+
 let commands () : #Protocol_client_context.full Clic.command list =
   Clic.
-    [ command
+    [
+      command
         ~group
         ~desc:"Originate a new multisig contract."
         (args14
@@ -134,7 +183,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            Client_proto_args.fee_cap_arg
            Client_proto_context_commands.verbose_signing_switch
            Client_proto_args.burn_cap_arg)
-        ( prefixes ["deploy"; "multisig"]
+        (prefixes ["deploy"; "multisig"]
         @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
              ~name:"new_multisig"
              ~desc:"name of the new multisig contract"
@@ -149,7 +198,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["with"; "threshold"]
         @@ threshold_param ()
         @@ prefixes ["on"; "public"; "keys"]
-        @@ seq_of_param (public_key_param ()) )
+        @@ seq_of_param (public_key_param ()))
         (fun ( fee,
                dry_run,
                gas_limit,
@@ -180,8 +229,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of an origination"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -222,8 +270,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 cctxt
                 errors
               >>= function
-              | None ->
-                  return_unit
+              | None -> return_unit
               | Some (_res, contract) ->
                   if dry_run then return_unit
                   else
@@ -232,14 +279,14 @@ let commands () : #Protocol_client_context.full Clic.command list =
                       cctxt
                       alias_name
                       contract
-                    >>=? fun () -> return_unit ));
+                    >>=? fun () -> return_unit));
       command
         ~group
         ~desc:
-          "Display the threshold, public keys, and byte sequence to sign for \
-           a multisigned transfer."
-        (args1 bytes_only_switch)
-        ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
+          "Display the threshold, public keys, and byte sequence to sign for a \
+           multisigned transfer."
+        (args3 bytes_only_switch arg_arg entrypoint_arg)
+        (prefixes ["prepare"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -251,28 +298,65 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
-        @@ stop )
-        (fun bytes_only
+        @@ stop)
+        (fun (bytes_only, parameter, entrypoint)
              (_, multisig_contract)
              amount
              (_, destination)
              (cctxt : #Protocol_client_context.full) ->
+          let entrypoint = Option.value ~default:"default" entrypoint in
+          let parameter = Option.value ~default:"Unit" parameter in
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression parameter
+          >>=? fun {expanded = parameter; _} ->
+          get_parameter_type cctxt ~destination ~entrypoint
+          >>=? fun parameter_type ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~multisig_contract
-            ~action:(Client_proto_multisig.Transfer (amount, destination))
+            ~action:
+              (Client_proto_multisig.Transfer
+                 {amount; destination; entrypoint; parameter_type; parameter})
             ()
           >>=? fun prepared_command ->
           return @@ prepare_command_display prepared_command bytes_only);
       command
         ~group
         ~desc:
-          "Display the threshold, public keys, and byte sequence to sign for \
-           a multisigned delegate change."
+          "Display the threshold, public keys, and byte sequence to sign for a \
+           multisigned lambda execution in a generic multisig contract."
         (args1 bytes_only_switch)
-        ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
+        (prefixes ["prepare"; "multisig"; "transaction"; "on"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"multisig"
+             ~desc:"name or address of the originated multisig contract"
+        @@ prefixes ["running"; "lambda"]
+        @@ lambda_param () @@ stop)
+        (fun bytes_only
+             (_, multisig_contract)
+             lambda
+             (cctxt : #Protocol_client_context.full) ->
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression lambda
+          >>=? fun {expanded = lambda; _} ->
+          Client_proto_multisig.prepare_multisig_transaction
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~multisig_contract
+            ~action:(Client_proto_multisig.Lambda lambda)
+            ()
+          >>=? fun prepared_command ->
+          return @@ prepare_command_display prepared_command bytes_only);
+      command
+        ~group
+        ~desc:
+          "Display the threshold, public keys, and byte sequence to sign for a \
+           multisigned delegate change."
+        (args1 bytes_only_switch)
+        (prefixes ["prepare"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -280,7 +364,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ Client_keys.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
-        @@ stop )
+        @@ stop)
         (fun bytes_only
              (_, multisig_contract)
              new_delegate
@@ -297,15 +381,15 @@ let commands () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:
-          "Display the threshold, public keys, and byte sequence to sign for \
-           a multisigned delegate withdraw."
+          "Display the threshold, public keys, and byte sequence to sign for a \
+           multisigned delegate withdraw."
         (args1 bytes_only_switch)
-        ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
+        (prefixes ["prepare"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
-        @@ stop )
+        @@ stop)
         (fun bytes_only
              (_, multisig_contract)
              (cctxt : #Protocol_client_context.full) ->
@@ -321,17 +405,17 @@ let commands () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:
-          "Display the threshold, public keys, and byte sequence to sign for \
-           a multisigned change of keys and threshold."
+          "Display the threshold, public keys, and byte sequence to sign for a \
+           multisigned change of keys and threshold."
         (args1 bytes_only_switch)
-        ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
+        (prefixes ["prepare"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "threshold"; "to"]
         @@ threshold_param ()
         @@ prefixes ["and"; "public"; "keys"; "to"]
-        @@ seq_of_param (public_key_param ()) )
+        @@ seq_of_param (public_key_param ()))
         (fun bytes_only
              (_, multisig_contract)
              new_threshold
@@ -354,8 +438,8 @@ let commands () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
-        no_options
-        ( prefixes ["sign"; "multisig"; "transaction"; "on"]
+        (args2 arg_arg entrypoint_arg)
+        (prefixes ["sign"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -368,29 +452,67 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ prefixes ["using"; "secret"; "key"]
-        @@ secret_key_param () @@ stop )
-        (fun ()
+        @@ secret_key_param () @@ stop)
+        (fun (parameter, entrypoint)
              (_, multisig_contract)
              amount
              (_, destination)
              sk
              (cctxt : #Protocol_client_context.full) ->
+          let entrypoint = Option.value ~default:"default" entrypoint in
+          let parameter = Option.value ~default:"Unit" parameter in
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression parameter
+          >>=? fun {expanded = parameter; _} ->
+          get_parameter_type cctxt ~destination ~entrypoint
+          >>=? fun parameter_type ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~multisig_contract
-            ~action:(Client_proto_multisig.Transfer (amount, destination))
+            ~action:
+              (Client_proto_multisig.Transfer
+                 {amount; destination; entrypoint; parameter_type; parameter})
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes
-          >>=? fun signature ->
+          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          return @@ Format.printf "%a@." Signature.pp signature);
+      command
+        ~group
+        ~desc:"Sign a lambda for a generic multisig contract."
+        no_options
+        (prefixes ["sign"; "multisig"; "transaction"; "on"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"multisig"
+             ~desc:"name or address of the originated multisig contract"
+        @@ prefixes ["running"; "lambda"]
+        @@ lambda_param ()
+        @@ prefixes ["using"; "secret"; "key"]
+        @@ secret_key_param () @@ stop)
+        (fun ()
+             (_, multisig_contract)
+             lambda
+             sk
+             (cctxt : #Protocol_client_context.full) ->
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression lambda
+          >>=? fun {expanded = lambda; _} ->
+          Client_proto_multisig.prepare_multisig_transaction
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~multisig_contract
+            ~action:(Lambda lambda)
+            ()
+          >>=? fun prepared_command ->
+          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
           return @@ Format.printf "%a@." Signature.pp signature);
       command
         ~group
         ~desc:"Sign a delegate change for a multisig contract."
         no_options
-        ( prefixes ["sign"; "multisig"; "transaction"; "on"]
+        (prefixes ["sign"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -399,7 +521,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
-        @@ secret_key_param () @@ stop )
+        @@ secret_key_param () @@ stop)
         (fun ()
              (_, multisig_contract)
              delegate
@@ -413,20 +535,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some delegate))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes
-          >>=? fun signature ->
+          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
           return @@ Format.printf "%a@." Signature.pp signature);
       command
         ~group
         ~desc:"Sign a delegate withdraw for a multisig contract."
         no_options
-        ( prefixes ["sign"; "multisig"; "transaction"; "on"]
+        (prefixes ["sign"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
         @@ prefixes ["using"; "secret"; "key"]
-        @@ secret_key_param () @@ stop )
+        @@ secret_key_param () @@ stop)
         (fun ()
              (_, multisig_contract)
              sk
@@ -439,15 +560,14 @@ let commands () : #Protocol_client_context.full Clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes
-          >>=? fun signature ->
+          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
           return @@ Format.printf "%a@." Signature.pp signature);
       command
         ~group
         ~desc:
           "Sign a change of public keys and threshold for a multisig contract."
         no_options
-        ( prefixes ["sign"; "multisig"; "transaction"; "on"]
+        (prefixes ["sign"; "multisig"; "transaction"; "on"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -456,7 +576,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["setting"; "threshold"; "to"]
         @@ threshold_param ()
         @@ prefixes ["and"; "public"; "keys"; "to"]
-        @@ seq_of_param (public_key_param ()) )
+        @@ seq_of_param (public_key_param ()))
         (fun ()
              (_, multisig_contract)
              sk
@@ -476,14 +596,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes
-          >>=? fun signature ->
+          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
           return @@ Format.printf "%a@." Signature.pp signature);
       command
         ~group
         ~desc:"Transfer tokens using a multisig contract."
         transfer_options
-        ( prefixes ["from"; "multisig"; "contract"]
+        (prefixes ["from"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name/literal of the multisig contract"
@@ -500,33 +619,41 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
+        @@ seq_of_param (signature_param ()))
         (fun ( fee,
                dry_run,
                verbose_signing,
                gas_limit,
                storage_limit,
                counter,
+               parameter,
                no_print_source,
                minimal_fees,
                minimal_nanotez_per_byte,
                minimal_nanotez_per_gas_unit,
                force_low_fee,
                fee_cap,
-               burn_cap )
+               burn_cap,
+               entrypoint )
              (_, multisig_contract)
              amount
              (_, destination)
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
+          let entrypoint = Option.value ~default:"default" entrypoint in
+          let parameter = Option.value ~default:"Unit" parameter in
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression parameter
+          >>=? fun {expanded = parameter; _} ->
+          get_parameter_type cctxt ~destination ~entrypoint
+          >>=? fun parameter_type ->
           match Contract.is_implicit source with
           | None ->
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -550,7 +677,15 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~src_pk
                 ~src_sk
                 ~multisig_contract
-                ~action:(Client_proto_multisig.Transfer (amount, destination))
+                ~action:
+                  (Client_proto_multisig.Transfer
+                     {
+                       amount;
+                       destination;
+                       entrypoint;
+                       parameter_type;
+                       parameter;
+                     })
                 ~signatures
                 ~amount:Tez.zero
                 ?gas_limit
@@ -562,12 +697,93 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     ~msg:"transfer simulation failed"
                     cctxt
               >>= function
-              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
+      command
+        ~group
+        ~desc:"Run a lambda on a generic multisig contract."
+        non_transfer_options
+        (prefixes ["from"; "multisig"; "contract"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"multisig"
+             ~desc:"name/literal of the multisig contract"
+        @@ prefixes ["run"; "lambda"]
+        @@ lambda_param ()
+        @@ prefixes ["on"; "behalf"; "of"]
+        @@ Client_proto_contracts.ContractAlias.destination_param
+             ~name:"src"
+             ~desc:"source calling the multisig contract"
+        @@ prefixes ["with"; "signatures"]
+        @@ seq_of_param (signature_param ()))
+        (fun ( fee,
+               dry_run,
+               verbose_signing,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             (_, multisig_contract)
+             lambda
+             (_, source)
+             signatures
+             (cctxt : #Protocol_client_context.full) ->
+          match Contract.is_implicit source with
+          | None ->
+              failwith
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Lwt.return @@ Micheline_parser.no_parsing_error
+              @@ Michelson_v1_parser.parse_expression lambda
+              >>=? fun {expanded = lambda; _} ->
+              Client_proto_multisig.call_multisig
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~verbose_signing
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~multisig_contract
+                ~action:(Client_proto_multisig.Lambda lambda)
+                ~signatures
+                ~amount:Tez.zero
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
       command
         ~group
         ~desc:"Change the delegate of a multisig contract."
-        transfer_options
-        ( prefixes ["set"; "delegate"; "of"; "multisig"; "contract"]
+        non_transfer_options
+        (prefixes ["set"; "delegate"; "of"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -580,7 +796,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
+        @@ seq_of_param (signature_param ()))
         (fun ( fee,
                dry_run,
                verbose_signing,
@@ -604,8 +820,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -641,12 +856,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     ~msg:"transfer simulation failed"
                     cctxt
               >>= function
-              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
       command
         ~group
         ~desc:"Withdraw the delegate of a multisig contract."
-        transfer_options
-        ( prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
+        non_transfer_options
+        (prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -655,7 +871,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
+        @@ seq_of_param (signature_param ()))
         (fun ( fee,
                dry_run,
                verbose_signing,
@@ -678,8 +894,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -715,12 +930,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     ~msg:"transfer simulation failed"
                     cctxt
               >>= function
-              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
       command
         ~group
         ~desc:"Change public keys and threshold for a multisig contract."
-        transfer_options
-        ( prefixes ["set"; "threshold"; "of"; "multisig"; "contract"]
+        non_transfer_options
+        (prefixes ["set"; "threshold"; "of"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
@@ -732,7 +948,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
+        @@ seq_of_param (signature_param ()))
         (fun ( fee,
                dry_run,
                verbose_signing,
@@ -757,8 +973,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               List.map_es
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 new_keys
@@ -800,7 +1015,8 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     ~msg:"transfer simulation failed"
                     cctxt
               >>= function
-              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
       (* This command is no longer necessary as Clic now supports non terminal
          lists of parameters, however, it is kept for compatibility. *)
       command
@@ -808,14 +1024,14 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:
           "Run a transaction described by a sequence of bytes on a multisig \
            contract."
-        transfer_options
-        ( prefixes ["run"; "transaction"]
+        non_transfer_options
+        (prefixes ["run"; "transaction"]
         @@ bytes_param
              ~name:"bytes"
              ~desc:
-               "the sequence of bytes to deserialize as a multisig action, \
-                can be obtained by one of the \"prepare multisig \
-                transaction\" commands"
+               "the sequence of bytes to deserialize as a multisig action, can \
+                be obtained by one of the \"prepare multisig transaction\" \
+                commands"
         @@ prefixes ["on"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
@@ -825,7 +1041,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
+        @@ seq_of_param (signature_param ()))
         (fun ( fee,
                dry_run,
                verbose_signing,
@@ -849,8 +1065,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source
-              >>=? fun (_, src_pk, src_sk) ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -886,7 +1101,8 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     ~msg:"transfer simulation failed"
                     cctxt
               >>= function
-              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              | None -> return_unit
+              | Some (_res, _contracts) -> return_unit));
       command
         ~group
         ~desc:"Show the hashes of the supported multisig contracts."
@@ -895,10 +1111,19 @@ let commands () : #Protocol_client_context.full Clic.command list =
         (fun () _cctxt ->
           Format.printf "Hashes of supported multisig contracts:@." ;
           List.iter
-            (fun h ->
-              Format.printf
-                "  0x%a@."
-                Hex.pp
-                (Script_expr_hash.to_bytes h |> Hex.of_bytes))
+            (fun h -> Format.printf "%a@." Script_expr_hash.pp h)
             Client_proto_multisig.known_multisig_hashes ;
-          return_unit) ]
+          return_unit);
+      command
+        ~group
+        ~desc:"Show the script of the recommended multisig contract."
+        no_options
+        (fixed ["show"; "multisig"; "script"])
+        (fun () _cctxt ->
+          let {Michelson_v1_parser.source; _} =
+            Michelson_v1_printer.unparse_toplevel
+              Client_proto_multisig.multisig_script
+          in
+          Format.printf "%s@." source ;
+          return_unit);
+    ]

@@ -155,14 +155,10 @@ and counter = Z.t
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
-  | Reveal _ ->
-      Kind.Reveal_manager_kind
-  | Transaction _ ->
-      Kind.Transaction_manager_kind
-  | Origination _ ->
-      Kind.Origination_manager_kind
-  | Delegation _ ->
-      Kind.Delegation_manager_kind
+  | Reveal _ -> Kind.Reveal_manager_kind
+  | Transaction _ -> Kind.Transaction_manager_kind
+  | Origination _ -> Kind.Origination_manager_kind
+  | Delegation _ -> Kind.Delegation_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -193,27 +189,22 @@ type packed_internal_operation =
   | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let rec to_list = function
-  | Contents_list (Single o) ->
-      [Contents o]
-  | Contents_list (Cons (o, os)) ->
-      Contents o :: to_list (Contents_list os)
+  | Contents_list (Single o) -> [Contents o]
+  | Contents_list (Cons (o, os)) -> Contents o :: to_list (Contents_list os)
 
 let rec of_list = function
-  | [] ->
-      assert false
-  | [Contents o] ->
-      Contents_list (Single o)
+  | [] -> assert false
+  | [Contents o] -> Contents_list (Single o)
   | Contents o :: os -> (
       let (Contents_list os) = of_list os in
       match (o, os) with
       | (Manager_operation _, Single (Manager_operation _)) ->
           Contents_list (Cons (o, os))
-      | (Manager_operation _, Cons _) ->
-          Contents_list (Cons (o, os))
+      | (Manager_operation _, Cons _) -> Contents_list (Cons (o, os))
       | _ ->
           Pervasives.failwith
             "Operation list of length > 1 should only contains manager \
-             operations." )
+             operations.")
 
 module Encoding = struct
   open Data_encoding
@@ -239,7 +230,7 @@ module Encoding = struct
         }
           -> 'kind case
 
-    let reveal_case =
+    let[@coq_axiom_with_reason "gadt"] reveal_case =
       MCase
         {
           tag = 0;
@@ -265,7 +256,8 @@ module Encoding = struct
           (fun () -> name)
       in
       union
-        [ builtin_case 0 "default";
+        [
+          builtin_case 0 "default";
           builtin_case 1 "root";
           builtin_case 2 "do";
           builtin_case 3 "set_delegate";
@@ -275,9 +267,10 @@ module Encoding = struct
             ~title:"named"
             (Bounded.string 31)
             (fun s -> Some s)
-            (fun s -> s) ]
+            (fun s -> s);
+        ]
 
-    let transaction_case =
+    let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
           tag = 1;
@@ -308,15 +301,13 @@ module Encoding = struct
             (fun (amount, destination, parameters) ->
               let (entrypoint, parameters) =
                 match parameters with
-                | None ->
-                    ("default", Script_repr.unit_parameter)
-                | Some (entrypoint, value) ->
-                    (entrypoint, value)
+                | None -> ("default", Script_repr.unit_parameter)
+                | Some (entrypoint, value) -> (entrypoint, value)
               in
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_case =
+    let[@coq_axiom_with_reason "gadt"] origination_case =
       MCase
         {
           tag = 2;
@@ -331,14 +322,15 @@ module Encoding = struct
           proj =
             (function
             | Origination
-                { credit;
+                {
+                  credit;
                   delegate;
                   script;
                   preorigination =
                     _
                     (* the hash is only used internally
                                when originating from smart
-                               contracts, don't serialize it *)
+                               contracts, don't serialize it *);
                 } ->
                 (credit, delegate, script));
           inj =
@@ -346,7 +338,7 @@ module Encoding = struct
               Origination {credit; delegate; script; preorigination = None});
         }
 
-    let delegation_case =
+    let[@coq_axiom_with_reason "gadt"] delegation_case =
       MCase
         {
           tag = 3;
@@ -370,10 +362,12 @@ module Encoding = struct
       in
       union
         ~tag_size:`Uint8
-        [ make reveal_case;
+        [
+          make reveal_case;
           make transaction_case;
           make origination_case;
-          make delegation_case ]
+          make delegation_case;
+        ]
   end
 
   type 'b case =
@@ -401,32 +395,31 @@ module Encoding = struct
         inj = (fun level -> Endorsement {level});
       }
 
-  let endorsement_encoding =
+  let[@coq_axiom_with_reason "gadt"] endorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
     let to_list : Kind.endorsement contents_list -> _ = function
-      | Single o ->
-          o
+      | Single o -> o
     in
     let of_list : Kind.endorsement contents -> _ = function o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
            (shell, (contents, signature)))
-         (fun (shell, (contents, signature)) ->
-           ({shell; protocol_data = {contents; signature}} : _ operation))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
          (merge_objs
             Operation.shell_header_encoding
             (obj2
                (req
                   "operations"
-                  ( conv to_list of_list
+                  (conv to_list of_list
                   @@ def "inlined.endorsement.contents"
-                  @@ union [make endorsement_case] ))
+                  @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
-  let seed_nonce_revelation_case =
+  let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
     Case
       {
         tag = 1;
@@ -442,7 +435,8 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
-  let endorsement_with_slot_case : Kind.endorsement_with_slot case =
+  let[@coq_axiom_with_reason "gadt"] endorsement_with_slot_case :
+      Kind.endorsement_with_slot case =
     Case
       {
         tag = 10;
@@ -458,12 +452,11 @@ module Encoding = struct
           (fun (Endorsement_with_slot {endorsement; slot}) ->
             (endorsement, slot));
         inj =
-          (fun (endorsement, slot) ->
-            Endorsement_with_slot {endorsement; slot});
+          (fun (endorsement, slot) -> Endorsement_with_slot {endorsement; slot});
       }
 
-  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case
-      =
+  let[@coq_axiom_with_reason "gadt"] double_endorsement_evidence_case :
+      Kind.double_endorsement_evidence case =
     Case
       {
         tag = 2;
@@ -475,19 +468,16 @@ module Encoding = struct
             (req "slot" uint16);
         select =
           (function
-          | Contents (Double_endorsement_evidence _ as op) ->
-              Some op
-          | _ ->
-              None);
+          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | _ -> None);
         proj =
           (fun (Double_endorsement_evidence {op1; op2; slot}) ->
             (op1, op2, slot));
         inj =
-          (fun (op1, op2, slot) ->
-            Double_endorsement_evidence {op1; op2; slot});
+          (fun (op1, op2, slot) -> Double_endorsement_evidence {op1; op2; slot});
       }
 
-  let double_baking_evidence_case =
+  let[@coq_axiom_with_reason "gadt"] double_baking_evidence_case =
     Case
       {
         tag = 3;
@@ -503,7 +493,7 @@ module Encoding = struct
         inj = (fun (bh1, bh2) -> Double_baking_evidence {bh1; bh2});
       }
 
-  let activate_account_case =
+  let[@coq_axiom_with_reason "gadt"] activate_account_case =
     Case
       {
         tag = 4;
@@ -522,7 +512,7 @@ module Encoding = struct
           (fun (id, activation_code) -> Activate_account {id; activation_code});
       }
 
-  let proposals_case =
+  let[@coq_axiom_with_reason "gadt"] proposals_case =
     Case
       {
         tag = 5;
@@ -542,7 +532,7 @@ module Encoding = struct
             Proposals {source; period; proposals});
       }
 
-  let ballot_case =
+  let[@coq_axiom_with_reason "gadt"] ballot_case =
     Case
       {
         tag = 6;
@@ -593,7 +583,7 @@ module Encoding = struct
     Manager_operation
       {source; fee; counter; gas_limit; storage_limit; operation}
 
-  let make_manager_case tag (type kind)
+  let[@coq_axiom_with_reason "gadt"] make_manager_case tag (type kind)
       (Manager_operations.MCase mcase : kind Manager_operations.case) =
     Case
       {
@@ -603,13 +593,10 @@ module Encoding = struct
         select =
           (function
           | Contents (Manager_operation ({operation; _} as op)) -> (
-            match mcase.select (Manager operation) with
-            | None ->
-                None
-            | Some operation ->
-                Some (Manager_operation {op with operation}) )
-          | _ ->
-              None);
+              match mcase.select (Manager operation) with
+              | None -> None
+              | Some operation -> Some (Manager_operation {op with operation}))
+          | _ -> None);
         proj =
           (function
           | Manager_operation {operation; _} as op ->
@@ -625,8 +612,7 @@ module Encoding = struct
   let origination_case =
     make_manager_case 109 Manager_operations.origination_case
 
-  let delegation_case =
-    make_manager_case 110 Manager_operations.delegation_case
+  let delegation_case = make_manager_case 110 Manager_operations.delegation_case
 
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
@@ -639,7 +625,8 @@ module Encoding = struct
     in
     def "operation.alpha.contents"
     @@ union
-         [ make endorsement_case;
+         [
+           make endorsement_case;
            make seed_nonce_revelation_case;
            make endorsement_with_slot_case;
            make double_endorsement_evidence_case;
@@ -651,7 +638,8 @@ module Encoding = struct
            make transaction_case;
            make origination_case;
            make delegation_case;
-           make failing_noop_case ]
+           make failing_noop_case;
+         ]
 
   let contents_list_encoding =
     conv to_list of_list (Variable.list contents_encoding)
@@ -720,28 +708,17 @@ let raw ({shell; protocol_data} : _ operation) =
 let acceptable_passes (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
-  | Single (Failing_noop _) ->
-      []
-  | Single (Endorsement _) ->
-      [0]
-  | Single (Endorsement_with_slot _) ->
-      [0]
-  | Single (Proposals _) ->
-      [1]
-  | Single (Ballot _) ->
-      [1]
-  | Single (Seed_nonce_revelation _) ->
-      [2]
-  | Single (Double_endorsement_evidence _) ->
-      [2]
-  | Single (Double_baking_evidence _) ->
-      [2]
-  | Single (Activate_account _) ->
-      [2]
-  | Single (Manager_operation _) ->
-      [3]
-  | Cons _ ->
-      [3]
+  | Single (Failing_noop _) -> []
+  | Single (Endorsement _) -> [0]
+  | Single (Endorsement_with_slot _) -> [0]
+  | Single (Proposals _) -> [1]
+  | Single (Ballot _) -> [1]
+  | Single (Seed_nonce_revelation _) -> [2]
+  | Single (Double_endorsement_evidence _) -> [2]
+  | Single (Double_baking_evidence _) -> [2]
+  | Single (Activate_account _) -> [2]
+  | Single (Manager_operation _) -> [3]
+  | Cons _ -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 
@@ -783,15 +760,10 @@ let check_signature (type kind) key chain_id
     else error Invalid_signature
   in
   match (protocol_data.contents, protocol_data.signature) with
-  | (Single _, None) ->
-      error Missing_signature
-  | (Cons _, None) ->
-      error Missing_signature
+  | (Single _, None) -> error Missing_signature
+  | (Cons _, None) -> error Missing_signature
   | ((Single (Endorsement _) as contents), Some signature) ->
-      check
-        ~watermark:(Endorsement chain_id)
-        (Contents_list contents)
-        signature
+      check ~watermark:(Endorsement chain_id) (Contents_list contents) signature
   | ((Single _ as contents), Some signature) ->
       check ~watermark:Generic_operation (Contents_list contents) signature
   | ((Cons _ as contents), Some signature) ->
@@ -819,92 +791,57 @@ let equal_manager_operation_kind :
     type a b. a manager_operation -> b manager_operation -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Reveal _, Reveal _) ->
-      Some Eq
-  | (Reveal _, _) ->
-      None
-  | (Transaction _, Transaction _) ->
-      Some Eq
-  | (Transaction _, _) ->
-      None
-  | (Origination _, Origination _) ->
-      Some Eq
-  | (Origination _, _) ->
-      None
-  | (Delegation _, Delegation _) ->
-      Some Eq
-  | (Delegation _, _) ->
-      None
+  | (Reveal _, Reveal _) -> Some Eq
+  | (Reveal _, _) -> None
+  | (Transaction _, Transaction _) -> Some Eq
+  | (Transaction _, _) -> None
+  | (Origination _, Origination _) -> Some Eq
+  | (Origination _, _) -> None
+  | (Delegation _, Delegation _) -> Some Eq
+  | (Delegation _, _) -> None
 
-let equal_contents_kind :
-    type a b. a contents -> b contents -> (a, b) eq option =
+let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
+    =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Endorsement _, Endorsement _) ->
-      Some Eq
-  | (Endorsement _, _) ->
-      None
-  | (Seed_nonce_revelation _, Seed_nonce_revelation _) ->
-      Some Eq
-  | (Seed_nonce_revelation _, _) ->
-      None
-  | (Endorsement_with_slot _, Endorsement_with_slot _) ->
-      Some Eq
-  | (Endorsement_with_slot _, _) ->
-      None
-  | (Double_endorsement_evidence _, Double_endorsement_evidence _) ->
-      Some Eq
-  | (Double_endorsement_evidence _, _) ->
-      None
-  | (Double_baking_evidence _, Double_baking_evidence _) ->
-      Some Eq
-  | (Double_baking_evidence _, _) ->
-      None
-  | (Activate_account _, Activate_account _) ->
-      Some Eq
-  | (Activate_account _, _) ->
-      None
-  | (Proposals _, Proposals _) ->
-      Some Eq
-  | (Proposals _, _) ->
-      None
-  | (Ballot _, Ballot _) ->
-      Some Eq
-  | (Ballot _, _) ->
-      None
-  | (Failing_noop _, Failing_noop _) ->
-      Some Eq
-  | (Failing_noop _, _) ->
-      None
+  | (Endorsement _, Endorsement _) -> Some Eq
+  | (Endorsement _, _) -> None
+  | (Seed_nonce_revelation _, Seed_nonce_revelation _) -> Some Eq
+  | (Seed_nonce_revelation _, _) -> None
+  | (Endorsement_with_slot _, Endorsement_with_slot _) -> Some Eq
+  | (Endorsement_with_slot _, _) -> None
+  | (Double_endorsement_evidence _, Double_endorsement_evidence _) -> Some Eq
+  | (Double_endorsement_evidence _, _) -> None
+  | (Double_baking_evidence _, Double_baking_evidence _) -> Some Eq
+  | (Double_baking_evidence _, _) -> None
+  | (Activate_account _, Activate_account _) -> Some Eq
+  | (Activate_account _, _) -> None
+  | (Proposals _, Proposals _) -> Some Eq
+  | (Proposals _, _) -> None
+  | (Ballot _, Ballot _) -> Some Eq
+  | (Ballot _, _) -> None
+  | (Failing_noop _, Failing_noop _) -> Some Eq
+  | (Failing_noop _, _) -> None
   | (Manager_operation op1, Manager_operation op2) -> (
-    match equal_manager_operation_kind op1.operation op2.operation with
-    | None ->
-        None
-    | Some Eq ->
-        Some Eq )
-  | (Manager_operation _, _) ->
-      None
+      match equal_manager_operation_kind op1.operation op2.operation with
+      | None -> None
+      | Some Eq -> Some Eq)
+  | (Manager_operation _, _) -> None
 
 let rec equal_contents_kind_list :
     type a b. a contents_list -> b contents_list -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Single op1, Single op2) ->
-      equal_contents_kind op1 op2
-  | (Single _, Cons _) ->
-      None
-  | (Cons _, Single _) ->
-      None
+  | (Single op1, Single op2) -> equal_contents_kind op1 op2
+  | (Single _, Cons _) -> None
+  | (Cons _, Single _) -> None
   | (Cons (op1, ops1), Cons (op2, ops2)) -> (
-    match equal_contents_kind op1 op2 with
-    | None ->
-        None
-    | Some Eq -> (
-      match equal_contents_kind_list ops1 ops2 with
-      | None ->
-          None
-      | Some Eq ->
-          Some Eq ) )
+      match equal_contents_kind op1 op2 with
+      | None -> None
+      | Some Eq -> (
+          match equal_contents_kind_list ops1 ops2 with
+          | None -> None
+          | Some Eq -> Some Eq))
 
 let equal : type a b. a operation -> b operation -> (a, b) eq option =
  fun op1 op2 ->

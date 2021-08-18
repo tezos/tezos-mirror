@@ -111,7 +111,7 @@ module Pp : S with type 'a repr = string and type size = string = struct
 
   let lam ~name f = Format.asprintf "fun %s -> %s" name (f name)
 
-  let app f arg = Format.asprintf "(%s %s)" f arg
+  let app f arg = Format.asprintf "(%s) %s" f arg
 
   let let_ ~name m f = Format.asprintf "let %s = %s in %s" name m (f name)
 
@@ -216,7 +216,9 @@ module Parameters :
 
   let log2 _x _ = String.Set.empty
 
-  let free ~name _ = ignore name ; String.Set.empty
+  let free ~name _ =
+    ignore name ;
+    String.Set.empty
 
   let lt = lift_binop
 
@@ -228,7 +230,9 @@ module Parameters :
 
   let app _f _arg _ = String.Set.empty
 
-  let let_ ~name _m _f _ = ignore name ; String.Set.empty
+  let let_ ~name _m _f _ =
+    ignore name ;
+    String.Set.empty
 
   let if_ _cond _ift _iff _ = String.Set.empty
 end
@@ -274,11 +278,15 @@ module Eval : S with type 'a repr = 'a and type size = float = struct
 
   let eq x y = x = y
 
-  let lam ~name f = ignore name ; f
+  let lam ~name f =
+    ignore name ;
+    f
 
   let app f arg = f arg
 
-  let let_ ~name m f = ignore name ; f m
+  let let_ ~name m f =
+    ignore name ;
+    f m
 
   let if_ cond ift iff = if cond then ift else iff
 end
@@ -324,8 +332,7 @@ let () =
             (Format.asprintf
                "Eval_linear_combination: cannot convert node %s"
                s)
-      | _ ->
-          None)
+      | _ -> None)
 
 module Eval_linear_combination_impl : sig
   include S
@@ -345,8 +352,7 @@ struct
   let false_ _ = Bool false
 
   let int i _ =
-    Affine
-      {const = float_of_int i; linear_comb = Free_variable.Sparse_vec.zero}
+    Affine {const = float_of_int i; linear_comb = Free_variable.Sparse_vec.zero}
 
   let float f _ =
     Affine {const = f; linear_comb = Free_variable.Sparse_vec.zero}
@@ -408,8 +414,7 @@ struct
 
   let free ~name subst =
     match subst name with
-    | Some const ->
-        Affine {const; linear_comb = Free_variable.Sparse_vec.zero}
+    | Some const -> Affine {const; linear_comb = Free_variable.Sparse_vec.zero}
     | None ->
         Affine
           {
@@ -555,7 +560,9 @@ functor
 
     let fresh =
       let c = ref ~-1 in
-      fun () -> incr c ; !c
+      fun () ->
+        incr c ;
+        !c
 
     let insert_if_not_present (term_thunk : unit -> size X.repr)
         (uti : unique_term_identifier) =
@@ -566,13 +573,12 @@ functor
           Hashtbl.add size_table hash (hash_consed, uti) ;
           hash_consed
       | bindings -> (
-        match List.find_opt (fun (_, uti') -> uti = uti') bindings with
-        | None ->
-            let hash_consed = {repr = term_thunk (); hash; tag = fresh ()} in
-            Hashtbl.add size_table hash (hash_consed, uti) ;
-            hash_consed
-        | Some (res, _) ->
-            res )
+          match List.find_opt (fun (_, uti') -> uti = uti') bindings with
+          | None ->
+              let hash_consed = {repr = term_thunk (); hash; tag = fresh ()} in
+              Hashtbl.add size_table hash (hash_consed, uti) ;
+              hash_consed
+          | Some (res, _) -> res)
 
     let lift2_nohash f x y =
       let hash = -1 in
@@ -625,7 +631,7 @@ functor
 
     let lt x y = {repr = X.lt x.repr y.repr; hash = -1; tag = fresh ()}
 
-    let eq x y = {repr = X.lt x.repr y.repr; hash = -1; tag = fresh ()}
+    let eq x y = {repr = X.eq x.repr y.repr; hash = -1; tag = fresh ()}
 
     (* The functions below are _not_ hash-consed. *)
     let shift_left x i =
@@ -679,19 +685,15 @@ functor
     let rec prj : type a. a repr -> a X.repr =
      fun x ->
       match x with
-      | Static_lam {name; lam} ->
-          X.lam ~name (fun arg -> prj (lam arg))
-      | Dynamic d ->
-          d
+      | Static_lam {name; lam} -> X.lam ~name (fun arg -> prj (lam arg))
+      | Dynamic d -> d
 
     let lift1 f x = match x with Dynamic d -> dyn (f d) | _ -> assert false
 
     let lift2 f x y =
       match (x, y) with
-      | (Dynamic d, Dynamic e) ->
-          dyn (f d e)
-      | _ ->
-          assert false
+      | (Dynamic d, Dynamic e) -> dyn (f d e)
+      | _ -> assert false
 
     let false_ = dyn X.false_
 
@@ -723,7 +725,7 @@ functor
 
     let lt x y = lift2 X.lt x y
 
-    let eq x y = lift2 X.lt x y
+    let eq x y = lift2 X.eq x y
 
     let lam : name:string -> ('a repr -> 'b repr) -> ('a -> 'b) repr =
      fun ~name f ->
@@ -733,13 +735,10 @@ functor
     let app : type a b. (a -> b) repr -> a repr -> b repr =
      fun f arg ->
       match f with
-      | Static_lam {lam; _} ->
-          lam (prj arg)
-      | Dynamic dyn_f ->
-          Dynamic (X.app dyn_f (prj arg))
+      | Static_lam {lam; _} -> lam (prj arg)
+      | Dynamic dyn_f -> Dynamic (X.app dyn_f (prj arg))
 
-    let let_ : type a b. name:string -> a repr -> (a repr -> b repr) -> b repr
-        =
+    let let_ : type a b. name:string -> a repr -> (a repr -> b repr) -> b repr =
      fun ~name m f -> Dynamic (X.let_ ~name (prj m) (fun x -> prj (f (dyn x))))
 
     let if_ cond ift iff = Dynamic (X.if_ (prj cond) (prj ift) (prj iff))
@@ -817,8 +816,7 @@ functor
     let if_ cond ift iff =
       {
         cont =
-          (fun k ->
-            cond.cont (fun cond -> k @@ X.if_ cond (prj ift) (prj iff)));
+          (fun k -> cond.cont (fun cond -> k @@ X.if_ cond (prj ift) (prj iff)));
       }
   end
 
@@ -826,3 +824,148 @@ functor
    function DSL *)
 module Hash_cons_vector = Hash_cons (Eval_linear_combination_impl)
 module Eval_to_vector = Beta_normalize (Hash_cons_vector)
+
+module Fold_constants (X : S) = struct
+  type size = X.size
+
+  type 'a maybe_const =
+    | Int : int -> size maybe_const
+    | Float : float -> size maybe_const
+    | Bool : bool -> bool maybe_const
+    | Not_const : 'a X.repr -> 'a maybe_const
+
+  type 'a repr = 'a maybe_const
+
+  let prj : type a. a maybe_const -> a X.repr = function
+    | Int i -> X.int i
+    | Float f -> X.float f
+    | Bool false -> X.false_
+    | Bool true -> X.true_
+    | Not_const term -> term
+
+  let inj x = Not_const x
+
+  let false_ = Bool false
+
+  let true_ = Bool true
+
+  let float f = Float f
+
+  let int i = Int i
+
+  let arith_op op_i op_f op_x x y =
+    match (x, y) with
+    | (Int i, Int j) -> Int (op_i i j)
+    | (Float i, Float j) -> Float (op_f i j)
+    | (Int i, Float j) -> Float (op_f (float_of_int i) j)
+    | (Float i, Int j) -> Float (op_f i (float_of_int j))
+    | (Not_const term, Int i) -> Not_const (op_x term (X.int i))
+    | (Int i, Not_const term) -> Not_const (op_x (X.int i) term)
+    | (Not_const term, Float i) -> Not_const (op_x term (X.float i))
+    | (Float i, Not_const term) -> Not_const (op_x (X.float i) term)
+    | (Not_const x, Not_const y) -> Not_const (op_x x y)
+    | (Bool _, _) | (_, Bool _) -> assert false
+
+  let ( + ) x y =
+    match (x, y) with
+    | (Int 0, term) | (Float 0.0, term) | (term, Int 0) | (term, Float 0.0) ->
+        term
+    | _ -> arith_op ( + ) ( +. ) X.( + ) x y
+
+  let ( * ) x y =
+    match (x, y) with
+    | (Int 0, _) | (Float 0.0, _) | (_, Int 0) | (_, Float 0.0) -> Int 0
+    | (Int 1, term) | (Float 1.0, term) | (term, Int 1) | (term, Float 1.0) ->
+        term
+    | _ -> arith_op ( * ) ( *. ) X.( * ) x y
+
+  let ( - ) x y =
+    match (x, y) with
+    | (term, Int 0) | (term, Float 0.0) -> term
+    | _ -> arith_op ( - ) ( -. ) X.( - ) x y
+
+  let ( / ) x y =
+    match (x, y) with
+    | (term, Int 1) -> term
+    | (term, Float 1.0) -> term
+    (* The next cases are here to avoid introducing floating point constants from the division *)
+    | (Int i, Int j) -> Not_const X.(int i / int j)
+    | (Float i, Float j) -> Not_const X.(float i / float j)
+    | (Int i, Float j) -> Not_const X.(int i / float j)
+    | (Float i, Int j) -> Not_const X.(float i / int j)
+    | _ -> arith_op ( / ) ( /. ) X.( / ) x y
+
+  let max = arith_op max max X.max
+
+  let min = arith_op min min X.min
+
+  let shift_left x s =
+    inj
+    @@
+    match x with
+    | Int i -> X.(shift_left (int i) s)
+    | Float f -> X.(shift_left (float f) s)
+    | Not_const term -> X.(shift_left term s)
+    | Bool _ -> assert false
+
+  let shift_right x s =
+    inj
+    @@
+    match x with
+    | Int i -> X.(shift_right (int i) s)
+    | Float f -> X.(shift_right (float f) s)
+    | Not_const term -> X.(shift_right term s)
+    | Bool _ -> assert false
+
+  let log2 x =
+    inj
+    @@
+    match x with
+    | Int i -> X.(log2 (int i))
+    | Float f -> X.(log2 (float f))
+    | Not_const term -> X.(log2 term)
+    | Bool _ -> assert false
+
+  let free ~name = Not_const (X.free ~name)
+
+  let lt x y =
+    match (x, y) with
+    | (Int i, Int j) -> Bool (i < j)
+    | (Float i, Float j) -> Bool (i < j)
+    | (Float i, Int j) -> Bool (i < float_of_int j)
+    | (Int i, Float j) -> Bool (float_of_int i < j)
+    | (Not_const term, Int i) -> Not_const X.(lt term (int i))
+    | (Int i, Not_const term) -> Not_const X.(lt (int i) term)
+    | (Not_const term, Float i) -> Not_const X.(lt term (float i))
+    | (Float i, Not_const term) -> Not_const X.(lt (float i) term)
+    | (Not_const x, Not_const y) -> Not_const X.(lt x y)
+    | (Bool _, _) | (_, Bool _) -> assert false
+
+  let eq x y =
+    match (x, y) with
+    | (Int i, Int j) -> Bool (i = j)
+    | (Float i, Float j) -> Bool (i = j)
+    | (Float i, Int j) -> Bool (i = float_of_int j)
+    | (Int i, Float j) -> Bool (float_of_int i = j)
+    | (Not_const term, Int i) -> Not_const X.(eq term (int i))
+    | (Int i, Not_const term) -> Not_const X.(eq (int i) term)
+    | (Not_const term, Float i) -> Not_const X.(eq term (float i))
+    | (Float i, Not_const term) -> Not_const X.(eq (float i) term)
+    | (Not_const x, Not_const y) -> Not_const X.(eq x y)
+    | (Bool _, _) | (_, Bool _) -> assert false
+
+  let lam ~name (f : 'a repr -> 'b repr) =
+    Not_const (X.lam ~name (fun x -> prj (f (inj x))))
+
+  let app f arg = Not_const (X.app (prj f) (prj arg))
+
+  let let_ ~name (m : 'a repr) (f : 'a repr -> 'b repr) : 'b repr =
+    Not_const (X.let_ ~name (prj m) (fun x -> prj (f (inj x))))
+
+  let if_ cond ift iff =
+    match cond with
+    | Bool true -> ift
+    | Bool false -> iff
+    | Not_const term -> Not_const (X.if_ term (prj ift) (prj iff))
+    | Int _ | Float _ -> assert false
+end

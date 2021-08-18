@@ -47,8 +47,7 @@ let print_annot_expr_unwrapped ppf (expr, annot) =
   Format.fprintf ppf "%a%a" print_var_annots annot print_expr_unwrapped expr
 
 let print_stack ppf = function
-  | [] ->
-      Format.fprintf ppf "[]"
+  | [] -> Format.fprintf ppf "[]"
   | more ->
       Format.fprintf
         ppf
@@ -87,10 +86,8 @@ let print_big_map_diff ppf diff =
   Format.fprintf
     ppf
     "@[<v 0>%a@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf ->
-       function
-       | Contract.Clear id ->
-           Format.fprintf ppf "Clear %a" pp_map id
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf -> function
+       | Contract.Clear id -> Format.fprintf ppf "Clear %a" pp_map id
        | Contract.Alloc {big_map; key_type; value_type} ->
            Format.fprintf
              ppf
@@ -112,8 +109,9 @@ let print_big_map_diff ppf diff =
              big_map
              print_expr
              diff_key
-             (fun ppf -> function None -> () | Some x ->
-                   Format.fprintf ppf " to %a" print_expr x)
+             (fun ppf -> function
+               | None -> ()
+               | Some x -> Format.fprintf ppf " to %a" print_expr x)
              diff_value))
     diff
 
@@ -123,22 +121,17 @@ let inject_types type_map parsed =
         Seq (inject_loc `before loc, List.map inject_expr items)
     | Prim (loc, name, items, annot) ->
         Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
-    | Int (loc, value) ->
-        Int (inject_loc `after loc, value)
-    | String (loc, value) ->
-        String (inject_loc `after loc, value)
-    | Bytes (loc, value) ->
-        Bytes (inject_loc `after loc, value)
+    | Int (loc, value) -> Int (inject_loc `after loc, value)
+    | String (loc, value) -> String (inject_loc `after loc, value)
+    | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
   and inject_loc which loc =
     let comment =
       let ( >?? ) = Option.bind in
-      List.assoc loc parsed.Michelson_v1_parser.expansion_table
+      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
       >?? fun (_, locs) ->
       let locs = List.sort compare locs in
-      List.hd locs
-      >?? fun head_loc ->
-      List.assoc head_loc type_map
-      >?? fun (bef, aft) ->
+      List.hd locs >?? fun head_loc ->
+      List.assoc ~equal:Int.equal head_loc type_map >?? fun (bef, aft) ->
       let stack = match which with `before -> bef | `after -> aft in
       Some (Format.asprintf "%a" print_stack stack)
     in
@@ -160,19 +153,14 @@ let unparse ?type_map parse expanded =
           | Prim (loc, name, items, annot) ->
               Prim
                 (inject_loc `after loc, name, List.map inject_expr items, annot)
-          | Int (loc, value) ->
-              Int (inject_loc `after loc, value)
-          | String (loc, value) ->
-              String (inject_loc `after loc, value)
-          | Bytes (loc, value) ->
-              Bytes (inject_loc `after loc, value)
+          | Int (loc, value) -> Int (inject_loc `after loc, value)
+          | String (loc, value) -> String (inject_loc `after loc, value)
+          | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
         and inject_loc which loc =
           let comment =
             let ( >?? ) = Option.bind in
-            List.assoc loc unexpansion_table
-            >?? fun loc ->
-            List.assoc loc type_map
-            >?? fun (bef, aft) ->
+            List.assoc ~equal:Int.equal loc unexpansion_table >?? fun loc ->
+            List.assoc ~equal:Int.equal loc type_map >?? fun (bef, aft) ->
             let stack = match which with `before -> bef | `after -> aft in
             Some (Format.asprintf "%a" print_stack stack)
           in
@@ -187,10 +175,8 @@ let unparse ?type_map parse expanded =
         |> Format.asprintf "%a" Micheline_printer.print_expr
   in
   match parse source with
-  | (res, []) ->
-      res
-  | (_, _ :: _) ->
-      Stdlib.failwith "Michelson_v1_printer.unparse"
+  | (res, []) -> res
+  | (_, _ :: _) -> Stdlib.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map =
   unparse ?type_map Michelson_v1_parser.parse_toplevel
@@ -209,242 +195,124 @@ let unparse_invalid expanded =
 let ocaml_constructor_of_prim =
   let open Michelson_v1_primitives in
   function
-  | K_parameter ->
-      "K_parameter"
-  | K_storage ->
-      "K_storage"
-  | K_code ->
-      "K_code"
-  | D_False ->
-      "D_False"
-  | D_Elt ->
-      "D_Elt"
-  | D_Left ->
-      "D_Left"
-  | D_None ->
-      "D_None"
-  | D_Pair ->
-      "D_Pair"
-  | D_Right ->
-      "D_Right"
-  | D_Some ->
-      "D_Some"
-  | D_True ->
-      "D_True"
-  | D_Unit ->
-      "D_Unit"
-  | I_PACK ->
-      "I_PACK"
-  | I_UNPACK ->
-      "I_UNPACK"
-  | I_BLAKE2B ->
-      "I_BLAKE2B"
-  | I_SHA256 ->
-      "I_SHA256"
-  | I_SHA512 ->
-      "I_SHA512"
-  | I_ABS ->
-      "I_ABS"
-  | I_ADD ->
-      "I_ADD"
-  | I_AMOUNT ->
-      "I_AMOUNT"
-  | I_AND ->
-      "I_AND"
-  | I_BALANCE ->
-      "I_BALANCE"
-  | I_CAR ->
-      "I_CAR"
-  | I_CDR ->
-      "I_CDR"
-  | I_CHAIN_ID ->
-      "I_CHAIN_ID"
-  | I_CHECK_SIGNATURE ->
-      "I_CHECK_SIGNATURE"
-  | I_COMPARE ->
-      "I_COMPARE"
-  | I_CONCAT ->
-      "I_CONCAT"
-  | I_CONS ->
-      "I_CONS"
-  | I_CREATE_ACCOUNT ->
-      "I_CREATE_ACCOUNT"
-  | I_CREATE_CONTRACT ->
-      "I_CREATE_CONTRACT"
-  | I_IMPLICIT_ACCOUNT ->
-      "I_IMPLICIT_ACCOUNT"
-  | I_DIP ->
-      "I_DIP"
-  | I_DROP ->
-      "I_DROP"
-  | I_DUP ->
-      "I_DUP"
-  | I_EDIV ->
-      "I_EDIV"
-  | I_EMPTY_BIG_MAP ->
-      "I_EMPTY_BIG_MAP"
-  | I_EMPTY_MAP ->
-      "I_EMPTY_MAP"
-  | I_EMPTY_SET ->
-      "I_EMPTY_SET"
-  | I_EQ ->
-      "I_EQ"
-  | I_EXEC ->
-      "I_EXEC"
-  | I_APPLY ->
-      "I_APPLY"
-  | I_FAILWITH ->
-      "I_FAILWITH"
-  | I_GE ->
-      "I_GE"
-  | I_GET ->
-      "I_GET"
-  | I_GT ->
-      "I_GT"
-  | I_HASH_KEY ->
-      "I_HASH_KEY"
-  | I_IF ->
-      "I_IF"
-  | I_IF_CONS ->
-      "I_IF_CONS"
-  | I_IF_LEFT ->
-      "I_IF_LEFT"
-  | I_IF_NONE ->
-      "I_IF_NONE"
-  | I_INT ->
-      "I_INT"
-  | I_LAMBDA ->
-      "I_LAMBDA"
-  | I_LE ->
-      "I_LE"
-  | I_LEFT ->
-      "I_LEFT"
-  | I_LOOP ->
-      "I_LOOP"
-  | I_LSL ->
-      "I_LSL"
-  | I_LSR ->
-      "I_LSR"
-  | I_LT ->
-      "I_LT"
-  | I_MAP ->
-      "I_MAP"
-  | I_MEM ->
-      "I_MEM"
-  | I_MUL ->
-      "I_MUL"
-  | I_NEG ->
-      "I_NEG"
-  | I_NEQ ->
-      "I_NEQ"
-  | I_NIL ->
-      "I_NIL"
-  | I_NONE ->
-      "I_NONE"
-  | I_NOT ->
-      "I_NOT"
-  | I_NOW ->
-      "I_NOW"
-  | I_OR ->
-      "I_OR"
-  | I_PAIR ->
-      "I_PAIR"
-  | I_PUSH ->
-      "I_PUSH"
-  | I_RIGHT ->
-      "I_RIGHT"
-  | I_SIZE ->
-      "I_SIZE"
-  | I_SOME ->
-      "I_SOME"
-  | I_SOURCE ->
-      "I_SOURCE"
-  | I_SENDER ->
-      "I_SENDER"
-  | I_SELF ->
-      "I_SELF"
-  | I_SLICE ->
-      "I_SLICE"
-  | I_STEPS_TO_QUOTA ->
-      "I_STEPS_TO_QUOTA"
-  | I_SUB ->
-      "I_SUB"
-  | I_SWAP ->
-      "I_SWAP"
-  | I_TRANSFER_TOKENS ->
-      "I_TRANSFER_TOKENS"
-  | I_SET_DELEGATE ->
-      "I_SET_DELEGATE"
-  | I_UNIT ->
-      "I_UNIT"
-  | I_UPDATE ->
-      "I_UPDATE"
-  | I_XOR ->
-      "I_XOR"
-  | I_ITER ->
-      "I_ITER"
-  | I_LOOP_LEFT ->
-      "I_LOOP_LEFT"
-  | I_ADDRESS ->
-      "I_ADDRESS"
-  | I_CONTRACT ->
-      "I_CONTRACT"
-  | I_ISNAT ->
-      "I_ISNAT"
-  | I_CAST ->
-      "I_CAST"
-  | I_RENAME ->
-      "I_RENAME"
-  | I_DIG ->
-      "I_DIG"
-  | I_DUG ->
-      "I_DUG"
-  | T_bool ->
-      "T_bool"
-  | T_contract ->
-      "T_contract"
-  | T_int ->
-      "T_int"
-  | T_key ->
-      "T_key"
-  | T_key_hash ->
-      "T_key_hash"
-  | T_lambda ->
-      "T_lambda"
-  | T_list ->
-      "T_list"
-  | T_map ->
-      "T_map"
-  | T_big_map ->
-      "T_big_map"
-  | T_nat ->
-      "T_nat"
-  | T_option ->
-      "T_option"
-  | T_or ->
-      "T_or"
-  | T_pair ->
-      "T_pair"
-  | T_set ->
-      "T_set"
-  | T_signature ->
-      "T_signature"
-  | T_string ->
-      "T_string"
-  | T_bytes ->
-      "T_bytes"
-  | T_mutez ->
-      "T_mutez"
-  | T_timestamp ->
-      "T_timestamp"
-  | T_unit ->
-      "T_unit"
-  | T_operation ->
-      "T_operation"
-  | T_address ->
-      "T_address"
-  | T_chain_id ->
-      "T_chain_id"
+  | K_parameter -> "K_parameter"
+  | K_storage -> "K_storage"
+  | K_code -> "K_code"
+  | D_False -> "D_False"
+  | D_Elt -> "D_Elt"
+  | D_Left -> "D_Left"
+  | D_None -> "D_None"
+  | D_Pair -> "D_Pair"
+  | D_Right -> "D_Right"
+  | D_Some -> "D_Some"
+  | D_True -> "D_True"
+  | D_Unit -> "D_Unit"
+  | I_PACK -> "I_PACK"
+  | I_UNPACK -> "I_UNPACK"
+  | I_BLAKE2B -> "I_BLAKE2B"
+  | I_SHA256 -> "I_SHA256"
+  | I_SHA512 -> "I_SHA512"
+  | I_ABS -> "I_ABS"
+  | I_ADD -> "I_ADD"
+  | I_AMOUNT -> "I_AMOUNT"
+  | I_AND -> "I_AND"
+  | I_BALANCE -> "I_BALANCE"
+  | I_CAR -> "I_CAR"
+  | I_CDR -> "I_CDR"
+  | I_CHAIN_ID -> "I_CHAIN_ID"
+  | I_CHECK_SIGNATURE -> "I_CHECK_SIGNATURE"
+  | I_COMPARE -> "I_COMPARE"
+  | I_CONCAT -> "I_CONCAT"
+  | I_CONS -> "I_CONS"
+  | I_CREATE_ACCOUNT -> "I_CREATE_ACCOUNT"
+  | I_CREATE_CONTRACT -> "I_CREATE_CONTRACT"
+  | I_IMPLICIT_ACCOUNT -> "I_IMPLICIT_ACCOUNT"
+  | I_DIP -> "I_DIP"
+  | I_DROP -> "I_DROP"
+  | I_DUP -> "I_DUP"
+  | I_EDIV -> "I_EDIV"
+  | I_EMPTY_BIG_MAP -> "I_EMPTY_BIG_MAP"
+  | I_EMPTY_MAP -> "I_EMPTY_MAP"
+  | I_EMPTY_SET -> "I_EMPTY_SET"
+  | I_EQ -> "I_EQ"
+  | I_EXEC -> "I_EXEC"
+  | I_APPLY -> "I_APPLY"
+  | I_FAILWITH -> "I_FAILWITH"
+  | I_GE -> "I_GE"
+  | I_GET -> "I_GET"
+  | I_GT -> "I_GT"
+  | I_HASH_KEY -> "I_HASH_KEY"
+  | I_IF -> "I_IF"
+  | I_IF_CONS -> "I_IF_CONS"
+  | I_IF_LEFT -> "I_IF_LEFT"
+  | I_IF_NONE -> "I_IF_NONE"
+  | I_INT -> "I_INT"
+  | I_LAMBDA -> "I_LAMBDA"
+  | I_LE -> "I_LE"
+  | I_LEFT -> "I_LEFT"
+  | I_LOOP -> "I_LOOP"
+  | I_LSL -> "I_LSL"
+  | I_LSR -> "I_LSR"
+  | I_LT -> "I_LT"
+  | I_MAP -> "I_MAP"
+  | I_MEM -> "I_MEM"
+  | I_MUL -> "I_MUL"
+  | I_NEG -> "I_NEG"
+  | I_NEQ -> "I_NEQ"
+  | I_NIL -> "I_NIL"
+  | I_NONE -> "I_NONE"
+  | I_NOT -> "I_NOT"
+  | I_NOW -> "I_NOW"
+  | I_OR -> "I_OR"
+  | I_PAIR -> "I_PAIR"
+  | I_PUSH -> "I_PUSH"
+  | I_RIGHT -> "I_RIGHT"
+  | I_SIZE -> "I_SIZE"
+  | I_SOME -> "I_SOME"
+  | I_SOURCE -> "I_SOURCE"
+  | I_SENDER -> "I_SENDER"
+  | I_SELF -> "I_SELF"
+  | I_SLICE -> "I_SLICE"
+  | I_STEPS_TO_QUOTA -> "I_STEPS_TO_QUOTA"
+  | I_SUB -> "I_SUB"
+  | I_SWAP -> "I_SWAP"
+  | I_TRANSFER_TOKENS -> "I_TRANSFER_TOKENS"
+  | I_SET_DELEGATE -> "I_SET_DELEGATE"
+  | I_UNIT -> "I_UNIT"
+  | I_UPDATE -> "I_UPDATE"
+  | I_XOR -> "I_XOR"
+  | I_ITER -> "I_ITER"
+  | I_LOOP_LEFT -> "I_LOOP_LEFT"
+  | I_ADDRESS -> "I_ADDRESS"
+  | I_CONTRACT -> "I_CONTRACT"
+  | I_ISNAT -> "I_ISNAT"
+  | I_CAST -> "I_CAST"
+  | I_RENAME -> "I_RENAME"
+  | I_DIG -> "I_DIG"
+  | I_DUG -> "I_DUG"
+  | T_bool -> "T_bool"
+  | T_contract -> "T_contract"
+  | T_int -> "T_int"
+  | T_key -> "T_key"
+  | T_key_hash -> "T_key_hash"
+  | T_lambda -> "T_lambda"
+  | T_list -> "T_list"
+  | T_map -> "T_map"
+  | T_big_map -> "T_big_map"
+  | T_nat -> "T_nat"
+  | T_option -> "T_option"
+  | T_or -> "T_or"
+  | T_pair -> "T_pair"
+  | T_set -> "T_set"
+  | T_signature -> "T_signature"
+  | T_string -> "T_string"
+  | T_bytes -> "T_bytes"
+  | T_mutez -> "T_mutez"
+  | T_timestamp -> "T_timestamp"
+  | T_unit -> "T_unit"
+  | T_operation -> "T_operation"
+  | T_address -> "T_address"
+  | T_chain_id -> "T_chain_id"
 
 let micheline_string_of_expression ~zero_loc expression =
   let string_of_list : string list -> string =
@@ -455,16 +323,12 @@ let micheline_string_of_expression ~zero_loc expression =
     | Int (loc, i) ->
         let z =
           match Z.to_int i with
-          | 0 ->
-              "Z.zero"
-          | 1 ->
-              "Z.one"
-          | i ->
-              Format.asprintf "Z.of_int %d" i
+          | 0 -> "Z.zero"
+          | 1 -> "Z.one"
+          | i -> Format.asprintf "Z.of_int %d" i
         in
         Format.asprintf "Int (%d, %s)" (show_loc loc) z
-    | String (loc, s) ->
-        Format.asprintf "String (%d, \"%s\")" (show_loc loc) s
+    | String (loc, s) -> Format.asprintf "String (%d, \"%s\")" (show_loc loc) s
     | Bytes (loc, b) ->
         Format.asprintf
           "Bytes (%d, Bytes.of_string \"%s\")"

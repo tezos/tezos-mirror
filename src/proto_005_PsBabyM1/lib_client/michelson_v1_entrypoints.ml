@@ -53,14 +53,12 @@ let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (chain, block)
     (program, entrypoint)
   >>= function
-  | Ok ty ->
-      return_some ty
+  | Ok ty -> return_some ty
   | Error
       (Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _) :: _)
     ->
       return None
-  | Error _ as err ->
-      Lwt.return err
+  | Error _ as err -> Lwt.return err
 
 let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     ~contract ~entrypoint =
@@ -70,29 +68,26 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     contract
     entrypoint
   >>= function
-  | Ok ty ->
-      return_some ty
-  | Error (RPC_context.Not_found _ :: _) ->
-      return None
-  | Error _ as err ->
-      Lwt.return err
+  | Ok ty -> return_some ty
+  | Error (RPC_context.Not_found _ :: _) -> return None
+  | Error _ as err -> Lwt.return err
 
 let print_entrypoint_type (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name ~entrypoint
     = function
   | Ok (Some ty) ->
-      ( if emacs then
-        cctxt#message
-          "@[<v 2>((entrypoint . %s) (type . %a))@]@."
-          entrypoint
-          Michelson_v1_emacs.print_expr
-          ty
+      (if emacs then
+       cctxt#message
+         "@[<v 2>((entrypoint . %s) (type . %a))@]@."
+         entrypoint
+         Michelson_v1_emacs.print_expr
+         ty
       else
         cctxt#message
           "@[<v 2>Entrypoint %s: %a@]@."
           entrypoint
           Michelson_v1_printer.print_expr
-          ty )
+          ty)
       >>= fun () -> return_unit
   | Ok None ->
       cctxt#message
@@ -101,12 +96,10 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
         (Format.pp_print_option (fun ppf ->
              Format.fprintf ppf " for contract %a" Contract.pp))
         contract
-        (Format.pp_print_option (fun ppf ->
-             Format.fprintf ppf " for script %s"))
+        (Format.pp_print_option (fun ppf -> Format.fprintf ppf " for script %s"))
         script_name
       >>= fun () -> return_unit
-  | Error errs ->
-      on_errors errs
+  | Error errs -> on_errors errs
 
 let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract =
   Alpha_services.Contract.list_entrypoints cctxt (chain, block) contract
@@ -118,18 +111,11 @@ let list_contract_unreachables cctxt ~chain ~block ~contract =
 let list_contract_entrypoints cctxt ~chain ~block ~contract =
   list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   >>=? fun (_, entrypoints) ->
-  if not @@ List.mem_assoc "default" entrypoints then
-    contract_entrypoint_type
-      cctxt
-      ~chain
-      ~block
-      ~contract
-      ~entrypoint:"default"
+  if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
+    contract_entrypoint_type cctxt ~chain ~block ~contract ~entrypoint:"default"
     >>= function
-    | Ok (Some ty) ->
-        return (("default", ty) :: entrypoints)
-    | _ ->
-        return entrypoints
+    | Ok (Some ty) -> return (("default", ty) :: entrypoints)
+    | _ -> return entrypoints
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
@@ -139,31 +125,29 @@ let list_unreachables cctxt ~chain ~block (program : Script.expr) =
 let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
   Alpha_services.Helpers.Scripts.list_entrypoints cctxt (chain, block) program
   >>=? fun (_, entrypoints) ->
-  if not @@ List.mem_assoc "default" entrypoints then
+  if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     script_entrypoint_type cctxt ~chain ~block program ~entrypoint:"default"
     >>= function
-    | Ok (Some ty) ->
-        return (("default", ty) :: entrypoints)
-    | _ ->
-        return entrypoints
+    | Ok (Some ty) -> return (("default", ty) :: entrypoints)
+    | _ -> return entrypoints
   else return entrypoints
 
 let print_entrypoints_list (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
   | Ok entrypoint_list ->
-      ( if emacs then
-        cctxt#message
-          "@[<v 2>(@[%a@])@."
-          (Format.pp_print_list
-             ~pp_sep:Format.pp_print_cut
-             (fun ppf (entrypoint, ty) ->
-               Format.fprintf
-                 ppf
-                 "@[<v 2>( ( entrypoint . %s ) ( type . @[%a@]))@]"
-                 entrypoint
-                 Michelson_v1_emacs.print_expr
-                 ty))
-          entrypoint_list
+      (if emacs then
+       cctxt#message
+         "@[<v 2>(@[%a@])@."
+         (Format.pp_print_list
+            ~pp_sep:Format.pp_print_cut
+            (fun ppf (entrypoint, ty) ->
+              Format.fprintf
+                ppf
+                "@[<v 2>( ( entrypoint . %s ) ( type . @[%a@]))@]"
+                entrypoint
+                Michelson_v1_emacs.print_expr
+                ty))
+         entrypoint_list
       else
         cctxt#message
           "@[<v 2>Entrypoints%a%a: @,%a@]@."
@@ -182,32 +166,30 @@ let print_entrypoints_list (cctxt : #Client_context.printer)
                  entrypoint
                  Michelson_v1_printer.print_expr
                  ty))
-          entrypoint_list )
+          entrypoint_list)
       >>= fun () -> return_unit
-  | Error errs ->
-      on_errors errs
+  | Error errs -> on_errors errs
 
 let print_unreachables (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
   | Ok unreachable ->
-      ( if emacs then
-        cctxt#message
-          "@[<v 2>(@[%a@])@."
-          (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf path ->
-               Format.fprintf
-                 ppf
-                 "@[<h>( unreachable-path . %a )@]"
-                 (Format.pp_print_list
-                    ~pp_sep:Format.pp_print_space
-                    (fun ppf prim ->
-                      Format.pp_print_string ppf
-                      @@ Michelson_v1_primitives.string_of_prim prim))
-                 path))
-          unreachable
+      (if emacs then
+       cctxt#message
+         "@[<v 2>(@[%a@])@."
+         (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf path ->
+              Format.fprintf
+                ppf
+                "@[<h>( unreachable-path . %a )@]"
+                (Format.pp_print_list
+                   ~pp_sep:Format.pp_print_space
+                   (fun ppf prim ->
+                     Format.pp_print_string ppf
+                     @@ Michelson_v1_primitives.string_of_prim prim))
+                path))
+         unreachable
       else
         match unreachable with
-        | [] ->
-            cctxt#message "@[<v 2>None.@]@."
+        | [] -> cctxt#message "@[<v 2>None.@]@."
         | _ ->
             cctxt#message
               "@[<v 2>Unreachable paths in the argument%a%a: @[%a@]@."
@@ -226,7 +208,6 @@ let print_unreachables (cctxt : #Client_context.printer)
                         (fun ppf prim ->
                           Format.pp_print_string ppf
                           @@ Michelson_v1_primitives.string_of_prim prim))))
-              unreachable )
+              unreachable)
       >>= fun () -> return_unit
-  | Error errs ->
-      on_errors errs
+  | Error errs -> on_errors errs

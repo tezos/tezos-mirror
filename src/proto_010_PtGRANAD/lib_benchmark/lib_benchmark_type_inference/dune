@@ -15,8 +15,3 @@
                    -open Tezos_protocol_010_PtGRANAD
                    -open Tezos_micheline
                    -open Tezos_micheline_rewriting)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

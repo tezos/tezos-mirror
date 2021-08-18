@@ -31,43 +31,45 @@
                   events are emitted.
 *)
 
+module Mock_sink = Test_services.Mock_sink
+
 (** [init_validator f] setups a mock validator, a mock block validator and
     mock chain and passes it them to the test function [f]. *)
 let init_validator
     (f :
       Validator.t ->
       Block_validator_process.t ->
-      State.Chain.t ->
+      Store.chain_store ->
       'a ->
       unit ->
       unit Lwt.t) test_dir switch () : unit Lwt.t =
-  Shell_test_helpers.init_chain test_dir
-  >>= (fun (state, chain, idx, _) ->
-        Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
-        >>=? fun p2p ->
-        let db = Distributed_db.create state p2p in
-        let validator_environment =
-          {
-            Block_validator_process.genesis = Shell_test_helpers.genesis;
-            user_activated_upgrades = [];
-            user_activated_protocol_overrides = [];
-          }
-        in
-        Block_validator_process.init
-          validator_environment
-          (Block_validator_process.Internal idx)
-        >>=? fun block_validator ->
-        Validator.create
-          state
-          db
-          Node.default_peer_validator_limits
-          Node.default_block_validator_limits
-          block_validator
-          Node.default_prevalidator_limits
-          Node.default_chain_validator_limits
-          ~start_testchain:false
-        >>=? fun validator ->
-        Lwt.return (ok (block_validator, validator, chain)))
+  ( Shell_test_helpers.init_chain test_dir >>= fun store ->
+    Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
+    >>=? fun p2p ->
+    let chain_store = Store.(main_chain_store store) in
+    let db = Distributed_db.create store p2p in
+    let validator_environment =
+      {
+        Block_validator_process.user_activated_upgrades = [];
+        user_activated_protocol_overrides = [];
+      }
+    in
+    Block_validator_process.init
+      validator_environment
+      (Block_validator_process.Internal chain_store)
+    >>=? fun block_validator ->
+    Validator.create
+      store
+      db
+      Node.default_peer_validator_limits
+      Node.default_block_validator_limits
+      block_validator
+      Node.default_prevalidator_limits
+      Node.default_chain_validator_limits
+      ~start_testchain:false
+    >>=? fun validator ->
+    Lwt.return (ok (block_validator, validator, Store.main_chain_store store))
+  )
   >>= function
   | Ok (block_validator, validator, chain) ->
       f validator block_validator chain switch ()
@@ -83,7 +85,7 @@ let init_validator
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f] *)
 let wrap f _switch () =
-  Shell_test_helpers.with_empty_mock_sink (fun _ ->
+  Test_services.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_validator f test_dir _switch ()))
 
@@ -92,7 +94,6 @@ let wrap f _switch () =
 (** Checks that validator emits activation and shutdown events. *)
 let validator_events validator block_validator chain _switch () =
   (* activate validator and check that the corresponding event is emitted *)
-  let open Shell_test_helpers in
   Validator.activate
     ~start_prevalidator:false
     validator
@@ -110,24 +111,32 @@ let validator_events validator block_validator chain _switch () =
       let filter = Some section in
       Mock_sink.assert_has_event
         "Should have an activate_chain event"
-        ~filter
-        ( Internal_event.Notice,
-          section,
-          `O [("activate_chain.v0", `String "NetXJCwCkKLtb7s")] ) ;
+        ?filter
+        {
+          level = Some Internal_event.Notice;
+          section = Some section;
+          name = "activate_chain";
+        } ;
       Mock_sink.clear_events () ;
       (* now shutdown the validator and verify that shutdown events are emitted
         *)
-      Validator.shutdown validator
-      >>= fun () ->
+      Validator.shutdown validator >>= fun () ->
       Mock_sink.assert_has_events
         "Should have an shutdown_block_validator"
-        ~filter
-        [ ( Internal_event.Notice,
-            section,
-            `O [("shutdown_chain_validator.v0", `String "NetXJCwCkKLtb7s")] );
-          ( Internal_event.Notice,
-            section,
-            `O [("shutdown_block_validator.v0", `O [])] ) ] ;
+        ?filter
+        Mock_sink.Pattern.
+          [
+            {
+              level = Some Internal_event.Notice;
+              section = Some section;
+              name = "shutdown_chain_validator";
+            };
+            {
+              level = Some Internal_event.Notice;
+              section = Some section;
+              name = "shutdown_block_validator";
+            };
+          ] ;
       Lwt.return_unit
 
 let tests =

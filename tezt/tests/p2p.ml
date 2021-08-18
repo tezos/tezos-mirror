@@ -30,6 +30,76 @@
    Subject:      Integration tests of p2p layer.
 *)
 
+module ACL = struct
+  (* Test.
+
+     Check IP address greylisting mechanism with unauthenticated connection.
+
+     1. Start a node,
+     2. Write noise on the welcome worker of this node,
+     3. Check the IP greylist with a RPC,
+     4. Try to connect to a greylisted node. *)
+  let check_ip_greylisting () =
+    let pp_list ~elt_pp l =
+      let rec pp_rec ~elt_pp ppf = function
+        | [] -> ()
+        | [elt] -> Format.fprintf ppf "%a" elt_pp elt
+        | head :: tail ->
+            Format.fprintf ppf "%a, " elt_pp head ;
+            pp_rec ~elt_pp ppf tail
+      in
+      Format.asprintf "[%a]" (pp_rec ~elt_pp) l
+    in
+    Test.register
+      ~__FILE__
+      ~title:"check ip greylisting"
+      ~tags:["p2p"; "acl"; "greylist"]
+    @@ fun () ->
+    let localhost_ips =
+      [
+        (* 127.0.0.1 *)
+        Unix.inet_addr_loopback;
+        (* ::1 *)
+        Unix.inet6_addr_loopback;
+        Unix.inet_addr_of_string "::ffff:127.0.0.1";
+        Unix.inet_addr_of_string "::ffff:7f00:0001";
+      ]
+    in
+    let* target = Node.init [] in
+    let* node = Node.init [] in
+    let* client = Client.init ~endpoint:(Node target) () in
+    let* () =
+      Node.send_raw_data
+        target
+        ~data:"\000\010Hello, world. This is garbage, greylist me !"
+    in
+    let* json = RPC.get_greylist_ips client in
+    let greylisted_ips = JSON.(as_list (json |-> "ips")) in
+    let nb_greylisted_ips = List.length greylisted_ips in
+    if nb_greylisted_ips <> 1 then
+      Test.fail
+        "The number of greylisted IPs is incorrect (actual: %d, expected: 1)."
+        nb_greylisted_ips ;
+    let greylisted_ip =
+      Unix.inet_addr_of_string (JSON.as_string (List.hd greylisted_ips))
+    in
+    if List.for_all (( <> ) greylisted_ip) localhost_ips then
+      Test.fail
+        "The greylisted IP is incorrect (actual: %s, expected: one of %s)."
+        (Unix.string_of_inet_addr greylisted_ip)
+        (pp_list
+           ~elt_pp:(fun ppf ip ->
+             Format.fprintf ppf "%s" (Unix.string_of_inet_addr ip))
+           localhost_ips) ;
+    let process = Client.Admin.spawn_connect_address ~peer:node client in
+    let error_rex =
+      rex "Error:(\n|.)*The address you tried to connect \\(.*\\) is banned."
+    in
+    Process.check_error ~msg:error_rex process
+
+  let tests () = check_ip_greylisting ()
+end
+
 (* [wait_for_accepted_peer_ids] waits until the node connects to a peer for
    which an expected [peer_id] was set. *)
 let wait_for_accepted_peer_ids node =
@@ -42,14 +112,14 @@ let wait_for_accepted_peer_ids node =
    `--peer` option and by setting an expected peer_id. To check that the nodes
    are connected, we activate the protocol and check that the block 1 has been
    propagated. *)
-let check_peer_option protocol =
-  Test.register
+let check_peer_option =
+  Protocol.register_test
     ~__FILE__
     ~title:"check peer option"
     ~tags:["p2p"; "cli"; "peer"]
-  @@ fun () ->
+  @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node:node_1 () in
+  let* client = Client.init ~endpoint:(Node node_1) () in
   let* () = Client.activate_protocol ~protocol client in
   let node_2 = Node.create [] in
   let wait = wait_for_accepted_peer_ids node_2 in
@@ -58,8 +128,35 @@ let check_peer_option protocol =
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  unit
+
+(* Test.
+
+   We create one node with the `--connections` option set to 1 and another one
+   with no specification. Then, we use the `--peer` option to let the p2p
+   maintenance of the first node establishes a connection with the other node.
+   To check the nodes are connected, we activate the protocol and check that
+   the block 1 has been propagated. *)
+
+let test_one_connection =
+  let nb_connection = 1 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"check --connection=1 option"
+    ~tags:["p2p"; "cli"; "connections"]
+  @@ fun protocol ->
+  let* node_1 = Node.init [Synchronisation_threshold 0] in
+  let* client = Client.init ~endpoint:(Node node_1) () in
+  let* () = Client.activate_protocol ~protocol client in
+  let node_2 = Node.create [Connections nb_connection] in
+  let wait = wait_for_accepted_peer_ids node_2 in
+  let* () = Node.identity_generate node_2 in
+  let* () = Node.config_init node_2 [] in
+  let* () = Node.add_peer_with_id node_2 node_1 in
+  let* () = Node.run node_2 [] in
+  let* () = wait in
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
 
 (* [wait_pred] waits until [pred arg] is true. An active wait with Lwt
@@ -139,7 +236,7 @@ module Maintenance = struct
       max_threshold
       max_connections ;
     let* target_node = Node.init [Connections expected_connections] in
-    let* target_client = Client.init ~node:target_node () in
+    let* target_client = Client.init ~endpoint:(Node target_node) () in
     Log.info "Target created." ;
     let nodes =
       Cluster.create max_connections [Connections (max_connections - 1)]
@@ -161,8 +258,8 @@ module Maintenance = struct
     let* nb_active_connections = get_nb_connections ~client:target_client in
     if nb_active_connections > max_target then
       Test.fail
-        "There are too many active connections (actual: %d, expected less \
-         than %d)"
+        "There are too many active connections (actual: %d, expected less than \
+         %d)"
         nb_active_connections
         max_target ;
     Lwt.return_unit
@@ -170,4 +267,9 @@ module Maintenance = struct
   let tests () = test_expected_connections ()
 end
 
-let register protocol = Maintenance.tests () ; check_peer_option protocol
+let register_protocol_independent () = Maintenance.tests ()
+
+let register ~protocols =
+  check_peer_option ~protocols ;
+  test_one_connection ~protocols ;
+  ACL.tests ()

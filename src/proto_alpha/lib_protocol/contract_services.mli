@@ -77,10 +77,7 @@ val script_opt :
   Script.t option shell_tzresult Lwt.t
 
 val storage :
-  'a #RPC_context.simple ->
-  'a ->
-  Contract.t ->
-  Script.expr shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr shell_tzresult Lwt.t
 
 val entrypoint_type :
   'a #RPC_context.simple ->

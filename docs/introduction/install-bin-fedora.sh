@@ -1,3 +1,4 @@
+# TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
 trap 'exit $?' ERR
 set -x
 # [install prerequisites]
@@ -6,6 +7,6 @@ dnf install -y dnf-plugins-core
 dnf copr enable -y @Serokell/Tezos && dnf update -y
 dnf install -y tezos-client
 dnf install -y tezos-node
-dnf install -y tezos-baker-007-PsDELPH1
-dnf install -y tezos-endorser-007-PsDELPH1
-dnf install -y tezos-accuser-007-PsDELPH1
+dnf install -y tezos-baker-009-PsFLoren
+dnf install -y tezos-endorser-009-PsFLoren
+dnf install -y tezos-accuser-009-PsFLoren

@@ -26,60 +26,34 @@
 open Level_repr
 
 let from_raw c ?offset l =
-  let l =
-    match offset with
-    | None ->
-        l
-    | Some o ->
-        Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
-  in
-  let constants = Raw_context.constants c in
-  let first_level = Raw_context.first_level c in
-  Level_repr.level_from_raw
-    ~first_level
-    ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
-    ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
-    l
+  let cycle_eras = Raw_context.cycle_eras c in
+  Level_repr.from_raw ~cycle_eras ?offset l
 
-let root c = Level_repr.root_level (Raw_context.first_level c)
+let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 
 let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
 let pred c (l : Level_repr.t) =
   match Raw_level_repr.pred l.Level_repr.level with
-  | None ->
-      None
-  | Some l ->
-      Some (from_raw c l)
+  | None -> None
+  | Some l -> Some (from_raw c l)
 
 let current ctxt = Raw_context.current_level ctxt
 
 let previous ctxt =
   let l = current ctxt in
   match pred ctxt l with
-  | None ->
-      assert false (* We never validate the Genesis... *)
-  | Some p ->
-      p
+  | None -> assert false (* We never validate the Genesis... *)
+  | Some p -> p
 
-let first_level_in_cycle ctxt c =
-  let constants = Raw_context.constants ctxt in
-  let first_level = Raw_context.first_level ctxt in
-  from_raw
-    ctxt
-    (Raw_level_repr.of_int32_exn
-       (Int32.add
-          (Raw_level_repr.to_int32 first_level)
-          (Int32.mul
-             constants.Constants_repr.blocks_per_cycle
-             (Cycle_repr.to_int32 c))))
+let first_level_in_cycle ctxt cycle =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  Level_repr.first_level_in_cycle cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
-  | None ->
-      assert false
-  | Some x ->
-      x
+  | None -> assert false
+  | Some x -> x
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
@@ -111,7 +85,22 @@ let last_allowed_fork_level c =
   let level = Raw_context.current_level c in
   let preserved_cycles = Constants_storage.preserved_cycles c in
   match Cycle_repr.sub level.cycle preserved_cycles with
-  | None ->
-      Raw_level_repr.root
-  | Some cycle ->
-      (first_level_in_cycle c cycle).level
+  | None -> Raw_level_repr.root
+  | Some cycle -> (first_level_in_cycle c cycle).level
+
+let last_of_a_cycle ctxt level =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  Level_repr.last_of_cycle cycle_eras level
+
+let dawn_of_a_new_cycle ctxt =
+  let level = current ctxt in
+  if last_of_a_cycle ctxt level then Some level.cycle else None
+
+let may_snapshot_rolls ctxt =
+  let level = current ctxt in
+  let blocks_per_roll_snapshot =
+    Constants_storage.blocks_per_roll_snapshot ctxt
+  in
+  Compare.Int32.equal
+    (Int32.rem level.cycle_position blocks_per_roll_snapshot)
+    (Int32.pred blocks_per_roll_snapshot)

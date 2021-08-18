@@ -11,15 +11,13 @@ let csv = rows "," `OCaml
 let clic_arg () =
   let open Clic in
   arg
-    ~doc:"Make the output script-friendly"
+    ~doc:"Make the output script-friendly. Possible values are 'TSV' and 'CSV'."
     ~long:"for-script"
     ~placeholder:"FORMAT"
     (parameter (fun _ spec ->
          match String.lowercase_ascii spec with
-         | "tsv" ->
-             return tsv
-         | "csv" ->
-             return csv
+         | "tsv" -> return tsv
+         | "csv" -> return csv
          | other ->
              failwith
                "Cannot recognize format %S, please try 'TSV' or 'CSV'"
@@ -27,14 +25,12 @@ let clic_arg () =
 
 let fprintf_lwt chan fmt =
   Format.kasprintf
-    (fun s ->
-      protect (fun () -> Lwt_io.write chan s >>= fun () -> return_unit))
+    (fun s -> protect (fun () -> Lwt_io.write chan s >>= fun () -> return_unit))
     fmt
 
 let output ?(channel = Lwt_io.stdout) how_option ~for_human ~for_script =
   match how_option with
-  | None ->
-      for_human ()
+  | None -> for_human ()
   | Some (Rows {separator; escape}) ->
       let open Format in
       List.iter_es
@@ -46,10 +42,8 @@ let output ?(channel = Lwt_io.stdout) how_option ~for_human ~for_script =
                ~pp_sep:(fun fmt () -> pp_print_string fmt separator)
                (fun fmt cell ->
                  match escape with
-                 | `OCaml ->
-                     fprintf fmt "%S" cell
-                 | `No ->
-                     pp_print_string fmt cell))
+                 | `OCaml -> fprintf fmt "%S" cell
+                 | `No -> pp_print_string fmt cell))
             row)
         (for_script ())
       >>=? fun () ->

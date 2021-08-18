@@ -27,17 +27,30 @@
 open Error_monad
 
 (** [default_net_timeout] is the default timeout used by functions in
-   this library which admit a timeout value, i.e. [read_bytes],
+   this library which admit a timeout value, i.e. [read_bytes_with_timeout],
    [Socket.connect], [Socket.recv]. *)
 val default_net_timeout : Ptime.Span.t ref
 
-(** [read_bytes ?timeout ?pos ?len fd buf] reads [len-pos] bytes from
-    [fd] into [bytes].
+(** [read_bytes_with_timeout ?timeout ?file_offset ?pos ?len fd buf] reads
+    [len-pos] bytes from [fd] into [bytes]. If [file_offset] is given,
+    {!Lwt_unix.pread} will be used instead of {!Lwt_unix.read}.
 
     @raise Lwt_unix.Timeout if the operation failed to finish within a
-    [timeout] time span.  *)
-val read_bytes :
+    [timeout] time span. *)
+val read_bytes_with_timeout :
   ?timeout:Ptime.Span.t ->
+  ?file_offset:int ->
+  ?pos:int ->
+  ?len:int ->
+  Lwt_unix.file_descr ->
+  bytes ->
+  unit Lwt.t
+
+(** [read_bytes ?file_offset ?pos ?len fd buf] reads
+    [len-pos] bytes from [fd] into [bytes]. If [file_offset] is given,
+    {!Lwt_unix.pread} will be used instead of {!Lwt_unix.read}. *)
+val read_bytes :
+  ?file_offset:int ->
   ?pos:int ->
   ?len:int ->
   Lwt_unix.file_descr ->
@@ -47,17 +60,42 @@ val read_bytes :
 val write_string :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> string -> unit Lwt.t
 
+(** [write_bytes ?file_offset ?pos ?len fd buf] writes [len-pos] bytes
+    from [bytes] to [fd]. If [file_offset] is given, {!Lwt_unix.pwrite}
+    will be used instead of {!Lwt_unix.write}.
+
+    @raise Lwt_unix.Timeout if the operation failed to finish within a
+    [timeout] time span. *)
 val write_bytes :
-  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> Bytes.t -> unit Lwt.t
+  ?file_offset:int ->
+  ?pos:int ->
+  ?len:int ->
+  Lwt_unix.file_descr ->
+  Bytes.t ->
+  unit Lwt.t
+
+(** [is_directory path] tests if the given [path] refers to a
+   directory (file kind is [S_DIR]). Returns [false] if [path] refers
+   to a symbolic link. *)
+val is_directory : string -> bool Lwt.t
 
 val remove_dir : string -> unit Lwt.t
 
 val create_dir : ?perm:int -> string -> unit Lwt.t
 
+(** [copy_dir ?perm src dst] copies the content of directory [src] in
+    a fresh directory [dst] created with [perm] (0o755 by default).
+
+    @raise Unix_error(ENOTDIR,_,_) if the given file is not a
+    directory. *)
+val copy_dir : ?perm:int -> string -> string -> unit Lwt.t
+
 val read_file : string -> string Lwt.t
 
+val copy_file : src:string -> dst:string -> unit Lwt.t
+
 val create_file :
-  ?close_on_exec:bool -> ?perm:int -> string -> string -> int Lwt.t
+  ?close_on_exec:bool -> ?perm:int -> string -> string -> unit Lwt.t
 
 val with_tempdir : string -> (string -> 'a Lwt.t) -> 'a Lwt.t
 

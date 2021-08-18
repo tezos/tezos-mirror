@@ -57,8 +57,7 @@ let n' = Z.of_int 43
 let basic_arith name (module A : Arith) =
   let err msg = err (Format.asprintf "%s test: %s" name msg) in
   let x = A.random () in
-  fail_unless A.(add zero x = x) (err "zero is neutral for +")
-  >>=? fun () ->
+  fail_unless A.(add zero x = x) (err "zero is neutral for +") >>=? fun () ->
   let x = A.random () in
   let y = A.random () in
   fail_unless A.(add x y = add y x) (err "addition is commutative")
@@ -128,8 +127,8 @@ let integral_tests () =
     (err "integral;fp;floor = integral")
   >>=? fun () ->
   fail_unless
-    ( Format.asprintf "%a" FP.pp FP.(fp (integral_exn n))
-    = Format.asprintf "%a" FP.pp_integral (FP.integral_exn n) )
+    (Format.asprintf "%a" FP.pp FP.(fp (integral_exn n))
+    = Format.asprintf "%a" FP.pp_integral (FP.integral_exn n))
     (err "pp_integral(integral) = pp(fp(integral))")
   >>=? fun () -> basic_arith "integral arith" (arith_from_integral (module FP))
 
@@ -140,8 +139,7 @@ let fp_nonzero () =
   let err msg = err (prefix msg) in
   basic_arith (prefix "integral arith") (arith_from_integral (module FP))
   >>=? fun () ->
-  basic_arith (prefix "fp arith") (arith_from_fp (module FP))
-  >>=? fun () ->
+  basic_arith (prefix "fp arith") (arith_from_fp (module FP)) >>=? fun () ->
   let epsilon = FP.unsafe_fp Z.one in
   fail_unless FP.(ceil epsilon = integral_exn Z.one) (err "ceil eps = 1")
   >>=? fun () ->
@@ -160,8 +158,7 @@ let fp_pp () =
   let err msg = err (prefix msg) in
   let epsilon = FP.unsafe_fp Z.one in
   let ( =:= ) x expected = Format.asprintf "%a" FP.pp x = expected in
-  fail_unless (epsilon =:= "0.001") (err "eps = 0.001")
-  >>=? fun () ->
+  fail_unless (epsilon =:= "0.001") (err "eps = 0.001") >>=? fun () ->
   fail_unless (FP.unsafe_fp (Z.of_int 1000) =:= "1") (err "1.000 = 1")
   >>=? fun () ->
   fail_unless (FP.unsafe_fp (Z.of_int 1001) =:= "1.001") (err "1.001")
@@ -170,6 +167,8 @@ let fp_pp () =
   >>=? fun () -> fail_unless (FP.zero =:= "0") (err "0")
 
 let tests =
-  [ Test_services.tztest "Integral tests (3 decimals)" `Quick integral_tests;
+  [
+    Test_services.tztest "Integral tests (3 decimals)" `Quick integral_tests;
     Test_services.tztest "FP tests (3 decimals)" `Quick fp_nonzero;
-    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp ]
+    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
+  ]

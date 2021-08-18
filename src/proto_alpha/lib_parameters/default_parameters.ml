@@ -29,33 +29,41 @@ let constants_mainnet =
   Constants.
     {
       preserved_cycles = 5;
-      blocks_per_cycle = 4096l;
-      blocks_per_commitment = 32l;
-      blocks_per_roll_snapshot = 256l;
-      blocks_per_voting_period = 20480l;
+      blocks_per_cycle = 8192l;
+      blocks_per_commitment = 64l;
+      blocks_per_roll_snapshot = 512l;
+      blocks_per_voting_period = 40960l;
       time_between_blocks = List.map Period.of_seconds_exn [60L; 40L];
-      endorsers_per_block = 32;
+      minimal_block_delay = Period.of_seconds_exn 30L;
+      endorsers_per_block = 256;
       hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
-      hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 10_400_000);
+      hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
       proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
       tokens_per_roll = Tez.(mul_exn one 8_000);
       michelson_maximum_type_size = 1000;
       seed_nonce_revelation_tip =
         (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
       origination_size = 257;
-      block_security_deposit = Tez.(mul_exn one 512);
-      endorsement_security_deposit = Tez.(mul_exn one 64);
+      block_security_deposit = Tez.(mul_exn one 640);
+      endorsement_security_deposit = Tez.(mul_exn one_cent 250);
       baking_reward_per_endorsement =
-        Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
-      endorsement_reward = Tez.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
+        Tez.[of_mutez_exn 78_125L; of_mutez_exn 11_719L];
+      endorsement_reward = Tez.[of_mutez_exn 78_125L; of_mutez_exn 52_083L];
       hard_storage_limit_per_operation = Z.of_int 60_000;
       cost_per_byte = Tez.of_mutez_exn 250L;
       quorum_min = 20_00l;
       (* quorum is in centile of a percentage *)
       quorum_max = 70_00l;
       min_proposal_quorum = 5_00l;
-      initial_endorsers = 24;
-      delay_per_missing_endorsement = Period.of_seconds_exn 8L;
+      initial_endorsers = 192;
+      delay_per_missing_endorsement = Period.of_seconds_exn 4L;
+      (* liquidity_baking_subsidy is 1/16th of total rewards for a block of priority 0 with all endorsements *)
+      liquidity_baking_subsidy = Tez.of_mutez_exn 2_500_000L;
+      (* level after protocol activation when liquidity baking shuts off:
+         about 6 months after first activation on mainnet *)
+      liquidity_baking_sunset_level = 2_032_928l;
+      (* 1/2 window size of 2000 blocks with precision of 1000 for integer computation *)
+      liquidity_baking_escape_ema_threshold = 1_000_000l;
     }
 
 let constants_sandbox =
@@ -68,9 +76,11 @@ let constants_sandbox =
       blocks_per_roll_snapshot = 4l;
       blocks_per_voting_period = 64l;
       time_between_blocks = List.map Period.of_seconds_exn [1L; 0L];
+      minimal_block_delay = Period.of_seconds_exn 1L;
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
       delay_per_missing_endorsement = Period.of_seconds_exn 1L;
+      liquidity_baking_sunset_level = 4096l;
     }
 
 let constants_test =
@@ -82,17 +92,21 @@ let constants_test =
       blocks_per_roll_snapshot = 32l;
       blocks_per_voting_period = 256l;
       time_between_blocks = List.map Period.of_seconds_exn [1L; 0L];
+      minimal_block_delay = Period.of_seconds_exn 1L;
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
       delay_per_missing_endorsement = Period.of_seconds_exn 1L;
+      liquidity_baking_sunset_level = 4096l;
     }
 
 let bootstrap_accounts_strings =
-  [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+  [
+    "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
     "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9";
     "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV";
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
-    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
+    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
+  ]
 
 let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
@@ -129,8 +143,7 @@ let commitments =
   ]|json}
   in
   match json_result with
-  | Error err ->
-      raise (Failure err)
+  | Error err -> raise (Failure err)
   | Ok json ->
       Data_encoding.Json.destruct (Data_encoding.list Commitment.encoding) json
 

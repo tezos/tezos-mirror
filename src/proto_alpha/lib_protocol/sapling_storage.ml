@@ -1,24 +1,27 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Commitments : sig
   val init : Raw_context.t -> Storage.Sapling.id -> Raw_context.t Lwt.t
@@ -100,7 +103,7 @@ end = struct
     assert (
       let first_of_height = pow2 (max_height - height) in
       let first_of_next_height = Int64.shift_left first_of_height 1 in
-      Compare.Int64.(node >= first_of_height && node < first_of_next_height) )
+      Compare.Int64.(node >= first_of_height && node < first_of_next_height))
 
   let assert_height height =
     assert (Compare.Int.(height >= 0 && height <= max_height))
@@ -115,13 +118,11 @@ end = struct
   let get_root_height ctx id node height =
     assert_node node height ;
     assert_height height ;
-    Storage.Sapling.Commitments.find (ctx, id) node
-    >|=? function
+    Storage.Sapling.Commitments.find (ctx, id) node >|=? function
     | (ctx, None) ->
         let hash = H.uncommitted height in
         (ctx, hash)
-    | (ctx, Some hash) ->
-        (ctx, hash)
+    | (ctx, Some hash) -> (ctx, hash)
 
   let left node = Int64.mul node 2L
 
@@ -132,8 +133,7 @@ end = struct
     if Compare.Int64.(n = 0L) then ([], l)
     else
       match l with
-      | [] ->
-          ([], l)
+      | [] -> ([], l)
       | x :: xs ->
           let (l1, l2) = split_at Int64.(pred n) xs in
           (x :: l1, l2)
@@ -160,19 +160,17 @@ end = struct
         >|=? fun (ctx, size) -> (ctx, size, h)
     | _ ->
         let height = height - 1 in
-        ( if Compare.Int64.(pos < pow2 height) then
-          let at = Int64.(sub (pow2 height) pos) in
-          let (cml, cmr) = split_at at cms in
-          insert ctx id (left node) height pos cml
-          >>=? fun (ctx, size_l, hl) ->
-          insert ctx id (right node) height 0L cmr
-          >|=? fun (ctx, size_r, hr) -> (ctx, size_l + size_r, hl, hr)
+        (if Compare.Int64.(pos < pow2 height) then
+         let at = Int64.(sub (pow2 height) pos) in
+         let (cml, cmr) = split_at at cms in
+         insert ctx id (left node) height pos cml >>=? fun (ctx, size_l, hl) ->
+         insert ctx id (right node) height 0L cmr >|=? fun (ctx, size_r, hr) ->
+         (ctx, size_l + size_r, hl, hr)
         else
-          get_root_height ctx id (left node) height
-          >>=? fun (ctx, hl) ->
+          get_root_height ctx id (left node) height >>=? fun (ctx, hl) ->
           let pos = Int64.(sub pos (pow2 height)) in
           insert ctx id (right node) height pos cms
-          >|=? fun (ctx, size_r, hr) -> (ctx, size_r, hl, hr) )
+          >|=? fun (ctx, size_r, hr) -> (ctx, size_r, hl, hr))
         >>=? fun (ctx, size_children, hl, hr) ->
         let h = H.merkle_hash ~height hl hr in
         Storage.Sapling.Commitments.add (ctx, id) node h
@@ -184,9 +182,9 @@ end = struct
     assert_pos pos height ;
     Storage.Sapling.Commitments.find (ctx, id) node
     (* we don't count gas for this function, it is called only by RPC *)
-    >>=? function
-    | (_ctx, None) ->
-        return acc
+    >>=?
+    function
+    | (_ctx, None) -> return acc
     | (_ctx, Some h) ->
         if Compare.Int.(height = 0) then return (f acc h)
         else
@@ -216,8 +214,8 @@ end = struct
     assert (Compare.Int.(l <= 1000)) ;
     let n' = Int64.(add pos (of_int l)) in
     assert (Compare.Int64.(n' <= max_size)) ;
-    insert ctx id root_node max_height pos cms
-    >|=? fun (ctx, size, _h) -> (ctx, size)
+    insert ctx id root_node max_height pos cms >|=? fun (ctx, size, _h) ->
+    (ctx, size)
 
   let get_from ctx id pos =
     fold_from_height
@@ -240,13 +238,10 @@ module Ciphertexts = struct
 
   let get_from ctx id offset =
     let rec aux (ctx, acc) pos =
-      Storage.Sapling.Ciphertexts.find (ctx, id) pos
-      >>=? fun (ctx, c) ->
+      Storage.Sapling.Ciphertexts.find (ctx, id) pos >>=? fun (ctx, c) ->
       match c with
-      | None ->
-          return (ctx, List.rev acc)
-      | Some c ->
-          aux (ctx, c :: acc) (Int64.succ pos)
+      | None -> return (ctx, List.rev acc)
+      | Some c -> aux (ctx, c :: acc) (Int64.succ pos)
     in
     aux (ctx, []) offset
 end
@@ -267,28 +262,24 @@ module Nullifiers = struct
      list of nullifiers. *)
   let add ctx id nfs =
     assert (Compare.Int.(List.length nfs <= 1000)) ;
-    size ctx id
-    >>=? fun nf_start_pos ->
+    size ctx id >>=? fun nf_start_pos ->
     fold_right_s
       (fun nf (ctx, pos, acc_size) ->
         Storage.Sapling.Nullifiers_hashed.init (ctx, id) nf
         >>=? fun (ctx, size) ->
-        Storage.Sapling.Nullifiers_ordered.init (ctx, id) pos nf
-        >|=? fun ctx -> (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
+        Storage.Sapling.Nullifiers_ordered.init (ctx, id) pos nf >|=? fun ctx ->
+        (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
       nfs
       (ctx, nf_start_pos, Z.zero)
     >>=? fun (ctx, nf_end_pos, size) ->
-    Storage.Sapling.Nullifiers_size.update (ctx, id) nf_end_pos
-    >|=? fun ctx -> (ctx, size)
+    Storage.Sapling.Nullifiers_size.update (ctx, id) nf_end_pos >|=? fun ctx ->
+    (ctx, size)
 
   let get_from ctx id offset =
     let rec aux acc pos =
-      Storage.Sapling.Nullifiers_ordered.find (ctx, id) pos
-      >>=? function
-      | None ->
-          return @@ List.rev acc
-      | Some c ->
-          aux (c :: acc) (Int64.succ pos)
+      Storage.Sapling.Nullifiers_ordered.find (ctx, id) pos >>=? function
+      | None -> return @@ List.rev acc
+      | Some c -> aux (c :: acc) (Int64.succ pos)
     in
     aux [] offset
 end
@@ -308,8 +299,8 @@ module Roots = struct
   (* pos is the index of the last inserted element *)
 
   let get ctx id =
-    Storage.Sapling.Roots_pos.get (ctx, id)
-    >>=? fun pos -> Storage.Sapling.Roots.get (ctx, id) pos
+    Storage.Sapling.Roots_pos.get (ctx, id) >>=? fun pos ->
+    Storage.Sapling.Roots.get (ctx, id) pos
 
   let init ctx id =
     let rec aux ctx pos =
@@ -318,19 +309,15 @@ module Roots = struct
         Storage.Sapling.Roots.init (ctx, id) pos Commitments.default_root
         >>=? fun ctx -> aux ctx (Int32.pred pos)
     in
-    aux ctx (Int32.pred size)
-    >>=? fun ctx ->
-    Storage.Sapling.Roots_pos.init (ctx, id) 0l
-    >>=? fun ctx ->
+    aux ctx (Int32.pred size) >>=? fun ctx ->
+    Storage.Sapling.Roots_pos.init (ctx, id) 0l >>=? fun ctx ->
     let level = (Raw_context.current_level ctx).level in
     Storage.Sapling.Roots_level.init (ctx, id) level
 
   let mem ctx id root =
-    Storage.Sapling.Roots_pos.get (ctx, id)
-    >>=? fun start_pos ->
+    Storage.Sapling.Roots_pos.get (ctx, id) >>=? fun start_pos ->
     let rec aux pos =
-      Storage.Sapling.Roots.get (ctx, id) pos
-      >>=? fun hash ->
+      Storage.Sapling.Roots.get (ctx, id) pos >>=? fun hash ->
       if Compare.Int.(Sapling.Hash.compare hash root = 0) then return true
       else
         let pos = Int32.(pred pos) in
@@ -341,23 +328,20 @@ module Roots = struct
 
   (* allows duplicates *)
   let add ctx id root =
-    Storage.Sapling.Roots_pos.get (ctx, id)
-    >>=? fun pos ->
+    Storage.Sapling.Roots_pos.get (ctx, id) >>=? fun pos ->
     let level = (Raw_context.current_level ctx).level in
-    Storage.Sapling.Roots_level.get (ctx, id)
-    >>=? fun stored_level ->
+    Storage.Sapling.Roots_level.get (ctx, id) >>=? fun stored_level ->
     if Raw_level_repr.(stored_level = level) then
       (* if there is another add during the same level, it will over-write on
-         the same position  *)
+         the same position *)
       Storage.Sapling.Roots.add (ctx, id) pos root >|= ok
     else
       (* it's the first add for this level *)
       (* TODO(samoht): why is it using [update] and not [init] then? *)
-      Storage.Sapling.Roots_level.update (ctx, id) level
-      >>=? fun ctx ->
+      Storage.Sapling.Roots_level.update (ctx, id) level >>=? fun ctx ->
       let pos = Int32.rem (Int32.succ pos) size in
-      Storage.Sapling.Roots_pos.update (ctx, id) pos
-      >>=? fun ctx -> Storage.Sapling.Roots.add (ctx, id) pos root >|= ok
+      Storage.Sapling.Roots_pos.update (ctx, id) pos >>=? fun ctx ->
+      Storage.Sapling.Roots.add (ctx, id) pos root >|= ok
 end
 
 (** This type links the permanent state stored in the context at the specified
@@ -378,22 +362,18 @@ let empty_state ?id ~memo_size () = {id; diff = empty_diff; memo_size}
 
 (** Returns a state from an existing id. *)
 let state_from_id ctxt id =
-  Storage.Sapling.Memo_size.get (ctxt, id)
-  >|=? fun memo_size -> ({id = Some id; diff = empty_diff; memo_size}, ctxt)
+  Storage.Sapling.Memo_size.get (ctxt, id) >|=? fun memo_size ->
+  ({id = Some id; diff = empty_diff; memo_size}, ctxt)
 
 let rpc_arg = Storage.Sapling.rpc_arg
 
 let get_memo_size ctx id = Storage.Sapling.Memo_size.get (ctx, id)
 
 let init ctx id ~memo_size =
-  Storage.Sapling.Memo_size.add (ctx, id) memo_size
-  >>= fun ctx ->
-  Storage.Sapling.Commitments_size.add (ctx, id) Int64.zero
-  >>= fun ctx ->
-  Commitments.init ctx id
-  >>= fun ctx ->
-  Nullifiers.init ctx id
-  >>= fun ctx ->
+  Storage.Sapling.Memo_size.add (ctx, id) memo_size >>= fun ctx ->
+  Storage.Sapling.Commitments_size.add (ctx, id) Int64.zero >>= fun ctx ->
+  Commitments.init ctx id >>= fun ctx ->
+  Nullifiers.init ctx id >>= fun ctx ->
   Roots.init ctx id >>=? fun ctx -> Ciphertexts.init ctx id >|= ok
 
 (* Gas costs for apply_diff. *)
@@ -415,42 +395,37 @@ let apply_diff ctx id diff =
   let sapling_cost =
     sapling_apply_diff_cost ~inputs:nb_nullifiers ~outputs:nb_commitments
   in
-  Raw_context.consume_gas ctx sapling_cost
-  >>?= fun ctx ->
-  Storage.Sapling.Commitments_size.get (ctx, id)
-  >>=? fun cm_start_pos ->
+  Raw_context.consume_gas ctx sapling_cost >>?= fun ctx ->
+  Storage.Sapling.Commitments_size.get (ctx, id) >>=? fun cm_start_pos ->
   let cms = List.rev_map fst diff.commitments_and_ciphertexts in
-  Commitments.add ctx id cms cm_start_pos
-  >>=? fun (ctx, size) ->
+  Commitments.add ctx id cms cm_start_pos >>=? fun (ctx, size) ->
   Storage.Sapling.Commitments_size.update
     (ctx, id)
     (Int64.add cm_start_pos (Int64.of_int nb_commitments))
   >>=? fun ctx ->
   fold_right_s
     (fun (_cm, cp) (ctx, pos, acc_size) ->
-      Ciphertexts.add ctx id cp pos
-      >|=? fun (ctx, size) ->
+      Ciphertexts.add ctx id cp pos >|=? fun (ctx, size) ->
       (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
     diff.commitments_and_ciphertexts
     (ctx, cm_start_pos, Z.of_int size)
   >>=? fun (ctx, _ct_end_pos, size) ->
-  Nullifiers.add ctx id diff.nullifiers
-  >>=? fun (ctx, size_nf) ->
+  Nullifiers.add ctx id diff.nullifiers >>=? fun (ctx, size_nf) ->
   let size = Z.add size size_nf in
   match diff.commitments_and_ciphertexts with
   | [] ->
       (* avoids adding duplicates to Roots *)
       return (ctx, size)
   | _ :: _ ->
-      Commitments.get_root ctx id
-      >>=? fun (ctx, root) -> Roots.add ctx id root >|=? fun ctx -> (ctx, size)
+      Commitments.get_root ctx id >>=? fun (ctx, root) ->
+      Roots.add ctx id root >|=? fun ctx -> (ctx, size)
 
 let add {id; diff; memo_size} cm_cipher_list =
   assert (
     List.for_all
       (fun (_cm, cipher) ->
         Compare.Int.(Sapling.Ciphertext.get_memo_size cipher = memo_size))
-      cm_cipher_list ) ;
+      cm_cipher_list) ;
   {
     id;
     diff =
@@ -464,8 +439,7 @@ let add {id; diff; memo_size} cm_cipher_list =
 
 let root_mem ctx {id} tested_root =
   match id with
-  | Some id ->
-      Roots.mem ctx id tested_root
+  | Some id -> Roots.mem ctx id tested_root
   | None ->
       return
         Compare.Int.(
@@ -481,10 +455,8 @@ let nullifiers_mem ctx {id; diff} nf =
   if exists_in_diff then return (ctx, true)
   else
     match id with
-    | None ->
-        return (ctx, false)
-    | Some id ->
-        Nullifiers.mem ctx id nf
+    | None -> return (ctx, false)
+    | Some id -> Nullifiers.mem ctx id nf
 
 (* Allows for duplicates as they are already checked by verify_update before
    updating the state. *)
@@ -502,12 +474,9 @@ let get_diff ctx id ?(offset_commitment = 0L) ?(offset_nullifier = 0L) () =
         valid_position offset_commitment && valid_position offset_nullifier)
   then failwith "Invalid argument."
   else
-    Commitments.get_from ctx id offset_commitment
-    >>=? fun commitments ->
-    Roots.get ctx id
-    >>=? fun root ->
-    Nullifiers.get_from ctx id offset_nullifier
-    >>=? fun nullifiers ->
+    Commitments.get_from ctx id offset_commitment >>=? fun commitments ->
+    Roots.get ctx id >>=? fun root ->
+    Nullifiers.get_from ctx id offset_nullifier >>=? fun nullifiers ->
     Ciphertexts.get_from ctx id offset_commitment
     (* we don't count gas for RPCs *)
     >|=? fun (_ctx, ciphertexts) ->

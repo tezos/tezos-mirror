@@ -56,17 +56,20 @@
        - position  = n - (n + 1) = -1
        - remaining = blocks_per_voting_period
 
-  In order to have the correct value for the RPCs a fix has been applied in
-  [voting_service] by calling a specific function
-  [voting_period_storage.get_rpc_fixed_current_info].
+  To work around this issue, two RPCs were added 
+  `Voting_period_storage.get_rpc_current_info`, which returns the correct 
+  info also for the last context of a period, and 
+  `Voting_period_storage.get_rpc_succ_info`, which can be used at the last 
+  context of a period to craft operations that will be valid for the first 
+  block of the new period.
 
   This odd behaviour could be fixed if [Amendment.may_start_new_voting_period]
-  was called when we start validating a block instead that at the end.
+  was called when we start validating the first block of a voting period instead
+  that at the end of the validation of the last block of a voting period.
   This should be carefully done because the voting period listing depends on
   the rolls and it might break some invariant.
 
   When this is implemented one should:
-  - remove the function [voting_period_storage.get_rpc_fixed_current_info]
   - edit the function [reset_current] and [inc_current] to use the
     current level and not the next one.
   - remove the storage for pred_kind
@@ -76,6 +79,11 @@
   https://gitlab.com/metastatedev/tezos/-/merge_requests/333
  *)
 
+(* Voting periods start at the first block of a cycle. More formally,
+   the invariant of start_position with respect to cycle_position is:
+     cycle_position mod blocks_per_cycle ==
+     position_in_period mod blocks_per_cycle *)
+
 let set_current = Storage.Vote.Current_period.update
 
 let get_current = Storage.Vote.Current_period.get
@@ -83,15 +91,12 @@ let get_current = Storage.Vote.Current_period.get
 let init = Storage.Vote.Current_period.init
 
 let init_first_period ctxt ~start_position =
-  init ctxt @@ Voting_period_repr.root ~start_position
-  >>=? fun ctxt ->
+  init ctxt @@ Voting_period_repr.root ~start_position >>=? fun ctxt ->
   Storage.Vote.Pred_period_kind.init ctxt Voting_period_repr.Proposal
 
 let common ctxt =
-  get_current ctxt
-  >>=? fun current_period ->
-  Storage.Vote.Pred_period_kind.update ctxt current_period.kind
-  >|=? fun ctxt ->
+  get_current ctxt >>=? fun current_period ->
+  Storage.Vote.Pred_period_kind.update ctxt current_period.kind >|=? fun ctxt ->
   let start_position =
     (* because we are preparing the voting period for the next block we need to
        use the next level. *)
@@ -100,20 +105,17 @@ let common ctxt =
   (ctxt, current_period, start_position)
 
 let reset ctxt =
-  common ctxt
-  >>=? fun (ctxt, current_period, start_position) ->
+  common ctxt >>=? fun (ctxt, current_period, start_position) ->
   Voting_period_repr.reset current_period ~start_position |> set_current ctxt
 
 let succ ctxt =
-  common ctxt
-  >>=? fun (ctxt, current_period, start_position) ->
+  common ctxt >>=? fun (ctxt, current_period, start_position) ->
   Voting_period_repr.succ current_period ~start_position |> set_current ctxt
 
 let get_current_kind ctxt = get_current ctxt >|=? fun {kind; _} -> kind
 
 let get_current_info ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in
@@ -128,8 +130,7 @@ let get_current_info ctxt =
   Voting_period_repr.{voting_period; position; remaining}
 
 let get_current_remaining ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in
@@ -139,10 +140,10 @@ let get_current_remaining ctxt =
     blocks_per_voting_period
 
 let is_last_block ctxt =
-  get_current_remaining ctxt
-  >|=? fun remaining -> Compare.Int32.(remaining = 0l)
+  get_current_remaining ctxt >|=? fun remaining ->
+  Compare.Int32.(remaining = 0l)
 
-let get_rpc_fixed_current_info ctxt =
+let get_rpc_current_info ctxt =
   get_current_info ctxt
   >>=? fun ({voting_period; position; _} as voting_period_info) ->
   if Compare.Int32.(position = Int32.minus_one) then
@@ -150,8 +151,7 @@ let get_rpc_fixed_current_info ctxt =
     let blocks_per_voting_period =
       Constants_storage.blocks_per_voting_period ctxt
     in
-    Storage.Vote.Pred_period_kind.get ctxt
-    >|=? fun pred_kind ->
+    Storage.Vote.Pred_period_kind.get ctxt >|=? fun pred_kind ->
     let voting_period : Voting_period_repr.t =
       {
         index = Int32.pred voting_period.index;
@@ -170,9 +170,8 @@ let get_rpc_fixed_current_info ctxt =
     ({voting_period; remaining; position} : Voting_period_repr.info)
   else return voting_period_info
 
-let get_rpc_fixed_succ_info ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+let get_rpc_succ_info ctxt =
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in

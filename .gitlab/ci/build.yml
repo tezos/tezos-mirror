@@ -1,69 +1,47 @@
 .build_template:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: build
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
-  interruptible: true
-
-check_opam_deps:
-  extends: .build_template
-  script:
-    - ./scripts/opam-check.sh
-  timeout: 10m # if it takes more than 10 minutes, then it'll just timeout after 1h
-
-check_opam_lint:
-  extends: .build_template
-  script:
-    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
-
-check_linting:
-  extends: .build_template
-  script:
-    - make check-linting
-
-check_precommit_hook:
-  extends: .build_template
-  script:
-    - ./scripts/pre_commit/pre_commit.py --test-itself
-    - cd tests_python
-    - poetry run pylint ../scripts/pre_commit/pre_commit.py
-    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
-    - poetry run mypy ../scripts/pre_commit/pre_commit.py
-
-check_python_linting:
-  extends: .build_template
-  script:
-    - make check-python-linting
-
-check_python_types:
-  extends: .build_template
-  script:
-    - make -C tests_python typecheck
-
-check_scripts_b58_prefix:
-  # Can be changed to a python image, but using the build docker image to keep
-  # in sync with the python version used for the tests
-  extends: .build_template
-  before_script:
-    - cd scripts/b58_prefix
-    - poetry install
-  script:
-    - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
-    - poetry run pytest test_b58_prefix.py -v
 
 build:
   extends: .build_template
+  needs: []
   script:
+    # The following protocols are not needed for tests.
+    # By removing them, we cause them not to be compiled and linked and the CI runs faster.
+    # At least the following other jobs still compile with all protocols:
+    # - Docker images (for master and releases)
+    # - static binaries (only for releases)
+    # Note: src/proto_000_Ps9mPmXa is needed by Flextesa
+    - rm -r src/proto_001_PtCJ7pwo
+    - rm -r src/proto_002_PsYLVpVv
+    - rm -r src/proto_003_PsddFKi3
+    - rm -r src/proto_004_Pt24m4xi
+    - rm -r src/proto_005_PsBABY5H
+    - rm -r src/proto_005_PsBabyM1
+    - rm -r src/proto_006_PsCARTHA
+    - rm -r src/proto_007_PsDELPH1
     - . ./scripts/version.sh
+    # 1. Some basic, fast sanity checks
+    - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
+        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        echo "${build_deps_image_version} != ${opam_repository_tag}" ;
+        exit 1 ;
+      fi
+    - scripts/check_opam_test.sh
+    - diff tests_python/poetry.lock /home/tezos/poetry.lock
+    - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
     - dune build @runtest_dune_template
+    # 2. Actually build
     - make all build-test
+    # 3. clean-up caches before uploading the cache
     - opam clean
   cache:
     key: "$CI_COMMIT_REF_SLUG"
@@ -80,8 +58,10 @@ build:
     when: on_success
 
 build_arm64:
-  extends: .build_template
-  when: manual
+  extends:
+    - .build_template
+    - .rules_template__extended_test_pipeline
+  needs: []
   script:
     - . ./scripts/version.sh
     - dune build @all
@@ -92,4 +72,3 @@ build_arm64:
       - install_root/bin/tezos-*
   tags:
     - arm64
-

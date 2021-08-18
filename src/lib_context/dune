@@ -1,0 +1,17 @@
+(library
+ (name tezos_context)
+ (public_name tezos-context)
+ (libraries tezos-base
+            tezos-shell-services
+            logs.fmt
+            digestif.c
+            irmin
+            irmin-pack
+            tezos-stdlib-unix
+            tezos-context.sigs
+            tezos-context.helpers
+            tezos-context.encoding)
+ (flags (:standard -open Tezos_shell_services
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_stdlib)))

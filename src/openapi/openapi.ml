@@ -76,45 +76,50 @@ module Schema = struct
 
   let rec to_json schema =
     obj
-      ( match schema with
-      | Ref name ->
-          [field "$ref" (string ("#/components/schemas/" ^ name))]
+      (match schema with
+      | Ref name -> [field "$ref" (string ("#/components/schemas/" ^ name))]
       | Other {title; description; nullable; kind} ->
           field_opt "title" title string
-          :: field_opt "description" description string
-          :: (if nullable then field "nullable" (bool true) else [])
           ::
-          ( match kind with
-          | Boolean ->
-              [typ "boolean"]
+          field_opt "description" description string
+          ::
+          (if nullable then field "nullable" (bool true) else [])
+          ::
+          (match kind with
+          | Boolean -> [typ "boolean"]
           | Integer {minimum; maximum; enum} ->
-              [ typ "integer";
+              [
+                typ "integer";
                 field_opt "minimum" minimum int;
                 field_opt "maximum" maximum int;
-                field_list "enum" (List.map int enum) ]
+                field_list "enum" (List.map int enum);
+              ]
           | Number {minimum; maximum} ->
-              [ typ "integer";
+              [
+                typ "integer";
                 field_opt "minimum" minimum float;
-                field_opt "maximum" maximum float ]
+                field_opt "maximum" maximum float;
+              ]
           | String {enum; pattern} ->
-              [ typ "string";
+              [
+                typ "string";
                 field_list "enum" (List.map string enum);
-                field_opt "pattern" pattern string ]
+                field_opt "pattern" pattern string;
+              ]
           | Array item_schema ->
               [typ "array"; field "items" (to_json item_schema)]
           | Object {properties; additional_properties} ->
               let properties =
                 let rec deduplicate known acc = function
-                  | [] ->
-                      List.rev acc
+                  | [] -> List.rev acc
                   | property :: tail ->
                       if String_set.mem property.name known then (
                         Printf.eprintf
-                          "Warning: field %s appears twice in the same \
-                           object; ignored duplicate occurrence\n\
+                          "Warning: field %s appears twice in the same object; \
+                           ignored duplicate occurrence\n\
                            %!"
                           property.name ;
-                        deduplicate known acc tail )
+                        deduplicate known acc tail)
                       else
                         deduplicate
                           (String_set.add property.name known)
@@ -123,7 +128,8 @@ module Schema = struct
                 in
                 deduplicate String_set.empty [] properties
               in
-              [ typ "object";
+              [
+                typ "object";
                 field
                   "properties"
                   (obj
@@ -132,15 +138,13 @@ module Schema = struct
                         properties));
                 field_list
                   "required"
-                  ( properties
+                  (properties
                   |> List.filter (fun p -> p.required)
-                  |> List.map (fun p -> string p.name) );
-                field_opt "additionalProperties" additional_properties to_json
+                  |> List.map (fun p -> string p.name));
+                field_opt "additionalProperties" additional_properties to_json;
               ]
-          | One_of schemas ->
-              [field "oneOf" (array (List.map to_json schemas))]
-          | Any ->
-              [] ) )
+          | One_of schemas -> [field "oneOf" (array (List.map to_json schemas))]
+          | Any -> []))
 
   type maker =
     ?title:string -> ?description:string -> ?nullable:bool -> unit -> t
@@ -192,13 +196,17 @@ module Response = struct
     in
     ( code,
       obj
-        [ field "description" (string description);
+        [
+          field "description" (string description);
           field
             "content"
             (obj
-               [ field
+               [
+                 field
                    "application/json"
-                   (obj [field "schema" (Schema.to_json schema)]) ]) ] )
+                   (obj [field "schema" (Schema.to_json schema)]);
+               ]);
+        ] )
 end
 
 module Parameter = struct
@@ -206,11 +214,13 @@ module Parameter = struct
 
   let to_json ?(required = true) in_ dynamic =
     obj
-      [ field "name" (string dynamic.name);
+      [
+        field "name" (string dynamic.name);
         field "in" (string in_);
         field_opt "description" dynamic.description string;
         field "required" (bool required);
-        field "schema" (Schema.to_json dynamic.schema) ]
+        field "schema" (Schema.to_json dynamic.schema);
+      ]
 end
 
 module Service = struct
@@ -228,12 +238,16 @@ module Service = struct
 
   let schema_in_content schema =
     obj
-      [ field
+      [
+        field
           "content"
           (obj
-             [ field
+             [
+               field
                  "application/json"
-                 (obj [field "schema" (Schema.to_json schema)]) ]) ]
+                 (obj [field "schema" (Schema.to_json schema)]);
+             ]);
+      ]
 
   let to_json parameters service =
     (* TODO: do we use mandatory query parameters? Here we assume we don't. *)
@@ -244,10 +258,11 @@ module Service = struct
         service.query
     in
     obj
-      [ field "description" (string service.description);
+      [
+        field "description" (string service.description);
         field_list "parameters" (parameters @ query);
         field_opt "requestBody" service.request_body schema_in_content;
-        field "responses" (obj [List.map Response.to_json service.responses])
+        field "responses" (obj [List.map Response.to_json service.responses]);
       ]
 end
 
@@ -259,10 +274,8 @@ module Path = struct
   let dynamic ?description ~schema name = Dynamic {name; description; schema}
 
   let string_of_item = function
-    | Static name ->
-        name
-    | Dynamic dynamic ->
-        "{" ^ dynamic.name ^ "}"
+    | Static name -> name
+    | Dynamic dynamic -> "{" ^ dynamic.name ^ "}"
 
   type t = item list
 
@@ -294,11 +307,13 @@ module Endpoint = struct
     in
     ( Path.to_string endpoint.path,
       obj
-        [ field_opt "get" endpoint.get (Service.to_json parameters);
+        [
+          field_opt "get" endpoint.get (Service.to_json parameters);
           field_opt "post" endpoint.post (Service.to_json parameters);
           field_opt "put" endpoint.put (Service.to_json parameters);
           field_opt "delete" endpoint.delete (Service.to_json parameters);
-          field_opt "patch" endpoint.patch (Service.to_json parameters) ] )
+          field_opt "patch" endpoint.patch (Service.to_json parameters);
+        ] )
 end
 
 module Server = struct
@@ -308,8 +323,10 @@ module Server = struct
 
   let to_json server =
     obj
-      [ field "url" (string server.url);
-        field_opt "description" server.description string ]
+      [
+        field "url" (string server.url);
+        field_opt "description" server.description string;
+      ]
 end
 
 type t = {
@@ -327,22 +344,25 @@ let make ~title ?description ~version ?(servers = []) ?(definitions = [])
 
 let to_json openapi =
   obj
-    [ field "openapi" (string "3.0.0");
+    [
+      field "openapi" (string "3.0.0");
       field
         "info"
         (obj
-           [ field "title" (string openapi.title);
+           [
+             field "title" (string openapi.title);
              field_opt "description" openapi.description string;
-             field "version" (string openapi.version) ]);
+             field "version" (string openapi.version);
+           ]);
       field_list "servers" (List.map Server.to_json openapi.servers);
       field "paths" (obj [List.map Endpoint.to_json openapi.endpoints]);
-      ( match openapi.definitions with
-      | [] ->
-          []
+      (match openapi.definitions with
+      | [] -> []
       | _ ->
           let definitions =
             List.map
               (fun (name, schema) -> field name (Schema.to_json schema))
               openapi.definitions
           in
-          field "components" (obj [field "schemas" (obj definitions)]) ) ]
+          field "components" (obj [field "schemas" (obj definitions)]));
+    ]

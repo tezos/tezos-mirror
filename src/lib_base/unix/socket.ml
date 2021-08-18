@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,10 +32,8 @@ type addr =
 let handle_literal_ipv6 host =
   (* To strip '[' and ']' when a literal IPv6 is provided *)
   match Ipaddr.of_string host with
-  | Error (`Msg _) ->
-      host
-  | Ok ipaddr ->
-      Ipaddr.to_string ipaddr
+  | Error (`Msg _) -> host
+  | Ok ipaddr -> Ipaddr.to_string ipaddr
 
 let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
   | Unix path ->
@@ -45,10 +43,8 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
       Lwt_unix.connect sock addr >>= fun () -> return sock
   | Tcp (host, service, opts) -> (
       let host = handle_literal_ipv6 host in
-      Lwt_unix.getaddrinfo host service opts
-      >>= function
-      | [] ->
-          failwith "could not resolve host '%s'" host
+      Lwt_unix.getaddrinfo host service opts >>= function
+      | [] -> failwith "could not resolve host '%s'" host
       | addrs ->
           let rec try_connect acc = function
             | [] ->
@@ -68,20 +64,17 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
                       (fun () ->
                         Lwt_unix.connect sock ai_addr >>= fun () -> return sock))
                 >>= function
-                | Ok sock ->
-                    return sock
-                | Error e ->
-                    try_connect (e @ acc) addrs )
+                | Ok sock -> return sock
+                | Error e -> try_connect (e @ acc) addrs)
           in
-          try_connect [] addrs )
+          try_connect [] addrs)
 
 let with_connection ?timeout addr f =
-  connect ?timeout addr
-  >>=? fun conn ->
+  connect ?timeout addr >>=? fun conn ->
   protect
     (fun () ->
-      f conn
-      >>=? fun a -> Lwt_utils_unix.safe_close conn >>=? fun () -> return a)
+      f conn >>=? fun a ->
+      Lwt_utils_unix.safe_close conn >>=? fun () -> return a)
     ~on_error:(fun e ->
       Lwt_utils_unix.safe_close conn >>=? fun () -> Lwt.return (Error e))
 
@@ -90,8 +83,7 @@ let bind ?(backlog = 10) = function
       let addr = Lwt_unix.ADDR_UNIX path in
       let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
       Lwt_unix.set_close_on_exec sock ;
-      Lwt_unix.bind sock addr
-      >>= fun () ->
+      Lwt_unix.bind sock addr >>= fun () ->
       Lwt_unix.listen sock backlog ;
       return [sock]
   | Tcp (host, service, opts) -> (
@@ -100,19 +92,17 @@ let bind ?(backlog = 10) = function
         service
         (AI_PASSIVE :: opts)
       >>= function
-      | [] ->
-          failwith "could not resolve host '%s'" host
+      | [] -> failwith "could not resolve host '%s'" host
       | addrs ->
           let do_bind {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} =
             let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
             Lwt_unix.set_close_on_exec sock ;
             Lwt_unix.setsockopt sock SO_REUSEADDR true ;
-            Lwt_unix.bind sock ai_addr
-            >>= fun () ->
+            Lwt_unix.bind sock ai_addr >>= fun () ->
             Lwt_unix.listen sock backlog ;
             return sock
           in
-          Tezos_error_monad.TzLwtreslib.List.map_es do_bind addrs )
+          Tezos_error_monad.TzLwtreslib.List.map_es do_bind addrs)
 
 (* To get the encoding/decoding errors into scope. *)
 open Data_encoding_wrapper
@@ -150,8 +140,7 @@ let send fd encoding message =
   assert (Option.is_some serialisation_state) ;
   let serialisation_state = Option.get serialisation_state in
   match Data_encoding.Binary.write encoding message serialisation_state with
-  | Error we ->
-      fail (Encoding_error we)
+  | Error we -> fail (Encoding_error we)
   | Ok last ->
       fail_unless
         (last = total_length_of_message)
@@ -168,7 +157,7 @@ let send fd encoding message =
 let recv ?timeout fd encoding =
   let header_buf = Bytes.create size_of_length_of_message_payload in
   protect (fun () ->
-      Lwt_utils_unix.read_bytes
+      Lwt_utils_unix.read_bytes_with_timeout
         ?timeout
         ~len:size_of_length_of_message_payload
         fd
@@ -177,12 +166,12 @@ let recv ?timeout fd encoding =
   >>=? fun () ->
   let len = Tezos_stdlib.TzEndian.get_uint16 header_buf 0 in
   let buf = Bytes.create len in
-  protect (fun () -> Lwt_utils_unix.read_bytes ?timeout ~len fd buf >|= ok)
+  protect (fun () ->
+      Lwt_utils_unix.read_bytes_with_timeout ?timeout ~len fd buf >|= ok)
   >>=? fun () ->
   let buf = Bytes.unsafe_to_string buf in
   match Data_encoding.Binary.read encoding buf 0 len with
-  | Error re ->
-      fail (Decoding_error re)
+  | Error re -> fail (Decoding_error re)
   | Ok (read_len, message) ->
       if read_len <> len then fail (Decoding_error Extra_bytes)
       else return message

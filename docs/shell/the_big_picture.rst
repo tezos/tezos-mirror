@@ -154,11 +154,12 @@ protocols.
     over HTTP server and client, allowing to make actual use of
     services declared using :package:`tezos-rpc`.
   - :package:`tezos-p2p` is the in-house peer-to-peer layer.
-  - :package:`tezos-storage` contains the raw simple key-value store
-    used for the chain data, and the raw versioned key-value store
+  - :package:`tezos-store` is the chain-data store that handles
+    on-disk block storage, snapshots exporting/importing and chain
+    reconstruction.
+  - :package:`tezos-context` contains the raw versioned key-value store
     used for storing the ledger's context (one version per
-    block). This is implemented using :opam:`irmin` and currently
-    :package:`tezos-lmdb`.
+    block). This is implemented using :opam:`irmin`.
   - :package:`tezos-protocol-updater` maintains the table of available
     protocol versions, embedded or dynamically linked.
   - :package:`tezos-shell` implements the scheduling of block
@@ -292,9 +293,12 @@ run them.
  - :package-name:`tezos-stdlib`
    (in directory :src:`src/lib_stdlib/test/`):
    tests for the basic data structures.
- - :package-name:`tezos-storage`
-   (in directory :src:`src/lib_storage/test/`):
+ - :package-name:`tezos-context`
+   (in directory :src:`src/lib_context/test/`):
    tests for the versioned key-value context.
+ - :package-name:`tezos-store`
+   (in directory :src:`src/lib_store/test/`):
+   tests for the on-disk store.
  - :package-name:`tezos-protocol-alpha`
    (in directory :src:`src/proto_alpha/lib_protocol/test/`):
    tests of the Alpha protocol (without launching a node).

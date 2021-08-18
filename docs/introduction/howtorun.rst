@@ -1,3 +1,5 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _howtorun:
 
 How to run Tezos
@@ -7,7 +9,7 @@ In this section, we discuss how to take part in the protocol that runs
 the network.
 There are two main ways to participate in the consensus, delegating
 your coins and running a delegate.
-To learn more about the protocol refer to :ref:`this section <proof-of-stake>`.
+To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
 
 Delegating your coins
@@ -78,6 +80,8 @@ are lucky to obtain more than one roll, you can register a delegate
 using this identity.
 Otherwise, you need to ask the faucet for more accounts and
 delegate them to the first.
+
+.. _over_delegation:
 
 Deposits and over-delegation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,6 +222,8 @@ baking rights at priority 2 like in the example above.
 There is no priority for endorsements, every missed endorsement is
 lost.
 
+.. _inactive_delegates:
+
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
@@ -230,6 +236,11 @@ Normally even a baker with one single roll should perform enough
 operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
+
+To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
+Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate.
+
+.. _baker_run:
 
 Baker
 ~~~~~
@@ -244,6 +255,12 @@ Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
    tezos-baker-alpha run with local node ~/.tezos-node bob
+
+.. warning::
+
+    **Remember that having two bakers or endorsers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
+    If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
+    **Never** use the same account on two daemons.
 
 Endorser
 ~~~~~~~~
@@ -267,7 +284,7 @@ chains and looks for:
 
 * bakers who signed two blocks at the same level
 * endorsers who injected more than one endorsement operation for the
-  same baking slot (more details :ref:`here<proof-of-stake>`)
+  same baking slot (more details :doc:`here <../active/proof_of_stake>`)
 
 Upon finding such irregularity, it will emit respectively a
 double-baking or double-endorsing denunciation operation, which will
@@ -277,24 +294,17 @@ cause the offender to lose its security deposit.
 
    tezos-accuser-alpha run
 
-Remember that having two bakers or endorsers running connected to the
-same account could lead to double baking/endorsing and the loss of all
-your bonds.
-If you are worried about the availability of your node when it is its turn to
-bake/endorse, there are other ways than duplicating your credentials.
-**Never** use the same account on two daemons.
-
 
 Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Edo2net, to know if you baked, just run::
+Assuming you run on Florencenet, to know if you baked, just run::
 
-    ./edo2net.sh baker log
-    ./edo2net.sh endorser log
+    ./florencenet.sh baker log
+    ./florencenet.sh endorser log
 
-(replace ``edo2net.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``florencenet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

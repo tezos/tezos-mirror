@@ -25,8 +25,7 @@
 (*****************************************************************************)
 
 let () =
-  Client_commands.register Protocol.hash
-  @@ fun network ->
+  Client_commands.register Protocol.hash @@ fun network ->
   List.map (Clic.map_command (new Protocol_client_context.wrap_full))
   @@ Client_proto_programs_commands.commands ()
   @ Client_proto_contracts_commands.commands ()
@@ -34,3 +33,4 @@ let () =
   @ Client_proto_multisig_commands.commands ()
   @ Client_proto_mockup_commands.commands ()
   @ Client_sapling_commands.commands ()
+  @ Client_proto_fa12_commands.commands ()

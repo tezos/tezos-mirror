@@ -29,5 +29,6 @@
 
 let () =
   Migration.register () ;
+  Migration_voting.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

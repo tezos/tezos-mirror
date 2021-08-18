@@ -35,40 +35,37 @@ let get_contract_manager (cctxt : #full) contract =
     ~block:cctxt#block
     contract
   >>=? function
-  | None ->
-      cctxt#error "This is not a smart contract."
+  | None -> cctxt#error "This is not a smart contract."
   | Some storage -> (
-    match root storage with
-    | Prim (_, D_Pair, [Bytes (_, bytes); _], _) | Bytes (_, bytes) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Signature.Public_key_hash.encoding
-          bytes
-      with
-      | Some k ->
-          return k
-      | None ->
+      match root storage with
+      | Prim (_, D_Pair, [Bytes (_, bytes); _], _) | Bytes (_, bytes) -> (
+          match
+            Data_encoding.Binary.of_bytes_opt
+              Signature.Public_key_hash.encoding
+              bytes
+          with
+          | Some k -> return k
+          | None ->
+              cctxt#error
+                "Cannot find a manager key in contracts storage (decoding \
+                 bytes failed).\n\
+                 Transfer from scripted contract are currently only supported \
+                 for \"manager\" contract.")
+      | Prim (_, D_Pair, [String (_, value); _], _) | String (_, value) -> (
+          match Signature.Public_key_hash.of_b58check_opt value with
+          | Some k -> return k
+          | None ->
+              cctxt#error
+                "Cannot find a manager key in contracts storage (\"%s\" is not \
+                 a valid key).\n\
+                 Transfer from scripted contract are currently only supported \
+                 for \"manager\" contract."
+                value)
+      | _raw_storage ->
           cctxt#error
-            "Cannot find a manager key in contracts storage (decoding bytes \
-             failed).\n\
-             Transfer from scripted contract are currently only supported for \
-             \"manager\" contract." )
-    | Prim (_, D_Pair, [String (_, value); _], _) | String (_, value) -> (
-      match Signature.Public_key_hash.of_b58check_opt value with
-      | Some k ->
-          return k
-      | None ->
-          cctxt#error
-            "Cannot find a manager key in contracts storage (\"%s\" is not a \
-             valid key).\n\
+            "Cannot find a manager key in contracts storage (wrong storage \
+             format : @[%a@]).\n\
              Transfer from scripted contract are currently only supported for \
              \"manager\" contract."
-            value )
-    | _raw_storage ->
-        cctxt#error
-          "Cannot find a manager key in contracts storage (wrong storage \
-           format : @[%a@]).\n\
-           Transfer from scripted contract are currently only supported for \
-           \"manager\" contract."
-          Michelson_v1_printer.print_expr
-          storage )
+            Michelson_v1_printer.print_expr
+            storage)

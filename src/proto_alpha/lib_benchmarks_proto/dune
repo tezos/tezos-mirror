@@ -1,0 +1,25 @@
+(library
+ (name tezos_benchmarks_proto_alpha)
+ (public_name tezos-benchmarks-proto-alpha)
+ (libraries
+  tezos-base
+  tezos-protocol-alpha
+  tezos-protocol-alpha-parameters
+  tezos-benchmark
+  tezos-benchmark-alpha
+  tezos-shell-benchmarks
+  tezos-micheline
+  tezos-alpha-test-helpers
+  tezos-sapling
+)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_base
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_error_monad
+                   -open Tezos_benchmark
+                   -open Tezos_benchmark_alpha
+                   -open Tezos_protocol_alpha
+                   -open Tezos_crypto
+                   -open Tezos_micheline
+                   -open Tezos_alpha_test_helpers)))

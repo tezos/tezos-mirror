@@ -45,22 +45,22 @@ let of_string s =
   match of_string_opt s with
   | None ->
       generic_error
-        "%s.of_string: wrong string size (%d)"
+        "%s.of_string: wrong string size (%d instead of %d)"
         name
         (String.length s)
-  | Some h ->
-      Ok h
+        size
+  | Some h -> Ok h
 
 let of_string_exn s =
   match of_string_opt s with
   | None ->
       Format.kasprintf
         invalid_arg
-        "%s.of_string_exn: wrong string size (%d)"
+        "%s.of_string_exn: wrong string size (%d instead of %d)"
         name
         (String.length s)
-  | Some h ->
-      h
+        size
+  | Some h -> h
 
 let to_string s = s
 
@@ -80,20 +80,18 @@ let of_bytes_exn b =
   | None ->
       let msg =
         Printf.sprintf
-          "%s.of_bytes: wrong string size (%d)"
+          "%s.of_bytes_exn: wrong string size (%d instead of %d)"
           name
           (Bytes.length b)
+          size
       in
       raise (Invalid_argument msg)
-  | Some h ->
-      h
+  | Some h -> h
 
 let of_bytes s =
   match of_bytes_opt s with
-  | Some x ->
-      Ok x
-  | None ->
-      generic_error "Failed to deserialize a hash (%s)" name
+  | Some x -> Ok x
+  | None -> generic_error "Failed to deserialize a hash (%s)" name
 
 let to_bytes = Bytes.of_string
 

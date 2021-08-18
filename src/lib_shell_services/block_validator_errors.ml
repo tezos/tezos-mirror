@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,11 +43,7 @@ type block_error =
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;
@@ -55,21 +51,21 @@ type block_error =
     }
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
+  | Invalid_protocol_environment_transition of
+      Protocol.env_version * Protocol.env_version
 
 let block_error_encoding error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Cannot_parse_operation"
         (obj2
            (req "error" (constant "cannot_parse_operation"))
            (req "operation" Operation_hash.encoding))
         (function
-          | Cannot_parse_operation operation ->
-              Some ((), operation)
-          | _ ->
-              None)
+          | Cannot_parse_operation operation -> Some ((), operation) | _ -> None)
         (fun ((), operation) -> Cannot_parse_operation operation);
       case
         (Tag 1)
@@ -79,10 +75,8 @@ let block_error_encoding error_encoding =
            (req "expected" Fitness.encoding)
            (req "found" Fitness.encoding))
         (function
-          | Invalid_fitness {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_fitness {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_fitness {expected; found});
       case
         (Tag 2)
@@ -104,10 +98,8 @@ let block_error_encoding error_encoding =
            (req "expected" int32)
            (req "found" int32))
         (function
-          | Invalid_level {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_level {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_level {expected; found});
       case
         (Tag 5)
@@ -117,10 +109,8 @@ let block_error_encoding error_encoding =
            (req "expected" uint8)
            (req "found" uint8))
         (function
-          | Invalid_proto_level {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_proto_level {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_proto_level {expected; found});
       case
         (Tag 6)
@@ -141,8 +131,7 @@ let block_error_encoding error_encoding =
         (function
           | Outdated_operation {operation; originating_block} ->
               Some ((), operation, originating_block)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, originating_block) ->
           Outdated_operation {operation; originating_block});
       case
@@ -156,8 +145,7 @@ let block_error_encoding error_encoding =
         (function
           | Expired_chain {chain_id; expiration; timestamp} ->
               Some ((), chain_id, expiration, timestamp)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), chain_id, expiration, timestamp) ->
           Expired_chain {chain_id; expiration; timestamp});
       case
@@ -167,10 +155,7 @@ let block_error_encoding error_encoding =
            (req "error" (constant "unexpected_number_of_passes"))
            (req "found" uint8))
         (function
-          | Unexpected_number_of_validation_passes n ->
-              Some ((), n)
-          | _ ->
-              None)
+          | Unexpected_number_of_validation_passes n -> Some ((), n) | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n);
       case
         (Tag 10)
@@ -181,10 +166,8 @@ let block_error_encoding error_encoding =
            (req "found" uint16)
            (req "max" uint16))
         (function
-          | Too_many_operations {pass; found; max} ->
-              Some ((), pass, found, max)
-          | _ ->
-              None)
+          | Too_many_operations {pass; found; max} -> Some ((), pass, found, max)
+          | _ -> None)
         (fun ((), pass, found, max) -> Too_many_operations {pass; found; max});
       case
         (Tag 11)
@@ -197,8 +180,7 @@ let block_error_encoding error_encoding =
         (function
           | Oversized_operation {operation; size; max} ->
               Some ((), operation, size, max)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, size, max) ->
           Oversized_operation {operation; size; max});
       case
@@ -212,8 +194,7 @@ let block_error_encoding error_encoding =
         (function
           | Unallowed_pass {operation; pass; allowed_pass} ->
               Some ((), operation, pass, allowed_pass)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, pass, allowed_pass) ->
           Unallowed_pass {operation; pass; allowed_pass});
       case
@@ -230,7 +211,21 @@ let block_error_encoding error_encoding =
            (req "trace" (list error_encoding)))
         (function
           | Economic_protocol_error trace -> Some ((), trace) | _ -> None)
-        (fun ((), trace) -> Economic_protocol_error trace) ]
+        (fun ((), trace) -> Economic_protocol_error trace);
+      case
+        (Tag 15)
+        ~title:"Invalid_protocol_environment_transition"
+        (obj3
+           (req "error" (constant "invalid_protocol_environment_transition"))
+           (req "before" Protocol.env_version_encoding)
+           (req "after" Protocol.env_version_encoding))
+        (function
+          | Invalid_protocol_environment_transition (before, after) ->
+              Some ((), before, after)
+          | _ -> None)
+        (fun ((), before, after) ->
+          Invalid_protocol_environment_transition (before, after));
+    ]
 
 let pp_block_error ppf = function
   | Cannot_parse_operation oph ->
@@ -247,10 +242,8 @@ let pp_block_error ppf = function
         expected
         Fitness.pp
         found
-  | Non_increasing_timestamp ->
-      Format.fprintf ppf "Non increasing timestamp"
-  | Non_increasing_fitness ->
-      Format.fprintf ppf "Non increasing fitness"
+  | Non_increasing_timestamp -> Format.fprintf ppf "Non increasing timestamp"
+  | Non_increasing_fitness -> Format.fprintf ppf "Non increasing fitness"
   | Invalid_level {expected; found} ->
       Format.fprintf
         ppf
@@ -323,6 +316,12 @@ let pp_block_error ppf = function
         "Failed to validate the economic-protocol content of the block: %a."
         Error_monad.pp_print_error
         err
+  | Invalid_protocol_environment_transition (before, after) ->
+      Format.fprintf
+        ppf
+        "Transition from protocol environment version %s to %s is not allowed."
+        (Protocol.module_name_of_env_version before)
+        (Protocol.module_name_of_env_version after)
 
 type validation_process_error =
   | Missing_handshake
@@ -335,7 +334,8 @@ type validation_process_error =
 let validation_process_error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Missing_handshake"
         (obj1 (req "constant" (constant "missing_handshake")))
@@ -370,15 +370,15 @@ let validation_process_error_encoding =
         ~title:"Cannot_run_external_validator"
         (obj1 (req "msg" string))
         (function Cannot_run_external_validator msg -> Some msg | _ -> None)
-        (fun msg -> Cannot_run_external_validator msg) ]
+        (fun msg -> Cannot_run_external_validator msg);
+    ]
 
 let pp_validation_process_error ppf = function
   | Missing_handshake ->
       Format.fprintf
         ppf
         "Missing handshake while initializing validation process."
-  | Protocol_dynlink_failure msg ->
-      Format.fprintf ppf "%s" msg
+  | Protocol_dynlink_failure msg -> Format.fprintf ppf "%s" msg
   | Inconsistent_handshake msg ->
       Format.fprintf ppf "Inconsistent handshake: %s." msg
   | Socket_path_too_long path ->
@@ -408,10 +408,10 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
-  | Failed_to_get_live_blocks of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
+  | Cannot_validate_while_shutting_down
 
 let () =
   Error_monad.register_recursive_error_kind
@@ -432,8 +432,7 @@ let () =
         merge_objs
           (obj1 (req "invalid_block" Block_hash.encoding))
           (block_error_encoding error_encoding)))
-    (function
-      | Invalid_block {block; error} -> Some (block, error) | _ -> None)
+    (function Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
   Error_monad.register_error_kind
     `Temporary
@@ -453,10 +452,8 @@ let () =
         (req "block" Block_hash.encoding)
         (req "missing_protocol" Protocol_hash.encoding))
     (function
-      | Unavailable_protocol {block; protocol} ->
-          Some (block, protocol)
-      | _ ->
-          None)
+      | Unavailable_protocol {block; protocol} -> Some (block, protocol)
+      | _ -> None)
     (fun (block, protocol) -> Unavailable_protocol {block; protocol}) ;
   Error_monad.register_error_kind
     `Temporary
@@ -483,8 +480,7 @@ let () =
     (function
       | Inconsistent_operations_hash {block; expected; found} ->
           Some (block, expected, found)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (block, expected, found) ->
       Inconsistent_operations_hash {block; expected; found}) ;
   Error_monad.register_error_kind
@@ -501,20 +497,6 @@ let () =
     Data_encoding.(obj1 (req "hash" Context_hash.encoding))
     (function Failed_to_checkout_context h -> Some h | _ -> None)
     (fun h -> Failed_to_checkout_context h) ;
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"Block_validator_process.failed_to_get_live_block"
-    ~title:"Fail to get live blocks"
-    ~description:"Unable to get live blocks from a given hash"
-    ~pp:(fun ppf (hash : Block_hash.t) ->
-      Format.fprintf
-        ppf
-        "@[Failed to get live blocks from block hash %a@]"
-        Block_hash.pp
-        hash)
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
-    (function Failed_to_get_live_blocks h -> Some h | _ -> None)
-    (fun h -> Failed_to_get_live_blocks h) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"Validator_process.system_error_while_validating"
@@ -559,6 +541,18 @@ let () =
         error)
     Data_encoding.(obj1 (req "error" validation_process_error_encoding))
     (function Validation_process_failed error -> Some error | _ -> None)
-    (fun error -> Validation_process_failed error)
+    (fun error -> Validation_process_failed error) ;
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"validator.cannot_validate_while_shutting_down"
+    ~title:"Cannot validate while shutting down"
+    ~description:"Cannot validate block while the node is shutting down."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot validate block while the node is shutting down.")
+    Data_encoding.empty
+    (function Cannot_validate_while_shutting_down -> Some () | _ -> None)
+    (fun () -> Cannot_validate_while_shutting_down)
 
 let invalid_block block error = Invalid_block {block; error}

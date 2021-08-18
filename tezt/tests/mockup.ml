@@ -36,12 +36,12 @@
 (* Test.
    Call `tezos-client rpc list` and check that return code is 0.
  *)
-let test_rpc_list ~protocol =
-  Test.register
+let test_rpc_list =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) RPC list" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
-  @@ fun () ->
+    ~title:"(Mockup) RPC list"
+    ~tags:["mockup"; "client"; "rpc"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
   Lwt.return_unit
@@ -49,12 +49,12 @@ let test_rpc_list ~protocol =
 (* Test.
    Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
  *)
-let test_rpc_header_shell ~protocol =
-  Test.register
+let test_rpc_header_shell =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) RPC header/shell" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
-  @@ fun () ->
+    ~title:"(Mockup) RPC header/shell"
+    ~tags:["mockup"; "client"; "rpc"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.shell_header client in
   Lwt.return_unit
@@ -84,12 +84,12 @@ let test_balances_after_transfer giver amount receiver =
 (* Test.
    Transfer some tz and check balance changes are as expected.
  *)
-let test_transfer ~protocol =
-  Test.register
+let test_transfer =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) Transfer" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer"
+    ~tags:["mockup"; "client"; "transfer"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let* giver_balance_before = Client.get_balance_for ~account:giver client in
@@ -112,37 +112,27 @@ let test_transfer ~protocol =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let test_simple_baking_event ~protocol =
-  Test.register
+let test_simple_baking_event =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf "(%s) (Mockup) Transfer (asynchronous)" (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
-  Log.info
-    "Transferring %s from %s to %s"
-    (Tez.to_string amount)
-    giver
-    receiver ;
+  Log.info "Transferring %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
   Client.bake_for ~key:giver client
 
-let test_same_transfer_twice ~protocol =
-  Test.register
+let test_same_transfer_twice =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Same transfer twice (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Same transfer twice (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -162,16 +152,12 @@ let test_same_transfer_twice ~protocol =
       mempool2 ;
   return ()
 
-let test_transfer_same_participants ~protocol =
-  Test.register
+let test_transfer_same_participants =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Transfer same participants (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer same participants (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -203,16 +189,12 @@ let test_transfer_same_participants ~protocol =
     Test.fail "Expected thrashpool to have one operation." ;
   return ()
 
-let test_multiple_baking ~protocol =
-  Test.register
+let test_multiple_baking =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Multi transfer/multi baking (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Multi transfer/multi baking (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -239,8 +221,9 @@ let test_multiple_baking ~protocol =
       return ())
     (range 1 10)
 
-let perform_migration ~protocol ~next_protocol ~pre_migration ~post_migration =
-  let* client = Client.init_mockup ~protocol () in
+let perform_migration ~protocol ~next_protocol ~next_constants ~pre_migration
+    ~post_migration =
+  let* client = Client.init_mockup ~constants:next_constants ~protocol () in
   let* pre_result = pre_migration client in
   Log.info
     "Migrating from %s to %s"
@@ -259,8 +242,7 @@ let get_candidates_to_migration () =
     List.filter_map
       (fun (protocol : Protocol.t) ->
         match Protocol.next_protocol protocol with
-        | None ->
-            None
+        | None -> None
         | Some next ->
             let next_hash = Protocol.hash next in
             if
@@ -287,18 +269,19 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
           Log.info "Searching for protocols to migrate..." ;
           let* protocols = get_candidates_to_migration () in
           match protocols with
-          | [] ->
-              Test.fail "No protocol can be tested for migration!"
+          | [] -> Test.fail "No protocol can be tested for migration!"
           | (protocol, next_protocol) :: _ ->
               perform_migration
                 ~protocol
                 ~next_protocol
+                ~next_constants:Protocol.default_constants
                 ~pre_migration
-                ~post_migration )
+                ~post_migration)
       | Some (protocol, next_protocol) ->
           perform_migration
             ~protocol
             ~next_protocol
+            ~next_constants:Protocol.default_constants
             ~pre_migration
             ~post_migration)
 
@@ -322,9 +305,7 @@ let test_migration_transfer ?migration_spec () =
       return (giver_balance_before, receiver_balance_before))
     ~post_migration:
       (fun client (giver_balance_before, receiver_balance_before) ->
-      let* giver_balance_after =
-        Client.get_balance_for ~account:giver client
-      in
+      let* giver_balance_after = Client.get_balance_for ~account:giver client in
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
       in
@@ -336,16 +317,156 @@ let test_migration_transfer ?migration_spec () =
     ~info:"transfer"
     ()
 
-(** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
-let test_origination_from_unrevealed_fees ~protocol =
+(** Check the dangling temp big maps cleanup performed at stitching from
+    Florence to Granada leaves existing non-temp big maps unchanged.
+    (and also check that dangling temp big maps are actually cleaned up)
+    This test can be removed once that stitching code is removed.
+*)
+let test_granada_migration_temp_big_maps =
+  let big_map_get_opt ~id ~key_hash client =
+    Lwt.catch
+      (fun () ->
+        let* v = RPC.Big_maps.get ~id:(string_of_int id) ~key_hash client in
+        Lwt.return_some v)
+      (fun _exn -> Lwt.return_none)
+  in
+  let find_big_maps_with_key_1 client =
+    (* There is no RPC to list all big maps, let's approximate the list of all
+       big maps by iterating over -5 .. 5 and collecting only big maps that
+       have key 1 *)
+    let key1 =
+      "expru2dKqDfZG8hu4wNGkiyunvq2hdSKuVYtcKta7BWP6Q18oNxKjS"
+      (* result of [tezos-client hash data 1 of type int] *)
+    in
+    let key2 =
+      "expruDuAZnFKqmLoisJqUGqrNzXTvw7PJM2rYk97JErM5FHCerQqgn"
+      (* result of [tezos-client hash data 2 of type int] *)
+    in
+    let min_id = -5 in
+    let max_id = 5 in
+    let rec aux acc id =
+      if id < min_id then return acc
+      else
+        let* val1_opt = big_map_get_opt ~id ~key_hash:key1 client in
+        match val1_opt with
+        | None -> aux acc (pred id)
+        | Some val1 ->
+            let* val2_opt = big_map_get_opt ~id ~key_hash:key2 client in
+            aux ((id, val1, val2_opt) :: acc) (pred id)
+    in
+    aux [] max_id
+  in
+  let pre_migration client =
+    let* _contract_address =
+      Client.originate_contract
+        ~alias:"temp_big_maps"
+        ~amount:Tez.zero
+        ~src:"bootstrap1"
+        ~prg:"file:./tezt/tests/contracts/proto_alpha/temp_big_maps.tz"
+        ~init:"{ Elt 1 3; Elt 2 4 }"
+        ~burn_cap:(Tez.of_int 2)
+        client
+    in
+    let* () = Client.bake_for ~key:"bootstrap1" client in
+    let arg =
+      "Pair (Left True) 1"
+      (* create a fresh big map containing { 1 -> 2 } and pass it as parameter *)
+    in
+    let* () =
+      Client.transfer
+        ~amount:Tez.zero
+        ~giver:"bootstrap1"
+        ~receiver:"temp_big_maps"
+        ~arg
+        client
+    in
+    let* () = Client.bake_for ~key:"bootstrap1" client in
+    let* big_maps = find_big_maps_with_key_1 client in
+    if List.length big_maps <= 0 then
+      Test.fail
+        "No big maps found after initializing the contract, did we use the \
+         correct RPC?" ;
+    let (non_temp_big_maps, temp_big_maps) =
+      List.partition (fun (id, _, _) -> id >= 0) big_maps
+    in
+    if List.length temp_big_maps <= 0 then
+      Test.fail "Dangling temporary big map expected in Edo and Florence" ;
+    Lwt.return non_temp_big_maps
+  in
+  let post_migration client pre_big_maps =
+    let* post_big_maps = find_big_maps_with_key_1 client in
+    (* Liquidity baking big maps introduced at Granada stitching won't be
+       returned by [find_big_maps_with_key_1] *)
+    if pre_big_maps <> post_big_maps then
+      Test.fail
+        "Big maps have changed, either dangling temporary ones were not \
+         cleaned or non-temporary ones have changed" ;
+    Lwt.return_unit
+  in
+  fun () ->
+    Test.register
+      ~__FILE__
+      ~title:"(Florence -> Alpha) dangling temp big maps cleanup"
+      ~tags:["mockup"; "migration"]
+      (fun () ->
+        perform_migration
+          ~protocol:Protocol.Florence
+          ~next_protocol:Protocol.Alpha
+          ~next_constants:Protocol.default_constants
+          ~pre_migration
+          ~post_migration)
+
+(* Check constants equality between that obtained by directly initializing
+   a mockup context at alpha and that obtained by migrating from
+   alpha~1 to alpha *)
+let test_migration_constants ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Mockup) origination fees from unrevealed"
-         (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
-  @@ fun () ->
+         "(%s -> %s) constant migration"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to))
+    ~tags:["mockup"; "migration"]
+    (fun () ->
+      let constants_path =
+        ["chains"; "main"; "blocks"; "head"; "context"; "constants"]
+      in
+      let* client_to =
+        Client.init_mockup
+          ~constants:Protocol.Constants_mainnet
+          ~protocol:migrate_to
+          ()
+      in
+      let* const_to = Client.(rpc GET constants_path client_to) in
+      let* const_migrated =
+        perform_migration
+          ~protocol:migrate_from
+          ~next_protocol:migrate_to
+          ~next_constants:Protocol.Constants_mainnet
+          ~pre_migration:(fun _ -> return ())
+          ~post_migration:(fun client () ->
+            Client.(rpc GET constants_path client))
+      in
+      if const_to = const_migrated then return ()
+      else (
+        Log.error
+          "constants (%s):\n%s\n"
+          (Protocol.tag migrate_to)
+          (JSON.encode const_to) ;
+        Log.error
+          "constants (migrated from %s):\n%s\n"
+          (Protocol.tag migrate_from)
+          (JSON.encode const_migrated) ;
+        Test.fail "Protocol constants mismatch"))
+
+(** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
+let test_origination_from_unrevealed_fees =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) origination fees from unrevealed"
+    ~tags:["mockup"; "client"; "transfer"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
     Client.import_secret_key
@@ -378,14 +499,19 @@ let test_origination_from_unrevealed_fees ~protocol =
   in
   return ()
 
-let register protocol =
-  test_rpc_list ~protocol ;
-  test_same_transfer_twice ~protocol ;
-  test_transfer_same_participants ~protocol ;
-  test_transfer ~protocol ;
-  test_simple_baking_event ~protocol ;
-  test_multiple_baking ~protocol ;
-  test_rpc_header_shell ~protocol ;
-  test_origination_from_unrevealed_fees ~protocol
+let register ~protocols =
+  test_rpc_list ~protocols ;
+  test_same_transfer_twice ~protocols ;
+  test_transfer_same_participants ~protocols ;
+  test_transfer ~protocols ;
+  test_simple_baking_event ~protocols ;
+  test_multiple_baking ~protocols ;
+  test_rpc_header_shell ~protocols ;
+  test_origination_from_unrevealed_fees ~protocols
 
-let register_protocol_independent () = test_migration_transfer ()
+let register_constant_migration ~migrate_from ~migrate_to =
+  test_migration_constants ~migrate_from ~migrate_to
+
+let register_protocol_independent () =
+  test_migration_transfer () ;
+  test_granada_migration_temp_big_maps ()

@@ -31,8 +31,7 @@ end)
 
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
     ~block ?async nonces =
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
   | [] ->
       lwt_log_notice

@@ -66,8 +66,7 @@ val compose_parameters :
   ('a, 'ctx) parameter -> ('a, 'ctx) parameter -> ('a, 'ctx) parameter
 
 (** Map a pure function over the result of a parameter parser. *)
-val map_parameter :
-  f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
+val map_parameter : f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
 
 (** {2 Flags and Options } *)
 
@@ -256,9 +255,7 @@ val args13 :
   ('k, 'ctx) arg ->
   ('l, 'ctx) arg ->
   ('m, 'ctx) arg ->
-  ( 'a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm,
-    'ctx )
-  options
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm, 'ctx) options
 
 (** Include 14 optional parameters *)
 val args14 :
@@ -319,22 +316,7 @@ val args16 :
   ('n, 'ctx) arg ->
   ('o, 'ctx) arg ->
   ('p, 'ctx) arg ->
-  ( 'a
-    * 'b
-    * 'c
-    * 'd
-    * 'e
-    * 'f
-    * 'g
-    * 'h
-    * 'i
-    * 'j
-    * 'k
-    * 'l
-    * 'm
-    * 'n
-    * 'o
-    * 'p,
+  ( 'a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p,
     'ctx )
   options
 
@@ -428,10 +410,7 @@ val non_terminal_seq :
 
 (** Parameter that expects a string *)
 val string :
-  name:string ->
-  desc:string ->
-  ('a, 'ctx) params ->
-  (string -> 'a, 'ctx) params
+  name:string -> desc:string -> ('a, 'ctx) params -> (string -> 'a, 'ctx) params
 
 (** {2 Commands }  *)
 
@@ -500,8 +479,7 @@ type verbosity = Terse | Short | Details | Full
     contents are only printed if the verbosity is equal to or
     above that level. Use prefix [=] for an exact match, or [-]
     for the inverse interpretation. *)
-val setup_formatter :
-  Format.formatter -> format -> verbosity -> formatter_state
+val setup_formatter : Format.formatter -> format -> verbosity -> formatter_state
 
 (** Restore the formatter state after [setup_formatter]. *)
 val restore_formatter : Format.formatter -> formatter_state -> unit
@@ -521,10 +499,7 @@ val dispatch : 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 (** Parse the global options, and return their value, with the rest of
     the command to be parsed. *)
 val parse_global_options :
-  ('a, 'ctx) options ->
-  'ctx ->
-  string list ->
-  ('a * string list) tzresult Lwt.t
+  ('a, 'ctx) options -> 'ctx -> string list -> ('a * string list) tzresult Lwt.t
 
 (** Pretty prints the error messages to the given formatter.
     [executable_name] and [global_options] are for help screens.

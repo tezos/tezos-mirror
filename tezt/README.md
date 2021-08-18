@@ -31,6 +31,12 @@ The Tezt directory contains several directories:
   regression test which can be either `tests/RPC_test.ml` or
   `tests/encoding.ml`.
 
+- `test-results.json` is a record of the time taken by tests.
+  It is used by the CI to distribute tests in jobs of roughly equal duration.
+  To update it, run (from the root of the Tezos repository):
+
+    make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
+
 ## Implementation Details
 
 Tezt is implemented in the [OCaml
@@ -43,7 +49,6 @@ An important feature of `tezt` is the possibility to catch `events`
 emitted by the node. This allows fine-grained tests. In particular, as
 much as possible, a test in `tezt` should avoid the use of `timeouts`
 and instead, should rely on `events` if possible.
-
 
 ## API Documentation
 

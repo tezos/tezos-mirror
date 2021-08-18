@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 
 module Events = struct
   include Internal_event.Simple
@@ -45,11 +45,19 @@ module Events = struct
       ~msg:"Cache miss: ({key})"
       ~level:Debug
       ("key", Data_encoding.string)
+
+  let split_key_triggers =
+    declare_2
+      ~section
+      ~level:Debug
+      ~name:"split_key_triggers"
+      ~msg:"split_key heuristic triggers, getting {parent} instead of {leaf}"
+      ("parent", Data_encoding.string)
+      ("leaf", Data_encoding.string)
 end
 
 let rec raw_context_size = function
-  | Tezos_shell_services.Block_services.Key _ | Cut ->
-      0
+  | Tezos_shell_services.Block_services.Key _ | Cut -> 0
   | Dir map ->
       TzString.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
 
@@ -59,16 +67,12 @@ let rec raw_context_to_tree
   match raw with
   | Key (bytes : Bytes.t) ->
       Lwt.return (Some (Local.Tree.of_raw (`Value bytes)))
-  | Cut ->
-      Lwt.return None
+  | Cut -> Lwt.return None
   | Dir map ->
       let add_to_tree tree (string, raw_context) =
-        raw_context_to_tree raw_context
-        >>= function
-        | None ->
-            Lwt.return tree
-        | Some u ->
-            Local.Tree.add_tree tree [string] u
+        raw_context_to_tree raw_context >>= function
+        | None -> Lwt.return tree
+        | Some u -> Local.Tree.add_tree tree [string] u
       in
       TzString.Map.bindings map
       |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
@@ -84,6 +88,8 @@ module type M = sig
   val proxy_mem : Proxy.proxy_getter_input -> Local.key -> bool tzresult Lwt.t
 end
 
+type proxy_m = (module M)
+
 module StringMap = TzString.Map
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =
@@ -97,12 +103,9 @@ struct
   let get = Local.Tree.find_tree
 
   let set_leaf tree key raw_context : t Proxy.update tzresult Lwt.t =
-    raw_context_to_tree raw_context
-    >>= (function
-          | None ->
-              Lwt.return tree
-          | Some sub_tree ->
-              Local.Tree.add_tree tree key sub_tree)
+    (raw_context_to_tree raw_context >>= function
+     | None -> Lwt.return tree
+     | Some sub_tree -> Local.Tree.add_tree tree key sub_tree)
     >|= fun updated_tree -> ok (Proxy.Value updated_tree)
 end
 
@@ -123,33 +126,26 @@ module RequestsTree : REQUESTS_TREE = struct
 
   let rec add (t : tree) (k : string list) : tree =
     match (t, k) with
-    | (_, []) | (All, _) ->
-        All
+    | (_, []) | (All, _) -> All
     | (Partial map, k_hd :: k_tail) -> (
         let sub_t_opt = StringMap.find_opt k_hd map in
         match sub_t_opt with
-        | None ->
-            Partial (StringMap.add k_hd (add empty k_tail) map)
+        | None -> Partial (StringMap.add k_hd (add empty k_tail) map)
         | Some (Partial _ as sub_t) ->
             Partial (StringMap.add k_hd (add sub_t k_tail) map)
-        | Some All ->
-            t )
+        | Some All -> t)
 
   let rec find_opt (t : tree) (k : string list) : tree option =
     match (t, k) with
-    | (All, _) ->
-        Some All
-    | (Partial _, []) ->
-        None
+    | (All, _) -> Some All
+    | (Partial _, []) -> None
     | (Partial map, k_hd :: k_tail) -> (
         let sub_t_opt = StringMap.find_opt k_hd map in
         match sub_t_opt with
-        | None ->
-            None
-        | Some All ->
-            Some All
+        | None -> None
+        | Some All -> Some All
         | Some (Partial _ as sub_t) -> (
-          match k_tail with [] -> Some sub_t | _ -> find_opt sub_t k_tail ) )
+            match k_tail with [] -> Some sub_t | _ -> find_opt sub_t k_tail))
 end
 
 module Core
@@ -164,20 +160,16 @@ module Core
         let e = T.empty in
         store := Some e ;
         Lwt.return e
-    | Some e ->
-        Lwt.return e
+    | Some e -> Lwt.return e
 
   let get key = lazy_load_store () >>= fun store -> T.get store key
 
   let do_rpc : Proxy.proxy_getter_input -> Local.key -> unit tzresult Lwt.t =
    fun pgi key ->
-    X.do_rpc pgi key
-    >>=? fun tree ->
-    lazy_load_store ()
-    >>= fun current_store ->
+    X.do_rpc pgi key >>=? fun tree ->
+    lazy_load_store () >>= fun current_store ->
     (* Update cache with data obtained *)
-    T.set_leaf current_store key tree
-    >>=? fun updated ->
+    T.set_leaf current_store key tree >>=? fun updated ->
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end
@@ -188,44 +180,51 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let pp_key k = String.concat ";" k
 
   let is_all k =
-    match RequestsTree.find_opt !requests k with
-    | Some All ->
-        true
-    | _ ->
-        false
+    match RequestsTree.find_opt !requests k with Some All -> true | _ -> false
 
   (** The kind of RPC request: is it a GET (i.e. is it loading data?) or is it only a MEMbership request (i.e. is the key associated to data?). *)
   type kind = Get | Mem
 
   (** Handles the application of [X.split_key] to optimize queries. *)
-  let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind) (key : Local.key) :
-      unit tzresult Lwt.t =
-    let (key, split) =
+  let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
+      (requested_key : Local.key) : unit tzresult Lwt.t =
+    let (key_to_get, split) =
       match kind with
       | Mem ->
           (* If the value is not going to be used, don't request a parent *)
-          (key, false)
+          (requested_key, false)
       | Get -> (
-        match X.split_key key with
-        | None ->
-            (* There's no splitting for this key *)
-            (key, false)
-        | Some (prefix, _) ->
-            (* Splitting triggers: a parent key will be requested *)
-            (prefix, true) )
+          match X.split_key pgi.mode requested_key with
+          | None ->
+              (* There's no splitting for this key *)
+              (requested_key, false)
+          | Some (prefix, _) ->
+              (* Splitting triggers: a parent key will be requested *)
+              (prefix, true))
+    in
+    let remember_request () =
+      (* Remember request was done: map [key] to [All] in [!requests]
+         (see [Proxy_getter.REQUESTS_TREE] mli for further details) *)
+      requests := RequestsTree.add !requests key_to_get ;
+      return_unit
     in
     (* [is_all] has been checked (by the caller: [generic_call])
        for the key received as parameter. Hence it only makes sense
        to check it if a parent key is being retrieved ('split' = true
        and hence 'key' here differs from the key received as parameter) *)
-    if split && is_all key then return_unit
+    if split && is_all key_to_get then return_unit
     else
-      C.do_rpc pgi key
-      >>=? fun () ->
-      (* Remember request was done: map [key] to [All] in [!requests]
-         (see [REQUESTS_TREE]'s mli for further details) *)
-      requests := RequestsTree.add !requests key ;
-      return_unit
+      (if split then
+       Events.(
+         emit split_key_triggers (pp_key key_to_get, pp_key requested_key))
+      else Lwt.return_unit)
+      >>= fun () ->
+      C.do_rpc pgi key_to_get >>= function
+      | Ok _ -> remember_request ()
+      | _ when X.failure_is_permanent requested_key -> remember_request ()
+      | Error err ->
+          (* Don't remember the request, maybe it will succeed in the future *)
+          Lwt.return_error err
 
   (* [generic_call] and [do_rpc] above go hand in hand. [do_rpc] takes
      care of performing the RPC call and updating [cache].
@@ -241,17 +240,17 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
     let pped_key = pp_key key in
-    ( if is_all key then
-      (* This exact request was done already.
-         So data was obtained already. Note that this does not imply
-         that this function will return [Some] (maybe the node doesn't
-         map this key). *)
-      Events.(emit cache_hit pped_key) >>= fun () -> return_unit
+    (if is_all key then
+     (* This exact request was done already.
+        So data was obtained already. Note that this does not imply
+        that this function will return [Some] (maybe the node doesn't
+        map this key). *)
+     Events.(emit cache_hit pped_key) >>= fun () -> return_unit
     else
       (* This exact request was NOT done already (either a longer request
          was done or no related request was done at all).
          An RPC MUST be done. *)
-      Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key )
+      Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key)
     >>=? fun () -> C.get key >>= return
 
   let proxy_get pgi key = generic_call Get pgi key
@@ -262,17 +261,13 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
              Local.Tree.kind tree = `Tree)
 
   let proxy_mem pgi key =
-    generic_call Mem pgi key
-    >>=? fun tree_opt ->
+    generic_call Mem pgi key >>=? fun tree_opt ->
     match tree_opt with
-    | None ->
-        return_false
+    | None -> return_false
     | Some tree -> (
-      match Local.Tree.kind tree with
-      | `Tree ->
-          return_false
-      | `Value ->
-          return_true )
+        match Local.Tree.kind tree with
+        | `Tree -> return_false
+        | `Value -> return_true)
 end
 
 module MakeProxy (X : Proxy_proto.PROTO_RPC) : M = Make (Core (Tree) (X)) (X)

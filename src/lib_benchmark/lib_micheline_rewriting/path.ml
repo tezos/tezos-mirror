@@ -52,29 +52,22 @@ module Without_hash_consing : S = struct
 
   let rec concat ~above:path1 ~under:path2 =
     match path2.rev_path_desc with
-    | Root ->
-        path1
-    | At_index (i, p) ->
-        at_index i (concat ~above:path1 ~under:p)
+    | Root -> path1
+    | At_index (i, p) -> at_index i (concat ~above:path1 ~under:p)
 
   let rec compare path1 path2 =
     match (path1.rev_path_desc, path2.rev_path_desc) with
-    | (Root, Root) ->
-        0
-    | (Root, _) ->
-        -1
-    | (_, Root) ->
-        1
+    | (Root, Root) -> 0
+    | (Root, _) -> -1
+    | (_, Root) -> 1
     | (At_index (i1, p1), At_index (i2, p2)) ->
         let c = Compare.Int.compare i1 i2 in
         if c = 0 then compare p1 p2 else c
 
   let rec to_string (x : t) =
     match x.rev_path_desc with
-    | Root ->
-        "*"
-    | At_index (i, up) ->
-        Printf.sprintf "%d -> %s" i (to_string up)
+    | Root -> "*"
+    | At_index (i, up) -> Printf.sprintf "%d -> %s" i (to_string up)
 end
 
 module With_hash_consing : functor
@@ -94,60 +87,53 @@ functor
 
     let table =
       match P.initial_size with
-      | None ->
-          Hashtbl.create 101
-      | Some size ->
-          Hashtbl.create size
+      | None -> Hashtbl.create 101
+      | Some size -> Hashtbl.create size
 
     let new_tag =
       let x = ref ~-1 in
-      fun () -> incr x ; !x
+      fun () ->
+        incr x ;
+        !x
 
     let root =
       let hash = Hashtbl.hash Root in
       let tag = new_tag () in
       let res = {tag; hash; rev_path_desc = Root} in
-      Hashtbl.add table hash res ; res
+      Hashtbl.add table hash res ;
+      res
 
     let add_new_index hash i path =
       let res = {tag = new_tag (); hash; rev_path_desc = At_index (i, path)} in
-      Hashtbl.add table hash res ; res
+      Hashtbl.add table hash res ;
+      res
 
     let at_index i path =
       let hash = Hashtbl.hash (i, path.tag) in
       match Hashtbl.find_all table hash with
-      | [] ->
-          add_new_index hash i path
+      | [] -> add_new_index hash i path
       | bucket -> (
           let exists =
             List.find_opt
               (fun {rev_path_desc; _} ->
                 match rev_path_desc with
-                | At_index (i', path') ->
-                    i' = i && path'.tag = path.tag
-                | _ ->
-                    false)
+                | At_index (i', path') -> i' = i && path'.tag = path.tag
+                | _ -> false)
               bucket
           in
           match exists with
-          | Some res ->
-              res
-          | None ->
-              add_new_index hash i path )
+          | Some res -> res
+          | None -> add_new_index hash i path)
 
     let rec concat ~above:path1 ~under:path2 =
       match path2.rev_path_desc with
-      | Root ->
-          path1
-      | At_index (i, p) ->
-          at_index i (concat ~above:path1 ~under:p)
+      | Root -> path1
+      | At_index (i, p) -> at_index i (concat ~above:path1 ~under:p)
 
     let compare path1 path2 = Compare.Int.compare path1.tag path2.tag
 
     let rec to_string (x : t) =
       match x.rev_path_desc with
-      | Root ->
-          "*"
-      | At_index (i, up) ->
-          Printf.sprintf "%d -> %s" i (to_string up)
+      | Root -> "*"
+      | At_index (i, up) -> Printf.sprintf "%d -> %s" i (to_string up)
   end

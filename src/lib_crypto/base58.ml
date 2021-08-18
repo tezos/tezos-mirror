@@ -53,11 +53,9 @@ module Alphabet = struct
   let bitcoin =
     make "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-  let ripple =
-    make "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
+  let ripple = make "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
 
-  let flickr =
-    make "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+  let flickr = make "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
   let default = bitcoin
 
@@ -116,10 +114,8 @@ let raw_decode ?(alphabet = Alphabet.default) s =
   TzString.fold_left
     (fun a c ->
       match (a, of_char ~alphabet c) with
-      | (Some a, Some i) ->
-          Some Z.(add (of_int i) (mul a zbase))
-      | _ ->
-          None)
+      | (Some a, Some i) -> Some Z.(add (of_int i) (mul a zbase))
+      | _ -> None)
     (Some Z.zero)
     s
   |> Option.map (fun res ->
@@ -127,8 +123,7 @@ let raw_decode ?(alphabet = Alphabet.default) s =
          let res_tzeros = count_trailing_char res '\000' in
          let len = String.length res - res_tzeros in
          let zeros = count_leading_char s alphabet.encode.[0] in
-         String.make zeros '\000'
-         ^ String.init len (fun i -> res.[len - i - 1]))
+         String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1]))
 
 let checksum s =
   let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
@@ -181,8 +176,8 @@ struct
       (fun (Encoding {encoded_prefix = s; length = l; _}) ->
         if
           length = l
-          && ( TzString.remove_prefix ~prefix:s prefix <> None
-             || TzString.remove_prefix ~prefix s <> None )
+          && (TzString.remove_prefix ~prefix:s prefix <> None
+             || TzString.remove_prefix ~prefix s <> None)
         then
           Format.ksprintf
             invalid_arg
@@ -203,8 +198,7 @@ struct
       if i = len then len else if zeros.[i] = ones.[i] then loop (i + 1) else i
     in
     let len = loop 0 in
-    if len = 0 then
-      invalid_arg "Base58.register_encoding: not a unique prefix." ;
+    if len = 0 then invalid_arg "Base58.register_encoding: not a unique prefix." ;
     (String.sub zeros 0 len, String.length zeros)
 
   let register_encoding ~prefix ~length ~to_raw ~of_raw ~wrap =
@@ -242,14 +236,11 @@ struct
 
   let decode ?alphabet s =
     let rec find s = function
-      | [] ->
-          None
+      | [] -> None
       | Encoding {prefix; of_raw; wrap; _} :: encodings -> (
-        match TzString.remove_prefix ~prefix s with
-        | None ->
-            find s encodings
-        | Some msg ->
-            of_raw msg |> Option.map wrap )
+          match TzString.remove_prefix ~prefix s with
+          | None -> find s encodings
+          | Some msg -> of_raw msg |> Option.map wrap)
     in
     Option.bind (safe_decode ?alphabet s) (fun s -> find s !encodings)
 end
@@ -281,20 +272,17 @@ struct
     | (Some min, Some max) ->
         let prefix_len = TzString.common_prefix min max in
         Some (String.sub min 0 prefix_len)
-    | _ ->
-        None
+    | _ -> None
 
   let complete ?alphabet context request =
     let rec find s = function
-      | [] ->
-          Lwt.return_nil
+      | [] -> Lwt.return_nil
       | Resolver {encoding; resolver} :: resolvers -> (
           if not (TzString.has_prefix ~prefix:encoding.encoded_prefix s) then
             find s resolvers
           else
             match partial_decode ?alphabet request encoding.encoded_length with
-            | None ->
-                find s resolvers
+            | None -> find s resolvers
             | Some prefix ->
                 let len = String.length prefix in
                 let ignored = String.length encoding.prefix in
@@ -302,16 +290,15 @@ struct
                   if len <= ignored then ""
                   else (
                     assert (String.sub prefix 0 ignored = encoding.prefix) ;
-                    String.sub prefix ignored (len - ignored) )
+                    String.sub prefix ignored (len - ignored))
                 in
-                resolver context msg
-                >|= fun msgs ->
+                resolver context msg >|= fun msgs ->
                 List.filter_map
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
                     TzString.remove_prefix ~prefix:request res
                     |> Option.map (fun _ -> res))
-                  msgs )
+                  msgs)
     in
     find request !resolvers
 end
@@ -348,7 +335,7 @@ module Prefix = struct
      $ dune utop src/lib_crypto
      utop # Tezos_crypto.Base58.make_encoded_prefix "\006\161\159" 20 ;;
      - : string * int = ("tz1", 36)
-   *)
+  *)
 
   (* 32 *)
   let block_hash = "\001\052" (* B(51) *)

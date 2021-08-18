@@ -1,24 +1,27 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* Positions and amounts in librustzcash are a uint64 but we cast them to int64
    for simplicity. Both values are only provided as arguments and not returned by
@@ -83,6 +86,8 @@ module T : Rustzcash_sig.T = struct
   type ivk = Bytes.t
 
   type diversifier_index = Bytes.t
+
+  let compare_diversifier_index = Bytes.compare
 
   (* 96 bytes *)
   type expanded_spending_key = {ask : ask; nsk : nsk; ovk : ovk}
@@ -334,12 +339,14 @@ module T : Rustzcash_sig.T = struct
   let of_zip32_expanded_spending_key (sk : zip32_expanded_spending_key) =
     Bytes.concat
       Bytes.empty
-      [ sk.depth;
+      [
+        sk.depth;
         sk.parent_fvk_tag;
         sk.child_index;
         sk.chain_code;
         of_expanded_spending_key sk.expsk;
-        sk.dk ]
+        sk.dk;
+      ]
 
   let of_full_viewing_key fvk =
     Bytes.concat Bytes.empty [of_ak fvk.ak; of_nk fvk.nk; of_ovk fvk.ovk]
@@ -347,12 +354,14 @@ module T : Rustzcash_sig.T = struct
   let of_zip32_full_viewing_key xfvk =
     Bytes.concat
       Bytes.empty
-      [ xfvk.depth;
+      [
+        xfvk.depth;
         xfvk.parent_fvk_tag;
         xfvk.child_index;
         xfvk.chain_code;
         of_full_viewing_key xfvk.fvk;
-        xfvk.dk ]
+        xfvk.dk;
+      ]
 
   let hash_compare = Stdlib.compare
 
@@ -533,8 +542,7 @@ let verification_ctx_free ctx = RS.verification_ctx_free ctx
 let tree_uncommitted =
   to_hash
     (Hex.to_bytes
-       (`Hex
-         "0100000000000000000000000000000000000000000000000000000000000000"))
+       (`Hex "0100000000000000000000000000000000000000000000000000000000000000"))
 
 let merkle_hash ~height a b =
   (* TODO: Change height to size_t. It is an int for the moment *)
@@ -664,7 +672,7 @@ let zip32_xfvk_address xfvk j =
       (* This value is returned from the lib, it is a valid diversifier *)
       WithExceptions.Option.get ~loc:__LOC__ @@ to_diversifier diversifier
     in
-    Some (to_diversifier_index j_ret, diversifier, to_pkd pkd) )
+    Some (to_diversifier_index j_ret, diversifier, to_pkd pkd))
   else None
 
 let to_scalar input =
@@ -701,9 +709,11 @@ let zip32_xfvk_derive parent index =
 exception Params_not_found of string list
 
 let () =
-  Printexc.register_printer
-  @@ function
+  Printexc.register_printer @@ function
   | Params_not_found locations ->
+      (* We tend to look at the same location several times,
+         but there is no need to confuse the user about it. *)
+      let locations = List.sort_uniq String.compare locations in
       Some
         (Format.asprintf
            "@[<v>cannot find Zcash params in any of:@,\
@@ -711,74 +721,66 @@ let () =
             https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
            (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
            locations)
-  | _ ->
-      None
+  | _ -> None
+
+type parameter_files = {spend_path : string; output_path : string}
+
+(* Find Zcash parameter files.
+   This function is parameterized by system functions in order to be able to test it
+   with a mock. *)
+let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
+    ?(file_exists = Sys.file_exists) () =
+  let ( // ) = Filename.concat in
+  (* [env name path] looks up the value of environment variable [name]
+     and concatenates it with [path].
+     If [split] is specified, the environment variable is expected
+     to contain a list of paths separated by character [split].
+     Otherwise the environment variable is expected to contain a single path. *)
+  let env ?split name path =
+    match getenv_opt name with
+    | None -> []
+    | Some value -> (
+        match split with
+        | None -> [Filename.concat value path]
+        | Some char ->
+            List.map (fun dir -> dir // path) (String.split_on_char char value))
+  in
+  (* [cwd path] is the current directory concatenated to [path]. *)
+  let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
+  (* List directories where we could find zcash parameter files.
+     Directories with higher priority come first. *)
+  let candidate_directories =
+    env "XDG_DATA_HOME" ".local/share/zcash-params"
+    @ env ~split:':' "XDG_DATA_DIRS" "zcash-params"
+    @ env "OPAM_SWITCH_PREFIX" "share/zcash-params"
+    @ env "PWD" "_opam/share/zcash-params"
+    @ cwd "_opam/share/zcash-params"
+    @ env "HOME" ".zcash-params"
+    @ env "HOME" ".local/share/zcash-params"
+    @ ["/usr/local/share/zcash-params"; "/usr/share/zcash-params"]
+  in
+  (* Files we are looking for. *)
+  let spend_path = "sapling-spend.params" in
+  let output_path = "sapling-output.params" in
+  (* Find the first candidate directory that contains the expected files. *)
+  let directory =
+    let contains_zcash_files directory =
+      file_exists (directory // spend_path)
+      && file_exists (directory // output_path)
+    in
+    match List.find_opt contains_zcash_files candidate_directories with
+    | None -> raise (Params_not_found candidate_directories)
+    | Some directory -> directory
+  in
+  let spend_path = directory // spend_path in
+  let output_path = directory // output_path in
+  {spend_path; output_path}
 
 let init_params () =
-  let home = Option.value (Sys.getenv_opt "HOME") ~default:"/" in
-  let opam_switch =
-    match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
-    | Some _ as x ->
-        x
-    | None -> (
-      match Sys.getenv_opt "PWD" with
-      | Some d ->
-          let switch = Filename.concat d "_opam" in
-          if Sys.file_exists switch then Some switch else None
-      | None ->
-          None )
-  in
-  let candidates =
-    Option.fold
-      ~none:[]
-      ~some:(fun d -> [Filename.concat d "share/zcash-params"])
-      opam_switch
-  in
-  let candidates = candidates @ [Filename.concat home ".zcash-params"] in
-  let data_home =
-    match Sys.getenv_opt "XDG_DATA_HOME" with
-    | Some x ->
-        x
-    | None ->
-        Filename.concat home ".local/share/"
-  in
-  let data_dirs =
-    data_home
-    :: String.split_on_char
-         ':'
-         (Option.value
-            (Sys.getenv_opt "XDG_DATA_DIRS")
-            ~default:"/usr/local/share/:/usr/share/")
-  in
-  let candidates =
-    List.fold_right
-      (fun x acc -> Filename.concat x "zcash-params" :: acc)
-      data_dirs
-      candidates
-  in
-  let prefix_opt =
-    List.fold_left
-      (fun acc x ->
-        match acc with
-        | Some _ ->
-            acc
-        | None ->
-            if Sys.file_exists x then Some x else acc)
-      None
-      candidates
-  in
-  let prefix =
-    match prefix_opt with
-    | Some p ->
-        p
-    | None ->
-        raise (Params_not_found candidates)
-  in
-  let spend_path = prefix ^ "/sapling-spend.params" in
+  let {spend_path; output_path} = find_params () in
   let spend_hash =
     "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c\000"
   in
-  let output_path = prefix ^ "/sapling-output.params" in
   let output_hash =
     "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
   in

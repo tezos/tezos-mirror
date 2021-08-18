@@ -45,6 +45,8 @@ module Timestamp = struct
   include Time_repr
 
   let current = Raw_context.current_timestamp
+
+  let predecessor = Raw_context.predecessor_timestamp
 end
 
 include Operation_repr
@@ -77,15 +79,10 @@ module Script_timestamp = struct
   include Script_timestamp_repr
 
   let now ctxt =
-    let {Constants_repr.time_between_blocks; _} = Raw_context.constants ctxt in
-    match time_between_blocks with
-    | [] ->
-        failwith
-          "Internal error: 'time_between_block' constants is an empty list."
-    | first_delay :: _ ->
-        let current_timestamp = Raw_context.predecessor_timestamp ctxt in
-        Time.add current_timestamp (Period_repr.to_seconds first_delay)
-        |> Timestamp.to_seconds |> of_int64
+    let {Constants_repr.minimal_block_delay; _} = Raw_context.constants ctxt in
+    let current_timestamp = Raw_context.predecessor_timestamp ctxt in
+    Time.add current_timestamp (Period_repr.to_seconds minimal_block_delay)
+    |> Timestamp.to_seconds |> of_int64
 end
 
 module Script = struct
@@ -93,14 +90,14 @@ module Script = struct
   include Script_repr
 
   let force_decode_in_context ctxt lexpr =
-    Script_repr.force_decode lexpr
-    >>? fun (v, cost) ->
-    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (v, ctxt)
+    Raw_context.consume_gas ctxt (Script_repr.force_decode_cost lexpr)
+    >>? fun ctxt ->
+    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
-    Script_repr.force_bytes lexpr
-    >>? fun (b, cost) ->
-    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (b, ctxt)
+    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    >>? fun ctxt ->
+    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
 end
 
 module Fees = Fees_storage
@@ -128,18 +125,24 @@ module Gas = struct
 
   type error += Block_quota_exceeded = Raw_context.Block_quota_exceeded
 
-  type error +=
-    | Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
+  type error += Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
 
-  let check_limit = Raw_context.check_gas_limit
+  let check_limit_is_valid = Raw_context.check_gas_limit_is_valid
 
   let set_limit = Raw_context.set_gas_limit
+
+  let consume_limit_in_block = Raw_context.consume_gas_limit_in_block
 
   let set_unlimited = Raw_context.set_gas_unlimited
 
   let consume = Raw_context.consume_gas
 
-  let check_enough = Raw_context.check_enough_gas
+  let remaining_operation_gas = Raw_context.remaining_operation_gas
+
+  let update_remaining_operation_gas =
+    Raw_context.update_remaining_operation_gas
+
+  let gas_exhausted_error = Raw_context.gas_exhausted_error
 
   let level = Raw_context.gas_level
 
@@ -189,14 +192,14 @@ module Big_map = struct
 
   let get_opt c m k = Storage.Big_map.Contents.find (c, m) k
 
+  let list_values ?offset ?length c m =
+    Storage.Big_map.Contents.list_values ?offset ?length (c, m)
+
   let exists c id =
-    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0)
-    >>?= fun c ->
-    Storage.Big_map.Key_type.find c id
-    >>=? fun kt ->
+    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) >>?= fun c ->
+    Storage.Big_map.Key_type.find c id >>=? fun kt ->
     match kt with
-    | None ->
-        return (c, None)
+    | None -> return (c, None)
     | Some kt ->
         Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
 end
@@ -247,9 +250,20 @@ module Global = struct
   let set_block_priority = Storage.Block_priority.update
 end
 
+module Migration = Migration_repr
+
 let prepare_first_block = Init_storage.prepare_first_block
 
 let prepare = Init_storage.prepare
+
+(* The rationale behind the value of this constant is that an
+   operation should be considered as alive for about one hour:
+
+   minimal_block_delay context *  max_operations_ttl = 3600
+
+   To avoid an unecessary computation, we have hard-coded the value of
+   this constant.  *)
+let max_operations_ttl = 120
 
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
@@ -258,7 +272,7 @@ let finalize ?commit_message:message c =
     Updater.context;
     fitness;
     message;
-    max_operations_ttl = 60;
+    max_operations_ttl;
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
@@ -297,3 +311,4 @@ let get_rewards = Raw_context.get_rewards
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
+module Liquidity_baking = Liquidity_baking_repr

@@ -78,30 +78,20 @@ module Event_filter = struct
   let rec run ~section ~level ~name filter =
     let continue = run ~section ~level ~name in
     match filter with
-    | True ->
-        true
-    | False ->
-        false
-    | Or l ->
-        List.exists continue l
-    | And l ->
-        List.for_all continue l
-    | Name s ->
-        String.equal s name
-    | Name_matches re ->
-        Re.execp re name
-    | Level_in l ->
-        List.mem level l
-    | Section_in l ->
-        List.mem section l
+    | True -> true
+    | False -> false
+    | Or l -> List.exists continue l
+    | And l -> List.for_all continue l
+    | Name s -> String.equal s name
+    | Name_matches re -> Re.execp re name
+    | Level_in l -> List.mem ~equal:Internal_event.Level.equal level l
+    | Section_in l -> List.mem ~equal:Internal_event.Section.equal section l
 
   let rec pp fmt filter =
     let open Format in
     match filter with
-    | True ->
-        pp_print_string fmt "true"
-    | False ->
-        pp_print_string fmt "false"
+    | True -> pp_print_string fmt "true"
+    | False -> pp_print_string fmt "false"
     | Or l ->
         fprintf
           fmt
@@ -114,10 +104,8 @@ module Event_filter = struct
           "(and@ @[<2>%a@]"
           (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@ ") pp)
           l
-    | Name s ->
-        fprintf fmt "(name-is@ %S)" s
-    | Name_matches re ->
-        fprintf fmt "(name-matches@ %a)" Re.pp_re re
+    | Name s -> fprintf fmt "(name-is@ %S)" s
+    | Name_matches re -> fprintf fmt "(name-matches@ %a)" Re.pp_re re
     | Level_in l ->
         fprintf
           fmt
@@ -129,11 +117,7 @@ module Event_filter = struct
           "(section-in@ [%a])"
           (pp_print_list
              ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
-             (fun fmt s ->
-               fprintf
-                 fmt
-                 "(Some %s)"
-                 (String.concat "," (Internal_event.Section.to_string_list s))))
+             (fun fmt s -> fprintf fmt "(Some %a)" Internal_event.Section.pp s))
           l
     [@@warning "-32"]
 
@@ -168,17 +152,13 @@ module Event_filter = struct
     List.fold_left
       (fun acc l ->
         match acc with
-        | [] ->
-            if l = lvl then [l] else []
-        | _ :: _ as acc ->
-            l :: acc)
+        | [] -> if l = lvl then [l] else []
+        | _ :: _ as acc -> l :: acc)
       []
       levels_in_order
     |> function
-    | [] ->
-        raise (Failure "level_at_least not found")
-    | _ :: _ as levels ->
-        level_in levels
+    | [] -> raise (Failure "level_at_least not found")
+    | _ :: _ as levels -> level_in levels
 end
 
 type t = {
@@ -212,17 +192,14 @@ let wrapped_encoding event_encoding =
 
 module Section_dir = struct
   let of_section (section : Internal_event.Section.t) =
-    String.concat "." (Internal_event.Section.to_string_list section)
+    Format.asprintf "%a" Internal_event.Section.pp section
 
   let section_name = function
-    | "no-section" ->
-        Ok None
+    | "no-section" -> Ok None
     | other -> (
-      match TzString.remove_prefix ~prefix:"section-" other with
-      | None ->
-          Error "wrong-dir-name"
-      | Some s ->
-          Ok (Some s) )
+        match TzString.remove_prefix ~prefix:"section-" other with
+        | None -> Error "wrong-dir-name"
+        | Some s -> Ok (Some s))
 end
 
 module Sink_implementation : Internal_event.SINK with type t = t = struct
@@ -235,15 +212,12 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       let name_res =
         Uri.get_query_param' uri "name-matches" |> Option.value ~default:[]
       in
-      let names =
-        Uri.get_query_param' uri "name" |> Option.value ~default:[]
-      in
+      let names = Uri.get_query_param' uri "name" |> Option.value ~default:[] in
       let levels =
         let ( >?? ) = Option.bind in
         Uri.get_query_param uri "level-at-least"
         >?? Internal_event.Level.of_string
-        |> Option.fold ~none:[] ~some:(fun l ->
-               [Event_filter.level_at_least l])
+        |> Option.fold ~none:[] ~some:(fun l -> [Event_filter.level_at_least l])
       in
       let sections =
         let somes =
@@ -257,16 +231,12 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         in
         let none =
           match Uri.get_query_param uri "no-section" with
-          | Some "true" ->
-              [Internal_event.Section.empty]
-          | _ ->
-              []
+          | Some "true" -> [Internal_event.Section.empty]
+          | _ -> []
         in
         match somes @ none with
-        | [] ->
-            []
-        | more ->
-            [Event_filter.section_in more]
+        | [] -> []
+        | more -> [Event_filter.section_in more]
       in
       Event_filter.(
         match
@@ -274,10 +244,8 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
           @ List.map name_matches_posix name_res
           @ List.map name_is names
         with
-        | [] ->
-            t
-        | more ->
-            any more)
+        | [] -> t
+        | more -> any more)
     in
     let t =
       {path = Uri.path uri; lwt_bad_citizen_hack = ref []; event_filter}
@@ -289,10 +257,8 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       (fun () ->
         Lwt_utils_unix.create_dir ~perm:0o700 (Filename.dirname file_path)
         >>= fun () ->
-        Lwt_utils_unix.Json.write_file file_path event_json
-        >>= function
-        | Ok () ->
-            return_unit
+        Lwt_utils_unix.Json.write_file file_path event_json >>= function
+        | Ok () -> return_unit
         | Error el ->
             failwith
               "ERROR while Handling %a,@ cannot write JSON to %s:@ %a\n%!"
@@ -339,16 +305,14 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
             dir_path
             (Printf.sprintf "%s_%s_%s.json" date time tag)
         in
-        lwt_bad_citizen_hack :=
-          (file_path, event_json) :: !lwt_bad_citizen_hack ;
+        lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
         output_json file_path event_json ~pp:(fun fmt () ->
             M.pp ~short:false fmt forced)
         >>=? fun () ->
         lwt_bad_citizen_hack :=
           List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
         return_unit
-    | false ->
-        return_unit
+    | false -> return_unit
 
   let close {lwt_bad_citizen_hack; _} =
     List.iter_es
@@ -365,15 +329,12 @@ open Sink_implementation
 module Query = struct
   let with_file_kind dir p =
     protect (fun () ->
-        Lwt_unix.stat (Filename.concat dir p)
-        >>= fun {Lwt_unix.st_kind; _} -> return st_kind)
+        Lwt_unix.stat (Filename.concat dir p) >>= fun {Lwt_unix.st_kind; _} ->
+        return st_kind)
     >>=? function
-    | Unix.S_DIR ->
-        return (`Directory p)
-    | Unix.S_REG ->
-        return (`Regular_file p)
-    | (Unix.S_CHR | Unix.S_BLK | Unix.S_LNK | Unix.S_FIFO | Unix.S_SOCK) as k
-      ->
+    | Unix.S_DIR -> return (`Directory p)
+    | Unix.S_REG -> return (`Regular_file p)
+    | (Unix.S_CHR | Unix.S_BLK | Unix.S_LNK | Unix.S_FIFO | Unix.S_SOCK) as k ->
         return (`Special (k, p))
 
   let fold_directory path ~init ~f =
@@ -384,8 +345,8 @@ module Query = struct
       protect (fun () ->
           Lwt.catch
             (fun () ->
-              Lwt_unix.readdir dirhandle
-              >>= fun d -> with_file_kind path d >>=? fun wk -> return_some wk)
+              Lwt_unix.readdir dirhandle >>= fun d ->
+              with_file_kind path d >>=? fun wk -> return_some wk)
             (function
               | End_of_file ->
                   Lwt_unix.closedir dirhandle >>= fun () -> return_none
@@ -395,8 +356,7 @@ module Query = struct
                     path
                     (Printexc.to_string e)))
       >>=? fun opt ->
-      prev
-      >>=? fun p ->
+      prev >>=? fun p ->
       match opt with Some more -> iter (f p more) | None -> prev
     in
     iter init
@@ -416,24 +376,16 @@ module Query = struct
     let rec check_logic check_terminal (t : t) string =
       let continue = check_logic check_terminal in
       match t with
-      | `All ->
-          true
-      | `And (a, b) ->
-          continue a string && continue b string
-      | `Or (a, b) ->
-          continue a string || continue b string
-      | (`Date _ | `Time _) as term ->
-          check_terminal term
+      | `All -> true
+      | `And (a, b) -> continue a string && continue b string
+      | `Or (a, b) -> continue a string || continue b string
+      | (`Date _ | `Time _) as term -> check_terminal term
 
     let op_with_string = function
-      | `Lt ->
-          fun a b -> String.compare a b > 0
-      | `Gt ->
-          fun a b -> String.compare a b < 0
-      | `Le ->
-          fun a b -> String.compare a b >= 0
-      | `Ge ->
-          fun a b -> String.compare a b <= 0
+      | `Lt -> fun a b -> String.compare a b > 0
+      | `Gt -> fun a b -> String.compare a b < 0
+      | `Le -> fun a b -> String.compare a b >= 0
+      | `Ge -> fun a b -> String.compare a b <= 0
 
     let check_date (t : t) date_string =
       check_logic
@@ -441,8 +393,7 @@ module Query = struct
           | `Date (op, f) ->
               let s = Micro_seconds.(date_string (of_float f) |> fst) in
               op_with_string op s date_string
-          | `Time _ ->
-              true)
+          | `Time _ -> true)
         t
         date_string
 
@@ -452,8 +403,7 @@ module Query = struct
           | `Time (op, f) ->
               let s = Micro_seconds.(date_string (of_float f) |> snd) in
               op_with_string op s string
-          | `Date _ ->
-              true)
+          | `Date _ -> true)
         t
         Micro_seconds.date_string
   end
@@ -473,21 +423,21 @@ module Query = struct
       let open Format in
       let error fmt = function
         | `Parsing_event e -> (
-          match e with
-          | `Encoding (path, exn) ->
-              fprintf
-                fmt
-                "@[Parse error:@ wrong encoding for %S: %a@]"
-                path
-                pp_exn
-                exn
-          | `Json (path, el) ->
-              fprintf
-                fmt
-                "@[Parse error:@ wrong JSON for %S: %a@]"
-                path
-                pp_print_error
-                el )
+            match e with
+            | `Encoding (path, exn) ->
+                fprintf
+                  fmt
+                  "@[Parse error:@ wrong encoding for %S: %a@]"
+                  path
+                  pp_exn
+                  exn
+            | `Json (path, el) ->
+                fprintf
+                  fmt
+                  "@[Parse error:@ wrong JSON for %S: %a@]"
+                  path
+                  pp_print_error
+                  el)
         | `Cannot_recognize_section sec ->
             fprintf
               fmt
@@ -503,10 +453,8 @@ module Query = struct
             fprintf fmt "Unknown event name@ %S@ at@ %S" name path
       in
       match x with
-      | `Error e ->
-          fprintf fmt "@[Error:@ %a@]" error e
-      | `Warning e ->
-          fprintf fmt "@[Warning:@ %a@]" warning e
+      | `Error e -> fprintf fmt "@[Error:@ %a@]" error e
+      | `Warning e -> fprintf fmt "@[Warning:@ %a@]" warning e
 
     let make_return m ((prev : item list), value) warning =
       return (m warning :: prev, value)
@@ -519,63 +467,55 @@ module Query = struct
   open Report
 
   let fold_event_kind_directory ~time_query path ~init ~f =
-    fold_directory path ~init:(return init) ~f:(fun previous ->
-      function
-      | `Directory "." | `Directory ".." ->
-          return previous
+    fold_directory path ~init:(return init) ~f:(fun previous -> function
+      | `Directory "." | `Directory ".." -> return previous
       | `Directory date when Time_constraint.check_date time_query date ->
           fold_directory
             (path // date)
             ~init:(return previous)
-            ~f:(fun previous ->
-            function
-            | `Directory "." | `Directory ".." ->
-                return previous
-            | `Directory time when Time_constraint.check_time time_query time
-              ->
+            ~f:(fun previous -> function
+            | `Directory "." | `Directory ".." -> return previous
+            | `Directory time when Time_constraint.check_time time_query time ->
                 fold_directory
                   (path // date // time)
                   ~init:(return previous)
-                  ~f:(fun previous -> function
-                    | `Directory "." | `Directory ".." -> return previous
-                    | `Regular_file file ->
-                        f previous (path // date // time // file)
-                    | `Directory p | `Special (_, p) ->
-                        return_with_warning
-                          previous
-                          (`Expecting_regular_file_at
-                            (path // date // time // p)))
-            | `Directory _ (* filtered out *) ->
-                return previous
+                  ~f:
+                    (fun previous -> function
+                      | `Directory "." | `Directory ".." -> return previous
+                      | `Regular_file file ->
+                          f previous (path // date // time // file)
+                      | `Directory p | `Special (_, p) ->
+                          return_with_warning
+                            previous
+                            (`Expecting_regular_file_at
+                              (path // date // time // p)))
+            | `Directory _ (* filtered out *) -> return previous
             | `Regular_file p | `Special (_, p) ->
                 return_with_warning
                   previous
                   (`Expecting_directory_at (path // date // p)))
-      | `Directory _ (* filtered out *) ->
-          return previous
+      | `Directory _ (* filtered out *) -> return previous
       | `Regular_file p | `Special (_, p) ->
           return_with_warning previous (`Expecting_directory_at (path // p)))
 
-  let handle_event_kind_directory (type a) ~time_query ~section_path ~init ~f
-      ev =
-    let module Event = ( val ev : Internal_event.EVENT_DEFINITION
-                           with type t = a )
+  let handle_event_kind_directory (type a) ~time_query ~section_path ~init ~f ev
+      =
+    let module Event = (val ev : Internal_event.EVENT_DEFINITION with type t = a)
     in
     let handle_event_file previous path =
-      Lwt_utils_unix.Json.read_file path
-      >>= function
+      Lwt_utils_unix.Json.read_file path >>= function
       | Ok json -> (
-        try
-          let {time_stamp; event; _} =
-            Data_encoding.Json.destruct (wrapped_encoding Event.encoding) json
-          in
-          f
-            (snd previous)
-            ~time_stamp:(time_stamp :> float)
-            (Internal_event.Generic.Event (Event.name, ev, event))
-          >>=? fun user_return -> return (fst previous, user_return)
-        with e ->
-          return_with_error previous (`Parsing_event (`Encoding (path, e))) )
+          try
+            let {time_stamp; event; _} =
+              Data_encoding.Json.destruct (wrapped_encoding Event.encoding) json
+            in
+            f
+              (snd previous)
+              ~time_stamp:(time_stamp :> float)
+              (Internal_event.Generic.Event (Event.name, ev, event))
+            >>=? fun user_return -> return (fst previous, user_return)
+          with e ->
+            return_with_error previous (`Parsing_event (`Encoding (path, e))))
       | Error el ->
           return_with_error previous (`Parsing_event (`Json (path, el)))
     in
@@ -585,71 +525,69 @@ module Query = struct
       ~init
       ~f:(fun prev file -> handle_event_file prev file)
 
-  let fold ?on_unknown ?only_sections ?only_names ?(time_query = `All) uri
-      ~init ~f =
+  let fold ?on_unknown ?only_sections ?only_names ?(time_query = `All) uri ~init
+      ~f =
     let name_matches =
       match only_names with
-      | None ->
-          fun _ -> true
-      | Some l ->
-          fun name -> List.mem name l
+      | None -> fun _ -> true
+      | Some l -> fun name -> List.mem ~equal:String.equal name l
     in
     let section_matches =
       match only_sections with
-      | None ->
-          fun _ -> true
-      | Some l ->
-          fun name -> List.mem name l
+      | None -> fun _ -> true
+      | Some l -> fun name -> List.mem ~equal:(Option.equal String.equal) name l
     in
-    configure uri
-    >>=? fun {path = sink_path; _} ->
+    configure uri >>=? fun {path = sink_path; _} ->
     fold_directory
       sink_path
       ~init:(return ([], init))
-      ~f:(fun previous -> function `Directory ("." | "..") -> return previous
-        | `Directory dir -> (
-          match Section_dir.section_name dir with
-          | Ok sec when section_matches sec ->
-              fold_directory
-                (sink_path // dir)
-                ~init:(return ([], init))
-                ~f:(fun previous -> function `Directory ("." | "..") ->
-                      return previous
-                  | `Directory event_name when name_matches event_name -> (
-                      let open Internal_event in
-                      match All_definitions.find (( = ) event_name) with
-                      | Some (Generic.Definition (_, ev)) ->
-                          handle_event_kind_directory
-                            ~time_query
-                            ev
-                            ~section_path:(sink_path // dir)
-                            ~init:previous
-                            ~f
-                      | None -> (
-                        match on_unknown with
-                        | None ->
+      ~f:
+        (fun previous -> function
+          | `Directory ("." | "..") -> return previous
+          | `Directory dir -> (
+              match Section_dir.section_name dir with
+              | Ok sec when section_matches sec ->
+                  fold_directory
+                    (sink_path // dir)
+                    ~init:(return ([], init))
+                    ~f:
+                      (fun previous -> function
+                        | `Directory ("." | "..") -> return previous
+                        | `Directory event_name when name_matches event_name
+                          -> (
+                            let open Internal_event in
+                            match All_definitions.find (( = ) event_name) with
+                            | Some (Generic.Definition (_, _, ev)) ->
+                                handle_event_kind_directory
+                                  ~time_query
+                                  ev
+                                  ~section_path:(sink_path // dir)
+                                  ~init:previous
+                                  ~f
+                            | None -> (
+                                match on_unknown with
+                                | None ->
+                                    return_with_warning
+                                      previous
+                                      (`Unknown_event_name_at
+                                        (event_name, sink_path // dir))
+                                | Some f ->
+                                    fold_event_kind_directory
+                                      ~time_query
+                                      (sink_path // dir // event_name)
+                                      ~init:previous
+                                      ~f:(fun prev file ->
+                                        f file >>=? fun () -> return prev)))
+                        | `Directory _ (* filtered out *) -> return previous
+                        | `Regular_file p | `Special (_, p) ->
                             return_with_warning
                               previous
-                              (`Unknown_event_name_at
-                                (event_name, sink_path // dir))
-                        | Some f ->
-                            fold_event_kind_directory
-                              ~time_query
-                              (sink_path // dir // event_name)
-                              ~init:previous
-                              ~f:(fun prev file ->
-                                f file >>=? fun () -> return prev) ) )
-                  | `Directory _ (* filtered out *) -> return previous
-                  | `Regular_file p | `Special (_, p) ->
-                      return_with_warning
-                        previous
-                        (`Expecting_directory_at (sink_path // p)))
-          | Ok _ (* section does not match *) ->
-              return previous
-          | Error _ ->
-              return_with_error previous (`Cannot_recognize_section dir) )
-        | `Regular_file p | `Special (_, p) ->
-            return_with_warning
-              previous
-              (`Expecting_directory_at (sink_path // p)))
+                              (`Expecting_directory_at (sink_path // p)))
+              | Ok _ (* section does not match *) -> return previous
+              | Error _ ->
+                  return_with_error previous (`Cannot_recognize_section dir))
+          | `Regular_file p | `Special (_, p) ->
+              return_with_warning
+                previous
+                (`Expecting_directory_at (sink_path // p)))
 end

@@ -96,13 +96,15 @@ module Big_map = struct
       Micheline.strip_locations
         (Script_repr.strip_annotations (Micheline.root value_type))
     in
-    Storage.Big_map.Key_type.init ctxt id key_type
-    >>=? fun ctxt -> Storage.Big_map.Value_type.init ctxt id value_type
+    Storage.Big_map.Key_type.init ctxt id key_type >>=? fun ctxt ->
+    Storage.Big_map.Value_type.init ctxt id value_type
 
   let apply_update ctxt ~id
-      { key = _key_is_shown_only_on_the_receipt_in_print_big_map_diff;
+      {
+        key = _key_is_shown_only_on_the_receipt_in_print_big_map_diff;
         key_hash;
-        value } =
+        value;
+      } =
     match value with
     | None ->
         Storage.Big_map.Contents.remove (ctxt, id) key_hash
@@ -122,8 +124,8 @@ module Big_map = struct
   let apply_updates ctxt ~id updates =
     fold_left_s
       (fun (ctxt, size) update ->
-        apply_update ctxt ~id update
-        >|=? fun (ctxt, added_size) -> (ctxt, Z.add size added_size))
+        apply_update ctxt ~id update >|=? fun (ctxt, added_size) ->
+        (ctxt, Z.add size added_size))
       (ctxt, Z.zero)
       updates
 
@@ -156,11 +158,9 @@ end
 
 let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
   function
-  | Big_map ->
-      (module Big_map)
-  | Sapling_state ->
-      (module Sapling_state)
-  [@@coq_axiom "gadt"]
+  | Big_map -> (module Big_map)
+  | Sapling_state -> (module Sapling_state)
+  [@@coq_axiom_with_reason "gadt"]
 
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
@@ -173,7 +173,8 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
  fun (module OPS) ->
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"update"
         (obj2
@@ -196,10 +197,8 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
            (req "source" OPS.Id.encoding)
            (req "updates" OPS.updates_encoding))
         (function
-          | Update {init = Copy {src}; updates} ->
-              Some ((), src, updates)
-          | _ ->
-              None)
+          | Update {init = Copy {src}; updates} -> Some ((), src, updates)
+          | _ -> None)
         (fun ((), src, updates) -> Update {init = Copy {src}; updates});
       case
         (Tag 3)
@@ -210,11 +209,10 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
               (req "updates" OPS.updates_encoding))
            OPS.alloc_encoding)
         (function
-          | Update {init = Alloc alloc; updates} ->
-              Some (((), updates), alloc)
-          | _ ->
-              None)
-        (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates}) ]
+          | Update {init = Alloc alloc; updates} -> Some (((), updates), alloc)
+          | _ -> None)
+        (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates});
+    ]
 
 (**
   [apply_updates ctxt ops ~id init] applies the updates [updates] on lazy
@@ -229,14 +227,12 @@ let apply_updates :
     u ->
     (Raw_context.t * Z.t) tzresult Lwt.t =
  fun ctxt (module OPS) ~id updates ->
-  OPS.apply_updates ctxt ~id updates
-  >>=? fun (ctxt, updates_size) ->
+  OPS.apply_updates ctxt ~id updates >>=? fun (ctxt, updates_size) ->
   if Z.(equal updates_size zero) then return (ctxt, updates_size)
   else
-    OPS.Total_bytes.get ctxt id
-    >>=? fun size ->
-    OPS.Total_bytes.update ctxt id (Z.add size updates_size)
-    >|=? fun ctxt -> (ctxt, updates_size)
+    OPS.Total_bytes.get ctxt id >>=? fun size ->
+    OPS.Total_bytes.update ctxt id (Z.add size updates_size) >|=? fun ctxt ->
+    (ctxt, updates_size)
 
 (**
   [apply_init ctxt ops ~id init] applies the initialization [init] on lazy
@@ -254,21 +250,17 @@ let apply_init :
     (Raw_context.t * Z.t) tzresult Lwt.t =
  fun ctxt (module OPS) ~id init ->
   match init with
-  | Existing ->
-      return (ctxt, Z.zero)
+  | Existing -> return (ctxt, Z.zero)
   | Copy {src} ->
-      OPS.copy ctxt ~from:src ~to_:id
-      >>=? fun ctxt ->
+      OPS.copy ctxt ~from:src ~to_:id >>=? fun ctxt ->
       if OPS.Id.is_temp id then return (ctxt, Z.zero)
       else
-        OPS.Total_bytes.get ctxt src
-        >>=? fun copy_size ->
+        OPS.Total_bytes.get ctxt src >>=? fun copy_size ->
         return (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
   | Alloc alloc ->
-      OPS.Total_bytes.init ctxt id Z.zero
-      >>=? fun ctxt ->
-      OPS.alloc ctxt id alloc
-      >>=? fun ctxt -> return (ctxt, OPS.bytes_size_for_empty)
+      OPS.Total_bytes.init ctxt id Z.zero >>=? fun ctxt ->
+      OPS.alloc ctxt id alloc >>=? fun ctxt ->
+      return (ctxt, OPS.bytes_size_for_empty)
 
 (**
   [apply_diff ctxt ops ~id diff] applies the diff [diff] on lazy storage [id]
@@ -290,16 +282,12 @@ let apply_diff :
       if OPS.Id.is_temp id then
         OPS.remove ctxt id >|= fun ctxt -> ok (ctxt, Z.zero)
       else
-        OPS.Total_bytes.get ctxt id
-        >>=? fun size ->
-        OPS.remove ctxt id
-        >>= fun ctxt ->
+        OPS.Total_bytes.get ctxt id >>=? fun size ->
+        OPS.remove ctxt id >>= fun ctxt ->
         return (ctxt, Z.neg (Z.add size OPS.bytes_size_for_empty))
   | Update {init; updates} ->
-      apply_init ctxt ops ~id init
-      >>=? fun (ctxt, init_size) ->
-      apply_updates ctxt ops ~id updates
-      >>=? fun (ctxt, updates_size) ->
+      apply_init ctxt ops ~id init >>=? fun (ctxt, init_size) ->
+      apply_updates ctxt ops ~id updates >>=? fun (ctxt, updates_size) ->
       return (ctxt, Z.add init_size updates_size)
 
 type diffs_item =
@@ -329,13 +317,11 @@ let item_encoding =
               (req "diff" (diff_encoding ops)))
            (fun (Item (kind, id, diff)) ->
              match Lazy_storage_kind.equal k kind with
-             | Eq ->
-                 Some ((), id, diff)
-             | Neq ->
-                 None)
+             | Eq -> Some ((), id, diff)
+             | Neq -> None)
            (fun ((), id, diff) -> Item (k, id, diff)))
        Lazy_storage_kind.all
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
 
 type diffs = diffs_item list
 
@@ -347,12 +333,10 @@ let apply ctxt diffs =
   fold_left_s
     (fun (ctxt, total_size) (Item (k, id, diff)) ->
       let ops = get_ops k in
-      apply_diff ctxt ops id diff
-      >|=? fun (ctxt, added_size) ->
+      apply_diff ctxt ops id diff >|=? fun (ctxt, added_size) ->
       let (module OPS) = ops in
       ( ctxt,
-        if OPS.Id.is_temp id then total_size else Z.add total_size added_size
-      ))
+        if OPS.Id.is_temp id then total_size else Z.add total_size added_size ))
     (ctxt, Z.zero)
     diffs
 
@@ -370,7 +354,7 @@ let fresh :
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
- [@@coq_axiom "gadt"]
+ [@@coq_axiom_with_reason "gadt"]
 
 let init ctxt =
   fold_left_s
@@ -379,7 +363,7 @@ let init ctxt =
       OPS.Next.init ctxt)
     ctxt
     Lazy_storage_kind.all
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
 
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
@@ -390,4 +374,16 @@ let cleanup_temporaries ctxt =
         ctxt
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
+
+(* Remove me after Granada *)
+let cleanup_edo_florence_dangling_lazy_storage ctxt =
+  let (ctxt, ()) =
+    Raw_context.fold_map_temporary_lazy_storage_ids
+      ctxt
+      (fun _prev_temp_ids_should_be_zero ->
+        ( Lazy_storage_kind.Temp_ids
+          .threshold_for_edo_florence_dangling_lazy_storage_cleanup,
+          () ))
+  in
+  cleanup_temporaries ctxt

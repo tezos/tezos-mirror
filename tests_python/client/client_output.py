@@ -64,8 +64,14 @@ class TransferResult:
         pattern = r"--branch ?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
+            self.branch_hash = None
+        else:
+            self.branch_hash = match.groups()[0]
+        pattern = r"Fee to the baker: ꜩ(.*)"
+        match = re.search(pattern, client_output)
+        if match is None:
             raise InvalidClientOutput(client_output)
-        self.branch_hash = match.groups()[0]
+        self.fees = float(match.groups()[0])
 
 
 class GetReceiptResult:
@@ -265,9 +271,7 @@ class SetDelegateResult:
         self.operation_hash = match.groups()[0]
         pattern = r"--branch ?(\w*)"
         match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.branch_hash = match.groups()[0]
+        self.branch_hash = None if match is None else match.groups()[0]
 
 
 class GetDelegateResult:
@@ -523,3 +527,40 @@ class CheckSignMessageResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.check = True
+
+
+class ViewResult:
+    """Result of a 'run tzip4 view...' command."""
+
+    def __init__(self, client_output: str):
+        self.result = client_output
+
+
+class FA12CheckResult:
+    """Result of a 'check contract .. has fa1.2 interface` command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"has an FA1.2 interface."
+        match = re.search(pattern, client_output)
+        if match is None:
+            pattern = r"Not a supported FA1.2 contract."
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.check = False
+        else:
+            self.check = True
+
+
+class FA12ViewResult:
+    """Result of a 'from fa1.2 contract .. get ..` command."""
+
+    def __init__(self, client_output: str):
+        try:
+            pattern = r"([\w.]*)"
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.amount = int(match.groups()[0])
+        except Exception as exception:
+            raise InvalidClientOutput(client_output) from exception

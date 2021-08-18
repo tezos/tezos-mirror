@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,20 +39,20 @@ let commands () =
       title = "Commands to perform privileged operations on the node";
     }
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Make the node forget its decision of rejecting blocks."
       no_options
-      ( prefixes ["unmark"; "invalid"]
+      (prefixes ["unmark"; "invalid"]
       @@ seq_of_param
            (block_param
               ~name:"block"
-              ~desc:"blocks to remove from invalid list") )
+              ~desc:"blocks to remove from invalid list"))
       (fun () blocks (cctxt : #Client_context.full) ->
         List.iter_es
           (fun block ->
-            Shell_services.Invalid_blocks.delete cctxt block
-            >>=? fun () ->
+            Shell_services.Invalid_blocks.delete cctxt block >>=? fun () ->
             cctxt#message
               "Block %a no longer marked invalid."
               Block_hash.pp
@@ -64,12 +65,10 @@ let commands () =
       no_options
       (prefixes ["unmark"; "all"; "invalid"; "blocks"] @@ stop)
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Invalid_blocks.list cctxt ()
-        >>=? fun invalid_blocks ->
+        Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
         List.iter_es
           (fun {Chain_services.hash; _} ->
-            Shell_services.Invalid_blocks.delete cctxt hash
-            >>=? fun () ->
+            Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
             cctxt#message
               "Block %a no longer marked invalid."
               Block_hash.pp_short
@@ -79,8 +78,8 @@ let commands () =
     command
       ~group
       ~desc:
-        "Retrieve the current checkpoint and display it in a format \
-         compatible with node argument `--checkpoint`."
+        "Retrieve the current checkpoint and display it in a format compatible \
+         with node argument `--checkpoint`."
       no_options
       (fixed ["show"; "current"; "checkpoint"])
       (fun () (cctxt : #Client_context.full) ->
@@ -90,7 +89,7 @@ let commands () =
           "@[<v 0>Checkpoint: %s@,\
            Checkpoint level: %ld@,\
            History mode: %a@,\
-           Save point level: %ld@,\
+           Savepoint level: %ld@,\
            Caboose level: %ld@]"
           (Block_header.to_b58check block_header)
           block_header.shell.level
@@ -98,4 +97,5 @@ let commands () =
           history_mode
           save_point
           caboose
-        >>= fun () -> return ()) ]
+        >>= fun () -> return ());
+  ]

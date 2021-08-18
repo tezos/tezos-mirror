@@ -62,6 +62,10 @@
       by a parent monitoring process (non-standard feature available
       on mainstream UNIX hosts, e.g. Linux and MacOSX).
 
+    - ["export TEZOS_NODE_HOSTNAME=hostname"]
+      The [hostname] will be used in the JSON representation of the event.
+      By default, it is the hostname given by [Unix.gethostname ()].
+
 *)
 
 type t

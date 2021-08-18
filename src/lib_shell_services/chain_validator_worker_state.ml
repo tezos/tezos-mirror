@@ -30,7 +30,8 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Hash"
           (obj1 (req "hash" Block_hash.encoding))
@@ -41,13 +42,12 @@ module Request = struct
           ~title:"Peer_id"
           (obj1 (req "peer_id" P2p_peer.Id.encoding))
           (function PeerId pid -> Some pid | _ -> None)
-          (fun pid -> PeerId pid) ]
+          (fun pid -> PeerId pid);
+      ]
 
   let pp ppf = function
-    | Hash h ->
-        Format.fprintf ppf "Block Hash %a" Block_hash.pp h
-    | PeerId pid ->
-        Format.fprintf ppf "Peer id %a" P2p_peer.Id.pp pid
+    | Hash h -> Block_hash.pp ppf h
+    | PeerId pid -> P2p_peer.Id.pp ppf pid
 end
 
 module Event = struct
@@ -78,8 +78,7 @@ module Event = struct
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
-    | Request_failure of
-        Request.view * Worker_types.request_status * error list
+    | Request_failure of Request.view * Worker_types.request_status * error list
 
   type view = t
 
@@ -87,32 +86,22 @@ module Event = struct
 
   let level = function
     | Processed_block req -> (
-      match req.update with
-      | Ignored_head ->
-          Internal_event.Info
-      | Branch_switch | Head_increment ->
-          Internal_event.Notice )
-    | Could_not_switch_testchain _ ->
-        Internal_event.Error
-    | Notify_head _ ->
-        Internal_event.Debug
-    | Notify_branch _ ->
-        Internal_event.Info
-    | Disconnection _ | Bootstrapped ->
-        Internal_event.Notice
+        match req.update with
+        | Ignored_head -> Internal_event.Info
+        | Branch_switch | Head_increment -> Internal_event.Notice)
+    | Could_not_switch_testchain _ -> Internal_event.Error
+    | Notify_head _ -> Internal_event.Debug
+    | Notify_branch _ -> Internal_event.Info
+    | Disconnection _ | Bootstrapped -> Internal_event.Notice
     | Sync_status sync_status -> (
-      match sync_status with
-      | Synchronised {is_chain_stuck} ->
-          if is_chain_stuck then Internal_event.Error
-          else Internal_event.Notice
-      | Not_synchronised ->
-          Internal_event.Warning )
-    | Bootstrap_active_peers _ ->
-        Internal_event.Debug
-    | Bootstrap_active_peers_heads_time _ ->
-        Internal_event.Debug
-    | Request_failure _ ->
-        Internal_event.Notice
+        match sync_status with
+        | Synchronised {is_chain_stuck} ->
+            if is_chain_stuck then Internal_event.Error
+            else Internal_event.Notice
+        | Not_synchronised -> Internal_event.Warning)
+    | Bootstrap_active_peers _ -> Internal_event.Debug
+    | Bootstrap_active_peers_heads_time _ -> Internal_event.Debug
+    | Request_failure _ -> Internal_event.Notice
 
   let sync_status_encoding =
     let open Data_encoding in
@@ -124,17 +113,20 @@ module Event = struct
          behind the chain's).\n\
          If 'synced', the node considers itself synchronized with its peers \
          and the current head timestamp is recent.\n\
-         If 'stuck', the node considers itself synchronized with its peers \
-         but the chain seems to be halted from its viewpoint."
+         If 'stuck', the node considers itself synchronized with its peers but \
+         the chain seems to be halted from its viewpoint."
       (string_enum
-         [ ("synced", Synchronised {is_chain_stuck = false});
+         [
+           ("synced", Synchronised {is_chain_stuck = false});
            ("unsynced", Not_synchronised);
-           ("stuck", Synchronised {is_chain_stuck = true}) ])
+           ("stuck", Synchronised {is_chain_stuck = true});
+         ])
 
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Processed_block"
           (obj6
@@ -143,19 +135,19 @@ module Event = struct
              (req
                 "outcome"
                 (string_enum
-                   [ ("ignored", Ignored_head);
+                   [
+                     ("ignored", Ignored_head);
                      ("branch", Branch_switch);
-                     ("increment", Head_increment) ]))
+                     ("increment", Head_increment);
+                   ]))
              (req "fitness" Fitness.encoding)
              (req "level" int32)
              (req "timestamp" Time.Protocol.encoding))
           (function
             | Processed_block
                 {request; request_status; update; fitness; level; timestamp} ->
-                Some
-                  (request, request_status, update, fitness, level, timestamp)
-            | _ ->
-                None)
+                Some (request, request_status, update, fitness, level, timestamp)
+            | _ -> None)
           (fun (request, request_status, update, fitness, level, timestamp) ->
             Processed_block
               {request; request_status; update; fitness; level; timestamp});
@@ -182,10 +174,8 @@ module Event = struct
           ~title:"Bootstrap_active_peers"
           (obj2 (req "active" int31) (req "needed" int31))
           (function
-            | Bootstrap_active_peers {active; needed} ->
-                Some (active, needed)
-            | _ ->
-                None)
+            | Bootstrap_active_peers {active; needed} -> Some (active, needed)
+            | _ -> None)
           (fun (active, needed) -> Bootstrap_active_peers {active; needed});
         case
           (Tag 5)
@@ -198,8 +188,7 @@ module Event = struct
             | Bootstrap_active_peers_heads_time
                 {min_head_time; max_head_time; most_recent_validation} ->
                 Some (min_head_time, max_head_time, most_recent_validation)
-            | _ ->
-                None)
+            | _ -> None)
           (fun (min_head_time, max_head_time, most_recent_validation) ->
             Bootstrap_active_peers_heads_time
               {min_head_time; max_head_time; most_recent_validation});
@@ -230,20 +219,18 @@ module Event = struct
              (dft "errors" RPC_error.encoding []))
           (function
             | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
-          (fun (r, s, err) -> Request_failure (r, s, err)) ]
+          (fun (r, s, err) -> Request_failure (r, s, err));
+      ]
 
   let sync_status_to_string = function
-    | Synchronised {is_chain_stuck = false} ->
-        "sync"
-    | Not_synchronised ->
-        "unsync"
-    | Synchronised {is_chain_stuck = true} ->
-        "stuck"
+    | Synchronised {is_chain_stuck = false} -> "sync"
+    | Not_synchronised -> "unsync"
+    | Synchronised {is_chain_stuck = true} -> "stuck"
 
   let pp ppf = function
     | Processed_block req ->
         Format.fprintf ppf "@[<v 0>" ;
-        ( match req.update with
+        (match req.update with
         | Ignored_head ->
             Format.fprintf
               ppf
@@ -258,7 +245,7 @@ module Event = struct
             Format.fprintf
               ppf
               "Update current head to %a (level %ld, timestamp %a, fitness \
-               %a), same branch@," )
+               %a), same branch@,")
           Request.pp
           req.request
           req.level
@@ -279,13 +266,9 @@ module Event = struct
           "@[<v 0>Error while switching test chain:@ %a@]"
           (Format.pp_print_list Error_monad.pp)
           err
-    | Bootstrapped ->
-        Format.fprintf ppf "@[<v 0>Chain is bootstrapped@]"
+    | Bootstrapped -> Format.fprintf ppf "@[<v 0>Chain is bootstrapped@]"
     | Sync_status ss ->
-        Format.fprintf
-          ppf
-          "@[<v 0>Sync_status: %s@]"
-          (sync_status_to_string ss)
+        Format.fprintf ppf "@[<v 0>Sync_status: %s@]" (sync_status_to_string ss)
     | Bootstrap_active_peers {active; needed} ->
         Format.fprintf
           ppf
@@ -353,22 +336,22 @@ module Distributed_db_state = struct
   let table_scheduler_encoding =
     let open Data_encoding in
     conv
-      (fun {table_length; scheduler_length} ->
-        (table_length, scheduler_length))
-      (fun (table_length, scheduler_length) ->
-        {table_length; scheduler_length})
+      (fun {table_length; scheduler_length} -> (table_length, scheduler_length))
+      (fun (table_length, scheduler_length) -> {table_length; scheduler_length})
       (obj2 (req "table_length" int31) (req "scheduler_length" int31))
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { p2p_readers_length;
+      (fun {
+             p2p_readers_length;
              active_chains_length;
              operation_db;
              operations_db;
              block_header_db;
              active_connections_length;
-             active_peers_length } ->
+             active_peers_length;
+           } ->
         ( p2p_readers_length,
           active_chains_length,
           operation_db,

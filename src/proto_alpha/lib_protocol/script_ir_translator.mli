@@ -33,7 +33,8 @@ type ex_comparable_ty =
 
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 
-type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
+type ex_stack_ty =
+  | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
@@ -51,9 +52,24 @@ type ('arg, 'storage) code = {
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
+type ('a, 's, 'b, 'u) cinstr = {
+  apply :
+    'r 'f.
+    ('a, 's) Script_typed_ir.kinfo ->
+    ('b, 'u, 'r, 'f) Script_typed_ir.kinstr ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kinstr;
+}
+
+type ('a, 's, 'b, 'u) descr = {
+  loc : Script.location;
+  bef : ('a, 's) Script_typed_ir.stack_ty;
+  aft : ('b, 'u) Script_typed_ir.stack_ty;
+  instr : ('a, 's, 'b, 'u) cinstr;
+}
+
 type tc_context =
   | Lambda : tc_context
-  | Dip : 'a Script_typed_ir.stack_ty * tc_context -> tc_context
+  | Dip : ('a, 's) Script_typed_ir.stack_ty * tc_context -> tc_context
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
@@ -62,14 +78,12 @@ type tc_context =
     }
       -> tc_context
 
-type 'bef judgement =
-  | Typed : ('bef, 'aft) Script_typed_ir.descr -> 'bef judgement
+type ('a, 's) judgement =
+  | Typed : ('a, 's, 'b, 'u) descr -> ('a, 's) judgement
   | Failed : {
-      descr :
-        'aft. 'aft Script_typed_ir.stack_ty ->
-        ('bef, 'aft) Script_typed_ir.descr;
+      descr : 'b 'u. ('b, 'u) Script_typed_ir.stack_ty -> ('a, 's, 'b, 'u) descr;
     }
-      -> 'bef judgement
+      -> ('a, 's) judgement
 
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
@@ -97,8 +111,7 @@ val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool
 
 val set_size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
 
-val empty_map :
-  'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
+val empty_map : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
 
 val map_fold :
   ('key -> 'value -> 'acc -> 'acc) ->
@@ -150,7 +163,7 @@ val big_map_get_and_update :
   'key ->
   'value option ->
   ('key, 'value) Script_typed_ir.big_map ->
-  ('value option * ('key, 'value) Script_typed_ir.big_map * context) tzresult
+  (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
   Lwt.t
 
 val ty_eq :
@@ -199,8 +212,8 @@ val parse_instr :
   context ->
   legacy:bool ->
   Script.node ->
-  'bef Script_typed_ir.stack_ty ->
-  ('bef judgement * context) tzresult Lwt.t
+  ('a, 's) Script_typed_ir.stack_ty ->
+  (('a, 's) judgement * context) tzresult Lwt.t
 
 (**
   [parse_ty] specialized for the right-hand side part of a big map type, i.e.
@@ -239,6 +252,31 @@ val parse_ty :
 
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
+
+val ty_of_comparable_ty :
+  'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
+
+(**
+  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty]
+  or any negative value if that result would be negative.
+  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
+*)
+val deduce_type_size : remaining:int -> 't Script_typed_ir.ty -> int
+
+(**
+  [check_comparable_type_size ~legacy ctxt ~loc ty] checks that the size of type [ty]
+  is not larger than the constant [maximum_type_size] from the context [ctxt].
+  If the check fails, an error [Type_too_large] is returned.
+  If [legacy] is [true], there is no check at all and [ok_unit] is returned directly.
+
+  It is guaranteed to not grow the stack by more than [maximum_type_size] non-tail calls.
+*)
+val check_comparable_type_size :
+  legacy:bool ->
+  context ->
+  loc:Script.location ->
+  't Script_typed_ir.comparable_ty ->
+  unit tzresult
 
 val parse_toplevel :
   legacy:bool ->
@@ -319,8 +357,8 @@ val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
   root_name:Script_typed_ir.field_annot option ->
-  ( Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t )
+  (Michelson_v1_primitives.prim list list
+  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t)
   tzresult
 
 val pack_data :
@@ -360,6 +398,9 @@ val extract_lazy_storage_diff :
   'a ->
   ('a * Lazy_storage.diffs option * context) tzresult Lwt.t
 
-(* raise Not_found if none or more than one found *)
+(* return [None] if none or more than one found *)
 val get_single_sapling_state :
-  context -> 'a Script_typed_ir.ty -> 'a -> (Sapling.Id.t * context) tzresult
+  context ->
+  'a Script_typed_ir.ty ->
+  'a ->
+  (Sapling.Id.t option * context) tzresult

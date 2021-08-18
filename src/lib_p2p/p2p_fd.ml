@@ -33,7 +33,7 @@ let () =
   (* Otherwise some writes trigger a SIGPIPE instead of raising an
      Lwt_unit exception. In the node, this is already done by
      Cohttp, so this is only useful when using the P2P layer as a
-     stand alone library.  *)
+     stand alone library. *)
   if is_not_windows then Sys.(set_signal sigpipe Signal_ignore)
 
 type t = {
@@ -55,8 +55,7 @@ let string_of_sockaddr addr =
   match addr with
   | Lwt_unix.ADDR_INET (ip, port) ->
       Printf.sprintf "%s:%d" (Unix.string_of_inet_addr ip) port
-  | Lwt_unix.ADDR_UNIX file ->
-      Printf.sprintf "@%s" file
+  | Lwt_unix.ADDR_UNIX file -> Printf.sprintf "@%s" file
 
 let id t = t.id
 
@@ -67,37 +66,31 @@ let socket proto kind arg =
      fd)
 
 let close t =
-  Events.(emit close_fd) (t.id, t.nread, t.nwrit)
-  >>= fun () -> Lwt_utils_unix.safe_close t.fd
+  Events.(emit close_fd) (t.id, t.nread, t.nwrit) >>= fun () ->
+  Lwt_utils_unix.safe_close t.fd
 
 let read t buf pos len =
-  Events.(emit try_read) (t.id, len)
-  >>= fun () ->
-  Lwt_unix.read t.fd buf pos len
-  >>= fun nread ->
+  Events.(emit try_read) (t.id, len) >>= fun () ->
+  Lwt_unix.read t.fd buf pos len >>= fun nread ->
   t.nread <- t.nread + nread ;
   Events.(emit read_fd) (t.id, nread, t.nread) >>= fun () -> Lwt.return nread
 
 let write t buf =
   let len = Bytes.length buf in
-  Events.(emit try_write) (t.id, len)
-  >>= fun () ->
-  Lwt_utils_unix.write_bytes t.fd buf
-  >>= fun () ->
+  Events.(emit try_write) (t.id, len) >>= fun () ->
+  Lwt_utils_unix.write_bytes t.fd buf >>= fun () ->
   t.nwrit <- t.nwrit + len ;
   Events.(emit written_fd) (t.id, len, t.nwrit) >>= fun () -> Lwt.return_unit
 
 let connect t saddr =
-  Events.(emit connect_fd) (t.id, string_of_sockaddr saddr)
-  >>= fun () -> Lwt_unix.connect t.fd saddr
+  Events.(emit connect_fd) (t.id, string_of_sockaddr saddr) >>= fun () ->
+  Lwt_unix.connect t.fd saddr
 
 let accept sock =
-  Lwt_unix.accept sock
-  >>= fun (fd, saddr) ->
-  create fd
-  >>= fun t ->
-  Events.(emit accept_fd) (t.id, string_of_sockaddr saddr)
-  >>= fun () -> Lwt.return (t, saddr)
+  Lwt_unix.accept sock >>= fun (fd, saddr) ->
+  create fd >>= fun t ->
+  Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) >>= fun () ->
+  Lwt.return (t, saddr)
 
 module Table = Hashtbl.Make (struct
   type nonrec t = t

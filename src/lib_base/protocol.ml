@@ -31,7 +31,9 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2
+and env_version = V0 | V1 | V2 | V3
+
+let compare_version = Stdlib.compare
 
 include Compare.Make (struct
   type nonrec t = t
@@ -42,37 +44,30 @@ end)
 let component_encoding =
   let open Data_encoding in
   conv
-    (fun {name; interface; implementation} ->
-      (name, interface, implementation))
-    (fun (name, interface, implementation) ->
-      {name; interface; implementation})
+    (fun {name; interface; implementation} -> (name, interface, implementation))
+    (fun (name, interface, implementation) -> {name; interface; implementation})
     (obj3
        (req "name" string)
        (opt "interface" string)
        (req "implementation" string))
 
 let module_name_of_env_version = function
-  | V0 ->
-      "V0"
-  | V1 ->
-      "V1"
-  | V2 ->
-      "V2"
+  | V0 -> "V0"
+  | V1 -> "V1"
+  | V2 -> "V2"
+  | V3 -> "V3"
 
 let env_version_encoding =
   let open Data_encoding in
   def "protocol.environment_version"
   @@ conv
-       (function V0 -> 0 | V1 -> 1 | V2 -> 2)
+       (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3)
        (function
-         | 0 ->
-             V0
-         | 1 ->
-             V1
-         | 2 ->
-             V2
-         | _ ->
-             failwith "unexpected environment version")
+         | 0 -> V0
+         | 1 -> V1
+         | 2 -> V2
+         | 3 -> V3
+         | _ -> failwith "unexpected environment version")
        uint16
 
 let encoding =
@@ -91,10 +86,8 @@ let encoding =
 
 let bounded_encoding ?max_size () =
   match max_size with
-  | None ->
-      encoding
-  | Some max_size ->
-      Data_encoding.check_size max_size encoding
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
 
 let pp ppf op =
   Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding op)
@@ -104,8 +97,9 @@ let pp_ocaml_component ppf {name; interface; implementation} =
     ppf
     "@[{@[<v 1> name = %S ;@ interface = %a ;@ implementation = %S ;@]@ }@]"
     name
-    (fun ppf -> function None -> Format.fprintf ppf "None" | Some s ->
-          Format.fprintf ppf "Some %S" s)
+    (fun ppf -> function
+      | None -> Format.fprintf ppf "None"
+      | Some s -> Format.fprintf ppf "Some %S" s)
     interface
     implementation
 

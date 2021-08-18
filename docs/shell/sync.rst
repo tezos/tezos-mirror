@@ -47,11 +47,12 @@ pair of a block's timestamp and a peer. The block from which the
 timestamp is taken must have been validated locally and it must be the
 most-recent such block advertised by the peer.
 
-The heuristic is parameterised by two values:
+The heuristic is parameterised by two values (see :doc:`node configuration <../user/node-configuration>`):
 
-- A ``threshold``: The number of candidates kept by the heuristic
-
-- A ``latency``: A delay in seconds to control possible forks and the
+- A ``threshold`` (configuration parameter ``synchronisation_threshold``): The
+  number of candidates kept by the heuristic
+- A ``latency`` (configuration parameter ``latency``): A delay in seconds to
+  control possible forks and the
   latency of the network (see :ref:`Acceptable values for
   parameters<acceptable_values>`)
 
@@ -87,8 +88,8 @@ though it is many blocks away from the chain's head.
 
 A good value for ``latency`` is ``2`` to ``5`` times the time between
 blocks, plus a small delta for network delays. At time of writing,
-because of the baking priority system (see :ref:`Proof of stake in
-Tezos<proof-of-stake>`) the time between two consecutive blocks is
+because of the baking priority system (see :doc:`Proof of stake in
+Tezos <../active/proof_of_stake>`) the time between two consecutive blocks is
 close to ``60`` seconds when the chain is healthy.
 
 A shorter ``latency`` might give false negatives: delays from a few

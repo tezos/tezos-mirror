@@ -36,8 +36,12 @@ type account = t
 
 let known_accounts = Signature.Public_key_hash.Table.create 17
 
+let random_seed ~rng_state =
+  Bytes.init Hacl.Ed25519.sk_size (fun _i ->
+      Char.chr (Random.State.int rng_state 256))
+
 let new_account ?seed () =
-  let (pkh, pk, sk) = Signature.generate_key ?seed () in
+  let (pkh, pk, sk) = Signature.generate_key ~algo:Ed25519 ?seed () in
   let account = {pkh; pk; sk} in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
   account
@@ -45,14 +49,14 @@ let new_account ?seed () =
 let add_account ({pkh; _} as account) =
   Signature.Public_key_hash.Table.add known_accounts pkh account
 
-let activator_account = new_account ()
+let activator_account =
+  let seed = random_seed ~rng_state:(Random.State.make [|0x1337533D|]) in
+  new_account ~seed ()
 
 let find pkh =
   match Signature.Public_key_hash.Table.find known_accounts pkh with
-  | Some k ->
-      return k
-  | None ->
-      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+  | Some k -> return k
+  | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
 let find_alternate pkh =
   let exception Found of t in
@@ -65,21 +69,30 @@ let find_alternate pkh =
     raise Not_found
   with Found account -> account
 
-let dummy_account = new_account ()
+let dummy_account =
+  let seed =
+    random_seed ~rng_state:(Random.State.make [|0x1337533D; 0x1337533D|])
+  in
+  new_account ~seed ()
 
-let generate_accounts ?(initial_balances = []) n : (t * Tez.t) list =
+let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
   Signature.Public_key_hash.Table.clear known_accounts ;
   let default_amount = Tez.of_mutez_exn 4_000_000_000_000L in
   let amount i =
     match List.nth_opt initial_balances i with
-    | None ->
-        default_amount
-    | Some a ->
-        Tez.of_mutez_exn a
+    | None -> default_amount
+    | Some a -> Tez.of_mutez_exn a
+  in
+  let rng_state =
+    match rng_state with
+    | None -> Random.State.make_self_init ()
+    | Some state -> state
   in
   List.map
     (fun i ->
-      let (pkh, pk, sk) = Signature.generate_key () in
+      let (pkh, pk, sk) =
+        Signature.generate_key ~algo:Ed25519 ~seed:(random_seed ~rng_state) ()
+      in
       let account = {pkh; pk; sk} in
       Signature.Public_key_hash.Table.add known_accounts pkh account ;
       (account, amount i))
@@ -96,6 +109,5 @@ let new_commitment ?seed () =
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
   Lwt.return
-    ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L))
-    >|? fun amount ->
-    (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )
+    ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L)) >|? fun amount ->
+      (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )

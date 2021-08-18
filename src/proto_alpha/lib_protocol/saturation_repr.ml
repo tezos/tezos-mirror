@@ -68,7 +68,33 @@ let saturate_if_undef = function None -> saturated | Some x -> x
 
 let safe_int x = of_int_opt x |> saturate_if_undef
 
+let numbits x =
+  let x = ref x and n = ref 0 in
+  (let y = !x lsr 32 in
+   if y <> 0 then (
+     n := !n + 32 ;
+     x := y)) ;
+  (let y = !x lsr 16 in
+   if y <> 0 then (
+     n := !n + 16 ;
+     x := y)) ;
+  (let y = !x lsr 8 in
+   if y <> 0 then (
+     n := !n + 8 ;
+     x := y)) ;
+  (let y = !x lsr 4 in
+   if y <> 0 then (
+     n := !n + 4 ;
+     x := y)) ;
+  (let y = !x lsr 2 in
+   if y <> 0 then (
+     n := !n + 2 ;
+     x := y)) ;
+  if !x lsr 1 <> 0 then !n + 2 else !n + !x
+
 let zero = 0
+
+let one = 1
 
 let small_enough z =
   (* The following literal triggers an error if compiled under 32-bit
@@ -83,13 +109,11 @@ let mul_safe_exn x =
   else failwith (Format.sprintf "mul_safe_exn: %d must be below 2147483648" x)
 
 let mul_safe_of_int_exn x =
-  Option.bind (of_int_opt x) mul_safe
-  |> function
+  Option.bind (of_int_opt x) mul_safe |> function
   | None ->
       failwith
         (Format.sprintf "mul_safe_of_int_exn: %d must be below 2147483648" x)
-  | Some x ->
-      x
+  | Some x -> x
 
 (* If [x] is positive, shifting to the right will produce a number
    which is positive and is less than [x]. *)
@@ -98,8 +122,7 @@ let shift_right x y = (x :> int) lsr y
 let mul x y =
   (* assert (x >= 0 && y >= 0); *)
   match x with
-  | 0 ->
-      0
+  | 0 -> 0
   | x ->
       if small_enough x && small_enough y then x * y
       else if Compare.Int.(y > saturated / x) then saturated
@@ -115,7 +138,9 @@ let scale_fast x y =
 
 let add x y =
   let z = x + y in
-  if z >= 0 then z else saturated
+  if Compare.Int.(z >= 0) then z else saturated
+
+let succ x = add one x
 
 let sub x y = Compare.Int.max (x - y) 0
 
@@ -133,8 +158,7 @@ let t_to_z_exn z =
   match of_z_opt z with
   | None ->
       (* since the encoding is applied to values of type [t]. *) assert false
-  | Some x ->
-      x
+  | Some x -> x
 
 let z_encoding = Data_encoding.(check_size 9 (conv to_z t_to_z_exn z))
 

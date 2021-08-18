@@ -31,6 +31,12 @@ open Tezos_micheline
 module Program = Client_aliases.Alias (struct
   type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Micheline_parser.compare Michelson_v1_parser.compare_parsed
+  end)
+
   let encoding =
     Data_encoding.conv
       (fun ({Michelson_v1_parser.source; _}, _) -> source)
@@ -52,11 +58,11 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
        ~show_source
        ~parsed)
     errs
-  >>= fun () -> cctxt#error "error running script" >>= fun () -> return_unit
+  >>= fun () ->
+  cctxt#error "error running script" >>= fun () -> return_unit
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas
-    ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()
-    =
+    ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =
   Alpha_services.Helpers.Scripts.typecheck_data
     cctxt
     (chain, block)
@@ -69,20 +75,18 @@ let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas
     (chain, block)
     (program.expanded, gas)
 
-let print_typecheck_result ~emacs ~show_types ~print_source_on_error program
-    res (cctxt : #Client_context.printer) =
+let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
+    (cctxt : #Client_context.printer) =
   if emacs then
     let (type_map, errs, _gas) =
       match res with
-      | Ok (type_map, gas) ->
-          (type_map, [], Some gas)
+      | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error
-          ( Environment.Ecoproto_error
-              (Script_tc_errors.Ill_typed_contract (_, type_map))
-            :: _ as errs ) ->
+          (Environment.Ecoproto_error
+             (Script_tc_errors.Ill_typed_contract (_, type_map))
+           :: _ as errs) ->
           (type_map, errs, None)
-      | Error errs ->
-          ([], errs, None)
+      | Error errs -> ([], errs, None)
     in
     cctxt#message
       "(@[<v 0>(types . %a)@ (errors . %a)@])"
@@ -98,8 +102,8 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error program
         cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]" Gas.pp gas
         >>= fun () ->
         if show_types then
-          cctxt#message "%a" Micheline_printer.print_expr program
-          >>= fun () -> return_unit
+          cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
+          return_unit
         else return_unit
     | Error errs ->
         cctxt#warning
@@ -132,14 +136,10 @@ let print_entrypoint_type (cctxt : #Client_context.printer) ~emacs ?script_name
 
 let list_entrypoints cctxt ~(chain : Chain_services.chain) ~block
     (program : Michelson_v1_parser.parsed) =
-  Michelson_v1_entrypoints.list_entrypoints
-    cctxt
-    ~chain
-    ~block
-    program.expanded
+  Michelson_v1_entrypoints.list_entrypoints cctxt ~chain ~block program.expanded
 
-let print_entrypoints_list (cctxt : #Client_context.printer) ~emacs
-    ?script_name ~show_source ~parsed ty =
+let print_entrypoints_list (cctxt : #Client_context.printer) ~emacs ?script_name
+    ~show_source ~parsed ty =
   Michelson_v1_entrypoints.print_entrypoints_list
     cctxt
     ~emacs

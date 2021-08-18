@@ -52,9 +52,8 @@ let () =
 
 module Public_key_hash = struct
   include Client_aliases.Alias (struct
-    type t = Signature.Public_key_hash.t
-
-    let encoding = Signature.Public_key_hash.encoding
+    (* includes t, Compare, encoding *)
+    include Signature.Public_key_hash
 
     let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
 
@@ -72,10 +71,8 @@ let uri_encoding =
   let to_uri s =
     let o = Uri.of_string s in
     match Uri.scheme o with
-    | None ->
-        Stdlib.failwith "Key URI needs a scheme"
-    | Some _ ->
-        o
+    | None -> Stdlib.failwith "Key URI needs a scheme"
+    | Some _ -> o
   in
   Data_encoding.(conv Uri.to_string to_uri string)
 
@@ -91,37 +88,35 @@ end)
 
 let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
   match Uri.scheme x with
-  | None ->
-      failwith "Error while parsing URI: PK_URI needs a scheme"
-  | Some _ ->
-      return x
+  | None -> failwith "Error while parsing URI: PK_URI needs a scheme"
+  | Some _ -> return x
 
 type sk_uri = Uri.t
 
+module CompareUri = Compare.Make (struct
+  type t = Uri.t
+
+  let compare = Uri.compare
+end)
+
 let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
   match Uri.scheme x with
-  | None ->
-      failwith "Error while parsing URI: SK_URI needs a scheme"
-  | Some _ ->
-      return x
+  | None -> failwith "Error while parsing URI: SK_URI needs a scheme"
+  | Some _ -> return x
 
 type sapling_uri = Uri.t
 
 let make_sapling_uri (x : Uri.t) : sapling_uri =
   match Uri.scheme x with
-  | None ->
-      Stdlib.failwith "SAPLING_URI needs a scheme"
-  | Some _ ->
-      x
+  | None -> Stdlib.failwith "SAPLING_URI needs a scheme"
+  | Some _ -> x
 
 type pvss_sk_uri = Uri.t
 
 let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult Lwt.t =
   match Uri.scheme x with
-  | None ->
-      failwith "Error while parsing URI: PVSS_URI needs a scheme"
-  | Some _ ->
-      return x
+  | None -> failwith "Error while parsing URI: PVSS_URI needs a scheme"
+  | Some _ -> return x
 
 let pk_uri_parameter () =
   Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
@@ -158,6 +153,8 @@ module Secret_key = Client_aliases.Alias (struct
 
   type t = sk_uri
 
+  include (CompareUri : Compare.S with type t := t)
+
   let of_source s = make_sk_uri @@ Uri.of_string s
 
   let to_source t = return (Uri.to_string t)
@@ -170,6 +167,14 @@ module Public_key = Client_aliases.Alias (struct
 
   type t = pk_uri * Signature.Public_key.t option
 
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare (apk, aso) (bpk, bso) =
+      Compare.or_else (CompareUri.compare apk bpk) (fun () ->
+          Option.compare Signature.Public_key.compare aso bso)
+  end)
+
   let of_source s =
     make_pk_uri @@ Uri.of_string s >>=? fun pk_uri -> return (pk_uri, None)
 
@@ -178,7 +183,8 @@ module Public_key = Client_aliases.Alias (struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           Json_only
           ~title:"Locator_only"
           uri_encoding
@@ -191,7 +197,8 @@ module Public_key = Client_aliases.Alias (struct
              (req "locator" uri_encoding)
              (req "key" Signature.Public_key.encoding))
           (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
-          (fun (uri, key) -> (uri, Some key)) ]
+          (fun (uri, key) -> (uri, Some key));
+      ]
 end)
 
 type sapling_key = {
@@ -209,6 +216,17 @@ module Sapling_key = Client_aliases.Alias (struct
 
   type t = sapling_key
 
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare a b =
+      Compare.or_else (CompareUri.compare a.sk b.sk) (fun () ->
+          Compare.or_else (Stdlib.compare a.path b.path) (fun () ->
+              Tezos_sapling.Core.Client.Viewing_key.compare_index
+                a.address_index
+                b.address_index))
+  end)
+
   let encoding =
     let open Data_encoding in
     conv
@@ -222,10 +240,8 @@ module Sapling_key = Client_aliases.Alias (struct
   let of_source s =
     let open Data_encoding in
     match Json.from_string s with
-    | Error _ ->
-        failwith "corrupted wallet"
-    | Ok s ->
-        return (Json.destruct encoding s)
+    | Error _ -> failwith "corrupted wallet"
+    | Ok s -> return (Json.destruct encoding s)
 
   let to_source k =
     let open Data_encoding in
@@ -233,11 +249,9 @@ module Sapling_key = Client_aliases.Alias (struct
 end)
 
 module PVSS_public_key = Client_aliases.Alias (struct
+  include Pvss_secp256k1.Public_key (* t, Compare, encoding *)
+
   let name = "PVSS public key"
-
-  type t = Pvss_secp256k1.Public_key.t
-
-  let encoding = Pvss_secp256k1.Public_key.encoding
 
   let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
 
@@ -248,6 +262,8 @@ module PVSS_secret_key = Client_aliases.Alias (struct
   let name = "PVSS secret key"
 
   type t = pvss_sk_uri
+
+  include CompareUri
 
   let encoding = uri_encoding
 
@@ -268,15 +284,13 @@ module type SIGNER = sig
   val import_secret_key :
     io:Client_context.io_wallet ->
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
-    Lwt.t
+    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
 
   val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
 
   val public_key_hash :
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
-    Lwt.t
+    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
 
   val sign :
     ?watermark:Signature.watermark ->
@@ -299,10 +313,8 @@ let register_signer signer =
 
 let find_signer_for_key ~scheme =
   match String.Hashtbl.find signers_table scheme with
-  | None ->
-      fail (Unregistered_key_scheme scheme)
-  | Some signer ->
-      return signer
+  | None -> fail (Unregistered_key_scheme scheme)
+  | Some signer -> return signer
 
 let registered_signers () : (string * (module SIGNER)) list =
   String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
@@ -327,10 +339,8 @@ let () =
 
 let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a) : 'a =
   match Uri.scheme uri with
-  | None ->
-      assert false
-  | Some scheme ->
-      find_signer_for_key ~scheme >>=? fun signer -> f signer
+  | None -> assert false
+  | Some scheme -> find_signer_for_key ~scheme >>=? fun signer -> f signer
 
 let neuterize sk_uri =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
@@ -350,24 +360,17 @@ let import_secret_key ~io pk_uri =
 
 let sign cctxt ?watermark sk_uri buf =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
-      Signer.sign ?watermark sk_uri buf
-      >>=? fun signature ->
-      Signer.neuterize sk_uri
-      >>=? fun pk_uri ->
-      Secret_key.rev_find cctxt sk_uri
-      >>=? (function
-             | None ->
-                 public_key pk_uri
-             | Some name -> (
-                 Public_key.find cctxt name
-                 >>=? function
-                 | (_, None) ->
-                     public_key pk_uri
-                     >>=? fun pk ->
-                     Public_key.update cctxt name (pk_uri, Some pk)
-                     >>=? fun () -> return pk
-                 | (_, Some pubkey) ->
-                     return pubkey ))
+      Signer.sign ?watermark sk_uri buf >>=? fun signature ->
+      Signer.neuterize sk_uri >>=? fun pk_uri ->
+      (Secret_key.rev_find cctxt sk_uri >>=? function
+       | None -> public_key pk_uri
+       | Some name -> (
+           Public_key.find cctxt name >>=? function
+           | (_, None) ->
+               public_key pk_uri >>=? fun pk ->
+               Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+               return pk
+           | (_, Some pubkey) -> return pubkey))
       >>=? fun pubkey ->
       fail_unless
         (Signature.check ?watermark pubkey signature buf)
@@ -375,12 +378,12 @@ let sign cctxt ?watermark sk_uri buf =
       >>=? fun () -> return signature)
 
 let append cctxt ?watermark loc buf =
-  sign cctxt ?watermark loc buf
-  >|=? fun signature -> Signature.concat buf signature
+  sign cctxt ?watermark loc buf >|=? fun signature ->
+  Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =
-  public_key pk_uri
-  >>=? fun pk -> return (Signature.check ?watermark pk signature buf)
+  public_key pk_uri >>=? fun pk ->
+  return (Signature.check ?watermark pk signature buf)
 
 let deterministic_nonce sk_uri data =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
@@ -396,12 +399,10 @@ let supports_deterministic_nonces sk_uri =
 
 let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
     ?public_key name =
-  Public_key.add ~force cctxt name (pk_uri, public_key)
-  >>=? fun () ->
-  Secret_key.add ~force cctxt name sk_uri
-  >>=? fun () ->
-  Public_key_hash.add ~force cctxt name public_key_hash
-  >>=? fun () -> return_unit
+  Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->
+  Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
+  Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
+  return_unit
 
 (* This function is used to chose between two aliases associated
    to the same key hash; if we know the secret key for one of them
@@ -409,121 +410,91 @@ let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
    we take it. *)
 let join_keys keys1_opt keys2 =
   match (keys1_opt, keys2) with
-  | (Some (_, Some _, None), (_, None, None)) ->
-      keys1_opt
-  | (Some (_, _, Some _), _) ->
-      keys1_opt
-  | _ ->
-      Some keys2
+  | (Some (_, Some _, None), (_, None, None)) -> keys1_opt
+  | (Some (_, _, Some _), _) -> keys1_opt
+  | _ -> Some keys2
 
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  Public_key_hash.rev_find_all cctxt pkh
-  >>=? (fun names ->
-         List.fold_left_es
-           (fun keys_opt n ->
-             Secret_key.find_opt cctxt n
-             >>=? fun sk_uri ->
-             Public_key.find_opt cctxt n
-             >>=? (function
-                    | None ->
-                        return_none
-                    | Some (_, Some pk) ->
-                        return_some pk
-                    | Some (pk_uri, None) ->
-                        public_key pk_uri
-                        >>=? fun pk ->
-                        Public_key.update cctxt n (pk_uri, Some pk)
-                        >>=? fun () -> return_some pk)
-             >>=? fun pk -> return @@ join_keys keys_opt (n, pk, sk_uri))
-           None
-           names
-         >>=? function
-         | None ->
-             failwith
-               "no keys for the source contract %a"
-               Signature.Public_key_hash.pp
-               pkh
-         | Some keys ->
-             return keys)
+  ( Public_key_hash.rev_find_all cctxt pkh >>=? fun names ->
+    List.fold_left_es
+      (fun keys_opt n ->
+        Secret_key.find_opt cctxt n >>=? fun sk_uri ->
+        (Public_key.find_opt cctxt n >>=? function
+         | None -> return_none
+         | Some (_, Some pk) -> return_some pk
+         | Some (pk_uri, None) ->
+             public_key pk_uri >>=? fun pk ->
+             Public_key.update cctxt n (pk_uri, Some pk) >>=? fun () ->
+             return_some pk)
+        >>=? fun pk -> return @@ join_keys keys_opt (n, pk, sk_uri))
+      None
+      names
+    >>=? function
+    | None ->
+        failwith
+          "no keys for the source contract %a"
+          Signature.Public_key_hash.pp
+          pkh
+    | Some keys -> return keys )
   >>= function
   | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
-      find_signer_for_key ~scheme:"remote"
-      >>=? (fun signer ->
-             let module Signer = (val signer : SIGNER) in
-             let path = Signature.Public_key_hash.to_b58check pkh in
-             let uri = Uri.make ~scheme:Signer.scheme ~path () in
-             Signer.public_key uri
-             >>=? fun pk -> return (path, Some pk, Some uri))
+      ( find_signer_for_key ~scheme:"remote" >>=? fun signer ->
+        let module Signer = (val signer : SIGNER) in
+        let path = Signature.Public_key_hash.to_b58check pkh in
+        let uri = Uri.make ~scheme:Signer.scheme ~path () in
+        Signer.public_key uri >>=? fun pk -> return (path, Some pk, Some uri) )
       >>= function
-      | Error _ ->
-          Lwt.return initial_result
-      | Ok _ as success ->
-          Lwt.return success )
-  | Ok _ as success ->
-      Lwt.return success
+      | Error _ -> Lwt.return initial_result
+      | Ok _ as success -> Lwt.return success)
+  | Ok _ as success -> Lwt.return success
 
 let get_key cctxt pkh =
-  raw_get_key cctxt pkh
-  >>=? function
-  | (pkh, Some pk, Some sk) ->
-      return (pkh, pk, sk)
+  raw_get_key cctxt pkh >>=? function
+  | (pkh, Some pk, Some sk) -> return (pkh, pk, sk)
   | (_pkh, _pk, None) ->
       failwith "Unknown secret key for %a" Signature.Public_key_hash.pp pkh
   | (_pkh, None, _sk) ->
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_public_key cctxt pkh =
-  raw_get_key cctxt pkh
-  >>=? function
-  | (pkh, Some pk, _sk) ->
-      return (pkh, pk)
+  raw_get_key cctxt pkh >>=? function
+  | (pkh, Some pk, _sk) -> return (pkh, pk)
   | (_pkh, None, _sk) ->
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
-  Secret_key.load cctxt
-  >>=? fun sks ->
+  Secret_key.load cctxt >>=? fun sks ->
   List.filter_map_s
     (fun (name, sk_uri) ->
-      Public_key_hash.find cctxt name
-      >>=? (fun pkh ->
-             Public_key.find cctxt name
-             >>=? (function
-                    | (_, Some pk) ->
-                        return pk
-                    | (pk_uri, None) ->
-                        public_key pk_uri
-                        >>=? fun pk ->
-                        Public_key.update cctxt name (pk_uri, Some pk)
-                        >>=? fun () -> return pk)
-             >>=? fun pk -> return (name, pkh, pk, sk_uri))
-      >>= function Ok r -> Lwt.return_some r | Error _ -> Lwt.return_none)
+      ( Public_key_hash.find cctxt name >>=? fun pkh ->
+        (Public_key.find cctxt name >>=? function
+         | (_, Some pk) -> return pk
+         | (pk_uri, None) ->
+             public_key pk_uri >>=? fun pk ->
+             Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+             return pk)
+        >>=? fun pk -> return (name, pkh, pk, sk_uri) )
+      >>= function
+      | Ok r -> Lwt.return_some r
+      | Error _ -> Lwt.return_none)
     sks
   >>= fun keys -> return keys
 
 let list_keys cctxt =
-  Public_key_hash.load cctxt
-  >>=? fun l ->
+  Public_key_hash.load cctxt >>=? fun l ->
   List.map_es
     (fun (name, pkh) ->
-      raw_get_key cctxt pkh
-      >>= function
-      | Ok (_name, pk, sk_uri) ->
-          return (name, pkh, pk, sk_uri)
-      | Error _ ->
-          return (name, pkh, None, None))
+      raw_get_key cctxt pkh >>= function
+      | Ok (_name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
+      | Error _ -> return (name, pkh, None, None))
     l
 
 let alias_keys cctxt name =
-  Public_key_hash.find cctxt name
-  >>=? fun pkh ->
-  raw_get_key cctxt pkh
-  >>= function
-  | Ok (_name, pk, sk_uri) ->
-      return_some (pkh, pk, sk_uri)
-  | Error _ ->
-      return_none
+  Public_key_hash.find cctxt name >>=? fun pkh ->
+  raw_get_key cctxt pkh >>= function
+  | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
+  | Error _ -> return_none
 
 let force_switch () =
   Clic.switch ~long:"force" ~short:'f' ~doc:"overwrite existing keys" ()

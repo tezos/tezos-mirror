@@ -3,7 +3,8 @@
 /api/tezos-snoop.html
 /api/tezos-codec.html
 /api/tezos-node-run.txt
-tezos-baker-*.html
-tezos-accuser-*.html
-tezos-endorser-*.html
-tezos-client-*.html
+tezos-baker.html
+tezos-accuser.html
+tezos-endorser.html
+tezos-client.html
+/CHANGES.rst

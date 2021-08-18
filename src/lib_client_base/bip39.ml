@@ -17,18 +17,12 @@ type entropy = {
 
 let entropy_of_bytes bytes =
   match Bytes.length bytes with
-  | 16 ->
-      Some {bytes; length = 16; digest_length = 4; num_words = 12}
-  | 20 ->
-      Some {bytes; length = 20; digest_length = 5; num_words = 15}
-  | 24 ->
-      Some {bytes; length = 24; digest_length = 6; num_words = 18}
-  | 28 ->
-      Some {bytes; length = 28; digest_length = 7; num_words = 21}
-  | 32 ->
-      Some {bytes; length = 32; digest_length = 8; num_words = 24}
-  | _ ->
-      None
+  | 16 -> Some {bytes; length = 16; digest_length = 4; num_words = 12}
+  | 20 -> Some {bytes; length = 20; digest_length = 5; num_words = 15}
+  | 24 -> Some {bytes; length = 24; digest_length = 6; num_words = 18}
+  | 28 -> Some {bytes; length = 28; digest_length = 7; num_words = 21}
+  | 32 -> Some {bytes; length = 32; digest_length = 8; num_words = 24}
+  | _ -> None
 
 type t = int list
 
@@ -38,7 +32,7 @@ let index_of_word word =
     List.iteri Bip39_english.words ~f:(fun i w ->
         if String.compare word w = 0 then (
           index := i ;
-          raise Exit )) ;
+          raise Exit)) ;
     None
   with Exit -> Some !index
 
@@ -46,10 +40,8 @@ let of_words words =
   try
     List.fold_right words ~init:(0, []) ~f:(fun word (count, acc) ->
         match index_of_word word with
-        | Some i ->
-            (succ count, i :: acc)
-        | _ ->
-            raise Exit)
+        | Some i -> (succ count, i :: acc)
+        | _ -> raise Exit)
     |> fun (count, x) ->
     if List.(mem count ~set:acceptable_num_words) then Some x else None
   with Exit -> None
@@ -98,18 +90,15 @@ let list_sub l n =
   let rec inner acc n l =
     if n > 0 then
       match l with
-      | h :: tl ->
-          inner (h :: acc) (pred n) tl
-      | _ ->
-          invalid_arg "Bip39.list_sub"
+      | h :: tl -> inner (h :: acc) (pred n) tl
+      | _ -> invalid_arg "Bip39.list_sub"
     else List.rev acc
   in
   inner [] n l
 
 let pack l pack_len =
   let rec inner (sub_acc_len, sub_acc, acc) = function
-    | [] ->
-        if sub_acc <> [] then List.rev sub_acc :: acc else acc
+    | [] -> if sub_acc <> [] then List.rev sub_acc :: acc else acc
     | h :: tl ->
         if sub_acc_len = pack_len then
           inner (1, [h], List.rev sub_acc :: acc) tl
@@ -119,8 +108,7 @@ let pack l pack_len =
 
 let of_entropy entropy =
   match entropy_of_bytes entropy with
-  | None ->
-      invalid_arg "Bip39.of_entropy: wrong entropy length"
+  | None -> invalid_arg "Bip39.of_entropy: wrong entropy length"
   | Some {bytes; digest_length; _} ->
       let digest = Bytes.get (Hacl.Hash.SHA256.digest entropy) 0 in
       let digest = list_sub (bits_of_char digest) digest_length in

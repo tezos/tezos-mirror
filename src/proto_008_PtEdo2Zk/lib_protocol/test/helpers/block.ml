@@ -83,10 +83,12 @@ let get_next_baker_by_account pkh block =
     ~max_priority:256
     block
   >|=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
@@ -94,25 +96,25 @@ let get_next_baker_by_account pkh block =
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
   >|=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
-           not (List.mem delegate excludes))
+           not
+             (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
          bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let dispatch_policy = function
-  | By_priority p ->
-      get_next_baker_by_priority p
-  | By_account a ->
-      get_next_baker_by_account a
-  | Excluding al ->
-      get_next_baker_excluding al
+  | By_priority p -> get_next_baker_by_priority p
+  | By_account a -> get_next_baker_by_account a
+  | Excluding al -> get_next_baker_excluding al
 
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
@@ -128,8 +130,7 @@ let get_endorsing_power b =
             op
             Chain_id.zero
           >|=? fun endorsement_power -> acc + endorsement_power
-      | _ ->
-          return acc)
+      | _ -> return acc)
     0
     b.operations
 
@@ -168,8 +169,7 @@ module Forge = struct
   let set_baker baker header = {header with baker}
 
   let sign_header {baker; shell; contents} =
-    Account.find baker
-    >|=? fun delegate ->
+    Account.find baker >|=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -185,24 +185,19 @@ module Forge = struct
 
   let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = []) pred
       =
-    dispatch_policy policy pred
-    >>=? fun (pkh, priority, _timestamp) ->
+    dispatch_policy policy pred >>=? fun (pkh, priority, _timestamp) ->
     Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
     >>=? fun expected_timestamp ->
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
-    ( match Fitness_repr.to_int64 pred.header.shell.fitness with
+    (match Fitness_repr.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
         Fitness_repr.from_int64 (Int64.add (Int64.of_int 1) old_fitness)
-    | Error _ ->
-        assert false )
+    | Error _ -> assert false)
     |> fun fitness ->
-    Alpha_services.Helpers.current_level ~offset:1l rpc_ctxt pred
-    >|=? (function
-           | {expected_commitment = true; _} ->
-               Some (fst (Proto_Nonce.generate ()))
-           | {expected_commitment = false; _} ->
-               None)
+    (Alpha_services.Helpers.current_level ~offset:1l rpc_ctxt pred >|=? function
+     | {expected_commitment = true; _} -> Some (fst (Proto_Nonce.generate ()))
+     | {expected_commitment = false; _} -> None)
     >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
@@ -266,11 +261,11 @@ let initial_context ?(with_commitments = false) constants header
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> add ctxt protocol_param_key proto_params)
+    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
+    add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  Main.init ctxt header >|= Environment.wrap_error
-  >|=? fun {context; _} -> context
+  Main.init ctxt header >|= Environment.wrap_error >|=? fun {context; _} ->
+  context
 
 let genesis_with_parameters parameters =
   let hash =
@@ -293,11 +288,10 @@ let genesis_with_parameters parameters =
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> add ctxt protocol_param_key proto_params)
+    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
+    add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  Main.init ctxt shell >|= Environment.wrap_error
-  >|=? fun {context; _} ->
+  Main.init ctxt shell >|= Environment.wrap_error >|=? fun {context; _} ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -323,12 +317,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     Option.value ~default:constants.min_proposal_quorum min_proposal_quorum
   in
   let constants =
-    {
-      constants with
-      endorsers_per_block;
-      initial_endorsers;
-      min_proposal_quorum;
-    }
+    {constants with endorsers_per_block; initial_endorsers; min_proposal_quorum}
   in
   (* Check there is at least one roll *)
   (let exception Return_unit_now in
@@ -336,8 +325,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     (fun () ->
       List.fold_left_es
         (fun acc (_, amount) ->
-          Environment.wrap_error @@ Tez_repr.( +? ) acc amount
-          >>?= fun acc ->
+          Environment.wrap_error @@ Tez_repr.( +? ) acc amount >>?= fun acc ->
           if acc >= constants.tokens_per_roll then raise Return_unit_now
           else return acc)
         Tez_repr.zero
@@ -346,8 +334,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
       failwith "Insufficient tokens in initial accounts to create one roll")
     (function Return_unit_now -> return_unit | exc -> raise exc))
   >>=? fun () ->
-  check_constants_consistency constants
-  >>=? fun () ->
+  check_constants_consistency constants >>=? fun () ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -387,8 +374,8 @@ let apply header ?(operations = []) pred =
     vstate
     operations
   >>=? fun vstate ->
-  Main.finalize_block vstate
-  >|=? fun (validation, _result) -> validation.context)
+  Main.finalize_block vstate >|=? fun (validation, _result) ->
+  validation.context)
   >|= Environment.wrap_error
   >|=? fun context ->
   let hash = Block_header.hash header in
@@ -397,17 +384,12 @@ let apply header ?(operations = []) pred =
 let bake ?policy ?timestamp ?operation ?operations pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) ->
-        Some (op :: ops)
-    | (Some op, None) ->
-        Some [op]
-    | (None, Some ops) ->
-        Some ops
-    | (None, None) ->
-        None
+    | (Some op, Some ops) -> Some (op :: ops)
+    | (Some op, None) -> Some [op]
+    | (None, Some ops) -> Some ops
+    | (None, None) -> None
   in
-  Forge.forge_header ?timestamp ?policy ?operations pred
-  >>=? fun header ->
+  Forge.forge_header ?timestamp ?policy ?operations pred >>=? fun header ->
   Forge.sign_header header >>=? fun header -> apply header ?operations pred
 
 (********** Cycles ****************)
@@ -415,12 +397,10 @@ let bake ?policy ?timestamp ?operation ?operations pred =
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
-let bake_n ?policy n b =
-  List.fold_left_es (fun b _ -> bake ?policy b) b (1 -- n)
+let bake_n ?policy n b = List.fold_left_es (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
-  get_constants b
-  >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
   let current_level = b.header.shell.level in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
@@ -430,8 +410,7 @@ let bake_until_n_cycle_end ?policy n b =
   List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let current_cycle b =
-  get_constants b
-  >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
   let current_level = b.header.shell.level in
   let current_cycle = Int32.div current_level blocks_per_cycle in
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
@@ -439,8 +418,7 @@ let current_cycle b =
 
 let bake_until_cycle ?policy cycle (b : t) =
   let rec loop (b : t) =
-    current_cycle b
-    >>=? fun current_cycle ->
+    current_cycle b >>=? fun current_cycle ->
     if Cycle.equal cycle current_cycle then return b
     else bake_until_cycle_end ?policy b >>=? fun b -> loop b
   in

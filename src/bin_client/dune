@@ -74,6 +74,23 @@
             (select void_for_linking-baking-010-PtGRANAD from
               (tezos-baking-010-PtGRANAD-commands.registration -> void_for_linking-baking-010-PtGRANAD.empty)
               (-> void_for_linking-baking-010-PtGRANAD.empty))
+
+            (select void_for_linking-007-PsDELPH1-protocol-plugin from
+              (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
+              (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))
+            (select void_for_linking-008-PtEdo2Zk-protocol-plugin from
+              (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty)
+              (-> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty))
+            (select void_for_linking-009-PsFLoren-protocol-plugin from
+              (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-009-PsFLoren-protocol-plugin.empty)
+              (-> void_for_linking-009-PsFLoren-protocol-plugin.empty))
+            (select void_for_linking-010-PtGRANAD-protocol-plugin from
+              (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-010-PtGRANAD-protocol-plugin.empty)
+              (-> void_for_linking-010-PtGRANAD-protocol-plugin.empty))
+            (select void_for_linking-alpha-protocol-plugin from
+              (tezos-protocol-plugin-alpha -> void_for_linking-alpha-protocol-plugin.empty)
+              (-> void_for_linking-alpha-protocol-plugin.empty))
+
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-signer-backends.unix)
@@ -110,14 +127,14 @@
    (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-baking-009-PsFLoren.empty "")
    (write-file void_for_linking-baking-010-PtGRANAD.empty "")
+   (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
+   (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin.empty "")
+   (write-file void_for_linking-009-PsFLoren-protocol-plugin.empty "")
+   (write-file void_for_linking-010-PtGRANAD-protocol-plugin.empty "")
+   (write-file void_for_linking-alpha-protocol-plugin.empty "")
 )))
 
 (install
  (package tezos-client)
  (section bin)
  (files (tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

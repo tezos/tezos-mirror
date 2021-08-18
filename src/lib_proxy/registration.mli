@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_shell_services
+
 (** The module type of a proxy environment. Modules of this type should be
     prepared protocol-side and registered here to become available to the
     proxy facility. *)
-
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
@@ -36,8 +37,8 @@ module type Proxy_sig = sig
   (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
   val hash :
     #RPC_context.simple ->
-    ?chain:Tezos_shell_services.Block_services.chain ->
-    ?block:Tezos_shell_services.Block_services.block ->
+    ?chain:Block_services.chain ->
+    ?block:Block_services.block ->
     unit ->
     Block_hash.t tzresult Lwt.t
 
@@ -45,15 +46,28 @@ module type Proxy_sig = sig
 
       - A printer (for logging)
       - An instance of [RPC_context.json], to perform RPCs
+      - Whether [tezos-client] or [tezos-proxy-server] is running
       - The chain for which the context is required
       - The block for which the context is required
     *)
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->
+    (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
-    Tezos_shell_services.Block_services.chain ->
-    Tezos_shell_services.Block_services.block ->
+    Proxy.mode ->
+    Block_services.chain ->
+    Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
+
+  (** The [time_between_blocks] constant for the given block, if any. *)
+  val time_between_blocks :
+    RPC_context.json ->
+    Block_services.chain ->
+    Block_services.block ->
+    int64 option tzresult Lwt.t
+
+  (** Functions used to implement the light mode *)
+  include Light_proto.PROTO_RPCS
 end
 
 type proxy_environment = (module Proxy_sig)
@@ -66,7 +80,8 @@ val register_proxy_context : proxy_environment -> unit
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
   #RPC_context.simple ->
+  [< `Mode_light | `Mode_proxy] ->
+  ?chain:Block_services.chain ->
+  ?block:Block_services.block ->
   Protocol_hash.t option ->
-  Tezos_shell_services.Block_services.chain ->
-  Tezos_shell_services.Block_services.block ->
   proxy_environment tzresult Lwt.t

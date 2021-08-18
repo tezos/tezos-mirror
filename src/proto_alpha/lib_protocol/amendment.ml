@@ -29,12 +29,10 @@ open Alpha_context
     Returns None in case of a tie, if proposal quorum is below required
     minimum or if there are no proposals. *)
 let select_winning_proposal ctxt =
-  Vote.get_proposals ctxt
-  >>=? fun proposals ->
+  Vote.get_proposals ctxt >>=? fun proposals ->
   let merge proposal vote winners =
     match winners with
-    | None ->
-        Some ([proposal], vote)
+    | None -> Some ([proposal], vote)
     | Some (winners, winners_vote) as previous ->
         if Compare.Int32.(vote = winners_vote) then
           Some (proposal :: winners, winners_vote)
@@ -43,16 +41,14 @@ let select_winning_proposal ctxt =
   in
   match Protocol_hash.Map.fold merge proposals None with
   | Some ([proposal], vote) ->
-      Vote.listing_size ctxt
-      >>=? fun max_vote ->
+      Vote.listing_size ctxt >>=? fun max_vote ->
       let min_proposal_quorum = Constants.min_proposal_quorum ctxt in
       let min_vote_to_pass =
         Int32.div (Int32.mul min_proposal_quorum max_vote) 100_00l
       in
       if Compare.Int32.(vote >= min_vote_to_pass) then return_some proposal
       else return_none
-  | _ ->
-      return_none
+  | _ -> return_none
 
 (* in case of a tie, let's do nothing. *)
 
@@ -90,16 +86,11 @@ let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
   (approval, new_participation_ema)
 
 let get_approval_and_update_participation_ema ctxt =
-  Vote.get_ballots ctxt
-  >>=? fun ballots ->
-  Vote.listing_size ctxt
-  >>=? fun maximum_vote ->
-  Vote.get_participation_ema ctxt
-  >>=? fun participation_ema ->
-  Vote.get_current_quorum ctxt
-  >>=? fun expected_quorum ->
-  Vote.clear_ballots ctxt
-  >>= fun ctxt ->
+  Vote.get_ballots ctxt >>=? fun ballots ->
+  Vote.listing_size ctxt >>=? fun maximum_vote ->
+  Vote.get_participation_ema ctxt >>=? fun participation_ema ->
+  Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
+  Vote.clear_ballots ctxt >>= fun ctxt ->
   let (approval, new_participation_ema) =
     approval_and_participation_ema
       ballots
@@ -107,47 +98,40 @@ let get_approval_and_update_participation_ema ctxt =
       ~participation_ema
       ~expected_quorum
   in
-  Vote.set_participation_ema ctxt new_participation_ema
-  >|=? fun ctxt -> (ctxt, approval)
+  Vote.set_participation_ema ctxt new_participation_ema >|=? fun ctxt ->
+  (ctxt, approval)
 
 (** Implements the state machine of the amendment procedure. Note that
    [update_listings], that computes the vote weight of each delegate, is run at
    the end of each voting period. This state-machine prepare the voting_period
    for the next block. *)
 let start_new_voting_period ctxt =
-  Voting_period.get_current_kind ctxt
-  >>=? fun kind ->
-  ( match kind with
+  Voting_period.get_current_kind ctxt >>=? fun kind ->
+  (match kind with
   | Proposal -> (
-      select_winning_proposal ctxt
-      >>=? fun proposal ->
-      Vote.clear_proposals ctxt
-      >>= fun ctxt ->
+      select_winning_proposal ctxt >>=? fun proposal ->
+      Vote.clear_proposals ctxt >>= fun ctxt ->
       match proposal with
-      | None ->
-          Voting_period.reset ctxt
+      | None -> Voting_period.reset ctxt
       | Some proposal ->
-          Vote.init_current_proposal ctxt proposal >>=? Voting_period.succ )
+          Vote.init_current_proposal ctxt proposal >>=? Voting_period.succ)
   | Exploration ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
       else
-        Vote.clear_current_proposal ctxt
-        >>=? fun ctxt -> Voting_period.reset ctxt
-  | Cooldown ->
-      Voting_period.succ ctxt
+        Vote.clear_current_proposal ctxt >>=? fun ctxt ->
+        Voting_period.reset ctxt
+  | Cooldown -> Voting_period.succ ctxt
   | Promotion ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
       else Vote.clear_current_proposal ctxt >>=? Voting_period.reset
   | Adoption ->
-      Vote.get_current_proposal ctxt
-      >>=? fun proposal ->
-      activate ctxt proposal
-      >>= fun ctxt -> Vote.clear_current_proposal ctxt >>=? Voting_period.reset
-  )
+      Vote.get_current_proposal ctxt >>=? fun proposal ->
+      activate ctxt proposal >>= fun ctxt ->
+      Vote.clear_current_proposal ctxt >>=? Voting_period.reset)
   >>=? fun ctxt -> Vote.update_listings ctxt
 
 type error +=
@@ -219,8 +203,7 @@ let () =
     `Branch
     ~id:"too_many_proposals"
     ~title:"Too many proposals"
-    ~description:
-      "The delegate reached the maximum number of allowed proposals."
+    ~description:"The delegate reached the maximum number of allowed proposals."
     ~pp:(fun ppf () -> Format.fprintf ppf "Too many proposals")
     empty
     (function Too_many_proposals -> Some () | _ -> None)
@@ -241,21 +224,17 @@ let rec longer_than l n =
   if Compare.Int.(n < 0) then assert false
   else
     match l with
-    | [] ->
-        false
+    | [] -> false
     | _ :: rest ->
-        if Compare.Int.(n = 0) then true
-        else (* n > 0 *)
-          longer_than rest (n - 1)
+        if Compare.Int.(n = 0) then true else (* n > 0 *)
+                                           longer_than rest (n - 1)
 
 let record_proposals ctxt delegate proposals =
   (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
   >>?= fun () ->
-  Voting_period.get_current_kind ctxt
-  >>=? function
+  Voting_period.get_current_kind ctxt >>=? function
   | Proposal ->
-      Vote.in_listings ctxt delegate
-      >>= fun in_listings ->
+      Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
         Vote.recorded_proposal_count_for_delegate ctxt delegate
         >>=? fun count ->
@@ -268,31 +247,23 @@ let record_proposals ctxt delegate proposals =
           ctxt
           proposals
       else fail Unauthorized_proposal
-  | Exploration | Cooldown | Promotion | Adoption ->
-      fail Unexpected_proposal
+  | Exploration | Cooldown | Promotion | Adoption -> fail Unexpected_proposal
 
 let record_ballot ctxt delegate proposal ballot =
-  Voting_period.get_current_kind ctxt
-  >>=? function
+  Voting_period.get_current_kind ctxt >>=? function
   | Exploration | Promotion ->
-      Vote.get_current_proposal ctxt
-      >>=? fun current_proposal ->
+      Vote.get_current_proposal ctxt >>=? fun current_proposal ->
       error_unless
         (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal
       >>?= fun () ->
-      Vote.has_recorded_ballot ctxt delegate
-      >>= fun has_ballot ->
-      error_when has_ballot Unauthorized_ballot
-      >>?= fun () ->
-      Vote.in_listings ctxt delegate
-      >>= fun in_listings ->
+      Vote.has_recorded_ballot ctxt delegate >>= fun has_ballot ->
+      error_when has_ballot Unauthorized_ballot >>?= fun () ->
+      Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot
       else fail Unauthorized_ballot
-  | Cooldown | Proposal | Adoption ->
-      fail Unexpected_ballot
+  | Cooldown | Proposal | Adoption -> fail Unexpected_ballot
 
 let may_start_new_voting_period ctxt =
-  Voting_period.is_last_block ctxt
-  >>=? fun is_last ->
+  Voting_period.is_last_block ctxt >>=? fun is_last ->
   if is_last then start_new_voting_period ctxt else return ctxt

@@ -1,45 +1,73 @@
 test-script-gen-genesis:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: test
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
+  needs: []
   before_script:
     - cd scripts/gen-genesis
   script:
     - dune build gen_genesis.exe
-  interruptible: true
-
-test-static-libs-patch:
-  extends: .runtime_build_test_dependencies_template
-  stage: test
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
-  script:
-    - git apply packaging/build/static_libs.patch
 
 .test_template:
-  extends: .build_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: test
+  needs: ["build"]
+  before_script:
+    - . ./scripts/version.sh
   retry: 2
   # avoid pushing cache for testing stage
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     policy: pull
 
-# this section is updated using the script scripts/update_unit_test.sh
-##BEGIN_UNITTEST##
-unit:alltest:
+.unit_test_template:
   extends: .test_template
   artifacts:
-    name: "alltest-${CI_COMMIT_SHA}"
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
     paths:
       - test_results
+    reports:
+      junit: test_results/*.xml
     expire_in: 1 day
-#    when: on_failure
+    when: always
+
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
+unit:008_PtEdo2Zk:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+
+unit:009_PsFLoren:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
+
+unit:010_PtGRANAD:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference 010_PtGRANAD_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark 010_PtGRANAD_lib_benchmark
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_client 010_PtGRANAD_lib_client
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_protocol 010_PtGRANAD_lib_protocol
+
+unit:alpha:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark/lib_benchmark_type_inference alpha_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark alpha_lib_benchmark
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+
+unit:non-proto:
+  extends: .unit_test_template
   script:
     - scripts/test_wrapper.sh src/bin_client client
     - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
@@ -49,8 +77,10 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_clic clic
     - scripts/test_wrapper.sh src/lib_client_base client_base
     - scripts/test_wrapper.sh src/lib_client_base_unix client_base_unix
+    - scripts/test_wrapper.sh src/lib_context context
     - scripts/test_wrapper.sh src/lib_crypto crypto
     - scripts/test_wrapper.sh src/lib_error_monad error_monad
+    - scripts/test_wrapper.sh src/lib_hacl_glue/js hacl_glue_js
     - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
     - scripts/test_wrapper.sh src/lib_micheline micheline
     - scripts/test_wrapper.sh src/lib_mockup mockup
@@ -58,34 +88,26 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
     - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
     - scripts/test_wrapper.sh src/lib_proxy proxy
+    - scripts/test_wrapper.sh src/lib_proxy_server_config proxy_server_config
     - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_rpc_http rpc_http
     - scripts/test_wrapper.sh src/lib_sapling sapling
     - scripts/test_wrapper.sh src/lib_shell shell
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
     - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
-    - scripts/test_wrapper.sh src/lib_storage storage
-    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
-    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference 010_PtGRANAD_lib_benchmark_lib_benchmark_type_inference
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark 010_PtGRANAD_lib_benchmark
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_client 010_PtGRANAD_lib_client
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_protocol 010_PtGRANAD_lib_protocol
-    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
-    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
-    - scripts/test_wrapper.sh src/tooling src_tooling
-    - scripts/test_wrapper.sh vendors/ocaml-bls12-381 ocaml-bls12-381
+    - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
+    - scripts/test_wrapper.sh src/lib_store store
     - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
     - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
-    - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
 ##END_UNITTEST##
+
+unit:js_components:
+  extends: .test_template
+  script:
+    - dune build @runtest_js
 
 unit:protocol_compiles:
   extends: .test_template
   script:
     - dune build @runtest_compile_protocol
-

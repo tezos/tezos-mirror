@@ -34,7 +34,8 @@ let balance_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.balance"
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Contract"
            (obj2
@@ -71,7 +72,8 @@ let balance_encoding =
               (req "delegate" Signature.Public_key_hash.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
-           (fun ((), (), d, l) -> Deposits (d, l)) ]
+           (fun ((), (), d, l) -> Deposits (d, l));
+       ]
 
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
@@ -83,34 +85,28 @@ let balance_update_encoding =
           "change"
           (conv
              (function
-               | Credited v ->
-                   Tez_repr.to_mutez v
-               | Debited v ->
-                   Int64.neg (Tez_repr.to_mutez v))
-             ( Json.wrap_error
-             @@ fun v ->
-             if Compare.Int64.(v < 0L) then
-               match Tez_repr.of_mutez (Int64.neg v) with
-               | Some v ->
-                   Debited v
-               | None ->
-                   failwith "Qty.of_mutez"
-             else
-               match Tez_repr.of_mutez v with
-               | Some v ->
-                   Credited v
-               | None ->
-                   failwith "Qty.of_mutez" )
+               | Credited v -> Tez_repr.to_mutez v
+               | Debited v -> Int64.neg (Tez_repr.to_mutez v))
+             ( Json.wrap_error @@ fun v ->
+               if Compare.Int64.(v < 0L) then
+                 match Tez_repr.of_mutez (Int64.neg v) with
+                 | Some v -> Debited v
+                 | None -> failwith "Qty.of_mutez"
+               else
+                 match Tez_repr.of_mutez v with
+                 | Some v -> Credited v
+                 | None -> failwith "Qty.of_mutez" )
              int64))
 
-type update_origin = Block_application | Protocol_migration
+type update_origin = Block_application | Protocol_migration | Subsidy
 
 let update_origin_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.update_origin"
   @@ obj1 @@ req "origin"
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Block_application"
            (constant "block")
@@ -121,7 +117,14 @@ let update_origin_encoding =
            ~title:"Protocol_migration"
            (constant "migration")
            (function Protocol_migration -> Some () | _ -> None)
-           (fun () -> Protocol_migration) ]
+           (fun () -> Protocol_migration);
+         case
+           (Tag 2)
+           ~title:"Subsidy"
+           (constant "subsidy")
+           (function Subsidy -> Some () | _ -> None)
+           (fun () -> Subsidy);
+       ]
 
 type balance_updates = (balance * balance_update * update_origin) list
 

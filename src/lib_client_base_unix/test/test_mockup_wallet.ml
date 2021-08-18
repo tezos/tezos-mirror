@@ -64,26 +64,23 @@ let testable_string_list_ignoring_order : string list Alcotest.testable =
 let validate_key (_, pk_hash, pk_sig_opt, sk_uri_opt) =
   match (pk_sig_opt, sk_uri_opt) with
   | (Some pk_sig, Some sk_uri) -> (
-      Client_keys.neuterize sk_uri
-      >>=? Client_keys.public_key_hash
+      Client_keys.neuterize sk_uri >>=? Client_keys.public_key_hash
       >>=? fun (pk_hash_from_sk, pk_sig_from_sk_opt) ->
       match pk_sig_from_sk_opt with
-      | None ->
-          return @@ Alcotest.fail "Is this a valid scenario?"
+      | None -> return @@ Alcotest.fail "Is this a valid scenario?"
       | Some pk_sig_from_sk ->
           return
-            ( Alcotest.check
-                testable_public_key_hash
-                "PK hash is consistent with SK"
-                pk_hash
-                pk_hash_from_sk ;
-              Alcotest.check
-                testable_public_key
-                "PK is consistent with SK"
-                pk_sig
-                pk_sig_from_sk ) )
-  | (_, _) ->
-      failwith "Key has no public signature or secret key"
+            (Alcotest.check
+               testable_public_key_hash
+               "PK hash is consistent with SK"
+               pk_hash
+               pk_hash_from_sk ;
+             Alcotest.check
+               testable_public_key
+               "PK is consistent with SK"
+               pk_sig
+               pk_sig_from_sk))
+  | (_, _) -> failwith "Key has no public signature or secret key"
 
 (** Check that names in [key_list] match the ones in [accounts_names],
     ignoring order *)
@@ -98,8 +95,8 @@ let validate_accounts_names key_list accounts_names =
     populated with the default bootstrap accounts *)
 let test_no_bootstrap_accounts_file_populates_defaults =
   Test_services.tztest
-    "When no bootstrap accounts file is provided, then the wallet is \
-     populated with the default bootstrap accounts"
+    "When no bootstrap accounts file is provided, then the wallet is populated \
+     with the default bootstrap accounts"
     `Quick
     (fun () ->
       Lwt_utils_unix.with_tempdir "test_mockup_wallet" (fun base_dir ->
@@ -112,10 +109,8 @@ let test_no_bootstrap_accounts_file_populates_defaults =
             Client_keys.register_signer
               (module Tezos_signer_backends.Unencrypted)
           in
-          populate io_wallet None
-          >>=? fun () ->
-          Client_keys.list_keys io_wallet
-          >>=? fun key_list ->
+          populate io_wallet None >>=? fun () ->
+          Client_keys.list_keys io_wallet >>=? fun key_list ->
           validate_accounts_names key_list default_bootstrap_accounts_names ;
           List.iter_es validate_key key_list))
 
@@ -137,20 +132,26 @@ let test_with_valid_bootstrap_accounts_file_populates =
           let account_name_2 = "account 2" in
           let bootstrap_accounts =
             `A
-              [ `O
-                  [ ("name", `String account_name_1);
+              [
+                `O
+                  [
+                    ("name", `String account_name_1);
                     ( "sk_uri",
                       `String
                         "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
                     );
-                    ("amount", `String "doesn't matter") ];
+                    ("amount", `String "doesn't matter");
+                  ];
                 `O
-                  [ ("name", `String account_name_2);
+                  [
+                    ("name", `String account_name_2);
                     ( "sk_uri",
                       `String
                         "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
                     );
-                    ("amount", `String "whatever") ] ]
+                    ("amount", `String "whatever");
+                  ];
+              ]
           in
           let bootstrap_accounts_file_path =
             Filename.concat base_dir "my_bootstrap_accounts_json"
@@ -163,17 +164,19 @@ let test_with_valid_bootstrap_accounts_file_populates =
             bootstrap_accounts_file_path
             bootstrap_accounts
           >>=? fun () ->
-          populate io_wallet (Some bootstrap_accounts_file_path)
-          >>=? fun () ->
-          Client_keys.list_keys io_wallet
-          >>=? fun key_list ->
+          populate io_wallet (Some bootstrap_accounts_file_path) >>=? fun () ->
+          Client_keys.list_keys io_wallet >>=? fun key_list ->
           validate_accounts_names key_list [account_name_1; account_name_2] ;
           List.iter_es validate_key key_list))
 
 let () =
   Alcotest_lwt.run
     "tezos-mockup-commands"
-    [ ( "mockup_wallet",
-        [ test_no_bootstrap_accounts_file_populates_defaults;
-          test_with_valid_bootstrap_accounts_file_populates ] ) ]
+    [
+      ( "mockup_wallet",
+        [
+          test_no_bootstrap_accounts_file_populates_defaults;
+          test_with_valid_bootstrap_accounts_file_populates;
+        ] );
+    ]
   |> Lwt_main.run

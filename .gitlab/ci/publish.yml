@@ -1,22 +1,13 @@
 .build_docker_release_template:
-  image: docker:latest
+  extends:
+    - .default_settings_template
+    - .image_template__latest
+    - .rules_template__master_and_releases
   services:
     - docker:dind
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: ""
-  stage: build_release
-  rules:
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - when: never
-  before_script:
-    - mkdir ~/.docker || true
-    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
     - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
     - ./scripts/create_docker_image.sh
@@ -35,7 +26,10 @@ publish:docker_manual:
   variables:
     public_docker_image_name: ${CI_REGISTRY_IMAGE}/
     DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
     IMAGE_ARCH_PREFIX: "amd64-"
+  stage: manual
+  needs: []
   rules:
     - if: '$CI_COMMIT_TAG || $CI_COMMIT_BRANCH =~ /docker/'
       when: on_success
@@ -45,68 +39,68 @@ publish:docker_manual:
     - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  tags:
-    -  gitlab-org-docker
+    - apk --no-cache --virtual add git
 
 build_release:docker_amd64:
   extends: .build_docker_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "amd64-"
+  stage: build_release
   tags:
     - safe_docker
+  before_script:
+    - mkdir ~/.docker || true
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
+    - apk --no-cache --virtual add git
 
 build_release:docker_arm64:
   extends: .build_docker_release_template
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "arm64-"
+  stage: build_release
   tags:
     - arm64
+  before_script:
+    - mkdir ~/.docker || true
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
+    - apk --no-cache --virtual add git
 
 .build_static_binaries_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies_template
+    - .rules_template__master_and_releases
   stage: build_release
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
-      when: on_success
-    - if: '$CI_COMMIT_TAG != null'
-      when: on_success
-    - when: never
   before_script:
-    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # TODO: include static version of this libraries to the default docker image
     - packaging/build/build-libusb-and-hidapi.sh
     # TODO: patch approach is very fragile, we should think about something
     # more reliable
     - git apply packaging/build/static_libs.patch
-    - dune build @install --profile release
-    - dune install --prefix install_root
+    # dune build @install make ocamlopt stack overflow when compiling
+    # protocol functor with static linking (because of
+    # liquidity_baking_cpmm.ml).
+    # Let's skip protocol functors, they are not needed for the release
+    - dune build $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done) --profile release
+    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
     # Strip debug symbols in binaries
-    - find . -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
   artifacts:
     paths:
-      - install_root/bin/*
+      - tezos-binaries/*
 
 build_release:static-x86_64-linux-binaries:
   extends: .build_static_binaries_template
   script:
     - sudo apk --no-cache --virtual add upx
     # Compress resulting binaries
-    - find . -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
 
 build_release:static-arm64-linux-binaries:
   extends: .build_static_binaries_template
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - when: never
   script:
     - echo "No compression for now"
   tags:
@@ -199,11 +193,12 @@ merge-manifest:
     - docker manifest push "${public_docker_image_name%?}:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
   interruptible: false
 
-publish:doc:
-  extends: .runtime_build_test_dependencies_template
+publish:documentation:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__master
   stage: doc
-  only:
-    - master@tezos/tezos
   before_script:
     - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
@@ -239,7 +234,11 @@ publish:doc:
 #
 
 pages:
-  when: manual
+  extends:
+    - .default_settings_template
+    - .rules_template__development_coverage
+  needs: ["test_coverage"]
+  stage: publish_coverage
   # The cache rule ensures public (i.e. the static website) isn't erased
   # whenever we start a new pipeline
   # https://docs.gitlab.com/ee/ci/caching/
@@ -248,10 +247,6 @@ pages:
   cache:
     paths:
       - public
-  stage: publish_coverage
-  except:
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   dependencies:
     - test_coverage
   script:

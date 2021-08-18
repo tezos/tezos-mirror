@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe \
                 -- test "^saturation arithmetic$"
     Subject:    The gas is represented using saturated arithmetic.
                 These unit tests check that saturated arithmetic operations
@@ -59,10 +59,8 @@ let add () =
       (add saturated (ok_int 1) = saturated)
       (err "saturated + 1 <> saturated")
     >>=? fun () ->
-    fail_unless (add zero n = n) (err "zero + n <> n")
-    >>=? fun () ->
-    fail_unless (add n zero = n) (err "n + zero <> n")
-    >>=? fun () ->
+    fail_unless (add zero n = n) (err "zero + n <> n") >>=? fun () ->
+    fail_unless (add n zero = n) (err "n + zero <> n") >>=? fun () ->
     let r = add n m in
     fail_unless
       (valid r && r = ok_int ((n |> to_int) + (m |> to_int)))
@@ -70,8 +68,7 @@ let add () =
 
 let sub () =
   Saturation_repr.(
-    fail_unless (sub zero n = zero) (err "zero - n <> zero")
-    >>=? fun () ->
+    fail_unless (sub zero n = zero) (err "zero - n <> zero") >>=? fun () ->
     let n = max n m and m = min n m in
     let r = sub n m in
     fail_unless
@@ -158,24 +155,25 @@ let encoding encoder () =
       | Error _ ->
           fail (err (Printf.sprintf "Problem during binary encoding of %d" x))
       | Ok bytes -> (
-        match of_bytes encoder bytes with
-        | Error _ ->
-            fail
-              (err (Printf.sprintf "Problem during binary decoding of %d" x))
-        | Ok x' ->
-            fail_unless
-              (ok_int x = x')
-              (err
-                 (Printf.sprintf
-                    "decode (encode %d) = %d <> %d"
-                    x
-                    (x' :> int)
-                    x)) ))
+          match of_bytes encoder bytes with
+          | Error _ ->
+              fail
+                (err (Printf.sprintf "Problem during binary decoding of %d" x))
+          | Ok x' ->
+              fail_unless
+                (ok_int x = x')
+                (err
+                   (Printf.sprintf
+                      "decode (encode %d) = %d <> %d"
+                      x
+                      (x' :> int)
+                      x))))
   in
   join_ep (List.map check_encode_decode [0; 7373737373; max_int - 1])
 
 let tests =
-  [ Test_services.tztest "Addition" `Quick add;
+  [
+    Test_services.tztest "Addition" `Quick add;
     Test_services.tztest "Subtraction" `Quick sub;
     Test_services.tztest "Multiplication" `Quick mul;
     Test_services.tztest "Multiplication (fast version)" `Quick mul_fast;
@@ -188,4 +186,5 @@ let tests =
     Test_services.tztest
       "Encoding through n"
       `Quick
-      (encoding Saturation_repr.n_encoding) ]
+      (encoding Saturation_repr.n_encoding);
+  ]

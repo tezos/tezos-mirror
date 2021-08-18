@@ -2,10 +2,12 @@
  (names bench_simple bench_tool)
  (libraries tezos-base
             tezos-shell
-            tezos-alpha-test-helpers)
+            tezos-alpha-test-helpers
+            tezos-protocol-plugin-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_alpha_parameters
                    -open Tezos_alpha_test_helpers)))
 
@@ -23,8 +25,3 @@
  (alias runbench_alpha)
  (deps bench_tool.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

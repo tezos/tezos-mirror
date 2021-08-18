@@ -38,8 +38,14 @@ let () =
     let directory = RPC_directory.empty
 
     let hash _ ?chain ?block _ =
-      ignore chain ; ignore block ; failwith "%s" msg
+      ignore chain ;
+      ignore block ;
+      failwith "%s" msg
 
-    let init_env_rpc_context _ _ _ _ = failwith "%s" msg
+    let init_env_rpc_context _ _ _ _ _ _ = failwith "%s" msg
+
+    let merkle_tree _ _ _ = failwith "%s" msg
+
+    let time_between_blocks _ _ _ = failwith "%s" msg
   end in
   register_proxy_context (module M)

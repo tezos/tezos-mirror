@@ -62,8 +62,7 @@ let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   List.iter
     (fun line ->
       match line with
-      | [] ->
-          ()
+      | [] -> ()
       | _ ->
           let s = String.concat sep_str line in
           Format.fprintf fmtr "%s%c@?" s linebreak)
@@ -77,10 +76,10 @@ let read_lines name : string list =
   let try_read () = try Some (input_line ic) with End_of_file -> None in
   let rec loop acc =
     match try_read () with
-    | Some s ->
-        loop (s :: acc)
+    | Some s -> loop (s :: acc)
     | None ->
-        close_in ic ; List.rev acc
+        close_in ic ;
+        List.rev acc
   in
   loop []
 
@@ -91,10 +90,8 @@ let import ~filename ?(separator = ',') () : csv =
   let lines = read_lines filename in
   let (header, rows) =
     match lines with
-    | [] ->
-        raise Empty_csv_file
-    | header :: tail ->
-        (header, tail)
+    | [] -> raise Empty_csv_file
+    | header :: tail -> (header, tail)
   in
   let header = String.split_on_char separator header in
   let ncols = List.length header in
@@ -103,8 +100,8 @@ let import ~filename ?(separator = ',') () : csv =
     Stdlib.failwith "Csv.import: mismatch between header width and row width" ;
   header :: rows
 
-let append_columns ~filename ?(separator = ',') ?(linebreak = '\n')
-    (data : csv) =
+let append_columns ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv)
+    =
   let file_data =
     try import ~filename ~separator ()
     with Sys_error _ | Empty_csv_file ->

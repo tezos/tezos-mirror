@@ -1,24 +1,24 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_origination[compare_big_type2.tz]
 
 Node is bootstrapped.
-Estimated gas: 5015.304 units (will add 100 for safety)
+Estimated gas: 2761.649 units (will add 100 for safety)
 Estimated storage: 393 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000879
+    Fee to the baker: ꜩ0.000654
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 5116
+    Gas limit: 2862
     Storage limit: 413 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000879
-      fees(the baker who will include this operation,5) ... +ꜩ0.000879
+      [CONTRACT_HASH] ................ -ꜩ0.000654
+      fees(the baker who will include this operation,5) ... +ꜩ0.000654
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -82,7 +82,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 136 bytes
         Paid storage size diff: 136 bytes
-        Consumed gas: 5015.304
+        Consumed gas: 2761.649
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.034
           [CONTRACT_HASH] ... -ꜩ0.06425

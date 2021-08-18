@@ -32,14 +32,10 @@ module Aspect = struct
 
   let compare (x : t) (y : t) =
     match (x, y) with
-    | (Hashing_Sha256, Hashing_Sha256) ->
-        0
-    | (Hashing_Blake2b, Hashing_Blake2b) ->
-        0
-    | (Hashing_Blake2b, Hashing_Sha256) ->
-        -1
-    | (Hashing_Sha256, Hashing_Blake2b) ->
-        1
+    | (Hashing_Sha256, Hashing_Sha256) -> 0
+    | (Hashing_Blake2b, Hashing_Blake2b) -> 0
+    | (Hashing_Blake2b, Hashing_Sha256) -> -1
+    | (Hashing_Sha256, Hashing_Blake2b) -> 1
 end
 
 type workload = Blake2b of {nbytes : int} | Sha256 of {nbytes : int}
@@ -76,7 +72,8 @@ module Probing_bench = struct
   let workload_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           ~title:"Blake2b"
           (Tag 0)
           int31
@@ -87,7 +84,8 @@ module Probing_bench = struct
           (Tag 1)
           int31
           (function Sha256 {nbytes} -> Some nbytes | _ -> None)
-          (fun nbytes -> Sha256 {nbytes}) ]
+          (fun nbytes -> Sha256 {nbytes});
+      ]
 
   (* How to interpret a workload as a vector; for automatic scatter-plotting. *)
   let workload_to_vector = function
@@ -122,10 +120,8 @@ module Probing_bench = struct
       {
         workload =
           (function
-          | Aspect.Hashing_Blake2b ->
-              Blake2b {nbytes}
-          | Hashing_Sha256 ->
-              Sha256 {nbytes});
+          | Aspect.Hashing_Blake2b -> Blake2b {nbytes}
+          | Hashing_Sha256 -> Sha256 {nbytes});
         probe;
         closure;
       }

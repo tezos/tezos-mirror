@@ -52,7 +52,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       protocol_root = test_dir;
       patch_context = None;
       p2p = None;
-      checkpoint = None;
+      target = None;
       disable_mempool = false;
       enable_testchain = true;
     }
@@ -106,44 +106,19 @@ let default_p2p_limits : P2p.limits =
 let default_p2p = Some (default_p2p, default_p2p_limits)
 
 let wrap f _switch () =
-  Shell_test_helpers.with_empty_mock_sink (fun _ ->
+  Test_services.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_config f test_dir _switch ()))
 
 (** Start tests *)
 
 let ( >>=?? ) m f =
-  m
-  >>= function
-  | Ok v ->
-      f v
+  m >>= function
+  | Ok v -> f v
   | Error error ->
       Format.printf "Error:\n   %a\n" pp_print_error error ;
       Format.print_flush () ;
       Lwt.return_unit
-
-let test_event msg (level1, section1, status1) (level2, section2, json2) =
-  Alcotest.(check (option Shell_test_helpers.Mock_sink.testable_section))
-    (msg ^ ". Section")
-    section1
-    section2 ;
-  Alcotest.(check Shell_test_helpers.Mock_sink.testable_level)
-    (msg ^ ". Level")
-    level1
-    level2 ;
-  match json2 with
-  | `O [("shell-node.v0", `String status2)] ->
-      Alcotest.(check string)
-        (msg ^ ". Should have correct status")
-        status1
-        status2
-  | _ ->
-      Alcotest.fail
-        (Format.asprintf
-           "%s. Incorrect json format :\n%a"
-           msg
-           Data_encoding.Json.pp
-           json2)
 
 (** Node creation in sandbox. Expects one event with status
     [p2p_layer_disabled]. *)
@@ -166,12 +141,15 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let open Shell_test_helpers in
-  let evs = Mock_sink.get_events ~filter () in
+  let evs = Test_services.Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have one event" 1 (List.length evs) ;
-  test_event
-    "Should have an p2p_layer_disabled"
-    (Internal_event.Notice, section, "p2p_layer_disabled")
+  Test_services.Mock_sink.Pattern.(
+    assert_event
+      {
+        level = Some Internal_event.Notice;
+        section = Some section;
+        name = "shell-node";
+      })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   (* End tests *)
   Node.shutdown n
@@ -196,16 +174,23 @@ let node_initialization_events _sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let open Shell_test_helpers in
-  let evs = Mock_sink.get_events ~filter () in
+  let evs = Test_services.Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have two events" 2 (List.length evs) ;
-  test_event
-    "Should have a p2p bootstrapping event"
-    (Internal_event.Notice, section, "bootstrapping")
+  Test_services.Mock_sink.Pattern.(
+    assert_event
+      {
+        level = Some Internal_event.Notice;
+        section = Some section;
+        name = "shell-node";
+      })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
-  test_event
-    "Should have a p2p_maintain_started event"
-    (Internal_event.Notice, section, "p2p_maintain_started")
+  Test_services.Mock_sink.Pattern.(
+    assert_event
+      {
+        level = Some Internal_event.Notice;
+        section = Some section;
+        name = "shell-node";
+      })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 1) ;
   (* End tests *)
   Node.shutdown n
@@ -228,26 +213,28 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let open Shell_test_helpers in
-  (* let evs = Mock_sink.get_events ~filter () in *)
-  Mock_sink.assert_has_event
-    "Should have a store_protocol_incorrect_hash event"
-    ~filter
-    ( Internal_event.Info,
-      section,
-      `O
-        [ ( "store_protocol_incorrect_hash.v0",
-            `String "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" ) ]
-    ) ;
-  (* End tests *)
+  (* let evs = Test_services.Mock_sink.get_events ~filter () in *)
+  Test_services.Mock_sink.(
+    assert_has_event
+      "Should have a store_protocol_incorrect_hash event"
+      ?filter
+      Pattern.
+        {
+          level = Some Internal_event.Info;
+          section = Some section;
+          name = "store_protocol_incorrect_hash";
+        }) ;
+  (* END tests *)
   Node.shutdown n
 
 let tests =
-  [ Alcotest_lwt.test_case
+  [
+    Alcotest_lwt.test_case
       "node_sandbox_initialization_events"
       `Quick
       (wrap node_sandbox_initialization_events);
     Alcotest_lwt.test_case
       "node_initialization_events"
       `Quick
-      (wrap node_initialization_events) ]
+      (wrap node_initialization_events);
+  ]

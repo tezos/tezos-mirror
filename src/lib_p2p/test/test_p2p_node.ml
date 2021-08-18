@@ -75,7 +75,8 @@ let propagation_tzresult points =
     (fun i _ -> if x = i then Error_monad.fail Some_error else return_unit)
     points
   >>= function
-  | Ok () -> Error_monad.fail Invalid_test_result | Error _ -> return_unit
+  | Ok () -> Error_monad.fail Invalid_test_result
+  | Error _ -> return_unit
 
 let points = ref []
 
@@ -90,15 +91,14 @@ let wrap n f =
   Alcotest.test_case n `Quick (fun () ->
       Lwt_main.run
         (let rec aux n f =
-           f ()
-           >>= function
-           | Ok () ->
-               Lwt.return_unit
+           f () >>= function
+           | Ok () -> Lwt.return_unit
            | Error
-               (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _))
-               :: _) ->
-               Event.(emit port_conflicts) ()
-               >>= fun () -> gen_points () ; aux n f
+               (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
+             ->
+               Event.(emit port_conflicts) () >>= fun () ->
+               gen_points () ;
+               aux n f
            | Error error ->
                Format.kasprintf Stdlib.failwith "%a" pp_print_error error
          in
@@ -115,9 +115,10 @@ let main () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [ ( "p2p-node",
-        [wrap "propagation-tzresult" (fun _ -> propagation_tzresult !points)]
-      ) ]
+    [
+      ( "p2p-node",
+        [wrap "propagation-tzresult" (fun _ -> propagation_tzresult !points)] );
+    ]
 
 let () =
   Sys.catch_break true ;

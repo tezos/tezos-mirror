@@ -40,9 +40,11 @@ endif
 		src/bin_codec/codec.exe \
 		src/lib_protocol_compiler/main_native.exe \
 		src/bin_snoop/main_snoop.exe \
+		src/bin_proxy_server/main_proxy_server.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
 	@cp _build/default/src/bin_node/main.exe tezos-node
@@ -53,6 +55,7 @@ endif
 	@cp _build/default/src/bin_codec/codec.exe tezos-codec
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@cp _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
+	@cp _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
 	@for p in $(active_protocol_directories) ; do \
 	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
 	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
@@ -60,6 +63,7 @@ endif
 	   mkdir -p src/proto_$$p/parameters ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
+	   cp _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
 	 done
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
@@ -128,7 +132,7 @@ test-python: all
 
 .PHONY: test-flextesa
 test-flextesa:
-	@dune build @runtest_flextesa
+	@make -f sandbox.Makefile
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
@@ -164,10 +168,9 @@ test: lint-opam-dune test-code
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
 	@src/tooling/lint.sh --check-scripts
 	@src/tooling/lint.sh --check-ocamlformat
-	@dune build @runtest_lint
+	@dune build @fmt
 
 check-python-linting:
 	@make -C tests_python lint
@@ -176,7 +179,7 @@ check-python-linting:
 fmt: fmt-ocaml fmt-python
 
 fmt-ocaml:
-	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+	@dune build @fmt --auto-promote
 
 fmt-python:
 	@make -C tests_python fmt
@@ -260,6 +263,7 @@ clean: coverage-clean
 		tezos-codec \
 		tezos-protocol-compiler \
 		tezos-snoop \
+		tezos-proxy-server \
 		tezos-sandbox \
 	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p)) \
 	  $(foreach p, $(active_protocol_directories), src/proto_$(p)/parameters/sandbox-parameters.json src/proto_$(p)/parameters/test-parameters.json)

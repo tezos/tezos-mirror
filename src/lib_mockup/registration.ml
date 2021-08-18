@@ -23,53 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+include Registration_intf
 
-module type MOCKUP = sig
-  type parameters
+module Make () : S = struct
+  include Registration_intf
 
-  type protocol_constants
+  type mockup_environment = (module MOCKUP)
 
-  val parameters_encoding : parameters Data_encoding.t
+  let registered : mockup_environment list ref = ref []
 
-  val default_parameters : parameters
+  let register_mockup_environment m = registered := m :: !registered
 
-  val protocol_constants_encoding : protocol_constants Data_encoding.t
-
-  val default_protocol_constants :
-    Tezos_client_base.Client_context.full -> protocol_constants tzresult Lwt.t
-
-  val default_bootstrap_accounts :
-    Tezos_client_base.Client_context.full -> string tzresult Lwt.t
-
-  val protocol_hash : Protocol_hash.t
-
-  module Protocol : sig
-    val hash : Protocol_hash.t
-
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  module Block_services :
-      module type of
-        Tezos_shell_services.Block_services.Make (Protocol) (Protocol)
-
-  val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
-
-  val init :
-    cctxt:Tezos_client_base.Client_context.full ->
-    parameters:parameters ->
-    constants_overrides_json:Data_encoding.json option ->
-    bootstrap_accounts_json:Data_encoding.json option ->
-    mockup_context tzresult Lwt.t
-
-  val migrate : mockup_context -> mockup_context tzresult Lwt.t
+  let get_registered_environments () = !registered
 end
 
-type mockup_environment = (module MOCKUP)
+include Make ()
 
-let registered : mockup_environment list ref = ref []
-
-let register_mockup_environment m = registered := m :: !registered
-
-let get_registered_environments () = !registered
+module Internal_for_tests = struct
+  module Make = Make
+end

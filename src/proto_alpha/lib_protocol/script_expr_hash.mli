@@ -24,4 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A specialized Blake2B implementation for hashing Michelson expressions. *)
+
 include S.HASH

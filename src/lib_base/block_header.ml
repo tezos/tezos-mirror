@@ -45,14 +45,16 @@ let shell_header_encoding =
       "Block header's shell-related content. It contains information such as \
        the block level, its predecessor and timestamp."
   @@ conv
-       (fun { level;
+       (fun {
+              level;
               proto_level;
               predecessor;
               timestamp;
               validation_passes;
               operations_hash;
               fitness;
-              context } ->
+              context;
+            } ->
          ( level,
            proto_level,
            predecessor,
@@ -98,25 +100,19 @@ include Compare.Make (struct
     let ( >> ) x y = if x = 0 then y () else x in
     let rec list compare xs ys =
       match (xs, ys) with
-      | ([], []) ->
-          0
-      | (_ :: _, []) ->
-          -1
-      | ([], _ :: _) ->
-          1
-      | (x :: xs, y :: ys) ->
-          compare x y >> fun () -> list compare xs ys
+      | ([], []) -> 0
+      | (_ :: _, []) -> -1
+      | ([], _ :: _) -> 1
+      | (x :: xs, y :: ys) -> compare x y >> fun () -> list compare xs ys
     in
-    Block_hash.compare b1.shell.predecessor b2.shell.predecessor
-    >> fun () ->
-    compare b1.protocol_data b2.protocol_data
-    >> fun () ->
+    Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
+    compare b1.protocol_data b2.protocol_data >> fun () ->
     Operation_list_list_hash.compare
       b1.shell.operations_hash
       b2.shell.operations_hash
     >> fun () ->
-    Time.Protocol.compare b1.shell.timestamp b2.shell.timestamp
-    >> fun () -> list compare b1.shell.fitness b2.shell.fitness
+    Time.Protocol.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
+    list compare b1.shell.fitness b2.shell.fitness
 end)
 
 let encoding =
@@ -135,10 +131,8 @@ let encoding =
 
 let bounded_encoding ?max_size () =
   match max_size with
-  | None ->
-      encoding
-  | Some max_size ->
-      Data_encoding.check_size max_size encoding
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
 
 let pp ppf op =
   Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding op)
@@ -174,9 +168,11 @@ let get_forced_protocol_upgrade ~user_activated_upgrades =
   in
   fun ~level -> LevelMap.find level table
 
-let get_voted_protocol_overrides ~user_activated_protocol_overrides proto_hash
-    =
-  List.assoc_opt proto_hash user_activated_protocol_overrides
+let get_voted_protocol_overrides ~user_activated_protocol_overrides proto_hash =
+  List.assoc_opt
+    ~equal:Protocol_hash.equal
+    proto_hash
+    user_activated_protocol_overrides
 
 let () =
   Data_encoding.Registration.register shell_header_encoding ;

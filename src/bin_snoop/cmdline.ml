@@ -70,7 +70,9 @@ type infer_parameters_options = {
   (* Source of CSV files for overriding free variables *)
   report : report;
   (* LaTeX report parameters *)
-  save_solution : string option; (* Serialise solution to given file *)
+  save_solution : string option;
+  (* Serialise solution to given file *)
+  dot_file : string option; (* Export dependency graph to graphviz format *)
 }
 
 (* Outcome of command-line parsing. *)
@@ -93,6 +95,11 @@ type command =
       model_name : string;
       codegen_options : codegen_options;
     }
+  | Codegen_all of {
+      solution : string;
+      matching : string;
+      codegen_options : codegen_options;
+    }
   | No_command
 
 (* -------------------------------------------------------------------------- *)
@@ -101,7 +108,8 @@ type command =
 let storage_kind_encoding : storage_kind Data_encoding.t =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         ~title:"memory"
         (Tag 0)
         unit
@@ -112,12 +120,12 @@ let storage_kind_encoding : storage_kind Data_encoding.t =
         (Tag 1)
         (tup3 Signature.Public_key_hash.encoding string string)
         (function
-          | Memory ->
-              None
+          | Memory -> None
           | Disk {source; base_dir; header_json} ->
               Some (source, base_dir, header_json))
         (fun (source, base_dir, header_json) ->
-          Disk {source; base_dir; header_json}) ]
+          Disk {source; base_dir; header_json});
+    ]
 
 let benchmark_options_encoding =
   (* : benchmark_options Data_encoding.encoding in *)

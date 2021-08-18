@@ -32,6 +32,12 @@ open Michelson_v1_printer
 module Program = Client_aliases.Alias (struct
   type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Micheline_parser.compare Michelson_v1_parser.compare_parsed
+  end)
+
   let encoding =
     Data_encoding.conv
       (fun ({Michelson_v1_parser.source; _}, _) -> source)
@@ -45,15 +51,20 @@ module Program = Client_aliases.Alias (struct
   let name = "script"
 end)
 
-let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
+let print_errors ?parsed (cctxt : #Client_context.printer) errs ~show_source =
   cctxt#warning
     "%a"
     (Michelson_v1_error_reporter.report_errors
        ~details:false
        ~show_source
-       ~parsed)
+       ?parsed)
     errs
-  >>= fun () -> cctxt#error "error running script" >>= fun () -> return_unit
+  >>= fun () ->
+  cctxt#error "error running script" >>= fun () -> return_unit
+
+let print_view_result (cctxt : #Client_context.printer) = function
+  | Ok expr -> cctxt#message "%a" print_expr expr >>= fun () -> return_unit
+  | Error errs -> print_errors cctxt ~show_source:false errs
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
@@ -69,12 +80,12 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         storage
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
-        (fun ppf -> function None -> () | Some diff ->
-              print_big_map_diff ppf diff)
+        (fun ppf -> function
+          | None -> ()
+          | Some diff -> print_big_map_diff ppf diff)
         maybe_lazy_storage_diff
       >>= fun () -> return_unit
-  | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
+  | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
 let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
@@ -92,14 +103,32 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         storage
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
-        (fun ppf -> function None -> () | Some diff ->
-              print_big_map_diff ppf diff)
+        (fun ppf -> function
+          | None -> ()
+          | Some diff -> print_big_map_diff ppf diff)
         maybe_lazy_storage_diff
         print_execution_trace
         trace
       >>= fun () -> return_unit
-  | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
+  | Error errs -> print_errors cctxt errs ~show_source ~parsed
+
+let run_view (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block ~(contract : Contract.t) ~entrypoint
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Plugin.RPC.run_view
+    cctxt
+    (chain, block)
+    ?gas
+    ~contract
+    ~entrypoint
+    ~input:input.expanded
+    ~chain_id
+    ~source
+    ~payer
+    ~unparsing_mode
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
@@ -108,8 +137,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~(input : Michelson_v1_parser.parsed)
     ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
     ?entrypoint () =
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.run_code_normalized
     cctxt
     (chain, block)
@@ -132,8 +160,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(input : Michelson_v1_parser.parsed)
     ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
     ?entrypoint () =
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.trace_code_normalized
     cctxt
     (chain, block)
@@ -150,8 +177,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~unparsing_mode
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
-    ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()
-    =
+    ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =
   Alpha_services.Helpers.Scripts.typecheck_data
     cctxt
     (chain, block)
@@ -169,20 +195,18 @@ let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ?legacy
     ~script:program.expanded
 
-let print_typecheck_result ~emacs ~show_types ~print_source_on_error program
-    res (cctxt : #Client_context.printer) =
+let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
+    (cctxt : #Client_context.printer) =
   if emacs then
     let (type_map, errs, _gas) =
       match res with
-      | Ok (type_map, gas) ->
-          (type_map, [], Some gas)
+      | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error
-          ( Environment.Ecoproto_error
-              (Script_tc_errors.Ill_typed_contract (_, type_map))
-            :: _ as errs ) ->
+          (Environment.Ecoproto_error
+             (Script_tc_errors.Ill_typed_contract (_, type_map))
+           :: _ as errs) ->
           (type_map, errs, None)
-      | Error errs ->
-          ([], errs, None)
+      | Error errs -> ([], errs, None)
     in
     cctxt#message
       "(@[<v 0>(types . %a)@ (errors . %a)@])"
@@ -198,8 +222,8 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error program
         cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]" Gas.pp gas
         >>= fun () ->
         if show_types then
-          cctxt#message "%a" Micheline_printer.print_expr program
-          >>= fun () -> return_unit
+          cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
+          return_unit
         else return_unit
     | Error errs ->
         cctxt#warning
@@ -232,14 +256,10 @@ let print_entrypoint_type (cctxt : #Client_context.printer) ~emacs ?script_name
 
 let list_entrypoints cctxt ~(chain : Chain_services.chain) ~block
     (program : Michelson_v1_parser.parsed) =
-  Michelson_v1_entrypoints.list_entrypoints
-    cctxt
-    ~chain
-    ~block
-    program.expanded
+  Michelson_v1_entrypoints.list_entrypoints cctxt ~chain ~block program.expanded
 
-let print_entrypoints_list (cctxt : #Client_context.printer) ~emacs
-    ?script_name ~show_source ~parsed ty =
+let print_entrypoints_list (cctxt : #Client_context.printer) ~emacs ?script_name
+    ~show_source ~parsed ty =
   Michelson_v1_entrypoints.print_entrypoints_list
     cctxt
     ~emacs

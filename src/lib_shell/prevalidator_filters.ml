@@ -76,8 +76,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
   end
 end
 
-let table : (module FILTER) Protocol_hash.Table.t =
-  Protocol_hash.Table.create 5
+let table : (module FILTER) Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
 let register (module Filter : FILTER) =
   assert (not (Protocol_hash.Table.mem table Filter.Proto.hash)) ;

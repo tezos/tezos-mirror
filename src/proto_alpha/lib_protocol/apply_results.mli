@@ -137,6 +137,10 @@ and packed_internal_operation_result =
       'kind internal_operation * 'kind manager_operation_result
       -> packed_internal_operation_result
 
+val pack_migration_operation_results :
+  Migration.origination_result list ->
+  packed_successful_manager_operation_result list
+
 (** Serializer for {!packed_operation_result}. *)
 val operation_metadata_encoding : packed_operation_metadata Data_encoding.t
 
@@ -183,14 +187,14 @@ val kind_equal_list :
 
 type block_metadata = {
   baker : Signature.Public_key_hash.t;
-  level : Level.compat_t;
   level_info : Level.t;
-  voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
+  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+  implicit_operations_results : packed_successful_manager_operation_result list;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding

@@ -1,16 +1,31 @@
-import time
+import tempfile
+import shutil
 import pytest
 from tools import utils, constants
 from launchers.sandbox import Sandbox
 from . import protocol
 
+PARAMS = constants.NODE_PARAMS
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
-PARAMS = constants.NODE_PARAMS + ['--history-mode', 'full']
-LEVEL_A = 10
-LEVEL_B = 20
-GROUP1 = [0]
-GROUP2 = [3, 4]
+BATCH_1 = 48
+BATCH_2 = 48  # not enough bakes to drag the savepoint after snapshot import
+BATCH_3 = 32  # enough bakes to drag the savepoint
+GROUP1 = [0, 1, 2]
+GROUP2 = [0, 1, 2, 3, 4, 5]
+GROUP_FULL = [1, 3]
+GROUP_ROLLING = [2, 4, 5]
+SNAPSHOT_DIR = tempfile.mkdtemp(prefix='tezos-snapshots.')
+
+
+def clean(node):
+    shutil.rmtree(node.node_dir)
+
+
+# Restart node. Side effect: clean store caches
+def restart(sandbox, node_id):
+    sandbox.node(node_id).terminate_or_kill()
+    sandbox.node(node_id).run()
+    assert sandbox.client(node_id).check_node_listening()
 
 
 @pytest.mark.multinode
@@ -18,49 +33,682 @@ GROUP2 = [3, 4]
 @pytest.mark.snapshot
 @pytest.mark.slow
 class TestMultiNodeSnapshot:
+    # Tests both the snapshot mechanism and the store's behaviour
+    # TL;DR, how it works:
+    # - bake few blocks using all history modes
+    # - export all kinds of snapshots
+    # - import all kinds of snapshots
+    # - check consistency (the snapshot's window includes genesis)
+    # - bake a few blocks
+    # - check consistency (the checkpoints should not move yet)
+    # - bake a few blocks
+    # - check consistency (the checkpoints should have moved)
+    # - export all kinds of snapshots
+    # - import all kinds of snapshots
+    # - check consistency (checkpoints should be still valid)
+    # - bake a few blocks
+    # - check consistency (the checkpoints should have moved)
+
     def test_init(self, sandbox: Sandbox):
-        for i in GROUP1:
-            sandbox.add_node(i, params=PARAMS)
+        # Node 0: archive baker
+        sandbox.add_node(0, params=PARAMS + ['--history-mode', 'archive'])
+        # Node 1: full
+        sandbox.add_node(1, params=PARAMS + ['--history-mode', 'full'])
+        # Node 2: rolling
+        sandbox.add_node(2, params=PARAMS + ['--history-mode', 'rolling'])
         protocol.activate(sandbox.client(GROUP1[0]), activate_in_the_past=True)
 
-    def test_bake_group1_level_a(self, sandbox: Sandbox):
-        for _ in range(LEVEL_A - 1):
-            sandbox.client(GROUP1[0]).bake('bootstrap1', BAKE_ARGS)
-            sandbox.client(GROUP1[0]).endorse('bootstrap2')
+    def test_bake_batch_1(self, sandbox, session):
+        for _ in range(BATCH_1):
+            utils.bake(sandbox.client(0))
+            sandbox.client(0).endorse('bootstrap2')
+        session['head_hash'] = sandbox.client(0).get_head()['hash']
+        session['head_level'] = sandbox.client(0).get_head()['header']['level']
+        session['snapshot_level'] = session['head_level']
 
-    def test_group1_level_a(self, sandbox: Sandbox, session: dict):
+    def test_group1_batch_1(self, sandbox, session):
         for i in GROUP1:
-            assert utils.check_level(sandbox.client(i), LEVEL_A)
-        session['head_hash'] = sandbox.client(GROUP1[0]).get_head()['hash']
+            assert utils.check_level(sandbox.client(i), session['head_level'])
 
-    def test_terminate_group1(self, sandbox: Sandbox):
-        for i in GROUP1:
-            sandbox.node(i).terminate()
-        time.sleep(1)
+    ###########################################################################
+    # Export all kinds of snapshots
+    def test_archive_export_full_1(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node0_batch_1.full'
+        export_level = session['snapshot_level']
+        sandbox.node(0).snapshot_export(
+            file, params=['--block', f'{export_level}']
+        )
 
-    def test_export_snapshot(self, sandbox: Sandbox, tmpdir, session: dict):
-        node_export = sandbox.node(GROUP1[0])
-        file = f'{tmpdir}/FILE.full'
-        head_hash = session['head_hash']
-        node_export.snapshot_export(file, params=['--block', head_hash])
+    def test_archive_export_rolling_1(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node0_batch_1.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(0).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
 
+    def test_full_export_full_1(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node1_batch_1.full'
+        export_level = session['snapshot_level']
+        sandbox.node(1).snapshot_export(
+            file, params=['--block', f'{export_level}']
+        )
+
+    def test_full_export_rolling_1(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node1_batch_1.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(1).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
+
+    def test_rolling_export_rolling_1(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node2_batch_1.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(2).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
+
+    ###########################################################################
+    # Import all kinds of snapshots
+    # New node: 3
+    def test_run_full_node_from_archive_1(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node0_batch_1.full'
+        sandbox.add_node(3, snapshot=file, params=PARAMS)
+
+    # New node: 4
+    def test_run_rolling_node_from_archive_1(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node0_batch_1.rolling'
+        sandbox.add_node(4, snapshot=file, params=PARAMS)
+
+    # Reset node 1
+    def test_reset_full_node_from_full_1(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node1_batch_1.full'
+        sandbox.rm_node(1)
+        sandbox.add_node(1, snapshot=file, params=PARAMS)
+
+    # New node: 5
+    def test_run_rolling_node_from_full_1(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node1_batch_1.rolling'
+        sandbox.add_node(5, snapshot=file, params=PARAMS)
+
+    # Reset node 2
+    def test_reset_rolling_node_from_rolling_1(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node2_batch_1.rolling'
+        sandbox.rm_node(2)
+        sandbox.add_node(2, snapshot=file, params=PARAMS)
+
+    ###########################################################################
+    # Check consistency of imported snapshots
+    # Do not factorize calls to ease debugging
+    # For the full nodes
+    def test_node_1_consistency_1(self, sandbox, session):
+        node_id = 1
+        restart(sandbox, node_id)
+        expected_level = session['snapshot_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    def test_node_3_consistency_1(self, sandbox, session):
+        node_id = 3
+        restart(sandbox, node_id)
+        expected_level = session['snapshot_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    # For the rolling nodes
+    def test_node_2_consistency_1(self, sandbox, session):
+        node_id = 2
+        restart(sandbox, node_id)
+        expected_level = session['snapshot_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_4_consistency_1(self, sandbox, session):
+        node_id = 4
+        restart(sandbox, node_id)
+        expected_level = session['snapshot_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_5_consistency_1(self, sandbox, session):
+        node_id = 5
+        restart(sandbox, node_id)
+        expected_level = session['snapshot_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    ###########################################################################
+    # Bake a few blocks
+    def test_bake_batch_2(self, sandbox, session):
+        for _ in range(BATCH_2):
+            utils.bake(sandbox.client(0))
+            sandbox.client(0).endorse('bootstrap2')
+        session['head_hash'] = sandbox.client(0).get_head()['hash']
+        session['head_level'] = sandbox.client(0).get_head()['header']['level']
         for i in GROUP2:
-            sandbox.add_node(i, snapshot=file, params=PARAMS)
+            assert utils.check_level(sandbox.client(i), session['head_level'])
 
-    def test_rerun_group1(self, sandbox: Sandbox):
-        for i in GROUP1:
-            sandbox.node(i).run()
-            sandbox.client(i).check_node_listening()
+    ###########################################################################
+    # Check consistency of imported snapshots after > 5 baked cycles
+    # The savepoints of full and rolling nodes **have not** been dragged yet
 
-    def test_level(self, sandbox: Sandbox):
-        for i in GROUP1 + GROUP2:
-            assert utils.check_level(sandbox.client(i), LEVEL_A)
+    # For the full nodes
+    def test_node_1_consistency_2(self, sandbox, session):
+        node_id = 1
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        savepoint_when_imported = session['snapshot_level']
+        expected_savepoint = savepoint_when_imported
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
 
-    def test_bake_group2_level_b(self, sandbox: Sandbox):
-        for _ in range(LEVEL_B - LEVEL_A):
-            sandbox.client(GROUP2[0]).bake('bootstrap1', BAKE_ARGS)
-            sandbox.client(GROUP2[0]).endorse('bootstrap2')
+    def test_node_3_consistency_2(self, sandbox, session):
+        node_id = 3
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        savepoint_when_imported = session['snapshot_level']
+        expected_savepoint = savepoint_when_imported
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
 
-    def test_all_level_c(self, sandbox: Sandbox):
-        for client in sandbox.all_clients():
-            assert utils.check_level(client, LEVEL_B)
+    # For the rolling nodes
+    # The caboose of rolling mode were no dragged yet as
+    # (checkpoint - max_op_ttl(head)) < savepoint
+    def test_node_2_consistency_2(self, sandbox, session):
+        node_id = 2
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        savepoint_when_imported = session['snapshot_level']
+        expected_savepoint = savepoint_when_imported
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_4_consistency_2(self, sandbox, session):
+        node_id = 4
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        savepoint_when_imported = session['snapshot_level']
+        expected_savepoint = savepoint_when_imported
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_5_consistency_2(self, sandbox, session):
+        node_id = 5
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        savepoint_when_imported = session['snapshot_level']
+        expected_savepoint = savepoint_when_imported
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    ###########################################################################
+    # Bake a few blocks
+    def test_bake_batch_3(self, sandbox, session):
+        for _ in range(BATCH_3):
+            utils.bake(sandbox.client(0))
+            sandbox.client(0).endorse('bootstrap2')
+        session['head_hash'] = sandbox.client(0).get_head()['hash']
+        session['head_level'] = sandbox.client(0).get_head()['header']['level']
+        session['snapshot_level'] = session['head_level']
+        for i in GROUP2:
+            assert utils.check_level(sandbox.client(i), session['head_level'])
+
+    ###########################################################################
+    # Check consistency of imported snapshots after > 5 baked cycles
+    # The savepoints of full and rolling nodes **have** been dragged yet
+
+    # For the full nodes
+    def test_node_1_consistency_3(self, sandbox, session):
+        node_id = 1
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    def test_node_3_consistency_3(self, sandbox, session):
+        node_id = 3
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    # For the rolling nodes
+    def test_node_2_consistency_3(self, sandbox, session):
+        node_id = 2
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
+        expected_caboose = expected_savepoint
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_4_consistency_3(self, sandbox, session):
+        node_id = 4
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
+        expected_caboose = expected_savepoint
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_5_consistency_3(self, sandbox, session):
+        node_id = 5
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
+        expected_caboose = expected_savepoint
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    ###########################################################################
+    # Re-export all kinds of snapshots
+    def test_archive_export_full_2(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node0_batch_3.full'
+        export_level = session['snapshot_level']
+        sandbox.node(0).snapshot_export(
+            file, params=['--block', f'{export_level}']
+        )
+
+    def test_archive_export_rolling_2(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node0_batch_3.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(0).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
+
+    def test_full_export_full_2(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node1_batch_3.full'
+        export_level = session['snapshot_level']
+        sandbox.node(1).snapshot_export(
+            file, params=['--block', f'{export_level}']
+        )
+
+    def test_full_export_rolling_2(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node1_batch_3.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(1).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
+
+    def test_rolling_export_rolling_2(self, sandbox, session):
+        file = f'{SNAPSHOT_DIR}/node2_batch_3.rolling'
+        export_level = session['snapshot_level']
+        sandbox.node(2).snapshot_export(
+            file, params=['--block', f'{export_level}', '--rolling']
+        )
+
+    ###########################################################################
+    # Import all kinds of snapshots
+    # Reset node: 3
+    def test_run_full_node_from_archive_2(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node0_batch_3.full'
+        sandbox.rm_node(3)
+        sandbox.add_node(3, snapshot=file, params=PARAMS)
+
+    # Reset node: 4
+    def test_run_rolling_node_from_archive_2(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node0_batch_3.rolling'
+        sandbox.rm_node(4)
+        sandbox.add_node(4, snapshot=file, params=PARAMS)
+
+    # Reset node 1
+    def test_reset_full_node_from_full_2(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node1_batch_3.full'
+        sandbox.rm_node(1)
+        sandbox.add_node(1, snapshot=file, params=PARAMS)
+
+    # Reset node: 5
+    def test_run_rolling_node_from_full_2(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node1_batch_3.rolling'
+        sandbox.rm_node(5)
+        sandbox.add_node(5, snapshot=file, params=PARAMS)
+
+    # Reset node 2
+    def test_reset_rolling_node_from_rolling_2(self, sandbox):
+        file = f'{SNAPSHOT_DIR}/node2_batch_3.rolling'
+        sandbox.rm_node(2)
+        sandbox.add_node(2, snapshot=file, params=PARAMS)
+
+    ###########################################################################
+    # Check consistency of imported snapshots with > 5 cycles
+
+    # For the full nodes
+    def test_node_1_consistency_4(self, sandbox, session):
+        node_id = 1
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    def test_node_3_consistency_4(self, sandbox, session):
+        node_id = 3
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level
+        expected_savepoint = expected_checkpoint
+        expected_caboose = 0
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.full_node_blocks_availability(
+            node_id, sandbox, expected_savepoint, expected_level
+        )
+
+    # For the rolling nodes
+    def test_node_2_consistency_4(self, sandbox, session):
+        node_id = 2
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_4_consistency_4(self, sandbox, session):
+        node_id = 4
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    def test_node_5_consistency_4(self, sandbox, session):
+        node_id = 5
+        restart(sandbox, node_id)
+        expected_level = session['head_level']
+        expected_checkpoint = expected_level
+        head = sandbox.client(node_id).get_head()
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint
+        expected_caboose = expected_checkpoint - max_op_ttl
+        utils.node_consistency_after_import(
+            node_id,
+            sandbox,
+            expected_level,
+            expected_checkpoint,
+            expected_savepoint,
+            expected_caboose,
+        )
+        utils.rolling_node_blocks_availability(
+            node_id,
+            sandbox,
+            expected_savepoint,
+            expected_caboose,
+            expected_level,
+        )
+
+    ###########################################################################
+    # Clean exported snapshots
+
+    def test_clean_files(self):
+        shutil.rmtree(SNAPSHOT_DIR)

@@ -36,6 +36,8 @@ type parsed = {
   unexpansion_table : (int * int) list;
 }
 
+let compare_parsed = Stdlib.compare
+
 (* Unexpanded toplevel expression should be a sequence *)
 let expand_all source ast errors =
   let (unexpanded, loc_table) = extract_locations ast in
@@ -45,14 +47,12 @@ let expand_all source ast errors =
   let (expanded, unexpansion_table) = extract_locations expanded in
   let expansion_table =
     let sorted =
-      List.sort (fun (_, a) (_, b) -> compare a b) unexpansion_table
+      List.sort (fun (_, a) (_, b) -> Stdlib.compare a b) unexpansion_table
     in
     let grouped =
       let rec group = function
-        | (acc, []) ->
-            acc
-        | ([], (u, e) :: r) ->
-            group ([(e, [u])], r)
+        | (acc, []) -> acc
+        | ([], (u, e) :: r) -> group ([(e, [u])], r)
         | (((pe, us) :: racc as acc), (u, e) :: r) ->
             if e = pe then group ((e, u :: us) :: racc, r)
             else group ((e, [u]) :: acc, r)
@@ -65,13 +65,11 @@ let expand_all source ast errors =
         (fun (l, ploc) (l', elocs) ->
           assert (l = l') ;
           (l, (ploc, elocs)))
-        (List.sort compare loc_table)
-        (List.sort compare grouped)
+        (List.sort Stdlib.compare loc_table)
+        (List.sort Stdlib.compare grouped)
     with
-    | Ok v ->
-        v
-    | Error () ->
-        invalid_arg "Michelson_v1_parser.expand_all"
+    | Ok v -> v
+    | Error () -> invalid_arg "Michelson_v1_parser.expand_all"
   in
   match Michelson_v1_primitives.prims_of_strings expanded with
   | Ok expanded ->
@@ -99,9 +97,7 @@ let parse_toplevel ?check source =
 
 let parse_expression ?check source =
   let (tokens, lexing_errors) = Micheline_parser.tokenize source in
-  let (ast, parsing_errors) =
-    Micheline_parser.parse_expression ?check tokens
-  in
+  let (ast, parsing_errors) = Micheline_parser.parse_expression ?check tokens in
   expand_all source ast (lexing_errors @ parsing_errors)
 
 let expand_all ~source ~original = expand_all source original []

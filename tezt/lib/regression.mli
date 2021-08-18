@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,13 +48,23 @@ val register :
   (unit -> unit Lwt.t) ->
   unit
 
+(** Capture some output of a regression test.
+
+    Call this to record a string into the [output_file] given to [register].
+    A newline character [\n] will be added after it.
+
+    This function only records its argument when called while a regression test is running,
+    i.e. from the body of [Regression.register]. If you call it outside of
+    [Regression.register], it has no effect. So you can define a function that captures
+    and use it with or without regression testing.
+
+    A typical use is to define custom process hooks that substitute non-deterministic
+    parts of the output with deterministic ones. See also {!hooks}. *)
+val capture : string -> unit
+
 (** Hooks that enable regression testing when attached to a process ran from a
     {!register}ed regression test function.
 
-    The hooks will capture the spawned command, its arguments and the output of
+    The hooks will {!capture} the spawned command, its arguments and the output of
     its execution into the registered [output_file]. *)
 val hooks : Process.hooks
-
-(** Similar to [hooks], but the captured output is pre-processed to remove
-    or replace potential variables that may change between runs. *)
-val scrubbing_hooks : Process.hooks

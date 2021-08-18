@@ -47,6 +47,10 @@ let time_between_blocks c =
   let constants = Raw_context.constants c in
   constants.time_between_blocks
 
+let minimal_block_delay c =
+  let constants = Raw_context.constants c in
+  constants.minimal_block_delay
+
 let endorsers_per_block c =
   let constants = Raw_context.constants c in
   constants.endorsers_per_block
@@ -122,5 +126,17 @@ let quorum_max c =
 let min_proposal_quorum c =
   let constants = Raw_context.constants c in
   constants.min_proposal_quorum
+
+let liquidity_baking_subsidy c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_subsidy
+
+let liquidity_baking_sunset_level c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_sunset_level
+
+let liquidity_baking_escape_ema_threshold c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_escape_ema_threshold
 
 let parametric c = Raw_context.constants c

@@ -63,13 +63,15 @@ module Tested_terms () = struct
 
   let terms : Script_repr.lazy_expr list =
     List.map (Script_repr.lazy_expr % Micheline.strip_locations)
-    @@ [ string;
+    @@ [
+         string;
          int;
          bytes;
          dummy_but_large_term ~depth:1 ~seed:1;
          dummy_but_large_term ~depth:5 ~seed:1;
          dummy_but_large_term ~depth:10 ~seed:1;
-         dummy_but_large_term ~depth:15 ~seed:1 ]
+         dummy_but_large_term ~depth:15 ~seed:1;
+       ]
 
   let bytes =
     List.map
@@ -91,10 +93,8 @@ module Tested_terms () = struct
     List.map
       (fun lazy_term ->
         match Script_repr.force_decode lazy_term with
-        | Error _ ->
-            assert false
-        | Ok (_term, cost) ->
-            cost)
+        | Error _ -> assert false
+        | Ok (_term, cost) -> cost)
       lazy_terms
 
   let check_correctness () =
@@ -122,8 +122,10 @@ let check_property () =
   T.check_correctness ()
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "Script_repr.minimal_deserialize_cost is a lower bound for full \
        deserialization cost"
       `Quick
-      check_property ]
+      check_property;
+  ]

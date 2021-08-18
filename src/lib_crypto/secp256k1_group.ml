@@ -134,7 +134,8 @@ end = struct
 
     let to_Z s =
       let cs = Cstruct.create 32 in
-      Sp.Scalar.get_b32 cs s ; cs |> z_of_b32
+      Sp.Scalar.get_b32 cs s ;
+      cs |> z_of_b32
 
     let of_int i = i |> Z.of_int |> of_Z
 
@@ -147,11 +148,13 @@ end = struct
 
     let mul x y =
       let r = Sp.Scalar.const () in
-      Sp.Scalar.mul r x y ; r
+      Sp.Scalar.mul r x y ;
+      r
 
     let negate x =
       let r = Sp.Scalar.const () in
-      Sp.Scalar.negate r x ; r
+      Sp.Scalar.negate r x ;
+      r
 
     let sub x y = add x (negate y)
 
@@ -168,13 +171,15 @@ end = struct
 
     let to_bits x =
       let c = Cstruct.create 32 in
-      Sp.Scalar.get_b32 c x ; Cstruct.to_string c
+      Sp.Scalar.get_b32 c x ;
+      Cstruct.to_string c
 
     let inverse x =
       if x = zero then None
       else
         let r = Sp.Scalar.const () in
-        Sp.Scalar.inverse r x ; Some r
+        Sp.Scalar.inverse r x ;
+        Some r
 
     type Base58.data += Data of t
 
@@ -290,7 +295,8 @@ end = struct
 
   let of_bits_exn bits =
     let buf = Cstruct.of_string bits and x = Sp.Group.of_fields () in
-    Sp.Group.from_pubkey x buf ; x |> jacobian_of_group
+    Sp.Group.from_pubkey x buf ;
+    x |> jacobian_of_group
 
   module Encoding = struct
     type Base58.data += Data of t

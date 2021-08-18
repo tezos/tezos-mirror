@@ -10,6 +10,16 @@ _`Block`
     `protocol`-agnostic data. It consists of generic information such as the
     block predecessor's hash and the block's timestamp.
 
+    _`Metadata`
+    A metadata, or block's metadata, is a piece of data associated to
+    a block. It is computed as a result of the application of the
+    block's Operations_ on its associated Context_. The metadata
+    consists in many information such as the operation receipts,
+    rewards updates, voting period, etc.
+
+    For a detailed metadata content check the :ref:`rpc_index` under
+    the prefix ``../<block_id>/metadata``.
+
 _`Context`
     The state of the blockchain. The context is defined by the
     `Economic Protocol`_ and typically includes information such as

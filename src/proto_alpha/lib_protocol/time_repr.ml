@@ -22,10 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
 include Time
 
-type time = t
+type time = Time.t
 
 type error += Timestamp_add (* `Permanent *)
 
@@ -52,13 +51,16 @@ let () =
     (function Timestamp_sub -> Some () | _ -> None)
     (fun () -> Timestamp_sub)
 
-let of_seconds_string s = Option.map of_seconds (Int64.of_string_opt s)
+let of_seconds_string s = Option.map Time.of_seconds (Int64.of_string_opt s)
 
 let to_seconds_string s = Int64.to_string (to_seconds s)
 
 let pp = pp_hum
 
 let ( +? ) x y =
-  try ok (add x (Period_repr.to_seconds y)) with _exn -> error Timestamp_add
+  let span = Period_repr.to_seconds y in
+  let t64 = Time.add x span in
+  if t64 < Time.of_seconds 0L then error Timestamp_add else ok t64
 
-let ( -? ) x y = record_trace Timestamp_sub (Period_repr.of_seconds (diff x y))
+let ( -? ) x y =
+  record_trace Timestamp_sub (Period_repr.of_seconds (Time.diff x y))

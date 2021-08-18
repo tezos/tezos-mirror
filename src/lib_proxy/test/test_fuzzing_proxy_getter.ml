@@ -30,7 +30,7 @@
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 module Proxy_getter = Tezos_proxy.Proxy_getter
 
 let tree_path_gen = Crowbar.list Crowbar.bytes
@@ -42,21 +42,19 @@ let test_set_leaf_get (tree_path : string list) leaf_data =
   let module Tree = Proxy_getter.Internal.Tree in
   let expected = leaf_data in
   let actual_lwt =
-    Tree.set_leaf
-      Tree.empty
-      tree_path
-      (Tezos_shell_services.Block_services.Key leaf_data)
-    >>= (function
-          | Ok (Value updated_tree) ->
-              Tree.get updated_tree tree_path
-          | _ ->
-              assert false)
+    (Tree.set_leaf
+       Tree.empty
+       tree_path
+       (Tezos_shell_services.Block_services.Key leaf_data)
+     >>= function
+     | Ok (Value updated_tree) -> Tree.get updated_tree tree_path
+     | _ -> assert false)
     >>= function
-    | None ->
-        assert false
+    | None -> assert false
     | Some result_tree -> (
-        Local.Tree.to_value result_tree
-        >|= function None -> assert false | Some bytes -> bytes )
+        Local.Tree.to_value result_tree >|= function
+        | None -> assert false
+        | Some bytes -> bytes)
   in
   let actual = Lwt_main.run actual_lwt in
   Crowbar.check_eq expected actual

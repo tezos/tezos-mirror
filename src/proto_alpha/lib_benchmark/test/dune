@@ -1,0 +1,37 @@
+(executables
+ (names test_sampling_data test_sampling_code test_autocompletion)
+ (libraries tezos-micheline
+            tezos-micheline-rewriting
+            tezos-benchmark-type-inference-alpha
+            tezos-benchmark
+            tezos-benchmark-alpha
+            tezos-protocol-alpha
+            tezos-alpha-test-helpers
+            tezos-error-monad
+            alcotest-lwt)
+;; uncomment to enable gprof profiling
+;; (ocamlopt_flags (:standard -p -ccopt -no-pie))
+ (flags (:standard
+         -open Tezos_micheline
+         -open Tezos_benchmark_type_inference_alpha
+         -open Tezos_benchmark_alpha)))
+
+(alias
+  (name buildtest)
+  (deps test_sampling_data.exe test_sampling_code.exe))
+
+(alias
+  (name runtest_micheline_rewriting_data)
+  (action (run %{exe:test_sampling_data.exe} 1234)))
+
+(alias
+  (name runtest_micheline_rewriting_code)
+  (action (run %{exe:test_sampling_code.exe} 1234)))
+
+
+(alias
+  (name runtest)
+  (package tezos-benchmark-alpha)
+  (deps (alias runtest_micheline_rewriting_data)
+        (alias runtest_micheline_rewriting_code)
+  ))

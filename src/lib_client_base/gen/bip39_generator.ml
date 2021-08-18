@@ -19,11 +19,12 @@ let read_lines filename =
   let rec loop acc ic =
     match input_line ic with
     | exception End_of_file ->
-        close_in ic ; List.rev acc
+        close_in ic ;
+        List.rev acc
     | exception exn ->
-        close_in ic ; raise exn
-    | x ->
-        loop (x :: acc) ic
+        close_in ic ;
+        raise exn
+    | x -> loop (x :: acc) ic
   in
   loop [] ic
 

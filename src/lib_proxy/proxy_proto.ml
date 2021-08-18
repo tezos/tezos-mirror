@@ -46,16 +46,29 @@ module type PROTO_RPC = sig
 
     To speed things up, this function returns "v1" on any of these keys,
     to do a single request instead of two. This list is arbitrary. It was
-    built by initial input from @klakplok and by experimenting.
+    built by initial input from \@klakplok and by experimenting. When
+    the proxy server was introduced, this function was generalized
+    to split differently according to the mode.
 
     This function guarantees that if it returns Some(prefix, suffix) then
-    prefix @@ suffix = key.
+    [prefix @@ suffix = key].
   *)
   val split_key :
-    Proxy_context.M.key -> (Proxy_context.M.key * Proxy_context.M.key) option
+    Proxy.mode ->
+    Proxy_context.M.key ->
+    (Proxy_context.M.key * Proxy_context.M.key) option
+
+  (** [failure_is_permanent key] means that, if the request 
+      [rpc get /chains/<chain_id>/blocks/<block_id>/context/raw/bytes/key]
+      fails once, then it should not be retried; because this key is known
+      to be missing all the time. It is safe to return always [false].
+      Returning [true] for some keys will reduce the number of RPC calls. *)
+  val failure_is_permanent : Proxy_context.M.key -> bool
 
   val do_rpc :
     Proxy.proxy_getter_input ->
     Proxy_context.M.key ->
     Tezos_shell_services.Block_services.raw_context tzresult Lwt.t
 end
+
+type proto_rpc = (module PROTO_RPC)

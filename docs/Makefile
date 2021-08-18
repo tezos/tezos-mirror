@@ -12,12 +12,12 @@ DOCRPCDIR     = $(DOCGENDIR)/rpcs
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 GRANADA_LONG = PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-EDO_LONG      = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+ACTIVE_LONG = $(FLORENCE_LONG)
 
 ALPHA_SHORT    = alpha
 GRANADA_SHORT = 010-PtGRANAD
 FLORENCE_SHORT = 009-PsFLoren
-EDO_SHORT      = 008-PtEdo2Zk
+ACTIVE_SHORT = $(FLORENCE_SHORT)
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -29,25 +29,20 @@ main:
 
 manuals: main
     # alpha protocol
-	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client-alpha.html
-	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker-alpha.html
-	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser-alpha.html
-	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser-alpha.html
+	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
+	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
+	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser.html
+	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
     # 010 (Granada) protocol
-	@../tezos-client -protocol $(GRANADA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-client-010.html
-	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker-010.html
-	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser-010.html
-	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser-010.html
-    # 009 (Florence) protocol
-	@../tezos-client -protocol $(FLORENCE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-client-009.html
-	@../tezos-baker-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-baker-009.html
-	@../tezos-endorser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-endorser-009.html
-	@../tezos-accuser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-accuser-009.html
-    # 008 (Edo) protocol
-	@../tezos-client -protocol $(EDO_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-client-008.html
-	@../tezos-baker-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-008.html
-	@../tezos-endorser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-endorser-008.html
-	@../tezos-accuser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-accuser-008.html
+	@../tezos-client -protocol $(GRANADA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-client.html
+	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker.html
+	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser.html
+	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser.html
+    # active (Florence) protocol
+	@../tezos-client -protocol $(ACTIVE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-client.html
+	@../tezos-baker-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-baker.html
+	@../tezos-endorser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-endorser.html
+	@../tezos-accuser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-accuser.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
@@ -75,8 +70,8 @@ redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
 
 xrefscheck:
-	$(CHECKXREFS) 009
-	$(CHECKXREFS) 010
+	$(CHECKXREFS) active
+	$(CHECKXREFS) -l 010
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -105,7 +100,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 009/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > active/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 010 > 010/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
@@ -121,9 +116,10 @@ p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 html: Makefile api/errors.rst rpc p2p
+	cp ../CHANGES.rst .
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 009/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 009/tezos-*.html 010/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst active/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 010/tezos-*.html alpha/tezos-*.html

@@ -37,8 +37,9 @@ let date_parameter option_name build =
       try
         if String.length s <> 8 then problem "date should be `YYYYMMDD`" ;
         String.iteri
-          (fun idx -> function '0' .. '9' -> () | other ->
-                problem "character %d is not a digit: '%c'." idx other)
+          (fun idx -> function
+            | '0' .. '9' -> ()
+            | other -> problem "character %d is not a digit: '%c'." idx other)
           s ;
         let month = int_of_string (String.sub s 4 2) - 1 in
         if month < 0 then problem "The month cannot be '00'" ;
@@ -64,10 +65,8 @@ let date_parameter option_name build =
         in
         return (build t)
       with
-      | Invalid_argument e ->
-          failwith "In `%s %S`, %s" option_name s e
-      | e ->
-          failwith "Exn: %a" pp_exn e)
+      | Invalid_argument e -> failwith "In `%s %S`, %s" option_name s e
+      | e -> failwith "Exn: %a" pp_exn e)
 
 let flat_pp pp o =
   Format.(
@@ -81,7 +80,8 @@ let flat_pp pp o =
 let commands () =
   let open Clic in
   let command ~desc = command ~group ~desc in
-  [ command
+  [
+    command
       ~desc:"Query the events from an event sink."
       (args7
          (arg
@@ -98,9 +98,8 @@ let commands () =
             (parameter (fun _ s ->
                  try
                    return
-                     ( String.split_on_char ',' s
-                     |> List.map (function "_" -> None | other -> Some other)
-                     )
+                     (String.split_on_char ',' s
+                     |> List.map (function "_" -> None | other -> Some other))
                  with _ -> failwith "List of sections cannot be parsed")))
          (arg
             ~doc:"Filter out events before DATE"
@@ -118,14 +117,14 @@ let commands () =
             ())
          (switch ~doc:"Try to display unknown events" ~long:"dump-unknown" ())
          (Scriptable.clic_arg ()))
-      ( prefixes ["query"; "events"; "from"]
+      (prefixes ["query"; "events"; "from"]
       @@ param
            ~name:"Sink-Name"
            ~desc:"The URI of the SINK to query"
            (parameter (fun _ s ->
                 try return (Uri.of_string s)
                 with _ -> failwith "Uri cannot be parsed"))
-      @@ stop )
+      @@ stop)
       (fun ( only_names,
              only_sections,
              since,
@@ -152,8 +151,7 @@ let commands () =
                     Scriptable.output_row
                       scriptable
                       ~for_human:(fun () ->
-                        cctxt#message "Unknown: %s" path
-                        >>= fun () ->
+                        cctxt#message "Unknown: %s" path >>= fun () ->
                         Lwt_stream.iter_s
                           (fun line -> cctxt#message "    |%s" line)
                           (Lwt_io.lines_of_file path)
@@ -161,13 +159,7 @@ let commands () =
                       ~for_script:(script_row "unknown-event" "-" "-" path))
             in
             let time_query =
-              match (since, until) with
-              | (None, None) ->
-                  None
-              | (Some a, None) | (None, Some a) ->
-                  Some a
-              | (Some a, Some b) ->
-                  Some (`And (a, b))
+              Option.merge (fun a b -> `And (a, b)) since until
             in
             File_event_sink.Query.fold
               ?only_names
@@ -189,8 +181,7 @@ let commands () =
                     tm.tm_hour
                     tm.tm_min
                     tm.tm_sec
-                    ( (time_value -. floor time_value) *. 10_000.
-                    |> int_of_float )
+                    ((time_value -. floor time_value) *. 10_000. |> int_of_float)
                 in
                 let pp fmt o =
                   if as_json then Data_encoding.Json.pp fmt o#json
@@ -210,8 +201,7 @@ let commands () =
                     let text = flat_pp pp o in
                     script_row "event" (time_string time_stamp) o#name text ()))
             >>=? function
-            | ([], ()) ->
-                return_unit
+            | ([], ()) -> return_unit
             | (errors_and_warnings, ()) ->
                 let open Format in
                 Scriptable.output
@@ -234,14 +224,12 @@ let commands () =
                       let text = flat_pp File_event_sink.Query.Report.pp e in
                       let tag =
                         match e with
-                        | `Error _ ->
-                            "error"
-                        | `Warning _ ->
-                            "warning"
+                        | `Error _ -> "error"
+                        | `Warning _ -> "warning"
                       in
                       script_row tag "-" "-" text ()
                     in
-                    List.map make_row errors_and_warnings) )
+                    List.map make_row errors_and_warnings))
         | Some other ->
             cctxt#message "URI scheme %S not handled as of now." other
             >>= fun () -> return_unit);
@@ -277,7 +265,7 @@ let commands () =
     command
       ~desc:"Output the JSON schema of an internal-event."
       no_options
-      ( prefixes ["output"; "schema"; "of"]
+      (prefixes ["output"; "schema"; "of"]
       @@ param
            ~name:"Event-Name"
            ~desc:"Name of the event"
@@ -287,17 +275,17 @@ let commands () =
            ~name:"File-path"
            ~desc:"Path to a JSON file"
            (parameter (fun _ s -> return s))
-      @@ stop )
+      @@ stop)
       (fun () event path (cctxt : #Client_context.full) ->
         let open Internal_event in
         match All_definitions.find (( = ) event) with
-        | None ->
-            failwith "Event %S not found" event
+        | None -> failwith "Event %S not found" event
         | Some ev ->
             let o = Generic.json_schema ev in
             Lwt_io.with_file ~mode:Lwt_io.output path (fun chan ->
                 let v = Format.asprintf "%a" Json_schema.pp o#schema in
                 Lwt_io.write chan v)
             >>= fun () ->
-            cctxt#message "Wrote schema of %s to %s" event path
-            >>= fun () -> return_unit) ]
+            cctxt#message "Wrote schema of %s to %s" event path >>= fun () ->
+            return_unit);
+  ]

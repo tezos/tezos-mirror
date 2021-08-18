@@ -55,8 +55,7 @@ let rec listen ?port addr =
       | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
         when port = None ->
           listen addr
-      | exn ->
-          Lwt.fail exn)
+      | exn -> Lwt.fail exn)
 
 let accept main_socket =
   P2p_fd.accept main_socket >>= fun (fd, _sockaddr) -> return fd
@@ -64,41 +63,39 @@ let accept main_socket =
 let rec accept_n main_socket n =
   if n <= 0 then return_nil
   else
-    accept_n main_socket (n - 1)
-    >>=? fun acc -> accept main_socket >>=? fun conn -> return (conn :: acc)
+    accept_n main_socket (n - 1) >>=? fun acc ->
+    accept main_socket >>=? fun conn -> return (conn :: acc)
 
 let connect addr port =
-  P2p_fd.socket PF_INET6 SOCK_STREAM 0
-  >>= fun fd ->
+  P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   P2p_fd.connect fd uaddr >>= fun () -> return fd
 
 let simple_msgs =
-  [| Bytes.create (1 lsl 6);
-     Bytes.create (1 lsl 7);
-     Bytes.create (1 lsl 8);
-     Bytes.create (1 lsl 9);
-     Bytes.create (1 lsl 10);
-     Bytes.create (1 lsl 11);
-     Bytes.create (1 lsl 12);
-     Bytes.create (1 lsl 13);
-     Bytes.create (1 lsl 14);
-     Bytes.create (1 lsl 15);
-     Bytes.create (1 lsl 16) |]
+  [|
+    Bytes.create (1 lsl 6);
+    Bytes.create (1 lsl 7);
+    Bytes.create (1 lsl 8);
+    Bytes.create (1 lsl 9);
+    Bytes.create (1 lsl 10);
+    Bytes.create (1 lsl 11);
+    Bytes.create (1 lsl 12);
+    Bytes.create (1 lsl 13);
+    Bytes.create (1 lsl 14);
+    Bytes.create (1 lsl 15);
+    Bytes.create (1 lsl 16);
+  |]
 
 let nb_simple_msgs = Array.length simple_msgs
 
 let receive conn =
   let buf = Bytes.create (1 lsl 16) in
   let rec loop () =
-    P2p_io_scheduler.read conn buf
-    >>= function
-    | Ok _ ->
-        loop ()
+    P2p_io_scheduler.mk_buffer buf >>?= P2p_io_scheduler.read conn >>= function
+    | Ok _ -> loop ()
     | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) ->
         Lwt.return_unit
-    | Error err ->
-        Lwt.fail (Error err)
+    | Error err -> Lwt.fail (Error err)
   in
   loop ()
 
@@ -121,20 +118,16 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
               P2p_stat.pp
               (P2p_io_scheduler.stat conn))) ;
   (* Accept and read message until the connection is closed. *)
-  accept_n main_socket n
-  >>=? fun conns ->
+  accept_n main_socket n >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  List.iter_p receive conns
-  >>= fun () ->
-  List.iter_ep P2p_io_scheduler.close conns
-  >>=? fun () ->
+  List.iter_p receive conns >>= fun () ->
+  List.iter_ep P2p_io_scheduler.close conns >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
   return_unit
 
 let max_size ?max_upload_speed () =
   match max_upload_speed with
-  | None ->
-      nb_simple_msgs
+  | None -> nb_simple_msgs
   | Some max_upload_speed ->
       let rec loop n =
         if n <= 1 then 1
@@ -144,8 +137,7 @@ let max_size ?max_upload_speed () =
       loop nb_simple_msgs
 
 let rec send conn nb_simple_msgs =
-  Lwt_main.yield ()
-  >>= fun () ->
+  Lwt_main.yield () >>= fun () ->
   let msg = simple_msgs.(Random.int nb_simple_msgs) in
   P2p_io_scheduler.write conn msg >>=? fun () -> send conn nb_simple_msgs
 
@@ -157,14 +149,12 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
       ~read_buffer_size:(1 lsl 12)
       ()
   in
-  connect addr port
-  >>=? fun conn ->
+  connect addr port >>=? fun conn ->
   let conn = P2p_io_scheduler.register sched conn in
   let nb_simple_msgs = max_size ?max_upload_speed () in
   Lwt.pick [send conn nb_simple_msgs; Lwt_unix.sleep time >>= return]
   >>=? fun () ->
-  P2p_io_scheduler.close conn
-  >>=? fun () ->
+  P2p_io_scheduler.close conn >>=? fun () ->
   let stat = P2p_io_scheduler.stat conn in
   lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () -> return_unit
 
@@ -174,13 +164,9 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
 *)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
-  Internal_event_unix.init ()
-  >>= fun () ->
-  listen ?port addr
-  >>= fun (main_socket, port) ->
-  Process.detach
-    ~prefix:"server: "
-    (fun (_ : (unit, unit) Process.Channel.t) ->
+  Internal_event_unix.init () >>= fun () ->
+  listen ?port addr >>= fun (main_socket, port) ->
+  Process.detach ~prefix:"server: " (fun (_ : (unit, unit) Process.Channel.t) ->
       server
         ?display_client_stat
         ?max_download_speed
@@ -192,18 +178,16 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
   let client n =
     let prefix = Printf.sprintf "client(%d): " n in
     Process.detach ~prefix (fun _ ->
-        Lwt_utils_unix.safe_close main_socket
-        >>= (function
-              | Error trace ->
-                  Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-                  Lwt.return_unit
-              | Ok () ->
-                  Lwt.return_unit)
+        (Lwt_utils_unix.safe_close main_socket >>= function
+         | Error trace ->
+             Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+             Lwt.return_unit
+         | Ok () -> Lwt.return_unit)
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  List.map_es client (1 -- n)
-  >>=? fun client_nodes -> Process.wait_all (server_node :: client_nodes)
+  List.map_es client (1 -- n) >>=? fun client_nodes ->
+  Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 
@@ -229,7 +213,8 @@ let display_client_stat = ref None
 
 let spec =
   Arg.
-    [ ("--port", Int (fun p -> port := Some p), " Listening port");
+    [
+      ("--port", Int (fun p -> port := Some p), " Listening port");
       ( "--addr",
         String (fun p -> addr := Ipaddr.V6.of_string_exn p),
         " Listening addr" );
@@ -255,7 +240,8 @@ let spec =
         " Hide the client bandwidth statistic." );
       ( "--display_clients_stat",
         Unit (fun () -> display_client_stat := Some true),
-        " Display the client bandwidth statistic." ) ]
+        " Display the client bandwidth statistic." );
+    ]
 
 let () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
@@ -267,21 +253,73 @@ let init_logs = lazy (Internal_event_unix.init ())
 let wrap n f =
   Alcotest.test_case n `Quick (fun () ->
       Lwt_main.run
-        ( Lazy.force init_logs
-        >>= fun () ->
-        f ()
-        >>= function
-        | Ok () ->
-            Lwt.return_unit
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
+        ( Lazy.force init_logs >>= fun () ->
+          f () >>= function
+          | Ok () -> Lwt.return_unit
+          | Error error ->
+              Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
+
+let test_mk_buffer_1 () =
+  Test_services.assert_true
+    "[mk_buffer ?len:-1] fails"
+    (Result.is_error @@ P2p_io_scheduler.mk_buffer ~len:(-1) @@ Bytes.create 8)
+
+let test_mk_buffer_2 () =
+  Test_services.assert_true
+    "[mk_buffer ?pos:-1] fails"
+    (Result.is_error @@ P2p_io_scheduler.mk_buffer ~pos:(-1) @@ Bytes.create 8)
+
+let test_mk_buffer_3 () =
+  Test_services.assert_true
+    "[mk_buffer ?len ?pos buf] with (len + pos > (Bytes.length buf)) fails"
+    (Result.is_error
+    @@ P2p_io_scheduler.mk_buffer ~pos:14 ~len:3
+    @@ Bytes.create 16)
+
+let test_mk_buffer_4 () =
+  Test_services.assert_true
+    "[mk_buffer Bytes.empty] succeeds"
+    (Result.is_ok @@ P2p_io_scheduler.mk_buffer Bytes.empty)
+
+let test_mk_buffer_5 () =
+  let len = 16 in
+  Test_services.assert_true
+    "[mk_buffer ?len=max ?pos:0] succeeds"
+    (Result.is_ok @@ P2p_io_scheduler.mk_buffer ~len ~pos:0 @@ Bytes.create len)
+
+let test_mk_buffer_safe () =
+  (* We don't need to use QCheck, because the input data we need
+     is [0..some_not_too_big_int[, so we can just test all the ints
+     until the chosen bound, which we set here to 128. The bound should
+     not be small, because a buffer of the given size is allocated. *)
+  let lengths = Stdlib.List.init 128 Fun.id in
+  let open P2p_io_scheduler in
+  List.iter
+    (fun buf_len ->
+      let safe_buffer = Bytes.create buf_len |> mk_buffer_safe in
+      let (pos, len, buf) = Internal.destruct_buffer safe_buffer in
+      Test_services.assert_true
+        "Result.is_ok mk_buffer"
+        (mk_buffer ~pos ~len buf |> Result.is_ok))
+    lengths
 
 let () =
+  let mk_buffer_tests =
+    [
+      test_mk_buffer_1;
+      test_mk_buffer_2;
+      test_mk_buffer_3;
+      test_mk_buffer_4;
+      test_mk_buffer_5;
+    ]
+  in
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [ ( "p2p.io-scheduler",
-        [ wrap "trivial-quota" (fun () ->
+    [
+      ( "p2p.io-scheduler",
+        [
+          wrap "trivial-quota" (fun () ->
               run
                 ?display_client_stat:!display_client_stat
                 ?max_download_speed:!max_download_speed
@@ -292,4 +330,13 @@ let () =
                 !addr
                 !port
                 !delay
-                !clients) ] ) ]
+                !clients);
+        ] );
+      ( "p2p.io-scheduler.mk_buffer",
+        Stdlib.List.combine (1 -- List.length mk_buffer_tests) mk_buffer_tests
+        |> List.map (fun (i, test) ->
+               Alcotest.test_case (Printf.sprintf "mk_buffer_%d" i) `Quick test)
+      );
+      ( "p2p.io-scheduler.mk_safe_buffer",
+        [Alcotest.test_case "mk_safe_buffer" `Quick test_mk_buffer_safe] );
+    ]

@@ -61,46 +61,50 @@ struct
 
   let table =
     match P.initial_size with
-    | None ->
-        Table.create 101
-    | Some size ->
-        Table.create size
+    | None -> Table.create 101
+    | Some size -> Table.create size
 
   let new_tag =
     let x = ref ~-1 in
-    fun () -> incr x ; !x
+    fun () ->
+      incr x ;
+      !x
 
   let alloc_int (hash : int) (z : Z.t) =
     let info = {tag = new_tag (); hash} in
     let res = Micheline.Int (info, z) in
-    Table.add table res ; res
+    Table.add table res ;
+    res
 
   let alloc_string (hash : int) (s : string) =
     let info = {tag = new_tag (); hash} in
     let res = Micheline.String (info, s) in
-    Table.add table res ; res
+    Table.add table res ;
+    res
 
   let alloc_bytes (hash : int) (b : Bytes.t) =
     let info = {tag = new_tag (); hash} in
     let res = Micheline.Bytes (info, b) in
-    Table.add table res ; res
+    Table.add table res ;
+    res
 
   let alloc_prim (hash : int) (prim : head) (subterms : node list)
       (annots : string list) =
     let info = {tag = new_tag (); hash} in
     let res = Micheline.Prim (info, prim, subterms, annots) in
-    Table.add table res ; res
+    Table.add table res ;
+    res
 
   let alloc_seq (hash : int) (subterms : node list) =
     let info = {tag = new_tag (); hash} in
     let res = Micheline.Seq (info, subterms) in
-    Table.add table res ; res
+    Table.add table res ;
+    res
 
   let int (z : Z.t) =
     let hash = Z.hash z in
     match Table.find_all_by_hash table hash with
-    | [] ->
-        alloc_int hash z
+    | [] -> alloc_int hash z
     | bucket -> (
         let exists =
           List.find_opt
@@ -108,30 +112,26 @@ struct
               | Micheline.Int (_, z') -> Compare.Z.equal z z' | _ -> false)
             bucket
         in
-        match exists with Some res -> res | None -> alloc_int hash z )
+        match exists with Some res -> res | None -> alloc_int hash z)
 
   let string (s : string) =
     let hash = Hashtbl.hash s in
     match Table.find_all_by_hash table hash with
-    | [] ->
-        alloc_string hash s
+    | [] -> alloc_string hash s
     | bucket -> (
         let exists =
           List.find_opt
             (function
-              | Micheline.String (_, s') ->
-                  Compare.String.equal s s'
-              | _ ->
-                  false)
+              | Micheline.String (_, s') -> Compare.String.equal s s'
+              | _ -> false)
             bucket
         in
-        match exists with Some res -> res | None -> alloc_string hash s )
+        match exists with Some res -> res | None -> alloc_string hash s)
 
   let bytes (b : Bytes.t) =
     let hash = Hashtbl.hash b in
     match Table.find_all_by_hash table hash with
-    | [] ->
-        alloc_bytes hash b
+    | [] -> alloc_bytes hash b
     | bucket -> (
         let exists =
           List.find_opt
@@ -139,7 +139,7 @@ struct
               | Micheline.Bytes (_, b') -> Bytes.equal b b' | _ -> false)
             bucket
         in
-        match exists with Some res -> res | None -> alloc_bytes hash b )
+        match exists with Some res -> res | None -> alloc_bytes hash b)
 
   let hash_empty_list = Hashtbl.hash []
 
@@ -159,19 +159,14 @@ struct
 
   let rec term_lists_equal (lx : node list) (ly : node list) =
     match (lx, ly) with
-    | ([], _ :: _) | (_ :: _, []) ->
-        false
-    | ([], []) ->
-        true
-    | (hx :: tlx, hy :: tly) ->
-        terms_equal hx hy && term_lists_equal tlx tly
+    | ([], _ :: _) | (_ :: _, []) -> false
+    | ([], []) -> true
+    | (hx :: tlx, hy :: tly) -> terms_equal hx hy && term_lists_equal tlx tly
 
   let rec string_lists_equal (lx : string list) (ly : string list) =
     match (lx, ly) with
-    | ([], _ :: _) | (_ :: _, []) ->
-        false
-    | ([], []) ->
-        true
+    | ([], _ :: _) | (_ :: _, []) -> false
+    | ([], []) -> true
     | (hx :: tlx, hy :: tly) ->
         Compare.String.equal hx hy && string_lists_equal tlx tly
 
@@ -181,8 +176,7 @@ struct
     let head_hash = X.hash head in
     let hash = Hashtbl.hash (head_hash, subterms_hash, annots_hash) in
     match Table.find_all_by_hash table hash with
-    | [] ->
-        alloc_prim hash head subterms annots
+    | [] -> alloc_prim hash head subterms annots
     | bucket -> (
         let exists =
           List.find_opt
@@ -191,33 +185,28 @@ struct
                   X.compare head head' = 0
                   && term_lists_equal subterms subterms'
                   && string_lists_equal annots annots'
-              | _ ->
-                  false)
+              | _ -> false)
             bucket
         in
         match exists with
-        | Some res ->
-            res
-        | None ->
-            alloc_prim hash head subterms annots )
+        | Some res -> res
+        | None -> alloc_prim hash head subterms annots)
 
   let seq (subterms : node list) =
     let subterms_hash = hash_node_list subterms in
     let hash = subterms_hash in
     match Table.find_all_by_hash table hash with
-    | [] ->
-        alloc_seq hash subterms
+    | [] -> alloc_seq hash subterms
     | bucket -> (
         let exists =
           List.find_opt
             (function
               | Micheline.Seq (_, subterms') ->
                   term_lists_equal subterms subterms'
-              | _ ->
-                  false)
+              | _ -> false)
             bucket
         in
-        match exists with Some res -> res | None -> alloc_seq hash subterms )
+        match exists with Some res -> res | None -> alloc_seq hash subterms)
 
   let label = Micheline.location
 end

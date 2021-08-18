@@ -48,7 +48,7 @@ rm -rf /tmp/tezos_proto_doc_snapshot
 
 # set current version
 sed -i.old.old -e 's/let version_value = "alpha_current"/let version_value = "'${current}'"/' \
-    src/proto_${version}/lib_protocol/raw_context.ml
+    src/proto_${version}/lib_protocol/raw_context.ml src/proto_${version}/lib_client/proxy.ml
 
 long_hash=$(./tezos-protocol-compiler -hash-only src/proto_${version}/lib_protocol)
 short_hash=$(echo $long_hash | head -c 8)
@@ -107,6 +107,7 @@ sed -i.old -e 's/"hash": "[^"]*",/"hash": "'$long_hash'",/' \
 
 sed -i.old -e s/protocol_alpha/protocol_${version}_${short_hash}/ \
            -e s/protocol-alpha/protocol-${version}-${short_hash}/ \
+           -e s/protocol-functor-alpha/protocol-functor-${version}-${short_hash}/ \
     $(find . -type f)
 
 sed -i.old -e s/-alpha/-${version}-${short_hash}/ \
@@ -123,6 +124,9 @@ for file in  $(find . -name \*.opam)
 do
     mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
 done
+
+# add this protocol to the immutable list
+printf \\n$long_hash >> ../../lib_protocol_compiler/final_protocol_versions
 
 dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
 

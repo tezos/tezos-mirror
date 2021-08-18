@@ -242,11 +242,20 @@ module Big_map : sig
 
   val rpc_arg : id RPC_arg.t
 
-  module Contents :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Script_expr_hash.t
-       and type value = Script_repr.expr
-       and type t := key
+  module Contents : sig
+    include
+      Non_iterable_indexed_carbonated_data_storage
+        with type key = Script_expr_hash.t
+         and type value = Script_repr.expr
+         and type t := key
+
+    (** HACK *)
+    val list_values :
+      ?offset:int ->
+      ?length:int ->
+      Raw_context.t * id ->
+      (Raw_context.t * Script_repr.expr list) tzresult Lwt.t
+  end
 
   module Total_bytes :
     Indexed_data_storage
@@ -290,9 +299,7 @@ module Sapling : sig
 
   (* Used by both Commitments and Ciphertexts *)
   module Commitments_size :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int64
+    Single_data_storage with type t := Raw_context.t * id and type value = int64
 
   module Memo_size :
     Single_data_storage with type t := Raw_context.t * id and type value = int
@@ -314,9 +321,7 @@ module Sapling : sig
   val ciphertexts_init : Raw_context.t -> id -> Raw_context.t Lwt.t
 
   module Nullifiers_size :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int64
+    Single_data_storage with type t := Raw_context.t * id and type value = int64
 
   module Nullifiers_ordered :
     Non_iterable_indexed_data_storage
@@ -338,9 +343,7 @@ module Sapling : sig
        and type value = Sapling.Hash.t
 
   module Roots_pos :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int32
+    Single_data_storage with type t := Raw_context.t * id and type value = int32
 
   module Roots_level :
     Single_data_storage
@@ -483,7 +486,36 @@ module Ramp_up : sig
        and type t := Raw_context.t
 end
 
-module Pending_migration_balance_updates :
-  Single_data_storage
-    with type value = Receipt_repr.balance_updates
-     and type t := Raw_context.t
+module Pending_migration : sig
+  module Balance_updates :
+    Single_data_storage
+      with type value = Receipt_repr.balance_updates
+       and type t := Raw_context.t
+
+  module Operation_results :
+    Single_data_storage
+      with type value = Migration_repr.origination_result list
+       and type t := Raw_context.t
+
+  val remove :
+    Raw_context.t ->
+    (Raw_context.t
+    * Receipt_repr.balance_updates
+    * Migration_repr.origination_result list)
+    tzresult
+    Lwt.t
+end
+
+module Liquidity_baking : sig
+  (** Exponential moving average (ema) of flags set in protocol_data.contents.
+    If at any block it's above the threshold set in constants,
+    liquidity baking permanently shuts off. **)
+  module Escape_ema :
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
+
+  (** Constant product market maker contract that receives liquidity baking subsidy. **)
+  module Cpmm_address :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Contract_repr.t
+end

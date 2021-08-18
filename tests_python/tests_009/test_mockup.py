@@ -591,6 +591,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "endorsement_security_deposit": "64000001",
                 "block_security_deposit": "512000001",
                 "origination_size": 258,
+                "test_chain_duration": "0",
                 "seed_nonce_revelation_tip": "125001",
                 "michelson_maximum_type_size": 1001,
                 "tokens_per_roll": "8000000001",

@@ -31,89 +31,68 @@ open Test_tez
 let ten_tez = Tez.of_int 10
 
 let simple_reveal () =
-  Context.init 1
-  >>=? fun (blk, contracts) ->
+  Context.init 1 >>=? fun (blk, contracts) ->
   let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one
-  >>=? fun operation ->
-  Block.bake blk ~operation
-  >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
-         | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation"
+   | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
-  Op.revelation (B blk) new_c.pk
-  >>=? fun operation ->
-  Block.bake blk ~operation
-  >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? function
-  | true -> () | false -> Stdlib.failwith "New contract revelation failed."
+  Op.revelation (B blk) new_c.pk >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+  | true -> ()
+  | false -> Stdlib.failwith "New contract revelation failed."
 
 let empty_account_on_reveal () =
-  Context.init 1
-  >>=? fun (blk, contracts) ->
+  Context.init 1 >>=? fun (blk, contracts) ->
   let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   let amount = Tez.one_mutez in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract amount
-  >>=? fun operation ->
-  Block.bake blk ~operation
-  >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
-         | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
+  Op.transaction (B blk) c new_contract amount >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation"
+   | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
-  Op.revelation ~fee:amount (B blk) new_c.pk
-  >>=? fun operation ->
-  Incremental.begin_construction blk
-  >>=? fun inc ->
-  Incremental.add_operation inc operation
-  >>=? fun _ ->
-  Block.bake blk ~operation
-  >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? function
-  | false ->
-      ()
-  | true ->
-      Stdlib.failwith "Empty account still exists and is revealed."
+  Op.revelation ~fee:amount (B blk) new_c.pk >>=? fun operation ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Incremental.add_operation inc operation >>=? fun _ ->
+  Block.bake blk ~operation >>=? fun blk ->
+  Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+  | false -> ()
+  | true -> Stdlib.failwith "Empty account still exists and is revealed."
 
 let not_enough_found_for_reveal () =
-  Context.init 1
-  >>=? fun (blk, contracts) ->
+  Context.init 1 >>=? fun (blk, contracts) ->
   let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
-  Op.transaction (B blk) c new_contract Tez.one_mutez
-  >>=? fun operation ->
-  Block.bake blk ~operation
-  >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract
-  >|=? (function
-         | true -> Stdlib.failwith "Unexpected revelation" | false -> ())
+  Op.transaction (B blk) c new_contract Tez.one_mutez >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation"
+   | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
-  Op.revelation ~fee:Tez.fifty_cents (B blk) new_c.pk
-  >>=? fun operation ->
-  Block.bake blk ~operation
-  >>= fun res ->
+  Op.revelation ~fee:Tez.fifty_cents (B blk) new_c.pk >>=? fun operation ->
+  Block.bake blk ~operation >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Balance_too_low _ ->
-          true
-      | _ ->
-          false)
+      | Contract_storage.Balance_too_low _ -> true
+      | _ -> false)
 
 let tests =
-  [ Test_services.tztest "simple reveal" `Quick simple_reveal;
+  [
+    Test_services.tztest "simple reveal" `Quick simple_reveal;
     Test_services.tztest
       "empty account on reveal"
       `Quick
@@ -121,4 +100,5 @@ let tests =
     Test_services.tztest
       "not enough found for reveal"
       `Quick
-      not_enough_found_for_reveal ]
+      not_enough_found_for_reveal;
+  ]

@@ -180,7 +180,7 @@ of integers) and output a prediction of execution time (or, up to unit
 conversion, a quantity of gas). If :math:`S` is the abstract set of sizes,
 we're trying to infer a function of type :math:`S \rightarrow \mathbb{R}_{\ge 0}`
 from a finite list of examples :math:`(s_n, t_n)_n \in (S \times \mathbb{R}_{\ge 0})^\ast`
-which minimizes some error criterion. This is an example of a _regression_
+which minimizes some error criterion. This is an example of a **regression**
 problem.
 
 Note that since :math:`S` is typically not finite, :math:`S \rightarrow \mathbb{R}_{\ge 0}`
@@ -200,9 +200,9 @@ Enumerating the currying isomorphisms, a linear model can be considered as:
 
 1. a **linear** function :math:`\mathbb{R}^n \multimap (S \rightarrow \mathbb{R}_{ge 0})`
    from "meta" parameters to cost functions;
-2. a function :math:`S \rightarrow (\mathbb{R}^n \rightarrow \mathbb{R}_{ge 0})`
+2. a function :math:`S \rightarrow (\mathbb{R}^n \rightarrow \mathbb{R}_{\ge 0})`
    from sizes to linear forms over "meta" parameters;
-3. a function :math:`S \times \mathbb{R}^n \rightarrow \mathbb{R}_{ge 0}`.
+3. a function :math:`S \times \mathbb{R}^n \rightarrow \mathbb{R}_{\ge 0}`.
 
 The two first forms are the useful ones. The first form is useful in stating
 the inference problem: we seek :math:`\theta` that minimizes some empirical

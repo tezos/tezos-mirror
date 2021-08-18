@@ -27,14 +27,22 @@ include module type of struct
   include Time
 end
 
+(** Internal timestamp representation. *)
 type time = t
 
+(** Pretty-prints the time stamp using RFC3339 format. *)
 val pp : Format.formatter -> t -> unit
 
+(** Parses RFC3339 representation and returns a timestamp. *)
 val of_seconds_string : string -> time option
 
+(** Returns the timestamp encoded in RFC3339 format. *)
 val to_seconds_string : time -> string
 
+(** Adds a time span to a timestamp.
+    This function fails on integer overflow *)
 val ( +? ) : time -> Period_repr.t -> time tzresult
 
+(** Returns the difference between two timestamps as a time span.
+    This function fails when the difference is negative *)
 val ( -? ) : time -> time -> Period_repr.t tzresult

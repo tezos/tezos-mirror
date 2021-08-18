@@ -108,8 +108,7 @@ module Adversarial = struct
   (* Adversarial Z.t *)
   let integers ~prefix_size ~card state =
     if card <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
-    if prefix_size.min < 0 then
-      invalid_arg "Base_samplers.Adversarial.integers" ;
+    if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     let common_prefix = string state ~size:prefix_size in
     let rand_suffix = salt state card in
     let elements =
@@ -128,7 +127,7 @@ module Adversarial = struct
       List.init ~when_negative_length:() card (fun _ ->
           common_prefix ^ rand_suffix ())
       |> (* see [invalid_arg] above *)
-         WithExceptions.Result.get_ok ~loc:__LOC__
+      WithExceptions.Result.get_ok ~loc:__LOC__
     in
     (common_prefix, elements)
 

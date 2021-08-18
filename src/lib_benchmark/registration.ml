@@ -34,7 +34,7 @@ let codegen_table : Model.for_codegen String_table.t = String_table.create 51
 let register ((module Bench) : Benchmark.t) =
   if String_table.mem bench_table Bench.name then (
     Format.eprintf "Benchmark %s already registered! exiting@." Bench.name ;
-    exit 1 )
+    exit 1)
   else String_table.add bench_table Bench.name (module Bench)
 
 let register_for_codegen name model =
@@ -64,7 +64,25 @@ let all_benchmarks_with_all_of (tags : string list) : Benchmark.t list =
   String_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
-         List.for_all (fun tag -> List.mem tag (Benchmark.tags b)) tags)
+         List.for_all
+           (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
+           tags)
+  |> List.sort (fun b1 b2 ->
+         String.compare (Benchmark.name b1) (Benchmark.name b2))
+
+let rec list_equal l1 l2 =
+  match (l1, l2) with
+  | ([], []) -> true
+  | (x :: t, y :: u) -> String.equal x y && list_equal t u
+  | _ -> false
+
+let all_benchmarks_with_exactly (tags : string list) : Benchmark.t list =
+  let sorted_requested_tags = List.sort String.compare tags in
+  String_table.to_seq bench_table
+  |> Seq.map snd |> List.of_seq
+  |> List.filter (fun b ->
+         let benchmark_tags = List.sort String.compare (Benchmark.tags b) in
+         list_equal sorted_requested_tags benchmark_tags)
   |> List.sort (fun b1 b2 ->
          String.compare (Benchmark.name b1) (Benchmark.name b2))
 
@@ -72,7 +90,9 @@ let all_benchmarks_with_any_of (tags : string list) : Benchmark.t list =
   String_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
-         List.exists (fun tag -> List.mem tag (Benchmark.tags b)) tags)
+         List.exists
+           (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
+           tags)
   |> List.sort (fun b1 b2 ->
          String.compare (Benchmark.name b1) (Benchmark.name b2))
 

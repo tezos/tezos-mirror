@@ -5,6 +5,8 @@ E.g. start and stop a server. The fixture is simply specified as a parameter
 in the test function, and the yielded values is then accessible with this
 parameter.
 """
+import subprocess
+import shutil
 import os
 import tempfile
 from typing import Optional, Iterator, List
@@ -14,7 +16,7 @@ from pytest_regtest import (
     deregister_converter_pre,
     _std_conversion,
 )
-from launchers.sandbox import Sandbox, SandboxMultiBranch
+from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
 from client.client import Client
@@ -32,9 +34,9 @@ def sanity_check(request) -> None:
 
 
 @pytest.fixture(scope="session")
-def log_dir(request) -> Iterator[str]:
+def log_dir(request) -> str:
     """Retrieve user-provided logging directory on the command line."""
-    yield request.config.getoption("--log-dir")
+    return request.config.getoption("--log-dir")
 
 
 @pytest.fixture(scope="session")
@@ -186,47 +188,6 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     yield clients
 
 
-@pytest.fixture(scope="class")
-def sandbox_multibranch(log_dir, request) -> Iterator[SandboxMultiBranch]:
-    """Multi-branch sandbox fixture. Parameterized by map of branches.
-
-    This fixture is identical to `sandbox` except that each node_id is
-    mapped to a pair (git revision, protocol version). For instance,
-    suppose a mapping:
-
-      MAP = { 0: ('zeronet', 'alpha'), 1:('mainnet', '003-PsddFKi3'),
-              2: ('alphanet', '003-PsddFKi3' }
-
-    If we annotate the class test as follows.
-    @pytest.mark.parametrize('sandbox_multibranch', [MAP], indirect=True)
-
-    The executables (node, baker, endorser)
-    - for node_id 0 will be looked up in `TEZOS_BINARY/zeronet`,
-    - for node_id 1 will be looked up in `TEZOS_BINARY/mainnet` and so on...
-
-    baker and endorser will use the specified protocol version, according
-    to the tezos executables naming conventions.
-    """
-    if paths.TEZOS_BINARIES is None:
-        pytest.skip()
-    branch_map = request.param
-    assert branch_map is not None
-    num_peers = max(branch_map) + 1
-
-    assert paths.TEZOS_BINARIES is not None  # helps `mypy`
-    with SandboxMultiBranch(
-        paths.TEZOS_BINARIES,
-        constants.IDENTITIES,
-        num_peers=num_peers,
-        log_dir=log_dir,
-        branch_map=branch_map,
-    ) as sandbox:
-        yield sandbox
-        # this assertion checks that daemons (baker, endorser, node...) didn't
-        # fail unexpected.
-        assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
-
-
 def pytest_collection_modifyitems(config, items):
     """Adapted from pytest-fixture-marker: adds the regression marker
     to all tests that use the regtest fixture.
@@ -283,3 +244,115 @@ def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
         ).create_mockup_result
         assert res == CreateMockupResult.OK
         yield sandbox.create_client(base_dir=base_dir, mode="mockup")
+
+
+@pytest.fixture(scope="class")
+def legacy_stores(request):
+    """Aims to generate legacy stores.
+
+    The number of blocks to bake (batch), the home path and the
+    export_snapshots variables are pecified as a class annotation.
+    @pytest.mark.parametrize('legacy_stores', […], indirect=True)
+    """
+    assert request.param is not None
+    home = request.param['home']
+    batch = request.param['batch']
+    export_snapshots = request.param['snapshot']
+    session = {}
+    data_dir = tempfile.mkdtemp(prefix='tezos-legacy-stores.')
+    build_dir = '_build/'
+    builder_target = 'legacy_store_builder'
+    builder_path = f'src/lib_store/legacy_store/{builder_target}.exe'
+    builder_bin = f'{build_dir}default/{builder_path}'
+    maker_target = 'legacy_store_maker'
+    maker_path = f'src/lib_store/test/{maker_target}.exe'
+    maker_bin = f'{build_dir}default/{maker_path}'
+    subprocess.run(
+        [
+            'dune',
+            'build',
+            '--build-dir',
+            f'{home}{build_dir}',
+            f'{builder_path}',
+        ],
+        check=True,
+        cwd=home,
+    )
+    subprocess.run(
+        ['dune', 'build', '--build-dir', f'{home}{build_dir}', f'{maker_path}'],
+        check=True,
+        cwd=home,
+    )
+    # Call the magic binary which generates legacy stores such as:
+    # data_dir/archive_store_to_upgrade
+    #         /full_store_to_upgrade
+    #         /rolling_store_to_upgrade
+    # where every store contains the "same chain"
+    subprocess.run(
+        [
+            maker_bin,
+            data_dir,
+            builder_bin,
+            str(batch),
+            str(export_snapshots).lower(),
+        ],
+        check=True,
+        cwd=home,
+    )
+
+    # Store data paths in session
+    for history_mode in ['archive', 'full', 'rolling']:
+        path = f'{data_dir}/{history_mode}_store_to_upgrade'
+        session[f'{history_mode}_path'] = path
+
+    # Store snapshot paths in legacy_stores
+    if export_snapshots:
+        for history_mode in ['archive', 'full']:
+            full_path = f'{data_dir}/snapshot_from_{history_mode}_storage.full'
+            session[f'from_{history_mode}.full'] = full_path
+            rolling_path = (
+                f'{data_dir}' + f'/snapshot_from_{history_mode}_storage.rolling'
+            )
+            session[f'from_{history_mode}.rolling'] = rolling_path
+        # Store the rolling path
+        session['from_rolling.rolling'] = (
+            f'{data_dir}/snapshot_from' + '_rolling_storage.rolling'
+        )
+
+    yield session
+    shutil.rmtree(data_dir)
+
+
+@pytest.fixture(scope="class")
+def nodes_legacy_store(sandbox, legacy_stores):
+    nodes = {}
+
+    # TODO would be cleaner to return couples (node, client) in order to
+    #      avoid relying on the invariant that nodes are numbered 1, 2, 3
+    #      or just return the id?
+    i = 1
+    for history_mode in ['archive', 'full', 'rolling']:
+        node_dir = legacy_stores[f'{history_mode}_path']
+        # init config with up to date version
+        params = constants.NODE_PARAMS + ['--history-mode', history_mode]
+        node = sandbox.register_node(i, node_dir=node_dir, params=params)
+        # Workaround to allow generating an identity on an
+        # old 0.0.4 storage with a 0.0.6 node
+        version = open(node_dir + "/version.json", "w")
+        version.write('{ "version": "0.0.6" }')
+        version.close()
+        node.init_config()
+        # write version to upgrade
+        version = open(node_dir + "/version.json", "w")
+        version.write('{ "version": "0.0.4" }')
+        version.close()
+
+        nodes[history_mode] = node
+        i += 1
+
+    yield nodes
+
+    # TODO think of case of failure before `yield`
+    for history_mode in ['archive', 'full', 'rolling']:
+        node_dir = legacy_stores[f'{history_mode}_path']
+        shutil.rmtree(node_dir)

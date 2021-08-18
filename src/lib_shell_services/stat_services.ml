@@ -27,7 +27,8 @@ open Gc
 let gc_stat_encoding =
   let open Data_encoding in
   conv
-    (fun { minor_words;
+    (fun {
+           minor_words;
            promoted_words;
            major_words;
            minor_collections;
@@ -42,7 +43,8 @@ let gc_stat_encoding =
            fragments;
            compactions;
            top_heap_words;
-           stack_size } ->
+           stack_size;
+         } ->
       ( ( minor_words,
           promoted_words,
           major_words,
@@ -112,7 +114,8 @@ let proc_stat_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case
+    [
+      case
         (Tag 0)
         (conv
            (fun {page_size; size; resident; shared; text; lib; data; dt} ->
@@ -142,7 +145,8 @@ let proc_stat_encoding =
               (req "resident" int64)))
         ~title:"Darwin_ps"
         (function Ps x -> Some x | _ -> None)
-        (function res -> Ps res) ]
+        (function res -> Ps res);
+    ]
 
 module S = struct
   let gc =

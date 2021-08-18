@@ -72,13 +72,15 @@ module Blake2b_bench : Benchmark.S = struct
   (* We posit that the execution time of blake2b is proportional to the
      length of the bytes. *)
   let models =
-    [ ( "blake2b",
+    [
+      ( "blake2b",
         Model.make
           ~conv:(fun {nbytes} -> (nbytes, ()))
           ~model:
             (Model.affine
                ~intercept:(Free_variable.of_string "blake2b_const")
-               ~coeff:(Free_variable.of_string "blake2b_ns_p_byte")) ) ]
+               ~coeff:(Free_variable.of_string "blake2b_ns_p_byte")) );
+    ]
 
   let blake2b_benchmark rng_state config () =
     let nbytes =
@@ -103,5 +105,5 @@ let () =
   Registration.register_for_codegen
     "blake2b_codegen"
     (Model.For_codegen
-       ( WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc "blake2b" Blake2b_bench.models ))
+       (WithExceptions.Option.get ~loc:__LOC__
+       @@ List.assoc ~equal:String.equal "blake2b" Blake2b_bench.models))

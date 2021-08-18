@@ -1,10 +1,11 @@
 from typing import List
 import pytest
-from tools import utils
+from tools import utils, constants
 from client.client import Client
+from . import protocol
 
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
+TRANSFER_AMOUNT = 500
 
 
 # TODO  test doesn't pass with n=2 (--bootstrap-treshold?)
@@ -28,7 +29,7 @@ class TestManualBaking:
         for i in range(1, 6):
             account = f'bootstrap{i}'
             client_i = level % len(clients)
-            clients[client_i].bake(account, BAKE_ARGS)
+            utils.bake(clients[client_i], account)
             for client in clients:
                 assert utils.check_level(client, level)
             level += 1
@@ -39,8 +40,11 @@ class TestManualBaking:
 
     def test_transfer(self, clients: List[Client], session: dict):
         client_id = 3 % len(clients)
-        transfer = clients[client_id].transfer(500, 'bootstrap1', 'bootstrap3')
+        transfer = clients[client_id].transfer(
+            TRANSFER_AMOUNT, 'bootstrap1', 'bootstrap3'
+        )
         session["transfer_hash"] = transfer.operation_hash
+        session["transfer_fees"] = transfer.fees
 
     def test_mempool_contains_endorse_and_transfer(
         self, clients: List[Client], session
@@ -54,7 +58,7 @@ class TestManualBaking:
             )
 
     def test_bake(self, clients: List[Client]):
-        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
+        utils.bake(clients[3 % len(clients)], 'bootstrap4')
 
     def test_block_contains_endorse_and_transfer(
         self, clients: List[Client], session
@@ -67,6 +71,14 @@ class TestManualBaking:
                 client, operation_hashes
             )
 
-    def test_balance(self, clients: List[Client]):
-        bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
-        assert bal == 3998987.999595
+    def test_balance(self, clients: List[Client], session):
+        baker_id = constants.IDENTITIES['bootstrap1']['identity']
+        bal = clients[0].get_balance(baker_id)
+        parameters = protocol.PARAMETERS
+        initial_amount = int(parameters["bootstrap_accounts"][0][1])
+        deposit = int(parameters["block_security_deposit"])
+        tx_fee = session['transfer_fees']
+        assert (
+            bal
+            == (initial_amount - deposit) / 1000000 - tx_fee - TRANSFER_AMOUNT
+        )

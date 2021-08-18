@@ -12,9 +12,6 @@ from client.client import Client
 from .contract_paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
 
 
-BAKE_ARGS = ['--minimal-timestamp']
-
-
 @pytest.mark.contract
 class TestContractMacros:
     """Tests for contracts using macros that do not require origination."""

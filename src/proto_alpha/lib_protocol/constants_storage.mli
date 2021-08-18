@@ -36,6 +36,8 @@ val blocks_per_voting_period : Raw_context.t -> int32
 
 val time_between_blocks : Raw_context.t -> Period_repr.t list
 
+val minimal_block_delay : Raw_context.t -> Period_repr.t
+
 val endorsers_per_block : Raw_context.t -> int
 
 val initial_endorsers : Raw_context.t -> int
@@ -74,5 +76,11 @@ val quorum_min : Raw_context.t -> int32
 val quorum_max : Raw_context.t -> int32
 
 val min_proposal_quorum : Raw_context.t -> int32
+
+val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
+
+val liquidity_baking_sunset_level : Raw_context.t -> int32
+
+val liquidity_baking_escape_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_repr.parametric

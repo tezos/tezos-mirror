@@ -44,39 +44,39 @@ let execute_all_modes client =
     (fun mode -> Client.normalize_data ~mode ~legacy ~data ~typ client)
     normalize_modes
 
-let test_normalize_vanilla ~protocol =
-  Test.register
+let test_normalize_vanilla =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: normalize data" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "normalize"; "data"]
-  @@ fun () ->
+    ~title:(sf "normalize data")
+    ~tags:["normalize"; "data"]
+  @@ fun protocol ->
   let* node = Node.init [] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let* _ = execute_all_modes client in
   Lwt.return_unit
 
-let test_normalize_mockup ~protocol =
-  Test.register
+let test_normalize_mockup =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: normalize data (mockup)" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "normalize"; "data"]
-  @@ fun () ->
+    ~title:"normalize data (mockup)"
+    ~tags:["mockup"; "normalize"; "data"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = execute_all_modes client in
   Lwt.return_unit
 
-let test_normalize_proxy ~protocol =
-  Test.register
+let test_normalize_proxy =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: normalize data (proxy)" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "normalize"; "data"]
-  @@ fun () ->
+    ~title:"normalize data (proxy)"
+    ~tags:["proxy"; "normalize"; "data"]
+  @@ fun protocol ->
   let* (_, client) = Proxy.init ~protocol () in
   let* _ = execute_all_modes client in
   Lwt.return_unit
 
-let register protocol =
-  test_normalize_vanilla ~protocol ;
-  test_normalize_mockup ~protocol ;
-  test_normalize_proxy ~protocol
+let register ~protocols =
+  test_normalize_vanilla ~protocols ;
+  test_normalize_mockup ~protocols ;
+  test_normalize_proxy ~protocols

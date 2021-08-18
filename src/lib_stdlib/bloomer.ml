@@ -48,8 +48,7 @@ type 'a t = {
 let sf = Printf.sprintf
 
 let check_peek_poke_args fname bytes ofs bits =
-  if bits <= 0 then
-    invalid_arg (sf "Bloomer.%s: non positive bits value" fname) ;
+  if bits <= 0 then invalid_arg (sf "Bloomer.%s: non positive bits value" fname) ;
   if ofs < 0 then invalid_arg (sf "Bloomer.%s: negative offset" fname) ;
   if bits > Sys.word_size - 2 then
     invalid_arg (sf "Bloomer.%s: indexes out of bounds" fname) ;
@@ -127,9 +126,7 @@ let%test_unit "sequential_read_writes" =
         assert (peek bytes ofs len = v) ;
         init (ofs + len) ((ofs, len, v) :: acc)
     in
-    List.iter
-      (fun (ofs, len, v) -> assert (peek bytes ofs len = v))
-      (init 0 [])
+    List.iter (fun (ofs, len, v) -> assert (peek bytes ofs len = v)) (init 0 [])
   done
 
 let%test_unit "read_over_write" =
@@ -272,7 +269,10 @@ let%test_unit "consistent_add_countdown_count" =
     in
     let bloomer = create ~hash ~index_bits ~hashes ~countdown_bits in
     let next_ref = ref 0 in
-    let next () = incr next_ref ; !next_ref in
+    let next () =
+      incr next_ref ;
+      !next_ref
+    in
     let actual_set () =
       List.filter (mem bloomer) (List.of_seq @@ Set.to_seq_keys set)
     in
@@ -312,30 +312,32 @@ let%test_unit "false_positive_rate" =
      check the behaviour of this implementation, as it is close enough
      for security yet much simpler to compute. *)
   let runs =
-    [| (18, 4);
-       (18, 6);
-       (18, 8);
-       (18, 10);
-       (20, 2);
-       (20, 4);
-       (20, 6);
-       (20, 8);
-       (20, 9);
-       (20, 10);
-       (20, 11);
-       (20, 12);
-       (20, 13);
-       (20, 14);
-       (21, 2);
-       (21, 3);
-       (21, 4);
-       (21, 5);
-       (22, 2);
-       (22, 3);
-       (22, 4);
-       (22, 5);
-       (22, 6);
-       (22, 8) |]
+    [|
+      (18, 4);
+      (18, 6);
+      (18, 8);
+      (18, 10);
+      (20, 2);
+      (20, 4);
+      (20, 6);
+      (20, 8);
+      (20, 9);
+      (20, 10);
+      (20, 11);
+      (20, 12);
+      (20, 13);
+      (20, 14);
+      (21, 2);
+      (21, 3);
+      (21, 4);
+      (21, 5);
+      (22, 2);
+      (22, 3);
+      (22, 4);
+      (22, 5);
+      (22, 6);
+      (22, 8);
+    |]
   in
   let steps = 995 in
   let init_samples = 5_000 in
@@ -354,7 +356,8 @@ let%test_unit "false_positive_rate" =
           let cur = ref 0 in
           ( (fun n ->
               for _ = 1 to n do
-                add bloomer !cur ; incr cur
+                add bloomer !cur ;
+                incr cur
               done),
             fun () -> !cur )
         in
@@ -362,15 +365,13 @@ let%test_unit "false_positive_rate" =
         ( float (Bytes.length bloomer.filter) /. 1024.,
           index_bits,
           hashes,
-          Array.init steps
-          @@ fun i ->
+          Array.init steps @@ fun i ->
           add samples_per_step ;
           let n = init_samples + ((i + 1) * samples_per_step) in
           let expected_fp_proba =
             let e = 2.718281828459045 in
-            ( 1.
-            -. (e ** (-.float hashes *. float n /. float (1 lsl index_bits)))
-            )
+            (1.
+            -. (e ** (-.float hashes *. float n /. float (1 lsl index_bits))))
             ** float hashes
           in
           let actual_proba =
@@ -380,18 +381,18 @@ let%test_unit "false_positive_rate" =
             done ;
             float !falses /. 500.
           in
-          ( if abs_float (expected_fp_proba -. actual_proba) >= 0.1 then
-            let message =
-              Format.asprintf
-                "wrong false positive rate for n=%d, m=%d,k=%d, expected %g, \
-                 got %g"
-                n
-                (1 lsl index_bits)
-                hashes
-                expected_fp_proba
-                actual_proba
-            in
-            failwith message ) ;
+          (if abs_float (expected_fp_proba -. actual_proba) >= 0.1 then
+           let message =
+             Format.asprintf
+               "wrong false positive rate for n=%d, m=%d,k=%d, expected %g, \
+                got %g"
+               n
+               (1 lsl index_bits)
+               hashes
+               expected_fp_proba
+               actual_proba
+           in
+           failwith message) ;
           (expected_fp_proba, actual_proba) ))
       runs
   in

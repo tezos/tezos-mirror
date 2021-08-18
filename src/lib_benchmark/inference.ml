@@ -161,12 +161,11 @@ let make_problem_from_workloads :
     evaluate:(workload -> Eval_to_vector.size Eval_to_vector.repr) ->
     problem =
  fun ~data ~overrides ~evaluate ->
-  ( match data with
+  (match data with
   | [] ->
       Stdlib.failwith
         "Inference.make_problem_from_workloads: empty workload data"
-  | _ ->
-      () ) ;
+  | _ -> ()) ;
   let line_count = List.length data in
   let model_progress =
     Benchmark_helpers.make_progress_printer
@@ -206,10 +205,8 @@ let make_problem_from_workloads :
     in
     let predicted =
       let predicted = Array.of_list predicted in
-      Scikit.Matrix.init
-        ~lines:(Array.length predicted)
-        ~cols:1
-        ~f:(fun l _c -> predicted.(l))
+      Scikit.Matrix.init ~lines:(Array.length predicted) ~cols:1 ~f:(fun l _c ->
+          predicted.(l))
     in
     Degenerate {predicted; measured}
   else
@@ -245,7 +242,7 @@ let to_list_of_rows (m : Scikit.Matrix.t) : float list list =
   let init n f =
     List.init ~when_negative_length:() n f
     |> (* lines/column count cannot be negative *)
-       WithExceptions.Result.get_ok ~loc:__LOC__
+    WithExceptions.Result.get_ok ~loc:__LOC__
   in
   init lines (fun l -> init cols (fun c -> Scikit.Matrix.get m l c))
 
@@ -266,7 +263,7 @@ let model_matrix_to_csv (m : Scikit.Matrix.t) (nmap : NMap.t) : Csv.csv =
     List.init ~when_negative_length:() cols (fun i ->
         fv_to_string (NMap.nth_exn nmap i))
     |> (* number of column cannot be negative *)
-       WithExceptions.Result.get_ok ~loc:__LOC__
+    WithExceptions.Result.get_ok ~loc:__LOC__
   in
   let rows = to_list_of_rows m in
   let rows = List.map (List.map string_of_float) rows in
@@ -290,8 +287,7 @@ let problem_to_csv : problem -> Csv.csv = function
 let solution_to_csv : solution -> Csv.csv option =
  fun {mapping; _} ->
   match mapping with
-  | [] ->
-      None
+  | [] -> None
   | _ ->
       let headers = List.map (fun (fv, _) -> fv_to_string fv) mapping
       and row = List.map (fun x -> Float.to_string (snd x)) mapping in
@@ -318,8 +314,7 @@ let solve_problem : problem -> solver -> solution =
               ~input
               ~output
               ()
-        | NNLS ->
-            Scikit.LinearModel.nnls ~input ~output
+        | NNLS -> Scikit.LinearModel.nnls ~input ~output
       in
       let lines = Scikit.Matrix.dim1 weights in
       if lines <> NMap.support nmap then

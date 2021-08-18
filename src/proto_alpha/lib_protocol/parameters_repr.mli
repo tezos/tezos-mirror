@@ -23,18 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines protocol parameters, i.e. constants regulating the
+    behaviour of the blockchain under the protocol. *)
+
+(** An implict contract (account) initially existing on a chain since genesis. *)
 type bootstrap_account = {
   public_key_hash : Signature.Public_key_hash.t;
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
 }
 
+(** An originated contract initially existing on a chain since genesis. *)
 type bootstrap_contract = {
   delegate : Signature.Public_key_hash.t;
   amount : Tez_repr.t;
   script : Script_repr.t;
 }
 
+(** Protocol parameters define some constants regulating behaviour of the
+    chain. *)
 type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
@@ -45,3 +52,5 @@ type t = {
 }
 
 val encoding : t Data_encoding.t
+
+val check_params : t -> unit tzresult

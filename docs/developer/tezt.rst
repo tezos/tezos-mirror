@@ -45,6 +45,11 @@ And here is how to get the list of tests and their tags::
 
     dune exec tezt/tests/main.exe -- --list
 
+To speed things up, you can run tests in parallel.
+Use ``parallel-tezt.Makefile`` and specify the number of parallel jobs with ``-j``::
+
+    make --makefile parallel-tezt.Makefile --jobs 8
+
 Regression Tests
 ----------------
 
@@ -52,7 +57,7 @@ This form of testing is used to prevent unintended changes to existing
 functionality by ensuring that the software behaves the same way as it did
 before introduced changes.
 
-Regression tests capture commands and output of commands executed during a test. 
+Regression tests capture commands and output of commands executed during a test.
 An output of regression test is stored in the repository and is expected to
 match exactly with the captured output on subsequent runs. An added advantage of
 this is that when a change in behaviour is intentional, its effect is made
@@ -107,6 +112,8 @@ Tezt is composed of some generic, non-Tezos-related modules:
 
 - a ``Regression`` module for regression testing by comparing command outputs
   with previous runs.
+
+- a ``Progress`` module to track and display progress of a test suite.
 
 All those modules are part of the ``tezt`` library which can be found in directory
 ``tezt/lib`` of the Tezos repository.
@@ -197,7 +204,9 @@ Let's review what our basic test in the previous section does.
   It is parameterized by a protocol and the history mode, so it is easy to run this test
   on all protocols with all three modes.
 
-- Function ``Test.register`` registers a test.
+- Function ``Protocol.register_test`` registers a test.
+  It is a wrapper over ``Test.register``.
+  This wrapper is preferred when the test is parameterized by a single protocol.
   The ``~__FILE__`` argument gives the source filename so that one can select this
   file with the ``--file`` argument, to only run tests declared in this file.
   Each test has a title which is used in logs and on the command-line with the ``--test``
@@ -207,7 +216,7 @@ Let's review what our basic test in the previous section does.
   No other test has this tag, so it is easy to run all of the tests of our new ``Basic``
   module, and only them, by adding ``basic`` on the command-line.
 
-- Function ``Test.register`` takes a function as an argument.
+- Function ``Protocol.register_test`` takes a function as an argument.
   This function contains the implementation of the test.
 
 - First, we initialize a node with ``Node.init``.

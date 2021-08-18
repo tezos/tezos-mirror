@@ -56,7 +56,8 @@ module Nonce = struct
   let info_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Revealed"
           (obj1 (req "nonce" Nonce.encoding))
@@ -73,7 +74,8 @@ module Nonce = struct
           ~title:"Forgotten"
           empty
           (function Forgotten -> Some () | _ -> None)
-          (fun () -> Forgotten) ]
+          (fun () -> Forgotten);
+      ]
 
   module S = struct
     let get =
@@ -88,33 +90,44 @@ module Nonce = struct
     let open Services_registration in
     register1 S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
-        Nonce.get ctxt level
-        >|= function
-        | Ok (Revealed nonce) ->
-            ok (Revealed nonce)
-        | Ok (Unrevealed {nonce_hash; _}) ->
-            ok (Missing nonce_hash)
-        | Error _ ->
-            ok Forgotten)
+        Nonce.get ctxt level >|= function
+        | Ok (Revealed nonce) -> ok (Revealed nonce)
+        | Ok (Unrevealed {nonce_hash; _}) -> ok (Missing nonce_hash)
+        | Error _ -> ok Forgotten)
 
-  let get ctxt block level =
-    RPC_context.make_call1 S.get ctxt block level () ()
+  let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
 
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
-module Helpers = Helpers_services
-module Forge = Helpers_services.Forge
-module Parse = Helpers_services.Parse
 module Voting = Voting_services
 module Sapling = Sapling_services
+
+module Liquidity_baking = struct
+  module S = struct
+    let get_cpmm_address =
+      RPC_service.get_service
+        ~description:"Liquidity baking CPMM address"
+        ~query:RPC_query.empty
+        ~output:Alpha_context.Contract.encoding
+        RPC_path.(custom_root / "context" / "liquidity_baking" / "cpmm_address")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 S.get_cpmm_address (fun ctxt () () ->
+        Alpha_context.Liquidity_baking.get_cpmm_address ctxt)
+
+  let get_cpmm_address ctxt block =
+    RPC_context.make_call0 S.get_cpmm_address ctxt block () ()
+end
 
 let register () =
   Contract.register () ;
   Constants.register () ;
   Delegate.register () ;
-  Helpers.register () ;
   Nonce.register () ;
   Voting.register () ;
-  Sapling.register ()
+  Sapling.register () ;
+  Liquidity_baking.register ()

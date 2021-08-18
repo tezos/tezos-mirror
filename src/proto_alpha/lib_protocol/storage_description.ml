@@ -31,7 +31,10 @@ type 'key t = 'key desc_with_path
     [rev_path] which is the reverse path up to the position, and [dir] the
     position's [description]. [rev_path] is only useful in case of an error to
     print a descriptive message. [List.rev rev_path] is a storage's path that
-    contains no conflict and allow the registration of a [dir]'s storage. *)
+    contains no conflict and allows the registration of a [dir]'s storage.
+    NB: [rev_path] indicates the position in the tree, so once the node is
+    added, it won't change; whereas [dir] is mutable because when more subtrees
+    are added this may require updating it. *)
 and 'key desc_with_path = {
   rev_path : string list;
   mutable dir : 'key description;
@@ -56,10 +59,8 @@ and 'key description =
 let rec pp : type a. Format.formatter -> a t -> unit =
  fun ppf {dir; _} ->
   match dir with
-  | Empty ->
-      Format.fprintf ppf "Empty"
-  | Value _e ->
-      Format.fprintf ppf "Value"
+  | Empty -> Format.fprintf ppf "Empty"
+  | Value _e -> Format.fprintf ppf "Value"
   | NamedDir map ->
       Format.fprintf
         ppf
@@ -84,29 +85,27 @@ let pp_rev_path ppf path =
     (List.rev path)
 
 let rec register_named_subcontext : type r. r t -> string list -> r t =
- fun ({rev_path; dir} as desc) names ->
-  match (dir, names) with
-  | (_, []) ->
-      desc
+ fun desc names ->
+  match (desc.dir, names) with
+  | (_, []) -> desc
   | (Value _, _) | (IndexedDir _, _) ->
       Format.kasprintf
         invalid_arg
         "Could not register a named subcontext at %a because of an existing %a."
         pp_rev_path
-        rev_path
+        desc.rev_path
         pp
         desc
   | (Empty, name :: names) ->
-      let subdir = {rev_path = name :: rev_path; dir = Empty} in
+      let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in
       desc.dir <- NamedDir (StringMap.singleton name subdir) ;
       register_named_subcontext subdir names
   | (NamedDir map, name :: names) ->
       let subdir =
         match StringMap.find_opt name map with
-        | Some subdir ->
-            subdir
+        | Some subdir -> subdir
         | None ->
-            let subdir = {rev_path = name :: rev_path; dir = Empty} in
+            let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in
             desc.dir <- NamedDir (StringMap.add name subdir map) ;
             subdir
       in
@@ -124,8 +123,7 @@ type (_, _, _) args =
       -> ('key, 'a * 'b, 'sub_key) args
 
 let rec unpack : type a b c. (a, b, c) args -> c -> a * b = function
-  | One _ ->
-      fun x -> x
+  | One _ -> fun x -> x
   | Pair (l, r) ->
       let unpack_l = unpack l in
       let unpack_r = unpack r in
@@ -133,43 +131,41 @@ let rec unpack : type a b c. (a, b, c) args -> c -> a * b = function
         let (c, d) = unpack_r x in
         let (b, a) = unpack_l c in
         (b, (a, d))
+  [@@coq_axiom_with_reason "gadt"]
 
 let rec pack : type a b c. (a, b, c) args -> a -> b -> c = function
-  | One _ ->
-      fun b a -> (b, a)
+  | One _ -> fun b a -> (b, a)
   | Pair (l, r) ->
       let pack_l = pack l in
       let pack_r = pack r in
       fun b (a, d) ->
         let c = pack_l b a in
         pack_r c d
+  [@@coq_axiom_with_reason "gadt"]
 
 let rec compare : type a b c. (a, b, c) args -> b -> b -> int = function
-  | One {compare; _} ->
-      compare
+  | One {compare; _} -> compare
   | Pair (l, r) -> (
       let compare_l = compare l in
       let compare_r = compare r in
       fun (a1, b1) (a2, b2) ->
-        match compare_l a1 a2 with 0 -> compare_r b1 b2 | x -> x )
+        match compare_l a1 a2 with 0 -> compare_r b1 b2 | x -> x)
+  [@@coq_axiom_with_reason "gadt"]
 
 let destutter equal l =
   match l with
-  | [] ->
-      []
+  | [] -> []
   | (i, _) :: l ->
       let rec loop acc i = function
-        | [] ->
-            acc
-        | (j, _) :: l ->
-            if equal i j then loop acc i l else loop (j :: acc) j l
+        | [] -> acc
+        | (j, _) :: l -> if equal i j then loop acc i l else loop (j :: acc) j l
       in
       loop [i] i l
 
 let rec register_indexed_subcontext :
     type r a b.
     r t -> list:(r -> a list tzresult Lwt.t) -> (r, a, b) args -> b t =
- fun ({dir; rev_path = desc_path} as desc) ~list path ->
+ fun desc ~list path ->
   match path with
   | Pair (left, right) ->
       let compare_left = compare left in
@@ -177,8 +173,7 @@ let rec register_indexed_subcontext :
       let list_left r = list r >|=? fun l -> destutter equal_left l in
       let list_right r =
         let (a, k) = unpack left r in
-        list a
-        >|=? fun l ->
+        list a >|=? fun l ->
         List.map snd (List.filter (fun (x, _) -> equal_left x k) l)
       in
       register_indexed_subcontext
@@ -186,54 +181,53 @@ let rec register_indexed_subcontext :
         ~list:list_right
         right
   | One {rpc_arg = arg; encoding = arg_encoding; _} -> (
-    match dir with
-    | Value _ | NamedDir _ ->
-        Format.kasprintf
-          invalid_arg
-          "Could not register an indexed subcontext at %a because of an \
-           existing %a."
-          pp_rev_path
-          desc_path
-          pp
-          desc
-    | Empty ->
-        let subdir =
-          {
-            rev_path =
-              Format.sprintf "(Maybe of %s)" RPC_arg.(descr arg).name
-              :: desc.rev_path;
-            dir = Empty;
-          }
-        in
-        desc.dir <- IndexedDir {arg; arg_encoding; list; subdir} ;
-        subdir
-    | IndexedDir {arg = inner_arg; subdir; _} -> (
-      match RPC_arg.eq arg inner_arg with
-      | None ->
+      match desc.dir with
+      | Value _ | NamedDir _ ->
           Format.kasprintf
             invalid_arg
-            "An indexed subcontext at %a already exists but has a different \
-             argument: `%s` <> `%s`."
+            "Could not register an indexed subcontext at %a because of an \
+             existing %a."
             pp_rev_path
-            desc_path
-            (RPC_arg.descr arg).name
-            (RPC_arg.descr inner_arg).name
-      | Some RPC_arg.Eq ->
-          subdir ) )
+            desc.rev_path
+            pp
+            desc
+      | Empty ->
+          let subdir =
+            {
+              rev_path =
+                Format.sprintf "(Maybe of %s)" RPC_arg.(descr arg).name
+                :: desc.rev_path;
+              dir = Empty;
+            }
+          in
+          desc.dir <- IndexedDir {arg; arg_encoding; list; subdir} ;
+          subdir
+      | IndexedDir {arg = inner_arg; subdir; _} -> (
+          match RPC_arg.eq arg inner_arg with
+          | None ->
+              Format.kasprintf
+                invalid_arg
+                "An indexed subcontext at %a already exists but has a \
+                 different argument: `%s` <> `%s`."
+                pp_rev_path
+                desc.rev_path
+                (RPC_arg.descr arg).name
+                (RPC_arg.descr inner_arg).name
+          | Some RPC_arg.Eq -> subdir))
+ [@@coq_axiom_with_reason "gadt"]
 
 let register_value :
     type a b.
     a t -> get:(a -> b option tzresult Lwt.t) -> b Data_encoding.t -> unit =
- fun ({dir; rev_path} as desc) ~get encoding ->
-  match dir with
-  | Empty ->
-      desc.dir <- Value {get; encoding}
+ fun desc ~get encoding ->
+  match desc.dir with
+  | Empty -> desc.dir <- Value {get; encoding}
   | _ ->
       Format.kasprintf
         invalid_arg
         "Could not register a value at %a because of an existing %a."
         pp_rev_path
-        rev_path
+        desc.rev_path
         pp
         desc
 
@@ -282,9 +276,10 @@ let rec combine_object = function
               handlers.encoding;
           get =
             (fun k i ->
-              handler.get k i
-              >>=? fun v1 -> handlers.get k i >|=? fun v2 -> (v1, v2));
+              handler.get k i >>=? fun v1 ->
+              handlers.get k i >|=? fun v2 -> (v1, v2));
         }
+  [@@coq_axiom_with_reason "gadt"]
 
 type query = {depth : int}
 
@@ -297,21 +292,19 @@ let depth_query =
 let build_directory : type key. key t -> key RPC_directory.t =
  fun dir ->
   let rpc_dir = ref (RPC_directory.empty : key RPC_directory.t) in
-  let register : type ikey. (key, ikey) RPC_path.t -> ikey opt_handler -> unit
-      =
+  let register : type ikey. (key, ikey) RPC_path.t -> ikey opt_handler -> unit =
    fun path (Opt_handler {encoding; get}) ->
     let service =
       RPC_service.get_service ~query:depth_query ~output:encoding path
     in
     rpc_dir :=
-      RPC_directory.register !rpc_dir service (fun k q () ->
-          get k (q.depth + 1)
-          >|=? function None -> raise Not_found | Some x -> x)
+      RPC_directory.opt_register !rpc_dir service (fun k q () ->
+          get k (q.depth + 1))
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
-   fun {dir; _} path ->
-    match dir with
+   fun desc path ->
+    match desc.dir with
     | Empty ->
         Opt_handler
           {encoding = Data_encoding.unit; get = (fun _ _ -> return_none)}
@@ -324,7 +317,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
                 (fun k i -> if Compare.Int.(i < 0) then return_none else get k);
             }
         in
-        register path handler ; handler
+        register path handler ;
+        handler
     | NamedDir map ->
         let fields = StringMap.bindings map in
         let fields =
@@ -344,7 +338,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
                   else handler.get k (i - 1) >>=? fun v -> return_some v);
             }
         in
-        register path handler ; handler
+        register path handler ;
+        handler
     | IndexedDir {arg; arg_encoding; list; subdir} ->
         let (Opt_handler handler) =
           build_handler subdir RPC_path.(path /: arg)
@@ -352,7 +347,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
         let encoding =
           let open Data_encoding in
           union
-            [ case
+            [
+              case
                 (Tag 0)
                 ~title:"Leaf"
                 (dynamic_size arg_encoding)
@@ -365,14 +361,14 @@ let build_directory : type key. key t -> key RPC_directory.t =
                    (dynamic_size arg_encoding)
                    (dynamic_size handler.encoding))
                 (function (key, Some value) -> Some (key, value) | _ -> None)
-                (fun (key, value) -> (key, Some value)) ]
+                (fun (key, value) -> (key, Some value));
+            ]
         in
         let get k i =
           if Compare.Int.(i < 0) then return_none
           else if Compare.Int.(i = 0) then return_some []
           else
-            list k
-            >>=? fun keys ->
+            list k >>=? fun keys ->
             map_s
               (fun key ->
                 if Compare.Int.(i = 1) then return (key, None)
@@ -384,7 +380,9 @@ let build_directory : type key. key t -> key RPC_directory.t =
           Opt_handler
             {encoding = Data_encoding.(list (dynamic_size encoding)); get}
         in
-        register path handler ; handler
+        register path handler ;
+        handler
   in
   ignore (build_handler dir RPC_path.open_root : key opt_handler) ;
   !rpc_dir
+ [@@coq_axiom_with_reason "gadt"]

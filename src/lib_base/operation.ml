@@ -25,6 +25,8 @@
 
 type shell_header = {branch : Block_hash.t}
 
+let equal_shell_header {branch = b1} {branch = b2} = Block_hash.equal b1 b2
+
 let shell_header_encoding =
   let open Data_encoding in
   def "operation.shell_header" ~description:"An operation's shell header."
@@ -40,8 +42,8 @@ include Compare.Make (struct
 
   let compare o1 o2 =
     let ( >> ) x y = if x = 0 then y () else x in
-    Block_hash.compare o1.shell.branch o2.shell.branch
-    >> fun () -> Bytes.compare o1.proto o2.proto
+    Block_hash.compare o1.shell.branch o2.shell.branch >> fun () ->
+    Bytes.compare o1.proto o2.proto
 end)
 
 let encoding =
@@ -59,19 +61,16 @@ let encoding =
 
 let bounded_encoding ?max_size () =
   match max_size with
-  | None ->
-      encoding
-  | Some max_size ->
-      Data_encoding.check_size max_size encoding
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
 
-let bounded_list_encoding ?max_length ?max_size ?max_operation_size ?max_pass
-    () =
+let bounded_list_encoding ?max_length ?max_size ?max_operation_size ?max_pass ()
+    =
   let open Data_encoding in
   let op_encoding = bounded_encoding ?max_size:max_operation_size () in
   let op_list_encoding =
     match max_size with
-    | None ->
-        Variable.list ?max_length (dynamic_size op_encoding)
+    | None -> Variable.list ?max_length (dynamic_size op_encoding)
     | Some max_size ->
         check_size
           max_size

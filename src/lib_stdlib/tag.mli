@@ -168,8 +168,5 @@ module DSL : sig
 
   (** Perform the actual application of a tag to a format. *)
   val ( -% ) :
-    (?tags:set -> 'a) ->
-    ('a, Format.formatter, unit, 'd) arg ->
-    ?tags:set ->
-    'd
+    (?tags:set -> 'a) -> ('a, Format.formatter, unit, 'd) arg -> ?tags:set -> 'd
 end

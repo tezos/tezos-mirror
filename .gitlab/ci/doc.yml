@@ -1,13 +1,16 @@
 ---
 
+# Warning: the documentation:linkcheck job must have at least the same
+# restrictions in the rules as documentation:build, otherwise the CI
+# may complain that documentation:linkcheck depends on documentation:build
+# which does not exist.
 documentation:build:
-  extends: .runtime_build_test_dependencies_template
-  interruptible: true
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: build
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
+  needs: []
   script:
     - make -C docs html
   artifacts:
@@ -16,28 +19,18 @@ documentation:build:
     expire_in: 1 week
 
 documentation:linkcheck:
-  extends: .runtime_build_test_dependencies_template
-  stage: doc
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_manual
+  stage: manual
+  needs:
+    - job: documentation:build
+      artifacts: true
   before_script:
     - . ./scripts/version.sh
-  dependencies:
-    - documentation:build
-  rules:
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /doc/'
-      when: on_success
-    - changes:
-        - /docs
-      when: on_success
-    - when: never
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck
     - make -C docs sanitycheck
   allow_failure: true
-  interruptible: true

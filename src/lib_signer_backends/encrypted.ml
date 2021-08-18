@@ -58,8 +58,7 @@ module Raw = struct
           Data_encoding.Binary.to_bytes_exn Ed25519.Secret_key.encoding sk
       | Secp256k1 sk ->
           Data_encoding.Binary.to_bytes_exn Secp256k1.Secret_key.encoding sk
-      | P256 sk ->
-          Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+      | P256 sk -> Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
     in
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -78,37 +77,33 @@ module Raw = struct
     match
       (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
     with
-    | (None, _) ->
-        return_none
+    | (None, _) -> return_none
     | (Some bytes, Signature.Ed25519) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
-      with
-      | Some sk ->
-          return_some (Ed25519 sk : Signature.Secret_key.t)
-      | None ->
-          failwith
-            "Corrupted wallet, deciphered key is not a valid Ed25519 secret key"
-      )
+        match
+          Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
+        with
+        | Some sk -> return_some (Ed25519 sk : Signature.Secret_key.t)
+        | None ->
+            failwith
+              "Corrupted wallet, deciphered key is not a valid Ed25519 secret \
+               key")
     | (Some bytes, Signature.Secp256k1) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
-      with
-      | Some sk ->
-          return_some (Secp256k1 sk : Signature.Secret_key.t)
-      | None ->
-          failwith
-            "Corrupted wallet, deciphered key is not a valid Secp256k1 secret \
-             key" )
+        match
+          Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
+        with
+        | Some sk -> return_some (Secp256k1 sk : Signature.Secret_key.t)
+        | None ->
+            failwith
+              "Corrupted wallet, deciphered key is not a valid Secp256k1 \
+               secret key")
     | (Some bytes, Signature.P256) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
-      with
-      | Some sk ->
-          return_some (P256 sk : Signature.Secret_key.t)
-      | None ->
-          failwith
-            "Corrupted wallet, deciphered key is not a valid P256 secret key" )
+        match
+          Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
+        with
+        | Some sk -> return_some (P256 sk : Signature.Secret_key.t)
+        | None ->
+            failwith
+              "Corrupted wallet, deciphered key is not a valid P256 secret key")
 end
 
 module Encodings = struct
@@ -119,8 +114,7 @@ module Encodings = struct
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
-        if String.length buf <> length then None
-        else Some (Bytes.of_string buf))
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_ed25519 sk)
 
   let secp256k1 =
@@ -131,8 +125,7 @@ module Encodings = struct
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
-        if String.length buf <> length then None
-        else Some (Bytes.of_string buf))
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
@@ -142,8 +135,7 @@ module Encodings = struct
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
-        if String.length buf <> length then None
-        else Some (Bytes.of_string buf))
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_p256 sk)
 
   let secp256k1_scalar =
@@ -153,8 +145,7 @@ module Encodings = struct
       ~length
       ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
-        if String.length buf <> length then None
-        else Some (Bytes.of_string buf))
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_secp256k1_element sk)
 
   let () =
@@ -168,21 +159,44 @@ end
    asking the user all the time *)
 let passwords = ref []
 
-let rec interactive_decrypt_loop (cctxt : #Client_context.prompter) ?name
+(* Loop asking the user to give their password. Fails if a wrong password is
+   given more than `retries_left` *)
+let interactive_decrypt_loop (cctxt : #Client_context.io) ?name ~retries_left
     ~encrypted_sk algo =
-  ( match name with
-  | None ->
-      cctxt#prompt_password "Enter password for encrypted key: "
-  | Some name ->
-      cctxt#prompt_password "Enter password for encrypted key \"%s\": " name )
-  >>=? fun password ->
-  Raw.decrypt algo ~password ~encrypted_sk
-  >>=? function
-  | Some sk ->
-      passwords := password :: !passwords ;
-      return sk
-  | None ->
-      interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
+  let rec interactive_decrypt_loop (cctxt : #Client_context.io) name
+      ~current_retries ~retries ~encrypted_sk algo =
+    match current_retries with
+    | n when n >= retries ->
+        failwith "%d incorrect password attempts" current_retries
+    | _ -> (
+        cctxt#prompt_password "Enter password for encrypted key%s: " name
+        >>=? fun password ->
+        Raw.decrypt algo ~password ~encrypted_sk >>=? function
+        | Some sk ->
+            passwords := password :: !passwords ;
+            return sk
+        | None ->
+            (if retries_left == 1 then Lwt.return_unit
+            else cctxt#message "Sorry, try again.")
+            >>= fun () ->
+            interactive_decrypt_loop
+              cctxt
+              name
+              ~current_retries:(current_retries + 1)
+              ~retries
+              ~encrypted_sk
+              algo)
+  in
+  let name =
+    Option.fold name ~some:(fun s -> Format.sprintf " \"%s\"" s) ~none:""
+  in
+  interactive_decrypt_loop
+    cctxt
+    name
+    ~current_retries:0
+    ~retries:retries_left
+    ~encrypted_sk
+    algo
 
 (* add all passwords obtained by [ctxt#load_passwords] to the list of known passwords *)
 let password_file_load ctxt =
@@ -192,47 +206,37 @@ let password_file_load ctxt =
         (fun p -> passwords := Bytes.of_string p :: !passwords)
         stream
       >>= fun () -> return_unit
-  | None ->
-      return_unit
+  | None -> return_unit
 
 let rec noninteractive_decrypt_loop algo ~encrypted_sk = function
-  | [] ->
-      return_none
+  | [] -> return_none
   | password :: passwords -> (
-      Raw.decrypt algo ~password ~encrypted_sk
-      >>=? function
-      | None ->
-          noninteractive_decrypt_loop algo ~encrypted_sk passwords
-      | Some sk ->
-          return_some sk )
+      Raw.decrypt algo ~password ~encrypted_sk >>=? function
+      | None -> noninteractive_decrypt_loop algo ~encrypted_sk passwords
+      | Some sk -> return_some sk)
 
 let decrypt_payload cctxt ?name encrypted_sk =
-  ( match Base58.decode encrypted_sk with
+  (match Base58.decode encrypted_sk with
   | Some (Encrypted_ed25519 encrypted_sk) ->
       return (Signature.Ed25519, encrypted_sk)
   | Some (Encrypted_secp256k1 encrypted_sk) ->
       return (Signature.Secp256k1, encrypted_sk)
-  | Some (Encrypted_p256 encrypted_sk) ->
-      return (Signature.P256, encrypted_sk)
-  | _ ->
-      failwith "Not a Base58Check-encoded encrypted key" )
+  | Some (Encrypted_p256 encrypted_sk) -> return (Signature.P256, encrypted_sk)
+  | _ -> failwith "Not a Base58Check-encoded encrypted key")
   >>=? fun (algo, encrypted_sk) ->
-  noninteractive_decrypt_loop algo ~encrypted_sk !passwords
-  >>=? function
-  | Some sk ->
-      return sk
+  noninteractive_decrypt_loop algo ~encrypted_sk !passwords >>=? function
+  | Some sk -> return sk
   | None ->
-      interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
+      let retries_left = if cctxt#multiple_password_retries then 3 else 1 in
+      interactive_decrypt_loop cctxt ?name ~retries_left ~encrypted_sk algo
 
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
   decrypt_payload cctxt ?name payload
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
-  Secret_key.load cctxt
-  >>=? fun sks ->
-  password_file_load cctxt
-  >>=? fun () ->
+  Secret_key.load cctxt >>=? fun sks ->
+  password_file_load cctxt >>=? fun () ->
   List.iter_es
     (fun (name, sk_uri) ->
       if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
@@ -240,15 +244,13 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
     sks
 
 let decrypt_list (cctxt : #Client_context.io_wallet) keys =
-  Secret_key.load cctxt
-  >>=? fun sks ->
-  password_file_load cctxt
-  >>=? fun () ->
+  Secret_key.load cctxt >>=? fun sks ->
+  password_file_load cctxt >>=? fun () ->
   List.iter_es
     (fun (name, sk_uri) ->
       if
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
-        && (keys = [] || List.mem name keys)
+        && (keys = [] || List.mem ~equal:String.equal name keys)
       then decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit
       else return_unit)
     sks
@@ -256,27 +258,24 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
 let rec read_password (cctxt : #Client_context.io) =
   cctxt#prompt_password "Enter password to encrypt your key: "
   >>=? fun password ->
-  cctxt#prompt_password "Confirm password: "
-  >>=? fun confirm ->
+  cctxt#prompt_password "Confirm password: " >>=? fun confirm ->
   if not (Bytes.equal password confirm) then
     cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
   else return password
 
-let encrypt cctxt sk =
-  read_password cctxt
-  >>=? fun password ->
+let encrypt sk password =
   let payload = Raw.encrypt ~password sk in
   let encoding =
     match sk with
-    | Ed25519 _ ->
-        Encodings.ed25519
-    | Secp256k1 _ ->
-        Encodings.secp256k1
-    | P256 _ ->
-        Encodings.p256
+    | Ed25519 _ -> Encodings.ed25519
+    | Secp256k1 _ -> Encodings.secp256k1
+    | P256 _ -> Encodings.p256
   in
   let path = Base58.simple_encode encoding payload in
   Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
+
+let prompt_twice_and_encrypt cctxt sk =
+  read_password cctxt >>=? fun password -> encrypt sk password
 
 module Sapling_raw = struct
   let salt_len = 8
@@ -316,8 +315,7 @@ module Sapling_raw = struct
 end
 
 let encrypt_sapling_key cctxt sk =
-  read_password cctxt
-  >>=? fun password ->
+  read_password cctxt >>=? fun password ->
   let path =
     Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
   in
@@ -330,16 +328,13 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     cctxt#prompt_password "Enter password to decrypt your key: "
     >>=? fun password ->
     match
-      Base58.simple_decode
-        (Sapling_raw.encrypted_b58_encoding password)
-        payload
+      Base58.simple_decode (Sapling_raw.encrypted_b58_encoding password) payload
     with
     | None ->
         failwith
           "Password incorrect or corrupted wallet, could not decipher \
            encrypted Sapling spending key."
-    | Some sapling_key ->
-        return sapling_key
+    | Some sapling_key -> return sapling_key
   else
     match
       Base58.simple_decode
@@ -349,11 +344,10 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     | None ->
         failwith
           "Corrupted wallet, could not read unencrypted Sapling spending key."
-    | Some sapling_key ->
-        return sapling_key
+    | Some sapling_key -> return sapling_key
 
 module Make (C : sig
-  val cctxt : Client_context.prompter
+  val cctxt : Client_context.io
 end) =
 struct
   let scheme = "encrypted"
@@ -376,27 +370,26 @@ struct
   let import_secret_key = Unencrypted.import_secret_key
 
   let neuterize sk_uri =
-    decrypt C.cctxt sk_uri
-    >>=? fun sk -> Unencrypted.make_pk (Signature.Secret_key.to_public_key sk)
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    Unencrypted.make_pk (Signature.Secret_key.to_public_key sk)
 
   let sign ?watermark sk_uri buf =
-    decrypt C.cctxt sk_uri
-    >>=? fun sk -> return (Signature.sign ?watermark sk buf)
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    return (Signature.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =
-    decrypt C.cctxt sk_uri
-    >>=? fun sk -> return (Signature.deterministic_nonce sk buf)
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    return (Signature.deterministic_nonce sk buf)
 
   let deterministic_nonce_hash sk_uri buf =
-    decrypt C.cctxt sk_uri
-    >>=? fun sk -> return (Signature.deterministic_nonce_hash sk buf)
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = return_true
 end
 
 let encrypt_pvss_key cctxt sk =
-  read_password cctxt
-  >>=? fun password ->
+  read_password cctxt >>=? fun password ->
   let payload = Raw.encrypt_pvss ~password sk in
   let encoding = Encodings.secp256k1_scalar in
   let path = Base58.simple_encode encoding payload in

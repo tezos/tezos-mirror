@@ -33,10 +33,12 @@
 let () =
   Alcotest_lwt.run
     "protocol_alpha"
-    [ ("transfer", Test_transfer.tests);
+    [
+      ("transfer", Test_transfer.tests);
       ("origination", Test_origination.tests);
       ("activation", Test_activation.tests);
       ("revelation", Test_reveal.tests);
+      ("baking module", Test_baking_module.tests);
       ("endorsement", Test_endorsement.tests);
       ("double endorsement", Test_double_endorsement.tests);
       ("double baking", Test_double_baking.tests);
@@ -56,7 +58,12 @@ let () =
       ("lazy storage diff", Test_lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);
       ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("script deserialize gas", Test_script_gas.tests);
       ("failing_noop operation", Test_failing_noop.tests);
-      ("storage description", Test_storage.tests) ]
+      ("storage description", Test_storage.tests);
+      ("time", Test_time_repr.tests);
+      ("constants", Test_constants.tests);
+      ("level module", Test_level_module.tests);
+      ("liquidity baking", Test_liquidity_baking.tests);
+      ("temp big maps", Test_temp_big_maps.tests);
+    ]
   |> Lwt_main.run

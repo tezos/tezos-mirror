@@ -12,7 +12,6 @@ OFFSET = int(BLOCKS_PER_VOTING_PERIOD / 2)
 POLLING_TIME = 5
 NUM_NODES = 3
 BAKER = "bootstrap1"
-BAKE_ARGS = ['--minimal-timestamp']
 ERROR_PATTERN = r"Uncaught|registered|error"
 
 PROTO_A = protocol.PREV_HASH
@@ -29,7 +28,7 @@ def client_get_current_period_kind(client) -> dict:
 
 def bake_n_blocks(client: Client, baker: str, n_blocks: int):
     for _ in range(n_blocks):
-        client.bake(baker, BAKE_ARGS)
+        utils.bake(client, baker)
 
 
 def bake_until_next_voting_period(client: Client, baker: str, offset: int = 0):

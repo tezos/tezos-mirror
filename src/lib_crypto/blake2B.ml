@@ -57,22 +57,22 @@ module Make_minimal (K : Name) = struct
     match of_string_opt s with
     | None ->
         generic_error
-          "%s.of_string: wrong string size (%d)"
+          "%s.of_string: wrong string size (%d instead of %d)"
           K.name
           (String.length s)
-    | Some h ->
-        Ok h
+          size
+    | Some h -> Ok h
 
   let of_string_exn s =
     match of_string_opt s with
     | None ->
         Format.kasprintf
           invalid_arg
-          "%s.of_string: wrong string size (%d)"
+          "%s.of_string_exn: wrong string size (%d instead of %d)"
           K.name
           (String.length s)
-    | Some h ->
-        h
+          size
+    | Some h -> h
 
   let to_string (Blake2b.Hash h) = Bytes.to_string h
 
@@ -100,20 +100,18 @@ module Make_minimal (K : Name) = struct
     | None ->
         let msg =
           Printf.sprintf
-            "%s.of_bytes: wrong string size (%d)"
+            "%s.of_bytes_exn: wrong string size (%d instead of %d)"
             K.name
             (Bytes.length b)
+            size
         in
         raise (Invalid_argument msg)
-    | Some h ->
-        h
+    | Some h -> h
 
   let of_bytes s =
     match of_bytes_opt s with
-    | Some x ->
-        Ok x
-    | None ->
-        generic_error "Failed to deserialize a hash (%s)" K.name
+    | Some x -> Ok x
+    | None -> generic_error "Failed to deserialize a hash (%s)" K.name
 
   let to_bytes (Blake2b.Hash h) = h
 
@@ -133,10 +131,14 @@ module Make_minimal (K : Name) = struct
       except the last one which contains the rest. *)
   let to_path key l =
     let (`Hex key) = to_hex key in
-    String.sub key 0 2 :: String.sub key 2 2 :: String.sub key 4 2
-    :: String.sub key 6 2 :: String.sub key 8 2
-    :: String.sub key 10 ((size * 2) - 10)
-    :: l
+    String.sub key 0 2
+    ::
+    String.sub key 2 2
+    ::
+    String.sub key 4 2
+    ::
+    String.sub key 6 2
+    :: String.sub key 8 2 :: String.sub key 10 ((size * 2) - 10) :: l
 
   let of_path path =
     let path = String.concat "" path in
@@ -245,16 +247,14 @@ struct
     else if m mod 2 = 0 then step a m
     else (
       a.(m + 1) <- a.(m) ;
-      step a (m + 1) )
+      step a (m + 1))
 
   let empty = H.empty
 
   let compute xs =
     match xs with
-    | [] ->
-        H.empty
-    | [x] ->
-        H.leaf x
+    | [] -> H.empty
+    | [x] -> H.leaf x
     | _ :: one :: rest ->
         let last = List.last one rest in
         let n = List.length xs in
@@ -266,9 +266,7 @@ struct
 
   let rec step_path a n p j =
     let m = (n + 1) / 2 in
-    let p =
-      if j mod 2 = 0 then Left (p, a.(j + 1)) else Right (a.(j - 1), p)
-    in
+    let p = if j mod 2 = 0 then Left (p, a.(j + 1)) else Right (a.(j - 1), p) in
     for i = 0 to m - 1 do
       a.(i) <- H.node a.(2 * i) a.((2 * i) + 1)
     done ;
@@ -277,14 +275,12 @@ struct
     else if m mod 2 = 0 then step_path a m p (j / 2)
     else (
       a.(m + 1) <- a.(m) ;
-      step_path a (m + 1) p (j / 2) )
+      step_path a (m + 1) p (j / 2))
 
   let compute_path xs i =
     match xs with
-    | [] ->
-        invalid_arg "compute_path"
-    | [_] ->
-        Op
+    | [] -> invalid_arg "compute_path"
+    | [_] -> Op
     | _ :: one :: rest ->
         let last = List.last one rest in
         let n = List.length xs in
@@ -295,8 +291,7 @@ struct
 
   let rec check_path p h =
     match p with
-    | Op ->
-        (H.leaf h, 1, 0)
+    | Op -> (H.leaf h, 1, 0)
     | Left (p, r) ->
         let (l, s, pos) = check_path p h in
         (H.node l r, s * 2, pos)
@@ -350,7 +345,8 @@ struct
     let open Data_encoding in
     mu "path" (fun path_encoding ->
         union
-          [ case
+          [
+            case
               (Tag 240)
               ~title:"Left"
               (obj2 (req "path" path_encoding) (req "right" encoding))
@@ -367,12 +363,12 @@ struct
               ~title:"Op"
               unit
               (function Op -> Some () | _ -> None)
-              (fun () -> Op) ])
+              (fun () -> Op);
+          ])
 
   let bounded_path_encoding ?max_length () =
     match max_length with
-    | None ->
-        path_encoding
+    | None -> path_encoding
     | Some max_length ->
         let max_depth = log2 max_length in
         Data_encoding.check_size ((max_depth * (size + 1)) + 1) path_encoding

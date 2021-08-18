@@ -48,17 +48,15 @@ struct
       ^ " requests."
 
     let description =
-      "Valid locators are of this form:\n" ^ " - " ^ scheme
-      ^ "://host/tz1...\n" ^ " - " ^ scheme
-      ^ "://host:port/path/to/service/tz1...\n"
+      "Valid locators are of this form:\n" ^ " - " ^ scheme ^ "://host/tz1...\n"
+      ^ " - " ^ scheme ^ "://host:port/path/to/service/tz1...\n"
       ^ "Environment variable TEZOS_SIGNER_HTTP_HEADERS can be specified to \
          add headers to the requests (only 'host' and custom 'x-...' headers \
          are supported)."
 
     let headers =
       match Sys.getenv_opt "TEZOS_SIGNER_HTTP_HEADERS" with
-      | None ->
-          None
+      | None -> None
       | Some contents ->
           let lines = String.split_on_char '\n' contents in
           Some
@@ -74,8 +72,8 @@ struct
                      let header = String.lowercase_ascii header in
                      if
                        header <> "host"
-                       && ( String.length header < 2
-                          || String.sub header 0 2 <> "x-" )
+                       && (String.length header < 2
+                          || String.sub header 0 2 <> "x-")
                      then
                        Stdlib.failwith
                          "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS \
@@ -96,23 +94,21 @@ struct
       (* extract `tz1..` from the last component of the path *)
       assert (Uri.scheme uri = Some scheme) ;
       let path = Uri.path uri in
-      ( match String.rindex_opt path '/' with
-      | None ->
-          failwith "Invalid locator %a" Uri.pp_hum uri
+      (match String.rindex_opt path '/' with
+      | None -> failwith "Invalid locator %a" Uri.pp_hum uri
       | Some i ->
           let pkh =
             try String.sub path (i + 1) (String.length path - i - 1)
             with _ -> ""
           in
           let path = String.sub path 0 i in
-          return (Uri.with_path uri path, pkh) )
+          return (Uri.with_path uri path, pkh))
       >>=? fun (base, pkh) ->
-      Lwt.return (Signature.Public_key_hash.of_b58check pkh)
-      >>=? fun pkh -> return (base, pkh)
+      Lwt.return (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
+      return (base, pkh)
 
     let public_key uri =
-      parse (uri : pk_uri :> Uri.t)
-      >>=? fun (base, pkh) ->
+      parse (uri : pk_uri :> Uri.t) >>=? fun (base, pkh) ->
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -126,8 +122,8 @@ struct
     let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
-      public_key uri
-      >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+      public_key uri >>=? fun pk ->
+      return (Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
@@ -147,21 +143,17 @@ struct
             authorized_keys
             (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg)
           >>=? fun signature -> return_some signature
-      | None ->
-          return_none
+      | None -> return_none
 
     let sign ?watermark uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (base, pkh) ->
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
       let msg =
         match watermark with
-        | None ->
-            msg
+        | None -> msg
         | Some watermark ->
             Bytes.cat (Signature.bytes_of_watermark watermark) msg
       in
-      get_signature base pkh msg
-      >>=? fun signature ->
+      get_signature base pkh msg >>=? fun signature ->
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -173,10 +165,8 @@ struct
         msg
 
     let deterministic_nonce uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (base, pkh) ->
-      get_signature base pkh msg
-      >>=? fun signature ->
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      get_signature base pkh msg >>=? fun signature ->
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -188,10 +178,8 @@ struct
         msg
 
     let deterministic_nonce_hash uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (base, pkh) ->
-      get_signature base pkh msg
-      >>=? fun signature ->
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      get_signature base pkh msg >>=? fun signature ->
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -203,8 +191,7 @@ struct
         msg
 
     let supports_deterministic_nonces uri =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (base, pkh) ->
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -215,12 +202,9 @@ struct
         ()
         ()
       >>= function
-      | Ok ans ->
-          return ans
-      | Error (RPC_context.Not_found _ :: _) ->
-          return_false
-      | Error _ as res ->
-          Lwt.return res
+      | Ok ans -> return ans
+      | Error (RPC_context.Not_found _ :: _) -> return_false
+      | Error _ as res -> Lwt.return res
   end
 
   let make_base host port = Uri.make ~scheme ~host ~port ()

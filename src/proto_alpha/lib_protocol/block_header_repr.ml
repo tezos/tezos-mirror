@@ -29,6 +29,7 @@ type contents = {
   priority : int;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
+  liquidity_baking_escape_vote : bool;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -49,16 +50,33 @@ let contents_encoding =
   let open Data_encoding in
   def "block_header.alpha.unsigned_contents"
   @@ conv
-       (fun {priority; seed_nonce_hash; proof_of_work_nonce} ->
-         (priority, proof_of_work_nonce, seed_nonce_hash))
-       (fun (priority, proof_of_work_nonce, seed_nonce_hash) ->
-         {priority; seed_nonce_hash; proof_of_work_nonce})
-       (obj3
+       (fun {
+              priority;
+              seed_nonce_hash;
+              proof_of_work_nonce;
+              liquidity_baking_escape_vote;
+            } ->
+         ( priority,
+           proof_of_work_nonce,
+           seed_nonce_hash,
+           liquidity_baking_escape_vote ))
+       (fun ( priority,
+              proof_of_work_nonce,
+              seed_nonce_hash,
+              liquidity_baking_escape_vote ) ->
+         {
+           priority;
+           seed_nonce_hash;
+           proof_of_work_nonce;
+           liquidity_baking_escape_vote;
+         })
+       (obj4
           (req "priority" uint16)
           (req
              "proof_of_work_nonce"
              (Fixed.bytes Constants_repr.proof_of_work_nonce_size))
-          (opt "seed_nonce_hash" Nonce_hash.encoding))
+          (opt "seed_nonce_hash" Nonce_hash.encoding)
+          (req "liquidity_baking_escape_vote" Data_encoding.bool))
 
 let protocol_data_encoding =
   let open Data_encoding in
@@ -108,6 +126,7 @@ let max_header_length =
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
+      liquidity_baking_escape_vote = false;
     }
   in
   Data_encoding.Binary.length

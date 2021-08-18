@@ -1,10 +1,8 @@
 import re
 import pytest
 from client.client import Client
-from tools import constants
+from tools import constants, utils
 from . import protocol
-
-BAKE_ARGS = ['--minimal-timestamp', '--max-priority', '1024']
 
 ENDORSING_SLOTS_PER_BLOCK = 2048
 NUM_ACCOUNTS = 256
@@ -12,8 +10,19 @@ ACCOUNTS = [f'bootstrap{i}' for i in range(1, NUM_ACCOUNTS + 1)]
 MAX_VALIDATION_TIME_MS = 1000
 
 
+@pytest.fixture(scope="session")
+def required_log_dir(
+    log_dir: str,
+) -> str:
+    """Skip test if CLI user-provided logging directory is not given"""
+    if log_dir is None:
+        pytest.skip('test must be run with "--log-dir LOG_DIR: option"')
+    return log_dir
+
+
 @pytest.fixture(scope="class")
 def client(sandbox):
+
     sandbox.add_node(0, config_client=False, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
     client.import_secret_key(
@@ -44,13 +53,13 @@ class TestManualBaking:
     spurious fails due to slow CI."""
 
     def test_endorse(self, client: Client):
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         for account in ACCOUNTS:
             client.endorse(account)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
-    def test_check_baking_time_from_log(self, client):
-        assert client.logs, 'test must be run with "--log-dir LOG_DIR: option'
+    def test_check_baking_time_from_log(self, required_log_dir, client):
+        assert required_log_dir
         file = client.logs[0]
         # pattern = r"completed in ?(\w*)ms"
         pattern = r"validator.block.*completed in ?(.*)s"

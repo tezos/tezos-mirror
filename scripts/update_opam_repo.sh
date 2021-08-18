@@ -107,7 +107,7 @@ done
 opam admin add-hashes sha256 sha512
 
 ## Generating the diff!
-git remote add tezos $opam_repository_url
+git remote add tezos $opam_repository_git
 git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
 git add packages

@@ -42,8 +42,3 @@
                    -open Tezos_client_commands
                    -open Tezos_client_006_PsCARTHA_commands
                    -open Tezos_rpc)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

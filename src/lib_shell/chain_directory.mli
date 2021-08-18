@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_chain_id : State.t -> Chain_services.chain -> Chain_id.t Lwt.t
+val get_chain_id : Store.t -> Chain_services.chain -> Chain_id.t Lwt.t
 
 val get_chain_id_opt :
-  State.t -> Chain_services.chain -> Chain_id.t option Lwt.t
+  Store.t -> Chain_services.chain -> Chain_id.t option Lwt.t
 
-val get_chain : State.t -> Chain_services.chain -> State.Chain.t Lwt.t
+val get_chain_store_exn :
+  Store.t -> Chain_services.chain -> Store.chain_store Lwt.t
 
-val get_checkpoint : State.t -> Chain_services.chain -> Block_hash.t Lwt.t
+val get_checkpoint : Store.t -> Chain_services.chain -> Block_hash.t Lwt.t
+
+val rpc_directory :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  Validator.t ->
+  Store.chain_store RPC_directory.t
 
 val build_rpc_directory :
   user_activated_upgrades:User_activated.upgrades ->

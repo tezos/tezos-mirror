@@ -168,3 +168,5 @@ module Eval_to_vector : sig
 
   val prj : 'a repr -> 'a Hash_cons_vector.repr
 end
+
+module Fold_constants : Transform

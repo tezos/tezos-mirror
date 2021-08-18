@@ -83,7 +83,8 @@ type t
     as a named pipe so that node events can be received.
 
     Default values for [net_port] or [rpc_port] are chosen automatically
-    with values starting from 19732. They are used by [config_init]
+    with values starting from 16384 (configurable with `--starting-port`).
+    They are used by [config_init]
     and by functions from the [Client] module. They are not used by [run],
     so if you do not call [config_init] or generate the configuration file
     through some other means, your node will not listen.
@@ -92,14 +93,19 @@ type t
     should run with. It is passed to the first run of [tezos-node config init].
     It is also passed to all runs of [tezos-node run] that occur before
     [tezos-node config init]. If [Expected_pow] is given, it is also used as
-    the default value for {!identity_generate}. *)
+    the default value for {!identity_generate}.
+
+    If [runner] is specified, the node will be spawned on this
+    runner using SSH. *)
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?rpc_host:string ->
   ?rpc_port:int ->
   argument list ->
   t
@@ -127,9 +133,15 @@ val add_peer : t -> t -> unit
     where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
 val add_peer_with_id : t -> t -> unit Lwt.t
 
-(** [point_and_id node] ["127.0.0.1:<PORT>#<ID>"] where [<PORT>] is the P2P
-    port  and [<ID>] is the identity of [node]. *)
-val point_and_id : t -> string Lwt.t
+(** Get the P2P point and id for a node.
+
+    Return ["<ADDRESS>:<PORT>#<ID>"] where [<PORT>] is the P2P
+    port and [<ID>] is the identity of the node.
+
+    [<ADDRESS>] is obtained using [Runner.address runner] with [?from]
+    being the runner of [from] and [runner] is the runner of the node.
+    In other words it is the address where [from] can contact [node]. *)
+val point_and_id : ?from:t -> t -> string Lwt.t
 
 (** Get the name of a node. *)
 val name : t -> string
@@ -137,11 +149,33 @@ val name : t -> string
 (** Get the network port given as [--net-addr] to a node. *)
 val net_port : t -> int
 
+(** Get the RPC host given as [--rpc-addr] to a node. *)
+val rpc_host : t -> string
+
 (** Get the RPC port given as [--rpc-addr] to a node. *)
 val rpc_port : t -> int
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
+
+(** Get the runner associated to a node.
+
+    Return [None] if the node runs on the local machine. *)
+val runner : t -> Runner.t option
+
+(** Wait until a node terminates and check its status.
+
+    If the node is not running,
+    or if the process returns an exit code which is not [exit_code],
+    or if [msg] does not match the stderr output, fail the test.
+
+    If [exit_code] is not specified, any non-zero code is accepted.
+    If no [msg] is given, the stderr is ignored.*)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
+
+(** Wait until a node terminates and return its status. If the node is not
+   running, make the test fail. *)
+val wait : t -> Unix.process_status Lwt.t
 
 (** Send SIGTERM to a node and wait for it to terminate. *)
 val terminate : t -> unit Lwt.t
@@ -162,15 +196,42 @@ val show_history_mode : history_mode -> string
 (** Run [tezos-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
+module Config_file : sig
+  (** Node configuration files. *)
+
+  (** Read the configuration file ([config.json]) of a node. *)
+  val read : t -> JSON.t
+
+  (** Write the configuration file of a node, replacing the existing one. *)
+  val write : t -> JSON.t -> unit
+
+  (** Update the configuration file of a node.
+
+      Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
+  val update : t -> (JSON.t -> JSON.t) -> unit
+
+  (** Set the network config to a sandbox with the given user
+      activated upgrades. *)
+  val set_sandbox_network_with_user_activated_upgrades :
+    t -> (int * Protocol.t) list -> unit
+end
+
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
 
 (** Spawn [tezos-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.
-    It continues running in the background. *)
+    It continues running in the background.
+
+    [event_level] specifies the verbosity of the file descriptor sink.
+    This must be at least ["notice"], which is the level of event
+    ["node_is_ready.v0"], needed for {!wait_for_ready}.
+    Possible values are therefore: ["debug"], ["info"], and ["notice"].
+    Other values are ignored (verbosity then stays at default ["notice"]). *)
 val run :
   ?on_terminate:(Unix.process_status -> unit) ->
+  ?event_level:string ->
   t ->
   argument list ->
   unit Lwt.t
@@ -228,8 +289,7 @@ val wait_for_identity : t -> string Lwt.t
     For instance, you can define a promise with
     [let x_event = wait_for node "x" (fun x -> Some x)]
     and bind it later with [let* x = x_event]. *)
-val wait_for :
-  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}
@@ -243,6 +303,12 @@ type event = {name : string; value : JSON.t}
     the order in which they trigger is unspecified. *)
 val on_event : t -> (event -> unit) -> unit
 
+(** Register an event handler that logs all events.
+
+    Use this when you need to debug or reverse engineer incoming events.
+    Usually you do not want to keep that in the final versions of your tests. *)
+val log_events : t -> unit
+
 (** {2 High-Level Functions} *)
 
 (** Initialize a node.
@@ -255,13 +321,16 @@ val on_event : t -> (event -> unit) -> unit
     If you do not wish the arguments to be stored in the configuration file
     (which will affect future runs too), do not use [init]. *)
 val init :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?rpc_host:string ->
   ?rpc_port:int ->
+  ?event_level:string ->
   argument list ->
   t Lwt.t
 
@@ -274,3 +343,7 @@ val init :
     You can pass them to [restart], or you can pass other values if you want
     to restart with other parameters. *)
 val restart : t -> argument list -> unit Lwt.t
+
+(** [send_raw_data node ~data] writes [~data] using an IP socket on the net
+    port of [node]. *)
+val send_raw_data : t -> data:string -> unit Lwt.t

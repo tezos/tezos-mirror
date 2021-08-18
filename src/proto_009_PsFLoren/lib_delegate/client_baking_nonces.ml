@@ -74,10 +74,8 @@ let remove_all nonces nonces_to_remove =
     nonces
 
 let get_block_level_opt cctxt ~chain ~block =
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  >>= function
-  | Ok {level; _} ->
-      Lwt.return_some level
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
+  | Ok {level; _} -> Lwt.return_some level
   | Error errs ->
       lwt_warn
         Tag.DSL.(
@@ -90,14 +88,12 @@ let get_block_level_opt cctxt ~chain ~block =
       >>= fun () -> Lwt.return_none
 
 let get_outdated_nonces cctxt ?constants ~chain nonces =
-  ( match constants with
-  | None ->
-      Alpha_services.Constants.all cctxt (chain, `Head 0)
-  | Some constants ->
-      return constants )
-  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} ->
-  get_block_level_opt cctxt ~chain ~block:(`Head 0)
-  >>= function
+  (match constants with
+  | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
+  | Some constants -> return constants)
+  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _}
+    ->
+  get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
   | None ->
       lwt_log_error
         Tag.DSL.(
@@ -113,16 +109,13 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
       in
       Block_hash.Map.fold
         (fun hash nonce acc ->
-          acc
-          >>=? fun (orphans, outdated) ->
-          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-          >>= function
+          acc >>=? fun (orphans, outdated) ->
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
           | Some level ->
               if is_older_than_preserved_cycles level then
                 return (orphans, add outdated hash nonce)
               else acc
-          | None ->
-              return (add orphans hash nonce, outdated))
+          | None -> return (add orphans hash nonce, outdated))
         nonces
         (return (empty, empty))
 
@@ -130,21 +123,19 @@ let filter_outdated_nonces cctxt ?constants location nonces =
   let chain = Client_baking_files.chain location in
   get_outdated_nonces cctxt ?constants ~chain nonces
   >>=? fun (orphans, outdated_nonces) ->
-  ( if Block_hash.Map.cardinal orphans >= 50 then
-    lwt_warn
-      Tag.DSL.(
-        fun f ->
-          f
-            "Found too many nonces associated to blocks unknown by the node \
-             in '$TEZOS_CLIENT/%s'. After checking that these blocks were \
-             never included in the chain (e.g. via a block explorer), \
-             consider using `tezos-client filter orphan nonces` to clear them."
-          -% s
-               Logging.filename_tag
-               (Client_baking_files.filename location ^ "s")
-          -% t event "too_many_orphans")
-    >>= fun () -> Lwt.return_unit
-  else Lwt.return_unit )
+  (if Block_hash.Map.cardinal orphans >= 50 then
+   lwt_warn
+     Tag.DSL.(
+       fun f ->
+         f
+           "Found too many nonces associated to blocks unknown by the node in \
+            '$TEZOS_CLIENT/%s'. After checking that these blocks were never \
+            included in the chain (e.g. via a block explorer), consider using \
+            `tezos-client filter orphan nonces` to clear them."
+         -% s Logging.filename_tag (Client_baking_files.filename location ^ "s")
+         -% t event "too_many_orphans")
+   >>= fun () -> Lwt.return_unit
+  else Lwt.return_unit)
   >>= fun () -> return (remove_all nonces outdated_nonces)
 
 let get_unrevealed_nonces cctxt location nonces =
@@ -159,11 +150,9 @@ let get_unrevealed_nonces cctxt location nonces =
   List.filter_map_es
     (fun hash ->
       match find_opt nonces hash with
-      | None ->
-          return_none
+      | None -> return_none
       | Some nonce -> (
-          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-          >>= function
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
           | Some level -> (
               Environment.wrap_tzresult (Raw_level.of_int32 level)
               >>?= fun level ->
@@ -185,10 +174,7 @@ let get_unrevealed_nonces cctxt location nonces =
                         f "Incoherent nonce for level %a"
                         -% t event "bad_nonce" -% a Logging.level_tag level)
                   >>= fun () -> return_none
-              | Forgotten ->
-                  return_none
-              | Revealed _ ->
-                  return_none )
-          | None ->
-              return_none ))
+              | Forgotten -> return_none
+              | Revealed _ -> return_none)
+          | None -> return_none))
     blocks

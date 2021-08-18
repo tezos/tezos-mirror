@@ -26,16 +26,11 @@
 type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
 
 let string_of_kind = function
-  | Proposal ->
-      "proposal"
-  | Exploration ->
-      "exploration"
-  | Cooldown ->
-      "cooldown"
-  | Promotion ->
-      "promotion"
-  | Adoption ->
-      "adoption"
+  | Proposal -> "proposal"
+  | Exploration -> "exploration"
+  | Cooldown -> "cooldown"
+  | Promotion -> "promotion"
+  | Adoption -> "adoption"
 
 let pp_kind ppf kind = Format.fprintf ppf "%s" @@ string_of_kind kind
 
@@ -43,7 +38,8 @@ let kind_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Proposal"
         (constant "proposal")
@@ -72,19 +68,15 @@ let kind_encoding =
         ~title:"Adoption"
         (constant "adoption")
         (function Adoption -> Some () | _ -> None)
-        (fun () -> Adoption) ]
+        (fun () -> Adoption);
+    ]
 
 let succ_kind = function
-  | Proposal ->
-      Exploration
-  | Exploration ->
-      Cooldown
-  | Cooldown ->
-      Promotion
-  | Promotion ->
-      Adoption
-  | Adoption ->
-      Proposal
+  | Proposal -> Exploration
+  | Exploration -> Cooldown
+  | Cooldown -> Promotion
+  | Promotion -> Adoption
+  | Adoption -> Proposal
 
 type voting_period = {index : int32; kind : kind; start_position : int32}
 
@@ -97,7 +89,7 @@ let root ~start_position = {index = 0l; kind = Proposal; start_position}
 let pp ppf {index; kind; start_position} =
   Format.fprintf
     ppf
-    "@[<hv 2>index: %ld@ ,kind:%a@, start_position: %ld@]"
+    "@[<hv 2>index: %ld,@ kind:%a,@ start_position: %ld@]"
     index
     pp_kind
     kind
@@ -106,7 +98,7 @@ let pp ppf {index; kind; start_position} =
 let pp_info ppf {voting_period; position; remaining} =
   Format.fprintf
     ppf
-    "@[<hv 2>voting_period: %a@ ,position:%ld@, remaining: %ld@]"
+    "@[<hv 2>voting_period: %a,@ position:%ld,@ remaining: %ld@]"
     pp
     voting_period
     position
@@ -122,10 +114,19 @@ let encoding =
           "index"
           ~description:
             "The voting period's index. Starts at 0 with the first block of \
-             protocol alpha."
+             the Alpha family of protocols."
           int32)
-       (req "kind" kind_encoding)
-       (req "start_position" int32))
+       (req
+          ~description:
+            "One of the several kinds of periods in the voting procedure."
+          "kind"
+          kind_encoding)
+       (req
+          ~description:
+            "The relative position of the first level of the period with \
+             respect to the first level of the Alpha family of protocols."
+          "start_position"
+          int32))
 
 let info_encoding =
   let open Data_encoding in
@@ -135,9 +136,19 @@ let info_encoding =
     (fun (voting_period, position, remaining) ->
       {voting_period; position; remaining})
     (obj3
-       (req "voting_period" encoding)
-       (req "position" int32)
-       (req "remaining" int32))
+       (req
+          ~description:"The voting period to which the block belongs."
+          "voting_period"
+          encoding)
+       (req
+          ~description:"The position of the block within the voting period."
+          "position"
+          int32)
+       (req
+          ~description:
+            "The number of blocks remaining till the end of the voting period."
+          "remaining"
+          int32))
 
 include Compare.Make (struct
   type nonrec t = t

@@ -75,7 +75,8 @@ type message = Ping
 let msg_config : message P2p_params.message_config =
   {
     encoding =
-      [ P2p_params.Encoding
+      [
+        P2p_params.Encoding
           {
             tag = 0x10;
             title = "Ping";
@@ -83,7 +84,8 @@ let msg_config : message P2p_params.message_config =
             wrap = (function () -> Ping);
             unwrap = (function Ping -> Some ());
             max_length = None;
-          } ];
+          };
+      ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
     distributed_db_versions = Distributed_db_version.[zero; one];
   }
@@ -121,25 +123,20 @@ type t = {
 (** Syncing inside the detached process *)
 let sync (node : t) =
   incr node.iteration ;
-  Event.(emit sync_iteration) !(node.iteration)
-  >>= fun () ->
-  Process.Channel.push node.channel ()
-  >>=? fun () -> Process.Channel.pop node.channel
+  Event.(emit sync_iteration) !(node.iteration) >>= fun () ->
+  Process.Channel.push node.channel () >>=? fun () ->
+  Process.Channel.pop node.channel
 
 (** Syncing from the main process everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
-  List.iter_ep (fun p -> Process.receive p) nodes
-  >>=? fun () ->
-  List.iter_ep (fun p -> Process.send p ()) nodes
-  >>=? fun () -> sync_nodes nodes
+  List.iter_ep (fun p -> Process.receive p) nodes >>=? fun () ->
+  List.iter_ep (fun p -> Process.send p ()) nodes >>=? fun () ->
+  sync_nodes nodes
 
 let sync_nodes nodes =
-  sync_nodes nodes
-  >>= function
-  | Ok () | Error (Exn End_of_file :: _) ->
-      return_unit
-  | Error _ as err ->
-      Lwt.return err
+  sync_nodes nodes >>= function
+  | Ok () | Error (Exn End_of_file :: _) -> return_unit
+  | Error _ as err -> Lwt.return err
 
 (**Detach a process with a p2p_pool and a welcome worker.  *)
 let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
@@ -203,12 +200,10 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       in
       with_timeout
         ~canceler
-        (Option.fold ~some:timer ~none:(Lwt_utils.never_ending ()) timeout)
+        (Option.fold_f ~some:timer ~none:Lwt_utils.never_ending timeout)
         (fun _canceler ->
           let iteration = ref 0 in
-          let sched =
-            P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ()
-          in
+          let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
           let trigger = P2p_trigger.create () in
           let watcher = Lwt_watcher.create_input () in
           let log event = Lwt_watcher.notify watcher event in
@@ -238,8 +233,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           P2p_welcome.create ~backlog:10 connect_handler ~addr port
           >>= fun welcome ->
           P2p_welcome.activate welcome ;
-          Event.(emit node_ready) port
-          >>= fun () ->
+          Event.(emit node_ready) port >>= fun () ->
           let node =
             {
               iteration;
@@ -252,19 +246,17 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               points = all_points;
             }
           in
-          sync node
-          >>=? fun () ->
+          sync node >>=? fun () ->
           (* Sync interaction 1 *)
-          f node
-          >>=? fun () ->
-          Event.(emit shutting_down) ()
-          >>= fun () ->
-          P2p_welcome.shutdown welcome
-          >>= fun () ->
-          P2p_pool.destroy pool
-          >>= fun () ->
-          P2p_io_scheduler.shutdown sched
-          >>= fun () -> Event.(emit bye) () >>= fun () -> return_unit))
+          f node >>=? fun () ->
+          Event.(emit shutting_down) () >>= fun () ->
+          P2p_welcome.shutdown welcome >>= fun () ->
+          (* Here P2p_pool.tear_down_connections is called instead of
+             P2p_pool.destroy because there is not data-dir and it is required
+             to save the known peers list. *)
+          P2p_pool.tear_down_connections pool >>= fun () ->
+          P2p_io_scheduler.shutdown sched >>= fun () ->
+          Event.(emit bye) () >>= fun () -> return_unit))
 
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.
@@ -306,7 +298,6 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         port)
     points
   >>= fun nodes ->
-  Lwt.return @@ Error_monad.all_e nodes
-  >>=? fun nodes ->
+  Lwt.return @@ Error_monad.all_e nodes >>=? fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes

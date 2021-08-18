@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune build @src/lib_proxy/runtest_proxy
     Subject:      --mode proxy of the client
 *)
 
@@ -34,7 +34,7 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = TzString.Map
-module Local = Tezos_storage_memory.Context
+module Local = Tezos_context_memory.Context
 
 (** Alias to make "empty list" intention more explicit *)
 let tree_root = []
@@ -42,8 +42,7 @@ let tree_root = []
 let tree_testable = Alcotest.testable Local.Tree.pp Local.Tree.equal
 
 let nb_nodes = function
-  | None ->
-      Lwt.return 0
+  | None -> Lwt.return 0
   | Some tree ->
       Local.Tree.fold tree tree_root ~init:0 ~f:(fun _ _ acc ->
           Lwt.return (acc + 1))
@@ -56,21 +55,21 @@ end
 
 (** Setup mocks *)
 let mock_proto_rpc () =
-  ( module struct
+  (module struct
     let calls : Local.key Stack.t = Stack.create ()
 
-    let split_key (k : Local.key) =
+    let split_key _ (k : Local.key) =
       match k with
       (* These constants are used in tests below *)
       | "split" :: "key" :: "trigger_now!" :: tail ->
           Some (["split"; "key"; "trigger_now!"], tail)
-      | _ ->
-          None
+      | _ -> None
+
+    let failure_is_permanent _ = false
 
     let do_rpc _chain_n_block (k : Local.key) =
       let rec mock_raw_context = function
-        | [] ->
-            Tezos_shell_services.Block_services.Key Bytes.empty
+        | [] -> Tezos_shell_services.Block_services.Key Bytes.empty
         | hd :: tail ->
             Tezos_shell_services.Block_services.Dir
               (TzString.Map.singleton hd (mock_raw_context tail))
@@ -78,14 +77,17 @@ let mock_proto_rpc () =
       (* Remember call *)
       Stack.push k calls ;
       return @@ mock_raw_context k
-  end : MOCKED_PROTO_RPC )
+  end : MOCKED_PROTO_RPC)
 
 class mock_rpc_context : RPC_context.simple =
   object
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       assert false
   end
 
@@ -94,7 +96,12 @@ let mock_chain = `Main
 let mock_block = `Head 0
 
 let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
-  {rpc_context = new mock_rpc_context; chain = mock_chain; block = mock_block}
+  {
+    rpc_context = new mock_rpc_context;
+    mode = Client;
+    chain = mock_chain;
+    block = mock_block;
+  }
 
 open Test_services_base
 
@@ -143,29 +150,24 @@ let test_tree _ () =
 let test_do_rpc_no_longer_key () =
   let (module MockedProtoRPC) = mock_proto_rpc () in
   let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
-  >>=? fun a_b_1_tree_opt ->
-  nb_nodes a_b_1_tree_opt
-  >>= fun nb_nodes_a_b_1_tree_opt ->
+  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt ->
+  nb_nodes a_b_1_tree_opt >>= fun nb_nodes_a_b_1_tree_opt ->
   lwt_assert_true
     "A;b;1 is mapped to tree of size 4"
     (nb_nodes_a_b_1_tree_opt = 4)
   >>= fun _ ->
   let a_b_1_tree = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt in
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
-  >>=? fun a_b_1_tree_opt' ->
+  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
   lwt_check tree_testable "Tree is always the same" a_b_1_tree a_b_1_tree'
   >>= fun _ ->
   lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
   >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"; "b"; "2"]
-  >>= fun _ ->
+  MockedGetter.proxy_get mock_input ["A"; "b"; "2"] >>= fun _ ->
   lwt_assert_true "Done two RPCs" (Stack.length MockedProtoRPC.calls = 2)
   >>= fun _ ->
   (* Let's check that value mapped by A;b;1 was unaffected by getting A;b;2 *)
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
-  >>=? fun a_b_1_tree_opt' ->
+  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
   lwt_check
     tree_testable
@@ -173,12 +175,10 @@ let test_do_rpc_no_longer_key () =
     a_b_1_tree
     a_b_1_tree'
   >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"]
-  >>= fun _ ->
+  MockedGetter.proxy_get mock_input ["A"] >>= fun _ ->
   lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
   >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"]
-  >>=? fun a_opt ->
+  MockedGetter.proxy_get mock_input ["A"] >>=? fun a_opt ->
   lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
   >>= fun _ ->
   (* Let's check that value mapped by A;b;1 was changed by getting A.
@@ -187,14 +187,11 @@ let test_do_rpc_no_longer_key () =
      longers keys. Because of our mocked implementation of do_rpc, all
      keys are mapped to single values. This means "A" is mapped to Key.
      We can hence check that A;b;1 was affected by witnessing it's None now. *)
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"]
-  >>=? fun a_b_1_tree_opt' ->
-  nb_nodes a_b_1_tree_opt'
-  >>= fun nb_nodes_a_b_1_tree_opt' ->
+  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
+  nb_nodes a_b_1_tree_opt' >>= fun nb_nodes_a_b_1_tree_opt' ->
   lwt_assert_true "A;b;1 tree is now missing" (nb_nodes_a_b_1_tree_opt' = 0)
   >>= fun _ ->
-  nb_nodes a_opt
-  >>= fun nb_nodes_a_opt ->
+  nb_nodes a_opt >>= fun nb_nodes_a_opt ->
   Stdlib.print_endline @@ string_of_int @@ nb_nodes_a_opt ;
   (* Size is 2 because mock_tree returns a tree rooted with a Dir, it's normal *)
   lwt_assert_true "A is mapped to tree of size 2" (nb_nodes_a_opt = 2)
@@ -219,11 +216,15 @@ let test_split_key_triggers () =
 let () =
   Alcotest_lwt.run
     "tezos-proxy"
-    [ ( "all",
-        [ Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
+    [
+      ( "all",
+        [
+          Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
           Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;
           Test_services.tztest
             "test split key triggers"
             `Quick
-            test_split_key_triggers ] ) ]
+            test_split_key_triggers;
+        ] );
+    ]
   |> Lwt_main.run

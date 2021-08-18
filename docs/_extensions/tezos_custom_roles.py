@@ -3,6 +3,7 @@ import os
 import os.path
 import re
 from pathlib import Path
+from gitlab_custom_role import gitlab_role
 
 TEZOS_HOME = '../'
 
@@ -12,6 +13,8 @@ def setup(app):
     app.add_role('package-src', package_role)
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
+    app.add_role('gl', gitlab_role)
+
 
 def find_dot_opam(name):
     for path, dirs, files in os.walk('..'):
@@ -68,16 +71,17 @@ def src_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     rel_lvl = inliner.document.current_source.replace(os.getcwd(),'').count('/')
     parts = re.match("^([^<>]*)<([^<>]*)>$", text)
     if parts:
-      text = parts.group(2)
-      src = parts.group(1)
+      text = parts.group(1)
+      src = parts.group(2)
     else:
       src = text
       text = text
 
     # raise a warning if the file does not exist
-    if not Path(TEZOS_HOME, src).exists():
+    file = re.sub("#L[0-9]+$", "", src) # drop line number if present
+    if not Path(TEZOS_HOME, file).exists():
         msg = [inliner.reporter.warning(
-            f'source file {src} does not exist in the repo',
+            f'source file {file} does not exist in the repo',
             line=lineno
         )]
     else:

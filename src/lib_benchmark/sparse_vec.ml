@@ -141,8 +141,7 @@ struct
 
   let swap vec i j =
     match (M.find_opt i vec, M.find_opt j vec) with
-    | (None, None) ->
-        vec
+    | (None, None) -> vec
     | (Some elt, None) ->
         let vec = set vec i R.zero in
         set vec j elt

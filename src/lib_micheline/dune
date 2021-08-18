@@ -17,8 +17,3 @@
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
                    -open Data_encoding)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

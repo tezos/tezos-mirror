@@ -32,13 +32,14 @@ let commands : Protocol_client_context.full Clic.command list =
   let group =
     {name = "Demo_counter"; title = "Commands for protocol Demo_counter"}
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Bake a block"
       no_options
-      ( prefixes ["bake"]
+      (prefixes ["bake"]
       @@ msg_param ~name:"message" ~desc:"message in block header"
-      @@ stop )
+      @@ stop)
       (fun () msg cctxt -> Commands.bake cctxt msg);
     command
       ~group
@@ -56,11 +57,11 @@ let commands : Protocol_client_context.full Clic.command list =
       ~group
       ~desc:"Transfer from A to B"
       no_options
-      ( prefixes ["transfer"]
+      (prefixes ["transfer"]
       @@ amount_param
            ~name:"amount"
            ~desc:"amount taken from A and given to B (possibly negative)"
-      @@ stop )
+      @@ stop)
       (fun () amount cctxt ->
         Commands.inject_op cctxt (Proto_operation.Transfer amount));
     command
@@ -74,7 +75,8 @@ let commands : Protocol_client_context.full Clic.command list =
       ~desc:"Get B counter"
       no_options
       (fixed ["get"; "b"])
-      (fun () cctxt -> Commands.get_counter cctxt `B) ]
+      (fun () cctxt -> Commands.get_counter cctxt `B);
+  ]
 
 let () =
   let f = Clic.map_command (new Protocol_client_context.wrap_full) in

@@ -59,10 +59,12 @@ let () =
         "One of the four possible namespaces of primitive (data constructor, \
          type name, instruction or keyword)."
     @@ string_enum
-         [ ("type", Michelson_v1_primitives.Type_namespace);
+         [
+           ("type", Michelson_v1_primitives.Type_namespace);
            ("constant", Constant_namespace);
            ("instruction", Instr_namespace);
-           ("keyword", Keyword_namespace) ]
+           ("keyword", Keyword_namespace);
+         ]
   in
   let kind_enc =
     def
@@ -72,11 +74,13 @@ let () =
         "One of the four possible kinds of expression (integer, string, \
          primitive application or sequence)."
     @@ string_enum
-         [ ("integer", Int_kind);
+         [
+           ("integer", Int_kind);
            ("string", String_kind);
            ("bytes", Bytes_kind);
            ("primitiveApplication", Prim_kind);
-           ("sequence", Seq_kind) ]
+           ("sequence", Seq_kind);
+         ]
   in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
@@ -93,10 +97,8 @@ let () =
           (req "expected_arity" arity_enc)
           (req "wrong_arity" arity_enc)))
     (function
-      | Invalid_arity (loc, name, exp, got) ->
-          Some (loc, (name, exp, got))
-      | _ ->
-          None)
+      | Invalid_arity (loc, name, exp, got) -> Some (loc, (name, exp, got))
+      | _ -> None)
     (fun (loc, (name, exp, got)) -> Invalid_arity (loc, name, exp, got)) ;
   register_error_kind
     `Permanent
@@ -160,10 +162,8 @@ let () =
           (req "expected_namespace" namespace_enc)
           (req "wrong_namespace" namespace_enc)))
     (function
-      | Invalid_namespace (loc, name, exp, got) ->
-          Some (loc, (name, exp, got))
-      | _ ->
-          None)
+      | Invalid_namespace (loc, name, exp, got) -> Some (loc, (name, exp, got))
+      | _ -> None)
     (fun (loc, (name, exp, got)) -> Invalid_namespace (loc, name, exp, got)) ;
   (* Invalid literal for type never *)
   register_error_kind
@@ -330,10 +330,8 @@ let () =
           (req "wrong_left_operand_type" Script.expr_encoding)
           (req "wrong_right_operand_type" Script.expr_encoding)))
     (function
-      | Undefined_binop (loc, n, tyl, tyr) ->
-          Some (loc, (n, tyl, tyr))
-      | _ ->
-          None)
+      | Undefined_binop (loc, n, tyl, tyr) -> Some (loc, (n, tyl, tyr))
+      | _ -> None)
     (fun (loc, (n, tyl, tyr)) -> Undefined_binop (loc, n, tyl, tyr)) ;
   (* Undefined unary operation *)
   register_error_kind
@@ -383,10 +381,8 @@ let () =
     ~description:"The annotations on two types could not be merged"
     (obj2 (req "annot1" string) (req "annot2" string))
     (function
-      | Inconsistent_annotations (annot1, annot2) ->
-          Some (annot1, annot2)
-      | _ ->
-          None)
+      | Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
+      | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
   (* Inconsistent field annotations *)
   register_error_kind
@@ -397,10 +393,8 @@ let () =
       "The specified field does not match the field annotation in the type"
     (obj2 (req "annot1" string) (req "annot2" string))
     (function
-      | Inconsistent_field_annotations (annot1, annot2) ->
-          Some (annot1, annot2)
-      | _ ->
-          None)
+      | Inconsistent_field_annotations (annot1, annot2) -> Some (annot1, annot2)
+      | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_field_annotations (annot1, annot2)) ;
   (* Inconsistent type annotations *)
   register_error_kind
@@ -413,10 +407,8 @@ let () =
           (req "type1" Script.expr_encoding)
           (req "type2" Script.expr_encoding)))
     (function
-      | Inconsistent_type_annotations (loc, ty1, ty2) ->
-          Some (loc, (ty1, ty2))
-      | _ ->
-          None)
+      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (ty1, ty2))
+      | _ -> None)
     (fun (loc, (ty1, ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
   (* Unexpected annotation *)
   register_error_kind
@@ -449,10 +441,8 @@ let () =
           (req "first_stack_type" stack_ty_enc)
           (req "other_stack_type" stack_ty_enc)))
     (function
-      | Unmatched_branches (loc, stya, styb) ->
-          Some (loc, (stya, styb))
-      | _ ->
-          None)
+      | Unmatched_branches (loc, stya, styb) -> Some (loc, (stya, styb))
+      | _ -> None)
     (fun (loc, (stya, styb)) -> Unmatched_branches (loc, stya, styb)) ;
   (* Bad stack item *)
   register_error_kind
@@ -512,8 +502,7 @@ let () =
     (function
       | Invalid_syntactic_constant (loc, expr, expected) ->
           Some (loc, (expected, expr))
-      | _ ->
-          None)
+      | _ -> None)
     (fun (loc, (expected, expr)) ->
       Invalid_syntactic_constant (loc, expr, expected)) ;
   (* Invalid contract *)
@@ -533,8 +522,8 @@ let () =
     ~id:"michelson_v1.invalid_big_map"
     ~title:"Invalid big_map"
     ~description:
-      "A script or data expression references a big_map that does not exist \
-       or assumes a wrong type for an existing big_map."
+      "A script or data expression references a big_map that does not exist or \
+       assumes a wrong type for an existing big_map."
     (located (obj1 (req "big_map" Big_map.Id.encoding)))
     (function Invalid_big_map (loc, c) -> Some (loc, c) | _ -> None)
     (fun (loc, c) -> Invalid_big_map (loc, c)) ;
@@ -569,8 +558,7 @@ let () =
     `Permanent
     ~id:"michelson_v1.inconsistent_memo_sizes"
     ~title:"Inconsistent memo sizes"
-    ~description:
-      "Memo sizes of two sapling states or transactions do not match"
+    ~description:"Memo sizes of two sapling states or transactions do not match"
     (obj2
        (req "first_memo_size" Sapling.Memo_size.encoding)
        (req "other_memo_size" Sapling.Memo_size.encoding))
@@ -593,8 +581,8 @@ let () =
     ~id:"michelson_v1.invalid_map_block_fail"
     ~title:"FAIL instruction occurred as body of map block"
     ~description:
-      "FAIL cannot be the only instruction in the body. The proper type of \
-       the return list cannot be inferred."
+      "FAIL cannot be the only instruction in the body. The proper type of the \
+       return list cannot be inferred."
     (obj1 (req "loc" Script.location_encoding))
     (function Invalid_map_block_fail loc -> Some loc | _ -> None)
     (fun loc -> Invalid_map_block_fail loc) ;
@@ -619,13 +607,9 @@ let () =
     ~id:"michelson_v1.type_too_large"
     ~title:"Stack item type too large"
     ~description:"An instruction generated a type larger than the limit."
-    (obj3
-       (req "loc" Script.location_encoding)
-       (req "type_size" uint16)
-       (req "maximum_type_size" uint16))
-    (function
-      | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts) | _ -> None)
-    (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
+    (obj2 (req "loc" Script.location_encoding) (req "maximum_type_size" uint16))
+    (function Type_too_large (loc, maxts) -> Some (loc, maxts) | _ -> None)
+    (fun (loc, maxts) -> Type_too_large (loc, maxts)) ;
   (* Bad PAIR argument *)
   register_error_kind
     `Permanent
@@ -706,10 +690,7 @@ let () =
        (req "ill_typed_code" Script.expr_encoding)
        (req "type_map" type_map_enc))
     (function
-      | Ill_typed_contract (expr, type_map) ->
-          Some (expr, type_map)
-      | _ ->
-          None)
+      | Ill_typed_contract (expr, type_map) -> Some (expr, type_map) | _ -> None)
     (fun (expr, type_map) -> Ill_typed_contract (expr, type_map)) ;
   (* Cannot serialize error *)
   register_error_kind

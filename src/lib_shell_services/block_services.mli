@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,7 +39,7 @@ val chain_arg : chain RPC_arg.t
 type block =
   [ `Genesis
   | `Head of int
-  | `Alias of [`Caboose | `Checkpoint | `Save_point] * int
+  | `Alias of [`Caboose | `Checkpoint | `Savepoint] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t ]
 
@@ -71,6 +72,29 @@ type raw_context =
 val pp_raw_context : Format.formatter -> raw_context -> unit
 
 type error += Invalid_depth_arg of int
+
+(** The kind of a [merkle_node] *)
+type merkle_hash_kind =
+  | Contents  (** The kind associated to leaves *)
+  | Node  (** The kind associated to directories *)
+
+(** A node in a [merkle_tree] *)
+type merkle_node =
+  | Hash of (merkle_hash_kind * string)  (** A shallow node: just a hash *)
+  | Data of raw_context  (** A full-fledged node containing actual data *)
+  | Continue of merkle_tree  (** An edge to a more nested tree *)
+
+(** The type of Merkle tree used by the light mode *)
+and merkle_tree = merkle_node TzString.Map.t
+
+(** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
+    or whether the returned tree should contain data at the given key
+    ([Raw_context]) *)
+type merkle_leaf_kind = Hole | Raw_context
+
+val pp_merkle_node : Format.formatter -> merkle_node -> unit
+
+val pp_merkle_tree : Format.formatter -> merkle_tree -> unit
 
 module type PROTO = sig
   val hash : Protocol_hash.t
@@ -157,11 +181,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   open RPC_context
 
   val info :
-    #simple ->
-    ?chain:chain ->
-    ?block:block ->
-    unit ->
-    block_info tzresult Lwt.t
+    #simple -> ?chain:chain -> ?block:block -> unit -> block_info tzresult Lwt.t
 
   val hash :
     #simple ->
@@ -300,6 +320,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?depth:int ->
       string list ->
       raw_context tzresult Lwt.t
+
+    val merkle_tree :
+      #simple ->
+      ?chain:chain ->
+      ?block:block ->
+      ?holey:bool ->
+      string list ->
+      merkle_tree option tzresult Lwt.t
   end
 
   module Helpers : sig
@@ -329,8 +357,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ?chain:chain ->
         ?block:block ->
         Next_proto.operation list ->
-        (Next_proto.operation_data * Next_proto.operation_receipt) list
-        tzresult
+        (Next_proto.operation_data * Next_proto.operation_receipt) list tzresult
         Lwt.t
     end
 
@@ -346,15 +373,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_refused :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_delayed :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    val pending_operations :
-      #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
+    val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
 
     val monitor_operations :
       #streamed ->
@@ -385,8 +409,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val header :
       ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
 
-    val raw_header :
-      ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
+    val raw_header : ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
 
     val metadata :
       ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
@@ -425,13 +448,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ([`GET], prefix, prefix, unit, unit, operation list list) RPC_service.t
 
       val operations_in_pass :
-        ( [`GET],
-          prefix,
-          prefix * int,
-          unit,
-          unit,
-          operation list )
-        RPC_service.t
+        ([`GET], prefix, prefix * int, unit, unit, operation list) RPC_service.t
 
       val operation :
         ( [`GET],
@@ -519,6 +536,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           raw_context )
         RPC_service.t
+
+      val merkle_tree :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < holey : bool option >,
+          unit,
+          merkle_tree option )
+        RPC_service.t
     end
 
     module Helpers : sig
@@ -559,13 +585,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       end
 
       val complete :
-        ( [`GET],
-          prefix,
-          prefix * string,
-          unit,
-          unit,
-          string list )
-        RPC_service.t
+        ([`GET], prefix, prefix * string, unit, unit, string list) RPC_service.t
     end
 
     module Mempool : sig
@@ -597,8 +617,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
 
       val request_operations :
-        ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
     end
 
     val live_blocks :

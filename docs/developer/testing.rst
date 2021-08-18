@@ -144,7 +144,7 @@ Typical use cases:
    randomized inputs.
 
 Example test:
- - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the :src:`Tezos_base.Time<src/lib_base/test/test_time.ml>` module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
+ - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the `Tezos_base.Time <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/Time/index.html>`_ module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
 
 References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
@@ -215,7 +215,7 @@ Example tests:
    ``gitlab-runner exec docker integration:p2p``.
 
 References:
- - `Pytest Documentation <https://github.com/stedolan/crowbar>`_
+ - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
  - :ref:`python_testing_framework`
  - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
@@ -307,11 +307,8 @@ References:
 
 .. _gitlab_test_ci:
 
-Executing tests
----------------
-
 Executing tests locally
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Whereas executing the tests through the CI, as described below, is the
 standard and most convenient way of running the full test suite, they
@@ -405,7 +402,7 @@ or use the ``--remove`` option of the instrumentation script:
 
 
 Known issues
-~~~~~~~~~~~~
+""""""""""""
 
 1. Report generation may fail spuriously.
 
@@ -437,7 +434,7 @@ Known issues
         opam pin add bisect_ppx.2.5.0 --dev-repo --yes
 
 Executing tests through the GitLab CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------
 
 All tests are executed on all branches for each commit.  For
 instances, to see the latest runs of the CI on the master branch,
@@ -446,10 +443,37 @@ visit `this page
 annotated with a green checkmark icon if the CI passed, and a red
 cross icon if not. You can click the icon for more details.
 
-By default, the CI runs the tests as a set of independent jobs in the
-``test`` stage. This is to better exploit GitLab runner parallelism: one job
-per ``pytest`` test file and one job for each OCaml package containing tests.
-This produces a report that is well-integrated with the CI user interface.
+The results of the test suite on terminated pipelines is presented on
+the details of the merge request page corresponding to the
+pipeline's branch (if any). For more information, see the `GitLab
+documentation on Unit test reports
+<https://docs.gitlab.com/ee/ci/unit_test_reports.html>`__.
+
+By default, the ``test`` of the CI runs the tests as a set of independent jobs
+that cluster the tests with a varying grain. This strikes a balance between exploiting GitLab
+runner parallelism while limiting the number of jobs per
+pipeline. The grain used varies slightly for different types of
+tests:
+
+Python integration and regression tests
+   We run one job per ``pytest`` test file whose tests are marked
+   ``slow``. We run one job regrouping the set of
+   ``pytest``\ s per protocol that are not marked ``slow``.
+
+Tezt integration and regression tests
+   Tezt tests are grouped in 3 batch jobs. New tests increases the
+   size of the last batch.
+
+The OCaml package tests (Alcotest, Crowbar & QCheck)
+   The OCaml package tests are regrouped analogously to the ``pytest``\ s:
+   one job per protocol package, in addition to one job regrouping
+   tests for remaining packages.
+
+Flextesa
+   Flextesa tests run in one job per test.
+
+Adding tests to the CI
+~~~~~~~~~~~~~~~~~~~~~~
 
 When adding a new test that should be run in the CI (which should be
 the case for most automatic tests), you need to make sure that it is
@@ -460,18 +484,26 @@ Python integration and regression tests
   Run ``./scripts/update_integration_test.sh`` in Tezos home. This
   will include your new test in :src:`.gitlab-ci.yml`.
 
-Tests executed through Dune (Alcotest, Flextesa)
+Tezt integration and regression tests
+  New Tezt tests will be included automatically in the CI.
+  To rebalance the Tezt batches, run (from the root of the Tezos repository):
+  ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
+
+The OCaml package tests (Alcotest, Crowbar & QCheck)
   Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
   include your new test in :src:`.gitlab-ci.yml`.
 
-Other
+Other (including Flextesa)
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
   this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
-A second way to run the tests is to trigger manually the job
+Launching tests manually and measuring coverage in the CI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Another way to run the tests is to trigger manually the job
 ``test_coverage`` in stage ``test_coverage``, from the Gitlab CI web interface.
 This job simply runs ``dune build @runtest`` in the project directory,
 followed by ``make all`` in the directory ``tests_python``. This is slower
@@ -482,7 +514,7 @@ The role of having this extra testing stage is twofold.
 - It can be launched locally in a container environment (see next section),
 - it can be used to generate a code coverage report, from the CI.
 
-The report artefact can be downloaded or browsed from the CI page upon completion
+The coverage report artefact can be downloaded or browsed from the CI page upon completion
 of ``test_coverage``. It can also be published on a publicly available webpage
 linked to the gitlab repository. This is done by triggering manually
 the ``pages`` job in the ``publish_coverage`` stage, from the Gitlab CI
@@ -539,7 +571,7 @@ Conventions
 
 Besides implementing tests, it is necessary to comment test files as
 much as possible to keep a maintainable project for future
-contributors. As part of this effort, we require that contributors 
+contributors. As part of this effort, we require that contributors
 follow this convention:
 
 1. For each unit test module, add a header that explains the overall

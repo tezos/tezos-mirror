@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (origination)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^origination$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^origination$"
     Subject:    On originating contracts.
 *)
 
@@ -42,20 +42,19 @@ let ten_tez = Tez.of_int 10
     meaning that this contract is spendable; delegatable default is
     set to true meaning that this contract is able to delegate. *)
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
-  Context.init 1
-  >>=? fun (b, contracts) ->
+  Context.init 1 >>=? fun (b, contracts) ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  Context.Contract.balance (B b) source
-  >>=? fun source_balance ->
+  Context.Contract.balance (B b) source >>=? fun source_balance ->
   Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
-  Block.bake ~operation b
-  >>=? fun b ->
+  Block.bake ~operation b >>=? fun b ->
   (* fee + credit + block security deposit were debited from source *)
   Context.get_constants (B b)
-  >>=? fun { parametric =
+  >>=? fun {
+             parametric =
                {origination_size; cost_per_byte; block_security_deposit; _};
-             _ } ->
+             _;
+           } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
   Tez.( +? ) credit block_security_deposit
@@ -84,13 +83,10 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
    originated operation valid.
    - the source contract has payed all the fees
    - the originated has been credited correctly *)
-let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
-    =
-  Context.init 1
-  >>=? fun (b, contracts) ->
+let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
+  Context.init 1 >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  Context.Contract.balance (B b) contract
-  >>=? fun balance ->
+  Context.Contract.balance (B b) contract >>=? fun balance ->
   Op.origination (B b) contract ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   (* The possible fees are: a given credit, an origination burn fee
@@ -101,9 +97,11 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
      is not related to origination but to the baking done in the
      tests.*)
   Context.get_constants (B b)
-  >>=? fun { parametric =
+  >>=? fun {
+             parametric =
                {origination_size; cost_per_byte; block_security_deposit; _};
-             _ } ->
+             _;
+           } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
   Tez.( +? ) credit block_security_deposit
@@ -111,8 +109,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
   >>? Tez.( +? ) origination_burn
   >>? Tez.( +? ) Op.dummy_script_cost
   >>?= fun total_fee ->
-  Block.bake ~operation b
-  >>=? fun b ->
+  Block.bake ~operation b >>=? fun b ->
   (* check that after the block has been baked the source contract
      was debited all the fees *)
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance total_fee
@@ -127,8 +124,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
 (** compute half of the balance and divided it by nth times *)
 
 let two_nth_of_balance incr contract nth =
-  Context.Contract.balance (I incr) contract
-  >>=? fun balance ->
+  Context.Contract.balance (I incr) contract >>=? fun balance ->
   Lwt.return (Tez.( /? ) balance nth >>? fun res -> Tez.( *? ) res 2L)
 
 (** Basic test. A contract is created as well as the newly originated
@@ -158,25 +154,19 @@ let test_pay_fee () =
 (** Create an originate contract where the contract does not have
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
-  Context.init 2
-  >>=? fun (b, contracts) ->
+  Context.init 2 >>=? fun (b, contracts) ->
   let contract_1 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
   let contract_2 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in
-  Incremental.begin_construction b
-  >>=? fun inc ->
+  Incremental.begin_construction b >>=? fun inc ->
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
-  Context.Contract.balance (I inc) contract_1
-  >>=? fun balance ->
-  Tez.( -? ) balance Tez.one
-  >>?= fun amount ->
-  Op.transaction (I inc) contract_1 contract_2 amount
-  >>=? fun operation ->
-  Incremental.add_operation inc operation
-  >>=? fun inc ->
+  Context.Contract.balance (I inc) contract_1 >>=? fun balance ->
+  Tez.( -? ) balance Tez.one >>?= fun amount ->
+  Op.transaction (I inc) contract_1 contract_2 amount >>=? fun operation ->
+  Incremental.add_operation inc operation >>=? fun inc ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) contract_1 balance amount
   >>=? fun _ ->
   (* use this source contract to create an originate contract where it requires
@@ -188,24 +178,19 @@ let test_not_tez_in_contract_to_pay_fee () =
     contract_1
     ~script:Op.dummy_script
   >>=? fun (op, _) ->
-  Incremental.add_operation inc op
-  >>= fun inc ->
+  Incremental.add_operation inc op >>= fun inc ->
   Assert.proto_error ~loc:__LOC__ inc (function
-      | Contract_storage.Balance_too_low _ ->
-          true
-      | _ ->
-          false)
+      | Contract_storage.Balance_too_low _ -> true
+      | _ -> false)
 
 (* Set the endorser of the block as manager/delegate of the originated
    account. *)
 let register_contract_get_endorser () =
-  Context.init 1
-  >>=? fun (b, contracts) ->
+  Context.init 1 >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  Incremental.begin_construction b
-  >>=? fun inc ->
-  Context.get_endorser (I inc)
-  >|=? fun (account_endorser, _slots) -> (inc, contract, account_endorser)
+  Incremental.begin_construction b >>=? fun inc ->
+  Context.get_endorser (I inc) >|=? fun (account_endorser, _slots) ->
+  (inc, contract, account_endorser)
 
 (* Create multiple originated contracts and ask contract to pay the fee. *)
 let n_originations n ?credit ?fee () =
@@ -224,29 +209,24 @@ let test_multiple_originations () =
 
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
-  Context.init 1
-  >>=? fun (b, contracts) ->
+  Context.init 1 >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  Incremental.begin_construction b
-  >>=? fun inc ->
+  Incremental.begin_construction b >>=? fun inc ->
   Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script
   >>=? fun (op1, _) ->
   Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script
   >>=? fun (op2, _) ->
-  Incremental.add_operation inc op1
-  >>=? fun inc ->
-  Incremental.add_operation inc op2
-  >>= fun res ->
+  Incremental.add_operation inc op1 >>=? fun inc ->
+  Incremental.add_operation inc op2 >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Counter_in_the_past _ ->
-          true
-      | _ ->
-          false)
+      | Contract_storage.Counter_in_the_past _ -> true
+      | _ -> false)
 
 (******************************************************)
 
 let tests =
-  [ Test_services.tztest "balances_simple" `Quick test_balances_simple;
+  [
+    Test_services.tztest "balances_simple" `Quick test_balances_simple;
     Test_services.tztest "balances_credit" `Quick test_balances_credit;
     Test_services.tztest "balances_credit_fee" `Quick test_balances_credit_fee;
     Test_services.tztest "pay_fee" `Quick test_pay_fee;
@@ -258,4 +238,5 @@ let tests =
       "multiple originations"
       `Quick
       test_multiple_originations;
-    Test_services.tztest "counter" `Quick test_counter ]
+    Test_services.tztest "counter" `Quick test_counter;
+  ]

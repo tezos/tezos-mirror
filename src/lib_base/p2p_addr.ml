@@ -36,35 +36,25 @@ type port = int
 
 let pp ppf addr =
   match Ipaddr.v4_of_v6 addr with
-  | Some addr ->
-      Format.fprintf ppf "%a" Ipaddr.V4.pp addr
-  | None ->
-      Format.fprintf ppf "[%a]" Ipaddr.V6.pp addr
+  | Some addr -> Format.fprintf ppf "%a" Ipaddr.V4.pp addr
+  | None -> Format.fprintf ppf "[%a]" Ipaddr.V6.pp addr
 
 let of_string_opt str =
   match Ipaddr.of_string str with
-  | Ok (Ipaddr.V4 addr) ->
-      Some (Ipaddr.v6_of_v4 addr)
-  | Ok (V6 addr) ->
-      Some addr
-  | Error (`Msg _) ->
-      None
+  | Ok (Ipaddr.V4 addr) -> Some (Ipaddr.v6_of_v4 addr)
+  | Ok (V6 addr) -> Some addr
+  | Error (`Msg _) -> None
 
 let of_string_exn str =
   match of_string_opt str with
-  | None ->
-      Stdlib.failwith "P2p_addr.of_string"
-  | Some t ->
-      t
+  | None -> Stdlib.failwith "P2p_addr.of_string"
+  | Some t -> t
 
 let of_string str =
   try Ok (of_string_exn str) with
-  | Invalid_argument s ->
-      Error s
-  | Failure s ->
-      Error s
-  | _ ->
-      Error "P2p_point.of_string"
+  | Invalid_argument s -> Error s
+  | Failure s -> Error s
+  | _ -> Error "P2p_point.of_string"
 
 let to_string saddr = Format.asprintf "%a" pp saddr
 

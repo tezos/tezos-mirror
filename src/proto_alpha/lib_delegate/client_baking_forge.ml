@@ -26,12 +26,7 @@
 open Protocol
 open Alpha_context
 open Protocol_client_context
-
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = Protocol.name ^ ".baking.forge"
-end)
-
-open Logging
+module Events = Delegate_events.Baking_forge
 
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
@@ -100,37 +95,39 @@ let create_state ?(minimal_fees = default_minimal_fees)
 let get_delegates cctxt state =
   match state.delegates with
   | [] ->
-      Client_keys.get_keys cctxt
-      >>=? fun keys -> return (List.map (fun (_, pkh, _, _) -> pkh) keys)
-  | _ ->
-      return state.delegates
+      Client_keys.get_keys cctxt >>=? fun keys ->
+      return (List.map (fun (_, pkh, _, _) -> pkh) keys)
+  | _ -> return state.delegates
 
 let generate_seed_nonce () =
   match Nonce.of_bytes (Rand.generate Constants.nonce_length) with
-  | Error _errs ->
-      assert false
-  | Ok nonce ->
-      nonce
+  | Error _errs -> assert false
+  | Ok nonce -> nonce
 
 let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
-    delegate_sk shell priority seed_nonce_hash =
+    delegate_sk shell priority seed_nonce_hash ~liquidity_baking_escape_vote =
   Client_baking_pow.mine cctxt chain block shell (fun proof_of_work_nonce ->
-      {Block_header.priority; seed_nonce_hash; proof_of_work_nonce})
+      {
+        Block_header.priority;
+        seed_nonce_hash;
+        proof_of_work_nonce;
+        liquidity_baking_escape_vote;
+      })
   >>=? fun contents ->
   let unsigned_header =
     Data_encoding.Binary.to_bytes_exn
       Alpha_context.Block_header.unsigned_encoding
       (shell, contents)
   in
-  Shell_services.Chain.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Client_keys.append
     cctxt
     delegate_sk
     ~watermark:(Block_header chain_id)
     unsigned_header
 
-let forge_faked_protocol_data ~priority ~seed_nonce_hash =
+let forge_faked_protocol_data ~priority ~seed_nonce_hash
+    ~liquidity_baking_escape_vote =
   Alpha_context.Block_header.
     {
       contents =
@@ -138,6 +135,7 @@ let forge_faked_protocol_data ~priority ~seed_nonce_hash =
           priority;
           seed_nonce_hash;
           proof_of_work_nonce = Client_baking_pow.empty_proof_of_work_nonce;
+          liquidity_baking_escape_vote;
         };
       signature = Signature.zero;
     }
@@ -155,32 +153,10 @@ let assert_valid_operations_hash shell_header operations =
        shell_header.Tezos_base.Block_header.operations_hash)
     (failure "Client_baking_forge.inject_block: inconsistent header.")
 
-let compute_endorsing_power cctxt ~chain ~block operations =
-  Shell_services.Chain.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
-  List.fold_left_es
-    (fun sum -> function
-      | { Alpha_context.protocol_data =
-            Operation_data {contents = Single (Endorsement_with_slot _); _};
-          _ } as op -> (
-          Delegate_services.Endorsing_power.get
-            cctxt
-            (chain, block)
-            op
-            chain_id
-          >>= function
-          | Error _ ->
-              (* Filters invalid endorsements *)
-              return sum
-          | Ok power ->
-              return (sum + power) ) | _ -> return sum)
-    0
-    operations
-
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
-    ~priority ~delegate_pkh ~delegate_sk ~level operations =
-  assert_valid_operations_hash shell_header operations
-  >>=? fun () ->
+    ~priority ~delegate_pkh ~delegate_sk ~level operations
+    ~liquidity_baking_escape_vote =
+  assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header
     cctxt
@@ -190,6 +166,7 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     shell_header
     priority
     seed_nonce_hash
+    ~liquidity_baking_escape_vote
   >>=? fun signed_header ->
   (* Record baked blocks to prevent double baking  *)
   let open Client_baking_highwatermarks in
@@ -202,16 +179,9 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
           record_block cctxt block_location ~delegate:delegate_pkh level
           >>=? fun () -> return_true
       | false ->
-          lwt_log_error
-            Tag.DSL.(
-              fun f ->
-                f "Level %a : previously baked"
-                -% t event "double_bake_near_miss"
-                -% a level_tag level)
-          >>= fun () -> return force)
+          Events.(emit double_bake_near_miss) level >>= fun () -> return force)
   >>=? function
-  | false ->
-      fail (Level_previously_baked level)
+  | false -> fail (Level_previously_baked level)
   | true ->
       Shell_services.Injection.block
         cctxt
@@ -220,14 +190,7 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
         signed_header
         operations
       >>=? fun block_hash ->
-      lwt_log_info
-        Tag.DSL.(
-          fun f ->
-            f "Client_baking_forge.inject_block: inject %a"
-            -% t event "inject_baked_block"
-            -% a Block_hash.Logging.tag block_hash
-            -% t signed_header_tag signed_header
-            -% t operations_tag operations)
+      Events.(emit inject_baked_block) (block_hash, signed_header, operations)
       >>= fun () -> return block_hash
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
@@ -279,14 +242,14 @@ let get_manager_content op =
             ( Some first_source,
               Some first_counter,
               total_fee,
-              Gas.Arith.add total_gas gas_limit ) | _ -> ok acc)
+              Gas.Arith.add total_gas gas_limit )
+      | _ -> ok acc)
     (None, None, Tez.zero, Gas.Arith.zero)
     l
   |> function
   | Ok (Some source, Some counter, total_fee, total_gas) ->
       Some {total_fee; total_gas; source; counter}
-  | _ ->
-      None
+  | _ -> None
 
 (* Sort operation considering potential gas and storage usage.
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
@@ -300,16 +263,14 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     let fee_f = Q.of_int64 (Tez.to_mutez fee) in
     let size_ratio = Q.(size_f / Q.of_int max_size) in
     let gas_ratio =
-      Q.(
-        gas_f / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
+      Q.(gas_f / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
     in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
   List.filter_map
     (fun op ->
       match get_manager_content op with
-      | None ->
-          None
+      | None -> None
       | Some {total_fee; total_gas; source; counter} ->
           if Tez.(total_fee < minimal_fees) then None
           else
@@ -367,8 +328,7 @@ let retain_operations_up_to_quota operations quota =
             Data_encoding.Binary.length Alpha_context.Operation.encoding op
           in
           let new_size = size + operation_size in
-          if new_size > max_size then raise (Full ops)
-          else (op :: ops, new_size))
+          if new_size > max_size then raise (Full ops) else (op :: ops, new_size))
         ([], 0)
         operations
       |> fst
@@ -385,8 +345,7 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
         | Some {total_gas; _} ->
             let size = Data_encoding.Binary.length Operation.encoding op in
             Some (op, (size, total_gas))
-        | None ->
-            None)
+        | None -> None)
       manager_operations
   in
   List.fold_left
@@ -462,9 +421,8 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
     ok overflowing_manager_operations
   in
   Lwt.return
-    ( overflowing_manager_operations
-    >>? fun overflowing_manager_operations ->
-    ok (Array.to_list t, overflowing_manager_operations) )
+    ( overflowing_manager_operations >>? fun overflowing_manager_operations ->
+      ok (Array.to_list t, overflowing_manager_operations) )
 
 let forge (op : Operation.packed) : Operation.raw =
   {
@@ -478,32 +436,30 @@ let forge (op : Operation.packed) : Operation.raw =
 let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
   (* We only retain the applied, unprocessed and delayed operations *)
   List.rev
-    ( Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed
+    (Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed
     @@ Operation_hash.Map.fold
          (fun _ (op, _) acc -> op :: acc)
          ops.branch_delayed
-    @@ List.rev_map (fun (_, op) -> op) ops.applied )
+    @@ List.rev_map (fun (_, op) -> op) ops.applied)
 
 let unopt_operations cctxt chain mempool = function
   | None -> (
-    match mempool with
-    | None ->
-        Alpha_block_services.Mempool.pending_operations cctxt ~chain ()
-        >>=? fun mpool ->
-        let ops = ops_of_mempool mpool in
-        return ops
-    | Some file ->
-        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
-        >>=? fun json ->
-        let mpool =
-          Data_encoding.Json.destruct
-            Alpha_block_services.S.Mempool.encoding
-            json
-        in
-        let ops = ops_of_mempool mpool in
-        return ops )
-  | Some operations ->
-      return operations
+      match mempool with
+      | None ->
+          Alpha_block_services.Mempool.pending_operations cctxt ~chain ()
+          >>=? fun mpool ->
+          let ops = ops_of_mempool mpool in
+          return ops
+      | Some file ->
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file >>=? fun json ->
+          let mpool =
+            Data_encoding.Json.destruct
+              Alpha_block_services.S.Mempool.encoding
+              json
+          in
+          let ops = ops_of_mempool mpool in
+          return ops)
+  | Some operations -> return operations
 
 let all_ops_valid (results : error Preapply_result.t list) =
   let open Operation_hash.Map in
@@ -524,7 +480,7 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
         endorsing_power
       >>=? fun minimal_timestamp -> return (priority, minimal_timestamp)
   | `Auto (src_pkh, max_priority) -> (
-      Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
+      Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
       Alpha_services.Delegate.Baking_rights.get
         cctxt
@@ -545,16 +501,13 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
             prio
             endorsing_power
           >>=? fun minimal_timestamp -> return (prio, minimal_timestamp)
-      | None ->
-          failwith "No slot found at level %a" Raw_level.pp level )
+      | None -> failwith "No slot found at level %a" Raw_level.pp level)
 
 let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
   let timestamp =
     match timestamp with
-    | None ->
-        minimal_timestamp
-    | Some timestamp ->
-        timestamp
+    | None -> minimal_timestamp
+    | Some timestamp -> timestamp
   in
   if (not force) && timestamp < minimal_timestamp then
     failwith
@@ -567,18 +520,8 @@ let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
 
 let merge_preapps (old : error Preapply_result.t)
     (neu : error Preapply_result.t) =
-  let merge _ a b =
-    (* merge ops *)
-    match (a, b) with
-    | (None, None) ->
-        None
-    | (Some x, None) ->
-        Some x
-    | (_, Some y) ->
-        Some y
-  in
-  let merge = Operation_hash.Map.merge merge in
-  (* merge op maps *)
+  let merge _ a b = (* merge ops *) Option.either b a in
+  let merge = (* merge op maps *) Operation_hash.Map.merge merge in
   (* merge preapplies *)
   {
     Preapply_result.applied = [];
@@ -591,32 +534,65 @@ let error_of_op (result : error Preapply_result.t) op =
   let op = forge op in
   let h = Tezos_base.Operation.hash op in
   match Operation_hash.Map.find h result.refused with
-  | Some (_, trace) ->
-      Some (Failed_to_preapply (op, trace))
+  | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
   | None -> (
-    match Operation_hash.Map.find h result.branch_refused with
-    | Some (_, trace) ->
-        Some (Failed_to_preapply (op, trace))
-    | None -> (
-      match Operation_hash.Map.find h result.branch_delayed with
-      | Some (_, trace) ->
-          Some (Failed_to_preapply (op, trace))
-      | None ->
-          None ) )
+      match Operation_hash.Map.find h result.branch_refused with
+      | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
+      | None -> (
+          match Operation_hash.Map.find h result.branch_delayed with
+          | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
+          | None -> None))
 
-let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
-    ?protocol_data
+let compute_endorsement_powers cctxt constants ~chain ~block =
+  Delegate_services.Endorsing_rights.get
+    cctxt
+    ~levels:[block.Client_baking_blocks.level]
+    (chain, `Hash (block.hash, 0))
+  >>=? fun endorsing_rights ->
+  let slots_arr = Array.make constants.Constants.endorsers_per_block 0 in
+  (* Populate the array *)
+  List.iter
+    (fun {Delegate_services.Endorsing_rights.slots; _} ->
+      let endorsing_power = List.length slots in
+      List.iter (fun slot -> slots_arr.(slot) <- endorsing_power) slots)
+    endorsing_rights ;
+  return slots_arr
+
+let compute_endorsing_power endorsement_powers operations =
+  List.fold_left
+    (fun sum -> function
+      | {
+          Alpha_context.protocol_data =
+            Operation_data
+              {contents = Single (Endorsement_with_slot {slot; _}); _};
+          _;
+        } -> (
+          try
+            let endorsement_power = endorsement_powers.(slot) in
+            sum + endorsement_power
+          with _ -> sum)
+      | _ -> sum)
+    0
+    operations
+
+let compute_minimal_valid_time constants ~priority ~endorsing_power
+    ~predecessor_timestamp =
+  Environment.wrap_tzresult
+    (Baking.minimal_valid_time
+       constants
+       ~priority
+       ~endorsing_power
+       ~predecessor_timestamp)
+
+let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
+    block_info ~priority ?protocol_data
     ((operations : packed_operation list list), _overflowing_operations) =
   (* Retrieve the minimal valid time for when the block can be baked with 0 endorsements *)
   Delegate_services.Minimal_valid_time.get cctxt (chain, block) priority 0
   >>=? fun min_valid_timestamp ->
   let open Client_baking_simulator in
-  lwt_debug
-    Tag.DSL.(
-      fun f ->
-        f "starting client-side validation after %a"
-        -% t event "baking_local_validation_start"
-        -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash)
+  Events.(emit baking_local_validation_start)
+    block_info.Client_baking_blocks.hash
   >>= fun () ->
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
@@ -624,104 +600,75 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
       (WithExceptions.Option.get
          ~loc:__LOC__
          (List.nth operations endorsements_index))
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth quota endorsements_index )
+      (WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth quota endorsements_index)
   in
   let votes =
     retain_operations_up_to_quota
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations votes_index)
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index)
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   let managers =
     (* Managers are already trimmed *)
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth operations managers_index
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations managers_index
   in
-  begin_construction
-    ~timestamp:min_valid_timestamp
-    ?protocol_data
-    state.index
-    block_info
-  >>= (function
-        | Ok inc ->
-            return inc
-        | Error errs ->
-            lwt_log_error
-              Tag.DSL.(
-                fun f ->
-                  f "Error while fetching current context : %a"
-                  -% t event "context_fetch_error"
-                  -% a errs_tag errs)
-            >>= fun () ->
-            lwt_log_notice
-              Tag.DSL.(
-                fun f ->
-                  f "Retrying to open the context" -% t event "reopen_context")
-            >>= fun () ->
-            Client_baking_simulator.load_context
-              ~context_path:state.context_path
-            >>= fun index ->
-            begin_construction
-              ~timestamp:min_valid_timestamp
-              ?protocol_data
-              index
-              block_info
-            >>=? fun inc ->
-            state.index <- index ;
-            return inc)
+  (begin_construction
+     ~timestamp:min_valid_timestamp
+     ?protocol_data
+     state.index
+     block_info
+   >>= function
+   | Ok inc -> return inc
+   | Error errs ->
+       Events.(emit context_fetch_error) errs >>= fun () ->
+       Events.(emit reopen_context) () >>= fun () ->
+       Client_baking_simulator.load_context ~context_path:state.context_path
+       >>= fun index ->
+       begin_construction
+         ~timestamp:min_valid_timestamp
+         ?protocol_data
+         index
+         block_info
+       >>=? fun inc ->
+       state.index <- index ;
+       return inc)
   >>=? fun initial_inc ->
   let validate_operation inc op =
-    protect (fun () -> add_operation inc op)
-    >>= function
+    protect (fun () -> add_operation inc op) >>= function
     | Error errs ->
-        lwt_debug
-          Tag.DSL.(
-            fun f ->
-              f
-                "@[<v 4>Client-side validation: filtered invalid operation %a@\n\
-                 %a@]"
-              -% t event "baking_rejected_invalid_operation"
-              -% a Operation_hash.Logging.tag (Operation.hash_packed op)
-              -% a errs_tag errs)
+        Events.(emit baking_rejected_invalid_operation)
+          (Operation.hash_packed op, errs)
         >>= fun () -> Lwt.return_none
     | Ok (resulting_state, receipt) -> (
-      try
-        (* Check that the metadata are serializable/deserializable *)
-        let _ =
-          Data_encoding.Binary.(
-            of_bytes_exn
-              Protocol.operation_receipt_encoding
-              (to_bytes_exn Protocol.operation_receipt_encoding receipt))
-        in
-        Lwt.return_some resulting_state
-      with exn ->
-        lwt_debug
-          Tag.DSL.(
-            fun f ->
-              f "Client-side validation: filtered invalid operation %a"
-              -% t event "baking_rejected_invalid_operation"
-              -% a
-                   errs_tag
-                   [ Validation_errors.Cannot_serialize_operation_metadata;
-                     Exn exn ])
-        >>= fun () -> Lwt.return_none )
+        try
+          (* Check that the metadata are serializable/deserializable *)
+          let _ =
+            Data_encoding.Binary.(
+              of_bytes_exn
+                Protocol.operation_receipt_encoding
+                (to_bytes_exn Protocol.operation_receipt_encoding receipt))
+          in
+          Lwt.return_some resulting_state
+        with exn ->
+          let errs =
+            [Validation_errors.Cannot_serialize_operation_metadata; Exn exn]
+          in
+          Events.(emit baking_rejected_invalid_operation)
+            (Operation.hash_packed op, errs)
+          >>= fun () -> Lwt.return_none)
   in
   let filter_valid_operations inc ops =
     List.fold_left_s
       (fun (inc, acc) op ->
-        validate_operation inc op
-        >>= function
-        | None ->
-            Lwt.return (inc, acc)
-        | Some inc' ->
-            Lwt.return (inc', op :: acc))
+        validate_operation inc op >>= function
+        | None -> Lwt.return (inc, acc)
+        | Some inc' -> Lwt.return (inc', op :: acc))
       (inc, [])
       ops
     >>= fun (inc, ops) -> Lwt.return (inc, List.rev ops)
@@ -729,25 +676,23 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   (* Apply operations and filter the invalid ones *)
   filter_valid_operations initial_inc endorsements
   >>= fun (inc, endorsements) ->
-  filter_valid_operations inc votes
-  >>= fun (inc, votes) ->
-  filter_valid_operations inc anonymous
-  >>= fun (manager_inc, anonymous) ->
-  filter_valid_operations manager_inc managers
-  >>= fun (inc, managers) ->
-  finalize_construction inc
-  >>=? fun _ ->
+  filter_valid_operations inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (manager_inc, anonymous) ->
+  filter_valid_operations manager_inc managers >>= fun (inc, managers) ->
+  finalize_construction inc >>=? fun _ ->
   let operations = [endorsements; votes; anonymous; managers] in
-  (* Rebuild the block with the set of valid operations and the
-     final timestamp *)
-  compute_endorsing_power cctxt ~chain ~block endorsements
-  >>=? fun current_endorsing_power ->
-  Delegate_services.Minimal_valid_time.get
-    cctxt
-    (chain, block)
-    priority
-    current_endorsing_power
-  >>=? fun expected_validity ->
+  (* Construct a context with the valid operations and a correct timestamp *)
+  let current_endorsing_power =
+    compute_endorsing_power endorsements_map endorsements
+  in
+  compute_minimal_valid_time
+    state.constants.parametric
+    ~priority
+    ~endorsing_power:current_endorsing_power
+    ~predecessor_timestamp:block_info.timestamp
+  >>?= fun expected_validity ->
+  (* Finally, we construct a block with the minimal possible timestamp
+     given the endorsing power *)
   begin_construction
     ~timestamp:expected_validity
     ?protocol_data
@@ -759,8 +704,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     inc
     (List.flatten operations)
   >>=? fun final_inc ->
-  finalize_construction final_inc
-  >>=? fun (validation_result, metadata) ->
+  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
   return
     (final_inc, (validation_result, metadata), operations, expected_validity)
 
@@ -779,21 +723,19 @@ let finalize_block_header shell_header ~timestamp validation_result operations
          operations)
   in
   let context = Shell_context.unwrap_disk_context context in
-  ( match predecessor_block_metadata_hash with
+  (match predecessor_block_metadata_hash with
   | Some predecessor_block_metadata_hash ->
       Context.add_predecessor_block_metadata_hash
         context
         predecessor_block_metadata_hash
-  | None ->
-      Lwt.return context )
+  | None -> Lwt.return context)
   >>= fun context ->
-  ( match predecessor_ops_metadata_hash with
+  (match predecessor_ops_metadata_hash with
   | Some predecessor_ops_metadata_hash ->
       Context.add_predecessor_ops_metadata_hash
         context
         predecessor_ops_metadata_hash
-  | None ->
-      Lwt.return context )
+  | None -> Lwt.return context)
   >>= fun context ->
   let context = Context.hash ~time:timestamp ?message context in
   let header =
@@ -813,27 +755,31 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
-    ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh
-    ~delegate_sk block =
+    ?mempool ?context_path ?seed_nonce_hash ~liquidity_baking_escape_vote ~chain
+    ~priority ~delegate_pkh ~delegate_sk block =
+  Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
   (* making the arguments usable *)
-  unopt_operations cctxt chain mempool operations
-  >>=? fun operations_arg ->
-  compute_endorsing_power cctxt ~chain ~block operations_arg
-  >>=? fun endorsing_power ->
+  unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
+  Client_baking_blocks.info cctxt ~chain block >>=? fun block_info ->
+  compute_endorsement_powers cctxt constants.parametric ~chain ~block:block_info
+  >>=? fun endorsement_powers ->
+  let endorsing_power =
+    compute_endorsing_power endorsement_powers operations_arg
+  in
   decode_priority cctxt chain block ~priority ~endorsing_power
   >>=? fun (priority, minimal_timestamp) ->
-  unopt_timestamp ?force timestamp minimal_timestamp
-  >>=? fun timestamp ->
+  unopt_timestamp ?force timestamp minimal_timestamp >>=? fun timestamp ->
   (* get basic building blocks *)
-  let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  Alpha_services.Constants.all cctxt (chain, block)
-  >>=? fun Constants.
-             { parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
-               _ } ->
+  let protocol_data =
+    forge_faked_protocol_data
+      ~priority
+      ~seed_nonce_hash
+      ~liquidity_baking_escape_vote
+  in
   classify_operations
     cctxt
     ~chain
-    ~hard_gas_limit_per_block
+    ~hard_gas_limit_per_block:constants.parametric.hard_gas_limit_per_block
     ~block
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
@@ -844,29 +790,27 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
     List.sub
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth operations endorsements_index )
-      endorsers_per_block
+      (WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations endorsements_index)
+      constants.parametric.endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations votes_index)
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      ( WithExceptions.Option.get ~loc:__LOC__
-      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index)
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   (* Size/Gas check already occurred in classify operations *)
   let managers =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth operations managers_index
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations managers_index
   in
   let operations = [endorsements; votes; anonymous; managers] in
-  ( match context_path with
+  (match context_path with
   | None ->
       Alpha_block_services.Helpers.Preapply.block
         cctxt
@@ -892,12 +836,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   | Some context_path ->
       assert sort ;
       assert best_effort ;
-      Context.init ~readonly:true context_path
-      >>= fun index ->
-      Client_baking_blocks.info cctxt ~chain block
-      >>=? fun bi ->
-      Alpha_services.Constants.all cctxt (chain, `Head 0)
-      >>=? fun constants ->
+      Context.init ~readonly:true context_path >>= fun index ->
       Client_baking_files.resolve_location cctxt ~chain `Nonce
       >>=? fun nonces_location ->
       let state =
@@ -914,45 +853,45 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           retry_counter = default_retry_counter;
         }
       in
+      compute_endorsement_powers
+        cctxt
+        constants.parametric
+        ~chain
+        ~block:block_info
+      >>=? fun endorsement_powers ->
       filter_and_apply_operations
         cctxt
         state
+        endorsement_powers
         ~chain
         ~block
         ~priority
         ~protocol_data
-        bi
+        block_info
         (operations, overflowing_ops)
       >>=? fun ( final_context,
                  (validation_result, _),
                  operations,
                  min_valid_timestamp ) ->
-      let current_protocol = bi.next_protocol in
+      let current_protocol = block_info.next_protocol in
       let context =
         Shell_context.unwrap_disk_context validation_result.context
       in
-      Context.get_protocol context
-      >>= fun next_protocol ->
+      Context.get_protocol context >>= fun next_protocol ->
       if Protocol_hash.equal current_protocol next_protocol then
         finalize_block_header
           final_context.header
           ~timestamp:min_valid_timestamp
           validation_result
           operations
-          bi.predecessor_block_metadata_hash
-          bi.predecessor_operations_metadata_hash
+          block_info.predecessor_block_metadata_hash
+          block_info.predecessor_operations_metadata_hash
         >>= function
-        | Error _ as errs ->
-            Lwt.return errs
+        | Error _ as errs -> Lwt.return errs
         | Ok shell_header ->
             return (shell_header, List.map (List.map forge) operations)
       else
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "New protocol detected: using shell validation"
-              -% t event "shell_prevalidation_notice")
-        >>= fun () ->
+        Events.(emit shell_prevalidation_new_protocol) () >>= fun () ->
         Alpha_block_services.Helpers.Preapply.block
           cctxt
           ~chain
@@ -962,34 +901,21 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           ~protocol_data
           operations
         >>=? fun (shell_header, _result) ->
-        return (shell_header, List.map (List.map forge) operations) )
+        return (shell_header, List.map (List.map forge) operations))
   >>=? fun (shell_header, operations) ->
   (* Now for some logging *)
   let total_op_count = List.length operations_arg in
   let valid_op_count = List.length (List.concat operations) in
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f
-          "found %d valid operations (%d refused) for timestamp %a (fitness %a)"
-        -% t event "found_valid_operations"
-        -% s valid_ops valid_op_count
-        -% s refused_ops (total_op_count - valid_op_count)
-        -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
-        -% a fitness_tag shell_header.fitness)
+  let time = Time.System.of_protocol_exn timestamp in
+  Events.(emit found_valid_operations)
+    (valid_op_count, total_op_count - valid_op_count, time, shell_header.fitness)
   >>= fun () ->
-  ( match Raw_level.of_int32 shell_header.level with
-  | Ok level ->
-      return level
+  (match Raw_level.of_int32 shell_header.level with
+  | Ok level -> return level
   | Error errs ->
       let errs = Environment.wrap_tztrace errs in
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Error on raw_level conversion : %a"
-            -% t event "block_injection_failed"
-            -% a errs_tag errs)
-      >>= fun () -> Lwt.return_error errs )
+      Events.(emit block_conversion_failed) errs >>= fun () ->
+      Lwt.return_error errs)
   >>=? fun level ->
   inject_block
     cctxt
@@ -1002,25 +928,23 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ~delegate_sk
     ~level
     operations
+    ~liquidity_baking_escape_vote
   >>= function
-  | Ok hash ->
-      return hash
+  | Ok hash -> return hash
   | Error errs as error ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f
-              "@[<v 4>Error while injecting block@ @[Included operations : \
-               %a@]@ %a@]"
-            -% t event "block_injection_failed"
-            -% a raw_operations_tag (List.concat operations)
-            -% a errs_tag errs)
+      Events.(emit block_injection_failed) (List.concat operations, errs)
       >>= fun () -> Lwt.return error
 
 let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
     ~timestamp seed_nonce_hash operations
     ((_, (bi, priority, delegate)) as _slot) =
-  let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
+  let liquidity_baking_escape_vote = false in
+  let protocol_data =
+    forge_faked_protocol_data
+      ~priority
+      ~seed_nonce_hash
+      ~liquidity_baking_escape_vote
+  in
   Alpha_block_services.Helpers.Preapply.block
     cctxt
     ~chain
@@ -1031,15 +955,7 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
     operations
   >>= function
   | Error errs ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f
-              "Shell-side validation: error while prevalidating operations:@\n\
-               %a"
-            -% t event "built_invalid_block_error"
-            -% a errs_tag errs)
-      >>= fun () -> return_none
+      Events.(emit built_invalid_block_error) errs >>= fun () -> return_none
   | Ok (shell_header, operations) ->
       let raw_ops =
         List.map (fun l -> List.map snd l.Preapply_result.applied) operations
@@ -1050,28 +966,35 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
 let filter_outdated_endorsements expected_level ops =
   List.filter
     (function
-      | { Alpha_context.protocol_data =
+      | {
+          Alpha_context.protocol_data =
             Operation_data
-              { contents =
+              {
+                contents =
                   Single
                     (Endorsement_with_slot
-                      { endorsement =
-                          { protocol_data =
+                      {
+                        endorsement =
+                          {
+                            protocol_data =
                               {contents = Single (Endorsement {level; _}); _};
-                            _ };
-                        _ });
-                _ };
-          _ } ->
+                            _;
+                          };
+                        _;
+                      });
+                _;
+              };
+          _;
+        } ->
           Raw_level.equal expected_level level
-      | _ ->
-          true)
+      | _ -> true)
     ops
 
 (** [fetch_operations] retrieve the operations present in the
     mempool. If no endorsements are present in the initial set, it
     waits until it's able to build a valid block. *)
-let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
-    (_, (head, priority, _delegate)) =
+let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
+    endorsement_powers (_, (head, priority, _delegate)) =
   Alpha_block_services.Mempool.monitor_operations
     cctxt
     ~chain
@@ -1081,37 +1004,69 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
     ~branch_refused:false
     ()
   >>=? fun (operation_stream, _stop) ->
+  let notify_endorsement_arrival operations =
+    List.iter_s
+      (function
+        | {
+            Alpha_context.protocol_data =
+              Operation_data
+                {contents = Single (Endorsement_with_slot {slot; _}); _};
+            _;
+          } -> (
+            try
+              let endorsing_power = endorsement_powers.(slot) in
+              Events.(emit endorsement_received (slot, endorsing_power))
+            with _ -> Lwt.return_unit)
+        | _ -> Lwt.return_unit)
+      operations
+  in
   (* Hypothesis : the first call to the stream returns instantly, even if the mempool is empty. *)
-  Lwt_stream.get operation_stream
-  >>= function
+  Lwt_stream.get operation_stream >>= function
   | None ->
       (* New head received : aborting block construction *)
       return_none
   | Some current_mempool ->
-      let block = `Hash (head.Client_baking_blocks.hash, 0) in
       let operations =
-        ref (filter_outdated_endorsements head.level current_mempool)
+        ref
+          (filter_outdated_endorsements
+             head.Client_baking_blocks.level
+             current_mempool)
       in
+      notify_endorsement_arrival !operations >>= fun () ->
+      let current_endorsing_power =
+        ref (compute_endorsing_power endorsement_powers !operations)
+      in
+      let previous_endorsing_power = ref 0 in
+      let previous_expected_validity_time = ref None in
       (* Actively request our peers' for missing operations *)
-      Shell_services.Mempool.request_operations cctxt ~chain ()
-      >>=? fun () ->
-      let compute_minimal_valid_time () =
-        compute_endorsing_power cctxt ~chain ~block !operations
-        >>=? fun current_endorsing_power ->
-        Delegate_services.Minimal_valid_time.get
-          cctxt
-          (chain, block)
-          priority
-          current_endorsing_power
-      in
+      Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
       let compute_timeout () =
-        compute_minimal_valid_time ()
+        let compute_minimal_valid_time () =
+          compute_minimal_valid_time
+            state.constants.parametric
+            ~priority
+            ~endorsing_power:!current_endorsing_power
+            ~predecessor_timestamp:head.timestamp
+          >>?= fun expected_validity ->
+          Events.(
+            emit
+              expected_validity_time
+              (expected_validity, !current_endorsing_power))
+          >>= fun () -> return expected_validity
+        in
+        (match !previous_expected_validity_time with
+        | None -> compute_minimal_valid_time ()
+        | Some _
+          when Compare.Int.(
+                 !current_endorsing_power > !previous_endorsing_power) ->
+            compute_minimal_valid_time ()
+        | Some previous_expected_validity_time ->
+            return previous_expected_validity_time)
         >>=? fun expected_validity ->
+        previous_expected_validity_time := Some expected_validity ;
         match Client_baking_scheduling.sleep_until expected_validity with
-        | None ->
-            return_unit
-        | Some timeout ->
-            timeout >>= fun () -> return_unit
+        | None -> return_unit
+        | Some timeout -> timeout >>= fun () -> return_unit
       in
       let last_get_event = ref None in
       let get_event () =
@@ -1120,17 +1075,24 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
             let t = Lwt_stream.get operation_stream in
             last_get_event := Some t ;
             t
-        | Some t ->
-            t
+        | Some t -> t
       in
       let rec loop () =
         Lwt.choose
-          [ (compute_timeout () >|= fun _ -> `Timeout);
-            (get_event () >|= fun e -> `Event e) ]
+          [
+            (compute_timeout () >|= fun _ -> `Timeout);
+            (get_event () >|= fun e -> `Event e);
+          ]
         >>= function
         | `Event (Some op_list) ->
             last_get_event := None ;
             let op_list = filter_outdated_endorsements head.level op_list in
+            notify_endorsement_arrival op_list >>= fun () ->
+            let added_endorsing_power =
+              compute_endorsing_power endorsement_powers op_list
+            in
+            current_endorsing_power :=
+              added_endorsing_power + !current_endorsing_power ;
             operations := op_list @ !operations ;
             loop ()
         | `Timeout ->
@@ -1142,8 +1104,12 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in
             operations := remaining_operations @ !operations ;
-            compute_minimal_valid_time ()
-            >>=? fun expected_validity ->
+            compute_minimal_valid_time
+              state.constants.parametric
+              ~priority
+              ~endorsing_power:!current_endorsing_power
+              ~predecessor_timestamp:head.timestamp
+            >>?= fun expected_validity ->
             return_some (!operations, expected_validity)
         | `Event None ->
             (* Got new head while waiting:
@@ -1157,37 +1123,22 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
     with consistent operations that went through the client-side
     validation *)
 let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
-    ((slot_timestamp, (bi, priority, delegate)) as slot) =
+    ((slot_timestamp, (bi, priority, delegate)) as slot)
+    ~liquidity_baking_escape_vote =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
-  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
+  Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
   >>=? fun next_level ->
   let seed_nonce_hash =
     if next_level.expected_commitment then Some seed_nonce_hash else None
   in
-  Client_keys.Public_key_hash.name cctxt delegate
-  >>=? fun name ->
-  lwt_debug
-    Tag.DSL.(
-      fun f ->
-        f "Try baking after %a (slot %d) for %s (%a)"
-        -% t event "try_baking"
-        -% a Block_hash.Logging.tag bi.hash
-        -% s bake_priority_tag priority
-        -% s Client_keys.Logging.tag name
-        -% a timestamp_tag (Time.System.of_protocol_exn slot_timestamp))
-  >>= fun () ->
-  fetch_operations cctxt ~chain slot
-  >>=? function
-  | None ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f
-              "Received a new head while waiting for operations. Aborting \
-               this block."
-            -% t event "new_head_received")
-      >>= fun () -> return_none
+  Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+  let time = Time.System.of_protocol_exn slot_timestamp in
+  Events.(emit try_baking) (bi.hash, priority, name, time) >>= fun () ->
+  compute_endorsement_powers cctxt state.constants.parametric ~chain ~block:bi
+  >>=? fun endorsement_powers ->
+  fetch_operations cctxt ~chain state endorsement_powers slot >>=? function
+  | None -> Events.(emit new_head_received) () >>= fun () -> return_none
   | Some (operations, timestamp) -> (
       classify_operations
         cctxt
@@ -1206,10 +1157,8 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             ~user_activated_upgrades
             ~level:(Raw_level.to_int32 next_level.level)
         with
-        | None ->
-            bi.next_protocol
-        | Some hash ->
-            hash
+        | None -> bi.next_protocol
+        | Some hash -> hash
       in
       if Protocol_hash.(Protocol.hash <> next_version) then
         (* Let the shell validate this *)
@@ -1223,11 +1172,15 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
           slot
       else
         let protocol_data =
-          forge_faked_protocol_data ~priority ~seed_nonce_hash
+          forge_faked_protocol_data
+            ~priority
+            ~seed_nonce_hash
+            ~liquidity_baking_escape_vote
         in
         filter_and_apply_operations
           cctxt
           state
+          endorsement_powers
           ~chain
           ~block
           ~priority
@@ -1236,22 +1189,8 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
           (operations, overflowing_ops)
         >>= function
         | Error errs ->
-            lwt_log_error
-              Tag.DSL.(
-                fun f ->
-                  f
-                    "Client-side validation: error while filtering invalid \
-                     operations :@\n\
-                     @[<v 4>%a@]"
-                  -% t event "client_side_validation_error"
-                  -% a errs_tag errs)
-            >>= fun () ->
-            lwt_log_notice
-              Tag.DSL.(
-                fun f ->
-                  f "Building a block using shell validation"
-                  -% t event "shell_prevalidation_notice")
-            >>= fun () ->
+            Events.(emit client_side_validation_error) errs >>= fun () ->
+            Events.(emit shell_prevalidation_notice) () >>= fun () ->
             shell_prevalidation
               cctxt
               ~chain
@@ -1260,47 +1199,27 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
               seed_nonce_hash
               operations
               slot
-        | Ok
-            (final_context, (validation_result, _), operations, valid_timestamp)
+        | Ok (final_context, (validation_result, _), operations, valid_timestamp)
           ->
-            ( if
-              Time.System.(Systime_os.now () < of_protocol_exn valid_timestamp)
+            (if
+             Time.System.(Systime_os.now () < of_protocol_exn valid_timestamp)
             then
-              lwt_log_notice
-                Tag.DSL.(
-                  fun f ->
-                    f "[%a] not ready to inject yet, waiting until %a"
-                    -% a timestamp_tag (Systime_os.now ())
-                    -% a
-                         timestamp_tag
-                         (Time.System.of_protocol_exn valid_timestamp)
-                    -% t event "waiting_before_injection")
-              >>= fun () ->
-              match Client_baking_scheduling.sleep_until valid_timestamp with
-              | None ->
-                  Lwt.return_unit
-              | Some timeout ->
-                  timeout
-            else Lwt.return_unit )
+             Events.(emit waiting_before_injection)
+               (Systime_os.now (), Time.System.of_protocol_exn valid_timestamp)
+             >>= fun () ->
+             match Client_baking_scheduling.sleep_until valid_timestamp with
+             | None -> Lwt.return_unit
+             | Some timeout -> timeout
+            else Lwt.return_unit)
             >>= fun () ->
-            lwt_debug
-              Tag.DSL.(
-                fun f ->
-                  f
-                    "Try forging locally the block header for %a (slot %d) \
-                     for %s (%a)"
-                  -% t event "try_forging"
-                  -% a Block_hash.Logging.tag bi.hash
-                  -% s bake_priority_tag priority
-                  -% s Client_keys.Logging.tag name
-                  -% a timestamp_tag (Time.System.of_protocol_exn timestamp))
+            Events.(emit try_forging)
+              (bi.hash, priority, name, Time.System.of_protocol_exn timestamp)
             >>= fun () ->
             let current_protocol = bi.next_protocol in
             let context =
               Shell_context.unwrap_disk_context validation_result.context
             in
-            Context.get_protocol context
-            >>= fun next_protocol ->
+            Context.get_protocol context >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then
               finalize_block_header
                 final_context.header
@@ -1310,8 +1229,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 bi.predecessor_block_metadata_hash
                 bi.predecessor_operations_metadata_hash
               >>= function
-              | Error _ as errs ->
-                  Lwt.return errs
+              | Error _ as errs -> Lwt.return errs
               | Ok shell_header ->
                   let raw_ops = List.map (List.map forge) operations in
                   return_some
@@ -1322,12 +1240,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                       delegate,
                       seed_nonce_hash )
             else
-              lwt_log_notice
-                Tag.DSL.(
-                  fun f ->
-                    f "New protocol detected: using shell validation"
-                    -% t event "shell_prevalidation_notice")
-              >>= fun () ->
+              Events.(emit shell_prevalidation_new_protocol) () >>= fun () ->
               shell_prevalidation
                 cctxt
                 ~chain
@@ -1335,41 +1248,179 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 ~timestamp
                 seed_nonce_hash
                 operations
-                slot )
+                slot)
+
+type per_block_votes = {liquidity_baking_escape_vote : bool option}
+
+let per_block_votes_encoding =
+  let open Data_encoding in
+  def "per_block_votes.alpha"
+  @@ conv
+       (fun {liquidity_baking_escape_vote} -> liquidity_baking_escape_vote)
+       (fun liquidity_baking_escape_vote -> {liquidity_baking_escape_vote})
+       (obj1 (opt "liquidity_baking_escape_vote" Data_encoding.bool))
+
+type error += Block_vote_file_not_found of string
+
+type error += Block_vote_file_invalid of string
+
+type error += Block_vote_file_wrong_content of string
+
+type error += Block_vote_file_missing_liquidity_baking_escape_vote of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_not_found"
+    ~title:
+      "The provided block vote file path does not point to an existing file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to an existing file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to an \
+         existing file.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_not_found file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_not_found file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_invalid"
+    ~title:
+      "The provided block vote file path does not point to a valid JSON file."
+    ~description:
+      "A block vote file path was provided on the command line but the path \
+       does not point to a valid JSON file."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file path \"%s\" does not point to a valid \
+         JSON file. The file exists but its content is not valid JSON.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function Block_vote_file_invalid file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_invalid file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.block_vote_file_wrong_content"
+    ~title:"The content of the provided block vote file is unexpected."
+    ~description:
+      "The block vote file is valid JSON but its content is not the expected \
+       one."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[The provided block vote file \"%s\" is a valid JSON file but its \
+         content is unexpected. Expecting a JSON file containing either \
+         '{\"liquidity_baking_escape_vote\": true}' or \
+         '{\"liquidity_baking_escape_vote\": false}'.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_wrong_content file_path -> Some file_path | _ -> None)
+    (fun file_path -> Block_vote_file_wrong_content file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "Client_baking_forge.block_vote_file_missing_liquidity_baking_escape_vote"
+    ~title:
+      "In the provided block vote file, no entry for liquidity baking escape \
+       vote was found"
+    ~description:
+      "In the provided block vote file, no entry for liquidity baking escape \
+       vote was found."
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "@[In the provided block vote file \"%s\", the \
+         \"liquidity_baking_escape_vote\" boolean field is missing. Expecting \
+         a JSON file containing either '{\"liquidity_baking_escape_vote\": \
+         true}' or '{\"liquidity_baking_escape_vote\": false}'.@]"
+        file_path)
+    Data_encoding.(obj1 (req "file_path" string))
+    (function
+      | Block_vote_file_missing_liquidity_baking_escape_vote file_path ->
+          Some file_path
+      | _ -> None)
+    (fun file_path ->
+      Block_vote_file_missing_liquidity_baking_escape_vote file_path)
+
+let traced_option_to_result ~error =
+  Option.fold ~some:ok ~none:(Error_monad.error error)
+
+let check_file_exists file =
+  if Sys.file_exists file then ok_unit
+  else error (Block_vote_file_not_found file)
+
+let read_liquidity_baking_escape_vote ~per_block_vote_file =
+  Events.(emit reading_per_block) per_block_vote_file >>= fun () ->
+  check_file_exists per_block_vote_file >>?= fun () ->
+  trace (Block_vote_file_invalid per_block_vote_file)
+  @@ Lwt_utils_unix.Json.read_file per_block_vote_file
+  >>=? fun votes_json ->
+  Events.(emit per_block_vote_file_notice) "found" >>= fun () ->
+  trace (Block_vote_file_wrong_content per_block_vote_file)
+  @@ Error_monad.protect (fun () ->
+         return
+         @@ Data_encoding.Json.destruct per_block_votes_encoding votes_json)
+  >>=? fun votes ->
+  Events.(emit per_block_vote_file_notice) "JSON decoded" >>= fun () ->
+  traced_option_to_result
+    ~error:
+      (Block_vote_file_missing_liquidity_baking_escape_vote per_block_vote_file)
+    votes.liquidity_baking_escape_vote
+  >>?= fun liquidity_baking_escape_vote ->
+  Events.(emit reading_liquidity_baking) () >>= fun () ->
+  Events.(emit liquidity_baking_escape_vote) liquidity_baking_escape_vote
+  >>= fun () -> return liquidity_baking_escape_vote
+
+let read_liquidity_baking_escape_vote_no_fail ~per_block_vote_file =
+  read_liquidity_baking_escape_vote ~per_block_vote_file >>= function
+  | Ok vote -> Lwt.return vote
+  | Error errs ->
+      Events.(emit per_block_vote_file_fail) errs >>= fun () -> Lwt.return false
 
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
-    ~chain state =
-  ( match state.best_slot with
-  | None ->
-      assert false (* unreachable *)
-  | Some slot ->
-      return slot )
+let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
+    ~user_activated_upgrades ~chain state =
+  (match state.best_slot with
+  | None -> assert false (* unreachable *)
+  | Some slot -> return slot)
   >>=? fun slot ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  build_block cctxt ~user_activated_upgrades state seed_nonce_hash slot
+  Option.fold
+    ~none:(Lwt.return false)
+    ~some:(fun per_block_vote_file ->
+      read_liquidity_baking_escape_vote_no_fail ~per_block_vote_file)
+    per_block_vote_file
+  >>= fun liquidity_baking_escape_vote ->
+  build_block
+    cctxt
+    ~user_activated_upgrades
+    state
+    seed_nonce_hash
+    slot
+    ~liquidity_baking_escape_vote
   >>=? function
   | Some (head, priority, shell_header, operations, delegate, seed_nonce_hash)
     -> (
       let level = Raw_level.succ head.level in
-      Client_keys.Public_key_hash.name cctxt delegate
-      >>=? fun name ->
-      lwt_log_info
-        Tag.DSL.(
-          fun f ->
-            f "Injecting block (priority %d, fitness %a) for %s after %a..."
-            -% t event "start_injecting_block"
-            -% s bake_priority_tag priority
-            -% a fitness_tag shell_header.fitness
-            -% s Client_keys.Logging.tag name
-            -% a Block_hash.Logging.predecessor_tag shell_header.predecessor
-            -% t Signature.Public_key_hash.Logging.tag delegate)
+      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+      Events.(emit start_injecting_block)
+        ( priority,
+          shell_header.fitness,
+          name,
+          shell_header.predecessor,
+          delegate )
       >>= fun () ->
-      Client_keys.get_key cctxt delegate
-      >>=? fun (_, _, delegate_sk) ->
+      Client_keys.get_key cctxt delegate >>=? fun (_, _, delegate_sk) ->
       inject_block
         cctxt
         ~chain
@@ -1381,46 +1432,31 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         ~delegate_sk
         ~level
         operations
+        ~liquidity_baking_escape_vote
       >>= function
       | Error errs ->
-          lwt_log_error
-            Tag.DSL.(
-              fun f ->
-                f
-                  "@[<v 4>Error while injecting block@ @[Included operations \
-                   : %a@]@ %a@]"
-                -% t event "block_injection_failed"
-                -% a raw_operations_tag (List.concat operations)
-                -% a errs_tag errs)
+          Events.(emit block_injection_failed) (List.concat operations, errs)
           >>= fun () -> return_unit
       | Ok block_hash ->
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f
-                  "Injected block %a for %s after %a (level %a, priority %d, \
-                   fitness %a, operations %a)."
-                -% t event "injected_block"
-                -% a Block_hash.Logging.tag block_hash
-                -% s Client_keys.Logging.tag name
-                -% a Block_hash.Logging.tag shell_header.predecessor
-                -% a level_tag level
-                -% s bake_priority_tag priority
-                -% a fitness_tag shell_header.fitness
-                -% a operations_tag operations)
+          Events.(emit injected_block)
+            ( block_hash,
+              name,
+              shell_header.predecessor,
+              level,
+              priority,
+              shell_header.fitness,
+              List.concat operations )
           >>= fun () ->
-          ( if seed_nonce_hash <> None then
-            cctxt#with_lock (fun () ->
-                let open Client_baking_nonces in
-                load cctxt state.nonces_location
-                >>=? fun nonces ->
-                let nonces = add nonces block_hash seed_nonce in
-                save cctxt state.nonces_location nonces)
-            |> trace_exn (Failure "Error while recording nonce")
-          else return_unit )
-          >>=? fun () -> return_unit )
-  | None ->
-      return_unit
+          (if seed_nonce_hash <> None then
+           cctxt#with_lock (fun () ->
+               let open Client_baking_nonces in
+               load cctxt state.nonces_location >>=? fun nonces ->
+               let nonces = add nonces block_hash seed_nonce in
+               save cctxt state.nonces_location nonces)
+           |> trace_exn (Failure "Error while recording nonce")
+          else return_unit)
+          >>=? fun () -> return_unit)
+  | None -> return_unit
 
 (** [get_baking_slots] calls the node via RPC to retrieve the potential
     slots for the given delegates within a given range of priority *)
@@ -1437,15 +1473,8 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
     (chain, block)
   >>= function
   | Error errs ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Error while fetching baking possibilities:\n%a"
-            -% t event "baking_slot_fetch_errors"
-            -% a errs_tag errs)
-      >>= fun () -> Lwt.return_nil
-  | Ok [] ->
-      Lwt.return_nil
+      Events.(emit baking_slot_fetch_errors) errs >>= fun () -> Lwt.return_nil
+  | Ok [] -> Lwt.return_nil
   | Ok slots ->
       let slots =
         List.filter_map
@@ -1464,22 +1493,15 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
     wake up. *)
 let compute_best_slot_on_current_level ?max_priority
     (cctxt : #Protocol_client_context.full) state new_head =
-  get_delegates cctxt state
-  >>=? fun delegates ->
+  get_delegates cctxt state >>=? fun delegates ->
   let level = Raw_level.succ new_head.Client_baking_blocks.level in
-  get_baking_slots cctxt ?max_priority new_head delegates
-  >>= function
+  get_baking_slots cctxt ?max_priority new_head delegates >>= function
   | [] ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            let max_priority =
-              Option.value ~default:default_max_priority max_priority
-            in
-            f "No slot found at level %a (max_priority = %d)"
-            -% t event "no_slot_found" -% a level_tag level
-            -% s bake_priority_tag max_priority)
-      >>= fun () -> return_none
+      let max_priority =
+        Option.value ~default:default_max_priority max_priority
+      in
+      Events.(emit no_slot_found) (level, max_priority) >>= fun () ->
+      return_none
       (* No slot found *)
   | h :: t ->
       (* One or more slot found, fetching the best (lowest) priority.
@@ -1491,20 +1513,10 @@ let compute_best_slot_on_current_level ?max_priority
           h
           t
       in
-      Client_keys.Public_key_hash.name cctxt delegate
-      >>=? fun name ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f
-              "New baking slot found (level %a, priority %d) at %a for %s \
-               after %a."
-            -% t event "have_baking_slot" -% a level_tag level
-            -% s bake_priority_tag priority
-            -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
-            -% s Client_keys.Logging.tag name
-            -% a Block_hash.Logging.tag new_head.hash
-            -% t Signature.Public_key_hash.Logging.tag delegate)
+      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+      let time = Time.System.of_protocol_exn timestamp in
+      Events.(emit have_baking_slot)
+        (level, priority, time, name, new_head.hash, delegate)
       >>= fun () ->
       (* Found at least a slot *)
       return_some best_slot
@@ -1515,15 +1527,8 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
   cctxt#with_lock (fun () ->
       Client_baking_files.resolve_location cctxt ~chain `Nonce
       >>=? fun nonces_location ->
-      Client_baking_nonces.load cctxt nonces_location
-      >>= function
-      | Error err ->
-          lwt_log_error
-            Tag.DSL.(
-              fun f ->
-                f "Cannot read nonces: %a" -% t event "read_nonce_fail"
-                -% a errs_tag err)
-          >>= fun () -> return_unit
+      Client_baking_nonces.load cctxt nonces_location >>= function
+      | Error err -> Events.(emit read_nonce_fail) err >>= fun () -> return_unit
       | Ok nonces -> (
           Client_baking_nonces.get_unrevealed_nonces
             cctxt
@@ -1531,15 +1536,8 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
             nonces
           >>= function
           | Error err ->
-              lwt_log_error
-                Tag.DSL.(
-                  fun f ->
-                    f "Cannot retrieve unrevealed nonces: %a"
-                    -% t event "nonce_retrieval_fail"
-                    -% a errs_tag err)
-              >>= fun () -> return_unit
-          | Ok [] ->
-              return_unit
+              Events.(emit nonce_retrieval_fail) err >>= fun () -> return_unit
+          | Ok [] -> return_unit
           | Ok nonces_to_reveal -> (
               Client_baking_revelation.inject_seed_nonce_revelation
                 cctxt
@@ -1548,18 +1546,13 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
                 nonces_to_reveal
               >>= function
               | Error err ->
-                  lwt_log_error
-                    Tag.DSL.(
-                      fun f ->
-                        f "Cannot inject nonces: %a"
-                        -% t event "nonce_injection_fail"
-                        -% a errs_tag err)
-                  >>= fun () -> return_unit
+                  Events.(emit nonce_injection_fail) err >>= fun () ->
+                  return_unit
               | Ok () ->
                   (* If some nonces are to be revealed it means:
-                   - We entered a new cycle and we can clear old nonces ;
-                   - A revelation was not included yet in the cycle beginning.
-                   So, it is safe to only filter outdated_nonces there *)
+                     - We entered a new cycle and we can clear old nonces ;
+                     - A revelation was not included yet in the cycle beginning.
+                     So, it is safe to only filter outdated_nonces there *)
                   Client_baking_nonces.filter_outdated_nonces
                     cctxt
                     ~constants
@@ -1567,19 +1560,18 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
                     nonces
                   >>=? fun live_nonces ->
                   Client_baking_nonces.save cctxt nonces_location live_nonces
-                  >>=? fun () -> return_unit ) ))
+                  >>=? fun () -> return_unit)))
 
 (** [create] starts the main loop of the baker. The loop monitors new blocks and
     starts individual baking operations when baking-slots are available to any of
     the [delegates] *)
 let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?max_priority ~chain ~context_path delegates block_stream =
+    ?max_priority ?per_block_vote_file ~chain ~context_path delegates
+    block_stream =
   let state_maker bi =
-    Alpha_services.Constants.all cctxt (chain, `Head 0)
-    >>=? fun constants ->
-    Client_baking_simulator.load_context ~context_path
-    >>= fun index ->
+    Alpha_services.Constants.all cctxt (chain, `Head 0) >>=? fun constants ->
+    Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency
       index
       bi.Client_baking_blocks.context
@@ -1617,29 +1609,21 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         (* No slot, just wait for new blocks which will give more info *)
         Lwt_utils.never_ending ()
     | Some (timestamp, _) -> (
-      match Client_baking_scheduling.sleep_until timestamp with
-      | None ->
-          Lwt.return_unit
-      | Some timeout ->
-          timeout )
+        match Client_baking_scheduling.sleep_until timestamp with
+        | None -> Lwt.return_unit
+        | Some timeout -> timeout)
   in
   let timeout_k cctxt state () =
-    bake cctxt ~user_activated_upgrades ~chain state
+    bake ?per_block_vote_file cctxt ~user_activated_upgrades ~chain state
     >>= function
     | Error err ->
         if state.retry_counter = 0 then (
           (* Stop the timeout and wait for the next block *)
           state.best_slot <- None ;
           state.retry_counter <- default_retry_counter ;
-          Lwt.return (Error err) )
+          Lwt.return (Error err))
         else
-          lwt_log_error
-            Tag.DSL.(
-              fun f ->
-                f "Retrying after baking error %a"
-                -% t event "retrying_on_error"
-                -% a errs_tag err)
-          >>= fun () ->
+          Events.(emit retrying_on_error) err >>= fun () ->
           state.retry_counter <- pred state.retry_counter ;
           return_unit
     | Ok () ->
@@ -1649,6 +1633,17 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         return_unit
   in
   let finalizer state = Context.close state.index in
+  Option.fold
+    ~none:return_unit
+    ~some:(fun per_block_vote_file ->
+      read_liquidity_baking_escape_vote ~per_block_vote_file
+      >>=? fun liquidity_baking_escape_vote ->
+      (if liquidity_baking_escape_vote then
+       Events.(emit liquidity_baking_escape) ()
+      else Events.(emit liquidity_baking_continue) ())
+      >>= fun () -> return_unit)
+    per_block_vote_file
+  >>=? fun () ->
   Client_baking_scheduling.main
     ~name:"baker"
     ~cctxt

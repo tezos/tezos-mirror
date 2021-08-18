@@ -44,6 +44,8 @@ class type prompter =
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
     method prompt_password : ('a, Bytes.t tzresult) lwt_format -> 'a
+
+    method multiple_password_retries : bool
   end
 
 class type io =
@@ -161,14 +163,21 @@ class proxy_context (obj : full) =
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       obj#call_service
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       obj#call_streamed_service
 
@@ -196,6 +205,8 @@ class proxy_context (obj : full) =
 
     method prompt_password : type a. (a, Bytes.t tzresult) lwt_format -> a =
       obj#prompt_password
+
+    method multiple_password_retries : bool = obj#multiple_password_retries
 
     method sleep : float -> unit Lwt.t = obj#sleep
 

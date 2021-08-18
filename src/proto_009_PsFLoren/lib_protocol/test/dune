@@ -4,7 +4,8 @@
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
-            crowbar
+            qcheck-alcotest
+            tezos-test-helpers
             tezos-009-PsFLoren-test-helpers
             tezos-stdlib-unix
             tezos-client-base
@@ -54,8 +55,3 @@
  (package tezos-protocol-009-PsFLoren-tests)
  (deps (alias runtest_proto_009_PsFLoren) (alias runtest_saturation_fuzzing))
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

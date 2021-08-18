@@ -37,6 +37,11 @@ type options = {
   max_relative_error : float;
       (** Percentage of admissible relative error when casting floats to ints  *)
   cast_mode : cast_mode;
+  inverse_scaling : int;
+      (** The constant prettification will consider 1/inverse_scaling digits to
+          be not significant. *)
+  resolution : int;
+      (** Resolution of the grid using when prettifying constants.  *)
 }
 
 (* Handling bad floating point values.  *)
@@ -54,8 +59,15 @@ exception Bad_floating_point_number of fp_error
 exception Codegen_error of fixed_point_transform_error
 
 (* ------------------------------------------------------------------------- *)
+
 let default_options =
-  {precision = 3; max_relative_error = 0.1; cast_mode = Round}
+  {
+    precision = 3;
+    max_relative_error = 0.1;
+    cast_mode = Round;
+    inverse_scaling = 3;
+    resolution = 5;
+  }
 
 (* ------------------------------------------------------------------------- *)
 (* Printers, encodings, etc. *)
@@ -88,7 +100,8 @@ let pp_fixed_point_transform_error fmtr (err : fixed_point_transform_error) =
 let cast_mode_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         ~title:"Ceil"
         (Tag 0)
         (constant "Ceil")
@@ -105,19 +118,22 @@ let cast_mode_encoding =
         (Tag 2)
         (constant "Round")
         (function Round -> Some () | _ -> None)
-        (fun () -> Round) ]
+        (fun () -> Round);
+    ]
 
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {precision; max_relative_error; cast_mode} ->
-      (precision, max_relative_error, cast_mode))
-    (fun (precision, max_relative_error, cast_mode) ->
-      {precision; max_relative_error; cast_mode})
-    (obj3
+    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution} ->
+      (precision, max_relative_error, cast_mode, inverse_scaling, resolution))
+    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution) ->
+      {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
+    (obj5
        (req "precision" int31)
        (req "max_relative_error" float)
-       (req "cast_mode" cast_mode_encoding))
+       (req "cast_mode" cast_mode_encoding)
+       (req "inverse_scaling" int31)
+       (req "resolution" int31))
 
 (* ------------------------------------------------------------------------- *)
 (* Error registration *)
@@ -129,17 +145,12 @@ let () =
           let s =
             match error with
             | Bad_fpclass fpcl -> (
-              match fpcl with
-              | FP_subnormal ->
-                  "FP_subnormal"
-              | FP_infinite ->
-                  "FP_infinite"
-              | FP_nan ->
-                  "FP_nan"
-              | _ ->
-                  assert false )
-            | Negative_or_zero_fp ->
-                "<= 0"
+                match fpcl with
+                | FP_subnormal -> "FP_subnormal"
+                | FP_infinite -> "FP_infinite"
+                | FP_nan -> "FP_nan"
+                | _ -> assert false)
+            | Negative_or_zero_fp -> "<= 0"
           in
           Some
             (Printf.sprintf
@@ -148,20 +159,35 @@ let () =
       | Codegen_error err ->
           let s = Format.asprintf "%a" pp_fixed_point_transform_error err in
           Some s
-      | _ ->
-          None)
+      | _ -> None)
+
+(* ------------------------------------------------------------------------- *)
+(* Constant prettification *)
+
+let rec log10 x =
+  if x <= 0 then invalid_arg "log10"
+  else if x <= 10 then 1
+  else 1 + log10 (x / 10)
+
+let rec pow x n =
+  if n < 0 then invalid_arg "pow"
+  else if n = 0 then 1
+  else if n = 1 then x
+  else x * pow x (n - 1)
+
+let snap_to_grid ~inverse_scaling ~resolution x =
+  let not_significant = log10 x / inverse_scaling in
+  let grid = resolution * pow 10 not_significant in
+  grid * (1 + (x / grid))
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
 
 let int_of_float mode x =
   match mode with
-  | Ceil ->
-      int_of_float (Float.ceil x)
-  | Floor ->
-      int_of_float (Float.floor x)
-  | Round ->
-      int_of_float (Float.round x)
+  | Ceil -> int_of_float (Float.ceil x)
+  | Floor -> int_of_float (Float.floor x)
+  | Round -> int_of_float (Float.round x)
 
 (* Checks that a floating point number is 'good' *)
 let assert_fp_is_correct (x : float) =
@@ -171,8 +197,7 @@ let assert_fp_is_correct (x : float) =
       raise (Bad_floating_point_number (Bad_fpclass fpcl))
   | FP_normal when x <= 0.0 ->
       raise (Bad_floating_point_number Negative_or_zero_fp)
-  | _ ->
-      ()
+  | _ -> ()
 
 let cast_safely_to_int max_relative_error mode f : int =
   let i = int_of_float mode f in
@@ -228,10 +253,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
       if n <= 0 then (List.rev acc, l)
       else
         match l with
-        | [] ->
-            Stdlib.failwith "take"
-        | hd :: tl ->
-            take (n - 1) tl (hd :: acc)
+        | [] -> Stdlib.failwith "take"
+        | hd :: tl -> take (n - 1) tl (hd :: acc)
     in
     take n l []
 
@@ -246,8 +269,7 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
   let exponent_bits_to_int (l : int64 list) =
     let rec exponent_to_int (l : int64 list) (index : int) : int64 =
       match l with
-      | [] ->
-          -1023L
+      | [] -> -1023L
       | bit :: tail ->
           let tail = exponent_to_int tail (index + 1) in
           Int64.(add (shift_left bit index) tail)
@@ -279,10 +301,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
               else i
             in
             match term_opt with
-            | None ->
-                (k + 1, Some new_term)
-            | Some term ->
-                (k + 1, Some Lang.(term + new_term))
+            | None -> (k + 1, Some new_term)
+            | Some term -> (k + 1, Some Lang.(term + new_term))
           else (k + 1, term_opt))
         (0, None)
         bits
@@ -291,18 +311,24 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
 end
 
 (* ------------------------------------------------------------------------- *)
-(* [Convert_floats] approximates floating point constants by integer ones. *)
+(* [Prettify_constants] map float and int constants to an integer grid. *)
 
-module Convert_floats (P : sig
+module Prettify_constants (P : sig
   val options : options
 end)
 (X : Costlang.S) :
   Costlang.S with type 'a repr = 'a X.repr and type size = X.size = struct
-  let {max_relative_error; cast_mode; _} = P.options
+  let {max_relative_error; cast_mode; inverse_scaling; resolution; _} =
+    P.options
 
   include X
 
-  let float f = X.int (cast_safely_to_int max_relative_error cast_mode f)
+  let int i = X.int (snap_to_grid ~inverse_scaling ~resolution i)
+
+  let float f =
+    let int = cast_safely_to_int max_relative_error cast_mode f in
+    let pretty_int = snap_to_grid ~inverse_scaling ~resolution int in
+    X.int pretty_int
 end
 
 (* [Convert_mult] approximates multiplications of the form [float * term] or
@@ -327,7 +353,7 @@ end = struct
 
   module FPA = Fixed_point_arithmetic (X)
 
-  let {precision; max_relative_error; cast_mode} = P.options
+  let {precision; max_relative_error; cast_mode; _} = P.options
 
   let cast_safely_to_int = cast_safely_to_int max_relative_error
 
@@ -335,19 +361,15 @@ end = struct
      not too high. *)
   let cast_safe (type a) (x : a repr) : a repr =
     match x with
-    | Term _ ->
-        x
-    | Const f ->
-        Term (X.int (cast_safely_to_int cast_mode f))
+    | Term _ -> x
+    | Const f -> Term (X.int (cast_safely_to_int cast_mode f))
 
   let lift_unop op x = match x with Term x -> Term (op x) | _ -> cast_safe x
 
   let rec lift_binop op x y =
     match (x, y) with
-    | (Term x, Term y) ->
-        Term (op x y)
-    | _ ->
-        lift_binop op (cast_safe x) (cast_safe y)
+    | (Term x, Term y) -> Term (op x y)
+    | _ -> lift_binop op (cast_safe x) (cast_safe y)
 
   let gensym : unit -> string =
     let x = ref 0 in
@@ -370,14 +392,12 @@ end = struct
 
   let ( * ) x y =
     match (x, y) with
-    | (Term x, Term y) ->
-        Term X.(x * y)
+    | (Term x, Term y) -> Term X.(x * y)
     | (Term x, Const y) | (Const y, Term x) ->
         (* let-bind the non-constant term to avoid copying it. *)
         Term
           (X.let_ ~name:(gensym ()) x (fun x -> FPA.approx_mult precision x y))
-    | (Const x, Const y) ->
-        Const (x *. y)
+    | (Const x, Const y) -> Const (x *. y)
 
   let ( / ) = lift_binop X.( / )
 
@@ -404,12 +424,9 @@ end = struct
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with
-    | (Term fn, Term arg) ->
-        Term (X.app fn arg)
-    | (Term fn, Const f) ->
-        Term (X.app fn (X.float f))
-    | (Const _, _) ->
-        assert false
+    | (Term fn, Term arg) -> Term (X.app fn arg)
+    | (Term fn, Const f) -> Term (X.app fn (X.float f))
+    | (Const _, _) -> assert false
 
   let let_ (type a b) ~name (m : a repr) (fn : a repr -> b repr) : b repr =
     match m with
@@ -428,4 +445,4 @@ end
 module Apply (P : sig
   val options : options
 end) : Costlang.Transform =
-  functor (X : Costlang.S) -> Convert_mult (P) (Convert_floats (P) (X))
+functor (X : Costlang.S) -> Convert_mult (P) (Prettify_constants (P) (X))

@@ -39,7 +39,7 @@ module Make (Monad : Traced_sigs.Monad.S) :
 
   let iter_ep f l = join_ep (rev_map (Lwt.apply f) l)
 
-  let lwt_apply2 f x y = try f x y with exc -> Lwt.fail exc
+  let lwt_apply2 f x y = try f x y with exn -> Lwt.fail exn
 
   let iteri_ep f l = join_ep (mapi (lwt_apply2 f) l)
 
@@ -62,8 +62,7 @@ module Make (Monad : Traced_sigs.Monad.S) :
   let exists_ep f l = rev_map_ep f l >|=? exists Fun.id
 
   let partition_ep f l =
-    rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l
-    >|=? fun bxs ->
+    rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l >|=? fun bxs ->
     fold_left
       (fun (trues, falses) (b, x) ->
         if b then (x :: trues, falses) else (trues, x :: falses))

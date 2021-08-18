@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let test_gas_storage_limits protocol =
-  Test.register
+let test_gas_storage_limits =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Protocol limits) " (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "protocol"; "limits"]
-  @@ fun () ->
+    ~title:"protocol limits"
+    ~tags:["mockup"; "protocol"; "limits"]
+  @@ fun protocol ->
   let parameters = JSON.parse_file (Protocol.parameter_file protocol) in
   let gas_limit =
     JSON.(parameters |-> "hard_gas_limit_per_operation" |> as_int)
@@ -74,10 +74,10 @@ let test_gas_storage_limits protocol =
   in
   if giver_balance <> expected_giver_balance then
     Test.fail
-      "test_gas_storage_limits: unexpected balance for giver (got %f, \
-       expected %f)"
+      "test_gas_storage_limits: unexpected balance for giver (got %f, expected \
+       %f)"
       giver_balance
       expected_giver_balance
   else return ()
 
-let register protocol = test_gas_storage_limits protocol
+let register ~protocols = test_gas_storage_limits ~protocols

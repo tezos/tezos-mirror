@@ -14,8 +14,3 @@
                    -open Tezos_client_base
                    -open Tezos_protocol_genesis_carthagenet
                    -open Tezos_client_commands)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{libexec:tezos-tooling:lint.sh} %{deps})))

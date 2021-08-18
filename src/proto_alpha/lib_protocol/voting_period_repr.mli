@@ -36,12 +36,19 @@ type kind =
 
 val kind_encoding : kind Data_encoding.t
 
-(** A voting period can be of 5 kinds and is uniquely identified by a counter
-    since the root. *)
+(** A voting period can be of several kinds and is uniquely identified by
+   the counter 'index'. The 'start_position' represents the relative
+   position of the first level of the period with respect to the
+   first level of the Alpha family of protocols. *)
 type voting_period = {index : Int32.t; kind : kind; start_position : Int32.t}
 
 type t = voting_period
 
+(** Information about a block with respect to the voting period it
+   belongs to: the voting period, the position within the voting
+   period and the number of remaining blocks till the end of the
+   period. The following invariant is satisfied:
+     `position + remaining + 1 = blocks_per_voting_period` *)
 type info = {voting_period : t; position : Int32.t; remaining : Int32.t}
 
 val root : start_position:Int32.t -> t

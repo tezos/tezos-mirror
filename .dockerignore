@@ -21,6 +21,7 @@ tezos-admin-client
 tezos-baker-*
 tezos-endorser-*
 tezos-accuser-*
+tezos-proxy-server
 tezos-signer
 
 scripts/opam-test-all.sh.DONE

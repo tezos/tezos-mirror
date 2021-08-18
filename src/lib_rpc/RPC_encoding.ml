@@ -69,16 +69,19 @@ open Resto.Description
 
 let meth_encoding =
   Data_encoding.string_enum
-    [ ("GET", `GET);
+    [
+      ("GET", `GET);
       ("POST", `POST);
       ("DELETE", `DELETE);
       ("PUT", `PUT);
-      ("PATCH", `PATCH) ]
+      ("PATCH", `PATCH);
+    ]
 
 let path_item_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         string
         ~title:"PStatic"
@@ -95,12 +98,14 @@ let path_item_encoding =
         multi_arg_encoding
         ~title:"PDynamicTail"
         (function PDynamicTail s -> Some s | _ -> None)
-        (fun s -> PDynamicTail s) ]
+        (fun s -> PDynamicTail s);
+    ]
 
 let query_kind_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Single"
         (obj1 (req "single" arg_encoding))
@@ -123,7 +128,8 @@ let query_kind_encoding =
         ~title:"Multi"
         (obj1 (req "multi" arg_encoding))
         (function Multi s -> Some s | _ -> None)
-        (fun s -> Multi s) ]
+        (fun s -> Multi s);
+    ]
 
 let query_item_encoding =
   let open Data_encoding in
@@ -143,11 +149,7 @@ let service_descr_encoding =
         path,
         description,
         query,
-        ( match input with
-        | None ->
-            None
-        | Some input ->
-            Some (Lazy.force input) ),
+        Option.map Lazy.force input,
         Lazy.force output,
         Lazy.force error ))
     (fun (meth, path, description, query, input, output, error) ->
@@ -156,12 +158,7 @@ let service_descr_encoding =
         path;
         description;
         query;
-        input =
-          ( match input with
-          | None ->
-              None
-          | Some input ->
-              Some (Lazy.from_val input) );
+        input = Option.map Lazy.from_val input;
         output = Lazy.from_val output;
         error = Lazy.from_val error;
       })
@@ -176,11 +173,11 @@ let service_descr_encoding =
 
 let directory_descr_encoding =
   let open Data_encoding in
-  mu "service_tree"
-  @@ fun directory_descr_encoding ->
+  mu "service_tree" @@ fun directory_descr_encoding ->
   let static_subdirectories_descr_encoding =
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Suffixes"
           (obj1
@@ -190,8 +187,7 @@ let directory_descr_encoding =
                    (obj2
                       (req "name" string)
                       (req "tree" directory_descr_encoding)))))
-          (function
-            | Suffixes map -> Some (StringMap.bindings map) | _ -> None)
+          (function Suffixes map -> Some (StringMap.bindings map) | _ -> None)
           (fun m ->
             let add acc (n, t) = StringMap.add n t acc in
             Suffixes (List.fold_left add StringMap.empty m));
@@ -205,7 +201,8 @@ let directory_descr_encoding =
                    (req "arg" arg_encoding)
                    (req "tree" directory_descr_encoding))))
           (function Arg (ty, tree) -> Some (ty, tree) | _ -> None)
-          (fun (ty, tree) -> Arg (ty, tree)) ]
+          (fun (ty, tree) -> Arg (ty, tree));
+      ]
   in
   let static_directory_descr_encoding =
     conv
@@ -215,10 +212,8 @@ let directory_descr_encoding =
       (fun (get, post, delete, put, patch, subdirs) ->
         let add meth s services =
           match s with
-          | None ->
-              services
-          | Some s ->
-              Resto.MethMap.add meth s services
+          | None -> services
+          | Some s -> Resto.MethMap.add meth s services
         in
         let services =
           Resto.MethMap.empty
@@ -238,7 +233,8 @@ let directory_descr_encoding =
          (opt "subdirs" static_subdirectories_descr_encoding))
   in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Static"
         (obj1 (req "static" static_directory_descr_encoding))
@@ -255,7 +251,8 @@ let directory_descr_encoding =
         ~title:"Empty"
         (constant "empty")
         (function Empty -> Some () | _ -> None)
-        (fun () -> Empty) ]
+        (fun () -> Empty);
+    ]
 
 let description_request_encoding =
   let open Data_encoding in

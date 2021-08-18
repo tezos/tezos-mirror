@@ -15,10 +15,12 @@ let setup_baking_ledger state uri ~client =
   Interactive_test.Pauser.generic
     state
     EF.
-      [ wf "Setting up the ledger device %S" uri;
+      [
+        wf "Setting up the ledger device %S" uri;
         haf
           "Please make sure the ledger is on the Baking app and quit (`q`) \
-           this prompt to continue." ]
+           this prompt to continue.";
+      ]
     ~force:true
   >>= fun () ->
   let key_name = "ledgered" in
@@ -32,8 +34,7 @@ let setup_baking_ledger state uri ~client =
         uri
         client.Tezos_client.id)
   >>= fun () ->
-  Tezos_client.Keyed.initialize state baker
-  >>= fun _ ->
+  Tezos_client.Keyed.initialize state baker >>= fun _ ->
   ledger_prompt_notice
     state
     EF.(
@@ -45,7 +46,8 @@ let setup_baking_ledger state uri ~client =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "setup";
+    [
+      "setup";
       "ledger";
       "to";
       "bake";
@@ -54,7 +56,8 @@ let setup_baking_ledger state uri ~client =
       "--main-hwm";
       "0";
       "--test-hwm";
-      "0" ]
+      "0";
+    ]
   >>= fun _ -> return baker
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
@@ -63,7 +66,8 @@ let transfer state ~client ~src ~dst ~amount =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "--wait";
+    [
+      "--wait";
       "none";
       "transfer";
       sprintf "%Ld" amount;
@@ -74,34 +78,36 @@ let transfer state ~client ~src ~dst ~amount =
       "--fee";
       "0.05";
       "--burn-cap";
-      "0.3" ]
+      "0.3";
+    ]
 
 let register state ~client ~dst =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "--wait";
-      "none";
-      "register";
-      "key";
-      dst;
-      "as";
-      "delegate";
-      "--fee";
-      "0.05" ]
+    ["--wait"; "none"; "register"; "key"; dst; "as"; "delegate"]
 
-let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
-    =
+let bake_until_voting_period ?keep_alive_delegate state ~protocol ~baker
+    ~attempts period =
+  let is_expected_period (voting_period : (string * Ezjsonm.value) list)
+      period_name =
+    match Stdlib.List.assoc_opt "voting_period" voting_period with
+    | Some (`O obj) -> (
+        match Stdlib.List.assoc_opt "kind" obj with
+        | Some (`String p) -> String.equal p period_name
+        | _ -> false)
+    | _ -> false
+  in
   let client = baker.Tezos_client.Keyed.client in
-  let period_name = Tezos_protocol.Voting_period.to_string period in
+  let period_name = Tezos_protocol.voting_period_to_string protocol period in
   Helpers.wait_for state ~attempts ~seconds:0.5 (fun nth ->
       Tezos_client.rpc
         state
         ~client
         `Get
-        ~path:"/chains/main/blocks/head/votes/current_period_kind"
+        ~path:"/chains/main/blocks/head/votes/current_period"
       >>= function
-      | `String p when String.equal p period_name ->
+      | `O voting_period when is_expected_period voting_period period_name ->
           return (`Done (nth - 1))
       | _ ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
@@ -126,27 +132,23 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
        ["--chain"; chain; "list"; "understood"; "protocols"])
     ~f:(function
       | Ok client_protocols_result -> (
-        match
-          List.find client_protocols_result#out ~f:(fun prefix ->
-              String.is_prefix protocol_hash ~prefix)
-        with
-        | Some _ ->
-            return `Proper_understanding
-        | None when expect_clueless_client ->
-            return `Expected_misunderstanding
-        | None ->
-            return `Failure_to_understand )
+          match
+            List.find client_protocols_result#out ~f:(fun prefix ->
+                String.is_prefix protocol_hash ~prefix)
+          with
+          | Some _ -> return `Proper_understanding
+          | None when expect_clueless_client ->
+              return `Expected_misunderstanding
+          | None -> return `Failure_to_understand)
       | Error (`Process_error _) when expect_clueless_client ->
           return `Expected_misunderstanding
-      | Error e ->
-          fail e)
+      | Error e -> fail e)
 
 let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
   let default_attempts = 50 in
-  Helpers.clear_root state
-  >>= fun () ->
+  Helpers.clear_root state >>= fun () ->
   Helpers.System_dependencies.precheck
     state
     `Or_fail
@@ -163,6 +165,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ( {
         protocol with
         time_between_blocks = [1; 0];
+        minimal_block_delay = 1;
         bootstrap_accounts =
           List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
               if Poly.(fst baker = n) then (n, v) else (n, 1_000L));
@@ -199,8 +202,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       ~key_name:"baker-0"
       ~secret_key:(Tezos_protocol.Account.private_key baker_0_account)
   in
-  Tezos_client.Keyed.initialize state baker_0
-  >>= fun _ ->
+  Tezos_client.Keyed.initialize state baker_0 >>= fun _ ->
   let level_counter = Counter_log.create () in
   let first_bakes = 5 in
   Loop.n_times first_bakes (fun nth ->
@@ -208,10 +210,9 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   let initial_level = first_bakes + 1 in
   Counter_log.add level_counter "initial_level" initial_level ;
-  ( match with_ledger with
+  (match with_ledger with
   | None ->
-      Console.say state EF.(wf "No ledger.")
-      >>= fun () ->
+      Console.say state EF.(wf "No ledger.") >>= fun () ->
       let account = Tezos_protocol.Account.of_name "special-baker" in
       let baker =
         Tezos_client.Keyed.make
@@ -220,8 +221,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           ~secret_key:(Tezos_protocol.Account.private_key account)
       in
       Tezos_client.Keyed.initialize state baker >>= fun _ -> return baker
-  | Some uri ->
-      setup_baking_ledger state ~client:(client 0) uri )
+  | Some uri -> setup_baking_ledger state ~client:(client 0) uri)
   >>= fun special_baker ->
   let winner_client = {baker_0.client with exec = winner_client_exec} in
   let winner_baker_0 =
@@ -235,23 +235,25 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_all_clients
+      [
+        arbitrary_command_on_all_clients
           state
           ~command_names:["wc"; "winner-client"]
           ?make_admin:None
-          ~clients:[winner_client] ] ;
-  Interactive_test.Pauser.generic
-    state
-    EF.[wf "You can now try the new-client"]
+          ~clients:[winner_client];
+      ] ;
+  Interactive_test.Pauser.generic state EF.[wf "You can now try the new-client"]
   >>= fun () ->
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_all_clients
+      [
+        arbitrary_command_on_all_clients
           state
           ~command_names:["baker"]
           ~make_admin
-          ~clients:[special_baker.Tezos_client.Keyed.client] ] ;
+          ~clients:[special_baker.Tezos_client.Keyed.client];
+      ] ;
   transfer
     state (* Tezos_client.successful_client_cmd state *)
     ~client:(client 0)
@@ -287,7 +289,24 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Tezos_client.successful_client_cmd
     state
     ~client:(client 0)
-    [ "--wait";
+    [
+      "--wait";
+      "none";
+      "reveal";
+      "key";
+      "for";
+      special_baker.Tezos_client.Keyed.key_name;
+      "--fee";
+      "0.1";
+    ]
+  >>= fun _ ->
+  Tezos_client.Keyed.bake state baker_0 "Bake to reveal special_baker key"
+  >>= fun _ ->
+  Tezos_client.successful_client_cmd
+    state
+    ~client:(client 0)
+    [
+      "--wait";
       "none";
       "register";
       "key";
@@ -295,7 +314,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       "as";
       "delegate";
       "--fee";
-      "0.5" ]
+      "0.4";
+    ]
   >>= fun _ ->
   let activation_bakes =
     let open Tezos_protocol in
@@ -332,6 +352,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   in
   bake_until_voting_period
     state
+    ~protocol
     ~baker:special_baker
     ~attempts
     `Proposal
@@ -354,34 +375,34 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   let default_protocols = res#out in
   let make_and_inject_protocol ?(make_different = false) name path =
     let tmpdir = Paths.root state // sprintf "protocol-%s" name in
-    Console.say state EF.(wf "Injecting protocol from %s" tmpdir)
-    >>= fun () ->
+    Console.say state EF.(wf "Injecting protocol from %s" tmpdir) >>= fun () ->
     Running_processes.run_successful_cmdf
       state
       "cp -L -R %s %s"
       (Caml.Filename.quote path)
       (Caml.Filename.quote tmpdir)
     >>= fun _ ->
-    ( if make_different then
-      Running_processes.run_successful_cmdf
-        state
-        "echo '(* Protocol %s *)' >> %s/main.mli"
-        name
-        (Caml.Filename.quote tmpdir)
-      >>= fun _ -> return ()
-    else return () )
+    (if make_different then
+     Running_processes.run_successful_cmdf
+       state
+       "echo '(* Protocol %s *)' >> %s/main.mli"
+       name
+       (Caml.Filename.quote tmpdir)
+     >>= fun _ -> return ()
+    else return ())
     >>= fun () ->
     Tezos_admin_client.inject_protocol admin_0 state ~path:tmpdir
     >>= fun (res, hash) ->
     Interactive_test.Pauser.generic
       state
       EF.
-        [ af "Just injected %s (%s): %s" name path hash;
-          markdown_verbatim (String.concat ~sep:"\n" res#out) ]
+        [
+          af "Just injected %s (%s): %s" name path hash;
+          markdown_verbatim (String.concat ~sep:"\n" res#out);
+        ]
     >>= fun () -> return hash
   in
-  make_and_inject_protocol "winner" winner_path
-  >>= fun winner_hash ->
+  make_and_inject_protocol "winner" winner_path >>= fun winner_hash ->
   make_and_inject_protocol
     ~make_different:Poly.(winner_path = demo_path)
     "demo"
@@ -393,30 +414,30 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Network up";
+      [
+        af "Network up";
         desc (haf "Protocols")
         @@ list
              (List.map after_injections_protocols ~f:(fun p ->
                   af
                     "`%s` (%s)"
                     p
-                    ( if List.mem default_protocols p ~equal:String.equal then
-                      "previously known"
+                    (if List.mem default_protocols p ~equal:String.equal then
+                     "previously known"
                     else
                       match p with
-                      | _ when String.equal p winner_hash ->
-                          "injected winner"
-                      | _ when String.equal p demo_hash ->
-                          "injected demo"
-                      | _ ->
-                          "injected unknown" ))) ]
+                      | _ when String.equal p winner_hash -> "injected winner"
+                      | _ when String.equal p demo_hash -> "injected demo"
+                      | _ -> "injected unknown")));
+      ]
   >>= fun () ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       Interactive_test.Pauser.generic
         state
         EF.
-          [ af "About to VOTE";
-            haf "Please switch to the Wallet app and quit (`q`) this prompt."
+          [
+            af "About to VOTE";
+            haf "Please switch to the Wallet app and quit (`q`) this prompt.";
           ]
         ~force:true)
   >>= fun (_ : unit option) ->
@@ -437,12 +458,11 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     >>= fun _ -> return ()
   in
   let to_submit_first = [winner_hash; demo_hash] in
-  ( match serialize_proposals with
-  | false ->
-      submit_proposals special_baker to_submit_first
+  (match serialize_proposals with
+  | false -> submit_proposals special_baker to_submit_first
   | true ->
       List_sequential.iter to_submit_first ~f:(fun one ->
-          submit_proposals special_baker [one]) )
+          submit_proposals special_baker [one]))
   >>= fun () ->
   Tezos_client.successful_client_cmd
     state
@@ -451,6 +471,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun _ ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:protocol.blocks_per_voting_period
     `Exploration
@@ -504,6 +525,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
@@ -520,26 +542,26 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  check_understood_protocols
-    state
-    ~client:winner_client
-    ~chain:"main"
-    ~protocol_hash:winner_hash
-    ~expect_clueless_client:clueless_winner
-  >>= (function
-        | `Proper_understanding ->
-            Interactive_test.Pauser.generic
-              state
-              EF.[wf "Cooldown period, with proper winner-client, have fun."]
-        | `Expected_misunderstanding ->
-            Console.say
-              state
-              EF.(wf "Winner-Client does know new protocol (expected)")
-        | `Failure_to_understand ->
-            failf "Winner-Client does know new protocol!")
+  (check_understood_protocols
+     state
+     ~client:winner_client
+     ~chain:"main"
+     ~protocol_hash:winner_hash
+     ~expect_clueless_client:clueless_winner
+   >>= function
+   | `Proper_understanding ->
+       Interactive_test.Pauser.generic
+         state
+         EF.[wf "Cooldown period, with proper winner-client, have fun."]
+   | `Expected_misunderstanding ->
+       Console.say
+         state
+         EF.(wf "Winner-Client does know new protocol (expected)")
+   | `Failure_to_understand -> failf "Winner-Client does know new protocol!")
   >>= fun () ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
@@ -556,8 +578,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  Interactive_test.Pauser.generic state EF.[haf "Before ballots"]
-  >>= fun () ->
+  Interactive_test.Pauser.generic state EF.[haf "Before ballots"] >>= fun () ->
   Tezos_client.successful_client_cmd
     state
     ~client:baker_0.client
@@ -567,9 +588,10 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       Interactive_test.Pauser.generic
         state
         EF.
-          [ af "About to cast approval ballot.";
+          [
+            af "About to cast approval ballot.";
             haf
-              "Please switch back to the Wallet app and quit (`q`) this prompt."
+              "Please switch back to the Wallet app and quit (`q`) this prompt.";
           ]
         ~force:true
       >>= fun () ->
@@ -599,21 +621,22 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Final ballot(s) are baked in.";
+      [
+        af "Final ballot(s) are baked in.";
         af
           "The client `%s` understands the following protocols: %s"
           Tezos_executable.(
             Option.value
               ~default:(default_binary client_exec)
               client_exec.binary)
-          (String.concat ~sep:", " client_protocols_result#out) ]
+          (String.concat ~sep:", " client_protocols_result#out);
+      ]
   >>= fun () ->
-  ( match protocol.kind with
+  (match protocol.kind with
   | `Alpha ->
       Loop.n_times protocol.blocks_per_voting_period (fun _ ->
           Tezos_client.Keyed.bake state baker_0 "Baking to Adoption period")
-  | _ ->
-      return () )
+  | _ -> return ())
   >>= fun () ->
   Helpers.wait_for
     state
@@ -629,8 +652,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       let json_string = curl_res#out |> String.concat ~sep:"\n" in
       let json_metadata = Ezjsonm.from_string json_string in
       match Jqo.field json_metadata ~k:"next_protocol" with
-      | `String p when String.equal p winner_hash ->
-          return (`Done (nth - 1))
+      | `String p when String.equal p winner_hash -> return (`Done (nth - 1))
       | other ->
           transfer
             state
@@ -658,92 +680,90 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     level_counter
     "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
-  check_understood_protocols
-    state
-    ~client:winner_client
-    ~chain:"main"
-    ~protocol_hash:winner_hash
-    ~expect_clueless_client:clueless_winner
-  >>= (function
-        | `Expected_misunderstanding ->
-            Console.say
-              state
-              EF.(
-                wf "As expected, the client does not know about %s" winner_hash)
-        | `Failure_to_understand ->
-            failf "The winner-client does not know about `%s`" winner_hash
-        | `Proper_understanding -> (
-            Console.say state EF.(wf "The client knows about %s" winner_hash)
-            >>= fun () ->
-            (* This actually depends on the protocol upgrade. *)
-            Asynchronous_result.bind_on_result
-              (Tezos_client.successful_client_cmd
+  (check_understood_protocols
+     state
+     ~client:winner_client
+     ~chain:"main"
+     ~protocol_hash:winner_hash
+     ~expect_clueless_client:clueless_winner
+   >>= function
+   | `Expected_misunderstanding ->
+       Console.say
+         state
+         EF.(wf "As expected, the client does not know about %s" winner_hash)
+   | `Failure_to_understand ->
+       failf "The winner-client does not know about `%s`" winner_hash
+   | `Proper_understanding -> (
+       Console.say state EF.(wf "The client knows about %s" winner_hash)
+       >>= fun () ->
+       (* This actually depends on the protocol upgrade. *)
+       Asynchronous_result.bind_on_result
+         (Tezos_client.successful_client_cmd
+            state
+            ~client:winner_client
+            ["upgrade"; "baking"; "state"])
+         ~f:(function
+           | Ok _ -> return ()
+           | Error _ ->
+               Console.say
                  state
-                 ~client:winner_client
-                 ["upgrade"; "baking"; "state"])
-              ~f:(function
-                | Ok _ ->
-                    return ()
-                | Error _ ->
-                    Console.say
-                      state
-                      EF.(
-                        desc
-                          (shout "Warning")
-                          (wf
-                             "Command `upgrade baking state` failed, but we \
-                              keep going with the baking.")))
-            >>= fun () ->
-            Asynchronous_result.map_option with_ledger ~f:(fun _ ->
-                Interactive_test.Pauser.generic
-                  state
-                  EF.
-                    [ af "About to bake on the new winning protocol.";
-                      haf
-                        "Please switch to the Baking app and quit (`q`) this \
-                         prompt." ]
-                  ~force:true
-                >>= fun () ->
-                Console.say state EF.(wf "Sleeping for a couple of seconds…")
-                (* USB thing is often slower than humans hitting `q` *)
-                >>= fun () -> System.sleep 4.)
-            >>= fun (_ : unit option) ->
-            Tezos_client.Keyed.bake
-              state
-              winner_baker_0
-              "First bake on new protocol !!"
-            >>= fun () ->
-            Counter_log.incr level_counter "baker-0-bakes-on-new-protocol" ;
-            Tezos_client.Keyed.bake
-              state
-              winner_special_baker
-              "Second bake on new protocol !!"
-            >>= fun () ->
-            Counter_log.incr
-              level_counter
-              "special-baker-bakes-on-new-protocol" ;
-            Tezos_client.rpc
-              state
-              ~client:winner_client
-              `Get
-              ~path:"/chains/main/blocks/head/metadata"
-            >>= fun json_metadata ->
-            match Jqo.field json_metadata ~k:"protocol" with
-            | `String p when String.equal p winner_hash ->
-                return ()
-            | other ->
-                failf
-                  "Protocol is not `%s` but `%s`"
-                  winner_hash
-                  Ezjsonm.(to_string (wrap other)) ))
+                 EF.(
+                   desc
+                     (shout "Warning")
+                     (wf
+                        "Command `upgrade baking state` failed, but we keep \
+                         going with the baking.")))
+       >>= fun () ->
+       Asynchronous_result.map_option with_ledger ~f:(fun _ ->
+           Interactive_test.Pauser.generic
+             state
+             EF.
+               [
+                 af "About to bake on the new winning protocol.";
+                 haf
+                   "Please switch to the Baking app and quit (`q`) this prompt.";
+               ]
+             ~force:true
+           >>= fun () ->
+           Console.say state EF.(wf "Sleeping for a couple of seconds…")
+           (* USB thing is often slower than humans hitting `q` *)
+           >>= fun () -> System.sleep 4.)
+       >>= fun (_ : unit option) ->
+       Tezos_client.Keyed.bake
+         state
+         winner_baker_0
+         "First bake on new protocol !!"
+       >>= fun () ->
+       Counter_log.incr level_counter "baker-0-bakes-on-new-protocol" ;
+       Tezos_client.Keyed.bake
+         state
+         winner_special_baker
+         "Second bake on new protocol !!"
+       >>= fun () ->
+       Counter_log.incr level_counter "special-baker-bakes-on-new-protocol" ;
+       Tezos_client.rpc
+         state
+         ~client:winner_client
+         `Get
+         ~path:"/chains/main/blocks/head/metadata"
+       >>= fun json_metadata ->
+       match Jqo.field json_metadata ~k:"protocol" with
+       | `String p when String.equal p winner_hash -> return ()
+       | other ->
+           failf
+             "Protocol is not `%s` but `%s`"
+             winner_hash
+             Ezjsonm.(to_string (wrap other))))
   >>= fun () ->
   Interactive_test.Pauser.generic
     state
     EF.
-      [ haf "End of the Voting test: SUCCESS \\o/";
+      [
+        haf "End of the Voting test: SUCCESS \\o/";
         desc
           (af "Estimated level: %d" (Counter_log.sum level_counter))
-          (markdown_verbatim (Counter_log.to_table_string level_counter)) ]
+          (markdown_verbatim (Counter_log.to_table_string level_counter));
+      ]
 
 let cmd () =
   let open Cmdliner in
@@ -758,20 +778,21 @@ let cmd () =
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
     const
-      (fun winner_path
-           demo_path
-           node_exec
-           client_exec
-           admin_exec
-           winner_client_exec
-           size
-           (`Clueless_winner clueless_winner)
-           (`Base_port base_port)
-           (`With_ledger with_ledger)
-           (`Serialize_proposals serialize_proposals)
-           protocol
-           state
-           ->
+      (fun
+        winner_path
+        demo_path
+        node_exec
+        client_exec
+        admin_exec
+        winner_client_exec
+        size
+        (`Clueless_winner clueless_winner)
+        (`Base_port base_port)
+        (`With_ledger with_ledger)
+        (`Serialize_proposals serialize_proposals)
+        protocol
+        state
+      ->
         Test_command_line.Run_command.or_hard_fail
           state
           ~pp_error
@@ -820,8 +841,8 @@ let cmd () =
                   ~doc:
                     "The protocol to inject and down-vote, e.g. \
                      `./src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL` \
-                     (if same as `WINNER-PROTOCOL-PATH` the scenario will \
-                     make them automatically & artificially different).")))
+                     (if same as `WINNER-PROTOCOL-PATH` the scenario will make \
+                     them automatically & artificially different).")))
     $ Tezos_executable.cli_term base_state `Node "current"
     $ Tezos_executable.cli_term base_state `Client "current"
     $ Tezos_executable.cli_term base_state `Admin "current"
@@ -884,12 +905,12 @@ $ Arg.(
   let info =
     let doc = "Sandbox network with a full round of voting." in
     let man : Manpage.block list =
-      [ `S "VOTING TEST";
+      [
+        `S "VOTING TEST";
         `P
           "This command provides a test which uses a network sandbox to \
-           perform a full round of protocol vote and upgrade, including \
-           voting and baking on the test chain with or without a Ledger Nano \
-           device.";
+           perform a full round of protocol vote and upgrade, including voting \
+           and baking on the test chain with or without a Ledger Nano device.";
         `P "There are two main test behaviors:";
         `P
           "* $(b,SIMPLE:) The simple one does as much as possible with any \
@@ -906,18 +927,19 @@ $ Arg.(
         `Noblank;
         `P "This is the version running in Gitlab-CI, see `bin_flextesa/dune`.";
         `P
-          "* $(b,FULL:) Without the `--winning-client-is-clueless` option, \
-           the test will try to bake on the test chain as well as after the \
-           protocol switch (with the winner-client). This requires the \
-           winning protocol to be a working one and, of course, the \
-           winning-client to understand it.";
+          "* $(b,FULL:) Without the `--winning-client-is-clueless` option, the \
+           test will try to bake on the test chain as well as after the \
+           protocol switch (with the winner-client). This requires the winning \
+           protocol to be a working one and, of course, the winning-client to \
+           understand it.";
         `P
           "The test can run fully automated unless one uses the \
            `\"--with-ledger=ledger://...\"` option in which case some steps \
            have to be interactive. In this case, the option \
            `--serialize-proposals` is recommended, because if it is not \
            provided, the proposal vote will be a “Sign Unverified” \
-           operation." ]
+           operation.";
+      ]
     in
     info ~doc ~man "voting"
   in

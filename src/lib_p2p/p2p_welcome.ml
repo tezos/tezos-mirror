@@ -39,15 +39,13 @@ type t = {
 
 let rec worker_loop st =
   let (Connect_handler connect_handler) = st.connect_handler in
-  Lwt_unix.yield ()
-  >>= fun () ->
+  Lwt_unix.yield () >>= fun () ->
   protect ~canceler:st.canceler (fun () -> P2p_fd.accept st.socket >>= return)
   >>= function
   | Ok (fd, addr) ->
       let point =
         match addr with
-        | Lwt_unix.ADDR_UNIX _ ->
-            assert false
+        | Lwt_unix.ADDR_UNIX _ -> assert false
         | Lwt_unix.ADDR_INET (addr, port) ->
             (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
       in
@@ -57,52 +55,47 @@ let rec worker_loop st =
      No reason to abort just now, but we want to stress out that we
      have a problem preventing us from accepting new connections. *)
   | Error
-      ( Exn
-          (Unix.Unix_error
-            ( ( EMFILE (* Too many open files by the process *)
-              | ENFILE (* Too many open files in the system *)
-              | ENETDOWN (* Network is down *) ),
-              _,
-              _ ))
-        :: _ as err ) ->
-      Events.(emit incoming_error) (err, "system")
-      >>= fun () ->
+      (Exn
+         (Unix.Unix_error
+           ( ( EMFILE (* Too many open files by the process *)
+             | ENFILE (* Too many open files in the system *)
+             | ENETDOWN (* Network is down *) ),
+             _,
+             _ ))
+       :: _ as err) ->
+      Events.(emit incoming_error) (err, "system") >>= fun () ->
       (* These are temporary system errors, giving some time for the system to
          recover *)
       Lwt_unix.sleep 5. >>= fun () -> worker_loop st
   | Error
-      ( Exn
-          (Unix.Unix_error
-            ( ( EAGAIN (* Resource temporarily unavailable; try again *)
-              | EWOULDBLOCK (* Operation would block *)
-              | ENOPROTOOPT (* Protocol not available *)
-              | EOPNOTSUPP (* Operation not supported on socket *)
-              | ENETUNREACH (* Network is unreachable *)
-              | ECONNABORTED (* Software caused connection abort *)
-              | ECONNRESET (* Connection reset by peer *)
-              | ETIMEDOUT (* Connection timed out *)
-              | EHOSTDOWN (* Host is down *)
-              | EHOSTUNREACH (* No route to host *)
-              (* Ugly hack to catch EPROTO and ENONET, Protocol error, which are not
-       defined in the Unix module (which is 20 years late on the POSIX
-       standard). A better solution is to use the package ocaml-unix-errno or
-       redo the work *)
-              | EUNKNOWNERR (71 | 64)
-              (* On Linux EPROTO is 71, ENONET is 64
-       On BSD systems, accept cannot raise EPROTO.
-       71 is EREMOTE   for openBSD, NetBSD, Darwin, which is irrelevant here
-       64 is EHOSTDOWN for openBSD, NetBSD, Darwin, which is already caught
-    *)
-                ),
-              _,
-              _ ))
-        :: _ as err ) ->
+      (Exn
+         (Unix.Unix_error
+           ( ( EAGAIN (* Resource temporarily unavailable; try again *)
+             | EWOULDBLOCK (* Operation would block *)
+             | ENOPROTOOPT (* Protocol not available *)
+             | EOPNOTSUPP (* Operation not supported on socket *)
+             | ENETUNREACH (* Network is unreachable *)
+             | ECONNABORTED (* Software caused connection abort *)
+             | ECONNRESET (* Connection reset by peer *)
+             | ETIMEDOUT (* Connection timed out *)
+             | EHOSTDOWN (* Host is down *)
+             | EHOSTUNREACH (* No route to host *)
+             (* Ugly hack to catch EPROTO and ENONET, Protocol error, which
+                are not defined in the Unix module (which is 20 years late on
+                the POSIX standard). A better solution is to use the package
+                ocaml-unix-errno or redo the work *)
+             | EUNKNOWNERR (71 | 64)
+             (* On Linux EPROTO is 71, ENONET is 64 On BSD systems, accept
+                cannot raise EPROTO.  71 is EREMOTE   for openBSD, NetBSD,
+                Darwin, which is irrelevant here 64 is EHOSTDOWN for openBSD,
+                NetBSD, Darwin, which is already caught *) ),
+             _,
+             _ ))
+       :: _ as err) ->
       (* These are socket-specific errors, ignoring. *)
       Events.(emit incoming_error) (err, "socket") >>= fun () -> worker_loop st
-  | Error (Canceled :: _) ->
-      Lwt.return_unit
-  | Error err ->
-      Events.(emit unexpected_error) err
+  | Error (Canceled :: _) -> Lwt.return_unit
+  | Error err -> Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -117,17 +110,8 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
 let create ?addr ~backlog connect_handler port =
   Lwt.catch
     (fun () ->
-      create_listening_socket ~backlog ?addr port
-      >>= fun socket ->
+      create_listening_socket ~backlog ?addr port >>= fun socket ->
       let canceler = Lwt_canceler.create () in
-      Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket
-          >>= function
-          | Error trace ->
-              Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-              Lwt.return_unit
-          | Ok () ->
-              Lwt.return_unit) ;
       let st =
         {
           socket;
@@ -136,6 +120,11 @@ let create ?addr ~backlog connect_handler port =
           worker = Lwt.return_unit;
         }
       in
+      Lwt_canceler.on_cancel canceler (fun () ->
+          st.worker >>= fun () ->
+          Lwt_utils_unix.safe_close socket >>= function
+          | Error trace -> Events.(emit unexpected_error_closing_socket) trace
+          | Ok () -> Lwt.return_unit) ;
       Lwt.return st)
     (fun exn ->
       Events.(emit incoming_connection_error) (Error_monad.Exn exn)

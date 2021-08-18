@@ -1,3 +1,5 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _test-networks:
 
 Test Networks
@@ -13,7 +15,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Edo for Edo2net), the protocol
+network is activated (such as Florence for FLorencenet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -28,17 +30,43 @@ You can obtain the key to these accounts from a faucet to claim the funds.
 All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
+Granadanet
+----------
+
+- Built-in network alias: ``granadanet`` (see :ref:`builtin_networks`)
+
+  * Available in version 9.2
+
+- Run Docker image: ``wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Granadanet is a test network running the ``PtGRANAD`` protocol.
+Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
+
+On Granadanet, the following constants differ from Mainnet:
+
+- ``preserved_cycles`` is 3 instead of 5;
+- ``blocks_per_cycle`` is 2048 instead of 4096;
+- ``blocks_per_voting_period`` is 1024 instead of 32768;
+- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
+- ``delay_per_missing_endorsement`` is 4 instead of 8.
+
+This results in a faster chain than Mainnet:
+
+- 2 blocks per minute;
+- a cycle should last about 17 hours;
+- a voting period lasts half a cycle and should thus last about 8 hours.
+
 Florencenet
 -----------
 
 - Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
 
-  * Available on ``master``, will be available in version 9.0
+  * Available in version 9.0
 
 - Run Docker image: ``wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
-Florencenet is a test network running the PsFLoren protocol.
-Florencenet will run until Florence is rejected or replaced by another protocol on Mainnet.
+Florencenet is a test network running the ``PsFLoren`` protocol.
+Florencenet will run until Florence is replaced by another protocol on Mainnet.
 
 On Florencenet, the following constants differ from Mainnet:
 
@@ -55,33 +83,6 @@ This results in a faster chain than Mainnet:
 - a cycle should last about 17 hours;
 - a voting period lasts half a cycle and should thus last about 8 hours.
 
-Edo2net
--------
-
-- Built-in network alias: ``edo2net`` (see :ref:`builtin_networks`)
-
-  * Available since version 8.3
-
-- Run Docker image: ``wget -O edo2net.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Edo2net is a test network running the Edo2Zk protocol.
-Edo2net will run until Edo is replaced by another protocol on Mainnet.
-
-On Edo2net, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 2048 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 61440 instead of 1966080;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts 1 cycle and should thus also last about 17 hours.
-
 Future Networks
 ---------------
 
@@ -94,6 +95,13 @@ P is activated, the previous test network will end and P-net will continue on it
 
 Old Networks
 ============
+
+Edo2net
+-------
+
+Edo2net was a test network running the Edo protocol.
+Following the activation of the Florence protocol replacing Edo on Mainnet,
+Edo2net stopped being maintained on May 11th, 2021.
 
 Delphinet
 ---------

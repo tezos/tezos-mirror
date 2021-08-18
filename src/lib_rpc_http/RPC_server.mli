@@ -43,3 +43,53 @@ val launch :
 
 (** Kill an RPC server. *)
 val shutdown : server -> unit Lwt.t
+
+module Acl : sig
+  include module type of Resto_acl.Acl
+
+  (** A policy for the whole RPC server is a set of access control lists for the
+      different addresses that the RPC server listens to. It is represented as
+      an association list mapping listening addresses (in string literal forms)
+      to deny/access access policies. *)
+  type policy
+
+  (** Default ACL policy in case none is defined in configuration. For the sake
+      of backwards compatibility it allows access to all resources. This will
+      probably change in the future so that access to sensitive resources is
+      restricted. *)
+  val default : t
+
+  (** Add an ACL for given address into the policy. Overrides previously existing
+      policy for that address if any. *)
+  val put_policy : P2p_point.Id.addr_port_id * t -> policy -> policy
+
+  (** Empty ACL policy allows access to all endpoints. Currently it's the same
+      as [default] below, but that will likely change in the future, therefore
+      it's better to use [default] rather than this value. It's mainly intended
+      for testing. *)
+  val empty_policy : policy
+
+  (** This is the default policy. Currently equivalent to [empty] above, but that
+      will likely change at some point in the future. *)
+  val default_policy : policy
+
+  val policy_encoding : policy Data_encoding.t
+
+  (** Returns the JSON representation of the policy. *)
+  val policy_to_string : policy -> string
+
+  (** [find_policy policy address] looks for the [address] within the [policy]
+      and returns corresponding access control list.
+
+      An ACL is considered matching if its corresponding host-name part matches
+      the host-name part of the [address] and either:
+      - its corresponding port also matches [address]'s port OR
+      - its corresponding address does not mention any port at all.
+
+      The first ACL whose corresponding address matches these criteria is
+      returned. *)
+  val find_policy : policy -> string -> t option
+
+  (** Returns string representation of a given matcher. Useful for testing. *)
+  val matcher_to_string : matcher -> string
+end

@@ -142,16 +142,10 @@ val update_script_storage :
   Raw_context.t tzresult Lwt.t
 
 val credit :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
 val spend :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
 val raw_originate :
   Raw_context.t ->

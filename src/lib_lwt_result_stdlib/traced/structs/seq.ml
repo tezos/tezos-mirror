@@ -30,16 +30,8 @@ module Make (Monad : Traced_sigs.Monad.S) :
   let iter_ep f seq =
     let rec iter_ep f seq acc =
       match seq () with
-      | Nil ->
-          Monad.join_ep acc
-      | Cons (item, seq) ->
-          iter_ep f seq (Lwt.apply f item :: acc)
+      | Nil -> Monad.join_ep acc
+      | Cons (item, seq) -> iter_ep f seq (Lwt.apply f item :: acc)
     in
     iter_ep f seq []
-
-  let map_ep f seq =
-    let open Monad in
-    all_ep (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
-    >|=? (* this is equivalent to rev |> to_seq but more direct *)
-         Stdlib.List.fold_left (fun s x () -> Cons (x, s)) empty
 end

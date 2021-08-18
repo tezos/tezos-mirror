@@ -29,6 +29,8 @@ open Alpha_context
 module ContractEntity = struct
   type t = Contract.t
 
+  include (Contract : Compare.S with type t := t)
+
   let encoding = Contract.encoding
 
   let of_source s =
@@ -36,8 +38,7 @@ module ContractEntity = struct
     | Error _ as err ->
         Lwt.return (Environment.wrap_error err)
         |> trace (failure "bad contract notation")
-    | Ok s ->
-        return s
+    | Ok s -> return s
 
   let to_source s = return (Contract.to_b58check s)
 
@@ -48,43 +49,34 @@ module RawContractAlias = Client_aliases.Alias (ContractEntity)
 
 module ContractAlias = struct
   let find cctxt s =
-    RawContractAlias.find_opt cctxt s
-    >>=? function
-    | Some v ->
-        return (s, v)
+    RawContractAlias.find_opt cctxt s >>=? function
+    | Some v -> return (s, v)
     | None -> (
-        Client_keys.Public_key_hash.find_opt cctxt s
-        >>=? function
-        | Some v ->
-            return (s, Contract.implicit_contract v)
-        | None ->
-            failwith "no contract or key named %s" s )
+        Client_keys.Public_key_hash.find_opt cctxt s >>=? function
+        | Some v -> return (s, Contract.implicit_contract v)
+        | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
-    Client_keys.Public_key_hash.find cctxt name
-    >>=? fun v -> return (name, Contract.implicit_contract v)
+    Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
+    return (name, Contract.implicit_contract v)
 
   let rev_find cctxt c =
     match Contract.is_implicit c with
     | Some hash -> (
-        Client_keys.Public_key_hash.rev_find cctxt hash
-        >>=? function
-        | Some name -> return_some ("key:" ^ name) | None -> return_none )
-    | None ->
-        RawContractAlias.rev_find cctxt c
+        Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
+        | Some name -> return_some ("key:" ^ name)
+        | None -> return_none)
+    | None -> RawContractAlias.rev_find cctxt c
 
   let get_contract cctxt s =
     match String.split ~limit:1 ':' s with
-    | ["key"; key] ->
-        find_key cctxt key
-    | _ ->
-        find cctxt s
+    | ["key"; key] -> find_key cctxt key
+    | _ -> find cctxt s
 
   let autocomplete cctxt =
-    Client_keys.Public_key_hash.autocomplete cctxt
-    >>=? fun keys ->
-    RawContractAlias.autocomplete cctxt
-    >>=? fun contracts -> return (List.map (( ^ ) "key:") keys @ contracts)
+    Client_keys.Public_key_hash.autocomplete cctxt >>=? fun keys ->
+    RawContractAlias.autocomplete cctxt >>=? fun contracts ->
+    return (List.map (( ^ ) "key:") keys @ contracts)
 
   let alias_param ?(name = "name") ?(desc = "existing contract alias") next =
     let desc =
@@ -111,49 +103,39 @@ module ContractAlias = struct
         ~desc
         (parameter
            ~autocomplete:(fun cctxt ->
-             autocomplete cctxt
-             >>=? fun list1 ->
-             Client_keys.Public_key_hash.autocomplete cctxt
-             >>=? fun list2 -> return (list1 @ list2))
+             autocomplete cctxt >>=? fun list1 ->
+             Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
+             return (list1 @ list2))
            (fun cctxt s ->
              match String.split ~limit:1 ':' s with
-             | ["alias"; alias] ->
-                 find cctxt alias
+             | ["alias"; alias] -> find cctxt alias
              | ["key"; text] ->
-                 Client_keys.Public_key_hash.find cctxt text
-                 >>=? fun v -> return (s, Contract.implicit_contract v)
+                 Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+                 return (s, Contract.implicit_contract v)
              | _ -> (
-                 find cctxt s
-                 >>= function
-                 | Ok v ->
-                     return v
+                 find cctxt s >>= function
+                 | Ok v -> return v
                  | Error k_errs -> (
-                     ContractEntity.of_source s
-                     >>= function
-                     | Ok v ->
-                         return (s, v)
-                     | Error c_errs ->
-                         Lwt.return (Error (k_errs @ c_errs)) ) ))))
+                     ContractEntity.of_source s >>= function
+                     | Ok v -> return (s, v)
+                     | Error c_errs -> Lwt.return (Error (k_errs @ c_errs)))))))
       next
 
   let name cctxt contract =
-    rev_find cctxt contract
-    >>=? function
-    | None -> return (Contract.to_b58check contract) | Some name -> return name
+    rev_find cctxt contract >>=? function
+    | None -> return (Contract.to_b58check contract)
+    | Some name -> return name
 end
 
 let list_contracts cctxt =
-  RawContractAlias.load cctxt
-  >>=? fun raw_contracts ->
+  RawContractAlias.load cctxt >>=? fun raw_contracts ->
   List.map_s (fun (n, v) -> Lwt.return ("", n, v)) raw_contracts
   >>= fun contracts ->
-  Client_keys.Public_key_hash.load cctxt
-  >>=? fun keys ->
+  Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
   (* List accounts (implicit contracts of identities) *)
   List.map_es
     (fun (n, v) ->
-      RawContractAlias.mem cctxt n
-      >>=? fun mem ->
+      RawContractAlias.mem cctxt n >>=? fun mem ->
       let p = if mem then "key:" else "" in
       let v' = Contract.implicit_contract v in
       return (p, n, v'))
@@ -162,10 +144,8 @@ let list_contracts cctxt =
 
 let get_manager cctxt ~chain ~block source =
   match Contract.is_implicit source with
-  | Some hash ->
-      return hash
-  | None ->
-      Alpha_services.Contract.manager cctxt (chain, block) source
+  | Some hash -> return hash
+  | None -> Alpha_services.Contract.manager cctxt (chain, block) source
 
 let get_delegate cctxt ~chain ~block source =
   Alpha_services.Contract.delegate_opt cctxt (chain, block) source
@@ -178,5 +158,4 @@ let may_check_key sourcePubKey sourcePubKeyHash =
            (Ed25519.Public_key.hash sourcePubKey)
            sourcePubKeyHash)
         (failure "Invalid public key in `client_proto_endorsement`")
-  | None ->
-      return_unit
+  | None -> return_unit

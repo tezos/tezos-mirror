@@ -92,11 +92,13 @@ let constants_test =
     }
 
 let bootstrap_accounts_strings =
-  [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+  [
+    "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
     "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9";
     "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV";
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
-    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
+    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
+  ]
 
 let bootstrap_balance = Tez_repr.of_mutez_exn 4_000_000_000_000L
 
@@ -133,8 +135,7 @@ let commitments =
   ]|json}
   in
   match json_result with
-  | Error err ->
-      raise (Failure err)
+  | Error err -> raise (Failure err)
   | Ok json ->
       Data_encoding.Json.destruct
         (Data_encoding.list Commitment_repr.encoding)

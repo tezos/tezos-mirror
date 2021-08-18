@@ -33,8 +33,7 @@ module Benchmark_cmd = struct
   (* Handling the options of the benchmarker *)
   open Measure
 
-  let set_flush_cache flush_opt options =
-    {options with flush_cache = flush_opt}
+  let set_flush_cache flush_opt options = {options with flush_cache = flush_opt}
 
   let set_stabilize_gc stabilize_gc options = {options with stabilize_gc}
 
@@ -86,8 +85,7 @@ module Benchmark_cmd = struct
     let save_file = options.save_file in
     let storage =
       match options.storage with
-      | Memory ->
-          "Mem"
+      | Memory -> "Mem"
       | Disk {source; base_dir; header_json} ->
           let pp_src =
             Format.asprintf "%a" Signature.Public_key_hash.pp source
@@ -170,8 +168,7 @@ module Benchmark_cmd = struct
           ~autocomplete:(fun () -> return ["mean"; "percentile@[0-100]"])
           (fun (_ : unit) parsed ->
             match parsed with
-            | "mean" ->
-                return Mean
+            | "mean" -> return Mean
             | s -> (
                 let error () =
                   Printf.eprintf "Wrong determinizer specification.\n" ;
@@ -180,10 +177,8 @@ module Benchmark_cmd = struct
                 match String.split_on_char '@' s with
                 | ["percentile"; i] ->
                     let i = try int_of_string i with _ -> error () in
-                    if i < 1 || i > 100 then error ()
-                    else return (Percentile i)
-                | _ ->
-                    error () ))
+                    if i < 1 || i > 100 then error () else return (Percentile i)
+                | _ -> error ()))
       in
       Clic.arg
         ~doc:"Method for determinizing empirical timing distribution"
@@ -327,12 +322,7 @@ module Benchmark_cmd = struct
     }
 
   let command =
-    Clic.command
-      ~group
-      ~desc:"Runs benchmarks"
-      options
-      params
-      benchmark_handler
+    Clic.command ~group ~desc:"Runs benchmarks" options params benchmark_handler
 end
 
 module Infer_cmd = struct
@@ -350,6 +340,7 @@ module Infer_cmd = struct
       override_files = None;
       report = NoReport;
       save_solution = None;
+      dot_file = None;
     }
 
   let set_print_problem print_problem options = {options with print_problem}
@@ -366,8 +357,7 @@ module Infer_cmd = struct
 
   let set_report report options =
     match report with
-    | None ->
-        {options with report = NoReport}
+    | None -> {options with report = NoReport}
     | Some file ->
         if String.equal file "stdout" then
           {options with report = ReportToStdout}
@@ -376,6 +366,8 @@ module Infer_cmd = struct
   let set_override_files override_files options = {options with override_files}
 
   let set_save_solution save_solution options = {options with save_solution}
+
+  let set_dot_file dot_file options = {options with dot_file}
 
   let list_solvers () =
     Printf.eprintf "ridge --ridge-alpha=<float>\n" ;
@@ -391,7 +383,8 @@ module Infer_cmd = struct
         lasso_positive,
         report,
         override_files,
-        save_solution ) model_name workload_data solver () =
+        save_solution,
+        dot_file ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -402,6 +395,7 @@ module Infer_cmd = struct
       |> set_report report
       |> set_override_files override_files
       |> set_save_solution save_solution
+      |> set_dot_file dot_file
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -499,11 +493,23 @@ module Infer_cmd = struct
         ~long:"save-solution"
         ~placeholder:"filename"
         override_file_param
+
+    let dot_file_arg =
+      let override_file_param =
+        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+      in
+      Clic.arg
+        ~doc:
+          "Specify file to which dependency graph will be saved in graphviz \
+           format"
+        ~long:"dot-file"
+        ~placeholder:"filename"
+        override_file_param
   end
 
   let options =
     let open Options in
-    Clic.args9
+    Clic.args10
       print_problem
       dump_csv_arg
       plot_arg
@@ -513,6 +519,7 @@ module Infer_cmd = struct
       report_arg
       override_arg
       save_solution_arg
+      dot_file_arg
 
   let model_param =
     Clic.param
@@ -605,29 +612,35 @@ module Codegen_cmd = struct
   (* ------------------------------------------------------------------------- *)
   (* Handling options for the "generate code" command *)
 
+  let load_fixed_point_parameters json_file =
+    try
+      let json =
+        let ic = open_in json_file in
+        let json = Ezjsonm.from_channel ic in
+        close_in ic ;
+        json
+      in
+      Fixed_point_transform
+        (Data_encoding.Json.destruct
+           Fixed_point_transform.options_encoding
+           json)
+    with _ ->
+      Format.eprintf
+        "Could not parse fixed-point transform parameters; aborting@." ;
+      Format.eprintf "Here's a well-formed file:@." ;
+      Format.eprintf
+        "%a@."
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct
+           Fixed_point_transform.options_encoding
+           Fixed_point_transform.default_options) ;
+      exit 1
+
   let codegen_handler json solution model_name () =
     let codegen_options =
       match json with
-      | None ->
-          No_transform
-      | Some json_file -> (
-          let json = Benchmark_helpers.load_json json_file in
-          try
-            Fixed_point_transform
-              (Data_encoding.Json.destruct
-                 Fixed_point_transform.options_encoding
-                 json)
-          with _ ->
-            Format.eprintf
-              "Could not parse fixed-point transform parameters; aborting@." ;
-            Format.eprintf "Here's a well-formed file:@." ;
-            Format.eprintf
-              "%a@."
-              Data_encoding.Json.pp
-              (Data_encoding.Json.construct
-                 Fixed_point_transform.options_encoding
-                 Fixed_point_transform.default_options) ;
-            exit 1 )
+      | None -> No_transform
+      | Some json_file -> load_fixed_point_parameters json_file
     in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
@@ -669,7 +682,46 @@ module Codegen_cmd = struct
   let group = {Clic.name = "codegen"; title = "Command for generating code"}
 
   let command =
-    Clic.command ~group ~desc:"Code generation" options params codegen_handler
+    Clic.command
+      ~group
+      ~desc:"Generate code for a specific model"
+      options
+      params
+      codegen_handler
+end
+
+module Codegen_all_cmd = struct
+  include Codegen_cmd
+
+  let codegen_all_handler json solution matching () =
+    let codegen_options =
+      match json with
+      | None -> No_transform
+      | Some json_file -> load_fixed_point_parameters json_file
+    in
+    commandline_outcome_ref :=
+      Some (Codegen_all {solution; matching; codegen_options}) ;
+    return ()
+
+  let params =
+    Clic.(
+      prefixes ["generate"; "code"; "using"; "solution"]
+      @@ string
+           ~name:"SOLUTION-FILE"
+           ~desc:
+             "File containing solution, as obtained using the --save-solution \
+              switch"
+      @@ prefixes ["for"; "all"; "models"; "matching"]
+      @@ string ~name:"REGEXP" ~desc:"Regular expression on model names"
+      @@ stop)
+
+  let command =
+    Clic.command
+      ~group
+      ~desc:"Generate code for all models matching regexp"
+      options
+      params
+      codegen_all_handler
 end
 
 module List_cmd = struct
@@ -741,6 +793,14 @@ module List_cmd = struct
   let handler_bench_tags_all show_tags tags () =
     base_handler_bench (Registration.all_benchmarks_with_all_of tags) show_tags
 
+  let params_bench_tags_exact =
+    Clic.(
+      prefixes ["list"; "benchmarks"; "with"; "tags"; "exactly"]
+      @@ seq_of_param tag_param)
+
+  let handler_bench_tags_exact show_tags tags () =
+    base_handler_bench (Registration.all_benchmarks_with_exactly tags) show_tags
+
   let group = {Clic.name = "list"; title = "Commands for displaying lists"}
 
   let command_all_bench =
@@ -775,18 +835,32 @@ module List_cmd = struct
       params_bench_tags_all
       handler_bench_tags_all
 
+  let command_bench_tags_exact =
+    Clic.command
+      ~group
+      ~desc:"List all implemented benchmarks containing exactly the given tags"
+      option_show_tags
+      params_bench_tags_exact
+      handler_bench_tags_exact
+
   let commands =
-    [ command_all_bench;
+    [
+      command_all_bench;
       command_all_tags;
       command_bench_tags_any;
-      command_bench_tags_all ]
+      command_bench_tags_all;
+      command_bench_tags_exact;
+    ]
 end
 
 let all_commands =
-  [ Benchmark_cmd.command;
+  [
+    Benchmark_cmd.command;
     Infer_cmd.command;
     Cull_outliers_cmd.command;
-    Codegen_cmd.command ]
+    Codegen_cmd.command;
+    Codegen_all_cmd.command;
+  ]
   @ List_cmd.commands
   @ Registration.all_custom_commands ()
 
@@ -822,16 +896,12 @@ let (original_args, autocomplete) =
     | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
         let args = List.rev acc @ args in
         (args, Some (prev_arg, cur_arg, script))
-    | x :: rest ->
-        move_autocomplete_token_upfront (x :: acc) rest
-    | [] ->
-        (List.rev acc, None)
+    | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
+    | [] -> (List.rev acc, None)
   in
   match Array.to_list Sys.argv with
-  | _ :: args ->
-      move_autocomplete_token_upfront [] args
-  | [] ->
-      ([], None)
+  | _ :: args -> move_autocomplete_token_upfront [] args
+  | [] -> ([], None)
 
 let (list_solvers, list_models) =
   ignore
@@ -844,30 +914,28 @@ let (list_solvers, list_models) =
     Lwt_main.run
       ( Clic.parse_global_options Global_options.options () original_args
       >>=? fun (list_flags, args) ->
-      match autocomplete with
-      | Some (prev_arg, cur_arg, script) ->
-          Clic.autocompletion
-            ~script
-            ~cur_arg
-            ~prev_arg
-            ~args:original_args
-            ~global_options:Global_options.options
-            commands_with_man
-            ()
-          >>=? fun completions ->
-          List.iter print_endline completions ;
-          return list_flags
-      | None -> (
-        match args with
-        | [] ->
+        match autocomplete with
+        | Some (prev_arg, cur_arg, script) ->
+            Clic.autocompletion
+              ~script
+              ~cur_arg
+              ~prev_arg
+              ~args:original_args
+              ~global_options:Global_options.options
+              commands_with_man
+              ()
+            >>=? fun completions ->
+            List.iter print_endline completions ;
             return list_flags
-        | _ ->
-            Clic.dispatch commands_with_man () args
-            >>=? fun () -> return list_flags ) )
+        | None -> (
+            match args with
+            | [] -> return list_flags
+            | _ ->
+                Clic.dispatch commands_with_man () args >>=? fun () ->
+                return list_flags) )
   in
   match result with
-  | Ok global_options ->
-      global_options
+  | Ok global_options -> global_options
   | Error [Clic.Version] ->
       let version = Tezos_version.Bin_version.version_string in
       Format.printf "%s\n" version ;

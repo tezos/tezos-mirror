@@ -1,58 +1,56 @@
-# We use `scripts/run-tezt-tests-ci.sh` to split the Tezt tests into ranges:
+# We use the --job option to split tests into jobs of roughly the same duration.
+# This is based on a file that contains timings of test results, generated with --record.
+# To rebalance jobs, update this record with:
+#
+#   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
 
-tezt:run-1-33:
-  extends: .test_template
-  before_script:
-    - make
-  script:
-    - sh scripts/run-tezt-tests-ci.sh 1 33
+.tezt_template:
+  extends: .integration_template
   artifacts:
+    reports:
+      junit: tezt-junit.xml
     paths:
       - tezt.log
+      - tezt-results-$TEZT_JOB.json
     expire_in: 1 day
-    when: on_failure
-
-tezt:run-34-66:
-  extends: .test_template
-  before_script:
-    - make
-  script:
-    - sh scripts/run-tezt-tests-ci.sh 34 66
-  artifacts:
-    paths:
-      - tezt.log
-    expire_in: 1 day
-    when: on_failure
-
-tezt:run-67-end:
-  extends: .test_template
-  before_script:
-    - make
-  script:
-    - sh scripts/run-tezt-tests-ci.sh 67
-  artifacts:
-    paths:
-      - tezt.log
-    expire_in: 1 day
-    when: on_failure
-
-
-tezt:manual:migration:
-  extends: .test_template
-  when: manual
-  before_script:
-    - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
-    - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
-    - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
-    - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
-
-    - make
-    - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
-  script:
-    - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
-  artifacts:
     when: always
-    paths:
-      - tezt-migration.log
-    expire_in: 30 days
+  variables:
+    TEZT_JOBS_TOTAL: 3
+  script:
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job $TEZT_JOB/$TEZT_JOBS_TOTAL --record tezt-results-$TEZT_JOB.json
 
+tezt:1:
+  extends: .tezt_template
+  variables:
+    TEZT_JOB: 1
+
+tezt:2:
+  extends: .tezt_template
+  variables:
+    TEZT_JOB: 2
+
+tezt:3:
+  extends: .tezt_template
+  variables:
+    TEZT_JOB: 3
+
+# Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
+#
+#tezt:manual:migration:
+#  extends:
+#    - .test_template
+#    - .rules_template__extended_test_pipeline
+#  before_script:
+#    - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+#    - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
+#    - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
+#    - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
+#    - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
+#  script:
+#    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
+#    - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
+#  artifacts:
+#    when: always
+#    paths:
+#      - tezt-migration.log
+#    expire_in: 30 days

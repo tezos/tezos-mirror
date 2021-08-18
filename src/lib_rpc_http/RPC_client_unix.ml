@@ -28,6 +28,8 @@ type attempt_event = {attempt : int; delay : float; text : string}
 module Attempt_logging = Internal_event.Make (struct
   type t = attempt_event
 
+  let section = None
+
   let name = "rpc_http_attempt"
 
   let doc = "Error emitted when an HTTP request returned a 502 error."
@@ -55,30 +57,22 @@ end)
 module RetryClient : Cohttp_lwt.S.Client = struct
   include Cohttp_lwt_unix.Client
 
-  let clone_body = function
-    | `Stream s ->
-        `Stream (Lwt_stream.clone s)
-    | x ->
-        x
+  let clone_body = function `Stream s -> `Stream (Lwt_stream.clone s) | x -> x
 
   let call ?ctx ?headers ?body ?chunked meth uri =
     let rec call_and_retry_on_502 attempt delay =
-      call ?ctx ?headers ?body ?chunked meth uri
-      >>= fun (response, ansbody) ->
+      call ?ctx ?headers ?body ?chunked meth uri >>= fun (response, ansbody) ->
       let status = Cohttp.Response.status response in
       match status with
       | `Bad_gateway ->
           let log_ansbody = clone_body ansbody in
-          Cohttp_lwt.Body.to_string log_ansbody
-          >>= fun text ->
-          Attempt_logging.emit (fun () -> {attempt; delay; text})
-          >>= fun _ ->
+          Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
+          Attempt_logging.emit (fun () -> {attempt; delay; text}) >>= fun _ ->
           if attempt >= 10 then Lwt.return (response, ansbody)
           else
-            Lwt_unix.sleep delay
-            >>= fun () -> call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
-      | _ ->
-          Lwt.return (response, ansbody)
+            Lwt_unix.sleep delay >>= fun () ->
+            call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
+      | _ -> Lwt.return (response, ansbody)
     in
     call_and_retry_on_502 1 0.
 end

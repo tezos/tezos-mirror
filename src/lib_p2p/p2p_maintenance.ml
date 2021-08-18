@@ -64,15 +64,13 @@ let broadcast_bootstrap_msg t =
       | Running {data = conn; _} ->
           if not (P2p_conn.private_node conn) then (
             ignore (P2p_conn.write_bootstrap conn) ;
-            t.log (Bootstrap_sent {source = peer_id}) )
-      | _ ->
-          ())
+            t.log (Bootstrap_sent {source = peer_id}))
+      | _ -> ())
     (P2p_pool.connected_peer_ids t.pool)
 
 let send_swap_request t =
   match P2p_pool.Connection.propose_swap_request t.pool with
-  | None ->
-      ()
+  | None -> ()
   | Some (proposed_point, proposed_peer_id, recipient) ->
       let recipient_peer_id = (P2p_conn.info recipient).peer_id in
       t.log (Swap_request_sent {source = recipient_peer_id}) ;
@@ -89,15 +87,13 @@ let classify pool private_mode start_time seen_points point pi =
   else
     match P2p_point_state.get pi with
     | Disconnected -> (
-      match P2p_point_state.Info.last_miss pi with
-      | Some last
-        when Time.System.(start_time < last)
-             || P2p_point_state.Info.can_reconnect ~now pi ->
-          `Seen
-      | last ->
-          `Candidate last )
-    | _ ->
-        `Seen
+        match P2p_point_state.Info.last_miss pi with
+        | Some last
+          when Time.System.(start_time < last)
+               || P2p_point_state.Info.can_reconnect ~now pi ->
+            `Seen
+        | last -> `Candidate last)
+    | _ -> `Seen
 
 (** [establish t contactable] tries to establish as many connection as possible
     with points in [contactable]. It returns the number of established
@@ -106,7 +102,9 @@ let establish t contactable =
   let try_to_connect count point =
     protect ~canceler:t.canceler (fun () ->
         P2p_connect_handler.connect t.connect_handler point)
-    >|= function Ok _ -> succ count | Error _ -> count
+    >|= function
+    | Ok _ -> succ count
+    | Error _ -> count
   in
   List.fold_left_s try_to_connect 0 contactable
 
@@ -114,32 +112,26 @@ let establish t contactable =
    [expected] connections candidates from the known points, not in [seen]
    points. *)
 let connectable t start_time expected seen_points =
-  let module Bounded_point_info = List.Bounded (struct
+  let module Bounded_point_info = Bounded_heap.Make (struct
     type t = Time.System.t option * P2p_point.Id.t
 
     let compare (t1, _) (t2, _) =
       match (t1, t2) with
-      | (None, None) ->
-          0
-      | (None, Some _) ->
-          1
-      | (Some _, None) ->
-          -1
-      | (Some t1, Some t2) ->
-          Time.System.compare t2 t1
+      | (None, None) -> 0
+      | (None, Some _) -> 1
+      | (Some _, None) -> -1
+      | (Some t1, Some t2) -> Time.System.compare t2 t1
   end) in
   let acc = Bounded_point_info.create expected in
   let f point pi seen_points =
     match
       classify t.pool t.config.private_mode start_time seen_points point pi
     with
-    | `Ignore ->
-        seen_points (* Ignored points can be retried again *)
+    | `Ignore -> seen_points (* Ignored points can be retried again *)
     | `Candidate last ->
         Bounded_point_info.insert (last, point) acc ;
         P2p_point.Set.add point seen_points
-    | `Seen ->
-        P2p_point.Set.add point seen_points
+    | `Seen -> P2p_point.Set.add point seen_points
   in
   let seen_points = P2p_pool.Points.fold_known t.pool ~init:seen_points ~f in
   (List.map snd (Bounded_point_info.get acc), seen_points)
@@ -164,8 +156,7 @@ let rec try_to_contact_loop t start_time ~seen_points min_to_contact
     in
     if candidates = [] then Lwt_unix.yield () >>= fun () -> Lwt.return_false
     else
-      establish t candidates
-      >>= fun established ->
+      establish t candidates >>= fun established ->
       try_to_contact_loop
         t
         start_time
@@ -204,12 +195,14 @@ let ask_for_more_contacts t =
     Option.iter P2p_discovery.wakeup t.discovery ;
     protect ~canceler:t.canceler (fun () ->
         Lwt.pick
-          [ P2p_trigger.wait_new_peer t.triggers;
+          [
+            P2p_trigger.wait_new_peer t.triggers;
             P2p_trigger.wait_new_point t.triggers;
             (* TODO exponential back-off, or wait for the existence
-         of a non grey-listed peer? *)
-            Lwt_unix.sleep time_between_looking_for_peers ]
-        >>= fun () -> return_unit) )
+               of a non grey-listed peer? *)
+            Lwt_unix.sleep time_between_looking_for_peers;
+          ]
+        >>= fun () -> return_unit))
 
 (** Selects [n] random connections. Ignore connections to
     nodes who are both private and trusted. *)
@@ -229,31 +222,27 @@ let random_connections pool n =
        between `min_threshold` and `max_threshold`. *)
 let rec do_maintain t =
   let n_connected = P2p_pool.active_connections t.pool in
-  if n_connected < t.bounds.min_threshold then
-    too_few_connections t n_connected
+  if n_connected < t.bounds.min_threshold then too_few_connections t n_connected
   else if t.bounds.max_threshold < n_connected then
     too_many_connections t n_connected
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
-    Events.(emit maintenance_ended) () >>= fun () -> return_unit )
+    Events.(emit maintenance_ended) () >>= fun () -> return_unit)
 
 and too_few_connections t n_connected =
   (* try and contact new peers *)
-  Events.(emit too_few_connections) n_connected
-  >>= fun () ->
+  Events.(emit too_few_connections) n_connected >>= fun () ->
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
-  try_to_contact t min_to_contact max_to_contact
-  >>= fun success ->
-  (if success then return_unit else ask_for_more_contacts t)
-  >>=? fun () -> do_maintain t
+  try_to_contact t min_to_contact max_to_contact >>= fun success ->
+  (if success then return_unit else ask_for_more_contacts t) >>=? fun () ->
+  do_maintain t
 
 and too_many_connections t n_connected =
   (* kill random connections *)
   let n = n_connected - t.bounds.max_target in
-  Events.(emit too_many_connections) n
-  >>= fun () ->
+  Events.(emit too_many_connections) n >>= fun () ->
   let connections = random_connections t.pool n in
   List.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
 
@@ -264,25 +253,24 @@ let rec worker_loop t =
      || t.bounds.max_threshold < n_connected
    then do_maintain t
    else
-     ( if not t.config.private_mode then send_swap_request t ;
-       return_unit )
+     (if not t.config.private_mode then send_swap_request t ;
+      return_unit)
      >>=? fun () ->
      protect ~canceler:t.canceler (fun () ->
          Lwt.pick
-           [ Systime_os.sleep t.config.maintenance_idle_time;
+           [
+             Systime_os.sleep t.config.maintenance_idle_time;
              Lwt_condition.wait t.please_maintain;
              (* when asked *)
              P2p_trigger.wait_too_few_connections t.triggers;
              (* limits *)
-             P2p_trigger.wait_too_many_connections t.triggers ]
+             P2p_trigger.wait_too_many_connections t.triggers;
+           ]
          >>= fun () -> return_unit))
   >>= function
-  | Ok () ->
-      worker_loop t
-  | Error (Canceled :: _) ->
-      Lwt.return_unit
-  | Error _ ->
-      Lwt.return_unit
+  | Ok () -> worker_loop t
+  | Error (Canceled :: _) -> Lwt.return_unit
+  | Error _ -> Lwt.return_unit
 
 let bounds ~min ~expected ~max =
   assert (min <= expected) ;
@@ -331,11 +319,8 @@ let maintain t =
   wait
 
 let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
-  Error_monad.cancel_with_exceptions canceler
-  >>= fun () ->
-  Option.iter_s P2p_discovery.shutdown discovery
-  >>= fun () ->
-  maintain_worker
-  >>= fun () ->
+  Error_monad.cancel_with_exceptions canceler >>= fun () ->
+  Option.iter_s P2p_discovery.shutdown discovery >>= fun () ->
+  maintain_worker >>= fun () ->
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit

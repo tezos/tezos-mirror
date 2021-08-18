@@ -29,22 +29,18 @@ let init_account ctxt
     ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
     =
   let contract = Contract_repr.implicit_contract public_key_hash in
-  Contract_storage.credit ctxt contract amount
-  >>=? fun ctxt ->
+  Contract_storage.credit ctxt contract amount >>=? fun ctxt ->
   match public_key with
   | Some public_key ->
       Contract_storage.reveal_manager_key ctxt public_key_hash public_key
-      >>=? fun ctxt ->
-      Delegate_storage.set ctxt contract (Some public_key_hash)
-  | None ->
-      return ctxt
+      >>=? fun ctxt -> Delegate_storage.set ctxt contract (Some public_key_hash)
+  | None -> return ctxt
 
 let init_contract ~typecheck ctxt
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, contract) ->
-  typecheck ctxt script
-  >>=? fun (script, ctxt) ->
+  typecheck ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate
     ctxt
     contract
@@ -58,13 +54,10 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
     Operation_hash.hash_bytes [Bytes.of_string "Un festival de GADT."]
   in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  fold_left_s init_account ctxt accounts
-  >>=? fun ctxt ->
-  fold_left_s (init_contract ~typecheck) ctxt contracts
-  >>=? fun ctxt ->
-  ( match no_reward_cycles with
-  | None ->
-      return ctxt
+  fold_left_s init_account ctxt accounts >>=? fun ctxt ->
+  fold_left_s (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
+  (match no_reward_cycles with
+  | None -> return ctxt
   | Some cycles ->
       (* Store pending ramp ups. *)
       let constants = Raw_context.constants ctxt in
@@ -80,12 +73,10 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
       Storage.Ramp_up.Rewards.init
         ctxt
         (Cycle_repr.of_int32_exn (Int32.of_int cycles))
-        (constants.baking_reward_per_endorsement, constants.endorsement_reward)
-  )
+        (constants.baking_reward_per_endorsement, constants.endorsement_reward))
   >>=? fun ctxt ->
   match ramp_up_cycles with
-  | None ->
-      return ctxt
+  | None -> return ctxt
   | Some cycles ->
       (* Store pending ramp ups. *)
       let constants = Raw_context.constants ctxt in
@@ -124,21 +115,16 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
 
 let cycle_end ctxt last_cycle =
   let next_cycle = Cycle_repr.succ last_cycle in
-  Storage.Ramp_up.Rewards.find ctxt next_cycle
-  >>=? (function
-         | None ->
-             return ctxt
-         | Some (baking_reward_per_endorsement, endorsement_reward) ->
-             Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle
-             >>=? fun ctxt ->
-             Raw_context.patch_constants ctxt (fun c ->
-                 {c with baking_reward_per_endorsement; endorsement_reward})
-             >|= ok)
+  (Storage.Ramp_up.Rewards.find ctxt next_cycle >>=? function
+   | None -> return ctxt
+   | Some (baking_reward_per_endorsement, endorsement_reward) ->
+       Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle >>=? fun ctxt ->
+       Raw_context.patch_constants ctxt (fun c ->
+           {c with baking_reward_per_endorsement; endorsement_reward})
+       >|= ok)
   >>=? fun ctxt ->
-  Storage.Ramp_up.Security_deposits.find ctxt next_cycle
-  >>=? function
-  | None ->
-      return ctxt
+  Storage.Ramp_up.Security_deposits.find ctxt next_cycle >>=? function
+  | None -> return ctxt
   | Some (block_security_deposit, endorsement_security_deposit) ->
       Storage.Ramp_up.Security_deposits.remove_existing ctxt next_cycle
       >>=? fun ctxt ->

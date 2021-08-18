@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,11 +43,7 @@ type block_error =
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;
@@ -55,6 +51,8 @@ type block_error =
     }
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
+  | Invalid_protocol_environment_transition of
+      Protocol.env_version * Protocol.env_version
 
 type validation_process_error =
   | Missing_handshake
@@ -73,9 +71,9 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
-  | Failed_to_get_live_blocks of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
+  | Cannot_validate_while_shutting_down
 
 val invalid_block : Block_hash.t -> block_error -> error

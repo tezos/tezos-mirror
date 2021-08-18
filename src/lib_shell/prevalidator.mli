@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,6 +56,8 @@ type limits = {
   operations_batch_size : int;
 }
 
+type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
+
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->
@@ -73,7 +75,12 @@ val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
 
 (** Notify the prevalidator that a new head has been selected. *)
-val flush : t -> Block_hash.t -> unit tzresult Lwt.t
+val flush :
+  t ->
+  Block_hash.t ->
+  Block_hash.Set.t ->
+  Operation_hash.Set.t ->
+  unit tzresult Lwt.t
 
 (** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
     reset of the prevalidation context *)
@@ -83,8 +90,7 @@ val timestamp : t -> Time.System.t
 val fitness : t -> Fitness.t Lwt.t
 
 (** Returns the list of valid operations known to this prevalidation worker *)
-val operations :
-  t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
+val operations : t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
 
 (** Returns the list of pending operations known to this prevalidation worker *)
 val pending : t -> Operation.t Operation_hash.Map.t Lwt.t
@@ -99,7 +105,7 @@ val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 val protocol_hash : t -> Protocol_hash.t
 
 (** Returns the parameters the prevalidator was created with. *)
-val parameters : t -> limits * Distributed_db.chain_db
+val parameters : t -> parameters
 
 (** Worker status and events *)
 

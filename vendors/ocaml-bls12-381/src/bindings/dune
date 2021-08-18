@@ -1,9 +1,0 @@
-(executable
- (name rustc_bls12_381_gen)
- (modules rustc_bls12_381_gen rustc_bls12_381_bindings)
- (libraries ctypes.stubs ctypes))
-
-(rule
- (targets rustc_bls12_381_stubs.ml rustc_bls12_381_ctypes_c_stubs.c)
- (deps    (:gen ./rustc_bls12_381_gen.exe))
- (action  (run %{gen} %{targets})))

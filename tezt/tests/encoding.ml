@@ -50,7 +50,7 @@ let check_dump_encodings () =
     ~title:"tezos-codec dump encodings"
     ~tags:["codec"; "dump"]
   @@ fun () ->
-  let* _ : JSON.t = Codec.dump_encodings () in
+  let* (_ : JSON.t) = Codec.dump_encodings () in
   unit
 
 let rec equal_json (a : JSON.u) (b : JSON.u) =
@@ -65,18 +65,12 @@ let rec equal_json (a : JSON.u) (b : JSON.u) =
              key_a = key_b && equal_json val_a val_b)
            (sort_object object_a)
            (sort_object object_b)
-  | (`Bool bool_a, `Bool bool_b) ->
-      bool_a = bool_b
-  | (`Float float_a, `Float float_b) ->
-      Float.equal float_a float_b
-  | (`A array_a, `A array_b) ->
-      List.for_all2 equal_json array_a array_b
-  | (`Null, `Null) ->
-      true
-  | (`String string_a, `String string_b) ->
-      string_a = string_b
-  | _ ->
-      false
+  | (`Bool bool_a, `Bool bool_b) -> bool_a = bool_b
+  | (`Float float_a, `Float float_b) -> Float.equal float_a float_b
+  | (`A array_a, `A array_b) -> List.for_all2 equal_json array_a array_b
+  | (`Null, `Null) -> true
+  | (`String string_a, `String string_b) -> string_a = string_b
+  | _ -> false
 
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
@@ -88,24 +82,23 @@ let check_sample ~name ~file =
   if not @@ equal_json (JSON.unannotate json) (JSON.unannotate decoded_json)
   then
     Test.fail
-      "The converted JSON doesn't match the original.\n\
-       Expected: %s\n\
-       Actual: %s"
+      "The converted JSON doesn't match the original.\nExpected: %s\nActual: %s"
       (JSON.encode json)
       (JSON.encode decoded_json) ;
   return ()
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~protocol ~samples =
+let check_samples_encoding ~group_name ~protocols ~samples =
   List.iter
     (fun sample ->
-      Regression.register
+      Protocol.register_regression_test
         ~__FILE__
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
         ~output_file:("encoding" // sf "%s.%s" group_name sample)
-      @@ fun () ->
+        ~protocols
+      @@ fun protocol ->
       let base_path =
         "tezt" // "tests" // "encoding_samples" // group_name // sample
       in
@@ -120,9 +113,10 @@ let register () =
   check_dump_encodings () ;
   check_samples_encoding
     ~group_name:"alpha"
-    ~protocol:Alpha
+    ~protocols:[Alpha]
     ~samples:
-      [ "block_header";
+      [
+        "block_header";
         "block_header.raw";
         "block_header.unsigned";
         "contract";
@@ -150,12 +144,14 @@ let register () =
         "vote.ballots";
         "vote.listings";
         "voting_period.kind";
-        "voting_period" ] ;
+        "voting_period";
+      ] ;
   check_samples_encoding
     ~group_name:"current"
-    ~protocol:Protocol.current_mainnet
+    ~protocols:[Protocol.current_mainnet]
     ~samples:
-      [ "block_header";
+      [
+        "block_header";
         "block_header.raw";
         "block_header.unsigned";
         "contract";
@@ -183,4 +179,5 @@ let register () =
         "vote.ballots";
         "vote.listings";
         "voting_period.kind";
-        "voting_period" ]
+        "voting_period";
+      ]

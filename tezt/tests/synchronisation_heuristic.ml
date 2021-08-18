@@ -35,10 +35,8 @@ open Base
 let wait_for_sync node =
   let filter json =
     match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
-    | None ->
-        None
-    | Some status ->
-        if status = "synced" then Some () else None
+    | None -> None
+    | Some status -> if status = "synced" then Some () else None
   in
   Node.wait_for node "node_chain_validator.v0" filter
 
@@ -47,14 +45,14 @@ let wait_for_sync node =
    synchronize themselves. Then we restart all the nodes and check
    they are all in the state mode `sync`. *)
 
-let check_node_synchronization_state protocol =
+let check_node_synchronization_state =
   let n = 4 in
   let blocks_to_bake = 5 in
-  Test.register
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: check synchronization state" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "bootstrap"; "node"; "sync"]
-  @@ fun () ->
+    ~title:"check synchronization state"
+    ~tags:["bootstrap"; "node"; "sync"]
+  @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
     Lwt_list.map_p
@@ -62,7 +60,7 @@ let check_node_synchronization_state protocol =
       (range 1 n)
   in
   Log.info "%d nodes initialized." (n + 1) ;
-  let* client = Client.init ~node:main_node () in
+  let* client = Client.init ~endpoint:(Node main_node) () in
   let* () =
     Client.activate_protocol
       ~protocol
@@ -99,8 +97,8 @@ let check_node_synchronization_state protocol =
 (* In order to check that the prevalidator is not alive, we cannot
    rely on events because it's indecidable, thus we query a RPC that
    is reachable only if the prevalidator is running. *)
-let check_is_prevalidator_started node =
-  let client = Client.create ~node () in
+let check_is_prevalidator_started endpoint =
+  let client = Client.create ~endpoint () in
   let process =
     Client.spawn_rpc
       GET
@@ -109,8 +107,8 @@ let check_is_prevalidator_started node =
   in
   Process.check ~expect_failure:false process
 
-let check_is_prevalidator_closed node =
-  let client = Client.create ~node () in
+let check_is_prevalidator_closed endpoint =
+  let client = Client.create ~endpoint () in
   let process =
     Client.spawn_rpc
       GET
@@ -129,12 +127,12 @@ let check_is_prevalidator_closed node =
    - node 3 has a synchronisation heuristic that is too high to successfully
      bootstrap in this test scenario: its validator is expected to not have
      started. *)
-let check_prevalidator_start protocol =
-  Test.register
+let check_prevalidator_start =
+  Protocol.register_test
     ~__FILE__
     ~title:"Check prevalidator start"
     ~tags:["bootstrap"; "node"; "prevalidator"]
-  @@ fun () ->
+  @@ fun protocol ->
   let init_node threshold = Node.init [Synchronisation_threshold threshold] in
   let* node1 = init_node 0 in
   let* node2 = init_node 1 in
@@ -144,7 +142,7 @@ let check_prevalidator_start protocol =
   let waiter_sync =
     Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
   in
-  let* client = Client.init ~node:node1 () in
+  let* client = Client.init ~endpoint:(Node node1) () in
   let* () = Client.activate_protocol ~protocol client ~timestamp_delay:3600. in
   Log.info "Activated protocol." ;
   let* () = Client.bake_for ~minimal_timestamp:false client in
@@ -165,11 +163,11 @@ let check_prevalidator_start protocol =
   Log.info "Waiting for nodes to be synchronized." ;
   let* () = waiter_sync in
   Log.info "Asserting that the prevalidator started for node 2." ;
-  let* () = check_is_prevalidator_started node2 in
+  let* () = check_is_prevalidator_started (Node node2) in
   Log.info "Asserting that the prevalidator did not start for node 3." ;
-  let* () = check_is_prevalidator_closed node3 in
+  let* () = check_is_prevalidator_closed (Node node3) in
   unit
 
-let register protocol =
-  check_node_synchronization_state protocol ;
-  check_prevalidator_start protocol
+let register ~protocols =
+  check_node_synchronization_state ~protocols ;
+  check_prevalidator_start ~protocols

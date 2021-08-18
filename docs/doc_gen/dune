@@ -5,7 +5,7 @@
             tezos-stdlib-unix
             tezos-shell
             tezos-protocol-updater
-            tezos-embedded-protocol-008-PtEdo2Zk
+            ; TODO nomadic-labs/tezos#462: adapt next line(s)
             tezos-embedded-protocol-009-PsFLoren
             tezos-embedded-protocol-010-PtGRANAD
             tezos-embedded-protocol-alpha
@@ -13,6 +13,7 @@
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_shell
+                   -open Tezos_store
                    -open Tezos_protocol_updater
                    -linkall)))
 
@@ -21,8 +22,3 @@
  (deps rpc_doc.exe
        p2p_doc.exe)
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

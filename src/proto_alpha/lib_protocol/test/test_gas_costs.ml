@@ -40,6 +40,8 @@ let dummy_list = list_cons 42 list_empty
 
 let forty_two = Alpha_context.Script_int.of_int 42
 
+let forty_two_n = Alpha_context.Script_int.abs forty_two
+
 let dummy_set =
   set_update forty_two true (empty_set Script_typed_ir.(Int_key None))
 
@@ -62,10 +64,10 @@ let free = ["balance"; "bool"; "parsing_unit"; "unparsing_unit"]
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_interpreter_costs =
   let open Michelson_v1_gas.Cost_of.Interpreter in
-  [ ("drop", drop);
+  [
+    ("drop", drop);
     ("dup", dup);
     ("swap", swap);
-    ("push", push);
     ("cons_some", cons_some);
     ("cons_none", cons_none);
     ("if_none", if_none);
@@ -94,7 +96,7 @@ let all_interpreter_costs =
     ("map_update", map_update forty_two dummy_map);
     ("map_size", map_size);
     ("add_seconds_timestamp", add_seconds_timestamp forty_two dummy_timestamp);
-    ("sub_seconds_timestamp", sub_seconds_timestamp forty_two dummy_timestamp);
+    ("sub_timestamp_seconds", sub_timestamp_seconds dummy_timestamp forty_two);
     ("diff_timestamps", diff_timestamps dummy_timestamp dummy_timestamp);
     ("concat_string_pair", concat_string_pair "dummy" "dummy");
     ("slice_string", slice_string "dummy");
@@ -104,7 +106,7 @@ let all_interpreter_costs =
     ("bytes_size", bytes_size);
     ("add_tez", add_tez);
     ("sub_tez", sub_tez);
-    ("mul_teznat", mul_teznat forty_two);
+    ("mul_teznat", mul_teznat);
     ("bool_or", bool_or);
     ("bool_and", bool_and);
     ("bool_xor", bool_xor);
@@ -113,13 +115,13 @@ let all_interpreter_costs =
     ("abs_int", abs_int forty_two);
     ("int_nat", int_nat);
     ("neg_int", neg_int forty_two);
-    ("neg_nat", neg_nat forty_two);
-    ("add_bigint", add_bigint forty_two forty_two);
-    ("sub_bigint", sub_bigint forty_two forty_two);
-    ("mul_bigint", mul_bigint forty_two forty_two);
+    ("neg_nat", neg_nat forty_two_n);
+    ("add_intint", add_intint forty_two forty_two);
+    ("sub_int", sub_int forty_two forty_two);
+    ("mul_intint", mul_intint forty_two forty_two);
     ("ediv_teznat", ediv_teznat Alpha_context.Tez.fifty_cents forty_two);
     ("ediv_tez", ediv_tez);
-    ("ediv_bigint", ediv_bigint forty_two (Alpha_context.Script_int.of_int 1));
+    ("ediv_intint", ediv_intint forty_two (Alpha_context.Script_int.of_int 1));
     ("eq", eq);
     ("lsl_nat", lsl_nat forty_two);
     ("lsr_nat", lsr_nat forty_two);
@@ -128,7 +130,6 @@ let all_interpreter_costs =
     ("xor_nat", xor_nat forty_two forty_two);
     ("not_int", not_int forty_two);
     ("not_nat", not_nat forty_two);
-    ("seq", seq);
     ("if_", if_);
     ("loop", loop);
     ("loop_left", loop_left);
@@ -142,7 +143,6 @@ let all_interpreter_costs =
     ("dipn", dipn 42);
     ("dropn", dropn 42);
     ("neq", neq);
-    ("nop", nop);
     ("compare", compare Script_typed_ir.(Int_key None) forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck (list_cons "42" list_empty) );
@@ -168,12 +168,14 @@ let all_interpreter_costs =
     ("self_address", self_address);
     ("amount", amount);
     ("chain_id", chain_id);
-    ("unpack_failed", unpack_failed (Bytes.of_string "dummy")) ]
+    ("unpack_failed", unpack_failed (Bytes.of_string "dummy"));
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_parsing_costs =
   let open Michelson_v1_gas.Cost_of.Typechecking in
-  [ ("public_key_optimized", public_key_optimized);
+  [
+    ("public_key_optimized", public_key_optimized);
     ("public_key_readable", public_key_readable);
     ("key_hash_optimized", key_hash_optimized);
     ("key_hash_readable", key_hash_readable);
@@ -194,12 +196,14 @@ let all_parsing_costs =
     ("timestamp_readable", timestamp_readable);
     ("contract", contract);
     ("contract_exists", contract_exists);
-    ("proof_argument", proof_argument 42) ]
+    ("proof_argument", proof_argument 42);
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_unparsing_costs =
   let open Michelson_v1_gas.Cost_of.Unparsing in
-  [ ("public_key_optimized", public_key_optimized);
+  [
+    ("public_key_optimized", public_key_optimized);
     ("public_key_readable", public_key_readable);
     ("key_hash_optimized", key_hash_optimized);
     ("key_hash_readable", key_hash_readable);
@@ -216,17 +220,20 @@ let all_unparsing_costs =
     ("unparse_data_cycle", unparse_data_cycle);
     ("unparsing_unit", unit);
     ("contract", contract);
-    ("operation", operation dummy_bytes) ]
+    ("operation", operation dummy_bytes);
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_io_costs =
   let open Storage_costs in
-  [ ("read_access 0 0", read_access ~path_length:0 ~read_bytes:0);
+  [
+    ("read_access 0 0", read_access ~path_length:0 ~read_bytes:0);
     ("read_access 1 0", read_access ~path_length:1 ~read_bytes:0);
     ("read_access 0 1", read_access ~path_length:0 ~read_bytes:1);
     ("read_access 1 1", read_access ~path_length:1 ~read_bytes:1);
     ("write_access 0", write_access ~written_bytes:0);
-    ("write_access 1", write_access ~written_bytes:1) ]
+    ("write_access 1", write_access ~written_bytes:1);
+  ]
 
 (* Here we're using knowledge of the internal representation of costs to
    cast them to S ... *)
@@ -239,7 +246,8 @@ let test_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
       if S.(cost > S.zero) then return_unit
-      else if S.equal cost S.zero && List.mem cost_name free then return_unit
+      else if S.equal cost S.zero && List.mem ~equal:String.equal cost_name free
+      then return_unit
       else
         fail
           (Exn
@@ -254,7 +262,8 @@ let test_costs_are_all_positive list () =
   test_cost_reprs_are_all_positive list ()
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "Positivity of interpreter costs"
       `Quick
       (test_costs_are_all_positive all_interpreter_costs);
@@ -269,4 +278,5 @@ let tests =
     Test_services.tztest
       "Positivity of io costs"
       `Quick
-      (test_cost_reprs_are_all_positive all_io_costs) ]
+      (test_cost_reprs_are_all_positive all_io_costs);
+  ]

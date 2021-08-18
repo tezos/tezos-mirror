@@ -1,11 +1,11 @@
 tezt/_regressions/encoding/alpha.delegate.frozen_balance.out
 
 ./tezos-codec encode alpha.delegate.frozen_balance from '{
-  "deposit": "0",
+  "deposits": "0",
   "fees": "100000000000",
   "rewards": "23425"
 }'
 0080d0dbc3f40281b701
 
 ./tezos-codec decode alpha.delegate.frozen_balance from 0080d0dbc3f40281b701
-{ "deposit": "0", "fees": "100000000000", "rewards": "23425" }
+{ "deposits": "0", "fees": "100000000000", "rewards": "23425" }

@@ -33,7 +33,8 @@
 let () =
   Alcotest_lwt.run
     "protocol_009_PsFLoren"
-    [ ("transfer", Test_transfer.tests);
+    [
+      ("transfer", Test_transfer.tests);
       ("origination", Test_origination.tests);
       ("activation", Test_activation.tests);
       ("revelation", Test_reveal.tests);
@@ -59,5 +60,6 @@ let () =
       ("helpers rpcs", Test_helpers_rpcs.tests);
       ("script deserialize gas", Test_script_gas.tests);
       ("failing_noop operation", Test_failing_noop.tests);
-      ("storage description", Test_storage.tests) ]
+      ("storage description", Test_storage.tests);
+    ]
   |> Lwt_main.run

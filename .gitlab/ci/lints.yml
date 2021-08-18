@@ -1,0 +1,57 @@
+misc_checks:
+  extends: .build_template
+  stage: test
+  needs: []
+  script:
+    # checks that all deps of opam packages are already installed
+    - ./scripts/opam-check.sh
+    # misc linting
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
+    - make check-linting
+    - make check-python-linting
+    # python checks
+    - make -C tests_python typecheck
+    # check the static-build patch applies cleanly
+    - git apply packaging/build/static_libs.patch
+    # Ensure that all unit tests are restricted to their opam package
+    # (change 'tezos-test-helpers' to one the most elementary packages of
+    # the repo if you add "internal" dependencies to tezos-test-helpers)
+    - dune runtest -p tezos-test-helpers ||
+      echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
+
+check_precommit_hook:
+  extends: .build_template
+  stage: test
+  needs: []
+  script:
+    - ./scripts/pre_commit/pre_commit.py --test-itself
+    - cd tests_python
+    - poetry run pylint ../scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
+    - poetry run mypy ../scripts/pre_commit/pre_commit.py
+
+check_scripts_b58_prefix:
+  # Can be changed to a python image, but using the build docker image to keep
+  # in sync with the python version used for the tests
+  extends: .test_template
+  needs: []
+  before_script:
+    - cd scripts/b58_prefix
+    - poetry install
+  script:
+    - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest test_b58_prefix.py -v
+
+# fast self-checks that depends on build
+sanity_ci:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
+  stage: sanity_ci
+  needs: ["build"]
+  before_script:
+    - . ./scripts/version.sh
+    - . $HOME/.venv/bin/activate
+  script:
+    - src/tooling/lint.sh --check-gitlab-ci-yml

@@ -23,15 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    _______
+
+    Invocation: dune build @src/lib_stdlib/test/runtest_tzList
+ *)
+
 let rec permut = function
-  | [] ->
-      [[]]
+  | [] -> [[]]
   | x :: xs ->
       let insert xs =
         let rec loop acc left right =
           match right with
-          | [] ->
-              List.rev (x :: left) :: acc
+          | [] -> List.rev (x :: left) :: acc
           | y :: ys ->
               loop (List.rev_append left (x :: right) :: acc) (y :: left) ys
         in
@@ -73,6 +77,35 @@ let test_take_n _ =
     ~f:(fun xs ->
       Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4; 5; 5; 5; 6])
 
-let tests = [("take_n", `Quick, test_take_n)]
+let list_size = QCheck.Gen.int_range 2 1000
 
-let () = Alcotest.run "stdlib" [("tzList", tests)]
+let pp_int_list =
+  Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+    Format.pp_print_int
+
+let test_shuffle_preserves_values =
+  QCheck.Test.make
+    ~name:"shuffle preserves value sets"
+    ~count:1000
+    QCheck.(list_of_size list_size int)
+    (fun l ->
+      let l1 = List.sort Int.compare l in
+      let l2 = List.sort Int.compare (TzList.shuffle l) in
+      Lib_test.Qcheck_helpers.qcheck_eq'
+        ~pp:pp_int_list
+        ~eq:( = )
+        ~actual:l2
+        ~expected:l1
+        ())
+
+let () =
+  Alcotest.run
+    "stdlib"
+    [
+      ( "tzList",
+        [
+          ("take_n", `Quick, test_take_n);
+          QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+        ] );
+    ]

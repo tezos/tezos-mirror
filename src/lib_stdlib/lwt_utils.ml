@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,12 +39,10 @@ let worker name ~on_event ~run ~cancel =
           (`Failed (Printf.sprintf "Exception: %s" (Printexc.to_string e))))
       cancel
   in
-  on_event name `Started
-  >>= fun () ->
+  on_event name `Started >>= fun () ->
   let p = Lwt.catch run fail in
   Lwt.on_termination p (Lwt.wakeup stopper) ;
-  stop
-  >>= fun () ->
+  stop >>= fun () ->
   Lwt.catch (fun () -> on_event name `Ended) (fun _ -> Lwt.return_unit)
 
 let worker name ~on_event ~run ~cancel =
@@ -53,13 +52,17 @@ let rec fold_left_s_n ~n f acc l =
   if n = 0 then Lwt.return (acc, l)
   else
     match l with
-    | [] ->
-        Lwt.return (acc, [])
+    | [] -> Lwt.return (acc, [])
     | x :: l ->
-        f acc x
-        >>= fun acc -> (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
+        f acc x >>= fun acc ->
+        (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
 
 let dont_wait handler f =
   let open Lwt in
   let p = apply f () in
   on_failure p handler
+
+let rec find_map_s f = function
+  | [] -> Lwt.return_none
+  | x :: l ->
+      Lwt.bind (f x) (function None -> find_map_s f l | r -> Lwt.return r)

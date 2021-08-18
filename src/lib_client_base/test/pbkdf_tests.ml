@@ -62,7 +62,9 @@ let pbkdf2_test13 =
       "daf8a734327745eb63d19054dbd4018a682cef11086a1bfb63fdbc16158c2f8b0742802f36aef1b1df92accbea5d31a5"
 
 let pbkdf2_tests =
-  [ ("Test Case 11", `Quick, pbkdf2_test11);
-    ("Test Case 13", `Quick, pbkdf2_test13) ]
+  [
+    ("Test Case 11", `Quick, pbkdf2_test11);
+    ("Test Case 13", `Quick, pbkdf2_test13);
+  ]
 
 let () = Alcotest.run "PBKDF Tests" [("PBKDF2 tests", pbkdf2_tests)]

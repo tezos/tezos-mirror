@@ -26,8 +26,8 @@
 open Alpha_context
 
 let custom_root =
-  ( RPC_path.(open_root / "context" / "constants")
-    : RPC_context.t RPC_path.context )
+  (RPC_path.(open_root / "context" / "constants")
+    : RPC_context.t RPC_path.context)
 
 module S = struct
   open Data_encoding

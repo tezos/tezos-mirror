@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Helpers RPCs)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^helpers rpcs$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^helpers rpcs$"
     Subject:    On RPCs.
 *)
 
@@ -37,40 +37,31 @@ open Alpha_context
    Future levels or cycles are not tested because it's hard in this framework,
    using only RPCs, to fabricate them. *)
 let test_baking_rights () =
-  Context.init 2
-  >>=? fun (b, contracts) ->
+  Context.init 2 >>=? fun (b, contracts) ->
   let open Alpha_services.Delegate.Baking_rights in
   (* default max_priority returns 65 results *)
-  get Block.rpc_ctxt b ~all:true
-  >>=? fun rights ->
+  get Block.rpc_ctxt b ~all:true >>=? fun rights ->
   assert (List.length rights = 65) ;
   (* arbitrary max_priority *)
   let max_priority = 15 in
-  get Block.rpc_ctxt b ~all:true ~max_priority
-  >>=? fun rights ->
+  get Block.rpc_ctxt b ~all:true ~max_priority >>=? fun rights ->
   assert (List.length rights = max_priority + 1) ;
   (* filtering by delegate *)
   let d =
     Option.bind (List.nth contracts 0) Contract.is_implicit
     |> WithExceptions.Option.get ~loc:__LOC__
   in
-  get Block.rpc_ctxt b ~all:true ~delegates:[d]
-  >>=? fun rights ->
+  get Block.rpc_ctxt b ~all:true ~delegates:[d] >>=? fun rights ->
   assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
   (* filtering by cycle *)
-  Plugin.RPC.current_level Block.rpc_ctxt b
-  >>=? fun {cycle; _} ->
-  get Block.rpc_ctxt b ~all:true ~cycles:[cycle]
-  >>=? fun rights ->
-  Plugin.RPC.levels_in_current_cycle Block.rpc_ctxt b
-  >>=? fun (first, last) ->
+  Plugin.RPC.current_level Block.rpc_ctxt b >>=? fun {cycle; _} ->
+  get Block.rpc_ctxt b ~all:true ~cycles:[cycle] >>=? fun rights ->
+  Plugin.RPC.levels_in_current_cycle Block.rpc_ctxt b >>=? fun (first, last) ->
   assert (
-    List.for_all (fun {level; _} -> level >= first && level <= last) rights ) ;
+    List.for_all (fun {level; _} -> level >= first && level <= last) rights) ;
   (* filtering by level *)
-  Plugin.RPC.current_level Block.rpc_ctxt b
-  >>=? fun {level; _} ->
-  get Block.rpc_ctxt b ~all:true ~levels:[level]
-  >>=? fun rights ->
+  Plugin.RPC.current_level Block.rpc_ctxt b >>=? fun {level; _} ->
+  get Block.rpc_ctxt b ~all:true ~levels:[level] >>=? fun rights ->
   let espected_level = level in
   assert (List.for_all (fun {level; _} -> level = espected_level) rights) ;
   return_unit

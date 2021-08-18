@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,8 +39,8 @@ let () =
     ~pp:(fun ppf addr ->
       Format.fprintf
         ppf
-        "The node is configured to listen on a public address (%a), while \
-         only 'private' networks are authorised with `--sandbox`.\n\
+        "The node is configured to listen on a public address (%a), while only \
+         'private' networks are authorised with `--sandbox`.\n\
         \           See `%s run --help` on how to change the listening address."
         Ipaddr.V6.pp
         addr
@@ -176,7 +176,22 @@ module Event = struct
       ~name:"bye"
       ~msg:"bye"
       ~level:Notice
+      (* may be negative in case of signals *)
       ("exit_code", Data_encoding.int31)
+
+  let incorrect_history_mode =
+    declare_2
+      ~section
+      ~name:"incorrect_history_mode"
+      ~msg:
+        "The given history mode {given_history_mode} does not correspond to \
+         the stored history mode {stored_history_mode}. If you wish to force \
+         the switch, use the flag '--force-history-mode-switch'."
+      ~level:Error
+      ~pp1:History_mode.pp
+      ("given_history_mode", History_mode.encoding)
+      ~pp2:History_mode.pp
+      ("stored_history_mode", History_mode.encoding)
 end
 
 open Filename.Infix
@@ -186,55 +201,44 @@ let init_identity_file (config : Node_config_file.t) =
     config.data_dir // Node_data_version.default_identity_file_name
   in
   if Sys.file_exists identity_file then
-    Node_identity_file.read identity_file
-    >>=? fun identity ->
+    Node_identity_file.read identity_file >>=? fun identity ->
     Event.(emit read_identity) identity.peer_id >>= fun () -> return identity
   else
-    Event.(emit generating_identity) ()
-    >>= fun () ->
+    Event.(emit generating_identity) () >>= fun () ->
     Node_identity_file.generate identity_file config.p2p.expected_pow
     >>=? fun identity ->
-    Event.(emit identity_generated) identity.peer_id
-    >>= fun () -> return identity
+    Event.(emit identity_generated) identity.peer_id >>= fun () ->
+    return identity
 
-let init_node ?sandbox ?checkpoint ~identity ~singleprocess
-    (config : Node_config_file.t) =
+let init_node ?sandbox ?target ~identity ~singleprocess
+    ~force_history_mode_switch (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
-  ( match config.disable_config_validation with
-  | true ->
-      Event.(emit disabled_config_validation) ()
-  | false ->
-      Lwt.return_unit )
+  (match config.disable_config_validation with
+  | true -> Event.(emit disabled_config_validation) ()
+  | false -> Lwt.return_unit)
   >>= fun () ->
-  ( match config.p2p.discovery_addr with
+  (match config.p2p.discovery_addr with
   | None ->
       Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
-      Node_config_file.resolve_discovery_addrs addr
-      >>=? function
-      | [] ->
-          failwith "Cannot resolve P2P discovery address: %S" addr
-      | (addr, port) :: _ ->
-          return (Some addr, Some port) ) )
+      Node_config_file.resolve_discovery_addrs addr >>=? function
+      | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
+      | (addr, port) :: _ -> return (Some addr, Some port)))
   >>=? fun (discovery_addr, discovery_port) ->
-  ( match config.p2p.listen_addr with
+  (match config.p2p.listen_addr with
   | None ->
       Event.(emit disabled_listen_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
-      Node_config_file.resolve_listening_addrs addr
-      >>=? function
-      | [] ->
-          failwith "Cannot resolve P2P listening address: %S" addr
-      | (addr, port) :: _ ->
-          return (Some addr, Some port) ) )
+      Node_config_file.resolve_listening_addrs addr >>=? function
+      | [] -> failwith "Cannot resolve P2P listening address: %S" addr
+      | (addr, port) :: _ -> return (Some addr, Some port)))
   >>=? fun (listening_addr, listening_port) ->
-  ( match (listening_addr, sandbox) with
+  (match (listening_addr, sandbox) with
   | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
       return_none
   | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
       fail (Non_private_sandbox addr)
-  | (None, Some _) ->
-      return_none
+  | (None, Some _) -> return_none
   | _ ->
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
@@ -256,20 +260,16 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
           trust_discovered_peers = sandbox <> None;
         }
       in
-      return_some (p2p_config, config.p2p.limits) )
+      return_some (p2p_config, config.p2p.limits))
   >>=? fun p2p_config ->
-  ( match (config.blockchain_network.genesis_parameters, sandbox) with
-  | (None, None) ->
-      return_none
+  (match (config.blockchain_network.genesis_parameters, sandbox) with
+  | (None, None) -> return_none
   | (Some parameters, None) ->
       return_some (parameters.context_key, parameters.values)
   | (_, Some filename) -> (
-      Lwt_utils_unix.Json.read_file filename
-      >>= function
-      | Error _err ->
-          fail (Invalid_sandbox_file filename)
-      | Ok json ->
-          return_some ("sandbox_parameter", json) ) )
+      Lwt_utils_unix.Json.read_file filename >>= function
+      | Error _err -> fail (Invalid_sandbox_file filename)
+      | Ok json -> return_some ("sandbox_parameter", json)))
   >>=? fun sandbox_param ->
   let genesis = config.blockchain_network.genesis in
   let patch_context =
@@ -290,11 +290,20 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
-      checkpoint;
+      target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
     }
   in
+  (match config.shell.history_mode with
+  | Some history_mode when force_history_mode_switch ->
+      Store.may_switch_history_mode
+        ~store_dir:node_config.store_root
+        ~context_dir:node_config.context_root
+        genesis
+        ~new_history_mode:history_mode
+  | _ -> return_unit)
+  >>=? fun () ->
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
@@ -313,7 +322,7 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
+let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
@@ -325,8 +334,7 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
   in
   let mode =
     match rpc_config.tls with
-    | None ->
-        `TCP (`Port port)
+    | None -> `TCP (`Port port)
     | Some {cert; key} ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
@@ -341,6 +349,7 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
         ~host
         mode
         dir
+        ?acl
         ~media_types:Media_type.all_media_types
         ~cors:
           {
@@ -351,87 +360,74 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (RPC_Port_already_in_use [(addr, port)])
-      | exn ->
-          Lwt.return (error_exn exn))
+      | exn -> Lwt.return (error_exn exn))
 
 let init_rpc (config : Node_config_file.t) node =
   List.fold_right_es
     (fun addr acc ->
-      Node_config_file.resolve_rpc_listening_addrs addr
-      >>=? function
-      | [] ->
-          failwith "Cannot resolve listening address: %S" addr
+      Node_config_file.resolve_rpc_listening_addrs addr >>=? function
+      | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
+          let acl =
+            Option.value ~default:RPC_server.Acl.default
+            @@ RPC_server.Acl.find_policy config.rpc.acl addr
+          in
           List.fold_right_es
             (fun x a ->
-              launch_rpc_server config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server ~acl config node x >>=? fun o -> return (o :: a))
             addrs
             acc)
     config.rpc.listen_addrs
     []
 
-let run ?verbosity ?sandbox ?checkpoint ~singleprocess
+let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
-  Node_data_version.ensure_data_dir config.data_dir
-  >>=? fun () ->
-  Lwt_lock_file.create
-    ~unlink_on_exit:true
-    (Node_data_version.lock_file config.data_dir)
-  >>=? fun () ->
+  Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   (* Main loop *)
   let log_cfg =
     match verbosity with
-    | None ->
-        config.log
-    | Some default_level ->
-        {config.log with default_level}
+    | None -> config.log
+    | Some default_level -> {config.log with default_level}
   in
   Internal_event_unix.init
     ~lwt_log_sink:log_cfg
     ~configuration:config.internal_events
     ()
   >>= fun () ->
-  Node_config_validation.check config
-  >>=? fun () ->
-  init_identity_file config
-  >>=? fun identity ->
+  Node_config_validation.check config >>=? fun () ->
+  init_identity_file config >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
-  Event.(emit starting_node) config.blockchain_network.chain_name
-  >>= fun () ->
-  init_node ?sandbox ?checkpoint ~identity ~singleprocess config
-  >>= (function
-        | Ok node ->
-            return node
-        | Error
-            (State.Incorrect_history_mode_switch {previous_mode; next_mode}
-            :: _) ->
-            failwith
-              "@[Cannot switch from history mode '%a' to '%a'. In order to \
-               change your history mode please refer to the Tezos node \
-               documentation. @]"
-              History_mode.pp
-              previous_mode
-              History_mode.pp
-              next_mode
-        | Error _ as err ->
-            Lwt.return err)
+  Event.(emit starting_node) config.blockchain_network.chain_name >>= fun () ->
+  (init_node
+     ?sandbox
+     ?target
+     ~identity
+     ~singleprocess
+     ~force_history_mode_switch
+     config
+   >>= function
+   | Ok node -> return node
+   | Error
+       (Store_errors.Cannot_switch_history_mode {previous_mode; next_mode} :: _)
+     as err ->
+       Event.(emit incorrect_history_mode) (previous_mode, next_mode)
+       >>= fun () -> Lwt.return err
+   | Error _ as err -> Lwt.return err)
   >>=? fun node ->
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Event.(emit shutting_down_node) () >>= fun () -> Node.shutdown node)
   in
-  init_rpc config node
-  >>=? fun rpc ->
+  init_rpc config node >>=? fun rpc ->
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[node_downer]
       (fun _ ->
-        Event.(emit shutting_down_rpc_server) ()
-        >>= fun () -> List.iter_p RPC_server.shutdown rpc)
+        Event.(emit shutting_down_rpc_server) () >>= fun () ->
+        List.iter_p RPC_server.shutdown rpc)
   in
-  Event.(emit node_is_ready) ()
-  >>= fun () ->
+  Event.(emit node_is_ready) () >>= fun () ->
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
@@ -441,7 +437,8 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   in
   Lwt_utils.never_ending ()
 
-let process sandbox verbosity checkpoint singleprocess args =
+let process sandbox verbosity target singleprocess force_history_mode_switch
+    args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -452,56 +449,63 @@ let process sandbox verbosity checkpoint singleprocess args =
         (match sandbox with Some _ -> true | None -> false)
       args
     >>=? fun config ->
-    ( match sandbox with
+    (match sandbox with
     | Some _ ->
         if config.data_dir = Node_config_file.default_data_dir then
           failwith "Cannot use default data directory while in sandbox mode"
         else return_unit
-    | None ->
-        return_unit )
+    | None -> return_unit)
     >>=? fun () ->
-    ( match checkpoint with
-    | None ->
-        return_none
-    | Some s -> (
-      match Block_header.of_b58check s with
-      | Some b ->
-          return_some b
-      | None ->
-          failwith
-            "Failed to parse the provided checkpoint (Base58Check-encoded)." )
-    )
-    >>=? fun checkpoint ->
-    Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
-    >>=? function
-    | false ->
+    (match target with
+    | None -> return_none
+    | Some s ->
+        let l = String.split_on_char ',' s in
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
-          (function
-            | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-                List.fold_right_es
-                  (fun addr acc ->
-                    Node_config_file.resolve_rpc_listening_addrs addr
-                    >>=? fun x -> return (x @ acc))
-                  config.rpc.listen_addrs
-                  []
-                >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
-            | exn ->
-                Lwt.return (error_exn exn))
-    | true ->
-        failwith "Data directory is locked by another process"
+          (fun () ->
+            assert (List.length l = 2) ;
+            let target =
+              match l with
+              | [block_hash; level] ->
+                  (Block_hash.of_b58check_exn block_hash, Int32.of_string level)
+              | _ -> assert false
+            in
+            return_some target)
+          (fun _ ->
+            failwith
+              "Failed to parse the provided target. A '<block_hash>,<level>' \
+               value was expected."))
+    >>=? fun target ->
+    Lwt_lock_file.try_with_lock
+      ~when_locked:(fun () ->
+        failwith "Data directory is locked by another process")
+      ~filename:(Node_data_version.lock_file config.data_dir)
+    @@ fun () ->
+    Lwt.catch
+      (fun () ->
+        run
+          ?sandbox
+          ?verbosity
+          ?target
+          ~singleprocess
+          ~force_history_mode_switch
+          config)
+      (function
+        | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
+            List.fold_right_es
+              (fun addr acc ->
+                Node_config_file.resolve_rpc_listening_addrs addr >>=? fun x ->
+                return (x @ acc))
+              config.rpc.listen_addrs
+              []
+            >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
+        | exn -> Lwt.return (error_exn exn))
   in
   Lwt_main.run
-    ( Lwt_exit.wrap_and_error main_promise
-    >>= function
-    | Ok (Ok _) ->
-        Lwt_exit.exit_and_wait 0 >>= fun _ -> Lwt.return (`Ok ())
-    | Ok (Error err) ->
-        Lwt_exit.exit_and_wait 2
-        >>= fun _ ->
-        Lwt.return (`Error (false, Format.asprintf "%a" pp_print_error err))
-    | Error exit_status ->
-        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)) )
+    (Lwt_exit.wrap_and_exit main_promise >>= function
+     | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
+     | Error err ->
+         Lwt_exit.exit_and_wait 1 >|= fun _ ->
+         `Error (false, Format.asprintf "%a" pp_print_error err))
 
 module Term = struct
   let verbosity =
@@ -524,8 +528,8 @@ module Term = struct
        network configuration (e.g. scripts/sandbox.json). $(b,IMPORTANT): \
        Using sandbox mode affects the node state and subsequent runs of Tezos \
        node must also use sandbox mode. In order to run the node in normal \
-       mode afterwards, a full reset must be performed (by removing the \
-       node's data directory)."
+       mode afterwards, a full reset must be performed (by removing the node's \
+       data directory)."
     in
     Arg.(
       value
@@ -536,12 +540,11 @@ module Term = struct
           ~docv:"FILE.json"
           ["sandbox"])
 
-  let checkpoint =
+  let target =
     let open Cmdliner in
     let doc =
-      "When asked to take a block hash as a checkpoint, the daemon will only \
-       accept the chains that contains that block and those that might reach \
-       it."
+      "When asked to take a block as a target, the daemon will only accept the \
+       chains that contains that block and those that might reach it."
     in
     Arg.(
       value
@@ -549,8 +552,8 @@ module Term = struct
       & info
           ~docs:Node_shared_arg.Manpage.misc_section
           ~doc
-          ~docv:"<level>,<block_hash>"
-          ["checkpoint"])
+          ~docv:"<block_hash>,<level>"
+          ["target"])
 
   let singleprocess =
     let open Cmdliner in
@@ -563,18 +566,34 @@ module Term = struct
       value & flag
       & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
+  let force_history_mode_switch =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Forces the switch of history modes when a different history mode is \
+         found between the written configuration and the given history mode.  \
+         Warning: this option will modify the storage irremediably. Please \
+         refer to the Tezos node documentation for more details."
+    in
+    Arg.(
+      value & flag
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ["force-history-mode-switch"])
+
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ sandbox $ verbosity $ checkpoint $ singleprocess
-        $ Node_shared_arg.Term.args ))
+        (const process $ sandbox $ verbosity $ target $ singleprocess
+       $ force_history_mode_switch $ Node_shared_arg.Term.args))
 end
 
 module Manpage = struct
   let command_description =
     "The $(b,run) command is meant to run the Tezos node. Most of its command \
-     line arguments corresponds to config file entries, and will have \
-     priority over the latter if used."
+     line arguments corresponds to config file entries, and will have priority \
+     over the latter if used."
 
   let description = [`S "DESCRIPTION"; `P command_description]
 
@@ -584,27 +603,30 @@ module Manpage = struct
         " "
         (TzString.Set.elements (Internal_event.get_registered_sections ()))
     in
-    [ `S "DEBUG";
+    [
+      `S "DEBUG";
       `P
-        ( "The environment variable $(b,TEZOS_LOG) is used to fine-tune what \
-           is going to be logged. The syntax is \
-           $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-           one of $(i," ^ log_sections
-        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
-           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
-           wildcard in sections, i.e. $(b, node* -> debug). The rules are \
-           matched left to right, therefore the leftmost rule is highest \
-           priority ." ) ]
+        ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
+          going to be logged. The syntax is \
+          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
+          one of $(i," ^ log_sections
+       ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
+          $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
+          wildcard in sections, i.e. $(b, node* -> debug). The rules are \
+          matched left to right, therefore the leftmost rule is highest \
+          priority .");
+    ]
 
   let examples =
-    [ `S "EXAMPLES";
+    [
+      `S "EXAMPLES";
       `I
-        ( "$(b,Run in sandbox mode listening to RPC commands at localhost \
-           port 8732)",
+        ( "$(b,Run in sandbox mode listening to RPC commands at localhost port \
+           8732)",
           "$(mname) run \
            --sandbox=src/proto_alpha/parameters/sandbox-parameters.json \
            --data-dir /custom/data/dir --rpc-addr localhost:8732" );
-      `I ("$(b,Run a node that accepts network connections)", "$(mname) run")
+      `I ("$(b,Run a node that accepts network connections)", "$(mname) run");
     ]
 
   let man =

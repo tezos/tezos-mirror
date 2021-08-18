@@ -26,14 +26,15 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Invocation:   dune build @src/proto_010_PtGRANAD/lib_protocol/runtest
     Subject:      Entrypoint
 *)
 
 let () =
   Alcotest_lwt.run
     "protocol_010_PtGRANAD"
-    [ ("transfer", Test_transfer.tests);
+    [
+      ("transfer", Test_transfer.tests);
       ("origination", Test_origination.tests);
       ("activation", Test_activation.tests);
       ("revelation", Test_reveal.tests);
@@ -63,5 +64,6 @@ let () =
       ("constants", Test_constants.tests);
       ("level module", Test_level_module.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
-      ("temp big maps", Test_temp_big_maps.tests) ]
+      ("temp big maps", Test_temp_big_maps.tests);
+    ]
   |> Lwt_main.run

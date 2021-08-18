@@ -82,12 +82,9 @@ module List (P : COMPARABLE) = Make (struct
 
   let rec compare xs ys =
     match (xs, ys) with
-    | ([], []) ->
-        0
-    | ([], _) ->
-        -1
-    | (_, []) ->
-        1
+    | ([], []) -> 0
+    | ([], _) -> -1
+    | (_, []) -> 1
     | (x :: xs, y :: ys) ->
         let hd = P.compare x y in
         if hd <> 0 then hd else compare xs ys
@@ -98,14 +95,10 @@ module Option (P : COMPARABLE) = Make (struct
 
   let compare xs ys =
     match (xs, ys) with
-    | (None, None) ->
-        0
-    | (None, _) ->
-        -1
-    | (_, None) ->
-        1
-    | (Some x, Some y) ->
-        P.compare x y
+    | (None, None) -> 0
+    | (None, _) -> -1
+    | (_, None) -> 1
+    | (Some x, Some y) -> P.compare x y
 end)
 
 module Result (Ok : COMPARABLE) (Error : COMPARABLE) = Make (struct
@@ -115,14 +108,10 @@ module Result (Ok : COMPARABLE) (Error : COMPARABLE) = Make (struct
            comparison. *)
   let compare ra rb =
     match (ra, rb) with
-    | (Ok a, Ok b) ->
-        Ok.compare a b
-    | (Error a, Error b) ->
-        Error.compare a b
-    | (Ok _, Error _) ->
-        -1
-    | (Error _, Ok _) ->
-        1
+    | (Ok a, Ok b) -> Ok.compare a b
+    | (Error a, Error b) -> Error.compare a b
+    | (Ok _, Error _) -> -1
+    | (Error _, Ok _) -> 1
 end)
 
 module Char = Make (Char)
@@ -241,3 +230,5 @@ end)
 module String = Make (String)
 module Bytes = Make (Bytes)
 module Z = Make (Z)
+
+let or_else c f = if c <> 0 then c else f ()

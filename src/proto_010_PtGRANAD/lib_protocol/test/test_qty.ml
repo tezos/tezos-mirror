@@ -26,14 +26,15 @@
 (** Testing
     -------
     Component:  Protocol (quantities)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^qty$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^qty$"
     Subject:    On tez quantities.
 *)
 
 open Protocol
 
 let known_ok_tez_literals =
-  [ (0L, "0");
+  [
+    (0L, "0");
     (10L, "0.00001");
     (100L, "0.0001");
     (1_000L, "0.001");
@@ -53,10 +54,12 @@ let known_ok_tez_literals =
     (1_000_000_010_000L, "1000000.01");
     (1_000_000_100_000L, "1000000.1");
     (123_123_123_123_123_123L, "123123123123.123123");
-    (999_999_999_999_999_999L, "999999999999.999999") ]
+    (999_999_999_999_999_999L, "999999999999.999999");
+  ]
 
 let known_bad_tez_literals =
-  [ "10000.";
+  [
+    "10000.";
     "100,.";
     "100,";
     "1,0000";
@@ -66,7 +69,8 @@ let known_bad_tez_literals =
     "HAHA";
     "0.000,000,1";
     "0.0000000";
-    "9,999,999,999,999.999,999" ]
+    "9,999,999,999,999.999,999";
+  ]
 
 let fail expected given msg =
   Format.kasprintf
@@ -90,21 +94,15 @@ let test_known_tez_literals () =
         Tez_repr.of_string (String.concat "" (String.split_on_char ',' s))
       in
       let vv =
-        match vv with
-        | None ->
-            fail_msg "could not unopt %Ld" v
-        | Some vv ->
-            vv
+        match vv with None -> fail_msg "could not unopt %Ld" v | Some vv -> vv
       in
       let vs =
         match vs with None -> fail_msg "could not unopt %s" s | Some vs -> vs
       in
       let vs' =
         match vs' with
-        | None ->
-            fail_msg "could not unopt %s" s
-        | Some vs' ->
-            vs'
+        | None -> fail_msg "could not unopt %s" s
+        | Some vs' -> vs'
       in
       assert (vv = vs) ;
       assert (vv = vs') ;
@@ -132,15 +130,13 @@ let test_random_tez_literals () =
     let vs' = Tez_repr.of_string s' in
     assert (vs <> None) ;
     assert (vs' <> None) ;
-    ( match vs with
-    | None ->
-        assert false
+    (match vs with
+    | None -> assert false
     | Some vs ->
         let rev = Tez_repr.to_int64 vs in
-        assert (v = rev) ) ;
+        assert (v = rev)) ;
     match vs' with
-    | None ->
-        assert false
+    | None -> assert false
     | Some vs' ->
         let rev = Tez_repr.to_int64 vs' in
         assert (v = rev)
@@ -148,15 +144,15 @@ let test_random_tez_literals () =
   return_unit
 
 let tests =
-  [ ("tez-literals", fun _ -> test_known_tez_literals ());
-    ("rnd-tez-literals", fun _ -> test_random_tez_literals ()) ]
+  [
+    ("tez-literals", fun _ -> test_known_tez_literals ());
+    ("rnd-tez-literals", fun _ -> test_random_tez_literals ());
+  ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f ()
-      >|= function
-      | Ok () ->
-          ()
+      f () >|= function
+      | Ok () -> ()
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 

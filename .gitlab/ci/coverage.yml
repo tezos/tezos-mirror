@@ -1,14 +1,12 @@
-# This job is manual. It can be launched from the gitlab CI interface.
-# It instruments the code with bisect_ppx and runs the full test suite
-# (sequentially).
+# This job is scheduled. It instruments the code with bisect_ppx and
+# runs the full test suite (sequentially).
 
 test_coverage:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_coverage
   stage: test_coverage
-  except:
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
-  when: manual
   variables:
     # We exclude from coverage old protocols and code that can't be
     # instrumented because of current limitations of bisect_ppx.

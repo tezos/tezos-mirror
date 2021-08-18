@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -218,8 +218,8 @@ module Peers : sig
         unit,
         < filters : P2p_peer.Filter.t list >,
         unit,
-        ( P2p_peer.Id.t
-        * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
+        (P2p_peer.Id.t
+        * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t)
         list )
       RPC_service.t
 
@@ -270,11 +270,32 @@ module Peers : sig
 end
 
 module ACL : sig
+  (** Structure that provides a friendly and bounded list of currently
+      greylisted IPs. *)
+  type ip_list = {
+    ips : Ipaddr.V6.t list;
+        (** If [not_reliable_since] is [None] contains the list of currently
+             greylisted IPs. *)
+    not_reliable_since : Ptime.t option;
+        (** Contains the date of the first time that the list of IPs has been
+         overflowed and became not reliable. *)
+  }
+
   val clear : #simple -> unit -> unit tzresult Lwt.t
+
+  val get_greylisted_peers : #simple -> P2p_peer.Id.t list tzresult Lwt.t
+
+  val get_greylisted_ips : #simple -> ip_list tzresult Lwt.t
 
   module S : sig
     val clear : ([`GET], unit, unit, unit, unit, unit) RPC_service.t
 
     val clear_delete : ([`DELETE], unit, unit, unit, unit, unit) RPC_service.t
+
+    val get_greylisted_peers :
+      ([`GET], unit, unit, unit, unit, P2p_peer.Id.t list) RPC_service.t
+
+    val get_greylisted_ips :
+      ([`GET], unit, unit, unit, unit, ip_list) RPC_service.t
   end
 end

@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 (** Storage for keys that have been authorized for baking. *)
-module Authorized_key :
-  Client_aliases.Alias with type t := Signature.public_key
+module Authorized_key : Client_aliases.Alias with type t := Signature.public_key
 
 (** [public_key cctxt pkh] returns the public key whose hash is [pkh]
     iff it is present if [cctxt]. *)
@@ -37,11 +36,11 @@ val public_key :
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
 val sign :
-  #Client_context.wallet ->
-  Signer_messages.Sign.Request.t ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
+  #Client_context.wallet ->
+  Signer_messages.Sign.Request.t ->
   Signature.t tzresult Lwt.t
 
 (** [deterministic_nonce cctxt req ~require_auth] generates

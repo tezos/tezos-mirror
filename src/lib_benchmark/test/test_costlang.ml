@@ -38,14 +38,13 @@ module Term (X : S) = struct
   (* Some examples of cost functions *)
   (* [linear size] is a term "const" + "v1" * size  *)
   let linear =
-    lam ~name:"size"
-    @@ fun size -> free ~name:fv_const + (free ~name:fv_v1 * size)
+    lam ~name:"size" @@ fun size ->
+    free ~name:fv_const + (free ~name:fv_v1 * size)
 
   let linear_sum =
-    lam ~name:"size1"
-    @@ fun size1 ->
-    lam ~name:"size2"
-    @@ fun size2 -> free ~name:fv_const + (free ~name:fv_v1 * (size1 + size2))
+    lam ~name:"size1" @@ fun size1 ->
+    lam ~name:"size2" @@ fun size2 ->
+    free ~name:fv_const + (free ~name:fv_v1 * (size1 + size2))
 
   (* This term, once applied to an argument, is not a linear combination
      with free variables as coefficients (ie cannot be used to perform
@@ -69,8 +68,8 @@ let test_pp_2 () =
 
 let test_pp_3 () =
   PP.applied_linear
-  = "((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + size2))) \
-     10) 33)"
+  = "((fun size1 -> fun size2 -> (free(const) + (free(v1) * (size1 + size2)))) \
+     10) 33"
 
 (* Test evaluation *)
 let test_eval1 () =
@@ -78,9 +77,13 @@ let test_eval1 () =
     Subst
       (struct
         let subst x =
-          match List.assoc x [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)] with
-          | Some v ->
-              v
+          match
+            List.assoc
+              ~equal:Free_variable.equal
+              x
+              [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)]
+          with
+          | Some v -> v
           | None ->
               Format.eprintf "failed to get %a@." Free_variable.pp x ;
               raise Not_found
@@ -96,9 +99,13 @@ let test_eval2 () =
     Subst
       (struct
         let subst x =
-          match List.assoc x [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)] with
-          | Some v ->
-              v
+          match
+            List.assoc
+              ~equal:Free_variable.equal
+              x
+              [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)]
+          with
+          | Some v -> v
           | None ->
               Format.eprintf "failed to get %a@." Free_variable.pp x ;
               raise Not_found
@@ -119,8 +126,7 @@ let test_eval_to_lincomb () =
          Mset_impl.(Eval_to_vector.(applied_linear + applied_linear))
   in
   match Eval_linear_combination_impl.run (fun _ -> None) res with
-  | exception _ ->
-      false
+  | exception _ -> false
   | {linear_comb; const} ->
       Free_variable.Sparse_vec.(
         equal linear_comb (of_list [(fv_v1, 86.); (fv_const, 2.)]))
@@ -131,13 +137,12 @@ let test_eval_to_lincomb_fail () =
     Hash_cons_vector.prj @@ Eval_to_vector.prj Mset_impl.(applied_not_linear)
   in
   match Eval_linear_combination_impl.run (fun _ -> None) res with
-  | exception Eval_linear_combination "*" ->
-      true
-  | _ ->
-      false
+  | exception Eval_linear_combination "*" -> true
+  | _ -> false
 
 let tests =
-  [ Test.tztest_assert "pp1" `Quick test_pp_1;
+  [
+    Test.tztest_assert "pp1" `Quick test_pp_1;
     Test.tztest_assert "pp2" `Quick test_pp_2;
     Test.tztest_assert "pp3" `Quick test_pp_3;
     Test.tztest_assert "eval" `Quick test_eval1;
@@ -146,4 +151,5 @@ let tests =
     Test.tztest_assert
       "eval_to_linear_comb_fail"
       `Quick
-      test_eval_to_lincomb_fail ]
+      test_eval_to_lincomb_fail;
+  ]

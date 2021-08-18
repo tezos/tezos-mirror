@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +26,7 @@
 
 module Request : sig
   type 'a t =
-    | Flush : Block_hash.t -> unit t
+    | Flush : Block_hash.t * Block_hash.Set.t * Operation_hash.Set.t -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
     | Inject : Operation.t -> unit t

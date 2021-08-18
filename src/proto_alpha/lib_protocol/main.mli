@@ -29,19 +29,16 @@ type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
   | Partial_construction of {predecessor : Block_hash.t}
   | Full_construction of {
       predecessor : Block_hash.t;
       protocol_data : Alpha_context.Block_header.contents;
       baker : Alpha_context.public_key_hash;
-      block_delay : Alpha_context.Period.t;
     }
 
 type validation_state = {
@@ -50,6 +47,9 @@ type validation_state = {
   ctxt : Alpha_context.t;
   op_count : int;
   migration_balance_updates : Alpha_context.Receipt.balance_updates;
+  liquidity_baking_escape_ema : Int32.t;
+  implicit_operations_results :
+    Apply_results.packed_successful_manager_operation_result list;
 }
 
 type operation_data = Alpha_context.packed_protocol_data

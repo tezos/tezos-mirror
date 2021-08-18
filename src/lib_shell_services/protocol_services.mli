@@ -36,13 +36,7 @@ val fetch : #simple -> Protocol_hash.t -> unit tzresult Lwt.t
 
 module S : sig
   val contents :
-    ( [`GET],
-      unit,
-      unit * Protocol_hash.t,
-      unit,
-      unit,
-      Protocol.t )
-    RPC_service.t
+    ([`GET], unit, unit * Protocol_hash.t, unit, unit, Protocol.t) RPC_service.t
 
   val environment :
     ( [`GET],

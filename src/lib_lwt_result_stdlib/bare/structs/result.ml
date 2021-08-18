@@ -50,20 +50,16 @@ let bind_error_s r f =
   match r with Ok _ as ok -> Lwt.return ok | Error e -> f e
 
 let join = function
-  | (Error _ as error) | Ok (Error _ as error) ->
-      error
-  | Ok (Ok _ as ok) ->
-      ok
+  | (Error _ as error) | Ok (Error _ as error) -> error
+  | Ok (Ok _ as ok) -> ok
 
 let map f = function Ok v -> Ok (f v) | Error _ as error -> error
 
 let map_e f r = bind r f
 
 let map_s f = function
-  | Ok v ->
-      f v >>= fun v -> Lwt.return (Ok v)
-  | Error _ as error ->
-      Lwt.return error
+  | Ok v -> f v >>= fun v -> Lwt.return (Ok v)
+  | Error _ as error -> Lwt.return error
 
 let map_es f r = bind_s r f
 
@@ -72,10 +68,8 @@ let map_error f = function Ok _ as ok -> ok | Error e -> Error (f e)
 let map_error_e f r = bind_error r f
 
 let map_error_s f = function
-  | Ok v ->
-      Lwt.return (Ok v)
-  | Error e ->
-      f e >>= fun e -> Lwt.return (Error e)
+  | Ok v -> Lwt.return (Ok v)
+  | Error e -> f e >>= fun e -> Lwt.return (Error e)
 
 let map_error_es f r = bind_error_s r f
 
@@ -95,23 +89,16 @@ let is_error = function Ok _ -> false | Error _ -> true
 
 let equal ~ok ~error x y =
   match (x, y) with
-  | (Ok x, Ok y) ->
-      ok x y
-  | (Error x, Error y) ->
-      error x y
-  | (Ok _, Error _) | (Error _, Ok _) ->
-      false
+  | (Ok x, Ok y) -> ok x y
+  | (Error x, Error y) -> error x y
+  | (Ok _, Error _) | (Error _, Ok _) -> false
 
 let compare ~ok ~error x y =
   match (x, y) with
-  | (Ok x, Ok y) ->
-      ok x y
-  | (Error x, Error y) ->
-      error x y
-  | (Ok _, Error _) ->
-      -1
-  | (Error _, Ok _) ->
-      1
+  | (Ok x, Ok y) -> ok x y
+  | (Error x, Error y) -> error x y
+  | (Ok _, Error _) -> -1
+  | (Error _, Ok _) -> 1
 
 let to_option = function Ok v -> Some v | Error _ -> None
 
@@ -120,7 +107,5 @@ let of_option ~error = function Some v -> Ok v | None -> Error error
 let to_list = function Ok v -> [v] | Error _ -> []
 
 let to_seq = function
-  | Ok v ->
-      Stdlib.Seq.return v
-  | Error _ ->
-      Stdlib.Seq.empty
+  | Ok v -> Stdlib.Seq.return v
+  | Error _ -> Stdlib.Seq.empty

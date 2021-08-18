@@ -36,7 +36,8 @@ let chain_status_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Main"
         (obj1 (req "chain_id" Chain_id.encoding))
@@ -52,8 +53,7 @@ let chain_status_encoding =
         (function
           | Active_test {chain; protocol; expiration_date} ->
               Some (chain, protocol, expiration_date)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (chain, protocol, expiration_date) ->
           Active_test {chain; protocol; expiration_date});
       case
@@ -61,7 +61,8 @@ let chain_status_encoding =
         ~title:"Stopping"
         (obj1 (req "stopping" Chain_id.encoding))
         (function Stopping chain_id -> Some chain_id | _ -> None)
-        (fun chain_id -> Stopping chain_id) ]
+        (fun chain_id -> Stopping chain_id);
+    ]
 
 module S = struct
   open Data_encoding
@@ -72,10 +73,10 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Wait for the node to have synchronized its chain with a few peers \
-         (configured by the node's administrator), streaming head updates \
-         that happen during the bootstrapping process, and closing the stream \
-         at the end. If the node was already bootstrapped, returns the \
-         current head immediately."
+         (configured by the node's administrator), streaming head updates that \
+         happen during the bootstrapping process, and closing the stream at \
+         the end. If the node was already bootstrapped, returns the current \
+         head immediately."
       ~query:RPC_query.empty
       ~output:
         (obj2
@@ -155,8 +156,8 @@ module S = struct
   let active_chains =
     RPC_service.get_service
       ~description:
-        "Monitor every chain creation and destruction. Currently active \
-         chains will be given as first elements"
+        "Monitor every chain creation and destruction. Currently active chains \
+         will be given as first elements"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list chain_status_encoding)
       RPC_path.(path / "active_chains")

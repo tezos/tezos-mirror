@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Context Storage
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test storage
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test storage
     Subject:    Test the correctnesss of debug message from storage_functor
  *)
 
@@ -47,10 +47,8 @@ module Int32 = struct
     let to_path c l = string_of_int c :: l
 
     let of_path = function
-      | [] | _ :: _ :: _ ->
-          None
-      | [c] ->
-          int_of_string_opt c
+      | [] | _ :: _ :: _ -> None
+      | [c] -> int_of_string_opt c
 
     type 'a ipath = 'a * t
 
@@ -77,10 +75,8 @@ module Int64 = struct
     let to_path c l = Int64.to_string c :: l
 
     let of_path = function
-      | [] | _ :: _ :: _ ->
-          None
-      | [c] ->
-          Int64.of_string_opt c
+      | [] | _ :: _ :: _ -> None
+      | [c] -> Int64.of_string_opt c
 
     type 'a ipath = 'a * t
 
@@ -95,29 +91,28 @@ module Int64 = struct
 end
 
 let create_context name : (module Raw_context.T with type t = Raw_context.t) =
-  ( module Make_subcontext (Registered) (Raw_context)
-             (struct
-               let name = [name]
-             end) )
+  (module Make_subcontext (Registered) (Raw_context)
+            (struct
+              let name = [name]
+            end))
 
 let create_subcontext name
     (module Context : Raw_context.T with type t = Raw_context.t) :
     (module Raw_context.T with type t = Raw_context.t) =
-  ( module Make_subcontext (Registered) (Context)
-             (struct
-               let name = [name]
-             end) )
+  (module Make_subcontext (Registered) (Context)
+            (struct
+              let name = [name]
+            end))
 
 let create_single_data_storage name
     (module Context : Raw_context.T with type t = Raw_context.t) :
-    (module Single_data_storage
-       with type t = Context.t
-        and type value = Int32.t) =
-  ( module Make_single_data_storage (Registered) (Context)
-             (struct
-               let name = [name]
-             end)
-             (Int32) )
+    (module Single_data_storage with type t = Context.t and type value = Int32.t)
+    =
+  (module Make_single_data_storage (Registered) (Context)
+            (struct
+              let name = [name]
+            end)
+            (Int32))
 
 let create_indexed_subcontext_int32
     (module Context : Raw_context.T with type t = Raw_context.t) :
@@ -162,9 +157,7 @@ let test_register_named_subcontext () =
   let f_prog () =
     let context = create_context "context2" in
     let subcontext = create_subcontext "sub_context" context in
-    let _single_data =
-      create_single_data_storage "error_register" subcontext
-    in
+    let _single_data = create_single_data_storage "error_register" subcontext in
     let subcontext = create_subcontext "error_register" subcontext in
     create_single_data_storage "single_data2" subcontext
   in
@@ -211,7 +204,8 @@ let test_register_indexed_subcontext_2 () =
   must_failwith f_prog error
 
 let tests =
-  [ Alcotest_lwt.test_case
+  [
+    Alcotest_lwt.test_case
       "register single data in existing path"
       `Quick
       (fun _ -> test_register_single_data);
@@ -226,4 +220,5 @@ let tests =
     Alcotest_lwt.test_case
       "register indexed subcontext with existing indexed subcontext"
       `Quick
-      (fun _ -> test_register_indexed_subcontext_2) ]
+      (fun _ -> test_register_indexed_subcontext_2);
+  ]

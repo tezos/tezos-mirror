@@ -167,8 +167,7 @@ module Solver = struct
               match node with
               | Redundant node | Solved node ->
                   (node :: solved_acc, unsolved_acc)
-              | Unsolved node ->
-                  (solved_acc, node :: unsolved_acc))
+              | Unsolved node -> (solved_acc, node :: unsolved_acc))
             n.provides
             (solved_acc, unsolved_acc))
         (solved_but_not_propagated, [])
@@ -179,10 +178,8 @@ module Solver = struct
 
   and propagate_solved_loop state solved_but_not_propagated =
     match solved_but_not_propagated with
-    | [] ->
-        state
-    | solved :: solved_list ->
-        propagate_solved state solved solved_list
+    | [] -> state
+    | solved :: solved_list -> propagate_solved state solved solved_list
 
   let solve {solved; unsolved} =
     assert (solved = []) ;
@@ -218,13 +215,12 @@ module Solver = struct
   let solve ~force state =
     let least_constrained = solve state in
     match state.unsolved with
-    | [] ->
-        least_constrained
+    | [] -> least_constrained
     | _ ->
         if force then (
           Format.eprintf
-            "Dep_graph.Solver.solve: forcing remaining unconstrained \
-             variables as solved.@." ;
+            "Dep_graph.Solver.solve: forcing remaining unconstrained variables \
+             as solved.@." ;
           List.iter
             (fun {dependencies; undecided_variables; _} ->
               Format.eprintf
@@ -233,7 +229,7 @@ module Solver = struct
                 (dependencies, undecided_variables))
             least_constrained.unsolved ;
           let set_solved = List.map force_solved least_constrained.unsolved in
-          {solved = least_constrained.solved @ set_solved; unsolved = []} )
+          {solved = least_constrained.solved @ set_solved; unsolved = []})
         else
           Stdlib.failwith
             "Dep_graph.Solver.solve: state is not completely solved, \
@@ -281,8 +277,10 @@ let get_free_variables (type workload) (model : workload Model.t)
     (workload : workload) : Free_variable.Set.t =
   let applied = Model.apply model workload in
   let module M = (val applied) in
-  let module R = M (Costlang.Free_variables) in
-  R.applied
+  let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
+  let module T1 = Costlang.Beta_normalize (T0) in
+  let module R = M (T1) in
+  T0.prj @@ T1.prj R.applied
 
 let add_names (state : string Solver.state) (filename : string)
     (names : Free_variable.Set.t) : string Solver.state =
@@ -314,30 +312,49 @@ let () =
       | Missing_file_for_free_variable {free_var} ->
           let error =
             Format.asprintf
-              "Bug found: variable %a is not associated to any dataset. \
-               Please report.\n"
+              "Bug found: variable %a is not associated to any dataset. Please \
+               report.\n"
               Free_variable.pp
               free_var
           in
           Some error
-      | _ ->
-          None)
+      | _ -> None)
 
 let to_graph (solved : string Solver.solved list) =
   let len = List.length solved in
   let g = G.create ~size:len () in
   let solved_to_file =
     List.fold_left
-      (fun map {Solver.provides; meta; _} ->
+      (fun map {Solver.provides; meta; dependencies} ->
         Fv_set.fold
           (fun free_var map ->
             match Fv_map.find free_var map with
             | None ->
-                Fv_map.add free_var meta.data map
-            | Some other_file ->
-                raise
-                  (Variable_solved_by_several_datasets
-                     {free_var; filename = meta.data; other_file}))
+                Format.eprintf
+                  "%s is set as data source to solve %a@."
+                  meta.data
+                  Free_variable.pp
+                  free_var ;
+                Fv_map.add free_var (meta.data, dependencies) map
+            | Some (other_file, other_deps) ->
+                Format.eprintf
+                  "%s is a potential alternative dataset to %s for %a@."
+                  meta.data
+                  other_file
+                  pp_print_set
+                  provides ;
+                let this_card = Fv_set.cardinal dependencies in
+                let other_card = Fv_set.cardinal other_deps in
+                if this_card < other_card then (
+                  Format.eprintf
+                    "Picking new dataset as it induces lower-dimensional \
+                     problem@." ;
+                  Fv_map.add free_var (meta.data, dependencies) map)
+                else (
+                  Format.eprintf
+                    "Keeping former dataset as it induces lower-dimensional \
+                     problem@." ;
+                  map))
           provides
           map)
       Fv_map.empty
@@ -345,50 +362,57 @@ let to_graph (solved : string Solver.solved list) =
   in
   List.iter
     (fun {Solver.dependencies; meta; _} ->
-      Fv_set.iter
-        (fun dep ->
-          match Fv_map.find dep solved_to_file with
-          | None ->
-              raise (Missing_file_for_free_variable {free_var = dep})
-          | Some dep_file ->
-              G.add_edge g meta.data dep_file)
-        dependencies)
+      if Fv_set.is_empty dependencies then G.add_vertex g meta.data
+      else
+        Fv_set.iter
+          (fun dep ->
+            match Fv_map.find dep solved_to_file with
+            | None -> raise (Missing_file_for_free_variable {free_var = dep})
+            | Some (dep_file, _) -> G.add_edge g dep_file meta.data)
+          dependencies)
     solved ;
   g
 
 let find_model_or_generic model_name model_list =
-  match List.assoc_opt model_name model_list with
-  | None ->
-      List.assoc_opt "*" model_list
-  | res ->
-      res
+  match List.assoc_opt ~equal:String.equal model_name model_list with
+  | None -> List.assoc_opt ~equal:String.equal "*" model_list
+  | res -> res
 
 let load_files (model_name : string) (files : string list) =
   (* Use a table to store loaded measurements *)
   let table = Hashtbl.create 51 in
+  let prune filename =
+    (* We assume filenames are of the form <dir>/<name>.workload, where <dir>
+       is common amongst all files. This function extracts only the <name> component,
+       and raises an exception if the suffix does not match.
+    *)
+    Filename.basename filename
+    |> Filename.chop_suffix_opt ~suffix:".workload"
+    |> WithExceptions.Option.get ~loc:__LOC__
+  in
   let state =
     List.fold_left
       (fun graph filename ->
+        let filename_short = prune filename in
         let measurement = Measure.load ~filename in
         match measurement with
         | Tezos_benchmark.Measure.Measurement ((module Bench), m) -> (
-          match find_model_or_generic model_name Bench.models with
-          | None ->
-              graph
-          | Some model ->
-              let () =
-                Format.eprintf "Loading %s in dependency graph@." filename
-              in
-              Hashtbl.add table filename measurement ;
-              let names =
-                List.fold_left
-                  (fun acc {Measure.workload; _} ->
-                    let names = get_free_variables model workload in
-                    Free_variable.Set.union names acc)
-                  Free_variable.Set.empty
-                  m.Measure.workload_data
-              in
-              add_names graph filename names ))
+            match find_model_or_generic model_name Bench.models with
+            | None -> graph
+            | Some model ->
+                let () =
+                  Format.eprintf "Loading %s in dependency graph@." filename
+                in
+                Hashtbl.add table filename_short measurement ;
+                let names =
+                  List.fold_left
+                    (fun acc {Measure.workload; _} ->
+                      let names = get_free_variables model workload in
+                      Free_variable.Set.union names acc)
+                    Free_variable.Set.empty
+                    m.Measure.workload_data
+                in
+                add_names graph filename_short names))
       Solver.empty_state
       files
   in

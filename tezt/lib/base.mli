@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,10 +36,17 @@ val sf : ('a, unit, string) format -> 'a
 (** {2 Concurrency Monad} *)
 
 (** Same as [Lwt.bind]. *)
-val (let*) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
 (** Same as [Lwt.both]. *)
-val (and*) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
+(** Same as [Lwt.both], but immediately propagate exceptions.
+
+    More precisely, if one of the two promises is rejected
+    or canceled, cancel the other promise and reject the resulting
+    promise immediately with the original exception. *)
+val ( and*! ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t
@@ -64,6 +71,10 @@ val range : int -> int -> int list
 (** Backport of [List.find_map] from OCaml 4.10. *)
 val list_find_map : ('a -> 'b option) -> 'a list -> 'b option
 
+(** [take n l] returns the first [n] elements of [l] if longer than [n],
+    else [l] itself. *)
+val take : int -> 'a list -> 'a list
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)
@@ -71,6 +82,9 @@ type rex
 
 (** Compile a regular expression using Perl syntax. *)
 val rex : string -> rex
+
+(** Convert a regular expression to a string using Perl syntax. *)
+val show_rex : rex -> string
 
 (** Test whether a string matches a regular expression.
 
@@ -83,44 +97,36 @@ val ( =~! ) : string -> rex -> bool
 (** Match a regular expression with one capture group. *)
 val ( =~* ) : string -> rex -> string option
 
+(** Match a regular expression with two capture groups. *)
+val ( =~** ) : string -> rex -> (string * string) option
+
 (** [replace_string ~all rex ~by s] iterates on [s], and replaces every
     occurrence of [rex] with [by]. If [all = false], then only the first
     occurrence of [rex] is replaced. *)
 val replace_string :
-  ?pos:int ->    (* Default: 0 *)
+  ?pos:int ->
+  (* Default: 0 *)
   ?len:int ->
-  ?all:bool ->   (* Default: true. Otherwise only replace first occurrence *)
-  rex ->         (* matched groups *)
-  by:string ->   (* replacement string *)
-  string ->      (* string to replace in *)
+  ?all:bool ->
+  (* Default: true. Otherwise only replace first occurrence *)
+  rex ->
+  (* matched groups *)
+  by:string ->
+  (* replacement string *)
+  string ->
+  (* string to replace in *)
   string
-
-(** {2 Asynchronous Promises} *)
-
-(** Register a promise so that [wait_for_async] handles it.
-
-    It is important to use [async] instead of [Lwt.async] so that we wait for those
-    promises to resolve (if only by being canceled) before moving on to other tests.
-
-    Warning: if an [async] promise raises an exception other than [Test.Failed],
-    it currently does not stop the test. You should probably not use [async], it
-    is mostly for internal use. *)
-val async : unit Lwt.t -> unit
-
-(** Return a promise which resolves once all {!async}s have resolved. *)
-val wait_for_async : unit -> unit Lwt.t
 
 (** {2 Promises} *)
 
 (** Repeat something a given amount of times. *)
 val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
 
-
 (** {2 Input/Output} *)
 
 (** Open file, use function to write output then close the output. In case of
    error while writing, the channel is closed before raising the exception *)
-val with_open_out : string -> (out_channel -> unit) ->unit
+val with_open_out : string -> (out_channel -> unit) -> unit
 
 (** Open file, use function to read input then close the input. In case of
    error while reading, the channel is closed before raising the exception **)
@@ -132,4 +138,5 @@ val read_file : string -> string Lwt.t
 (** {2 Common structures} *)
 
 module String_map : Map.S with type key = string
+
 module String_set : Set.S with type elt = string

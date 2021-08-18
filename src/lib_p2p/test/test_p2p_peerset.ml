@@ -71,10 +71,7 @@ let test_remove _ =
   List.iter (fun peer -> P2p_acl.PeerFIFOCache.add set peer) peers ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "bar")) ;
   P2p_acl.PeerFIFOCache.remove set (a "bar") ;
-  assert_equal_bool
-    ~msg:__LOC__
-    false
-    (P2p_acl.PeerFIFOCache.mem set (a "bar"))
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerFIFOCache.mem set (a "bar"))
 
 (** An initial cache of size 3 is filled with 3 peer ids. Additionaly,
     we add "foo" and "zor", hence they are cached but not for "bar"
@@ -88,19 +85,13 @@ let test_LRU_overflow _ =
   P2p_acl.PeerFIFOCache.add set (a "zor") ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "zor")) ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "foo")) ;
-  assert_equal_bool
-    ~msg:__LOC__
-    false
-    (P2p_acl.PeerFIFOCache.mem set (a "bar")) ;
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerFIFOCache.mem set (a "bar")) ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "baz")) ;
   P2p_acl.PeerFIFOCache.add set (a "baz") ;
   P2p_acl.PeerFIFOCache.add set (a "baz") ;
   P2p_acl.PeerFIFOCache.add set (a "baz") ;
   P2p_acl.PeerFIFOCache.add set (a "qux") ;
-  assert_equal_bool
-    ~msg:__LOC__
-    false
-    (P2p_acl.PeerFIFOCache.mem set (a "foo")) ;
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerFIFOCache.mem set (a "foo")) ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "zor")) ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "baz")) ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerFIFOCache.mem set (a "qux"))
@@ -109,8 +100,12 @@ let () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [ ( "p2p.peerset",
-        [ ("empty", `Quick, test_empty);
+    [
+      ( "p2p.peerset",
+        [
+          ("empty", `Quick, test_empty);
           ("add", `Quick, test_add);
           ("LRU overflow", `Quick, test_LRU_overflow);
-          ("remove", `Quick, test_remove) ] ) ]
+          ("remove", `Quick, test_remove);
+        ] );
+    ]

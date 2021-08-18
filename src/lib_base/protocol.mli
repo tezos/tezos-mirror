@@ -31,9 +31,20 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2
+and env_version = V0 | V1 | V2 | V3
 
 val component_encoding : component Data_encoding.t
+
+(** [compare_version va vb] is negative if [va] is a less recent version than
+    [vb], positive if [va] is a more recent version than [vb], zero if they are
+    the same version.
+
+    In less precise but more intuitive terms,
+    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
+    where [<op>] is any comparison operator.
+
+    E.g., [compare_version V0 V1 < 0] is [true]. *)
+val compare_version : env_version -> env_version -> int
 
 val env_version_encoding : env_version Data_encoding.t
 

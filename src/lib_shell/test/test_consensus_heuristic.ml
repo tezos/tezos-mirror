@@ -33,12 +33,9 @@
 open Consensus_heuristic
 
 let prn = function
-  | Consensus hash ->
-      Format.asprintf "Consensus with %a" Block_hash.pp hash
-  | No_consensus _ ->
-      "No consensus"
-  | Need_more_candidates ->
-      "Synchronised (not stuck)"
+  | Consensus hash -> Format.asprintf "Consensus with %a" Block_hash.pp hash
+  | No_consensus _ -> "No consensus"
+  | Need_more_candidates -> "Synchronised (not stuck)"
 
 let forge_peer_id () =
   let identity = P2p_identity.generate_with_pow_target_0 () in
@@ -83,19 +80,18 @@ let create_no_consensus () =
   Assert.equal ~prn (get_state h) (No_consensus [(hash_1, 1); (hash_2, 2)])
 
 let tests_raw : (string * (unit -> unit)) list =
-  [ ("create_state_init_1", create_state_init_1);
+  [
+    ("create_state_init_1", create_state_init_1);
     ("create_state_bad_threshold", create_state_bad_threshold);
     ("create_state_bad_expected", create_state_bad_expected);
     ("create_consensus", create_consensus);
-    ("create_no_consensus", create_no_consensus) ]
+    ("create_no_consensus", create_no_consensus);
+  ]
 
 let prn = function
-  | Lwt.Fail exn ->
-      Format.asprintf "fail: %s@." (Printexc.to_string exn)
-  | Lwt.Sleep ->
-      "sleep"
-  | Lwt.Return _ ->
-      "return"
+  | Lwt.Fail exn -> Format.asprintf "fail: %s@." (Printexc.to_string exn)
+  | Lwt.Sleep -> "sleep"
+  | Lwt.Return _ -> "return"
 
 let job_failed () =
   let worker =
@@ -168,12 +164,14 @@ let worker_canceled () =
   Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
 
 let tests_worker_raw : (string * (unit -> unit)) list =
-  [ ("job failed", job_failed);
+  [
+    ("job failed", job_failed);
     ("job canceled", job_canceled);
     ("job return hash", job_return_hash);
     ("job sleep", job_sleep);
     ("job protected", job_protected);
-    ("worker canceled", job_canceled) ]
+    ("worker canceled", job_canceled);
+  ]
 
 let job_return_no_consensus () =
   let counter = ref 0 in
@@ -185,12 +183,14 @@ let job_return_no_consensus () =
       ~job:(fun () ->
         if !counter = 0 then (
           incr counter ;
-          Lwt.return (No_consensus []) )
+          Lwt.return (No_consensus []))
         else (
           Assert.equal !counter 1 ;
-          Lwt.return (Consensus hash_1) ))
+          Lwt.return (Consensus hash_1)))
   in
-  Worker.wait worker >>= fun res -> Assert.equal res hash_1 ; Lwt.return_unit
+  Worker.wait worker >>= fun res ->
+  Assert.equal res hash_1 ;
+  Lwt.return_unit
 
 let job_return_need_more_candidates () =
   let counter = ref 0 in
@@ -202,12 +202,14 @@ let job_return_need_more_candidates () =
       ~job:(fun () ->
         if !counter = 0 then (
           incr counter ;
-          Lwt.return Need_more_candidates )
+          Lwt.return Need_more_candidates)
         else (
           Assert.equal !counter 1 ;
-          Lwt.return (Consensus hash_1) ))
+          Lwt.return (Consensus hash_1)))
   in
-  Worker.wait worker >>= fun res -> Assert.equal res hash_1 ; Lwt.return_unit
+  Worker.wait worker >>= fun res ->
+  Assert.equal res hash_1 ;
+  Lwt.return_unit
 
 let job_age_limit_twice () =
   let cpt = ref 0 in
@@ -222,14 +224,13 @@ let job_age_limit_twice () =
         Lwt_condition.broadcast condition () ;
         Lwt.return (Consensus ()))
   in
-  Worker.wait worker
-  >>= fun () ->
+  Worker.wait worker >>= fun () ->
   Assert.equal !cpt 1 ;
-  p
-  >>= fun () ->
-  Lwt_unix.sleep 1.
-  >>= fun () ->
-  Worker.wait worker >>= fun () -> Assert.equal !cpt 2 ; Lwt.return_unit
+  p >>= fun () ->
+  Lwt_unix.sleep 1. >>= fun () ->
+  Worker.wait worker >>= fun () ->
+  Assert.equal !cpt 2 ;
+  Lwt.return_unit
 
 let job_on_next_consensus_1 () =
   let cpt = ref 0 in
@@ -240,7 +241,9 @@ let job_on_next_consensus_1 () =
       ~job:(fun () -> Lwt.return (Consensus ()))
   in
   Worker.on_next_consensus worker (fun () -> incr cpt) ;
-  Worker.wait worker >>= fun () -> Assert.equal !cpt 1 ; Lwt.return_unit
+  Worker.wait worker >>= fun () ->
+  Assert.equal !cpt 1 ;
+  Lwt.return_unit
 
 let job_on_next_consensus_2 () =
   let cpt = ref 0 in
@@ -255,7 +258,9 @@ let job_on_next_consensus_2 () =
   let p = Worker.wait worker in
   Assert.equal !cpt 0 ;
   Lwt.wakeup_later u () ;
-  p >>= fun () -> Assert.equal !cpt 1 ; Lwt.return_unit
+  p >>= fun () ->
+  Assert.equal !cpt 1 ;
+  Lwt.return_unit
 
 let job_on_all_consensus_1 () =
   let cpt = ref 0 in
@@ -266,7 +271,9 @@ let job_on_all_consensus_1 () =
       ~job:(fun () -> Lwt.return (Consensus ()))
   in
   Worker.on_all_consensus worker (fun () -> incr cpt) ;
-  Worker.wait worker >>= fun () -> Assert.equal !cpt 1 ; Lwt.return_unit
+  Worker.wait worker >>= fun () ->
+  Assert.equal !cpt 1 ;
+  Lwt.return_unit
 
 let job_on_all_consensus_2 () =
   let cpt = ref 0 in
@@ -281,7 +288,9 @@ let job_on_all_consensus_2 () =
   let p = Worker.wait worker in
   Assert.equal !cpt 0 ;
   Lwt.wakeup_later u () ;
-  p >>= fun () -> Assert.equal !cpt 1 ; Lwt.return_unit
+  p >>= fun () ->
+  Assert.equal !cpt 1 ;
+  Lwt.return_unit
 
 let job_on_all_consensus_3 () =
   let cpt = ref 0 in
@@ -296,12 +305,12 @@ let job_on_all_consensus_3 () =
   let p = Worker.wait worker in
   Assert.equal !cpt 0 ;
   Lwt.wakeup_later u () ;
-  p
-  >>= fun () ->
+  p >>= fun () ->
   Assert.equal !cpt 1 ;
-  Lwt_unix.sleep 1.
-  >>= fun () ->
-  Worker.wait worker >>= fun () -> Assert.equal !cpt 2 ; Lwt.return_unit
+  Lwt_unix.sleep 1. >>= fun () ->
+  Worker.wait worker >>= fun () ->
+  Assert.equal !cpt 2 ;
+  Lwt.return_unit
 
 let job_on_next_consensus_3 () =
   let cpt = ref 0 in
@@ -316,16 +325,18 @@ let job_on_next_consensus_3 () =
   let p = Worker.wait worker in
   Assert.equal !cpt 0 ;
   Lwt.wakeup_later u () ;
-  p
-  >>= fun () ->
+  p >>= fun () ->
   Assert.equal !cpt 1 ;
-  Worker.wait worker >>= fun () -> Assert.equal !cpt 1 ; Lwt.return_unit
+  Worker.wait worker >>= fun () ->
+  Assert.equal !cpt 1 ;
+  Lwt.return_unit
 
 let wrap f _switch () = f ()
 
 let tests_worker_lwt_raw : (string * (Lwt_switch.t -> unit -> unit Lwt.t)) list
     =
-  [ ("job return no consensus", wrap job_return_no_consensus);
+  [
+    ("job return no consensus", wrap job_return_no_consensus);
     ("job return need more canddidates", wrap job_return_need_more_candidates);
     ("job age limit twice", wrap job_age_limit_twice);
     ("job on next consensus_1", wrap job_on_next_consensus_1);
@@ -333,7 +344,8 @@ let tests_worker_lwt_raw : (string * (Lwt_switch.t -> unit -> unit Lwt.t)) list
     ("job on next consensus_3", wrap job_on_next_consensus_3);
     ("job on all consensus_1", wrap job_on_all_consensus_1);
     ("job on all consensus_2", wrap job_on_all_consensus_2);
-    ("job on all consensus_3", wrap job_on_all_consensus_3) ]
+    ("job on all consensus_3", wrap job_on_all_consensus_3);
+  ]
 
 let tests =
   List.map

@@ -40,14 +40,7 @@ following command:
 
     $ tezos-client list mockup protocols
 
-At the time of writing, three protocols are supported hence the output should
-be the following (ignore the Warning if there is any):
-
-::
-
-    ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-    PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-    PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+At any given time, it should return ``Alpha`` and the two protocols before that.
 
 To create the mockup client state, issue the following command:
 
@@ -147,6 +140,28 @@ typecheck scripts:
 .. code-block:: shell-session
 
     $ tezos-client --mode mockup typecheck script ./tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
+
+The script can also be executed:
+
+.. code-block:: shell-session
+
+   $ tezos-client --mode mockup run script <filename> on storage <storage> and input <input>
+
+where ``<storage>`` and ``<input>`` are some :ref:`Michelson expression
+<michelson_type_system>` describing contract's storage and script input
+respectively. A ``--trace-stack`` option can be added in the end to output the
+state of the stack after each step of script's execution.
+
+For example:
+
+.. code-block:: shell-session
+
+  $ tezos-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
+  # Ignore warnings about the missing/wrong base directory, they do not apply to "run script"
+  storage
+    "world"
+  [...]
+
 
 Tune mockup parameters
 ======================

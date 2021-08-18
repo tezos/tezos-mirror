@@ -81,29 +81,26 @@ module Make
    fun path acc ->
     let desc = path.Path.rev_path_desc in
     match desc with
-    | Path.Root ->
-        acc
-    | Path.At_index (i, path) ->
-        reverse path (i :: acc)
+    | Path.Root -> acc
+    | Path.At_index (i, path) -> reverse path (i :: acc)
 
   let reverse path = reverse path []
 
   let rec get_subterm_aux : term:node -> path:forward_path -> node =
    fun ~term ~path ->
     match path with
-    | [] ->
-        term
+    | [] -> term
     | index :: l -> (
-      match term with
-      | Int _ | String _ | Bytes _ ->
-          let msg =
-            Printf.sprintf
-              "get_subterm_aux: non-empty path (%s)"
-              (string_of_forward_path path)
-          in
-          raise (Rewrite_error (msg, Some term))
-      | Prim (_, _, subterms, _) | Seq (_, subterms) ->
-          get_subterm_at subterms index l )
+        match term with
+        | Int _ | String _ | Bytes _ ->
+            let msg =
+              Printf.sprintf
+                "get_subterm_aux: non-empty path (%s)"
+                (string_of_forward_path path)
+            in
+            raise (Rewrite_error (msg, Some term))
+        | Prim (_, _, subterms, _) | Seq (_, subterms) ->
+            get_subterm_at subterms index l)
 
   and get_subterm_at : node list -> int -> forward_path -> node =
    fun subterms index path ->
@@ -115,31 +112,27 @@ module Make
             (string_of_forward_path path)
         in
         raise (Rewrite_error (msg, None))
-    | (hd :: _, 0) ->
-        get_subterm_aux ~term:hd ~path
-    | (_ :: tl, _) ->
-        get_subterm_at tl (index - 1) path
+    | (hd :: _, 0) -> get_subterm_aux ~term:hd ~path
+    | (_ :: tl, _) -> get_subterm_at tl (index - 1) path
 
   let get_subterm : term:node -> path:path -> node =
    fun ~term ~path ->
     let path = reverse path in
     get_subterm_aux ~term ~path
 
-  let rec subst_aux :
-      term:node -> path:forward_path -> replacement:node -> node =
+  let rec subst_aux : term:node -> path:forward_path -> replacement:node -> node
+      =
    fun ~term ~path ~replacement ->
     match path with
-    | [] ->
-        replacement
+    | [] -> replacement
     | index :: l -> (
-      match term with
-      | Int _ | String _ | Bytes _ ->
-          let msg = "subst_aux: non-empty path" in
-          raise (Rewrite_error (msg, Some term))
-      | Prim (_, head, subterms, annot) ->
-          M.prim head (subst_at subterms index l replacement) annot
-      | Seq (_, subterms) ->
-          M.seq (subst_at subterms index l replacement) )
+        match term with
+        | Int _ | String _ | Bytes _ ->
+            let msg = "subst_aux: non-empty path" in
+            raise (Rewrite_error (msg, Some term))
+        | Prim (_, head, subterms, annot) ->
+            M.prim head (subst_at subterms index l replacement) annot
+        | Seq (_, subterms) -> M.seq (subst_at subterms index l replacement))
 
   and subst_at : node list -> int -> forward_path -> node -> node list =
    fun subterms index path replacement ->
@@ -147,10 +140,8 @@ module Make
     | ([], _) ->
         let msg = Printf.sprintf "subst_at: empty list (%d)" index in
         raise (Rewrite_error (msg, None))
-    | (hd :: tl, 0) ->
-        subst_aux ~term:hd ~path ~replacement :: tl
-    | (hd :: tl, _) ->
-        hd :: subst_at tl (index - 1) path replacement
+    | (hd :: tl, 0) -> subst_aux ~term:hd ~path ~replacement :: tl
+    | (hd :: tl, _) -> hd :: subst_at tl (index - 1) path replacement
 
   let subst :
       term:('l, head) Micheline.node -> path:Path.t -> replacement:node -> node

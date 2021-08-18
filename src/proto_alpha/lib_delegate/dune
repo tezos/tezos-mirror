@@ -10,8 +10,9 @@
             tezos-client-base
             tezos-client-alpha
             tezos-client-commands
+            tezos-stdlib
             tezos-stdlib-unix
-            tezos-storage
+            tezos-context
             tezos-rpc-http
             tezos-rpc
             lwt-canceler
@@ -22,13 +23,15 @@
                      delegate_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
+                   -open Tezos_stdlib
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_context
-                   -open Tezos_storage
+                   -open Tezos_context
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))
 
@@ -79,8 +82,3 @@
                    -open Tezos_baking_alpha
                    -open Tezos_baking_alpha_commands
                    -open Tezos_rpc)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

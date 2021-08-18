@@ -51,8 +51,3 @@
                    -open Tezos_client_sapling_008_PtEdo2Zk
                    -open Tezos_rpc
                    -open Tezos_protocol_plugin_008_PtEdo2Zk)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

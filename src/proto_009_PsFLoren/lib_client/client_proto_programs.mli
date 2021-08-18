@@ -32,6 +32,20 @@ module Program :
   Client_aliases.Alias
     with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
+val run_view :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  contract:Contract.t ->
+  entrypoint:string ->
+  input:Michelson_v1_parser.parsed ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  ?source:Contract.t ->
+  ?payer:Contract.t ->
+  ?gas:Gas.Arith.integral ->
+  unit ->
+  Script.expr tzresult Lwt.t
+
 val run :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -66,20 +80,23 @@ val trace :
   ?gas:Gas.Arith.integral ->
   ?entrypoint:string ->
   unit ->
-  ( Script.expr
+  (Script.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult
   Lwt.t
+
+val print_view_result :
+  #Client_context.printer -> Script_repr.expr tzresult -> unit tzresult Lwt.t
 
 val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  ( Script_repr.expr
+  (Script_repr.expr
   * packed_internal_operation list
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
 
@@ -87,10 +104,10 @@ val print_trace_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  ( Script_repr.expr
+  (Script_repr.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
 

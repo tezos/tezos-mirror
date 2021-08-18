@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^baking module$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^baking module$"
     Subject:    some functions in the Baking module
 *)
 
@@ -47,10 +47,8 @@ let emmystar_delay ~te ~ie ~md ~bd ~dp ~de ~p ~e =
    (Actually, there are currently only two sets of relevant constants, as
    the values of the relevant test and sandbox constants coincide.) *)
 let test_minimal_time () =
-  Context.init 1
-  >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun constants ->
+  Context.init 1 >>=? fun (b, _) ->
+  Context.get_constants (B b) >>=? fun constants ->
   let bd =
     Stdlib.List.hd constants.parametric.time_between_blocks
     |> Period.to_seconds |> Int64.to_int
@@ -73,13 +71,14 @@ let test_minimal_time () =
     (fun (priority, ((bd, dp), md)) ->
       Context.init
         ~time_between_blocks:
-          [ Period.of_seconds_exn (Int64.of_int bd);
-            Period.of_seconds_exn (Int64.of_int dp) ]
+          [
+            Period.of_seconds_exn (Int64.of_int bd);
+            Period.of_seconds_exn (Int64.of_int dp);
+          ]
         ~minimal_block_delay:(Period.of_seconds_exn (Int64.of_int md))
         1
       >>=? fun (b, _) ->
-      Context.get_constants (B b)
-      >>=? fun constants ->
+      Context.get_constants (B b) >>=? fun constants ->
       Baking.minimal_time
         constants.parametric
         ~priority
@@ -99,10 +98,8 @@ let test_minimal_time () =
 
 (* Same comment as for the previous test. *)
 let test_minimal_valid_time () =
-  Context.init 1
-  >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun constants ->
+  Context.init 1 >>=? fun (b, _) ->
+  Context.get_constants (B b) >>=? fun constants ->
   let md =
     constants.parametric.minimal_block_delay |> Period.to_seconds
     |> Int64.to_int
@@ -144,16 +141,16 @@ let test_minimal_valid_time () =
       Context.init
         ~endorsers_per_block:te
         ~time_between_blocks:
-          [ Period.of_seconds_exn (Int64.of_int bd);
-            Period.of_seconds_exn (Int64.of_int dp) ]
+          [
+            Period.of_seconds_exn (Int64.of_int bd);
+            Period.of_seconds_exn (Int64.of_int dp);
+          ]
         ~minimal_block_delay:(Period.of_seconds_exn (Int64.of_int md))
         ~initial_endorsers:ie
-        ~delay_per_missing_endorsement:
-          (Period.of_seconds_exn (Int64.of_int de))
+        ~delay_per_missing_endorsement:(Period.of_seconds_exn (Int64.of_int de))
         1
       >>=? fun (b, _) ->
-      Context.get_constants (B b)
-      >>=? fun constants ->
+      Context.get_constants (B b) >>=? fun constants ->
       Baking.minimal_valid_time
         constants.parametric
         ~priority:p
@@ -172,5 +169,7 @@ let test_minimal_valid_time () =
     range
 
 let tests =
-  [ Test_services.tztest "minimal time" `Quick test_minimal_time;
-    Test_services.tztest "minimal valid time" `Quick test_minimal_valid_time ]
+  [
+    Test_services.tztest "minimal time" `Quick test_minimal_time;
+    Test_services.tztest "minimal valid time" `Quick test_minimal_valid_time;
+  ]

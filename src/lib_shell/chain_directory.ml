@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,98 +26,96 @@
 
 open Chain_services
 
-let get_chain_id state = function
-  | `Main ->
-      Lwt.return (State.Chain.main state)
+let get_chain_id store =
+  let main_chain_store = Store.main_chain_store store in
+  function
+  | `Main -> Lwt.return (Store.Chain.chain_id main_chain_store)
   | `Test -> (
-      State.Chain.get_exn state (State.Chain.main state)
-      >>= fun main_chain ->
-      State.Chain.test main_chain
-      >>= function
-      | None -> Lwt.fail Not_found | Some chain_id -> Lwt.return chain_id )
-  | `Hash chain_id ->
-      Lwt.return chain_id
+      Store.Chain.testchain main_chain_store >>= function
+      | None -> Lwt.fail Not_found
+      | Some testchain ->
+          let testchain_store = Store.Chain.testchain_store testchain in
+          Lwt.return (Store.Chain.chain_id testchain_store))
+  | `Hash chain_id -> Lwt.return chain_id
 
-let get_chain_id_opt state chain =
+let get_chain_id_opt store chain =
   Lwt.catch
-    (fun () -> get_chain_id state chain >>= Lwt.return_some)
+    (fun () -> get_chain_id store chain >>= Lwt.return_some)
     (fun _exn -> Lwt.return_none)
 
-let get_chain state chain =
-  get_chain_id state chain
-  >>= fun chain_id -> State.Chain.get_exn state chain_id
+let get_chain_store_exn store chain =
+  get_chain_id store chain >>= fun chain_id ->
+  Store.get_chain_store_opt store chain_id >>= function
+  | Some chain_store -> Lwt.return chain_store
+  | None -> Lwt.fail Not_found
 
-let get_checkpoint state (chain : Chain_services.chain) =
-  get_chain state chain
-  >>= fun chain ->
-  State.Chain.checkpoint chain
-  >>= fun header -> Lwt.return (Block_header.hash header)
+let get_checkpoint store (chain : Chain_services.chain) =
+  get_chain_store_exn store chain >>= fun chain_store ->
+  Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
+  Lwt.return checkpoint_hash
 
-let predecessors ignored length head =
+let predecessors chain_store ignored length head =
   let rec loop acc length block =
-    if length <= 0 then Lwt.return (List.rev acc)
+    if length <= 0 then return (List.rev acc)
     else
-      State.Block.predecessor block
-      >>= function
-      | None ->
-          Lwt.return (List.rev acc)
+      Store.Block.read_ancestor_hash chain_store ~distance:1 block >>=? function
+      | None -> return (List.rev acc)
       | Some pred ->
-          if Block_hash.Set.mem (State.Block.hash block) ignored then
-            Lwt.return (List.rev acc)
-          else loop (State.Block.hash pred :: acc) (length - 1) pred
+          if Block_hash.Set.mem block ignored then return (List.rev acc)
+          else loop (pred :: acc) (length - 1) pred
   in
-  loop [State.Block.hash head] (length - 1) head
+  let head_hash = Store.Block.hash head in
+  loop [head_hash] (length - 1) head_hash
 
-let list_blocks chain_state ?(length = 1) ?min_date heads =
-  ( match heads with
+let list_blocks chain_store ?(length = 1) ?min_date heads =
+  (match heads with
   | [] ->
-      Chain.known_heads chain_state
+      Store.Chain.known_heads chain_store >>= fun heads ->
+      Lwt_list.filter_map_p
+        (fun (h, _) -> Store.Block.read_block_opt chain_store h)
+        heads
       >>= fun heads ->
       let heads =
         match min_date with
-        | None ->
-            heads
+        | None -> heads
         | Some min_date ->
             List.filter
               (fun block ->
-                let timestamp = State.Block.timestamp block in
+                let timestamp = Store.Block.timestamp block in
                 Time.Protocol.(min_date <= timestamp))
               heads
       in
       let sorted_heads =
         List.sort
           (fun b1 b2 ->
-            let f1 = State.Block.fitness b1 in
-            let f2 = State.Block.fitness b2 in
+            let f1 = Store.Block.fitness b1 in
+            let f2 = Store.Block.fitness b2 in
             ~-(Fitness.compare f1 f2))
           heads
       in
       Lwt.return (List.map (fun b -> Some b) sorted_heads)
-  | _ :: _ as heads ->
-      List.map_p (State.Block.read_opt chain_state) heads )
+  | _ :: _ as heads -> List.map_p (Store.Block.read_block_opt chain_store) heads)
   >>= fun requested_heads ->
-  List.fold_left_s
+  List.fold_left_es
     (fun (ignored, acc) head ->
       match head with
-      | None ->
-          Lwt.return (ignored, acc)
+      | None -> return (ignored, acc)
       | Some block ->
-          predecessors ignored length block
-          >>= fun predecessors ->
+          predecessors chain_store ignored length block >>=? fun predecessors ->
           let ignored =
             List.fold_left
               (fun acc v -> Block_hash.Set.add v acc)
               ignored
               predecessors
           in
-          Lwt.return (ignored, predecessors :: acc))
+          return (ignored, predecessors :: acc))
     (Block_hash.Set.empty, [])
     requested_heads
-  >>= fun (_, blocks) -> return (List.rev blocks)
+  >>=? fun (_, blocks) -> return (List.rev blocks)
 
 let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
     validator =
-  let dir : State.Chain.t RPC_directory.t ref = ref RPC_directory.empty in
+  let dir : Store.chain_store RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir :=
       RPC_directory.register !dir (RPC_service.subst0 s) (fun chain p q ->
@@ -136,29 +134,26 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
         (RPC_path.subst1 s)
         (fun (chain, a) -> f chain a)
   in
-  register0 S.chain_id (fun chain () () -> return (State.Chain.id chain)) ;
-  register0 S.checkpoint (fun chain () () ->
-      State.Chain.checkpoint chain
-      >>= fun checkpoint ->
-      State.Chain.save_point chain
-      >>= fun (save_point, _) ->
-      State.Chain.caboose chain
-      >>= fun (caboose, _) ->
-      State.history_mode (State.Chain.global_state chain)
-      >>= fun history_mode ->
-      return (checkpoint, save_point, caboose, history_mode)) ;
-  register0 S.is_bootstrapped (fun chain () () ->
-      match Validator.get validator (State.Chain.id chain) with
-      | Error _ ->
-          Lwt.fail Not_found
+  register0 S.chain_id (fun chain_store () () ->
+      return (Store.Chain.chain_id chain_store)) ;
+  register0 S.checkpoint (fun chain_store () () ->
+      Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
+      Store.Block.read_block chain_store checkpoint_hash >>=? fun block ->
+      let checkpoint_header = Store.Block.header block in
+      Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
+      Store.Chain.caboose chain_store >>= fun (_, caboose_level) ->
+      let history_mode = Store.Chain.history_mode chain_store in
+      return (checkpoint_header, savepoint_level, caboose_level, history_mode)) ;
+  register0 S.is_bootstrapped (fun chain_store () () ->
+      match Validator.get validator (Store.Chain.chain_id chain_store) with
+      | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
           return
             Chain_validator.
               (is_bootstrapped chain_validator, sync_status chain_validator)) ;
-  register0 S.force_bootstrapped (fun chain () b ->
-      match Validator.get validator (State.Chain.id chain) with
-      | Error _ ->
-          Lwt.fail Not_found
+  register0 S.force_bootstrapped (fun chain_store () b ->
+      match Validator.get validator (Store.Chain.chain_id chain_store) with
+      | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
           return (Chain_validator.force_bootstrapped chain_validator b)) ;
   (* blocks *)
@@ -170,25 +165,23 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
        ~user_activated_upgrades
        ~user_activated_protocol_overrides) ;
   (* invalid_blocks *)
-  register0 S.Invalid_blocks.list (fun chain () () ->
-      let convert (hash, level, errors) = {hash; level; errors} in
-      State.Block.list_invalid chain
-      >>= fun blocks -> return (List.map convert blocks)) ;
-  register1 S.Invalid_blocks.get (fun chain hash () () ->
-      State.Block.read_invalid chain hash
-      >>= function
-      | None ->
-          Lwt.fail Not_found
-      | Some {level; errors} ->
-          return {hash; level; errors}) ;
-  register1 S.Invalid_blocks.delete (fun chain hash () () ->
-      State.Block.unmark_invalid chain hash) ;
+  register0 S.Invalid_blocks.list (fun chain_store () () ->
+      let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
+      Store.Block.read_invalid_blocks chain_store >>= fun invalid_blocks_map ->
+      let blocks = Block_hash.Map.bindings invalid_blocks_map in
+      return (List.map convert blocks)) ;
+  register1 S.Invalid_blocks.get (fun chain_store hash () () ->
+      Store.Block.read_invalid_block_opt chain_store hash >>= function
+      | None -> Lwt.fail Not_found
+      | Some {level; errors} -> return {hash; level; errors}) ;
+  register1 S.Invalid_blocks.delete (fun chain_store hash () () ->
+      Store.Block.unmark_invalid chain_store hash) ;
   !dir
 
 let build_rpc_directory ~user_activated_upgrades
     ~user_activated_protocol_overrides validator =
   let distributed_db = Validator.distributed_db validator in
-  let state = Distributed_db.state distributed_db in
+  let store = Distributed_db.store distributed_db in
   let dir =
     ref
       (rpc_directory
@@ -200,12 +193,11 @@ let build_rpc_directory ~user_activated_upgrades
   let merge d = dir := RPC_directory.merge !dir d in
   merge
     (RPC_directory.map
-       (fun chain ->
-         match Validator.get validator (State.Chain.id chain) with
-         | Error _ ->
-             Lwt.fail Not_found
+       (fun chain_store ->
+         match Validator.get validator (Store.Chain.chain_id chain_store) with
+         | Error _ -> Lwt.fail Not_found
          | Ok chain_validator ->
              Lwt.return (Chain_validator.prevalidator chain_validator))
        Prevalidator.rpc_directory) ;
   RPC_directory.prefix Chain_services.path
-  @@ RPC_directory.map (fun ((), chain) -> get_chain state chain) !dir
+  @@ RPC_directory.map (fun ((), chain) -> get_chain_store_exn store chain) !dir

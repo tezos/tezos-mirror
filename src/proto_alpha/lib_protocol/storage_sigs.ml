@@ -76,6 +76,7 @@ module type Single_data_storage = sig
       the bucket does not exists *)
   val remove : context -> Raw_context.t Lwt.t
 end
+[@@coq_precise_signature]
 
 (** Restricted version of {!Indexed_data_storage} w/o iterators. *)
 module type Non_iterable_indexed_data_storage = sig
@@ -129,6 +130,7 @@ module type Non_iterable_indexed_data_storage = sig
       bucket does not exists. *)
   val remove : context -> key -> Raw_context.t Lwt.t
 end
+[@@coq_precise_signature]
 
 (** Variant of {!Non_iterable_indexed_data_storage} with gas accounting. *)
 module type Non_iterable_indexed_carbonated_data_storage = sig
@@ -210,6 +212,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       indicating if a value was already associated to this key. *)
   val remove : context -> key -> (Raw_context.t * int * bool) tzresult Lwt.t
 end
+[@@coq_precise_signature]
 
 (** The generic signature of indexed data accessors (a set of values
     of the same type indexed by keys of the same form in the
@@ -352,10 +355,7 @@ module type Indexed_raw_context = sig
     Data_set_storage with type t = t and type elt = key
 
   module Make_map (N : NAME) (V : VALUE) :
-    Indexed_data_storage
-      with type t = t
-       and type key = key
-       and type value = V.t
+    Indexed_data_storage with type t = t and type key = key and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage

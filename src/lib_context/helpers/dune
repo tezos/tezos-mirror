@@ -1,0 +1,10 @@
+(library
+ (name tezos_context_helpers)
+ (public_name tezos-context.helpers)
+ (libraries tezos-base
+            tezos-context.encoding
+            tezos-context.sigs
+            irmin
+            irmin-pack)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib)))

@@ -73,8 +73,7 @@ module T () = struct
         let arity = arity_1
 
         let model =
-          lam ~name:"size"
-          @@ fun size ->
+          lam ~name:"size" @@ fun size ->
           free ~name:fv_const + (free ~name:fv_quad * (size * size))
       end
     end in
@@ -95,10 +94,12 @@ module T () = struct
       (Inference.Lasso {alpha = 1.0; normalize = false; positive = false})
 
   let const =
-    List.assoc fv_const mapping |> WithExceptions.Option.get ~loc:__LOC__
+    List.assoc ~equal:Free_variable.equal fv_const mapping
+    |> WithExceptions.Option.get ~loc:__LOC__
 
   let quadratic_term =
-    List.assoc fv_quad mapping |> WithExceptions.Option.get ~loc:__LOC__
+    List.assoc ~equal:Free_variable.equal fv_quad mapping
+    |> WithExceptions.Option.get ~loc:__LOC__
 end
 
 (* ------------------------------------------------------------------------- *)

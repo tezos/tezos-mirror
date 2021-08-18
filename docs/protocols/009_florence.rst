@@ -26,7 +26,7 @@ effect of slightly more than doubling the maximum size of a smart
 contract.
 
 -  Commit:
-   `tezos#3ff6bc8d <https://gitlab.com/tezos/tezos/commit/3ff6bc8da9f8941b65fb9be4e51d3de1e93bfaed>`__
+   :gl:`tezos#3ff6bc8d`
 -  TZIP:
    `increase_operation_size_limit <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-increase_operation_size_limit.md>`__
 
@@ -34,9 +34,9 @@ Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entry
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  Solves issue:
-   `tezos#643 <https://gitlab.com/tezos/tezos/-/issues/643>`__
+   :gl:`tezos#643`
 -  Commit:
-   `tezos#e879b1a7 <https://gitlab.com/tezos/tezos/commit/e879b1a764ed95182ce33b0a13e0f807f21520ed>`__
+   :gl:`tezos#e879b1a7`
 
 Depth-First Execution Order (⚠️ Attention Smart Contract Developers!)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,9 +54,9 @@ review their contracts for security threats made possible by the new execution
 order.
 
 -  TZIP:
-   `tzip!111 <https://gitlab.com/tzip/tzip/-/merge_requests/111>`__
+   :gl:`tzip!111`
 -  MR:
-   `tezos!2420 <https://gitlab.com/tezos/tezos/-/merge_requests/2420>`__
+   :gl:`tezos!2420`
 
 
 Tooling
@@ -73,9 +73,9 @@ pairs into the format they had before the introduction of the compact
 notations in Edo.
 
 -  Solves issue:
-   `tezos#1016 <https://gitlab.com/tezos/tezos/-/issues/1016>`__
+   :gl:`tezos#1016`
 -  MR:
-   `tezos!2354 <https://gitlab.com/tezos/tezos/-/merge_requests/2354>`__
+   :gl:`tezos!2354`
 
 New ``failing_noop`` Operation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,9 +86,9 @@ sign arbitrary data securely, without fear of malicious injection into
 future protocols.
 
 - Solves issue:
-  `tezos#52 <https://gitlab.com/metastatedev/tezos/-/issues/52>`__
+  :gl:`tezos#52`
 - MR:
-  `tezos!2361 <https://gitlab.com/tezos/tezos/-/merge_requests/2361>`__
+  :gl:`tezos!2361`
 
 Performance
 -----------
@@ -117,21 +117,21 @@ signer, and then wraps the result in an `endorsement_with_slot`
 before injection.
 
 -  Solves issue:
-   `tezos#1028 <https://gitlab.com/tezos/tezos/-/issues/1028>`__
+   :gl:`tezos#1028`
 -  MR:
-   `tezos!2471 <https://gitlab.com/tezos/tezos/-/merge_requests/2471>`__
+   :gl:`tezos!2471`
 
 Staking balance RPC
 ~~~~~~~~~~~~~~~~~~~
 
 Some users observed degraded performance in v8.1 as reported in issue
-`tezos#1067 <https://gitlab.com/tezos/tezos/-/issues/1067>`__. To
+:gl:`tezos#1067`. To
 address this, the measurement of staking balance has been reworked,
 improving the performance of the
 ``/chains/[...]/blocks/[...]/context/delegates/[...]`` RPC endpoint.
 
 -  MR:
-   `tezos!2547 <https://gitlab.com/tezos/tezos/-/merge_requests/2547>`__
+   :gl:`tezos!2547`
 
 Gas Optimizations
 ~~~~~~~~~~~~~~~~~
@@ -141,10 +141,10 @@ Most notably, gas consumption is now computed using `saturated
 arithmetic <https://en.wikipedia.org/wiki/Saturation_arithmetic>`__.
 
 -  MR’s:
-   `tezos!2328 <https://gitlab.com/tezos/tezos/-/merge_requests/2328>`__,
-   `tezos!2327 <https://gitlab.com/tezos/tezos/-/merge_requests/2327>`__,
+   :gl:`tezos!2328`,
+   :gl:`tezos!2327`,
    and
-   `tezos!2329 <https://gitlab.com/tezos/tezos/-/merge_requests/2329>`__
+   :gl:`tezos!2329`
 
 Governance
 ----------
@@ -165,9 +165,9 @@ Furthermore, the voting periods have been renamed as follows:
   5. Adoption       --> Adoption
 
 -  TZIP:
-   `tzip!141 <https://gitlab.com/tzip/tzip/-/merge_requests/141>`__
+   :gl:`tzip!141`
 -  MR:
-   `tezos!2469 <https://gitlab.com/tezos/tezos/-/merge_requests/2469>`__
+   :gl:`tezos!2469`
 
 Migration
 ---------
@@ -181,9 +181,9 @@ Accounts <#Baking-accounts>`__ and facilitates `developer
 invoicing <https://www.youtube.com/watch?v=VFY76qFq5Gk>`__.
 
 -  Solves issue:
-   `tezos#138 <https://gitlab.com/metastatedev/tezos/-/issues/138>`__
+   :gl:`tezos#138`
 -  MR:
-   `tezos!2437 <https://gitlab.com/tezos/tezos/-/merge_requests/2437>`__
+   :gl:`tezos!2437`
 
 Internal
 --------
@@ -195,7 +195,7 @@ Abstract protocol types can now be used consistently outside the
 protocol.
 
 -  MR:
-   `tezos!2497 <https://gitlab.com/tezos/tezos/-/merge_requests/2497>`__
+   :gl:`tezos!2497`
 
 Authors & Invoice
 -----------------

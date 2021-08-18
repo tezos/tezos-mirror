@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:  Protocol (time repr)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^time$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^time$"
     Subject:    Error handling of time operations 
 *)
 
@@ -21,25 +21,24 @@ let test_nominal_add () =
         Time_repr.pp_hum
         v
         (Time_repr.of_seconds (Int64.of_int 3))
-  | Error _ ->
-      failwith "Addition has overflowed"
+  | Error _ -> failwith "Addition has overflowed"
 
 let test_overflow_add () =
   let t = Time_repr.of_seconds Int64.max_int in
   match Period_repr.of_seconds Int64.one with
-  | Error _ ->
-      failwith "period_repr conversion"
+  | Error _ -> failwith "period_repr conversion"
   | Ok p -> (
-    match Time_repr.( +? ) t p with
-    | Error _ ->
-        return_unit
-    | Ok tres ->
-        failwith
-          "No overflow: %Ld + %Ld = %Ld"
-          (Time_repr.to_seconds t)
-          (Period_repr.to_seconds p)
-          (Time_repr.to_seconds tres) )
+      match Time_repr.( +? ) t p with
+      | Error _ -> return_unit
+      | Ok tres ->
+          failwith
+            "No overflow: %Ld + %Ld = %Ld"
+            (Time_repr.to_seconds t)
+            (Period_repr.to_seconds p)
+            (Time_repr.to_seconds tres))
 
 let tests =
-  [ Test_services.tztest "non-overflowing addition" `Quick test_nominal_add;
-    Test_services.tztest "overflowing addition" `Quick test_overflow_add ]
+  [
+    Test_services.tztest "non-overflowing addition" `Quick test_nominal_add;
+    Test_services.tztest "overflowing addition" `Quick test_overflow_add;
+  ]

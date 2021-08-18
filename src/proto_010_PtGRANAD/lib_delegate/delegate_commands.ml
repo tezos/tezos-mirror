@@ -40,9 +40,8 @@ let mempool_arg =
     ~long:"mempool"
     ~placeholder:"file"
     ~doc:
-      "When used the client will read the mempool in the provided file \
-       instead of querying the node through an RPC (useful for debugging \
-       only)."
+      "When used the client will read the mempool in the provided file instead \
+       of querying the node through an RPC (useful for debugging only)."
     string_parameter
 
 let context_path_arg =
@@ -50,9 +49,8 @@ let context_path_arg =
     ~long:"context"
     ~placeholder:"path"
     ~doc:
-      "When use the client will read in the local context at the provided \
-       path in order to build the block, instead of relying on the 'preapply' \
-       RPC."
+      "When use the client will read in the local context at the provided path \
+       in order to build the block, instead of relying on the 'preapply' RPC."
     string_parameter
 
 let pidfile_arg =
@@ -63,12 +61,15 @@ let pidfile_arg =
     ~placeholder:"filename"
     (Clic.parameter (fun _ s -> return s))
 
-let may_lock_pidfile = function
-  | None ->
-      return_unit
+let may_lock_pidfile pidfile_opt f =
+  match pidfile_opt with
+  | None -> f ()
   | Some pidfile ->
-      trace (failure "Failed to create the pidfile: %s" pidfile)
-      @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
+      Lwt_lock_file.try_with_lock
+        ~when_locked:(fun () ->
+          failwith "Failed to create the pidfile: %s" pidfile)
+        ~filename:pidfile
+        f
 
 let block_param t =
   Clic.param
@@ -90,8 +91,8 @@ let per_block_vote_file_arg =
   Clic.arg
     ~doc:
       "Read per block votes as json file. The content of the file should be \
-       either \"{'liquidity_baking_escape_vote':'false'}\" or \
-       \"{'liquidity_baking_escape_vote':'true'}\"."
+       either {\"liquidity_baking_escape_vote\": false} or \
+       {\"liquidity_baking_escape_vote\": true}."
     ~short:'V'
     ~long:"votefile"
     ~placeholder:"filename"
@@ -105,7 +106,8 @@ let liquidity_baking_escape_vote_switch =
 
 let delegate_commands () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"Forge and inject block using the delegate rights."
       (args9
@@ -118,11 +120,11 @@ let delegate_commands () =
          mempool_arg
          context_path_arg
          liquidity_baking_escape_vote_switch)
-      ( prefixes ["bake"; "for"]
+      (prefixes ["bake"; "for"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"baker"
            ~desc:"name of the delegate owning the baking right"
-      @@ stop )
+      @@ stop)
       (fun ( max_priority,
              minimal_fees,
              minimal_nanotez_per_gas_unit,
@@ -171,13 +173,12 @@ let delegate_commands () =
       ~group
       ~desc:"Forge and inject an endorsement operation."
       no_options
-      ( prefixes ["endorse"; "for"]
+      (prefixes ["endorse"; "for"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"baker"
            ~desc:"name of the delegate owning the endorsement right"
-      @@ stop )
-      (fun () delegate cctxt ->
-        endorse_block cctxt ~chain:cctxt#chain delegate);
+      @@ stop)
+      (fun () delegate cctxt -> endorse_block cctxt ~chain:cctxt#chain delegate);
     command
       ~group
       ~desc:
@@ -192,22 +193,18 @@ let delegate_commands () =
             >>=? fun nonces_location ->
             let open Client_baking_nonces in
             (* Filtering orphan nonces *)
-            load cctxt nonces_location
-            >>=? fun nonces ->
+            load cctxt nonces_location >>=? fun nonces ->
             Block_hash.Map.fold
               (fun block nonce acc ->
-                acc
-                >>= fun acc ->
+                acc >>= fun acc ->
                 Shell_services.Blocks.Header.shell_header
                   cctxt
                   ~chain
                   ~block:(`Hash (block, 0))
                   ()
                 >>= function
-                | Ok _ ->
-                    Lwt.return acc
-                | Error _ ->
-                    Lwt.return (Block_hash.Map.add block nonce acc))
+                | Ok _ -> Lwt.return acc
+                | Error _ -> Lwt.return (Block_hash.Map.add block nonce acc))
               nonces
               (Lwt.return empty)
             >>= fun orphans ->
@@ -232,8 +229,8 @@ let delegate_commands () =
               let filtered_nonces =
                 Client_baking_nonces.remove_all nonces orphans
               in
-              save cctxt nonces_location filtered_nonces
-              >>=? fun () -> return_unit));
+              save cctxt nonces_location filtered_nonces >>=? fun () ->
+              return_unit));
     command
       ~group
       ~desc:"List orphan nonces."
@@ -254,7 +251,8 @@ let delegate_commands () =
               (Block_hash.Map.cardinal orphan_nonces)
               (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
               block_hashes
-            >>= fun () -> return_unit)) ]
+            >>= fun () -> return_unit));
+  ]
 
 let baker_commands () =
   let open Clic in
@@ -264,7 +262,8 @@ let baker_commands () =
       title = "Commands related to the baker daemon.";
     }
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Launch the baker daemon."
       (args7
@@ -275,12 +274,12 @@ let baker_commands () =
          minimal_nanotez_per_byte_arg
          keep_alive_arg
          per_block_vote_file_arg)
-      ( prefixes ["run"; "with"; "local"; "node"]
+      (prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"context_path"
            ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
            directory_parameter
-      @@ seq_of_param Client_keys.Public_key_hash.alias_param )
+      @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun ( pidfile,
              max_priority,
              minimal_fees,
@@ -291,8 +290,7 @@ let baker_commands () =
            node_path
            delegates
            cctxt ->
-        may_lock_pidfile pidfile
-        >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt
           (List.map fst delegates)
@@ -307,7 +305,8 @@ let baker_commands () =
           ?per_block_vote_file
           ~context_path:(Filename.concat node_path "context")
           ~keep_alive
-          (List.map snd delegates)) ]
+          (List.map snd delegates));
+  ]
 
 let endorser_commands () =
   let open Clic in
@@ -317,14 +316,14 @@ let endorser_commands () =
       title = "Commands related to endorser daemon.";
     }
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Launch the endorser daemon"
       (args3 pidfile_arg endorsement_delay_arg keep_alive_arg)
       (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (pidfile, endorsement_delay, keep_alive) delegates cctxt ->
-        may_lock_pidfile pidfile
-        >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt
           (List.map fst delegates)
@@ -333,18 +332,19 @@ let endorser_commands () =
         let delegates_no_duplicates =
           Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
         in
-        ( if List.length delegates <> List.length delegates_no_duplicates then
-          cctxt#message
-            "Warning: the list of public key hash aliases contains duplicate \
-             hashes, which are ignored"
-        else Lwt.return () )
+        (if List.length delegates <> List.length delegates_no_duplicates then
+         cctxt#message
+           "Warning: the list of public key hash aliases contains duplicate \
+            hashes, which are ignored"
+        else Lwt.return ())
         >>= fun () ->
         Client_daemon.Endorser.run
           cctxt
           ~chain:cctxt#chain
           ~delay:endorsement_delay
           ~keep_alive
-          delegates_no_duplicates) ]
+          delegates_no_duplicates);
+  ]
 
 let accuser_commands () =
   let open Clic in
@@ -354,16 +354,17 @@ let accuser_commands () =
       title = "Commands related to the accuser daemon.";
     }
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Launch the accuser daemon"
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        may_lock_pidfile pidfile
-        >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain
           ~preserved_levels
-          ~keep_alive) ]
+          ~keep_alive);
+  ]

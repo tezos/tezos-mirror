@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +26,7 @@
 
 module Request = struct
   type 'a t =
-    | Flush : Block_hash.t -> unit t
+    | Flush : Block_hash.t * Block_hash.Set.t * Operation_hash.Set.t -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
     | Inject : Operation.t -> unit t
@@ -39,14 +40,16 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Flush"
           (obj2
              (req "request" (constant "flush"))
              (req "block" Block_hash.encoding))
-          (function View (Flush hash) -> Some ((), hash) | _ -> None)
-          (fun ((), hash) -> View (Flush hash));
+          (function View (Flush (hash, _, _)) -> Some ((), hash) | _ -> None)
+          (fun ((), hash) ->
+            View (Flush (hash, Block_hash.Set.empty, Operation_hash.Set.empty)));
         case
           (Tag 1)
           ~title:"Notify"
@@ -55,10 +58,8 @@ module Request = struct
              (req "peer" P2p_peer.Id.encoding)
              (req "mempool" Mempool.encoding))
           (function
-            | View (Notify (peer, mempool)) ->
-                Some ((), peer, mempool)
-            | _ ->
-                None)
+            | View (Notify (peer, mempool)) -> Some ((), peer, mempool)
+            | _ -> None)
           (fun ((), peer, mempool) -> View (Notify (peer, mempool)));
         case
           (Tag 2)
@@ -89,11 +90,12 @@ module Request = struct
           ~title:"Leftover"
           (obj1 (req "request" (constant "leftover")))
           (function View Leftover -> Some () | _ -> None)
-          (fun () -> View Leftover) ]
+          (fun () -> View Leftover);
+      ]
 
   let pp ppf (View r) =
     match r with
-    | Flush hash ->
+    | Flush (hash, _, _) ->
         Format.fprintf ppf "switching to new head %a" Block_hash.pp hash
     | Notify (id, {Mempool.known_valid; pending}) ->
         Format.fprintf
@@ -102,16 +104,13 @@ module Request = struct
           P2p_peer.Id.pp
           id ;
         List.iter
-          (fun oph ->
-            Format.fprintf ppf "@,%a (applied)" Operation_hash.pp oph)
+          (fun oph -> Format.fprintf ppf "@,%a (applied)" Operation_hash.pp oph)
           known_valid ;
         List.iter
-          (fun oph ->
-            Format.fprintf ppf "@,%a (pending)" Operation_hash.pp oph)
+          (fun oph -> Format.fprintf ppf "@,%a (pending)" Operation_hash.pp oph)
           (Operation_hash.Set.elements pending) ;
         Format.fprintf ppf "@]"
-    | Leftover ->
-        Format.fprintf ppf "process next batch of operation"
+    | Leftover -> Format.fprintf ppf "process next batch of operation"
     | Inject op ->
         Format.fprintf
           ppf
@@ -120,8 +119,7 @@ module Request = struct
           (Operation.hash op)
     | Arrived (oph, _) ->
         Format.fprintf ppf "operation %a arrived" Operation_hash.pp oph
-    | Advertise ->
-        Format.fprintf ppf "advertising pending operations"
+    | Advertise -> Format.fprintf ppf "advertising pending operations"
 end
 
 module Event = struct
@@ -142,23 +140,14 @@ module Event = struct
   let level req =
     let open Request in
     match req with
-    | Request (View (Flush _), _, _) ->
-        Internal_event.Notice
-    | Request (View (Notify _), _, _) ->
-        Internal_event.Debug
-    | Request (View Leftover, _, _) ->
-        Internal_event.Debug
-    | Request (View (Inject _), _, _) ->
-        Internal_event.Notice
-    | Request (View (Arrived _), _, _) ->
-        Internal_event.Debug
-    | Request (View Advertise, _, _) ->
-        Internal_event.Debug
-    | Invalid_mempool_filter_configuration
-    | Unparsable_operation _
-    | Processing_n_operations _
-    | Fetching_operation _
-    | Operation_included _
+    | Request (View (Flush _), _, _) -> Internal_event.Notice
+    | Request (View (Notify _), _, _) -> Internal_event.Debug
+    | Request (View Leftover, _, _) -> Internal_event.Debug
+    | Request (View (Inject _), _, _) -> Internal_event.Notice
+    | Request (View (Arrived _), _, _) -> Internal_event.Debug
+    | Request (View Advertise, _, _) -> Internal_event.Debug
+    | Invalid_mempool_filter_configuration | Unparsable_operation _
+    | Processing_n_operations _ | Fetching_operation _ | Operation_included _
     | Operations_not_flushed _ ->
         Internal_event.Debug
 
@@ -166,7 +155,8 @@ module Event = struct
     let open Data_encoding in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Request"
           (obj2
@@ -220,7 +210,8 @@ module Event = struct
           ~title:"operations_not_flushed"
           int31
           (function Operations_not_flushed n -> Some n | _ -> None)
-          (fun n -> Operations_not_flushed n) ]
+          (fun n -> Operations_not_flushed n);
+      ]
 
   let pp ppf = function
     | Invalid_mempool_filter_configuration ->

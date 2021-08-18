@@ -6,7 +6,7 @@
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs
             tezos-micheline
-            tezos-storage.memory)
+            tezos-context.memory)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline))
  (wrapped false)
@@ -14,12 +14,14 @@
           Environment_V0
           Environment_V1
           Environment_V2
+          Environment_V3
           Environment_context
           Environment_context_intf
           Environment_protocol_T
           Environment_protocol_T_V0
           Environment_protocol_T_V1
           Environment_protocol_T_V2
+          Environment_protocol_T_V3
           Dummy_context
           Memory_context
           Proxy_context))
@@ -29,10 +31,5 @@
  (public_name tezos-shell-context)
  (libraries tezos-base
             tezos-protocol-environment
-            tezos-storage)
+            tezos-context)
  (modules Shell_context))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

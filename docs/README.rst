@@ -52,7 +52,7 @@ reStructuredText is the default plaintext markup language used by
 `Sphinx <https://www.sphinx-doc.org/>`_, which
 is the tool used to compile this format into plain web pages in HTML format.
 
-For the RST syntax, see the `Sphinx RST primer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html>`_.
+For the RST syntax, see the `Sphinx RST primer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html>`_ and also the `Sphinx extensions`_ below.
 
 Sphinx extensions
 -----------------
@@ -70,10 +70,84 @@ Some ad-hoc reference kinds are supported.
   exists
 - ``:src:`/path/to/file/or/dir``` or
   ``:src:`text</path/to/file/or/dir>``` points to the gitlab source
-  tree viewer
+  tree viewer. It is possible to refer to a particular line in a file by adding
+  a line number suffix of the form ``#Lnnn``.
 - ``:opam:`package``` or ``:opam:`text<package>``` points to the
   package page on ``opam.ocaml.org``, version number is supported
   (``package.version``)
+- ``:gl:`[special gitlab reference]``` or ``:gl:`text <[special gitlab
+  reference]>``` expands and links `GitLab special references
+  <https://docs.gitlab.com/ce/user/markdown.html#special-gitlab-references>`_,
+  like for
+  merge requests :gl:`tezos/tezos!123` (``:gl:`tezos/tezos!123```),
+  issues :gl:`tezos/tezos#999` (``:gl:`tezos/tezos#999```)
+  and
+  commits :gl:`28309c81` (``:gl:`28309c81```).
+  The default project and namespace is
+  ``tezos/tezos``. In other words, ``tezos/tezos#999``, ``tezos#999`` and
+  ``#999`` all refer to the same thing. Currently supports usernames,
+  projects, issues, merge requests, snippets, milestone ids, commits
+  and commit ranges. The implementation of this role is in
+  :src:`docs/_extensions/gitlab_custom_role.py`.
+
+Style guidelines
+----------------
+
+Currently there are no enforced guidelines about the style in writing documentation.
+In particular, the choice of American, British, Canadian, ... English (alphabetical, non-exhaustive list!) is up to each contributor.
+So is the capitalization convention of section names, and other typesetting aspects.
+The focus should be on the contents: on logical structure of documents, on uniform use of terms, on avoiding incoherencies between pages, and so on.
+
+However, when adding a new page or modifying an existing one, you should check that your text displays correctly and introduces no new problems.
+For that, you should build the documentation (by running ``make`` in the ``docs`` directory), address any new error message, and check the generated pages (`docs/_build/index.html`) in a browser.
+
+Links
+~~~~~
+
+When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
+
+- When referring to a whole documentation page, you should use a ``:doc:`` role rather than introducing a label at the start of the page.
+  Indeed, labels incur an overhead, especially when pages get duplicated for different protocol versions.
+  In particular, when referring to a page of the currently active protocol, consider using ``active/`` as the directory of that page, instead of a hardcoded protocol number ``NNN/``.
+- When referring to an artifact in the code repository (source file, commit, etc.), you may use an appropriate custom or GitLab role (see `Sphinx extensions`_) instead of a plain HTML link.
+  Indeed, specific roles are checked for correctness more effectively and more efficiently than HTML links.
+
+Line breaking
+~~~~~~~~~~~~~
+
+When writing documentation in text formats such as RST, it is not required to respect a maximal line width, such as 80 columns.
+Therefore, you may choose between the different line breaking policies your text editor proposes.
+However, you should be aware that file comparison tools such as ``diff`` tend to output large differences for a paragraph that has been reformatted after only a small change in one phrase.
+Also, reviewing tools such as the one in the GitLab user interface associate comments and change suggestions to lines, while these comments and suggestions are usually logically associated with whole phrases.
+
+For such reasons:
+
+- Some contributors use one line per complete phrase, which allows to make rephrasing suggestions more easily in ``gitlab``, associated to this (possibly long) line; and which allows ``diff`` to isolate modified phrases, instead of showing the whole container paragraph as modified.
+- Other contributors, whose editor breaks lines at a fixed width, introduce an extra line break at the end of each phrase. This also allows ``diff`` to isolate modified phrases.
+
+Thus, you may choose your own formatting style, while tolerating different styles from other contributors.
+
+
+Writing executable documentation
+--------------------------------
+
+When you are writing documentation containing executable parts, such as sequences of instructions to install, configure, or launch some tool, there is sometimes a better way than copying those instructions from a terminal (where you supposedly tried them before!) to a documentation page.
+This better way is to write "executable documentation".
+The idea is to write such executable scripts separated from the documentation, and to automatically copy them in the documentation whenever it is (re)generated.
+Executable documentation allows one to test those scripts, e.g. in CI (continuous integration), ensuring they work and are up to date with the code and with its environment.
+
+Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distrbutions, and so on.
+By continuously testing such installation scripts, executable documentation allows one to detect problems and fix obsolete instructions as early as possible, avoiding headaches and frustration, for new end users and experienced developers alike.
+
+Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.
+For example, the following directive includes a script fragment detailing a step in compiling the Tezos sources::
+
+  .. literalinclude:: compile-sources.sh
+    :language: shell
+    :start-after: [install packages]
+    :end-before: [test executable]
+
+Whenever appropriate, in addition to including the script (fragment) in the documentation as above, make sure it is regularly tested, manually and/or within a CI job.
 
 Writing protocol documentation
 ------------------------------
@@ -161,6 +235,8 @@ Documenting protocols
 Due to the duplication of the documentation for multiple protocol versions, the following extra guidelines should be observed.
 
 - In principle, protocol-independent pages should only refer to the currently active protocol. Indeed, until newer protocols are adopted, there is no guarantee that their features will be part of Tezos someday.
+  Note that there is a symbolic link called ``active`` within the documentation folder pointing to the currently active protocol directory.
+  Use it whenever appropriate to avoid introducing hardcoded protocol numbers.
 
 - When modifying the pages of a given protocol version, you might have to also modify it for later versions. Otherwise, when newer protocols are adopted, your changes will vanish! In particular, when fixing a problem in the documentation of the current protocol (e.g. adding a term in the glossary), you might have to fix it also for the candidate protocol (if there is one under the voting procedure) and for the Alpha protocol under development (assuming that the features of the candidate protocol will be inherited by or proposed in another form in Alpha).
 

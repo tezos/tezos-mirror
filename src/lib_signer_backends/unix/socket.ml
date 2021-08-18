@@ -44,8 +44,7 @@ struct
     | Deterministic_nonce_hash_request
 
   let build_request pkh data signature = function
-    | Sign_request ->
-        Request.Sign {Sign.Request.pkh; data; signature}
+    | Sign_request -> Request.Sign {Sign.Request.pkh; data; signature}
     | Deterministic_nonce_request ->
         Request.Deterministic_nonce
           {Deterministic_nonce.Request.pkh; data; signature}
@@ -60,10 +59,8 @@ struct
       conn
       (result_encoding Authorized_keys.Response.encoding)
     >>=? fun authorized_keys ->
-    Lwt.return authorized_keys
-    >>=? function
-    | No_authentication ->
-        return_none
+    Lwt.return authorized_keys >>=? function
+    | No_authentication -> return_none
     | Authorized_keys authorized_keys ->
         authenticate authorized_keys (Sign.Request.to_sign ~pkh ~data:msg)
         >>=? fun signature -> return_some signature
@@ -71,33 +68,29 @@ struct
   let with_signer_operation path pkh msg request_type enc =
     let f () =
       Tezos_base_unix.Socket.with_connection path (fun conn ->
-          maybe_authenticate pkh msg conn
-          >>=? fun signature ->
+          maybe_authenticate pkh msg conn >>=? fun signature ->
           let req = build_request pkh msg signature request_type in
-          Tezos_base_unix.Socket.send conn Request.encoding req
-          >>=? fun () -> Tezos_base_unix.Socket.recv conn (result_encoding enc))
+          Tezos_base_unix.Socket.send conn Request.encoding req >>=? fun () ->
+          Tezos_base_unix.Socket.recv conn (result_encoding enc))
     in
     let rec loop n =
-      protect (fun () -> f ())
-      >>= function
-      | Error trace as e when List.mem (Exn Lwt_unix.Timeout) trace ->
+      protect (fun () -> f ()) >>= function
+      | Error trace as e
+        when List.exists
+               (function Exn Lwt_unix.Timeout -> true | _ -> false)
+               trace ->
           if n = 0 then Lwt.return e
-          else
-            Events.(emit signer_timeout) (pred n) >>= fun () -> loop (pred n)
-      | Error _ as e ->
-          Lwt.return e
-      | Ok v ->
-          Lwt.return v
+          else Events.(emit signer_timeout) (pred n) >>= fun () -> loop (pred n)
+      | Error _ as e -> Lwt.return e
+      | Ok v -> Lwt.return v
     in
     loop 3
 
   let sign ?watermark path pkh msg =
     let msg =
       match watermark with
-      | None ->
-          msg
-      | Some watermark ->
-          Bytes.cat (Signature.bytes_of_watermark watermark) msg
+      | None -> msg
+      | Some watermark -> Bytes.cat (Signature.bytes_of_watermark watermark) msg
     in
     with_signer_operation path pkh msg Sign_request Sign.Response.encoding
 
@@ -151,11 +144,10 @@ struct
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
       match Uri.get_query_param uri "pkh" with
-      | None ->
-          generic_error "Missing the query parameter: 'pkh=tz1...'"
+      | None -> generic_error "Missing the query parameter: 'pkh=tz1...'"
       | Some key ->
-          Signature.Public_key_hash.of_b58check key
-          >|? fun key -> (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
+          Signature.Public_key_hash.of_b58check key >|? fun key ->
+          (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
 
     let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
@@ -165,26 +157,26 @@ struct
     let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
-      public_key uri
-      >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+      public_key uri >>=? fun pk ->
+      return (Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
     let sign ?watermark uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> sign ?watermark path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      sign ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> deterministic_nonce path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce path pkh msg
 
     let deterministic_nonce_hash uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> deterministic_nonce_hash path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce_hash path pkh msg
 
     let supports_deterministic_nonces uri =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> supports_deterministic_nonces path pkh
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
   end
 
   module Tcp = struct
@@ -199,15 +191,12 @@ struct
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
       match (Uri.host uri, Uri.port uri) with
-      | (None, _) ->
-          generic_error "Missing host address"
-      | (_, None) ->
-          generic_error "Missing host port"
+      | (None, _) -> generic_error "Missing host address"
+      | (_, None) -> generic_error "Missing host port"
       | (Some path, Some port) ->
           let pkh = Uri.path uri in
           let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
-          Signature.Public_key_hash.of_b58check pkh
-          >|? fun pkh ->
+          Signature.Public_key_hash.of_b58check pkh >|? fun pkh ->
           let tcp_socket =
             Tezos_base_unix.Socket.Tcp
               (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM])
@@ -222,26 +211,26 @@ struct
     let neuterize uri = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t)
 
     let public_key_hash uri =
-      public_key uri
-      >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+      public_key uri >>=? fun pk ->
+      return (Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
     let sign ?watermark uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> sign ?watermark path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      sign ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> deterministic_nonce path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce path pkh msg
 
     let deterministic_nonce_hash uri msg =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> deterministic_nonce_hash path pkh msg
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce_hash path pkh msg
 
     let supports_deterministic_nonces uri =
-      parse (uri : sk_uri :> Uri.t)
-      >>=? fun (path, pkh) -> supports_deterministic_nonces path pkh
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
   end
 end
 

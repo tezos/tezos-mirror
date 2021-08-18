@@ -31,8 +31,6 @@ type t = {
 let encoding =
   let open Data_encoding in
   conv
-    (fun {blinded_public_key_hash; amount} ->
-      (blinded_public_key_hash, amount))
-    (fun (blinded_public_key_hash, amount) ->
-      {blinded_public_key_hash; amount})
+    (fun {blinded_public_key_hash; amount} -> (blinded_public_key_hash, amount))
+    (fun (blinded_public_key_hash, amount) -> {blinded_public_key_hash; amount})
     (tup2 Blinded_public_key_hash.encoding Tez_repr.encoding)

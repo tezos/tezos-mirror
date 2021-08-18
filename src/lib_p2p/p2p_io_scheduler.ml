@@ -26,6 +26,42 @@
 
 module Events = P2p_events.P2p_io_scheduler
 
+type error +=
+  | Invalid_read_request of {
+      expected : string;
+      pos : int32;
+      len : int32;
+      buflen : int32;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"p2p_io_scheduler.invalid_read_request"
+    ~title:"Read request is erroneously specified"
+    ~description:
+      "When about to read incoming data, read parameters are erroneous"
+    ~pp:(fun fmt (expected, pos, len, buflen) ->
+      Format.fprintf
+        fmt
+        "%s should hold, but pos=%ld len=%ld buflen=%ld"
+        expected
+        pos
+        len
+        buflen)
+    Data_encoding.(
+      obj4
+        (req "expected" string)
+        (req "pos" int32)
+        (req "len" int32)
+        (req "buflen" int32))
+    (function
+      | Invalid_read_request {expected; pos; len; buflen} ->
+          Some (expected, pos, len, buflen)
+      | _ -> None)
+    (fun (expected, pos, len, buflen) ->
+      Invalid_read_request {expected; pos; len; buflen})
+
 let alpha = 0.2
 
 module type IO = sig
@@ -106,8 +142,7 @@ module Scheduler (IO : IO) = struct
   let cancel (conn : connection) err =
     if conn.closed then Lwt.return_unit
     else
-      Events.(emit connection_closed) ("cancel", conn.id, IO.name)
-      >>= fun () ->
+      Events.(emit connection_closed) ("cancel", conn.id, IO.name) >>= fun () ->
       conn.closed <- true ;
       Lwt.catch
         (fun () -> IO.close conn.out_param err)
@@ -133,10 +168,8 @@ module Scheduler (IO : IO) = struct
       (fun () ->
         (* To ensure that there is no concurrent calls to IO.pop, we
            wait for the promise to be fulfilled. *)
-        conn.current_pop
-        >>= fun res ->
-        conn.current_push
-        >>= fun _ ->
+        conn.current_pop >>= fun res ->
+        conn.current_push >>= fun _ ->
         let was_empty =
           Queue.is_empty st.readys_high && Queue.is_empty st.readys_low
         in
@@ -158,8 +191,8 @@ module Scheduler (IO : IO) = struct
      Quota is ignored if no max speed is set. *)
   let check_quota st =
     if st.max_speed <> None && st.quota < 0 then
-      Events.(emit wait_quota) IO.name
-      >>= fun () -> Lwt_condition.wait st.quota_updated
+      Events.(emit wait_quota) IO.name >>= fun () ->
+      Lwt_condition.wait st.quota_updated
     else Lwt_unix.yield ()
 
   (* Main worker loop:
@@ -198,10 +231,8 @@ module Scheduler (IO : IO) = struct
      connections are updated asynchronously by the moving_average
      worker. *)
   let rec worker_loop st =
-    check_quota st
-    >>= fun () ->
-    Events.(emit wait) IO.name
-    >>= fun () ->
+    check_quota st >>= fun () ->
+    Events.(emit wait) IO.name >>= fun () ->
     Lwt.pick [Lwt_canceler.when_canceling st.canceler; wait_data st]
     >>= fun () ->
     if Lwt_canceler.canceled st.canceler then Lwt.return_unit
@@ -212,35 +243,33 @@ module Scheduler (IO : IO) = struct
         else (false, Queue.pop st.readys_low)
       in
       match msg with
-      | Error (Canceled :: _) ->
-          worker_loop st
+      | Error (Canceled :: _) -> worker_loop st
       | Error (P2p_errors.Connection_closed :: _ as err)
       | Error (Exn Lwt_pipe.Closed :: _ as err)
-      | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err)
-        ->
+      | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err) ->
           Events.(emit connection_closed) ("pop", conn.id, IO.name)
-          >>= fun () -> cancel conn err >>= fun () -> worker_loop st
+          >>= fun () ->
+          cancel conn err >>= fun () -> worker_loop st
       | Error err ->
           Events.(emit unexpected_error) ("pop", conn.id, IO.name, err)
-          >>= fun () -> cancel conn err >>= fun () -> worker_loop st
+          >>= fun () ->
+          cancel conn err >>= fun () -> worker_loop st
       | Ok msg ->
           conn.current_push <-
-            ( IO.push conn.out_param msg
-            >>= function
-            | Ok () | Error (Canceled :: _) ->
-                return_unit
-            | Error (P2p_errors.Connection_closed :: _ as err)
-            | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
-            | Error (Exn Lwt_pipe.Closed :: _ as err) ->
-                Events.(emit connection_closed) ("push", conn.id, IO.name)
-                >>= fun () -> cancel conn err >>= fun () -> return_unit
-            | Error err ->
-                Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
-                >>= fun () ->
-                cancel conn err >>= fun () -> Lwt.return_error err ) ;
+            (IO.push conn.out_param msg >>= function
+             | Ok () | Error (Canceled :: _) -> return_unit
+             | Error (P2p_errors.Connection_closed :: _ as err)
+             | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
+             | Error (Exn Lwt_pipe.Closed :: _ as err) ->
+                 Events.(emit connection_closed) ("push", conn.id, IO.name)
+                 >>= fun () ->
+                 cancel conn err >>= fun () -> return_unit
+             | Error err ->
+                 Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
+                 >>= fun () ->
+                 cancel conn err >>= fun () -> Lwt.return_error err) ;
           let len = IO.length msg in
-          Events.(emit handle_connection) (len, conn.id, IO.name)
-          >>= fun () ->
+          Events.(emit handle_connection) (len, conn.id, IO.name) >>= fun () ->
           Moving_average.add st.counter len ;
           st.quota <- st.quota - len ;
           Moving_average.add conn.counter len ;
@@ -290,7 +319,8 @@ module Scheduler (IO : IO) = struct
         quota = 0;
       }
     in
-    waiter st conn ; conn
+    waiter st conn ;
+    conn
 
   (* Updating the global quota of the set of scheduled connections.
      If a max_speed is set, the new time frame's quota is max_speed
@@ -314,14 +344,14 @@ module Scheduler (IO : IO) = struct
           else Queue.push msg tmp)
         st.readys_low ;
       Queue.clear st.readys_low ;
-      Queue.transfer tmp st.readys_low )
+      Queue.transfer tmp st.readys_low)
 
   (* On shutdown, cancel the scheduler canceler and wait for the
      worker to terminate.
      The canceler does not have attached callback. *)
   let shutdown st =
-    Error_monad.cancel_with_exceptions st.canceler
-    >>= fun () -> st.worker >>= fun () -> Events.(emit shutdown) IO.name
+    Error_monad.cancel_with_exceptions st.canceler >>= fun () ->
+    st.worker >>= fun () -> Events.(emit shutdown) IO.name
 end
 
 module ReadIO = struct
@@ -352,7 +382,7 @@ module ReadIO = struct
   (* [pop] at most [maxlen] data from the given [fd] and write them in
      the circular buffer [read_buffer].
      Invariant: Given a connection, there is not concurrent call to
-     pop.  *)
+     pop. *)
   let pop {fd; maxlen; read_buffer} =
     Lwt.catch
       (fun () ->
@@ -364,8 +394,7 @@ module ReadIO = struct
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
             fail P2p_errors.Connection_closed
-        | exn ->
-            Lwt.return (error_exn exn))
+        | exn -> Lwt.return (error_exn exn))
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.t
 
@@ -377,9 +406,7 @@ module ReadIO = struct
 
   (* on [close] we push the given [err] toward the data consumer. *)
   let close p err =
-    Lwt.catch
-      (fun () -> Lwt_pipe.push p (Error err))
-      (fun _ -> Lwt.return_unit)
+    Lwt.catch (fun () -> Lwt_pipe.push p (Error err)) (fun _ -> Lwt.return_unit)
 end
 
 module ReadScheduler = Scheduler (ReadIO)
@@ -418,14 +445,12 @@ module WriteIO = struct
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _)
         | Unix.Unix_error (Unix.EPIPE, _, _)
-        | Lwt.Canceled
-        | End_of_file ->
+        | Lwt.Canceled | End_of_file ->
             fail P2p_errors.Connection_closed
-        | exn ->
-            Lwt.return (error_exn exn))
+        | exn -> Lwt.return (error_exn exn))
 
   (* [close] does nothing, it will still be possible to push values to
-     the network.  *)
+     the network. *)
   let close _p _err = Lwt.return_unit
 end
 
@@ -472,14 +497,14 @@ let reset_quota st =
     Moving_average.stat st.write_scheduler.counter
   in
   let nb_conn = P2p_fd.Table.length st.connected in
-  ( if nb_conn > 0 then
-    let fair_read_quota = current_inflow / nb_conn
-    and fair_write_quota = current_outflow / nb_conn in
-    P2p_fd.Table.iter
-      (fun _id conn ->
-        conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
-        conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
-      st.connected ) ;
+  (if nb_conn > 0 then
+   let fair_read_quota = current_inflow / nb_conn
+   and fair_write_quota = current_outflow / nb_conn in
+   P2p_fd.Table.iter
+     (fun _id conn ->
+       conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
+       conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
+     st.connected) ;
   ReadScheduler.update_quota st.read_scheduler ;
   WriteScheduler.update_quota st.write_scheduler
 
@@ -521,8 +546,7 @@ let read_size = function
       (Sys.word_size / 8 * 8)
       + Circular_buffer.length data
       + Lwt_pipe.push_overhead
-  | Error _ ->
-      0
+  | Error _ -> 0
 
 (* we push Error only when we close the socket, we don't fear memory
    leaks in that case... *)
@@ -548,7 +572,7 @@ let register st fd =
       (fun trace ->
         Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
       (fun () -> P2p_fd.close fd) ;
-    raise Closed )
+    raise Closed)
   else
     let id = P2p_fd.id fd in
     let canceler = Lwt_canceler.create () in
@@ -584,13 +608,11 @@ let register st fd =
         Moving_average.destroy st.ma_state write_conn.counter ;
         Lwt_pipe.close write_queue ;
         Lwt_pipe.close read_queue ;
-        P2p_fd.close fd
-        >>= function
+        P2p_fd.close fd >>= function
         | Error trace ->
             Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
             Lwt.return_unit
-        | Ok () ->
-            Lwt.return_unit) ;
+        | Ok () -> Lwt.return_unit) ;
     let conn =
       {
         fd;
@@ -618,16 +640,51 @@ let write ?canceler {write_queue; _} msg =
 (* pushing bytes in the pipe or return false if it is bounded and full *)
 let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
 
+(** Container to write bytes to when reading [len] bytes from a connection.
+    Bytes read are written to [buf] starting at offset [pos].
+    Values of this type guarantee that [0 <= len], [0 <= pos], and
+    [pos + len <= (Bytes.length buf)].
+
+    This is ensured by the smart constructor [mk_buffer] and
+    the type's implementation not being exposed. *)
+type buffer = {len : int; pos : int; buf : Bytes.t}
+
+(** [mk_buffer ?pos ?len buf] creates an instance of {!buffer},
+    making sure its invariant holds; or fails with [Invalid_read_request]. *)
+let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
+  let buflen = Bytes.length buf in
+  let pos = Option.value ~default:0 pos in
+  let len = Option.value ~default:(buflen - pos) len in
+  let check cond ~expected =
+    if cond then ok ()
+    else
+      error
+        Int32.(
+          Invalid_read_request
+            {
+              expected;
+              pos = of_int pos;
+              len = of_int pos;
+              buflen = of_int buflen;
+            })
+  in
+  check (0 <= len) ~expected:"0 <= len" >>? fun () ->
+  check (0 <= pos) ~expected:"0 <= pos" >>? fun () ->
+  check (pos + len <= buflen) ~expected:"pos + len <= buflen" >>? fun () ->
+  Ok {len; pos; buf}
+
+let mk_buffer_safe buf : buffer = {len = Bytes.length buf; pos = 0; buf}
+
+(** [shift amount buffer] returns a variant of buffer whose next read
+    will write to [buffer.buf] [amount] cells to the right. *)
+let shift amount {pos; len; buf} =
+  mk_buffer ~pos:(pos + amount) ~len:(len - amount) buf
+
 (* Copy [len] bytes from [data] starting at [pos] into [buf].
 
    If not all [data] is read, the remainder is put back in
    [conn.partial_read] *)
-let read_from conn ?pos ?len buf data =
-  let maxlen = Bytes.length buf in
-  let pos = Option.value ~default:0 pos in
-  assert (0 <= pos && pos < maxlen) ;
-  let len = Option.value ~default:(maxlen - pos) len in
-  assert (len <= maxlen - pos) ;
+let read_from conn {pos = offset; len; buf} data =
   match data with
   | Ok data ->
       let read_len = min len (Circular_buffer.length data) in
@@ -638,10 +695,9 @@ let read_from conn ?pos ?len buf data =
            conn.read_buffer
            ~len:read_len
            ~into:buf
-           ~offset:pos) ;
+           ~offset) ;
       Ok read_len
-  | Error _ ->
-      error P2p_errors.Connection_closed
+  | Error _ -> error P2p_errors.Connection_closed
 
 (* Read available data if any.
 
@@ -650,47 +706,43 @@ let read_from conn ?pos ?len buf data =
 
    TODO: [read_now] could do a better job by popping data until buf is
    full or pipe is drained ?  *)
-let read_now conn ?pos ?len buf =
+let read_now conn buffer =
   match conn.partial_read with
   | Some msg ->
       conn.partial_read <- None ;
-      Some (read_from conn ?pos ?len buf (Ok msg))
+      Some (read_from conn buffer (Ok msg))
   | None -> (
-    try
-      Option.map
-        (read_from conn ?pos ?len buf)
-        (Lwt_pipe.pop_now conn.read_queue)
-    with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed) )
+      try Option.map (read_from conn buffer) (Lwt_pipe.pop_now conn.read_queue)
+      with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed))
 
 (* Read available data or wait for it.
 
    Todo : could do [read_now] and wait for data if result is None *)
-let read ?canceler conn ?pos ?len buf =
+let read ?canceler conn buffer =
   match conn.partial_read with
   | Some msg ->
       conn.partial_read <- None ;
-      Lwt.return (read_from conn ?pos ?len buf (Ok msg))
+      Lwt.return (read_from conn buffer (Ok msg))
   | None ->
       Lwt.catch
         (fun () ->
           protect ?canceler (fun () -> Lwt_pipe.pop conn.read_queue)
-          >|= fun msg -> read_from conn ?pos ?len buf msg)
+          >|= read_from conn buffer)
         (fun _ -> fail P2p_errors.Connection_closed)
 
 (* fill [buf] with data *)
-let read_full ?canceler conn ?pos ?len buf =
-  let maxlen = Bytes.length buf in
-  let pos = Option.value ~default:0 pos in
-  let len = Option.value ~default:(maxlen - pos) len in
-  assert (0 <= pos && pos < maxlen) ;
-  assert (len <= maxlen - pos) ;
-  let rec loop pos len =
+let read_full ?canceler conn buffer =
+  let rec loop ({len; _} as buffer) =
     if len = 0 then return_unit
     else
-      read ?canceler conn ~pos ~len buf
-      >>=? fun read_len -> loop (pos + read_len) (len - read_len)
+      read ?canceler conn buffer >>=? fun read_len ->
+      (* This is safe - even if the initial ~len is not a multiple of the
+         connection's pending bytes - because the low-level read function
+         [read_from] reads *at most* the requested number of bytes:
+         it doesn't try to read more than available. *)
+      shift read_len buffer >>?= loop
   in
-  loop pos len
+  loop buffer
 
 let convert ~ws ~rs =
   {
@@ -728,36 +780,31 @@ let close ?timeout conn =
      - closing underlying socket (p2p_fd)
 
      We wait the cancellation to be finished.*)
-  ( match timeout with
+  (match timeout with
   | None -> (
-      Lwt_canceler.when_canceled conn.canceler
-      >>= function
-      | Ok () | Error [] ->
-          return_unit
+      Lwt_canceler.when_canceled conn.canceler >>= function
+      | Ok () | Error [] -> return_unit
       | Error excs ->
           (* Do not prevent the closing if an exception is raised *)
           List.iter_p
             (fun exc -> Events.(emit close_error) (id, Error_monad.Exn exc))
             excs
-          >>= fun () -> return_unit )
+          >>= fun () -> return_unit)
   | Some timeout ->
       with_timeout
         ~canceler:conn.canceler
         (Lwt_unix.sleep timeout)
         (fun canceler ->
-          Lwt_canceler.when_canceled canceler
-          >>= function
-          | Ok () | Error [] ->
-              return_unit
+          Lwt_canceler.when_canceled canceler >>= function
+          | Ok () | Error [] -> return_unit
           | Error (exn :: _) ->
               (* Do not prevent the closing if an exception is raised *)
-              Events.(emit close_error) (id, Error_monad.Exn exn) >>= return)
-  )
+              Events.(emit close_error) (id, Error_monad.Exn exn) >>= return))
   >>=? fun () ->
   (* and here we wait for one push in the socket, not for all the
-     values in the pipe to be pushed.  *)
-  conn.write_conn.current_push
-  >>= fun res -> Events.(emit close) id >>= fun () -> Lwt.return res
+     values in the pipe to be pushed. *)
+  conn.write_conn.current_push >>= fun res ->
+  Events.(emit close) id >>= fun () -> Lwt.return res
 
 let iter_connection {connected; _} f =
   P2p_fd.Table.iter (fun _ conn -> f conn) connected
@@ -765,18 +812,21 @@ let iter_connection {connected; _} f =
 let shutdown ?timeout st =
   st.closed <- true ;
   (* stop the reader loop if it's not stuck due to (max_speed+dead
-     moving average worker).  *)
-  ReadScheduler.shutdown st.read_scheduler
-  >>= fun () ->
+     moving average worker). *)
+  ReadScheduler.shutdown st.read_scheduler >>= fun () ->
   (* trigger the connections closing and wait for the start of the
-     cancellation of every connection.  *)
+     cancellation of every connection. *)
   P2p_fd.Table.iter_p
     (fun _peer_id conn -> close ?timeout conn >>= fun _ -> Lwt.return_unit)
     st.connected
   >>= fun () ->
   (* stop the writer loop if it's not stuck due to (max_speed+dead
      moving average worker).*)
-  WriteScheduler.shutdown st.write_scheduler
-  >>= fun () -> Events.(emit shutdown_scheduler) ()
+  WriteScheduler.shutdown st.write_scheduler >>= fun () ->
+  Events.(emit shutdown_scheduler) ()
 
 let id conn = P2p_fd.id conn.fd
+
+module Internal = struct
+  let destruct_buffer {pos; len; buf} = (pos, len, buf)
+end

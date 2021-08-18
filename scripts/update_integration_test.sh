@@ -18,27 +18,21 @@ for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' |
 
     # Add fast python integration tests grouped in one job
     cat >> "$tmp" <<EOF
-integration:${PROTO_DIR_BASE}_fast:
+integration:${PROTO_DIR_BASE}_batch:
   extends: .integration_python_template
   script:
-    - poetry run pytest ${PROTO_DIR##tests_python/} -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/${PROTO_DIR_BASE}_fast.out | tail
+    - poetry run pytest "${PROTO_DIR##tests_python/}" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_batch.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_batch.out" | tail
   stage: test
 
 EOF
 
     # Add slow python integration tests, one per job
     slow_tests=$(cd "$PROTO_DIR";
-                 for i in $(poetry run pytest -m slow --collect-only -qq); do
+                 for i in $(poetry run pytest --exitfirst -m slow --collect-only -qq); do
                      echo "${i%%\:\:*}" ;
                  done | grep ^tests_.*\.py | uniq | LC_COLLATE=C sort)
 
     for test in $slow_tests; do
-     case "$test" in
-       */multibranch/*)
-         # skip multibranch tests for now
-         ;;
-       *)
-
         testname=${test##*/test_}
         testname=${testname%%.py}
 
@@ -46,11 +40,10 @@ EOF
 integration:${PROTO_DIR_BASE}_${testname}:
   extends: .integration_python_template
   script:
-    - poetry run pytest ${test} -s --log-dir=tmp 2>&1 | tee tmp/${PROTO_DIR_BASE}_${testname}.out | tail
+    - poetry run pytest "${test}" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_${testname}.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_${testname}.out" | tail
   stage: test
 
 EOF
-     esac
     done
 
 done
@@ -61,7 +54,7 @@ integration:examples:
   script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
-    - PYTHONPATH=./ poetry run pytest examples/test_example.py
+    - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
   stage: test
 EOF
 

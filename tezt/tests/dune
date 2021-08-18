@@ -3,5 +3,6 @@
  (libraries tezt-tezos
             data-encoding
             tezos-base
+            tezos-base.unix
             tezos-stdlib-unix)
  (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

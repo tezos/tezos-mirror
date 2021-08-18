@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_saturation_fuzzing
+    Invocation:   dune build @src/proto_010_PtGRANAD/lib_protocol/runtest_saturation_fuzzing
     Subject:      Operations in Saturation_repr
 *)
 
@@ -174,8 +174,10 @@ let tests_boundaries = [test_leq_saturated; test_geq_zero]
 let tests =
   Alcotest.run
     "Saturation"
-    [ ("add", qcheck_wrap tests_add);
+    [
+      ("add", qcheck_wrap tests_add);
       ("mul", qcheck_wrap tests_mul);
       ("sub", qcheck_wrap tests_sub);
       ("add and sub", qcheck_wrap tests_add_sub);
-      ("<= and >=", qcheck_wrap tests_boundaries) ]
+      ("<= and >=", qcheck_wrap tests_boundaries);
+    ]

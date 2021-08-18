@@ -10,7 +10,7 @@ Ledger support
 It is possible and advised to use a hardware wallet to manage your
 keys, Tezos' client supports Ledger Nano devices provided that you have
 a Tezos app installed.
-The apps are developed by Obsidian Systems and they provide a comprehensive
+The apps were developed by Obsidian Systems and they provide a comprehensive
 `tutorial on how to install it.
 <https://github.com/obsidiansystems/ledger-app-tezos>`_
 
@@ -101,18 +101,60 @@ of the signer.
    home~$ tezos-signer gen keys alice
    home~$ cat ~/.tezos-signer/public_key_hashs
    [ { "name": "alice", "value": "tz1abc..." } ]
-   home~$ tezos-signer launch socket signer -a home-ip
+   home~$ tezos-signer launch socket signer -a home
 
-   vps~$ tezos-client import secret key alice tcp://home-ip:7732/tz1abc...
+   vps~$ tezos-client import secret key alice tcp://home:7732/tz1abc...
+   vps~$ tezos-client sign bytes 0x00 for alice
 
 Every time the client on *vps* needs to sign an operation for
 *alice*, it sends a signature request to the remote signer on
 *home*.
-Note that this setup alone is not secure, **the signer accepts
-requests from anybody and happily signs any transaction!**
+
+However, with the above method, the address of the signer is hard-coded into the remote key value.
+Consequently, if we ever have to move the signer to another machine or access it using another protocol, we will have to change all the remote keys.
+A more flexible method is to only register a key as being remote, and separately supply the address of the signer uisng the `-R` option::
+
+   vps~$ tezos-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
+   vps~$ tezos-client -R 'tcp://home:7732' sign bytes 0x00 for alice
+
+Alternatively, the address of the signer can be recorded in environment variables::
+
+   vps~$ export TEZOS_SIGNER_TCP_HOST=home
+   vps~$ export TEZOS_SIGNER_TCP_PORT=7732
+   vps~$ tezos-client import secret key alice remote:tz1abc...
+   vps~$ tezos-client sign bytes 0x00 for alice
+
+All the above methods can be retargeted to the other signing schemes, for instance, ``http``::
+
+   home~$ tezos-signer launch http signer -a home
+
+   vps~$ tezos-client import secret key alice http://home:7732/tz1abc...
+   vps~$ tezos-client sign bytes 0x00 for alice
+
+   vps~$ tezos-client -R 'http://home:7732' import secret key alice remote:tz1abc...
+   vps~$ tezos-client -R 'http://home:7732' sign bytes 0x00 for alice
+
+   vps~$ export TEZOS_SIGNER_HTTP_HOST=home
+   vps~$ export TEZOS_SIGNER_HTTP_PORT=7732
+   vps~$ tezos-client import secret key alice remote:tz1abc...
+   vps~$ tezos-client sign bytes 0x00 for alice
+
+The complete list of environment variables for connecting to the remote signer is:
+
++ `TEZOS_SIGNER_TCP_HOST`
++ `TEZOS_SIGNER_TCP_PORT` (default: 7732)
++ `TEZOS_SIGNER_HTTP_HOST`
++ `TEZOS_SIGNER_HTTP_PORT` (default: 6732)
++ `TEZOS_SIGNER_HTTPS_HOST`
++ `TEZOS_SIGNER_HTTPS_PORT` (default: 443)
++ `TEZOS_SIGNER_UNIX_PATH`
++ `TEZOS_SIGNER_HTTP_HEADERS`
 
 Secure the connection
 ~~~~~~~~~~~~~~~~~~~~~
+
+Note that this setup alone is not secure, **the signer accepts
+requests from anybody and happily signs any transaction!**
 
 Improving the security of the communication channel can be done at the
 system level, setting up a tunnel with ``ssh`` or ``wireguard``

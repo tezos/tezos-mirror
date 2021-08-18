@@ -42,8 +42,10 @@ let test_no_config_file_dummy () =
   Alcotest.check testable_chain_id "default value is dummy" expected actual
 
 let tests =
-  [ ( "Chain_id.choose uses the dummy value if no config file is specified",
+  [
+    ( "Chain_id.choose uses the dummy value if no config file is specified",
       `Quick,
-      test_no_config_file_dummy ) ]
+      test_no_config_file_dummy );
+  ]
 
 let () = Alcotest.run "tezos-mockup" [("mockup_args", tests)]

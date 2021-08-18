@@ -7,7 +7,7 @@ sudo apt-get install -y sudo
 sudo apt-get install -y cargo # NV: to avoid error on compiling rust-conf
 export OPAMYES=true
 # [install packages]
-sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq
+sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq zlib1g-dev
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
@@ -30,3 +30,4 @@ source ./src/bin_client/bash-completion.sh
 export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executable]
 ./tezos-client
+./tezos-node config --help

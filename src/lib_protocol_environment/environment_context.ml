@@ -85,8 +85,7 @@ module Context = struct
 
   type _ kind = ..
 
-  type ('a, 'b) equality_witness =
-    'a Equality_witness.t * 'b Equality_witness.t
+  type ('a, 'b) equality_witness = 'a Equality_witness.t * 'b Equality_witness.t
 
   let equality_witness () = (Equality_witness.make (), Equality_witness.make ())
 
@@ -129,13 +128,11 @@ module Context = struct
     match equiv c.equality_witness t.equality_witness with
     | (Some Refl, Some Refl) ->
         Ops.add_tree ctxt key t.tree >|= fun ctxt -> Context {c with ctxt}
-    | _ ->
-        err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
+    | _ -> err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
 
   let find_tree
       (Context
-        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
-      =
+        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key =
     Ops.find_tree ctxt key
     >|= Option.map (fun tree -> Tree {ops; tree; equality_witness; impl_name})
 
@@ -143,8 +140,7 @@ module Context = struct
       (Context
         {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
       ?offset ?length key =
-    Ops.list ctxt ?offset ?length key
-    >|= fun ls ->
+    Ops.list ctxt ?offset ?length key >|= fun ls ->
     List.fold_left
       (fun acc (k, tree) ->
         let v = Tree {ops; tree; equality_witness; impl_name} in
@@ -172,17 +168,14 @@ module Context = struct
 
     let of_value
         (Context
-          {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v
-        =
-      Ops.Tree.of_value ctxt v
-      >|= fun tree -> Tree {ops; tree; equality_witness; impl_name}
+          {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v =
+      Ops.Tree.of_value ctxt v >|= fun tree ->
+      Tree {ops; tree; equality_witness; impl_name}
 
     let equal (Tree {ops = (module Ops); tree; equality_witness; _}) (Tree t) =
       match equiv equality_witness t.equality_witness with
-      | (Some Refl, Some Refl) ->
-          Ops.Tree.equal tree t.tree
-      | _ ->
-          false
+      | (Some Refl, Some Refl) -> Ops.Tree.equal tree t.tree
+      | _ -> false
 
     let empty
         (Context
@@ -205,10 +198,8 @@ module Context = struct
     let add_tree (Tree ({ops = (module Ops); _} as c)) key (Tree t) =
       match equiv c.equality_witness t.equality_witness with
       | (Some Refl, Some Refl) ->
-          Ops.Tree.add_tree c.tree key t.tree
-          >|= fun tree -> Tree {c with tree}
-      | _ ->
-          err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
+          Ops.Tree.add_tree c.tree key t.tree >|= fun tree -> Tree {c with tree}
+      | _ -> err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
 
     let find_tree (Tree ({ops = (module Ops); tree; _} as c)) key =
       Ops.Tree.find_tree tree key
@@ -220,8 +211,7 @@ module Context = struct
     let list
         (Tree {ops = (module Ops) as ops; tree; equality_witness; impl_name})
         ?offset ?length key =
-      Ops.Tree.list tree ?offset ?length key
-      >|= fun ls ->
+      Ops.Tree.list tree ?offset ?length key >|= fun ls ->
       List.fold_left
         (fun acc (k, tree) ->
           let v = Tree {ops; tree; equality_witness; impl_name} in
@@ -252,8 +242,8 @@ module Context = struct
 
   let fork_test_chain (Context ({ops = (module Ops); ctxt; _} as c)) ~protocol
       ~expiration =
-    Ops.fork_test_chain ctxt ~protocol ~expiration
-    >|= fun ctxt -> Context {c with ctxt}
+    Ops.fork_test_chain ctxt ~protocol ~expiration >|= fun ctxt ->
+    Context {c with ctxt}
 end
 
 module Register (C : CONTEXT) = struct

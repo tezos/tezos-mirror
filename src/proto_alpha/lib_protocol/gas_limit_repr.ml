@@ -31,6 +31,7 @@ type integral_tag
 
 module S = Saturation_repr
 
+(* 1 gas unit *)
 let scaling_factor = S.mul_safe_of_int_exn 1000
 
 module Arith = struct
@@ -79,18 +80,15 @@ module Arith = struct
   let integral_of_int_exn i =
     S.(
       match of_int_opt i with
-      | None ->
-          fatally_saturated_int i
+      | None -> fatally_saturated_int i
       | Some i' ->
           let r = scale_fast scaling_factor i' in
           if r = saturated then fatally_saturated_int i else r)
 
   let integral_exn z =
     match Z.to_int z with
-    | i ->
-        integral_of_int_exn i
-    | exception Z.Overflow ->
-        fatally_saturated_z z
+    | i -> integral_of_int_exn i
+    | exception Z.Overflow -> fatally_saturated_z z
 
   let integral_to_z (i : integral) : Z.t = S.(to_z (ediv i scaling_factor))
 
@@ -122,10 +120,8 @@ module Arith = struct
 
   let unsafe_fp x =
     match of_int_opt (Z.to_int x) with
-    | Some int ->
-        int
-    | None ->
-        fatally_saturated_z x
+    | Some int -> int
+    | None -> fatally_saturated_z x
 
   let sub_opt = S.sub_opt
 end
@@ -137,7 +133,8 @@ type cost = S.may_saturate S.t
 let encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Limited"
         Arith.z_fp_encoding
@@ -148,11 +145,11 @@ let encoding =
         ~title:"Unaccounted"
         (constant "unaccounted")
         (function Unaccounted -> Some () | _ -> None)
-        (fun () -> Unaccounted) ]
+        (fun () -> Unaccounted);
+    ]
 
 let pp ppf = function
-  | Unaccounted ->
-      Format.fprintf ppf "unaccounted"
+  | Unaccounted -> Format.fprintf ppf "unaccounted"
   | Limited {remaining} ->
       Format.fprintf ppf "%a units remaining" Arith.pp remaining
 
@@ -160,20 +157,25 @@ let cost_encoding = S.z_encoding
 
 let pp_cost fmt z = S.pp fmt z
 
+(* 2 units of gas *)
 let allocation_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 2)) |> S.mul_safe_exn
 
 let step_weight = scaling_factor
 
+(* 100 units of gas *)
 let read_base_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 100)) |> S.mul_safe_exn
 
+(* 160 units of gas *)
 let write_base_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 160)) |> S.mul_safe_exn
 
+(* 10 units of gas *)
 let byte_read_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 10)) |> S.mul_safe_exn
 
+(* 15 units of gas *)
 let byte_written_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 15)) |> S.mul_safe_exn
 

@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Test_fuzzing_tests
+open Lib_test.Qcheck_helpers
 
 module SeqWithBase = struct
   type 'a elt = 'a
@@ -36,18 +37,19 @@ module SeqWithBase = struct
 
   let name = "Seq"
 
-  let pp fmt s = Crowbar.(pp_list pp_int) fmt (to_list s)
+  let pp fmt s = Format.pp_print_list Format.pp_print_int fmt (to_list s)
 end
 
-(* Internal consistency *)
-module TestSeqIterFold = TestIterFold (SeqWithBase)
+module type F = functor (S : module type of SeqWithBase) -> sig
+  val tests : QCheck.Test.t list
+end
 
-(* consistency w.r.t. Stdlib *)
-module Filter = TestFilterAgainstStdlibList (SeqWithBase)
-module Filtermap = TestFiltermapAgainstStdlibList (SeqWithBase)
-module Fold = TestFoldAgainstStdlibList (SeqWithBase)
-module Iter = TestIterAgainstStdlibList (SeqWithBase)
-module Iterp = TestIterMonotoneAgainstStdlibList (SeqWithBase)
-module Map = TestMapAgainstStdlibList (SeqWithBase)
-module Mapp = TestMappAgainstStdlibList (SeqWithBase)
-module Find = TestFindStdlibList (SeqWithBase)
+let wrap (name, (module Test : F)) =
+  let module M = Test (SeqWithBase) in
+  (name, qcheck_wrap M.tests)
+
+let () =
+  let name = "Test_fuzzing_seq" in
+  let tests = [("TestSeqIterfold", (module TestIterFold : F))] in
+  let tests = List.map wrap tests in
+  Alcotest.run name tests

@@ -3,6 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================
@@ -25,7 +26,9 @@ The source code of Tezos is placed under the MIT Open Source License.
 Latest Release
 --------------
 
-The current version of Tezos is :ref:`version-8`.
+The current version of Tezos is :ref:`version-9`.
+
+.. _tezos_community:
 
 The Community
 -------------
@@ -102,13 +105,18 @@ in the :ref:`introduction <howtoget>`.
    :caption: User documentation:
 
    user/key-management
+   user/node-configuration
+   user/snapshots
+   user/history_modes
+   user/multinetwork
    user/sandbox
    user/mockup
    user/proxy
-   user/history_modes
-   user/snapshots
+   user/light
+   user/proxy-server
+   user/multisig
+   user/fa12
    user/various
-   user/multinetwork
 
 .. toctree::
    :maxdepth: 2
@@ -116,6 +124,7 @@ in the :ref:`introduction <howtoget>`.
 
    shell/the_big_picture
    shell/validation
+   shell/storage
    shell/sync
    shell/p2p
    shell/p2p_api
@@ -125,27 +134,15 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 008 Edo doc:
-
-   008/michelson
-   008/proof_of_stake
-   008/sapling
-   008/voting
-   008/glossary
-   008/cli-commands
-   008/rpc
-
-.. toctree::
-   :maxdepth: 2
    :caption: 009 Florence doc:
 
-   009/michelson
-   009/proof_of_stake
-   009/sapling
-   009/voting
-   009/glossary
-   009/cli-commands
-   009/rpc
+   active/michelson
+   active/proof_of_stake
+   active/sapling
+   active/voting
+   active/glossary
+   active/cli-commands
+   active/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -171,12 +168,14 @@ in the :ref:`introduction <howtoget>`.
    alpha/glossary
    alpha/cli-commands
    alpha/rpc
+   alpha/liquidity_baking
 
 .. toctree::
    :maxdepth: 2
    :caption: Developer Tutorials:
 
    developer/rpc
+   developer/encodings
    developer/data_encoding
    developer/error_monad
    developer/michelson_anti_patterns
@@ -213,6 +212,7 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Releases:
 
+   releases/releases
    releases/april-2019
    releases/may-2019
    releases/september-2019

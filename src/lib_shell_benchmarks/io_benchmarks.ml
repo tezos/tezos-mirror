@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -292,7 +292,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_storage.Context.close index
+          ( Tezos_context.Context.close index
           >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
       let result = try f context with _ -> finalizer () ; exit 1 in
@@ -364,7 +364,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_storage.Context.close index
+          ( Tezos_context.Context.close index
           >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
       let result = try f context with _ -> finalizer () ; exit 1 in
@@ -618,7 +618,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_storage.Context.close index
+          ( Tezos_context.Context.close index
           >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
       let result = try f context with _ -> finalizer () ; exit 1 in
@@ -782,7 +782,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_storage.Context.close index
+          ( Tezos_context.Context.close index
           >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
       let result = try f context with _ -> finalizer () ; exit 1 in
@@ -878,7 +878,7 @@ module Read_random_key_bench : Benchmark.S = struct
       in
       let finalizer () =
         Gc.compact () ;
-        Lwt_main.run (Tezos_storage.Context.close index)
+        Lwt_main.run (Tezos_context.Context.close index)
       in
       let result = try f context with _ -> finalizer () ; exit 1 in
       finalizer () ; result
@@ -1054,7 +1054,7 @@ module Write_random_keys_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_storage.Context.close index
+          ( Tezos_context.Context.close index
           >>= fun () ->
           Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir )
       in

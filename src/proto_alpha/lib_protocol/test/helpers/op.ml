@@ -37,58 +37,50 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
   ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
 let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
-  ( match delegate with
-  | None ->
-      Context.get_endorser ctxt >|=? fun (delegate, _slots) -> delegate
-  | Some delegate ->
-      return delegate )
+  (match delegate with
+  | None -> Context.get_endorser ctxt >|=? fun (delegate, _slots) -> delegate
+  | Some delegate -> return delegate)
   >>=? fun delegate_pkh ->
-  Account.find delegate_pkh
-  >>=? fun delegate ->
+  Account.find delegate_pkh >>=? fun delegate ->
   Lwt.return
-    ( ( match level with
-      | None ->
-          Context.get_level ctxt
-      | Some level ->
-          ok level )
+    ( (match level with
+      | None -> Context.get_level ctxt
+      | Some level -> ok level)
     >|? fun level ->
-    let op = Single (Endorsement {level}) in
-    sign
-      ~watermark:Signature.(Endorsement Chain_id.zero)
-      delegate.sk
-      signing_context
-      op )
+      let op = Single (Endorsement {level}) in
+      sign
+        ~watermark:Signature.(Endorsement Chain_id.zero)
+        delegate.sk
+        signing_context
+        op )
 
 let endorsement_with_slot ?delegate ?level ctxt ?(signing_context = ctxt) () =
   (match delegate with None -> Context.get_endorser ctxt | Some v -> return v)
   >>=? fun (delegate_pkh, slots) ->
   let slot = WithExceptions.Option.get ~loc:__LOC__ (List.hd slots) in
-  Account.find delegate_pkh
-  >>=? fun delegate ->
+  Account.find delegate_pkh >>=? fun delegate ->
   Lwt.return
-    ( ( match level with
-      | None ->
-          Context.get_level ctxt
-      | Some level ->
-          ok level )
+    ( (match level with
+      | None -> Context.get_level ctxt
+      | Some level -> ok level)
     >|? fun level ->
-    let op = Single (Endorsement {level}) in
-    let endorsement =
-      sign
-        ~watermark:Signature.(Endorsement Chain_id.zero)
-        delegate.sk
-        signing_context
-        op
-    in
-    ( {
-        shell = endorsement.shell;
-        protocol_data =
-          {
-            contents = Single (Endorsement_with_slot {endorsement; slot});
-            signature = None;
-          };
-      }
-      : Kind.endorsement_with_slot Operation.t ) )
+      let op = Single (Endorsement {level}) in
+      let endorsement =
+        sign
+          ~watermark:Signature.(Endorsement Chain_id.zero)
+          delegate.sk
+          signing_context
+          op
+      in
+      ({
+         shell = endorsement.shell;
+         protocol_data =
+           {
+             contents = Single (Endorsement_with_slot {endorsement; slot});
+             signature = None;
+           };
+       }
+        : Kind.endorsement_with_slot Operation.t) )
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
@@ -104,58 +96,53 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
         Block_hash.(branch = b))
-      packed_operations ) ;
+      packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
     List.map
       (function
         | {Alpha_context.protocol_data = Operation_data {contents; _}; _} -> (
-          match Contents_list contents with
-          | Contents_list (Single o) ->
-              Contents o
-          | Contents_list
-              (Cons (Manager_operation {operation = Reveal _; _}, Single o)) ->
-              Contents o
-          | _ ->
-              (* TODO : decent error *) assert false ))
+            match Contents_list contents with
+            | Contents_list (Single o) -> Contents o
+            | Contents_list
+                (Cons (Manager_operation {operation = Reveal _; _}, Single o))
+              ->
+                Contents o
+            | _ -> (* TODO : decent error *) assert false))
       packed_operations
   in
-  ( match counter with
-  | Some counter ->
-      return counter
-  | None ->
-      Context.Contract.counter ctxt source )
+  (match counter with
+  | Some counter -> return counter
+  | None -> Context.Contract.counter ctxt source)
   >>=? fun counter ->
   (* We increment the counter *)
   let counter = Z.succ counter in
-  Context.Contract.manager ctxt source
-  >>=? fun account ->
+  Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
-  Context.Contract.is_manager_key_revealed ctxt source
-  >|=? (function
-         | false ->
-             let reveal_op =
-               Manager_operation
-                 {
-                   source = Signature.Public_key.hash public_key;
-                   fee = Tez.zero;
-                   counter;
-                   operation = Reveal public_key;
-                   gas_limit = Gas.Arith.integral_of_int_exn 10_000;
-                   storage_limit = Z.zero;
-                 }
-             in
-             (Some (Contents reveal_op), Z.succ counter)
-         | true ->
-             (None, counter))
+  (Context.Contract.is_manager_key_revealed ctxt source >|=? function
+   | false ->
+       let reveal_op =
+         Manager_operation
+           {
+             source = Signature.Public_key.hash public_key;
+             fee = Tez.zero;
+             counter;
+             operation = Reveal public_key;
+             gas_limit = Gas.Arith.integral_of_int_exn 10_000;
+             storage_limit = Z.zero;
+           }
+       in
+       (Some (Contents reveal_op), Z.succ counter)
+   | true -> (None, counter))
   >|=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
   let operations =
     List.fold_left
-      (fun (counter, acc) -> function Contents (Manager_operation m) ->
+      (fun (counter, acc) -> function
+        | Contents (Manager_operation m) ->
             ( Z.succ counter,
-              Contents (Manager_operation {m with counter}) :: acc ) | x ->
-            (counter, x :: acc))
+              Contents (Manager_operation {m with counter}) :: acc )
+        | x -> (counter, x :: acc))
       (counter, match manager_op with None -> [] | Some op -> [op])
       unpacked_operations
     |> snd |> List.rev
@@ -163,40 +150,34 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   (* patch a random operation with a corrupted pkh *)
   let operations =
     match spurious_operation with
-    | None ->
-        operations
+    | None -> operations
     | Some op -> (
         let op =
           match op with
           | {protocol_data; shell = _} -> (
-            match protocol_data with
-            | Operation_data {contents; _} -> (
-              match contents with
-              | Cons _ ->
-                  assert false
-              | Single op ->
-                  Alpha_context.Contents op ) )
+              match protocol_data with
+              | Operation_data {contents; _} -> (
+                  match contents with
+                  | Cons _ -> assert false
+                  | Single op -> Alpha_context.Contents op))
         in
         (* Select where to insert spurious op *)
         let legit_ops = List.length operations in
         let index = Random.int legit_ops in
         match List.split_n index operations with
         | (preserved_prefix, preserved_suffix) ->
-            preserved_prefix @ (op :: preserved_suffix) )
+            preserved_prefix @ op :: preserved_suffix)
   in
   let operations = Operation.of_list operations in
   sign account.sk ctxt operations
 
 let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
     ?public_key ~source ctxt operation =
-  ( match counter with
-  | Some counter ->
-      return counter
-  | None ->
-      Context.Contract.counter ctxt source )
+  (match counter with
+  | Some counter -> return counter
+  | None -> Context.Contract.counter ctxt source)
   >>=? fun counter ->
-  Context.get_constants ctxt
-  >>=? fun c ->
+  Context.get_constants ctxt >>=? fun c ->
   let gas_limit =
     let default = c.parametric.hard_gas_limit_per_operation in
     Option.value ~default gas_limit
@@ -206,12 +187,10 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
       ~default:c.parametric.hard_storage_limit_per_operation
       storage_limit
   in
-  Context.Contract.manager ctxt source
-  >>=? fun account ->
+  Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   let counter = Z.succ counter in
-  Context.Contract.is_manager_key_revealed ctxt source
-  >|=? function
+  Context.Contract.is_manager_key_revealed ctxt source >|=? function
   | true ->
       let op =
         Manager_operation
@@ -253,10 +232,8 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
 let revelation ?(fee = Tez.zero) ctxt public_key =
   let pkh = Signature.Public_key.hash public_key in
   let source = Contract.implicit_contract pkh in
-  Context.Contract.counter ctxt source
-  >>=? fun counter ->
-  Context.Contract.manager ctxt source
-  >|=? fun account ->
+  Context.Contract.counter ctxt source >>=? fun counter ->
+  Context.Contract.manager ctxt source >|=? fun account ->
   let counter = Z.succ counter in
   let sop =
     Contents_list
@@ -285,8 +262,7 @@ exception Impossible
 
 let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
     ?credit ?fee ?gas_limit ?storage_limit ctxt source =
-  Context.Contract.manager ctxt source
-  >>=? fun account ->
+  Context.Contract.manager ctxt source >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit =
     WithExceptions.Option.to_exn ~none:Impossible default_credit
@@ -309,8 +285,7 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
 let miss_signed_endorsement ?level ctxt =
   (match level with None -> Context.get_level ctxt | Some level -> ok level)
   >>?= fun level ->
-  Context.get_endorser ctxt
-  >>=? fun (real_delegate_pkh, _slots) ->
+  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, _slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
   endorsement ~delegate:delegate.pkh ~level ctxt ()
 
@@ -318,35 +293,31 @@ let transaction ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
     (src : Contract.t) (dst : Contract.t) (amount : Tez.t) =
   let top = Transaction {amount; parameters; destination = dst; entrypoint} in
-  manager_operation
-    ?counter
-    ?fee
-    ?gas_limit
-    ?storage_limit
-    ~source:src
-    ctxt
-    top
+  manager_operation ?counter ?fee ?gas_limit ?storage_limit ~source:src ctxt top
   >>=? fun sop ->
-  Context.Contract.manager ctxt src
-  >|=? fun account -> sign account.sk ctxt sop
+  Context.Contract.manager ctxt src >|=? fun account -> sign account.sk ctxt sop
 
 let delegation ?fee ctxt source dst =
   let top = Delegation dst in
-  manager_operation ?fee ~source ctxt top
+  manager_operation
+    ?fee
+    ~gas_limit:(Gas.Arith.integral_of_int_exn 1000)
+    ~source
+    ctxt
+    top
   >>=? fun sop ->
-  Context.Contract.manager ctxt source
-  >|=? fun account -> sign account.sk ctxt sop
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt sop
 
 let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
-  ( match pkh with
-  | Ed25519 edpkh ->
-      return edpkh
+  (match pkh with
+  | Ed25519 edpkh -> return edpkh
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
          Ed25519 encrypted public key hash"
         Signature.Public_key_hash.pp
-        pkh )
+        pkh)
   >|=? fun id ->
   let contents = Single (Activate_account {id; activation_code}) in
   let branch = Context.branch ctxt in
@@ -383,22 +354,20 @@ let seed_nonce_revelation ctxt level nonce =
   }
 
 let proposals ctxt (pkh : Contract.t) proposals =
-  Context.Contract.pkh pkh
-  >>=? fun source ->
+  Context.Contract.pkh pkh >>=? fun source ->
   Context.Vote.get_current_period ctxt
   >>=? fun {voting_period = {index; _}; _} ->
   let op = Proposals {source; period = index; proposals} in
-  Account.find source
-  >|=? fun account -> sign account.sk ctxt (Contents_list (Single op))
+  Account.find source >|=? fun account ->
+  sign account.sk ctxt (Contents_list (Single op))
 
 let ballot ctxt (pkh : Contract.t) proposal ballot =
-  Context.Contract.pkh pkh
-  >>=? fun source ->
+  Context.Contract.pkh pkh >>=? fun source ->
   Context.Vote.get_current_period ctxt
   >>=? fun {voting_period = {index; _}; _} ->
   let op = Ballot {source; period = index; proposal; ballot} in
-  Account.find source
-  >|=? fun account -> sign account.sk ctxt (Contents_list (Single op))
+  Account.find source >|=? fun account ->
+  sign account.sk ctxt (Contents_list (Single op))
 
 let dummy_script =
   let open Micheline in
@@ -409,21 +378,24 @@ let dummy_script =
           (strip_locations
              (Seq
                 ( 0,
-                  [ Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []);
+                  [
+                    Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []);
                     Prim (0, K_storage, [Prim (0, T_unit, [], [])], []);
                     Prim
                       ( 0,
                         K_code,
-                        [ Seq
+                        [
+                          Seq
                             ( 0,
-                              [ Prim (0, I_CDR, [], []);
+                              [
+                                Prim (0, I_CDR, [], []);
                                 Prim
-                                  ( 0,
-                                    I_NIL,
-                                    [Prim (0, T_operation, [], [])],
-                                    [] );
-                                Prim (0, I_PAIR, [], []) ] ) ],
-                        [] ) ] )));
+                                  (0, I_NIL, [Prim (0, T_operation, [], [])], []);
+                                Prim (0, I_PAIR, [], []);
+                              ] );
+                        ],
+                        [] );
+                  ] )));
       storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], [])));
     }
 

@@ -62,6 +62,7 @@ module Forge : sig
     ?proof_of_work_nonce:Bytes.t ->
     ?priority:int ->
     ?seed_nonce_hash:Nonce_hash.t ->
+    ?liquidity_baking_escape_vote:bool ->
     unit ->
     Block_header.contents
 
@@ -73,6 +74,7 @@ module Forge : sig
     ?policy:baker_policy ->
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
+    ?liquidity_baking_escape_vote:bool ->
     t ->
     header tzresult Lwt.t
 
@@ -87,6 +89,8 @@ module Forge : sig
   val sign_header : header -> Block_header.block_header tzresult Lwt.t
 end
 
+val check_constants_consistency : Constants.parametric -> unit tzresult Lwt.t
+
 (** [genesis <opts> accounts] : generates an initial block with the
     given constants [<opts>] and initializes [accounts] with their
     associated amounts.
@@ -96,12 +100,29 @@ val genesis :
   ?endorsers_per_block:int ->
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
 val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 
-(** Applies a signed header and its operations to a block and
+(** [alpha_context <opts> accounts] : instantiates an alpha_context with the
+    given constants [<opts>] and initializes [accounts] with their
+    associated amounts.
+*)
+val alpha_context :
+  ?with_commitments:bool ->
+  ?endorsers_per_block:int ->
+  ?initial_endorsers:int ->
+  ?min_proposal_quorum:int32 ->
+  (Account.t * Tez.tez) list ->
+  Alpha_context.t tzresult Lwt.t
+
+(** applies a signed header and its operations to a block and
     obtains a new block *)
 val apply :
   Block_header.block_header ->
@@ -122,11 +143,47 @@ val bake :
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
+  ?liquidity_baking_escape_vote:bool ->
   t ->
   t tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
-val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
+val bake_n :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  block tzresult Lwt.t
+
+(** Version of bake_n that returns a list of all balance updates included
+    in the metadata of baked blocks. **)
+val bake_n_with_all_balance_updates :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
+
+(** Version of bake_n that returns a list of all origination results
+    in the metadata of baked blocks. **)
+val bake_n_with_origination_results :
+  ?policy:baker_policy ->
+  int ->
+  t ->
+  (block
+  * Alpha_context.Kind.origination
+    Apply_results.successful_manager_operation_result
+    list)
+  tzresult
+  Lwt.t
+
+(** Version of bake_n that returns the liquidity baking escape EMA after [n] blocks. **)
+val bake_n_with_liquidity_baking_escape_ema :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  (block * Alpha_context.Liquidity_baking.escape_ema) tzresult Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 
@@ -140,3 +197,18 @@ val bake_until_n_cycle_end :
 
 (** Bakes enough blocks to reach the cycle. *)
 val bake_until_cycle : ?policy:baker_policy -> Cycle.t -> t -> t tzresult Lwt.t
+
+(** Common util function to create parameters for [initial_context] function *)
+val prepare_initial_context_params :
+  ?endorsers_per_block:int ->
+  ?initial_endorsers:int ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
+  ?min_proposal_quorum:int32 ->
+  ?level:int32 ->
+  (Account.t * Tez.t) list ->
+  ( Constants.parametric * Block_header.shell_header * Block_hash.t,
+    tztrace )
+  result
+  Lwt.t

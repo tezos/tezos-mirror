@@ -80,10 +80,7 @@ type error +=
     }
 
 type error +=
-  | Outdated_double_baking_evidence of {
-      level : Raw_level.t;
-      last : Raw_level.t;
-    }
+  | Outdated_double_baking_evidence of {level : Raw_level.t; last : Raw_level.t}
 
 type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
@@ -91,30 +88,40 @@ type error += Gas_quota_exceeded_init_deserialize
 
 type error += Inconsistent_sources
 
-type error +=
-  | Not_enough_endorsements_for_priority of {
-      required : int;
-      priority : int;
-      endorsements : int;
-      timestamp : Time.t;
-    }
-
 type error += (* `Permanent *) Failing_noop_error
 
-val begin_partial_construction : t -> (t, error trace) result Lwt.t
+val begin_partial_construction :
+  t ->
+  escape_vote:bool ->
+  (t
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema)
+  tzresult
+  Lwt.t
 
 val begin_full_construction :
   t ->
   Time.t ->
   Block_header.contents ->
-  (t * Block_header.contents * public_key * Period.t, error trace) result Lwt.t
+  (t
+  * Block_header.contents
+  * public_key
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema)
+  tzresult
+  Lwt.t
 
 val begin_application :
   t ->
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  (t * public_key * Period.t, error trace) result Lwt.t
+  (t
+  * public_key
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema)
+  tzresult
+  Lwt.t
 
 val apply_operation :
   t ->
@@ -130,8 +137,9 @@ val finalize_application :
   t ->
   Block_header.contents ->
   public_key_hash ->
-  block_delay:Period.t ->
   Receipt.balance_updates ->
+  Liquidity_baking.escape_ema ->
+  packed_successful_manager_operation_result list ->
   (t * block_metadata, error trace) result Lwt.t
 
 val apply_manager_contents_list :
@@ -152,5 +160,5 @@ val apply_contents_list :
   'kind contents_list ->
   (t * 'kind contents_result_list) tzresult Lwt.t
 
-val check_minimum_endorsements :
-  t -> Block_header.contents -> Period.t -> int -> (unit, error trace) result
+val check_minimal_valid_time :
+  t -> priority:int -> endorsing_power:int -> (unit, error trace) result

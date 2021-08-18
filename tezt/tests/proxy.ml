@@ -36,10 +36,10 @@ let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false
 (** Returns: a node and a proxy client *)
 let init ~protocol () =
   let* node = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  Client.set_mode (Proxy node) client ;
+  Client.set_mode (Proxy (Node node)) client ;
   let* () = Client.bake_for client in
   Log.info "Baked 1 block: protocol is now %s" (Protocol.name protocol) ;
   Lwt.return (node, client)
@@ -48,16 +48,15 @@ let init ~protocol () =
     This test checks that the proxy client creates its cache for
     RPC answers at most once for a given (chain, block) pair.
 *)
-let test_cache_at_most_once ?query_string path protocol =
-  Test.register
+let test_cache_at_most_once ?query_string path =
+  Protocol.register_test
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Proxy) (%s) Cache at most once"
-         (Protocol.name protocol)
+         "(Proxy) (%s) Cache at most once"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
-  @@ fun () ->
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let env =
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
@@ -82,12 +81,10 @@ let test_cache_at_most_once ?query_string path protocol =
   let find_duplicate l =
     let rec go with_duplicates without_duplicates =
       match (with_duplicates, without_duplicates) with
-      | ([], []) ->
-          None
+      | ([], []) -> None
       | (hd_dup :: tl_dup, hd_nodup :: tl_nodup) ->
           if hd_dup = hd_nodup then go tl_dup tl_nodup else Some hd_dup
-      | _ ->
-          assert false
+      | _ -> assert false
     in
     go (List.sort Stdlib.compare l) (List.sort_uniq Stdlib.compare l)
   in
@@ -103,9 +100,9 @@ let test_cache_at_most_once ?query_string path protocol =
            block)
   |> Lwt.return
 
-let test_cache_at_most_once protocol =
+let test_cache_at_most_once ~protocols =
   let paths =
-    [ (["context"; "constants"], []);
+    [
       (["helpers"; "baking_rights"], []);
       (["helpers"; "baking_rights"], [("all", "true")]);
       (["helpers"; "current_level"], []);
@@ -116,20 +113,23 @@ let test_cache_at_most_once protocol =
       (["context"; "nonces"; "3"], []);
       (["helpers"; "endorsing_rights"], []);
       (["helpers"; "levels_in_current_cycle"], []);
+      (["votes"; "current_period"], []);
+      (["votes"; "successor_period"], []);
+      (["votes"; "total_voting_power"], []);
       (["votes"; "ballot_list"], []);
       (["votes"; "ballots"], []);
-      (["votes"; "current_period_kind"], []);
       (["votes"; "current_proposal"], []);
       (["votes"; "current_quorum"], []);
       (["votes"; "listings"], []);
-      (["votes"; "proposals"], []) ]
+      (["votes"; "proposals"], []);
+    ]
   in
   List.iter
     (fun (sub_path, query_string) ->
       test_cache_at_most_once
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocol)
+        ~protocols)
     paths
 
 (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
@@ -147,7 +147,7 @@ let starts_with ~(prefix : string) (s : string) : bool =
     In this scenario, the proxy client should look directly in the data within the tree received by the first request.
 
     For this, this test inspects the debug output produced by
-    setting TEZOS_LOG to alphas.proxy_rpc->debug. This causes the client
+    setting TEZOS_LOG to alpha.proxy_rpc->debug. This causes the client
     to print the RPCs done to get pieces of the context:
 
     alpha.proxy_rpc: P/v1/constants
@@ -162,20 +162,21 @@ let starts_with ~(prefix : string) (s : string) : bool =
 
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
-let test_context_suffix_no_rpc ?query_string path protocol =
-  Test.register
+let test_context_suffix_no_rpc ?query_string path =
+  (* This test's implementation is similar to [Light.NoUselessRpc.test] *)
+  Protocol.register_test
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Proxy) (%s) No useless RPC call"
-         (Protocol.name protocol)
+         "(Proxy) (%s) No useless RPC call"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
-  @@ fun () ->
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
-    |> List.to_seq |> String_map.of_seq
+    String_map.singleton
+      "TEZOS_LOG"
+      (Protocol.daemon_name protocol ^ ".proxy_rpc->debug")
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
@@ -194,8 +195,7 @@ let test_context_suffix_no_rpc ?query_string path protocol =
   in
   let context_queries = lines |> List.filter_map extract_rpc_path in
   let rec test_no_overlap_rpc = function
-    | [] ->
-        ()
+    | [] -> ()
     | query_after :: queries_before ->
         List.iter
           (fun query_before ->
@@ -213,48 +213,48 @@ let test_context_suffix_no_rpc ?query_string path protocol =
   assert (List.length context_queries >= 2) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
-let test_context_suffix_no_rpc protocol =
+let test_context_suffix_no_rpc ~protocols =
+  let iter l f = List.iter f l in
+  iter protocols @@ fun protocol ->
   let paths =
-    [ (["helpers"; "baking_rights"], []);
-      (["helpers"; "baking_rights"], [("all", "true")]);
-      (["context"; "delegates"], []);
-      (["context"; "nonces"; "3"], []);
-      (["helpers"; "endorsing_rights"], []);
-      (["votes"; "ballot_list"], []);
-      (["votes"; "ballots"], []);
-      (["votes"; "current_period_kind"], []);
-      (["votes"; "current_proposal"], []);
-      (["votes"; "current_quorum"], []);
-      (["votes"; "listings"], []);
-      (["votes"; "proposals"], []) ]
+    (match protocol with
+    | Protocol.Alpha -> []
+    | _ -> [(["votes"; "current_period_kind"], [])])
+    @ [
+        (["helpers"; "baking_rights"], []);
+        (["helpers"; "baking_rights"], [("all", "true")]);
+        (["context"; "delegates"], []);
+        (["context"; "nonces"; "3"], []);
+        (["helpers"; "endorsing_rights"], []);
+        (["votes"; "current_period"], []);
+        (["votes"; "successor_period"], []);
+        (["votes"; "total_voting_power"], []);
+        (["votes"; "ballot_list"], []);
+        (["votes"; "ballots"], []);
+        (["votes"; "current_proposal"], []);
+        (["votes"; "current_quorum"], []);
+        (["votes"; "listings"], []);
+        (["votes"; "proposals"], []);
+      ]
   in
-  List.iter
-    (fun (sub_path, query_string) ->
-      test_context_suffix_no_rpc
-        ~query_string
-        ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocol)
-    paths
+  iter paths @@ fun (sub_path, query_string) ->
+  test_context_suffix_no_rpc
+    ~query_string
+    ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
+    ~protocols:[protocol]
 
 (** Test.
     Test that [tezos-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
-let test_wrong_proto protocol =
-  Test.register
-    ~__FILE__
-    ~title:(sf "(%s) (Proxy) Wrong proto" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "bake"]
-  @@ fun () ->
-  let* (_, client) = init ~protocol () in
+let wrong_proto protocol client =
   let other_proto =
     match List.find_opt (( <> ) protocol) Protocol.all with
     | None ->
         Test.fail
           "No other protocol than %s is available."
           (Protocol.name protocol)
-    | Some other_proto ->
-        other_proto
+    | Some other_proto -> other_proto
   in
   let* stderr =
     Client.spawn_bake_for ~protocol:other_proto client
@@ -272,19 +272,29 @@ let test_wrong_proto protocol =
   else Test.fail "Did not fail as expected: %s" stderr
 
 (** Test.
+    Test that [tezos-client --mode proxy --protocol P] fails
+    when the endpoint's protocol is not [P].
+ *)
+let test_wrong_proto =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Proxy) Wrong proto"
+    ~tags:["proxy"; "initialization"]
+  @@ fun protocol ->
+  let* (_, client) = init ~protocol () in
+  wrong_proto protocol client
+
+(** Test.
     Bake a few blocks in proxy mode.
  *)
-let test_bake protocol =
-  Test.register
-    ~__FILE__
-    ~title:(sf "(%s) (Proxy) Bake" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "bake"]
-  @@ fun () ->
+let test_bake =
+  Protocol.register_test ~__FILE__ ~title:"(Proxy) Bake" ~tags:["proxy"; "bake"]
+  @@ fun protocol ->
   let* node = Node.init [] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  Client.set_mode (Proxy node) client ;
+  Client.set_mode (Proxy (Node node)) client ;
   let* () = repeat 10 (fun () -> Client.bake_for client) in
   Log.info "Baked 10 blocks." ;
   let* level = Node.wait_for_level node 11 in
@@ -294,12 +304,12 @@ let test_bake protocol =
 (** Test.
     Do some transfers and bakes the corresponding blocks in proxy mode.
  *)
-let test_transfer protocol =
-  Test.register
+let test_transfer =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Proxy) Transfer" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "transfer"]
-  @@ fun () ->
+    ~title:"(Proxy) Transfer"
+    ~tags:["proxy"; "transfer"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let* () =
     Client.transfer
@@ -334,18 +344,28 @@ module Location = struct
     | Unknown  (** Client doesn't output location info (vanilla mode) *)
 
   let location_to_string = function
-    | Local ->
-        "Local"
-    | Distant ->
-        "Distant"
-    | Unknown ->
-        "Unknown"
+    | Local -> "Local"
+    | Distant -> "Distant"
+    | Unknown -> "Unknown"
 
   type clients = {vanilla : Client.t; alternative : Client.t}
 
-  type alt_mode = Proxy (* | Light : later on *)
+  type alt_mode =
+    | Vanilla_proxy_server
+        (** A vanilla client ([--mode client]) but whose [--endpoint] is
+        a [tezos-proxy-server] *)
+    | Light  (** A light client ([--mode light]) *)
+    | Proxy  (** A proxy client ([--mode proxy]) *)
 
-  let alt_mode_to_string = function Proxy -> "proxy"
+  (** Whether an alternative client is expected to execute RPCs locally *)
+  let executes_locally = function
+    | Vanilla_proxy_server -> false
+    | Light | Proxy -> true
+
+  let alt_mode_to_string = function
+    | Vanilla_proxy_server -> "vanilla_proxy_server_endpoint"
+    | Light -> "light"
+    | Proxy -> "proxy"
 
   let chain_id = "main"
 
@@ -362,8 +382,8 @@ module Location = struct
         Printf.sprintf
           "%s[ a-zA-Z]*: [A-Z]+\\(\n\\| \\)%s"
           prefix
-          ( Re.Str.quote
-          @@ Client.rpc_path_query_to_string ?query_string rpc_path )
+          (Re.Str.quote
+          @@ Client.rpc_path_query_to_string ?query_string rpc_path)
       in
       Re.Str.regexp re_str
     in
@@ -375,16 +395,35 @@ module Location = struct
 
   (** Calls [rpc get] on the given [client] but specifies an alternative
       environment to make sure the location where the RPC executes is
-      printed to output. *)
-  let rpc_get ?query_string client rpc_path =
-    let env = String_map.singleton "TEZOS_LOG" "proxy_rpc_ctxt->debug" in
+      printed to output. [tz_log] can be used to augment TEZOS_LOG
+      (useful for debugging). *)
+  let rpc_get ?(tz_log = []) ?query_string client rpc_path =
+    let (proxy_key, proxy_value) = ("proxy_rpc_ctxt", "debug") in
+    List.iter
+      (fun (k, v) ->
+        if k = proxy_key && v = proxy_value then
+          Test.fail
+            "TEZOS_LOG key %s bound both to '%s' and '%s': impossible to honor \
+             both"
+            proxy_key
+            proxy_value
+            v
+        else ())
+      tz_log ;
+    let value =
+      (proxy_key, proxy_value) :: tz_log
+      |> List.map (fun (k, v) -> Printf.sprintf "%s->%s" k v)
+      |> String.concat "; "
+    in
+    let env = String_map.singleton "TEZOS_LOG" value in
     Client.spawn_rpc ~env ?query_string Client.GET rpc_path client
     |> Process.check_and_read_both
 
   (** Check that executing [rpc get rpc_path] on client causes the RPC
-      to be executed on the given location ([expected_loc]) *)
-  let check_location alt_mode client rpc_path expected_loc =
-    let* (_, stderr) = rpc_get client rpc_path in
+      to be executed on the given location ([expected_loc]).
+      [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
+  let check_location ?tz_log alt_mode client rpc_path expected_loc =
+    let* (_, stderr) = rpc_get ?tz_log client rpc_path in
     let actual_loc = parse_rpc_exec_location stderr rpc_path in
     if actual_loc <> expected_loc then
       Test.fail
@@ -395,68 +434,76 @@ module Location = struct
         (location_to_string actual_loc) ;
     Lwt.return_unit
 
-  let check_locations alt_mode client =
+  (* [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
+  let check_locations ?tz_log alt_mode client =
     let paths_n_locations =
-      [ ( ["chains"; chain_id; "blocks"; block_id; "context"; "delegates"],
-          Local );
+      [
+        (["chains"; chain_id; "blocks"; block_id; "context"; "delegates"], Local);
         (["chains"; chain_id; "blocks"], Distant);
-        (["network"; "self"], Distant) ]
+        (["network"; "self"], Distant);
+      ]
     in
     Lwt_list.iter_s
       (fun (rpc_path, expected_loc) ->
-        check_location alt_mode client rpc_path expected_loc)
+        check_location ?tz_log alt_mode client rpc_path expected_loc)
       paths_n_locations
 
-  let locations_tags alt_mode protocol =
-    [ Protocol.tag protocol;
-      alt_mode_to_string alt_mode;
-      "location";
-      "rpc";
-      "get" ]
+  let locations_tags alt_mode =
+    [alt_mode_to_string alt_mode; "location"; "rpc"; "get"]
 
   (** Test.
       Check the location where an RPC is executed by the proxy client. *)
-  let test_locations_proxy protocol =
+  let test_locations_proxy =
     let alt_mode = Proxy in
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:(sf "(%s) (Proxy) RPC get's location" (Protocol.name protocol))
-      ~tags:(locations_tags alt_mode protocol)
-    @@ fun () ->
+      ~title:"(Proxy) RPC get's location"
+      ~tags:(locations_tags alt_mode)
+    @@ fun protocol ->
     let* (_, client) = init ~protocol () in
     check_locations alt_mode client
 
   (** Check the output of [rpc get] on a number on RPC between two
       clients are equivalent. One of them is a vanilla client ([--mode client]) while the
       other client uses an alternative mode ([--mode proxy]). *)
-  let check_equivalence alt_mode {vanilla; alternative} =
+  let check_equivalence ?tz_log protocol alt_mode {vanilla; alternative} =
     let alt_mode_string = alt_mode_to_string alt_mode in
     let compared =
       let add_rpc_path_prefix rpc_path =
         "chains" :: chain_id :: "blocks" :: block_id :: rpc_path
       in
-      [ (add_rpc_path_prefix ["context"; "constants"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
-        (add_rpc_path_prefix ["helpers"; "current_level"], []);
-        (add_rpc_path_prefix ["minimal_valid_time"], []);
-        (add_rpc_path_prefix ["context"; "constants"], []);
-        (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
-        (add_rpc_path_prefix ["context"; "delegates"], []);
-        (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
-        (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
-        (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
-        (add_rpc_path_prefix ["votes"; "ballot_list"], []);
-        (add_rpc_path_prefix ["votes"; "ballots"], []);
-        (add_rpc_path_prefix ["votes"; "current_period_kind"], []);
-        (add_rpc_path_prefix ["votes"; "current_proposal"], []);
-        (add_rpc_path_prefix ["votes"; "current_quorum"], []);
-        (add_rpc_path_prefix ["votes"; "listings"], []);
-        (add_rpc_path_prefix ["votes"; "proposals"], []) ]
+      (match protocol with
+      | Protocol.Alpha -> []
+      | _ -> [(add_rpc_path_prefix ["votes"; "current_period_kind"], [])])
+      @ [
+          (add_rpc_path_prefix ["context"; "constants"], []);
+          (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
+          (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
+          (add_rpc_path_prefix ["helpers"; "current_level"], []);
+          (add_rpc_path_prefix ["minimal_valid_time"], []);
+          (add_rpc_path_prefix ["context"; "constants"], []);
+          (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
+          (add_rpc_path_prefix ["context"; "delegates"], []);
+          (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
+          (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
+          (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
+          (add_rpc_path_prefix ["votes"; "current_period"], []);
+          (add_rpc_path_prefix ["votes"; "successor_period"], []);
+          (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
+          (add_rpc_path_prefix ["votes"; "ballot_list"], []);
+          (add_rpc_path_prefix ["votes"; "ballots"], []);
+          (add_rpc_path_prefix ["votes"; "current_proposal"], []);
+          (add_rpc_path_prefix ["votes"; "current_quorum"], []);
+          (add_rpc_path_prefix ["votes"; "listings"], []);
+          (add_rpc_path_prefix ["votes"; "proposals"], []);
+        ]
     in
     let perform (rpc_path, query_string) =
-      let* (vanilla_out, vanilla_err) = rpc_get ~query_string vanilla rpc_path
-      and* (alt_out, alt_err) = rpc_get ~query_string alternative rpc_path in
+      let* (vanilla_out, vanilla_err) =
+        rpc_get ?tz_log ~query_string vanilla rpc_path
+      and* (alt_out, alt_err) =
+        rpc_get ?tz_log ~query_string alternative rpc_path
+      in
       if vanilla_out <> alt_out then
         Test.fail
           "rpc get %s yields different results for the vanilla client and the \
@@ -469,18 +516,24 @@ module Location = struct
           vanilla_out
           alt_out
       else
+        let log_same_answer () =
+          Log.info
+            "%s client, %s: same answer than vanilla client ✓"
+            alt_mode_string
+            (Client.rpc_path_query_to_string ~query_string rpc_path)
+        in
         match
           ( parse_rpc_exec_location vanilla_err ~query_string rpc_path,
             parse_rpc_exec_location alt_err ~query_string rpc_path )
         with
+        (* Unknown matches on the left-hand side: there should be no match
+           in the vanilla output, because the vanilla client doesn't deal
+           with alternative stuff. That is why [Unknown] is matched here. *)
+        | (Unknown, Unknown) when not (executes_locally alt_mode) ->
+            log_same_answer () ;
+            Lwt.return_unit
         | (Unknown, Local) ->
-            (* There should be no match in the vanilla output,
-               because the vanilla client doesn't deal with alternative stuff.
-               That is why [Unknown] is matched here. *)
-            Log.info
-              "%s client, %s: same answer than vanilla client ✓"
-              alt_mode_string
-              (Client.rpc_path_query_to_string ~query_string rpc_path) ;
+            log_same_answer () ;
             Log.info
               "%s client, %s: done locally ✓"
               alt_mode_string
@@ -509,30 +562,29 @@ module Location = struct
     in
     Lwt_list.iter_s perform compared
 
-  let compare_tags alt_mode protocol =
-    [Protocol.tag protocol; alt_mode_to_string alt_mode; "rpc"; "get"]
+  let compare_tags alt_mode = [alt_mode_to_string alt_mode; "rpc"; "get"]
 
   (** Test.
       Check that executing a number of RPCs with a vanilla client and
       an alternative client yield the same results. *)
-  let test_compare_proxy protocol =
+  let test_compare_proxy =
     let alt_mode = Proxy in
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:(sf "(%s) (Proxy) Compare RPC get" (Protocol.name protocol))
-      ~tags:(compare_tags alt_mode protocol)
-    @@ fun () ->
+      ~title:"(Proxy) Compare RPC get"
+      ~tags:(compare_tags alt_mode)
+    @@ fun protocol ->
     let* (node, alternative) = init ~protocol () in
-    let* vanilla = Client.init ~node () in
+    let* vanilla = Client.init ~endpoint:(Node node) () in
     let clients = {vanilla; alternative} in
-    check_equivalence alt_mode clients
+    check_equivalence protocol alt_mode clients
 end
 
-let register protocol =
-  test_bake protocol ;
-  test_transfer protocol ;
-  test_wrong_proto protocol ;
-  test_context_suffix_no_rpc protocol ;
-  test_cache_at_most_once protocol ;
-  Location.test_locations_proxy protocol ;
-  Location.test_compare_proxy protocol
+let register ~protocols =
+  test_bake ~protocols ;
+  test_transfer ~protocols ;
+  test_wrong_proto ~protocols ;
+  test_context_suffix_no_rpc ~protocols ;
+  test_cache_at_most_once ~protocols ;
+  Location.test_locations_proxy ~protocols ;
+  Location.test_compare_proxy ~protocols

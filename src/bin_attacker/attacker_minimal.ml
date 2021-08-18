@@ -55,8 +55,10 @@ let signed_wrong = Ed25519.append_signature wrong_account.secret_key
 (* forge a block from a list of operations *)
 let block_forged ?prev ops =
   let from_int64 x =
-    [ Bytes.of_string Proto.Constants_repr.version_number;
-      Proto.Fitness_repr.int64_to_bytes x ]
+    [
+      Bytes.of_string Proto.Constants_repr.version_number;
+      Proto.Fitness_repr.int64_to_bytes x;
+    ]
   in
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
   let block ops =
@@ -78,10 +80,8 @@ let block_forged ?prev ops =
       Proto.Nonce_storage.of_bytes
       @@ Rand.generate Proto.Alpha_context.Constants.nonce_length
     with
-    | Error _ ->
-        assert false
-    | Ok nonce ->
-        nonce
+    | Error _ -> assert false
+    | Ok nonce -> nonce
   in
   Block_repr.forge_header
     (block ops)
@@ -151,8 +151,7 @@ let try_action addr port action =
   let socket = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
   Lwt_unix.set_close_on_exec socket ;
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  Lwt_unix.connect socket (Lwt_unix.ADDR_INET (uaddr, port))
-  >>= fun () ->
+  Lwt_unix.connect socket (Lwt_unix.ADDR_INET (uaddr, port)) >>= fun () ->
   let io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 14) () in
   let conn = P2p_io_scheduler.register io_sched socket in
   P2p_connection.authenticate
@@ -163,13 +162,11 @@ let try_action addr port action =
     identity
     Distributed_db.Raw.supported_versions
   >>=? fun (_, auth_fd) ->
-  P2p_connection.accept auth_fd Distributed_db.Raw.encoding
-  >>= function
-  | Error _ ->
-      failwith "Connection rejected by peer."
+  P2p_connection.accept auth_fd Distributed_db.Raw.encoding >>= function
+  | Error _ -> failwith "Connection rejected by peer."
   | Ok conn ->
-      action conn
-      >>=? fun () -> P2p_connection.close conn >>= fun () -> return_unit
+      action conn >>=? fun () ->
+      P2p_connection.close conn >>= fun () -> return_unit
 
 let replicate n x =
   let rec replicate_acc acc n x =
@@ -190,10 +187,8 @@ let request_block_times block_hash n conn =
 let request_op_times op_signed n conn =
   let open Operation_hash in
   let op_hash = hash_bytes [op_signed] in
-  lwt_log_notice "sending %a transaction" pp_short op_hash
-  >>= fun () ->
-  send conn (Operation op_signed)
-  >>=? fun () ->
+  lwt_log_notice "sending %a transaction" pp_short op_hash >>= fun () ->
+  send conn (Operation op_signed) >>=? fun () ->
   lwt_log_notice "requesting %a transaction %d times" pp_short op_hash n
   >>= fun () ->
   let op_hashes = replicate n op_hash in
@@ -228,8 +223,7 @@ let send_operation_size n conn =
     Operation_hash.pp_short
     op_hashed
   >>= fun () ->
-  send conn (Operation op_faked)
-  >>=? fun () ->
+  send conn (Operation op_faked) >>=? fun () ->
   let block = signed (block_forged [op_hashed]) in
   let block_hashed = Block_hash.hash_bytes [block] in
   lwt_log_notice
@@ -247,8 +241,7 @@ let send_operation_bad_signature () conn =
     pp_short
     hashed_wrong_op
   >>= fun () ->
-  send conn (Operation signed_wrong_op)
-  >>=? fun () ->
+  send conn (Operation signed_wrong_op) >>=? fun () ->
   let block = signed (block_forged [hashed_wrong_op]) in
   let block_hashed = Block_hash.hash_bytes [block] in
   lwt_log_notice
@@ -274,16 +267,14 @@ let double_spend () conn =
     let block_hashed = Block_hash.hash_bytes [block_signed] in
     lwt_log_notice "propagating operation %a" Operation_hash.pp_short op_hashed
     >>= fun () ->
-    send conn (Operation op_signed)
-    >>=? fun () ->
+    send conn (Operation op_signed) >>=? fun () ->
     lwt_log_notice "propagating block %a" Block_hash.pp_short block_hashed
     >>= fun () -> send conn (Block block_signed)
   in
   spend destination_account >>=? fun () -> spend another_account
 
 let long_chain n conn =
-  lwt_log_notice "propagating %d blocks" n
-  >>= fun () ->
+  lwt_log_notice "propagating %d blocks" n >>= fun () ->
   let prev_ref = ref genesis_block_hashed in
   let rec loop k =
     if k < 1 then return_unit
@@ -302,10 +293,8 @@ let lots_transactions amount fee n conn =
   in
   let ops = replicate n (Operation_hash.hash_bytes [signed_op]) in
   let signed_block = signed (block_forged ops) in
-  lwt_log_notice "propagating %d transactions" n
-  >>= fun () ->
-  loop n
-  >>=? fun () ->
+  lwt_log_notice "propagating %d transactions" n >>= fun () ->
+  loop n >>=? fun () ->
   lwt_log_notice
     "propagating block %a with wrong signature"
     Block_hash.pp_short
@@ -320,13 +309,11 @@ let main () =
     Arg.Unit
       (fun () ->
         Lwt_main.run
-          ( lwt ()
-          >>= function
-          | Ok () ->
-              Lwt.return_unit
-          | Error err ->
-              lwt_log_error "Error: %a" pp_print_error err
-              >>= fun () -> Lwt.return_unit ))
+          (lwt () >>= function
+           | Ok () -> Lwt.return_unit
+           | Error err ->
+               lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+               Lwt.return_unit))
   in
   let run_cmd_int_suffix lwt =
     Arg.String
@@ -335,23 +322,20 @@ let main () =
         let init = String.sub str 0 (String.length str - 1) in
         let n =
           if last == 'k' || last == 'K' then int_of_string init * (1 lsl 10)
-          else if last == 'm' || last == 'M' then
-            int_of_string init * (1 lsl 20)
-          else if last == 'g' || last == 'G' then
-            int_of_string init * (1 lsl 30)
+          else if last == 'm' || last == 'M' then int_of_string init * (1 lsl 20)
+          else if last == 'g' || last == 'G' then int_of_string init * (1 lsl 30)
           else int_of_string str
         in
         Lwt_main.run
-          ( lwt n
-          >>= function
-          | Ok () ->
-              Lwt.return_unit
-          | Error err ->
-              lwt_log_error "Error: %a" pp_print_error err
-              >>= fun () -> Lwt.return_unit ))
+          (lwt n >>= function
+           | Ok () -> Lwt.return_unit
+           | Error err ->
+               lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+               Lwt.return_unit))
   in
   let cmds =
-    [ ( "-1",
+    [
+      ( "-1",
         run_cmd_int_suffix
           (run_action << request_block_times genesis_block_hashed),
         "[N {,K,M,G}] Attempt to request to download N {,kilo,mega,giga}blocks."
@@ -359,8 +343,7 @@ let main () =
       ( "-2",
         run_cmd_int_suffix
           (run_action << request_op_times (signed (tx_forged 5L 1L))),
-        "[N {,K,M,G}] Attempt to request to download N {,kilo,mega,giga}ops."
-      );
+        "[N {,K,M,G}] Attempt to request to download N {,kilo,mega,giga}ops." );
       ( "-3",
         run_cmd_int_suffix (run_action << send_block_size),
         "[N {,K,M,G}] Attempt to propagate an N {,kilo,mega,giga}byte fake \
@@ -387,6 +370,7 @@ let main () =
         "[N {,K,M,G}] Attempt to send a chain of N {,kilo,mega,giga}blocks" );
       ( "-10",
         run_cmd_int_suffix (run_action << lots_transactions 0L 0L),
-        "[N {,K,M,G}] Attempt to send N {,kilo,mega,giga}ops" ) ]
+        "[N {,K,M,G}] Attempt to send N {,kilo,mega,giga}ops" );
+    ]
   in
   Arg.parse cmds print_endline "Tezos Evil Client"

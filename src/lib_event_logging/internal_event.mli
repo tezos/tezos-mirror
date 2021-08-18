@@ -66,7 +66,7 @@ module Level : sig
 
   val encoding : t Data_encoding.t
 
-  val compare : t -> t -> int
+  include Compare.S with type t := t
 end
 
 (** Sections are a simple way of classifying events at the time of
@@ -85,6 +85,10 @@ module Section : sig
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
+
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
 end
 
 (** All the section that has been registered. Currently, sections are registered
@@ -96,6 +100,12 @@ val register_section : Section.t -> unit
 (** Parameters defining an inspectable type of events. *)
 module type EVENT_DEFINITION = sig
   type t
+
+  (** Defines an optional section for the event.
+
+      {b Warning} [None] is only for legacy events and
+     should not be used in new code.  *)
+  val section : Section.t option
 
   (** Defines the identifier for the event. Names should be unique and
       are restricted to alphanumeric characters or [".@-_+=,~"].*)
@@ -135,7 +145,10 @@ type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
 
 (** Helper functions to manipulate all kinds of events in a generic way. *)
 module Generic : sig
-  type definition = Definition : (string * 'a event_definition) -> definition
+  type definition =
+    | Definition :
+        (Section.t option * string * 'a event_definition)
+        -> definition
 
   type event = Event : (string * 'a event_definition * 'a) -> event
 
@@ -497,8 +510,7 @@ module Lwt_worker_event : sig
 
   (** [on_event msg status] emits an event of type [t] and matches
         the signature required by {!Lwt_utils.worker}.  *)
-  val on_event :
-    string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
+  val on_event : string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
 end
 
 (** {3 Compatibility With Legacy Logging } *)
@@ -531,8 +543,7 @@ module Legacy_logging : sig
 
     val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
-    val lwt_fatal_error :
-      ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+    val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
 
   open Tezos_stdlib

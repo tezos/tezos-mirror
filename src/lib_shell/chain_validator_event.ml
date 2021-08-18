@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,7 +34,7 @@ let updated_to_checkpoint =
     ~msg:"updated to checkpoint {block_hash} (running in mode {history_mode})"
     ~level:Notice
     ("block_hash", Block_hash.encoding)
-    ("history_mode", History_mode.encoding)
+    ("history_mode", History_mode.Legacy.encoding)
 
 let prevalidator_filter_not_found =
   declare_1

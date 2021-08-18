@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -51,10 +51,18 @@ type hooks = {
     each logged output line. Parameter [color] specifies the color of those
     output lines.
 
-    Parameter [hooks] allow to attach some hooks to the process.
+    Parameter [hooks] allows to attach some hooks to the process.
+
+    Note that this function can only be called if [Background.register] is
+    allowed (which is the case inside functions given to [Test.register]).
+
+    Parameter [runner] specifies the runner on which to run the process.
+    If unspecified, the process runs locally. Otherwise, it runs on the given
+    runner using SSH.
 
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
+  ?runner:Runner.t ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->
@@ -67,6 +75,7 @@ val spawn :
 
 (** Same as {!spawn}, but with a channel to send data to the process [stdin]. *)
 val spawn_with_stdin :
+  ?runner:Runner.t ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->
@@ -92,6 +101,15 @@ val wait : t -> Unix.process_status Lwt.t
     or if [expect_failure] and exit code is 0,
     or if the process was killed, fail the test. *)
 val check : ?expect_failure:bool -> t -> unit Lwt.t
+
+(** Wait until a process terminates and check its status.
+
+    If [exit_code] is different than [t] exit code,
+    or if [msg] does not match the stderr output, fail the test.
+
+    If [exit_code] is not specified, any non-zero code is accepted.
+    If no [msg] is given, the stderr is ignored.*)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
 (** Wait until a process terminates and read its standard output.
 

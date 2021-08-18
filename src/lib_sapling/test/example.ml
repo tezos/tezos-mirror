@@ -1,24 +1,27 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Tezos_error_monad.Error_monad
 open Tezos_error_monad.TzLwtreslib
@@ -220,15 +223,13 @@ module Validator = struct
         Format.fprintf
           ppf
           "@[<v 1>This is not the root of a recent merkle tree:@,%s@]@."
-          ( match
-              Data_encoding.Binary.to_bytes
-                Data_encoding.(obj1 (req "root" Core.Hash.encoding))
-                hash
-            with
-          | Ok bytes ->
-              Hex.show @@ Hex.of_bytes @@ bytes
-          | Error _ ->
-              "root corrupted, cannot be decoded" ))
+          (match
+             Data_encoding.Binary.to_bytes
+               Data_encoding.(obj1 (req "root" Core.Hash.encoding))
+               hash
+           with
+          | Ok bytes -> Hex.show @@ Hex.of_bytes @@ bytes
+          | Error _ -> "root corrupted, cannot be decoded"))
       Data_encoding.(obj1 (req "root" Core.Hash.encoding))
       (function Too_old_root hash -> Some hash | _ -> None)
       (fun hash -> Too_old_root hash)
@@ -243,13 +244,11 @@ module Validator = struct
         Format.fprintf
           ppf
           "@[<v 1>This input has already been spent:@,%s@]@."
-          ( match
-              Data_encoding.Binary.to_bytes Core.UTXO.input_encoding input
-            with
-          | Ok bytes ->
-              Hex.show @@ Hex.of_bytes @@ bytes
-          | Error _ ->
-              "input corrupted, cannot be decoded" ))
+          (match
+             Data_encoding.Binary.to_bytes Core.UTXO.input_encoding input
+           with
+          | Ok bytes -> Hex.show @@ Hex.of_bytes @@ bytes
+          | Error _ -> "input corrupted, cannot be decoded"))
       Core.UTXO.input_encoding
       (function Input_spent i -> Some i | _ -> None)
       (fun i -> Input_spent i)
@@ -268,13 +267,11 @@ module Validator = struct
           "@[<v 1>This output has an incorrect zk proof, or does not respect \
            the zk statement:@,\
            %s@]@."
-          ( match
-              Data_encoding.Binary.to_bytes Core.UTXO.output_encoding output
-            with
-          | Ok bytes ->
-              Hex.show @@ Hex.of_bytes @@ bytes
-          | Error _ ->
-              "output corrupted, cannot be decoded" ))
+          (match
+             Data_encoding.Binary.to_bytes Core.UTXO.output_encoding output
+           with
+          | Ok bytes -> Hex.show @@ Hex.of_bytes @@ bytes
+          | Error _ -> "output corrupted, cannot be decoded"))
       Core.UTXO.output_encoding
       (function Output_incorrect i -> Some i | _ -> None)
       (fun i -> Output_incorrect i)
@@ -292,13 +289,11 @@ module Validator = struct
           ppf
           "@[<hov 0>This input has an incorrect zk proof,@ does not respect \
            the zk statement or has an incorrect signature:@ %s@]@."
-          ( match
-              Data_encoding.Binary.to_bytes Core.UTXO.input_encoding input
-            with
-          | Ok bytes ->
-              Hex.show @@ Hex.of_bytes @@ bytes
-          | Error _ ->
-              "input corrupted, cannot be decoded" ))
+          (match
+             Data_encoding.Binary.to_bytes Core.UTXO.input_encoding input
+           with
+          | Ok bytes -> Hex.show @@ Hex.of_bytes @@ bytes
+          | Error _ -> "input corrupted, cannot be decoded"))
       Core.UTXO.input_encoding
       (function Input_incorrect i -> Some i | _ -> None)
       (fun i -> Input_incorrect i)
@@ -313,15 +308,13 @@ module Validator = struct
         Format.fprintf
           ppf
           "Incorrect signature: %s"
-          ( match
-              Data_encoding.Binary.to_bytes
-                Core.UTXO.binding_sig_encoding
-                signature
-            with
-          | Ok bytes ->
-              Hex.show @@ Hex.of_bytes @@ bytes
-          | Error _ ->
-              "input binding signature, cannot be decoded" ))
+          (match
+             Data_encoding.Binary.to_bytes
+               Core.UTXO.binding_sig_encoding
+               signature
+           with
+          | Ok bytes -> Hex.show @@ Hex.of_bytes @@ bytes
+          | Error _ -> "input binding signature, cannot be decoded"))
       (obj1 (req "binding_sig" Core.UTXO.binding_sig_encoding))
       (function Binding_sig_incorrect bs -> Some bs | _ -> None)
       (fun bs -> Binding_sig_incorrect bs)
@@ -389,7 +382,7 @@ module Validator = struct
     if not coherence_of_memo_size then fail (Incoherent_memo_size ())
     else if
       (* To avoid overflowing the balance, the number of inputs and outputs must be
-       bounded *)
+         bounded *)
       Compare.Int.(List.length transaction.inputs >= 5208)
     then fail (Too_many_inputs transaction.inputs)
     else if Compare.Int.(List.length transaction.outputs >= 2019) then

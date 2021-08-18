@@ -43,15 +43,17 @@ let updates_len_existing = [1; 2; 3]
 let updates_len_other = 0 :: updates_len_existing
 
 let gen_inits idx :
-    ( ( Lazy_storage_kind.Big_map.Id.t,
-        Lazy_storage_kind.Big_map.alloc )
-      Lazy_storage_diff.init
-    * int list )
+    (( Lazy_storage_kind.Big_map.Id.t,
+       Lazy_storage_kind.Big_map.alloc )
+     Lazy_storage_diff.init
+    * int list)
     list =
-  [ (Existing, updates_len_existing);
+  [
+    (Existing, updates_len_existing);
     (Copy {src = ids.(idx - 1)}, updates_len_other);
     ( Alloc {key_type = exprs.(idx); value_type = exprs.(idx - 1)},
-      updates_len_other ) ]
+      updates_len_other );
+  ]
 
 let gen_update_list idx : Lazy_storage_kind.Big_map.update list =
   [None; Some exprs.(idx)]
@@ -79,16 +81,16 @@ let gen_diffs idx :
     list =
   let open Lazy_storage_diff in
   Remove
-  :: ( gen_inits idx
-     |> List.map (fun (init, updates_lens) ->
-            gen_updates_list updates_lens
-            |> List.map (fun updates -> Update {init; updates}))
-     |> List.flatten )
+  ::
+  (gen_inits idx
+  |> List.map (fun (init, updates_lens) ->
+         gen_updates_list updates_lens
+         |> List.map (fun updates -> Update {init; updates}))
+  |> List.flatten)
 
 let gen_diffs_items idx : Lazy_storage_diff.diffs_item list =
   let id = ids.(idx) in
-  gen_diffs idx
-  |> List.map (fun diff -> Lazy_storage_diff.make Big_map id diff)
+  gen_diffs idx |> List.map (fun diff -> Lazy_storage_diff.make Big_map id diff)
 
 let rec gen_diffs_list len : Lazy_storage_diff.diffs list =
   if len = 0 then []
@@ -122,22 +124,24 @@ let encoding_roundtrip lazy_storage_diff =
       lazy_storage_diff
   in
   match Data_encoding.Binary.of_bytes Lazy_storage_diff.encoding encoded with
-  | Ok decoded ->
-      assert (Stdlib.( = ) decoded lazy_storage_diff)
-  | Error _ ->
-      Stdlib.failwith "Decoding failed"
+  | Ok decoded -> assert (Stdlib.( = ) decoded lazy_storage_diff)
+  | Error _ -> Stdlib.failwith "Decoding failed"
 
 (** Iterator and test definitions *)
 
-let on_diffs f () = List.iter f diffs_list ; return_unit
+let on_diffs f () =
+  List.iter f diffs_list ;
+  return_unit
 
 (* Marked Slow because they take 5 to 10 seconds and are unlikely to change *)
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "conversion roundtrip"
       `Slow
       (on_diffs conversion_roundtrip);
     Test_services.tztest
       "encoding roundtrip"
       `Slow
-      (on_diffs encoding_roundtrip) ]
+      (on_diffs encoding_roundtrip);
+  ]

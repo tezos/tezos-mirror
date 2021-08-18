@@ -6,10 +6,11 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-stdlib"
   "tezos-crypto"
+  "bls12-381-unix"
+  "tezos-hacl-glue-unix"
   "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
   "tezos-event-logging"
@@ -18,10 +19,8 @@ depends: [
   "ptime" { >= "0.8.4" }
   "ezjsonm" { >= "0.5.0" }
   "ipaddr" {>= "5.0.0" & < "6.0.0"}
-  "crowbar" { with-test }
   "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
-  "bigstringaf" { = "0.7.0"}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

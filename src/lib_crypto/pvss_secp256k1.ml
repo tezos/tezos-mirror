@@ -76,10 +76,7 @@ let generate_keys ?(seed = Hacl.Rand.gen 32) () =
       (Bigstring.of_bytes seed |> Bigstring.to_string)
   in
   let sk =
-    convert_encoding
-      Secp256k1_group.Group.Scalar.encoding
-      Secret_key.encoding
-      s
+    convert_encoding Secp256k1_group.Group.Scalar.encoding Secret_key.encoding s
   in
   let pk = Secret_key.to_public_key sk in
   (pk, sk)

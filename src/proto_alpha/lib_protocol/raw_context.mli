@@ -64,7 +64,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Edo_008
+type previous_protocol = Genesis of Parameters_repr.t | Florence_009
 
 val prepare_first_block :
   level:int32 ->
@@ -94,7 +94,8 @@ val constants : t -> Constants_repr.parametric
 val patch_constants :
   t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
 
-val first_level : t -> Raw_level_repr.t
+(** Retrieve the cycle eras. *)
+val cycle_eras : t -> Level_repr.cycle_eras
 
 (** Increment the current block fee stash that will be credited to baker's
     frozen_fees account at finalize_application *)
@@ -116,7 +117,9 @@ val get_deposits : t -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
-val check_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
+val check_gas_limit_is_valid : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
+
+val consume_gas_limit_in_block : t -> 'a Gas_limit_repr.Arith.t -> t tzresult
 
 val set_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> t
 
@@ -126,7 +129,15 @@ val gas_level : t -> Gas_limit_repr.t
 
 val gas_consumed : since:t -> until:t -> Gas_limit_repr.Arith.fp
 
+val remaining_operation_gas : t -> Gas_limit_repr.Arith.fp
+
+val update_remaining_operation_gas : t -> Gas_limit_repr.Arith.fp -> t
+
+val gas_exhausted_error : t -> 'a tzresult
+
 val block_gas_level : t -> Gas_limit_repr.Arith.fp
+
+val storage_space_to_pay : t -> Z.t option
 
 val init_storage_space_to_pay : t -> t
 

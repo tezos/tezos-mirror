@@ -40,12 +40,14 @@ type context =
   | If_cond
   | If_branch
 
+let equal_context : context -> context -> bool = Stdlib.( = )
+
 type printed = Format.formatter -> context -> unit
 
 let pp c fmtr printed = Format.fprintf fmtr (printed c)
 
 let unprotect_in_context ctxts f fmtr c =
-  if List.mem c ctxts then Format.fprintf fmtr "%a" f ()
+  if List.mem ~equal:equal_context c ctxts then Format.fprintf fmtr "%a" f ()
   else Format.fprintf fmtr "(%a)" f ()
 
 let to_string (x : printed) = Format.asprintf "%a" x Lam_body
@@ -157,8 +159,8 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
           If_branch)
 end
 
-module Pp_impl_abstract :
-  S with type 'a repr = printed and type size = string = struct
+module Pp_impl_abstract : S with type 'a repr = printed and type size = string =
+struct
   include Pp_impl
 
   let app f _arg =
@@ -195,18 +197,14 @@ let maths s =
 let benchmark_options_table (bench_opts : Measure.options) =
   let flush_cache =
     match bench_opts.flush_cache with
-    | `Cache_megabytes i ->
-        normal_text (Printf.sprintf "%d megabytes" i)
-    | `Dont ->
-        normal_text "no"
+    | `Cache_megabytes i -> normal_text (Printf.sprintf "%d megabytes" i)
+    | `Dont -> normal_text "no"
   in
   let stabilize_gc = normal_text (string_of_bool bench_opts.stabilize_gc) in
   let seed =
     match bench_opts.seed with
-    | None ->
-        normal_text "self-init"
-    | Some seed ->
-        normal_text (string_of_int seed)
+    | None -> normal_text "self-init"
+    | Some seed -> normal_text (string_of_int seed)
   in
   let nsamples =
     let s = string_of_int bench_opts.nsamples in
@@ -214,56 +212,52 @@ let benchmark_options_table (bench_opts : Measure.options) =
   in
   let determinizer =
     match bench_opts.determinizer with
-    | Percentile i ->
-        normal_text (Printf.sprintf "percentile@%d" i)
-    | Mean ->
-        normal_text "mean"
+    | Percentile i -> normal_text (Printf.sprintf "percentile@%d" i)
+    | Mean -> normal_text "mean"
   in
   let cpu_affinity =
     match bench_opts.cpu_affinity with
-    | None ->
-        normal_text "none"
-    | Some i ->
-        normal_text (Printf.sprintf "cpu %d" i)
+    | None -> normal_text "none"
+    | Some i -> normal_text (Printf.sprintf "cpu %d" i)
   in
   let open Syntax in
   let rows =
-    [ Hline;
+    [
+      Hline;
       Row [[normal_text "flush cache"]; [flush_cache]];
       Row [[normal_text "stabilize gc"]; [stabilize_gc]];
       Row [[normal_text "seed"]; [seed]];
       Row [[normal_text "nsamples"]; [nsamples]];
       Row [[normal_text "determinizer"]; [determinizer]];
       Row [[normal_text "cpu affinity"]; [cpu_affinity]];
-      Hline ]
+      Hline;
+    ]
   in
   ([Vbar; L; Vbar; L; Vbar], rows)
 
 let inferred_params_table (solution : Inference.solution) =
   match Inference.solution_to_csv solution with
-  | None ->
-      None
+  | None -> None
   | Some solution_csv -> (
-    match solution_csv with
-    | [] | [[]] ->
-        assert false
-    | column_names :: lines ->
-        let spec_data =
-          (* we do not actually care about the content of the column_names,
-              just matching things one-to-one for equal length. *)
-          List.rev_map (fun _ -> Syntax.L) column_names
-        in
-        let spec = splice Syntax.Vbar spec_data in
-        let hdr =
-          Syntax.Row (List.map (fun x -> [normal_text x]) column_names)
-        in
-        let data =
-          List.map
-            (fun l -> Syntax.Row (List.map (fun x -> [maths x]) l))
-            lines
-        in
-        let rows = (Syntax.Hline :: hdr :: data) @ [Syntax.Hline] in
-        Some (spec, rows) )
+      match solution_csv with
+      | [] | [[]] -> assert false
+      | column_names :: lines ->
+          let spec_data =
+            (* we do not actually care about the content of the column_names,
+                just matching things one-to-one for equal length. *)
+            List.rev_map (fun _ -> Syntax.L) column_names
+          in
+          let spec = splice Syntax.Vbar spec_data in
+          let hdr =
+            Syntax.Row (List.map (fun x -> [normal_text x]) column_names)
+          in
+          let data =
+            List.map
+              (fun l -> Syntax.Row (List.map (fun x -> [maths x]) l))
+              lines
+          in
+          let rows = Syntax.Hline :: hdr :: data @ [Syntax.Hline] in
+          Some (spec, rows))
 
 let overrides_table (overrides : float Free_variable.Map.t) =
   if Free_variable.Map.is_empty overrides then None
@@ -278,7 +272,7 @@ let overrides_table (overrides : float Free_variable.Map.t) =
         overrides
         []
     in
-    let rows = (Syntax.Hline :: hdr :: data) @ [Syntax.Hline] in
+    let rows = Syntax.Hline :: hdr :: data @ [Syntax.Hline] in
     Some (spec, rows)
 
 module Int_set = Set.Make (Int)
@@ -300,9 +294,7 @@ let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
   let table = Hashtbl.create 41 in
   List.iter
     (fun {Measure.workload; qty} ->
-      let qties =
-        Hashtbl.find_opt table workload |> Option.value ~default:[]
-      in
+      let qties = Hashtbl.find_opt table workload |> Option.value ~default:[] in
       Hashtbl.replace table workload (qty :: qties))
     workload_data ;
   let compute_avg s qtyies =
@@ -328,8 +320,7 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
     List.filter_map
       (fun (model_name, model) ->
         match model with
-        | Tezos_benchmark.Model.Preapplied _ ->
-            None
+        | Tezos_benchmark.Model.Preapplied _ -> None
         | Tezos_benchmark.Model.Packaged {model; _} ->
             let module M = (val model) in
             let module Model = M.Def (Pp_impl_abstract) in
@@ -353,47 +344,50 @@ let report ~(measure : Measure.packed_measurement)
   in
   let overrides_table : section_content =
     match overrides_table overrides_map with
-    | None ->
-        Text [normal_text "None."]
-    | Some table ->
-        Table table
+    | None -> Text [normal_text "None."]
+    | Some table -> Table table
   in
   let inferred_params : section_content =
     match inferred_params_table solution with
-    | None ->
-        Text [normal_text "None. All free parameters already set."]
-    | Some table ->
-        Table table
+    | None -> Text [normal_text "None. All free parameters already set."]
+    | Some table -> Table table
   in
   let benchmark_options : section_content =
     Table (benchmark_options_table bench_opts)
   in
   let figure =
     match figs_file with
-    | None ->
-        []
+    | None -> []
     | Some figs_file ->
-        [ Figure
+        [
+          Figure
             ( [normal_text Bench.name],
-              {filename = figs_file; size = Some (Width_cm 17)} ) ]
+              {filename = figs_file; size = Some (Width_cm 17)} );
+        ]
   in
   let model_table : section_content = Table (model_table (module Bench)) in
   let short_table =
-    [ preamble;
+    [
+      preamble;
       benchmark_options;
       Text [normal_text "Model (sample):"];
       model_table;
       Text [normal_text "Inferred parameters:"];
-      inferred_params ]
+      inferred_params;
+    ]
   in
   let sections =
     if short then short_table
     else
       short_table
-      @ [ Text
-            [ normal_text
-                "Overrides used in inference (previously solved variables):" ];
-          overrides_table ]
+      @ [
+          Text
+            [
+              normal_text
+                "Overrides used in inference (previously solved variables):";
+            ];
+          overrides_table;
+        ]
       @ Option.fold
           ~none:[]
           ~some:(fun contents ->
@@ -412,8 +406,7 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
   let figs_file =
     let filename = Filename.temp_file "figure" ".pdf" in
     let plot_target = Display.Save {file = Some filename} in
-    if
-      Display.perform_plot ~measure ~model_name ~problem ~solution ~plot_target
+    if Display.perform_plot ~measure ~model_name ~problem ~solution ~plot_target
     then Some filename
     else None
   in

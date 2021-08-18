@@ -10,7 +10,7 @@ type t = private
   ; peers: int list
   ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t
-  ; history_mode: [`Full | `Archive | `Rolling] option
+  ; history_mode: [`Archive | `Full of int | `Rolling of int] option
   ; single_process: bool
   ; cors_origin: string option
   ; custom_network: custom_network option }
@@ -26,14 +26,14 @@ val make :
   -> ?protocol:Tezos_protocol.t
   -> ?custom_network:[`Json of Ezjsonm.value]
   -> ?single_process:bool
-  -> ?history_mode:[`Archive | `Full | `Rolling]
+  -> ?history_mode:[`Archive | `Full of int | `Rolling of int]
   -> string
   -> expected_connections:int
   -> rpc_port:int
   -> p2p_port:int
   -> int list
   -> t
-(** Create a node value (inert, not started), see 
+(** Create a node value (inert, not started), see
    ["tezos-node run --help"] for corresponding parameters.
 
 - [?single_process]: defaults to [true] (for now since multi-process

@@ -25,18 +25,12 @@
 
 (** Temporary files for tests. *)
 
-(** Main temporary directory, e.g. ["/tmp/tezt-1234"].
-
-    Don't use it directly to create files, use [file] or [dir] instead.
-    Use this value only in messages to users. *)
-val main_dir : string
-
 (** Get a temporary file name.
 
     For instance:
-    - [file "hello.ml"] may return something like ["/tmp/tezt-1234/hello.ml"];
-    - [file "some/dir/hello.ml"] may return ["/tmp/tezt-1234/some/dir/hello.ml"];
-    - [file "/dir/hello.ml"] may return ["/tmp/tezt-1234/dir/hello.ml"].
+    - [file "hello.ml"] may return something like ["/tmp/tezt-1234/1/hello.ml"];
+    - [file "some/dir/hello.ml"] may return ["/tmp/tezt-1234/1/some/dir/hello.ml"];
+    - [file "/dir/hello.ml"] may return ["/tmp/tezt-1234/1/dir/hello.ml"].
 
     This function also creates the directory (and its parents) needed to host the
     resulting file.
@@ -44,14 +38,21 @@ val main_dir : string
     [perms] is the permissions for parent directories if they are created.
     Default is [0o755], i.e. [rwxr-xr-x].
 
+    If [runner] is specified, the temporary file is registered to be located
+    in this remote runner, which means that it will be removed using SSH
+    by the [clean up] function.
+
     [file base] always returns the same result for a given [base]
     and for the same process. *)
-val file : ?perms:Unix.file_perm -> string -> string
+val file : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
 (** Get a temporary file name and create it as a directory. *)
-val dir : ?perms:Unix.file_perm -> string -> string
+val dir : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
-(** Allow calls to [file] and [dir] until the next [clean_up].
+(** Allow calls to [file] and [dir] until the next [clean_up] or [stop].
+
+    Return the main temporary directory, e.g. ["/tmp/tezt-1234/1"],
+    so that it can be displayed to users.
 
     Calls to [file] and [dir] which are made before [start] result in an error.
 
@@ -60,7 +61,12 @@ val dir : ?perms:Unix.file_perm -> string -> string
     actually runs. Indeed, if your test is disabled from the command-line it should
     not create temporary files. By using {!Test.run} you also ensure that {!clean_up}
     is called. *)
-val start : unit -> unit
+val start : unit -> string
+
+(** Disallow calls to [file] and [dir] until the next [start].
+
+    This can be called in place of [clean_up] if you want to keep temporary files. *)
+val stop : unit -> unit
 
 (** Delete temporary files and directories.
 

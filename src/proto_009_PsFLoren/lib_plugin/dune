@@ -19,8 +19,3 @@
                    -open Tezos_embedded_protocol_009_PsFLoren
                    -open Tezos_protocol_plugin_009_PsFLoren
                    -open Tezos_shell)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -27,17 +27,18 @@
 open Error_monad
 
 module Public_key_hash = struct
-  include Blake2B.Make
-            (Base58)
-            (struct
-              let name = "Ed25519.Public_key_hash"
+  include
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Ed25519.Public_key_hash"
 
-              let title = "An Ed25519 public key hash"
+        let title = "An Ed25519 public key hash"
 
-              let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
+        let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
 
-              let size = Some 20
-            end)
+        let size = Some 20
+      end)
 
   module Logging = struct
     let tag = Tag.def ~doc:title name pp
@@ -49,7 +50,7 @@ let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 open Hacl.Ed25519
 
 module Public_key = struct
-  type t = Hacl.public key
+  type t = Hacl.public Hacl.Ed25519.key
 
   let name = "Ed25519.Public_key"
 
@@ -84,7 +85,7 @@ module Public_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare = compare
+    let compare = Hacl.Ed25519.compare
   end)
 
   include Helpers.MakeRaw (struct
@@ -179,22 +180,17 @@ module Secret_key = struct
 
   let of_b58check_opt s =
     match Base58.simple_decode b58check_encoding s with
-    | Some x ->
-        Some x
-    | None ->
-        Base58.simple_decode secret_key_encoding s
+    | Some x -> Some x
+    | None -> Base58.simple_decode secret_key_encoding s
 
   let of_b58check_exn s =
     match of_b58check_opt s with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
+    | Some x -> x
+    | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
-    | Some x ->
-        Ok x
+    | Some x -> Ok x
     | None ->
         generic_error "Failed to read a b58check_encoding data (%s): %S" name s
 
@@ -359,11 +355,10 @@ let generate_key ?seed () =
              seedlen)
       else
         match sk_of_bytes (Bytes.sub seed 0 Secret_key.size) with
-        | None ->
-            invalid_arg "Ed25519.generate_key: invalid seed"
+        | None -> invalid_arg "Ed25519.generate_key: invalid seed"
         | Some sk ->
             let pk = neuterize sk in
-            (Public_key.hash pk, pk, sk) )
+            (Public_key.hash pk, pk, sk))
 
 let deterministic_nonce sk msg =
   let key = Secret_key.to_bytes sk in

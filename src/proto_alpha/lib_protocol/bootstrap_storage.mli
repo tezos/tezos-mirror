@@ -25,11 +25,11 @@
 
 val init :
   Raw_context.t ->
-  typecheck:(Raw_context.t ->
-            Script_repr.t ->
-            ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
-            tzresult
-            Lwt.t) ->
+  typecheck:
+    (Raw_context.t ->
+    Script_repr.t ->
+    ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t) tzresult
+    Lwt.t) ->
   ?ramp_up_cycles:int ->
   ?no_reward_cycles:int ->
   Parameters_repr.bootstrap_account list ->

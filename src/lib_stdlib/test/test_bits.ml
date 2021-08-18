@@ -45,8 +45,8 @@ let check x =
 let check_values _ =
   List.iter
     check
-    ( [max_int; 1 lsl 15; 1 lsl 16; 1 lsl 17; 1 lsl 31; 1 lsl 32; 1 lsl 33]
-    @ (0 -- ((1 lsl 8) + 1)) )
+    ([max_int; 1 lsl 15; 1 lsl 16; 1 lsl 17; 1 lsl 31; 1 lsl 32; 1 lsl 33]
+    @ (0 -- ((1 lsl 8) + 1)))
 
 let exhaustive_check () =
   if Bits.numbits 0 <> 0 then Alcotest.fail "numbits 0 <> 0" ;
@@ -58,7 +58,9 @@ let exhaustive_check () =
   done
 
 let tests =
-  [ ("numbits_on_samples", `Quick, check_values);
-    ("numbits_correct", `Slow, exhaustive_check) ]
+  [
+    ("numbits_on_samples", `Quick, check_values);
+    ("numbits_correct", `Slow, exhaustive_check);
+  ]
 
 let () = Alcotest.run "stdlib" [("numbits", tests)]

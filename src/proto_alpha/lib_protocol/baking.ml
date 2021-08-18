@@ -28,7 +28,13 @@ open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 
-type error += Timestamp_too_early of Timestamp.t * Timestamp.t
+type error +=
+  | Timestamp_too_early of {
+      minimal_time : Timestamp.t;
+      provided_time : Timestamp.t;
+      priority : int;
+      endorsing_power_opt : int option;
+    }
 
 (* `Permanent *)
 
@@ -52,21 +58,37 @@ let () =
     `Permanent
     ~id:"baking.timestamp_too_early"
     ~title:"Block forged too early"
-    ~description:
-      "The block timestamp is before the first slot for this baker at this \
-       level"
-    ~pp:(fun ppf (r, p) ->
+    ~description:"The block timestamp is before the minimal valid one."
+    ~pp:(fun ppf (minimal_time, provided_time, priority, endorsing_power) ->
+      let message_regarding_endorsements =
+        match endorsing_power with
+        | None -> ""
+        | Some power -> Format.asprintf " and endorsing power %d" power
+      in
       Format.fprintf
         ppf
-        "Block forged too early (%a is before %a)"
+        "Block forged too early: %a is before the minimal time %a for priority \
+         %d%s)"
         Time.pp_hum
-        p
+        provided_time
         Time.pp_hum
-        r)
+        minimal_time
+        priority
+        message_regarding_endorsements)
     Data_encoding.(
-      obj2 (req "minimum" Time.encoding) (req "provided" Time.encoding))
-    (function Timestamp_too_early (r, p) -> Some (r, p) | _ -> None)
-    (fun (r, p) -> Timestamp_too_early (r, p)) ;
+      obj4
+        (req "minimal_time" Time.encoding)
+        (req "provided_time" Time.encoding)
+        (req "priority" int31)
+        (opt "endorsing_power" int31))
+    (function
+      | Timestamp_too_early
+          {minimal_time; provided_time; priority; endorsing_power_opt} ->
+          Some (minimal_time, provided_time, priority, endorsing_power_opt)
+      | _ -> None)
+    (fun (minimal_time, provided_time, priority, endorsing_power_opt) ->
+      Timestamp_too_early
+        {minimal_time; provided_time; priority; endorsing_power_opt}) ;
   register_error_kind
     `Permanent
     ~id:"baking.invalid_fitness_gap"
@@ -155,53 +177,67 @@ let () =
     (function Unexpected_endorsement_slot v -> Some v | _ -> None)
     (fun v -> Unexpected_endorsement_slot v)
 
-let minimal_time c priority pred_timestamp =
-  let priority = Int32.of_int priority in
+(* The function implements the fast-path case in [minimal_time]. (See
+   [minimal_valid_time] for the definition of the fast-path.) *)
+let minimal_time_fastpath_case minimal_block_delay pred_timestamp =
+  Timestamp.(pred_timestamp +? minimal_block_delay)
+
+(* The function implements the slow-path case in [minimal_time]. (See
+   [minimal_valid_time] for the definition of the slow-path.) *)
+let minimal_time_slowpath_case time_between_blocks priority pred_timestamp =
   let rec cumsum_time_between_blocks acc durations p =
     if Compare.Int32.( <= ) p 0l then ok acc
     else
       match durations with
-      | [] ->
-          cumsum_time_between_blocks acc [Period.one_minute] p
-      | [last] ->
-          Period.mult p last >>? fun period -> Timestamp.(acc +? period)
+      | [] -> cumsum_time_between_blocks acc [Period.one_minute] p
+      | [last] -> Period.mult p last >>? fun period -> Timestamp.(acc +? period)
       | first :: durations ->
-          Timestamp.(acc +? first)
-          >>? fun acc ->
+          Timestamp.(acc +? first) >>? fun acc ->
           let p = Int32.pred p in
           cumsum_time_between_blocks acc durations p
   in
   cumsum_time_between_blocks
     pred_timestamp
-    (Constants.time_between_blocks c)
+    time_between_blocks
     (Int32.succ priority)
+
+let minimal_time constants ~priority pred_timestamp =
+  let priority = Int32.of_int priority in
+  if Compare.Int32.(priority = 0l) then
+    minimal_time_fastpath_case
+      constants.Constants.minimal_block_delay
+      pred_timestamp
+  else
+    minimal_time_slowpath_case
+      constants.time_between_blocks
+      priority
+      pred_timestamp
 
 let earlier_predecessor_timestamp ctxt level =
   let current = Level.current ctxt in
   let current_timestamp = Timestamp.current ctxt in
   let gap = Level.diff level current in
-  let step = List.hd (Constants.time_between_blocks ctxt) in
+  let step = Constants.minimal_block_delay ctxt in
   if Compare.Int32.(gap < 1l) then
     failwith "Baking.earlier_block_timestamp: past block."
   else
-    Period.mult (Int32.pred gap) step
-    >>? fun delay -> Timestamp.(current_timestamp +? delay)
+    Period.mult (Int32.pred gap) step >>? fun delay ->
+    Timestamp.(current_timestamp +? delay)
 
-let check_timestamp c priority pred_timestamp =
-  minimal_time c priority pred_timestamp
+let check_timestamp c ~priority pred_timestamp =
+  minimal_time (Constants.parametric c) priority pred_timestamp
   >>? fun minimal_time ->
-  let timestamp = Alpha_context.Timestamp.current c in
+  let timestamp = Timestamp.current c in
   record_trace
-    (Timestamp_too_early (minimal_time, timestamp))
+    (Timestamp_too_early
+       {
+         minimal_time;
+         provided_time = timestamp;
+         priority;
+         endorsing_power_opt = None;
+       })
     Timestamp.(timestamp -? minimal_time)
-
-let check_baking_rights c {Block_header.priority; _} pred_timestamp =
-  let level = Level.current c in
-  Roll.baking_rights_owner c level ~priority
-  >>=? fun delegate ->
-  Lwt.return
-    ( check_timestamp c priority pred_timestamp
-    >|? fun block_delay -> (delegate, block_delay) )
+  >>? fun _block_delay -> ok ()
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -239,8 +275,7 @@ let rec reward_for_priority reward_per_prio prio =
   | [] ->
       (* Empty reward list in parameters means no rewards *)
       Tez.zero
-  | [last] ->
-      last
+  | [last] -> last
   | first :: rest ->
       if Compare.Int.(prio <= 0) then first
       else reward_for_priority rest (pred prio)
@@ -271,29 +306,26 @@ let endorsing_reward ctxt ~block_priority num_slots =
 
 let baking_priorities c level =
   let rec f priority =
-    Roll.baking_rights_owner c level ~priority
-    >|=? fun delegate -> LCons (delegate, fun () -> f (succ priority))
+    Roll.baking_rights_owner c level ~priority >|=? fun delegate ->
+    LCons (delegate, fun () -> f (succ priority))
   in
   f 0
 
 let endorsement_rights ctxt level =
   fold_right_s
     (fun slot acc ->
-      Roll.endorsement_rights_owner ctxt level ~slot
-      >|=? fun pk ->
+      Roll.endorsement_rights_owner ctxt level ~slot >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
         match Signature.Public_key_hash.Map.find_opt pkh acc with
-        | None ->
-            (pk, [slot], false)
-        | Some (pk, slots, used) ->
-            (pk, slot :: slots, used)
+        | None -> (pk, [slot], false)
+        | Some (pk, slots, used) -> (pk, slot :: slots, used)
       in
       Signature.Public_key_hash.Map.add pkh right acc)
     (0 --> (Constants.endorsers_per_block ctxt - 1))
     Signature.Public_key_hash.Map.empty
 
-let check_endorsement_rights ctxt chain_id ~slot
+let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
   if
     Compare.Int.(slot < 0 (* should not happen because of binary format *))
@@ -306,21 +338,19 @@ let check_endorsement_rights ctxt chain_id ~slot
     >>=? fun pk ->
     let pkh = Signature.Public_key.hash pk in
     match Operation.check_signature pk chain_id op with
-    | Error _ ->
-        fail Unexpected_endorsement
+    | Error _ -> fail Unexpected_endorsement
     | Ok () -> (
-        ( if Raw_level.(succ level = current_level.level) then
-          return (Alpha_context.allowed_endorsements ctxt)
-        else endorsement_rights ctxt (Level.from_raw ctxt level) )
+        (if Raw_level.(succ level = current_level.level) then
+         return (Alpha_context.allowed_endorsements ctxt)
+        else endorsement_rights ctxt (Level.from_raw ctxt level))
         >>=? fun endorsements ->
         match Signature.Public_key_hash.Map.find_opt pkh endorsements with
-        | None ->
-            fail Unexpected_endorsement (* unexpected *)
+        | None -> fail Unexpected_endorsement (* unexpected *)
         | Some (_pk, slots, v) ->
             error_unless
               Compare.Int.(slot = List.hd slots)
               (Unexpected_endorsement_slot slot)
-            >>?= fun () -> return (pkh, slots, v) )
+            >>?= fun () -> return (pkh, slots, v))
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
@@ -340,8 +370,8 @@ let select_delegate delegate delegate_list max_priority =
   loop [] delegate_list 0
 
 let first_baking_priorities ctxt ?(max_priority = 32) delegate level =
-  baking_priorities ctxt level
-  >>=? fun delegate_list -> select_delegate delegate delegate_list max_priority
+  baking_priorities ctxt level >>=? fun delegate_list ->
+  select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
   let bytes = Block_hash.to_bytes hash in
@@ -389,44 +419,50 @@ let max_fitness_gap _ctxt = 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in
-  Fitness.to_int64 block.shell.fitness
-  >>? fun announced_fitness ->
+  Fitness.to_int64 block.shell.fitness >>? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else ok_unit
 
-let last_of_a_cycle ctxt (l : Level.t) =
-  Compare.Int32.(
-    Int32.succ l.Level.cycle_position = Constants.blocks_per_cycle ctxt)
+(* The minimal threshold on the endorsing power for the fast-path case
+   is 60% of the maximal endorsing power. *)
+let fastpath_endorsing_power_threshold maximal_endorsing_power =
+  3 * maximal_endorsing_power / 5
 
-let dawn_of_a_new_cycle ctxt =
-  let level = Level.current ctxt in
-  if last_of_a_cycle ctxt level then Some level.cycle else None
-
-let minimum_allowed_endorsements ctxt ~block_delay =
-  let minimum = Constants.initial_endorsers ctxt in
-  let delay_per_missing_endorsement =
-    Period.to_seconds (Constants.delay_per_missing_endorsement ctxt)
-  in
-  let reduced_time_constraint =
-    let delay = Period.to_seconds block_delay in
-    if Compare.Int64.(delay_per_missing_endorsement = 0L) then delay
-    else Int64.div delay delay_per_missing_endorsement
-  in
-  if Compare.Int64.(Int64.of_int minimum < reduced_time_constraint) then 0
-  else minimum - Int64.to_int reduced_time_constraint
-
-let minimal_valid_time ctxt ~priority ~endorsing_power =
-  let predecessor_timestamp = Timestamp.current ctxt in
-  minimal_time ctxt priority predecessor_timestamp
-  >>? fun minimal_time ->
-  let minimal_required_endorsements = Constants.initial_endorsers ctxt in
-  let delay_per_missing_endorsement =
-    Constants.delay_per_missing_endorsement ctxt
-  in
-  let missing_endorsements =
-    Compare.Int.max 0 (minimal_required_endorsements - endorsing_power)
-  in
-  Period.mult (Int32.of_int missing_endorsements) delay_per_missing_endorsement
-  >|? fun delay -> Time.add minimal_time (Period.to_seconds delay)
+(* This function computes the minimal time at which a block is
+   valid. It distinguishes between the "fast-path" case, when the
+   priority is 0 and the endorsing power is at least 60% of the
+   maximal endorsing power, and the "slow-path" case, when this
+   condition is not satisfied. *)
+let minimal_valid_time constants ~priority ~endorsing_power
+    ~predecessor_timestamp =
+  if
+    Compare.Int.(priority = 0)
+    && Compare.Int.(
+         endorsing_power
+         >= fastpath_endorsing_power_threshold
+              constants.Constants.endorsers_per_block)
+  then
+    minimal_time_fastpath_case
+      constants.minimal_block_delay
+      predecessor_timestamp
+  else
+    minimal_time_slowpath_case
+      constants.time_between_blocks
+      (Int32.of_int priority)
+      predecessor_timestamp
+    >>? fun minimal_time ->
+    let delay_per_missing_endorsement =
+      constants.Constants.delay_per_missing_endorsement
+    in
+    let missing_endorsements =
+      let minimal_required_endorsements =
+        constants.Constants.initial_endorsers
+      in
+      Compare.Int.max 0 (minimal_required_endorsements - endorsing_power)
+    in
+    Period.mult
+      (Int32.of_int missing_endorsements)
+      delay_per_missing_endorsement
+    >|? fun delay -> Time.add minimal_time (Period.to_seconds delay)

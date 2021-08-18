@@ -2,7 +2,7 @@ trap 'exit $?' ERR
 set -x
 
 apt-get update
-apt-get -y install make m4 gcc patch unzip bubblewrap
+apt-get -y install make m4 gcc patch unzip bubblewrap wget
 # apt-get install -y curl
 # sh <(curl -sL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)
 
@@ -16,7 +16,9 @@ opam init --bare -y
 export OPAMYES=true
 export OPAMSOLVERTIMEOUT=1200
 # [install ocaml compiler]
-opam switch create for_tezos 4.09.1
+wget -O latest-release:version.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/version.sh
+source latest-release:version.sh
+opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
 opam install depext

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_test_tez_repr
+    Invocation:   dune build @src/proto_010_PtGRANAD/lib_protocol/runtest_test_tez_repr
     Subject:      Operations in Tez_repr
 *)
 
@@ -55,8 +55,7 @@ let compare (c' : Z.t) (c : Tez.t tzresult) : bool =
   | (false, Ok _) ->
       QCheck.Test.fail_reportf
         "@[<h 0>Results are not in Z bounds, but tez operation did not fail.@]"
-  | (false, Error _) ->
-      true
+  | (false, Error _) -> true
 
 (* [prop_binop f f' (a, b)] compares the function [f] in Tez with a model
    function function [f'] in [Z].
@@ -70,8 +69,8 @@ let prop_binop (f : Tez.t -> Tez.t -> Tez.t tzresult) (f' : Z.t -> Z.t -> Z.t)
 
 (* [prop_binop64 f f' (a, b)] is as [prop_binop] but for binary operations
    where the second operand is of type [int64]. *)
-let prop_binop64 (f : Tez.t -> int64 -> Tez.t tzresult)
-    (f' : Z.t -> Z.t -> Z.t) ((a, b) : Tez.t * int64) : bool =
+let prop_binop64 (f : Tez.t -> int64 -> Tez.t tzresult) (f' : Z.t -> Z.t -> Z.t)
+    ((a, b) : Tez.t * int64) : bool =
   compare (f' (tez_to_z a) (Z.of_int64 b)) (f a b)
 
 (** Arbitrary int64 by conversion from int32 *)
@@ -83,9 +82,11 @@ let arb_int64_of32 : int64 QCheck.arbitrary =
 let arb_int64_sizes : int64 QCheck.arbitrary =
   let open QCheck in
   oneof
-    [ QCheck.map ~rev:Int64.to_int Int64.of_int (int_range (-10) 10);
+    [
+      QCheck.map ~rev:Int64.to_int Int64.of_int (int_range (-10) 10);
       arb_int64_of32;
-      int64 ]
+      int64;
+    ]
 
 (** Arbitrary positive int64, mixing small positive integers,
     int64s from int32 and arbitrary int64 with equal frequency *)
@@ -109,7 +110,8 @@ let () =
   let count = 100 in
   QCheck_base_runner.run_tests_main
     ~argv
-    [ (* Test.
+    [
+      (* Test.
        * Tez_repr: test that Tez.( *? ) is coherent w.r.t. Z.( * )
        *)
       QCheck.Test.make
@@ -146,4 +148,5 @@ let () =
         QCheck.(pair arb_tez_sizes arb_ui64_sizes)
         (fun (a, b) ->
           QCheck.assume (b > 0L) ;
-          prop_binop64 Tez.( /? ) Z.( / ) (a, b)) ]
+          prop_binop64 Tez.( /? ) Z.( / ) (a, b));
+    ]

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -46,6 +46,13 @@ val may_patch_protocol :
 val update_testchain_status :
   Context.t -> Block_header.t -> Time.Protocol.t -> Context.t Lwt.t
 
+(** [check_proto_environment_version_increasing hash before after]
+    returns successfully if the environment version stays the same or
+    increases from [before] to [after]. Otherwise, an
+    [Invalid_protocol_environment_transition] error is returned. *)
+val check_proto_environment_version_increasing :
+  Block_hash.t -> Protocol.env_version -> Protocol.env_version -> unit tzresult
+
 (** [init_test_chain] must only be called on a forking block. *)
 val init_test_chain :
   Context.t -> Block_header.t -> Block_header.t tzresult Lwt.t
@@ -56,13 +63,12 @@ type result = {
   ops_metadata : Bytes.t list list;
   block_metadata_hash : Block_metadata_hash.t option;
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
-  forking_testchain : bool;
 }
 
 val result_encoding : result Data_encoding.t
 
 (** [check_liveness live_blocks live_operations hash ops] checks
-    there is no duplicate operation and that is not outdate *)
+    there is no duplicate operation and that is not out-of-date *)
 val check_liveness :
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->

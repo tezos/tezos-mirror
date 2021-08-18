@@ -352,10 +352,7 @@ module type S_ES = sig
       This can be used to, e.g., count the number of resolved/unresolved
       promises. *)
   val fold_promises :
-    (key -> ('a, 'trace) result Lwt.t -> 'b -> 'b) ->
-    ('a, 'trace) t ->
-    'b ->
-    'b
+    (key -> ('a, 'trace) result Lwt.t -> 'b -> 'b) -> ('a, 'trace) t -> 'b -> 'b
 
   (** [fold_resolved f tbl init] folds over the already resolved promises of
       [tbl]. More specifically, it folds over the [v] for all the promises

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (rolls)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^rolls$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^rolls$"
     Subject:    On rolls and baking rights.
                 A delegate has baking rights provided that it has at least
                 more than [token_per_rolls] tz of staking balance. This
@@ -52,10 +52,8 @@ let wrap e = Lwt.return (Environment.wrap_tzresult e)
     verified against the value in the context, i.e. we are testing
     Storage.Roll.Delegate_roll_list. We do not use RPCs here. *)
 let check_rolls (b : Block.t) (account : Account.t) =
-  Context.get_constants (B b)
-  >>=? fun constants ->
-  Context.Delegate.info (B b) account.pkh
-  >>=? fun {staking_balance; _} ->
+  Context.get_constants (B b) >>=? fun constants ->
+  Context.Delegate.info (B b) account.pkh >>=? fun {staking_balance; _} ->
   let token_per_roll = constants.parametric.tokens_per_roll in
   let expected_rolls =
     Int64.div (Tez.to_mutez staking_balance) (Tez.to_mutez token_per_roll)
@@ -68,9 +66,7 @@ let check_rolls (b : Block.t) (account : Account.t) =
     ~fitness:b.header.shell.fitness
   >>= wrap
   >>=? fun ctxt ->
-  Roll_storage.count_rolls ctxt account.pkh
-  >>= wrap
-  >>=? fun rolls ->
+  Roll_storage.count_rolls ctxt account.pkh >>= wrap >>=? fun rolls ->
   Assert.equal_int ~loc:__LOC__ rolls (Int64.to_int expected_rolls)
 
 let check_no_rolls (b : Block.t) (account : Account.t) =
@@ -82,47 +78,36 @@ let check_no_rolls (b : Block.t) (account : Account.t) =
     ~fitness:b.header.shell.fitness
   >>= wrap
   >>=? fun ctxt ->
-  Roll_storage.count_rolls ctxt account.pkh
-  >>= wrap
-  >>=? fun rolls -> Assert.equal_int ~loc:__LOC__ rolls 0
+  Roll_storage.count_rolls ctxt account.pkh >>= wrap >>=? fun rolls ->
+  Assert.equal_int ~loc:__LOC__ rolls 0
 
 (** Create a block with two initialized contracts/accounts. Assert
     that the first account has a staking balance that is equal to its
     own balance, and that its staking rights are consistent
     (check_rolls). *)
 let test_simple_staking_rights () =
-  Context.init 2
-  >>=? fun (b, accounts) ->
+  Context.init 2 >>=? fun (b, accounts) ->
   let (a1, _a2) = account_pair accounts in
-  Context.Contract.balance (B b) a1
-  >>=? fun balance ->
-  Context.Contract.manager (B b) a1
-  >>=? fun m1 ->
-  Context.Delegate.info (B b) m1.pkh
-  >>=? fun info ->
-  Assert.equal_tez ~loc:__LOC__ balance info.staking_balance
-  >>=? fun () -> check_rolls b m1
+  Context.Contract.balance (B b) a1 >>=? fun balance ->
+  Context.Contract.manager (B b) a1 >>=? fun m1 ->
+  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
+  Assert.equal_tez ~loc:__LOC__ balance info.staking_balance >>=? fun () ->
+  check_rolls b m1
 
 (** Create a block with two initialized contracts/accounts. Bake
     five blocks. Assert that the staking balance of the first account
     equals to its balance. Then both accounts have consistent staking
     rights. *)
 let test_simple_staking_rights_after_baking () =
-  Context.init 2
-  >>=? fun (b, accounts) ->
+  Context.init 2 >>=? fun (b, accounts) ->
   let (a1, a2) = account_pair accounts in
-  Context.Contract.balance (B b) a1
-  >>=? fun balance ->
-  Context.Contract.manager (B b) a1
-  >>=? fun m1 ->
-  Context.Contract.manager (B b) a2
-  >>=? fun m2 ->
-  Block.bake_n ~policy:(By_account m2.pkh) 5 b
-  >>=? fun b ->
-  Context.Delegate.info (B b) m1.pkh
-  >>=? fun info ->
-  Assert.equal_tez ~loc:__LOC__ balance info.staking_balance
-  >>=? fun () -> check_rolls b m1 >>=? fun () -> check_rolls b m2
+  Context.Contract.balance (B b) a1 >>=? fun balance ->
+  Context.Contract.manager (B b) a1 >>=? fun m1 ->
+  Context.Contract.manager (B b) a2 >>=? fun m2 ->
+  Block.bake_n ~policy:(By_account m2.pkh) 5 b >>=? fun b ->
+  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
+  Assert.equal_tez ~loc:__LOC__ balance info.staking_balance >>=? fun () ->
+  check_rolls b m1 >>=? fun () -> check_rolls b m2
 
 let frozen_deposit (info : Context.Delegate.info) =
   Cycle.Map.fold
@@ -131,35 +116,26 @@ let frozen_deposit (info : Context.Delegate.info) =
     Tez.zero
 
 let check_activate_staking_balance ~loc ~deactivated b (a, (m : Account.t)) =
-  Context.Delegate.info (B b) m.pkh
-  >>=? fun info ->
-  Assert.equal_bool ~loc info.deactivated deactivated
-  >>=? fun () ->
-  Context.Contract.balance (B b) a
-  >>=? fun balance ->
+  Context.Delegate.info (B b) m.pkh >>=? fun info ->
+  Assert.equal_bool ~loc info.deactivated deactivated >>=? fun () ->
+  Context.Contract.balance (B b) a >>=? fun balance ->
   let deposit = frozen_deposit info in
   Assert.equal_tez ~loc Test_tez.Tez.(balance + deposit) info.staking_balance
 
 let run_until_deactivation () =
-  Context.init 2
-  >>=? fun (b, accounts) ->
+  Context.init 2 >>=? fun (b, accounts) ->
   let (a1, a2) = account_pair accounts in
-  Context.Contract.balance (B b) a1
-  >>=? fun balance_start ->
-  Context.Contract.manager (B b) a1
-  >>=? fun m1 ->
-  Context.Contract.manager (B b) a2
-  >>=? fun m2 ->
+  Context.Contract.balance (B b) a1 >>=? fun balance_start ->
+  Context.Contract.manager (B b) a1 >>=? fun m1 ->
+  Context.Contract.manager (B b) a2 >>=? fun m2 ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b (a1, m1)
   >>=? fun () ->
-  Context.Delegate.info (B b) m1.pkh
-  >>=? fun info ->
+  Context.Delegate.info (B b) m1.pkh >>=? fun info ->
   Block.bake_until_cycle ~policy:(By_account m2.pkh) info.grace_period b
   >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b (a1, m1)
   >>=? fun () ->
-  Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b
-  >>=? fun b ->
+  Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:true b (a1, m1)
   >|=? fun () -> (b, ((a1, m1), balance_start), (a2, m2))
 
@@ -172,8 +148,7 @@ let test_deactivation_then_bake () =
              ( ((_deactivated_contract, deactivated_account) as deactivated),
                _start_balance ),
              (_a2, _m2) ) ->
-  Block.bake ~policy:(By_account deactivated_account.pkh) b
-  >>=? fun b ->
+  Block.bake ~policy:(By_account deactivated_account.pkh) b >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated
   >>=? fun () -> check_rolls b deactivated_account
 
@@ -192,10 +167,9 @@ let test_deactivation_then_self_delegation () =
   >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated
   >>=? fun () ->
-  Context.Contract.balance (B b) deactivated_contract
-  >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ start_balance balance
-  >>=? fun () -> check_rolls b deactivated_account
+  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ start_balance balance >>=? fun () ->
+  check_rolls b deactivated_account
 
 (** A deactivated account, which is emptied (into a newly created sink
     account), then self-delegated, becomes activated. Its balance is
@@ -207,8 +181,7 @@ let test_deactivation_then_empty_then_self_delegation () =
                _start_balance ),
              (_a2, m2) ) ->
   (* empty the contract *)
-  Context.Contract.balance (B b) deactivated_contract
-  >>=? fun balance ->
+  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
   Context.get_constants (B b)
@@ -217,10 +190,8 @@ let test_deactivation_then_empty_then_self_delegation () =
   >>?= fun origination_burn ->
   let amount =
     match Tez.(balance -? origination_burn) with
-    | Ok r ->
-        r
-    | Error _ ->
-        assert false
+    | Ok r -> r
+    | Error _ -> assert false
   in
   Op.transaction (B b) deactivated_contract sink_contract amount
   >>=? fun empty_contract ->
@@ -233,10 +204,9 @@ let test_deactivation_then_empty_then_self_delegation () =
   >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated
   >>=? fun () ->
-  Context.Contract.balance (B b) deactivated_contract
-  >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ Tez.zero balance
-  >>=? fun () -> check_rolls b deactivated_account
+  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ Tez.zero balance >>=? fun () ->
+  check_rolls b deactivated_account
 
 (** A deactivated account, which is emptied, then self-delegated, then
     re-credited of the sunk amount, becomes active again. Staking
@@ -256,10 +226,8 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   >>?= fun origination_burn ->
   let amount =
     match Tez.(balance -? origination_burn) with
-    | Ok r ->
-        r
-    | Error _ ->
-        assert false
+    | Ok r -> r
+    | Error _ -> assert false
   in
   Op.transaction (B b) deactivated_contract sink_contract amount
   >>=? fun empty_contract ->
@@ -277,10 +245,9 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated
   >>=? fun () ->
-  Context.Contract.balance (B b) deactivated_contract
-  >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ amount balance
-  >>=? fun () -> check_rolls b deactivated_account
+  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ amount balance >>=? fun () ->
+  check_rolls b deactivated_account
 
 (** Initialize a block with two contracts/accounts. A third new
     account is also created. The first account is self-delegated. First
@@ -289,48 +256,35 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
     self-delegated and is supposed to be activated. Again, consistency
     for baking rights are preserved for the first and third accounts. *)
 let test_delegation () =
-  Context.init 2
-  >>=? fun (b, accounts) ->
+  Context.init 2 >>=? fun (b, accounts) ->
   let (a1, a2) = account_pair accounts in
   let m3 = Account.new_account () in
   Account.add_account m3 ;
-  Context.Contract.manager (B b) a1
-  >>=? fun m1 ->
-  Context.Contract.manager (B b) a2
-  >>=? fun m2 ->
+  Context.Contract.manager (B b) a1 >>=? fun m1 ->
+  Context.Contract.manager (B b) a2 >>=? fun m2 ->
   let a3 = Contract.implicit_contract m3.pkh in
-  Context.Contract.delegate_opt (B b) a1
-  >>=? fun delegate ->
-  ( match delegate with
-  | None ->
-      assert false
-  | Some pkh ->
-      assert (Signature.Public_key_hash.equal pkh m1.pkh) ) ;
-  Op.transaction (B b) a1 a3 Tez.fifty_cents
-  >>=? fun transact ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:transact
-  >>=? fun b ->
-  Context.Contract.delegate_opt (B b) a3
-  >>=? fun delegate ->
+  Context.Contract.delegate_opt (B b) a1 >>=? fun delegate ->
+  (match delegate with
+  | None -> assert false
+  | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
+  Op.transaction (B b) a1 a3 Tez.fifty_cents >>=? fun transact ->
+  Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
+  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with None -> () | Some _ -> assert false) ;
-  check_no_rolls b m3
-  >>=? fun () ->
-  Op.delegation (B b) a3 (Some m3.pkh)
-  >>=? fun delegation ->
-  Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation
-  >>=? fun b ->
-  Context.Contract.delegate_opt (B b) a3
-  >>=? fun delegate ->
-  ( match delegate with
-  | None ->
-      assert false
-  | Some pkh ->
-      assert (Signature.Public_key_hash.equal pkh m3.pkh) ) ;
+  check_no_rolls b m3 >>=? fun () ->
+  Op.delegation (B b) a3 (Some m3.pkh) >>=? fun delegation ->
+  Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation >>=? fun b ->
+  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
+  (match delegate with
+  | None -> assert false
+  | Some pkh -> assert (Signature.Public_key_hash.equal pkh m3.pkh)) ;
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b (a3, m3)
-  >>=? fun () -> check_rolls b m3 >>=? fun () -> check_rolls b m1
+  >>=? fun () ->
+  check_rolls b m3 >>=? fun () -> check_rolls b m1
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "simple staking rights"
       `Quick
       test_simple_staking_rights;
@@ -354,4 +308,5 @@ let tests =
       "deactivation then empty then self delegation then recredit"
       `Quick
       test_deactivation_then_empty_then_self_delegation_then_recredit;
-    Test_services.tztest "delegation" `Quick test_delegation ]
+    Test_services.tztest "delegation" `Quick test_delegation;
+  ]

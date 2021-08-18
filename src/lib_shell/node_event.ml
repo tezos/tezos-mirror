@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,18 +79,9 @@ let storage_corrupted_context_detected =
   declare_0
     ~section
     ~name:"corrupted_context_detected"
-    ~msg:
-      "context corruption detected: restoring integrity, this may take a while"
+    ~msg:"context corruption detected"
     ~level:Error
     ()
-
-let storage_restored_context_integrity =
-  declare_1
-    ~section
-    ~name:"restored_context_integrity"
-    ~msg:"successfully restored context integrity - repaired {entries} entries"
-    ~level:Notice
-    ("entries", Data_encoding.int31)
 
 let storage_context_already_consistent =
   declare_0
@@ -99,15 +90,6 @@ let storage_context_already_consistent =
     ~msg:"no corruption detected while scanning the context."
     ~level:Info
     ()
-
-let storage_restore_context_integrity_error =
-  declare_1
-    ~section
-    ~name:"restore_context_integrity_error"
-    ~msg:"error while scanning the context: {trace}"
-    ~level:Error
-    ~pp1:pp_print_error_first
-    ("trace", trace_encoding)
 
 let section = section_root @ ["shutdown"]
 
@@ -135,5 +117,5 @@ let shutdown_validator =
     ~level:Info
     ()
 
-let shutdown_state =
-  declare_0 ~section ~name:"shutdown_state" ~msg:"closing state" ~level:Info ()
+let shutdown_store =
+  declare_0 ~section ~name:"shutdown_store" ~msg:"closing store" ~level:Info ()

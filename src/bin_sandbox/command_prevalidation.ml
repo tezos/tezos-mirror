@@ -6,8 +6,7 @@ let run state node_exec client_exec () =
   Test_scenario.network_with_protocol ~size:2 state ~node_exec ~client_exec
   >>= fun (nodes, _protocol) ->
   match nodes with
-  | [] | [_] | _ :: _ :: _ :: _ ->
-      assert false
+  | [] | [_] | _ :: _ :: _ :: _ -> assert false
   | [n1; n2] ->
       let c1 = Tezos_client.of_node ~exec:client_exec n1 in
       let c2 = Tezos_client.of_node ~exec:client_exec n2 in
@@ -21,8 +20,8 @@ let run state node_exec client_exec () =
       Stdlib.ignore c1 ;
       Stdlib.ignore c2 ;
       let commands = Interactive_test.Commands.all_defaults state ~nodes in
-      Prompt.command state ~commands
-      >>= fun () -> Running_processes.wait_all state
+      Prompt.command state ~commands >>= fun () ->
+      Running_processes.wait_all state
 
 let cmd () =
   let open Cmdliner in

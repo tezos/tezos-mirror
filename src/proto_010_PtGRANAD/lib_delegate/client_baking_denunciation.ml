@@ -72,28 +72,34 @@ let get_block_offset level =
 let process_endorsements (cctxt : #Protocol_client_context.full) state
     (endorsements : Alpha_block_services.operation list) level =
   List.iter_es
-    (fun {Alpha_block_services.shell; chain_id; receipt; hash; protocol_data; _}
-         ->
+    (fun {Alpha_block_services.shell; chain_id; receipt; hash; protocol_data; _} ->
       let chain = `Hash chain_id in
       match (protocol_data, receipt) with
       | ( Operation_data
-            { contents =
+            {
+              contents =
                 Single
                   (Endorsement_with_slot
-                    { endorsement =
-                        { protocol_data =
+                    {
+                      endorsement =
+                        {
+                          protocol_data =
                             {contents = Single (Endorsement _); _} as
                             protocol_data;
-                          _ };
-                      _ });
-              _ },
+                          _;
+                        };
+                      _;
+                    });
+              _;
+            },
           Some
             Apply_results.(
               Operation_metadata
-                { contents =
+                {
+                  contents =
                     Single_result
                       (Endorsement_with_slot_result
-                        (Endorsement_result {delegate; slots = slot :: _; _}))
+                        (Endorsement_result {delegate; slots = slot :: _; _}));
                 }) ) -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
@@ -115,8 +121,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
             when Block_hash.(
                    existing_endorsement.shell.branch
                    <> new_endorsement.shell.branch) ->
-              get_block_offset level
-              >>= fun block ->
+              get_block_offset level >>= fun block ->
               Alpha_block_services.hash cctxt ~chain ~block ()
               >>=? fun block_hash ->
               Plugin.RPC.Forge.double_endorsement_evidence
@@ -146,7 +151,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
           | Some _ ->
               (* This endorsement is already present in another
                    block but endorse the same predecessor *)
-              return_unit )
+              return_unit)
       | _ ->
           Events.(emit inconsistent_endorsement) hash >>= fun () -> return_unit)
     endorsements
@@ -157,17 +162,17 @@ let process_block (cctxt : #Protocol_client_context.full) state
   match header with
   | {hash; metadata = None; _} ->
       Events.(emit unexpected_pruned_block) hash >>= fun () -> return_unit
-  | { Alpha_block_services.chain_id;
-      hash;
-      metadata = Some {protocol_data = {baker; level_info = {level; _}; _}; _};
-      _ } -> (
+  | {
+   Alpha_block_services.chain_id;
+   hash;
+   metadata = Some {protocol_data = {baker; level_info = {level; _}; _}; _};
+   _;
+  } -> (
       let chain = `Hash chain_id in
       let map =
         match HLevel.find state.blocks_table (chain_id, level) with
-        | None ->
-            Delegate_Map.empty
-        | Some x ->
-            x
+        | None -> Delegate_Map.empty
+        | Some x -> x
       in
       match Delegate_Map.find baker map with
       | None ->
@@ -178,8 +183,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
                (Delegate_Map.add baker hash map)
       | Some existing_hash when Block_hash.( = ) existing_hash hash ->
           (* This case should never happen *)
-          Events.(emit double_baking_but_not) ()
-          >>= fun () ->
+          Events.(emit double_baking_but_not) () >>= fun () ->
           return
           @@ HLevel.replace
                state.blocks_table
@@ -187,7 +191,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
                (Delegate_Map.add baker hash map)
       | Some existing_hash ->
           (* If a previous endorsement made by this pkh is found for
-           the same level we inject a double_endorsement *)
+             the same level we inject a double_endorsement *)
           Alpha_block_services.header
             cctxt
             ~chain
@@ -201,8 +205,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
                      Alpha_block_services.block_header) ->
           let bh2 = {Alpha_context.Block_header.shell; protocol_data} in
           (* If the blocks are on different chains then skip it *)
-          get_block_offset level
-          >>= fun block ->
+          get_block_offset level >>= fun block ->
           Alpha_block_services.hash cctxt ~chain ~block ()
           >>=? fun block_hash ->
           Plugin.RPC.Forge.double_baking_evidence
@@ -214,18 +217,16 @@ let process_block (cctxt : #Protocol_client_context.full) state
             ()
           >>=? fun bytes ->
           let bytes = Signature.concat bytes Signature.zero in
-          Events.(emit double_baking_detected) ()
-          >>= fun () ->
+          Events.(emit double_baking_detected) () >>= fun () ->
           (* A denunciation may have already occurred *)
           Shell_services.Injection.operation cctxt ~chain bytes
           >>=? fun op_hash ->
-          Events.(emit double_baking_denounced) (op_hash, bytes)
-          >>= fun () ->
+          Events.(emit double_baking_denounced) (op_hash, bytes) >>= fun () ->
           return
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level)
-               (Delegate_Map.add baker hash map) )
+               (Delegate_Map.add baker hash map))
 
 (* Remove levels that are lower than the [highest_level_encountered] minus [preserved_levels] *)
 let cleanup_old_operations state =
@@ -236,8 +237,9 @@ let cleanup_old_operations state =
   let threshold =
     if diff < 0 then Raw_level.root
     else
-      Raw_level.of_int32 (Int32.of_int diff)
-      |> function Ok threshold -> threshold | Error _ -> Raw_level.root
+      Raw_level.of_int32 (Int32.of_int diff) |> function
+      | Ok threshold -> threshold
+      | Error _ -> Raw_level.root
   in
   let filter hmap =
     HLevel.filter_map_inplace
@@ -260,33 +262,29 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
   if Protocol_hash.(protocol <> next_protocol) then
     Events.(emit protocol_change_detected) () >>= fun () -> return_unit
   else
-    Events.(emit accuser_saw_block) (level, hash)
-    >>= fun () ->
+    Events.(emit accuser_saw_block) (level, hash) >>= fun () ->
     let chain = `Hash chain_id in
     let block = `Hash (hash, 0) in
     state.highest_level_encountered <-
       Raw_level.max level state.highest_level_encountered ;
     (* Processing blocks *)
-    Alpha_block_services.info cctxt ~chain ~block ()
-    >>= (function
-          | Ok block_info ->
-              process_block cctxt state block_info
-          | Error errs ->
-              Events.(emit fetch_operations_error) (hash, errs)
-              >>= fun () -> return_unit)
+    (Alpha_block_services.info cctxt ~chain ~block () >>= function
+     | Ok block_info -> process_block cctxt state block_info
+     | Error errs ->
+         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
+         return_unit)
     >>=? fun () ->
     (* Processing endorsements *)
-    Alpha_block_services.Operations.operations cctxt ~chain ~block ()
-    >>= (function
-          | Ok operations -> (
-            match List.nth operations endorsements_index with
-            | Some endorsements ->
-                process_endorsements cctxt state endorsements level
-            | None ->
-                return_unit )
-          | Error errs ->
-              Events.(emit fetch_operations_error) (hash, errs)
-              >>= fun () -> return_unit)
+    (Alpha_block_services.Operations.operations cctxt ~chain ~block ()
+     >>= function
+     | Ok operations -> (
+         match List.nth operations endorsements_index with
+         | Some endorsements ->
+             process_endorsements cctxt state endorsements level
+         | None -> return_unit)
+     | Error errs ->
+         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
+         return_unit)
     >>=? fun () ->
     cleanup_old_operations state ;
     return_unit
@@ -294,12 +292,9 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
 let create (cctxt : #Protocol_client_context.full) ~preserved_levels
     valid_blocks_stream =
   let process_block cctxt state bi =
-    process_new_block cctxt state bi
-    >>= function
-    | Ok () ->
-        Events.(emit accuser_processed_block) bi.hash >>= return
-    | Error errs ->
-        Events.(emit accuser_block_error) (bi.hash, errs) >>= return
+    process_new_block cctxt state bi >>= function
+    | Ok () -> Events.(emit accuser_processed_block) bi.hash >>= return
+    | Error errs -> Events.(emit accuser_block_error) (bi.hash, errs) >>= return
   in
   let state_maker _ = create_state ~preserved_levels >>= return in
   Client_baking_scheduling.main

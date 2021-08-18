@@ -39,10 +39,8 @@ let conp trace _trace = trace
 let conp_list tr _trs = tr
 
 let pp_print pp_error ppf = function
-  | [] ->
-      assert false
-  | [error] ->
-      Format.fprintf ppf "@[<v 2>Error:@ %a@]@." pp_error error
+  | [] -> assert false
+  | [error] -> Format.fprintf ppf "@[<v 2>Error:@ %a@]@." pp_error error
   | error :: _ as errors ->
       Format.fprintf
         ppf
@@ -53,10 +51,8 @@ let pp_print pp_error ppf = function
         (List.rev errors)
 
 let pp_print_top pp_error fmt = function
-  | [] ->
-      assert false
-  | error :: _ ->
-      pp_error fmt error
+  | [] -> assert false
+  | error :: _ -> pp_error fmt error
 
 let encoding error_encoding = Data_encoding.list error_encoding
 

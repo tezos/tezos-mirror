@@ -184,11 +184,6 @@ module Endorsing_power : sig
     int shell_tzresult Lwt.t
 end
 
-module Required_endorsements : sig
-  val get :
-    'a #RPC_context.simple -> 'a -> Period.t -> int shell_tzresult Lwt.t
-end
-
 module Minimal_valid_time : sig
   val get :
     'a #RPC_context.simple -> 'a -> int -> int -> Time.t shell_tzresult Lwt.t
@@ -208,8 +203,7 @@ val endorsing_power :
   Alpha_context.packed_operation * Chain_id.t ->
   int tzresult Lwt.t
 
-val required_endorsements : Alpha_context.t -> Alpha_context.Period.t -> int
-
-val minimal_valid_time : Alpha_context.t -> int -> int -> Time.t tzresult
+val minimal_valid_time :
+  Alpha_context.t -> int -> int -> Time.t -> Time.t tzresult
 
 val register : unit -> unit

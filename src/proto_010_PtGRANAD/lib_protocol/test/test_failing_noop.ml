@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe\
+    Invocation:   dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe\
                   -- test "^failing_noop$"
     Subject:      The Failing_noop operation was added bearing in mind the
                   possibility for the end user to sign arbitrary bytes,
@@ -40,8 +40,7 @@ open Protocol
 open Alpha_context
 
 let register_one_contract () =
-  Context.init 1
-  >>=? fun (b, contracts) ->
+  Context.init 1 >>=? fun (b, contracts) ->
   let contract =
     List.nth contracts 0 |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -49,25 +48,20 @@ let register_one_contract () =
 
 (** try to apply a failing_noop and assert that the operation fails *)
 let failing_noop_must_fail_when_injected () =
-  register_one_contract ()
-  >>=? fun (blk, contract) ->
-  Contract.is_implicit contract
-  |> function
-  | None ->
-      Alcotest.fail "only implicit accounts can sign"
+  register_one_contract () >>=? fun (blk, contract) ->
+  Contract.is_implicit contract |> function
+  | None -> Alcotest.fail "only implicit accounts can sign"
   | Some source ->
-      Op.failing_noop (B blk) source "tezos"
-      >>=? fun operation ->
-      Block.bake ~operation blk
-      >>= fun res ->
+      Op.failing_noop (B blk) source "tezos" >>=? fun operation ->
+      Block.bake ~operation blk >>= fun res ->
       Assert.proto_error ~loc:__LOC__ res (function
-          | Apply.Failing_noop_error ->
-              true
-          | _ ->
-              false)
+          | Apply.Failing_noop_error -> true
+          | _ -> false)
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "injection fails"
       `Quick
-      failing_noop_must_fail_when_injected ]
+      failing_noop_must_fail_when_injected;
+  ]

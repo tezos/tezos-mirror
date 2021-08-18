@@ -8,48 +8,13 @@ import pytest
 from client.client import Client
 from tools import utils
 from tools.constants import IDENTITIES
+from tools.utils import originate
 from .contract_paths import (
     CONTRACT_PATH,
     ILLTYPED_CONTRACT_PATH,
     all_contracts,
     all_legacy_contracts,
 )
-
-BAKE_ARGS = ['--minimal-timestamp']
-
-
-def file_basename(path):
-    return os.path.splitext(os.path.basename(path))[0]
-
-
-# Generic piece of code to originate a contract
-def originate(
-    client,
-    session,
-    contract,
-    init_storage,
-    amount,
-    contract_name=None,
-    sender='bootstrap1',
-    baker='bootstrap5',
-    arguments=None,
-):
-    if contract_name is None:
-        contract_name = file_basename(contract)
-
-    args = ['--init', init_storage, '--burn-cap', '10.0']
-    if arguments is not None:
-        args += arguments
-    origination = client.originate(
-        contract_name, amount, sender, contract, args
-    )
-    session['contract'] = origination.contract
-    print(origination.contract)
-    client.bake(baker, BAKE_ARGS)
-    assert utils.check_block_contains_operations(
-        client, [origination.operation_hash]
-    )
-    return origination
 
 
 @pytest.mark.contract
@@ -121,19 +86,19 @@ class TestManager:
 
     def test_manager_set_delegate(self, client: Client):
         client.set_delegate('manager', 'bootstrap2', [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         bootstrap2_pkh = IDENTITIES['bootstrap2']['identity']
         client.set_delegate('delegatable_target', bootstrap2_pkh, [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         delegate = IDENTITIES['bootstrap2']['identity']
         assert client.get_delegate('manager', []).delegate == delegate
         assert (
             client.get_delegate('delegatable_target', []).delegate == delegate
         )
         client.set_delegate('manager', 'bootstrap3', [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         client.set_delegate('delegatable_target', 'bootstrap3', [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         delegate = IDENTITIES['bootstrap3']['identity']
         assert client.get_delegate('manager', []).delegate == delegate
         assert (
@@ -142,9 +107,9 @@ class TestManager:
 
     def test_manager_withdraw_delegate(self, client: Client):
         client.withdraw_delegate('manager', [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         client.withdraw_delegate('delegatable_target', [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         assert client.get_delegate('manager', []).delegate is None
         assert client.get_delegate('delegatable_target', []).delegate is None
 
@@ -159,7 +124,7 @@ class TestManager:
             'manager',
             ['--gas-limit', f'{128 * 15450 + 108}'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.000548
@@ -181,7 +146,7 @@ class TestManager:
             'bootstrap2',
             ['--gas-limit', f'{128 * 26350 + 12}'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.000794
@@ -204,7 +169,7 @@ class TestManager:
             'manager2',
             ['--gas-limit', f'{128 * 44950 + 112}'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
@@ -218,13 +183,13 @@ class TestManager:
         client.transfer(
             10, 'manager', 'bootstrap2', ['--entrypoint', 'default']
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         client.transfer(10, 'manager', 'manager', ['--entrypoint', 'default'])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_from_manager_to_target(self, client: Client):
         client.transfer(10, 'manager', 'target', ['--burn-cap', '0.356'])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_from_manager_to_entrypoint_with_args(
         self, client: Client
@@ -237,14 +202,14 @@ class TestManager:
             'target',
             ['--entrypoint', 'add_left', '--arg', arg, '--burn-cap', '0.067'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         client.transfer(
             0,
             'manager',
             'target',
             ['--entrypoint', 'mem_left', '--arg', '"hello"'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         # using 'call'
         client.call(
@@ -252,33 +217,33 @@ class TestManager:
             'target',
             ['--entrypoint', 'add_left', '--arg', arg, '--burn-cap', '0.067'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         client.call(
             'manager',
             'target',
             ['--entrypoint', 'mem_left', '--arg', '"hello"'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_from_manager_no_entrypoint_with_args(
         self, client: Client
     ):
         arg = 'Left Unit'
         client.transfer(0, 'manager', 'target_no_entrypoints', ['--arg', arg])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         client.call('manager', 'target_no_entrypoints', ['--arg', arg])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_from_manager_to_no_default_with_args(
         self, client: Client
     ):
         arg = 'Left Unit'
         client.transfer(0, 'manager', 'target_no_default', ['--arg', arg])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         client.call('manager', 'target_no_default', ['--arg', arg])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_from_manager_to_rooted_target_with_args(
         self, client: Client
@@ -290,12 +255,12 @@ class TestManager:
             'rooted_target',
             ['--arg', arg, '--entrypoint', 'root'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         client.call(
             'manager', 'rooted_target', ['--arg', arg, '--entrypoint', 'root']
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_transfer_json_to_entrypoint_with_args(self, client):
         balance = client.get_mutez_balance('manager')
@@ -315,7 +280,7 @@ class TestManager:
         ]
         json_ops = json.dumps(json_obj, separators=(',', ':'))
         client.run(client.cmd_batch('manager', json_ops))
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         assert balance == new_balance
@@ -335,7 +300,7 @@ class TestManager:
         ]
         json_ops = json.dumps(json_obj, separators=(',', ':'))
         client.run(client.cmd_batch('manager', json_ops))
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
@@ -379,7 +344,7 @@ class TestExecutionOrdering:
             client, session, self.STORER, '""', 0, arguments=['--force']
         )
         session['storer'] = origination.contract
-        client.bake('bootstrap3', BAKE_ARGS)
+        utils.bake(client, 'bootstrap3')
         return origination.contract
 
     def originate_appender(
@@ -395,7 +360,7 @@ class TestExecutionOrdering:
             arguments=['--force'],
         )
         session[f'appender.{argument}'] = origination.contract
-        client.bake('bootstrap3', BAKE_ARGS)
+        utils.bake(client, 'bootstrap3')
         return origination.contract
 
     def originate_caller(
@@ -410,7 +375,7 @@ class TestExecutionOrdering:
             0,
             contract_name=f'caller-{hash(storage)}',
         )
-        client.bake('bootstrap3', BAKE_ARGS)
+        utils.bake(client, 'bootstrap3')
         return origination.contract
 
     @pytest.mark.parametrize(
@@ -452,7 +417,7 @@ class TestExecutionOrdering:
             root,
             ["--burn-cap", "5"],
         )
-        client.bake('bootstrap3', ["--minimal-timestamp"])
+        utils.bake(client, 'bootstrap3')
         assert client.get_storage(storer) == '"{}"'.format(expected)
 
 
@@ -775,7 +740,7 @@ class TestChainId:
         path = os.path.join(CONTRACT_PATH, 'opcodes', 'chain_id.tz')
         originate(client, session, path, 'Unit', 0)
         client.call('bootstrap2', "chain_id", [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_chain_id_authentication_origination(self, client: Client, session):
         path = os.path.join(
@@ -783,7 +748,7 @@ class TestChainId:
         )
         pubkey = IDENTITIES['bootstrap1']['public']
         originate(client, session, path, f'Pair 0 "{pubkey}"', 1000)
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_chain_id_authentication_first_run(
         self, client: Client, session: dict
@@ -809,7 +774,7 @@ class TestChainId:
             'authentication',
             ['--arg', f'Pair {operation} \"{signature}\"'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
 
 @pytest.mark.contract
@@ -817,14 +782,14 @@ class TestBigMapToSelf:
     def test_big_map_to_self_origination(self, client: Client, session: dict):
         path = os.path.join(CONTRACT_PATH, 'opcodes', 'big_map_to_self.tz')
         originate(client, session, path, '{}', 0)
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     def test_big_map_to_self_transfer(self, client: Client):
         client.call('bootstrap2', "big_map_to_self", [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         client.transfer(0, 'bootstrap2', "big_map_to_self", [])
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
 
 @pytest.mark.contract
@@ -869,7 +834,7 @@ class TestMiniScenarios:
             "create_contract",
             ['-arg', 'None', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         pattern = r"New contract (\w*) originated"
         match = re.search(pattern, transfer_result.client_output)
         assert match is not None
@@ -901,7 +866,7 @@ class TestMiniScenarios:
             origination_res.contract,
             ['-arg', 'Unit', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         pattern = r"New contract (\w*) originated"
         match = re.search(pattern, transfer_result.client_output)
@@ -932,7 +897,7 @@ class TestMiniScenarios:
             "default_account",
             ['-arg', f'"{tz1}"', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         account = 'tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5'
         client.transfer(
             0,
@@ -940,7 +905,7 @@ class TestMiniScenarios:
             "default_account",
             ['-arg', f'"{account}"', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         assert client.get_balance(account) == 100
 
     # Test bytes, SHA252, CHECK_SIGNATURE
@@ -1014,7 +979,7 @@ class TestMiniScenarios:
             "reveal_signed_preimage",
             ['-arg', arg, '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     # Test vote_for_delegate
     def test_vote_for_delegate_originate(self, client: Client, session: dict):
@@ -1055,7 +1020,7 @@ class TestMiniScenarios:
             "vote_for_delegate",
             ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
 
@@ -1070,7 +1035,7 @@ class TestMiniScenarios:
             "vote_for_delegate",
             ['-arg', f'(Some "{b_2}")', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_2, storage)
 
@@ -1085,7 +1050,7 @@ class TestMiniScenarios:
             "vote_for_delegate",
             ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
 
@@ -1103,7 +1068,7 @@ class TestMiniScenarios:
 
         # originate contract
         originate(client, session, path, storage, 0)
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
         # call contract: creates the internal contract and calls it.
         client.transfer(
@@ -1112,7 +1077,7 @@ class TestMiniScenarios:
             'multiple_entrypoints_counter',
             ['--burn-cap', '10'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
         assert client.get_storage('multiple_entrypoints_counter') == 'None', (
             "The storage of the multiple_entrypoints_counter contract"
             " should be None"
@@ -1129,7 +1094,7 @@ class TestMiniScenarios:
             CONTRACT_PATH, 'entrypoints', 'simple_entrypoints.tz'
         )
         originate(client, session, contract_target, 'Unit', 0)
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
 
     @pytest.mark.parametrize(
         'contract_annotation, contract_type, param, expected_storage',
@@ -1482,7 +1447,39 @@ class TestSelfAddressTransfer:
             'self_address_sender',
             ['--arg', f'"{receiver_address}"', '--burn-cap', '2'],
         )
-        client.bake('bootstrap5', BAKE_ARGS)
+        utils.bake(client, 'bootstrap5')
+
+
+@pytest.mark.slow
+@pytest.mark.contract
+@pytest.mark.regression
+class TestScriptHashRegression:
+    @pytest.mark.parametrize("contract", all_contracts())
+    def test_contract_hash(self, client_regtest: Client, contract):
+        client = client_regtest
+        assert contract.endswith(
+            '.tz'
+        ), "test contract should have .tz extension"
+        client.hash_script(os.path.join(CONTRACT_PATH, contract))
+
+
+@pytest.mark.contract
+class TestScriptHashOrigination:
+    def test_contract_hash_with_origination(
+        self, client: Client, session: dict
+    ):
+        script = 'parameter unit; storage unit; code {CAR; NIL operation; PAIR}'
+        originate(
+            client,
+            session,
+            contract=script,
+            init_storage='Unit',
+            amount=1000,
+            contract_name='dummy_contract',
+        )
+        hash1 = client.hash_script(script)
+        hash2 = client.get_script_hash('dummy_contract')
+        assert hash1 == hash2
 
 
 @pytest.mark.contract
@@ -1531,3 +1528,30 @@ class TestNormalize:
     def test_normalize_type(self, client_regtest_scrubbed, typ):
         client = client_regtest_scrubbed
         client.normalize_type(typ)
+
+
+@pytest.mark.contract
+class TestTZIP4View:
+    """Tests for the "run tzip4 view" command."""
+
+    def test_run_view(self, client: Client, session: dict):
+
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios', 'tzip4_view.tz')
+        originate(
+            client,
+            session,
+            contract=path,
+            init_storage='Unit',
+            amount=1000,
+            contract_name='view_contract',
+        )
+        client.bake('bootstrap5')
+
+        const_view_res = client.run_view(
+            "view_const", "view_contract", "Unit", []
+        )
+        add_view_res = client.run_view(
+            "view_add", "view_contract", "Pair 1 3", []
+        )
+
+        assert const_view_res.result == "5\n" and add_view_res.result == "4\n"

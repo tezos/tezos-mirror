@@ -29,6 +29,10 @@
 (** An abstract version number for the low-level P2P layer. *)
 type t = private int
 
+val equal : t -> t -> bool
+
+val compare : t -> t -> int
+
 val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t

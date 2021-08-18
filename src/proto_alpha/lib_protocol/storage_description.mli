@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module is responsible for building the description of the current state
+    of the storage, which is then used to build specification of the RPC
+    endpoints for accessing the storage. It produces [resto] [RPC_directory.t]
+    values, which can be used directly to construct the RPC endpoint tree. *)
+
 (** Typed description of the key-value context. *)
 type 'key t
 
@@ -40,10 +45,7 @@ val create : unit -> 'key t
 
 (** Register a single key accessor at a given path. *)
 val register_value :
-  'key t ->
-  get:('key -> 'a option tzresult Lwt.t) ->
-  'a Data_encoding.t ->
-  unit
+  'key t -> get:('key -> 'a option tzresult Lwt.t) -> 'a Data_encoding.t -> unit
 
 (** Return a description for a prefixed fragment of the given context.
     All keys registered in the subcontext will be shared by the external

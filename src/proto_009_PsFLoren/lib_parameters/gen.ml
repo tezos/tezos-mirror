@@ -38,7 +38,8 @@ let () =
         (Default_parameters.json_of_parameters parameters)
     in
     let fd = open_out file in
-    output_string fd str ; close_out fd
+    output_string fd str ;
+    close_out fd
   in
   if Array.length Sys.argv < 2 then print_usage_and_fail ""
   else
@@ -57,5 +58,4 @@ let () =
           Default_parameters.(
             parameters_of_constants ~with_commitments:true constants_mainnet)
           "mainnet-parameters.json"
-    | s ->
-        print_usage_and_fail s
+    | s -> print_usage_and_fail s

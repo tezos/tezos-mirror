@@ -9,16 +9,11 @@
             tezos-shell-context
             tezos-protocol-compiler.registerer
             tezos-protocol-compiler.native
-            tezos-storage
+            tezos-context
             lwt-exit
             dynlink)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_micheline
                    -open Tezos_shell_services
-                   -open Tezos_storage)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+                   -open Tezos_context)))

@@ -47,8 +47,7 @@ let print_annot_expr_unwrapped ppf (expr, annot) =
   Format.fprintf ppf "%a%a" print_var_annots annot print_expr_unwrapped expr
 
 let print_stack ppf = function
-  | [] ->
-      Format.fprintf ppf "[]"
+  | [] -> Format.fprintf ppf "[]"
   | more ->
       Format.fprintf
         ppf
@@ -84,22 +83,17 @@ let inject_types type_map parsed =
         Seq (inject_loc `before loc, List.map inject_expr items)
     | Prim (loc, name, items, annot) ->
         Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
-    | Int (loc, value) ->
-        Int (inject_loc `after loc, value)
-    | String (loc, value) ->
-        String (inject_loc `after loc, value)
-    | Bytes (loc, value) ->
-        Bytes (inject_loc `after loc, value)
+    | Int (loc, value) -> Int (inject_loc `after loc, value)
+    | String (loc, value) -> String (inject_loc `after loc, value)
+    | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
   and inject_loc which loc =
     let comment =
       let ( >?? ) = Option.bind in
-      List.assoc loc parsed.Michelson_v1_parser.expansion_table
+      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
       >?? fun (_, locs) ->
       let locs = List.sort compare locs in
-      List.hd locs
-      >?? fun head_loc ->
-      List.assoc head_loc type_map
-      >?? fun (bef, aft) ->
+      List.hd locs >?? fun head_loc ->
+      List.assoc ~equal:Int.equal head_loc type_map >?? fun (bef, aft) ->
       let stack = match which with `before -> bef | `after -> aft in
       Some (Format.asprintf "%a" print_stack stack)
     in
@@ -121,19 +115,14 @@ let unparse ?type_map parse expanded =
           | Prim (loc, name, items, annot) ->
               Prim
                 (inject_loc `after loc, name, List.map inject_expr items, annot)
-          | Int (loc, value) ->
-              Int (inject_loc `after loc, value)
-          | String (loc, value) ->
-              String (inject_loc `after loc, value)
-          | Bytes (loc, value) ->
-              Bytes (inject_loc `after loc, value)
+          | Int (loc, value) -> Int (inject_loc `after loc, value)
+          | String (loc, value) -> String (inject_loc `after loc, value)
+          | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
         and inject_loc which loc =
           let comment =
             let ( >?? ) = Option.bind in
-            List.assoc loc unexpansion_table
-            >?? fun loc ->
-            List.assoc loc type_map
-            >?? fun (bef, aft) ->
+            List.assoc ~equal:Int.equal loc unexpansion_table >?? fun loc ->
+            List.assoc ~equal:Int.equal loc type_map >?? fun (bef, aft) ->
             let stack = match which with `before -> bef | `after -> aft in
             Some (Format.asprintf "%a" print_stack stack)
           in
@@ -148,10 +137,8 @@ let unparse ?type_map parse expanded =
         |> Format.asprintf "%a" Micheline_printer.print_expr
   in
   match parse source with
-  | (res, []) ->
-      res
-  | (_, _ :: _) ->
-      Stdlib.failwith "Michelson_v1_printer.unparse"
+  | (res, []) -> res
+  | (_, _ :: _) -> Stdlib.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map =
   unparse ?type_map Michelson_v1_parser.parse_toplevel

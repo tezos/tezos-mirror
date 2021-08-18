@@ -53,8 +53,7 @@ module Make (X : PARAMETERS) = struct
     }
 
   let () =
-    Printexc.register_printer
-    @@ function
+    Printexc.register_printer @@ function
     | Terminated_before_event {daemon; event; where = None} ->
         Some (sf "%s terminated before event occurred: %s" daemon event)
     | Terminated_before_event {daemon; event; where = Some where} ->
@@ -64,8 +63,7 @@ module Make (X : PARAMETERS) = struct
              daemon
              event
              where)
-    | _ ->
-        None
+    | _ -> None
 
   (* When a daemon is running, we store:
      - its process, so that we can terminate it for instance;
@@ -112,13 +110,12 @@ module Make (X : PARAMETERS) = struct
 
   let terminate daemon =
     match daemon.status with
-    | Not_running ->
-        unit
+    | Not_running -> unit
     | Running {event_loop_promise = None; _} ->
-        invalid_arg
-          "you cannot call Daemon.terminate before Daemon.run returns"
+        invalid_arg "you cannot call Daemon.terminate before Daemon.run returns"
     | Running {process; event_loop_promise = Some event_loop_promise; _} ->
-        Process.terminate process ; event_loop_promise
+        Process.terminate process ;
+        event_loop_promise
 
   let next_name = ref 1
 
@@ -133,25 +130,23 @@ module Make (X : PARAMETERS) = struct
     let color =
       X.default_colors.(!next_color mod Array.length X.default_colors)
     in
-    incr next_color ; color
+    incr next_color ;
+    color
 
   let () =
-    Test.declare_reset_function
-    @@ fun () ->
+    Test.declare_reset_function @@ fun () ->
     next_name := 1 ;
     next_color := 0
 
-  let create ~path ?name ?color ?event_pipe persistent_state =
+  let create ~path ?runner ?name ?color ?event_pipe persistent_state =
     let name = match name with None -> fresh_name () | Some name -> name in
     let color =
       match color with None -> get_next_color () | Some color -> color
     in
     let event_pipe =
       match event_pipe with
-      | None ->
-          Temp.file (name ^ "-event-pipe")
-      | Some file ->
-          file
+      | None -> Temp.file ?runner (name ^ "-event-pipe")
+      | Some file -> file
     in
     {
       name;
@@ -166,10 +161,9 @@ module Make (X : PARAMETERS) = struct
     }
 
   let handle_raw_event daemon line =
-    let open JSON in
-    let json = parse ~origin:("event from " ^ daemon.name) line in
-    let event = json |-> "fd-sink-item.v0" |-> "event" in
-    match as_object_opt event with
+    let json = JSON.parse ~origin:("event from " ^ daemon.name) line in
+    let event = JSON.(json |-> "fd-sink-item.v0" |-> "event") in
+    match JSON.as_object_opt event with
     | None | Some ([] | _ :: _ :: _) ->
         (* Some events are not one-field objects. Ignore them for now. *)
         ()
@@ -181,8 +175,7 @@ module Make (X : PARAMETERS) = struct
           daemon.persistent_event_handlers ;
         (* Trigger one-shot events. *)
         match String_map.find_opt name daemon.one_shot_event_handlers with
-        | None ->
-            ()
+        | None -> ()
         | Some events ->
             (* Trigger matching events and accumulate others in [acc]. *)
             let rec loop acc = function
@@ -200,43 +193,65 @@ module Make (X : PARAMETERS) = struct
                            [Test.Failed], and events are handled with [async] so we
                            need to convert the exception. *)
                         Test.fail
-                          "uncaught exception in filter for event %s of \
-                           daemon %s: %s"
+                          "uncaught exception in filter for event %s of daemon \
+                           %s: %s"
                           name
                           daemon.name
                           (Printexc.to_string exn)
-                    | None ->
-                        head :: acc
+                    | None -> head :: acc
                     | Some value ->
                         Lwt.wakeup_later resolver (Some value) ;
                         acc
                   in
                   loop acc tail
             in
-            loop [] events )
+            loop [] events)
 
-  let run ?(on_terminate = fun _ -> unit) daemon session_state arguments =
-    ( match daemon.status with
-    | Not_running ->
-        ()
-    | Running _ ->
-        Test.fail "daemon %s is already running" daemon.name ) ;
+  let run ?runner ?(on_terminate = fun _ -> unit) ?event_level daemon
+      session_state arguments =
+    (match daemon.status with
+    | Not_running -> ()
+    | Running _ -> Test.fail "daemon %s is already running" daemon.name) ;
     (* Create the named pipe where the daemon will send its internal events in JSON. *)
-    if Sys.file_exists daemon.event_pipe then Sys.remove daemon.event_pipe ;
-    Unix.mkfifo daemon.event_pipe 0o640 ;
+    if Runner.Sys.file_exists ?runner daemon.event_pipe then
+      Runner.Sys.remove ?runner daemon.event_pipe ;
+    Runner.Sys.mkfifo ?runner ~perms:0o640 daemon.event_pipe ;
     (* Note: in the CI, it seems that if the daemon tries to open the
        FIFO for writing before we opened it for reading, the
        [Lwt.openfile] call (of the daemon, for writing) blocks
        forever. So we need to make sure that we open the file before we
        spawn the daemon. *)
-    let* event_input = Lwt_io.(open_file ~mode:input) daemon.event_pipe in
+    let event_process =
+      match runner with
+      | None -> None
+      | Some runner ->
+          let cmd = "cat" in
+          let arguments = [daemon.event_pipe] in
+          let name = Filename.basename daemon.event_pipe in
+          let process =
+            Process.spawn ~name ~runner ~log_output:false cmd arguments
+          in
+          Some process
+    in
+    (* The input is either the local pipe or the remote pipe. *)
+    let* event_input =
+      match event_process with
+      | None -> Lwt_io.(open_file ~mode:input) daemon.event_pipe
+      | Some process -> Lwt.return @@ Process.stdout process
+    in
     let env =
+      let level_str =
+        match event_level with
+        | None -> ""
+        | Some level -> "?level-at-least=" ^ level
+      in
       String_map.singleton
         "TEZOS_EVENTS_CONFIG"
-        ("file-descriptor-path://" ^ daemon.event_pipe)
+        ("file-descriptor-path://" ^ daemon.event_pipe ^ level_str)
     in
     let process =
       Process.spawn
+        ?runner
         ~name:daemon.name
         ~color:daemon.color
         ~env
@@ -256,14 +271,16 @@ module Make (X : PARAMETERS) = struct
             handle_raw_event daemon line ;
             event_loop ()
         | None -> (
-          match daemon.status with
-          | Not_running ->
-              Lwt_io.close event_input
-          | Running _ ->
-              (* It can take a little while before the pipe is opened by the daemon,
-                 and before that, reading from it yields end of file for some reason. *)
-              let* () = Lwt_unix.sleep 0.01 in
-              event_loop () )
+            match daemon.status with
+            | Not_running -> (
+                match event_process with
+                | None -> Lwt_io.close event_input
+                | Some process -> Lwt.return @@ Process.kill process)
+            | Running _ ->
+                (* It can take a little while before the pipe is opened by the daemon,
+                   and before that, reading from it yields end of file for some reason. *)
+                let* () = Lwt_unix.sleep 0.01 in
+                event_loop ())
       in
       let rec stdout_loop () =
         let* stdout_line = Lwt_io.read_line_opt (Process.stdout process) in
@@ -272,17 +289,16 @@ module Make (X : PARAMETERS) = struct
             List.iter (fun handler -> handler line) daemon.stdout_handlers ;
             stdout_loop ()
         | None -> (
-          match daemon.status with
-          | Not_running ->
-              Lwt.return_unit
-          | Running _ ->
-              (* TODO: is the sleep necessary here? *)
-              let* () = Lwt_unix.sleep 0.01 in
-              stdout_loop () )
+            match daemon.status with
+            | Not_running -> Lwt.return_unit
+            | Running _ ->
+                (* TODO: is the sleep necessary here? *)
+                let* () = Lwt_unix.sleep 0.01 in
+                stdout_loop ())
       in
       let* () = event_loop ()
-      and* () = stdout_loop ()
-      and* () =
+      and*! () = stdout_loop ()
+      and*! () =
         let* process_status = Process.wait process in
         (* Setting [daemon.status] to [Not_running] stops the event loop cleanly. *)
         daemon.status <- Not_running ;
@@ -299,7 +315,7 @@ module Make (X : PARAMETERS) = struct
       unit
     in
     running_status.event_loop_promise <- Some event_loop_promise ;
-    async event_loop_promise ;
+    Background.register event_loop_promise ;
     unit
 
   let wait_for ?where daemon name filter =
@@ -318,8 +334,7 @@ module Make (X : PARAMETERS) = struct
     | None ->
         raise
           (Terminated_before_event {daemon = daemon.name; event = name; where})
-    | Some x ->
-        return x
+    | Some x -> return x
 
   let on_event daemon handler =
     daemon.persistent_event_handlers <-
@@ -327,4 +342,8 @@ module Make (X : PARAMETERS) = struct
 
   let on_stdout daemon handler =
     daemon.stdout_handlers <- handler :: daemon.stdout_handlers
+
+  let log_events daemon =
+    on_event daemon @@ fun event ->
+    Log.info "Received event: %s = %s" event.name (JSON.encode event.value)
 end

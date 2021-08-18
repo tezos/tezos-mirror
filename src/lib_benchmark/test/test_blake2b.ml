@@ -70,7 +70,7 @@ let solution =
   match measurement with
   | Measure.Measurement ((module Bench), {workload_data; _}) ->
       let model =
-        List.assoc "blake2b" Bench.models
+        List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let problem =
@@ -93,21 +93,26 @@ let () =
   match measurement with
   | Measure.Measurement ((module Bench), _) -> (
       let model =
-        List.assoc "blake2b" Bench.models
+        List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let solution = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
-      ( match Codegen.codegen model solution (module Costlang.Identity) with
-      | None ->
-          assert false
+      (match
+         Codegen.codegen
+           (Model.For_codegen model)
+           solution
+           (module Costlang.Identity)
+       with
+      | None -> assert false
       | Some code ->
-          Format.printf "let blake2b_model = %s@." code ) ;
+          Format.printf "let blake2b_model = %a@." Codegen.pp_expr code) ;
       let module FPT = Fixed_point_transform.Apply (struct
-        let options =
-          {Fixed_point_transform.default_options with precision = 5}
+        let options = {Fixed_point_transform.default_options with precision = 5}
       end) in
-      match Codegen.codegen model solution (module FPT) with
-      | None ->
-          assert false
+      match Codegen.codegen (Model.For_codegen model) solution (module FPT) with
+      | None -> assert false
       | Some code ->
-          Format.printf "let blake2b_model_fixed_point = %s@." code )
+          Format.printf
+            "let blake2b_model_fixed_point = %a@."
+            Codegen.pp_expr
+            code)

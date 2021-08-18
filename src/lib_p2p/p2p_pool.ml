@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -66,7 +66,7 @@ type ('msg, 'peer, 'conn) t = {
   acl : P2p_acl.t;
 }
 
-module Gc_point_set = List.Bounded (struct
+module Gc_point_set = Bounded_heap.Make (struct
   type t = Time.System.t * P2p_point.Id.t
 
   let compare (x, _) (y, _) = -Time.System.compare x y
@@ -74,8 +74,7 @@ end)
 
 let gc_points {config = {max_known_points; _}; known_points; log; _} =
   match max_known_points with
-  | None ->
-      ()
+  | None -> ()
   | Some (_, target) ->
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then (
@@ -88,17 +87,15 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
             if P2p_point_state.is_disconnected point_info then
               let time =
                 match P2p_point_state.Info.last_miss point_info with
-                | None ->
-                    now
-                | Some t ->
-                    t
+                | None -> now
+                | Some t -> t
               in
               Gc_point_set.insert (time, p) table)
           known_points ;
         let to_remove = Gc_point_set.get table in
         ListLabels.iter to_remove ~f:(fun (_, p) ->
             P2p_point.Table.remove known_points p) ;
-        log Gc_points )
+        log Gc_points)
 
 let greylist_addr pool addr = P2p_acl.IPGreylist.add pool.acl addr
 
@@ -106,26 +103,24 @@ let set_expected_peer_id :
     ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t =
  fun pool point peer_id ->
   match P2p_point.Table.find pool.known_points point with
-  | None ->
-      Lwt.return_unit
+  | None -> Lwt.return_unit
   | Some point_info -> (
       P2p_point_state.set_expected_peer_id point_info peer_id ;
       match P2p_point_state.get point_info with
-      | Disconnected | Requested _ ->
-          Lwt.return_unit
+      | Disconnected | Requested _ -> Lwt.return_unit
       (* If the expected_peer_id is not the same than the one given
          for the current connection, we greylist and disconnect if
          possible. *)
       | Running {current_peer_id; data} ->
           if not (P2p_peer.Id.equal peer_id current_peer_id) then (
             greylist_addr pool (fst point) ;
-            P2p_conn.disconnect data )
+            P2p_conn.disconnect data)
           else Lwt.return_unit
       | Accepted {current_peer_id; _} ->
           if not (P2p_peer.Id.equal peer_id current_peer_id) then (
             greylist_addr pool (fst point) ;
-            Lwt.return_unit )
-          else Lwt.return_unit )
+            Lwt.return_unit)
+          else Lwt.return_unit)
 
 let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
   match P2p_point.Table.find pool.known_points point with
@@ -135,32 +130,26 @@ let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
       in
       Option.iter
         (fun (max, _) ->
-          if P2p_point.Table.length pool.known_points >= max then
-            gc_points pool)
+          if P2p_point.Table.length pool.known_points >= max then gc_points pool)
         pool.config.max_known_points ;
       P2p_point.Table.add pool.known_points point point_info ;
       P2p_trigger.broadcast_new_point pool.triggers ;
       pool.log (New_point point) ;
       point_info
   | Some point_info ->
-      ( match expected_peer_id with
+      (match expected_peer_id with
       | Some peer_id ->
           Lwt_utils.dont_wait
             (fun _ -> ())
             (fun () -> set_expected_peer_id pool point peer_id)
-      | None ->
-          () ) ;
-      ( match trusted with
-      | Some true ->
-          P2p_point_state.Info.set_trusted point_info
-      | Some false ->
-          P2p_point_state.Info.unset_trusted point_info
-      | None ->
-          () ) ;
+      | None -> ()) ;
+      (match trusted with
+      | Some true -> P2p_point_state.Info.set_trusted point_info
+      | Some false -> P2p_point_state.Info.unset_trusted point_info
+      | None -> ()) ;
       point_info
 
-let unregister_point pool point =
-  P2p_point.Table.remove pool.known_points point
+let unregister_point pool point = P2p_point.Table.remove pool.known_points point
 
 let register_new_point ?trusted t point =
   if not (P2p_point.Table.mem t.my_id_points point) then
@@ -168,8 +157,7 @@ let register_new_point ?trusted t point =
   else None
 
 let register_list_of_new_points ?trusted ~medium ~source t point_list =
-  Event.(emit get_points) (medium, source, point_list)
-  >>= fun () ->
+  Event.(emit get_points) (medium, source, point_list) >>= fun () ->
   let f point = register_new_point ?trusted t point |> ignore in
   Lwt.return (List.iter f point_list)
 
@@ -180,7 +168,7 @@ let register_list_of_new_points ?trusted ~medium ~source t point_list =
    case of a flood attack, the newly added infos will probably belong
    to peer_ids with the same (low) score and removing the most recent ones
    ensure that older (and probably legit) peer_id infos are kept. *)
-module Gc_peer_set = List.Bounded (struct
+module Gc_peer_set = Bounded_heap.Make (struct
   type t = float * Time.System.t * P2p_peer.Id.t
 
   let compare (s, t, _) (s', t', _) =
@@ -189,14 +177,15 @@ module Gc_peer_set = List.Bounded (struct
 end)
 
 let gc_peer_ids
-    { peer_meta_config = {score; _};
+    {
+      peer_meta_config = {score; _};
       config = {max_known_peer_ids; _};
       known_peer_ids;
       log;
-      _ } =
+      _;
+    } =
   match max_known_peer_ids with
-  | None ->
-      ()
+  | None -> ()
   | Some (_, target) ->
       let current_size = P2p_peer.Table.length known_peer_ids in
       if current_size > target then (
@@ -212,7 +201,7 @@ let gc_peer_ids
         let to_remove = Gc_peer_set.get table in
         ListLabels.iter to_remove ~f:(fun (_, _, peer_id) ->
             P2p_peer.Table.remove known_peer_ids peer_id) ;
-        log Gc_peer_ids )
+        log Gc_peer_ids)
 
 let register_peer pool peer_id =
   match P2p_peer.Table.find pool.known_peer_ids peer_id with
@@ -233,18 +222,15 @@ let register_peer pool peer_id =
       P2p_peer.Table.add pool.known_peer_ids peer_id peer ;
       pool.log (New_peer peer_id) ;
       peer
-  | Some peer ->
-      peer
+  | Some peer -> peer
 
 (* this function duplicates bit of code from the modules below to avoid
    creating mutually recursive modules *)
 let connection_of_peer_id pool peer_id =
   Option.bind (P2p_peer.Table.find pool.known_peer_ids peer_id) (fun p ->
       match P2p_peer_state.get p with
-      | Running {data; _} ->
-          Some data
-      | _ ->
-          None)
+      | Running {data; _} -> Some data
+      | _ -> None)
 
 (* Every running connection matching the point's ip address is returned. *)
 let connections_of_addr pool addr =
@@ -252,10 +238,8 @@ let connections_of_addr pool addr =
   |> Seq.filter_map (fun ((addr', _), p) ->
          if Ipaddr.V6.compare addr addr' = 0 then
            match P2p_point_state.get p with
-           | P2p_point_state.Running {data; _} ->
-               Some data
-           | _ ->
-               None
+           | P2p_point_state.Running {data; _} -> Some data
+           | _ -> None
          else None)
 
 let get_addr pool peer_id =
@@ -324,6 +308,11 @@ module Points = struct
     set_trusted pool (point, None)
 
   let untrust pool point = unset_trusted pool point
+
+  let get_greylisted_list pool = P2p_acl.IPGreylist.list pool.acl
+
+  let greylisted_list_not_reliable_since pool =
+    P2p_acl.IPGreylist.list_not_reliable_since pool.acl
 end
 
 module Peers = struct
@@ -335,10 +324,8 @@ module Peers = struct
 
   let get_peer_metadata pool peer_id =
     match P2p_peer.Table.find pool.known_peer_ids peer_id with
-    | Some peer ->
-        P2p_peer_state.Info.peer_metadata peer
-    | None ->
-        pool.peer_meta_config.peer_meta_initial ()
+    | Some peer -> P2p_peer_state.Info.peer_metadata peer
+    | None -> pool.peer_meta_config.peer_meta_initial ()
 
   let get_score pool peer_id =
     pool.peer_meta_config.score (get_peer_metadata pool peer_id)
@@ -375,35 +362,34 @@ module Peers = struct
     P2p_acl.PeerBlacklist.add pool.acl peer ;
     (* Kick [peer] if it is in `Running` state. *)
     match connection_of_peer_id pool peer with
-    | Some conn ->
-        P2p_conn.disconnect conn
-    | None ->
-        Lwt.return_unit
+    | Some conn -> P2p_conn.disconnect conn
+    | None -> Lwt.return_unit
 
   let unban pool peer = P2p_acl.unban_peer pool.acl peer
 
-  let trust pool peer = unban pool peer ; set_trusted pool peer
+  let trust pool peer =
+    unban pool peer ;
+    set_trusted pool peer
 
   let untrust pool peer = unset_trusted pool peer
 
   let banned pool peer = P2p_acl.banned_peer pool.acl peer
+
+  let get_greylisted_list pool = P2p_acl.PeerGreylist.list pool.acl
 end
 
 module Connection = struct
   let fold pool ~init ~f =
     Peers.fold_connected pool ~init ~f:(fun peer_id peer_info acc ->
         match P2p_peer_state.get peer_info with
-        | Running {data; _} ->
-            f peer_id data acc
-        | _ ->
-            acc)
+        | Running {data; _} -> f peer_id data acc
+        | _ -> acc)
 
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
 
   let random_elt = function
-    | [] ->
-        None
+    | [] -> None
     | _ :: _ as l ->
         let n = List.length l in
         let r = Random.int n in
@@ -420,10 +406,8 @@ module Connection = struct
             | Some _ | None -> (
                 let ci = P2p_conn.info conn in
                 match ci.id_point with
-                | (_, None) ->
-                    acc
-                | (addr, Some port) ->
-                    ((addr, port), ci.peer_id) :: acc ))
+                | (_, None) -> acc
+                | (addr, Some port) -> ((addr, port), ci.peer_id) :: acc))
     in
     random_elt candidates
 
@@ -441,37 +425,28 @@ module Connection = struct
             match different_than with
             | Some excluded_conn when P2p_conn.equal_sock conn excluded_conn ->
                 acc
-            | Some _ | None ->
-                conn :: acc)
+            | Some _ | None -> conn :: acc)
     in
     random_elt candidates
 
   let propose_swap_request pool =
-    match random_connection ~no_private:true pool with
-    | Some recipient -> (
-      match random_addr ~different_than:recipient ~no_private:true pool with
-      | None ->
-          None
-      | Some (proposed_point, proposed_peer_id) ->
-          Some (proposed_point, proposed_peer_id, recipient) )
-    | None ->
-        None
+    let ( >?? ) = Option.bind in
+    random_connection ~no_private:true pool >?? fun recipient ->
+    random_addr ~different_than:recipient ~no_private:true pool
+    >?? fun (proposed_point, proposed_peer_id) ->
+    Some (proposed_point, proposed_peer_id, recipient)
 
   let find_by_peer_id pool peer_id =
     Option.bind (Peers.info pool peer_id) (fun p ->
         match P2p_peer_state.get p with
-        | Running {data; _} ->
-            Some data
-        | _ ->
-            None)
+        | Running {data; _} -> Some data
+        | _ -> None)
 
   let find_by_point pool point =
     Option.bind (Points.info pool point) (fun p ->
         match P2p_point_state.get p with
-        | Running {data; _} ->
-            Some data
-        | _ ->
-            None)
+        | Running {data; _} -> Some data
+        | _ -> None)
 end
 
 let connected_peer_ids pool = pool.connected_peer_ids
@@ -528,37 +503,30 @@ let create config peer_meta_config triggers ~log =
           let peer_id = P2p_peer_state.Info.peer_id peer_info in
           P2p_peer.Table.add pool.known_peer_ids peer_id peer_info ;
           match P2p_peer_state.Info.last_seen peer_info with
-          | None | Some ((_, None) (* no reachable port stored*), _) ->
-              ()
+          | None | Some ((_, None) (* no reachable port stored*), _) -> ()
           | Some ((addr, Some port), _) ->
               register_point pool (addr, port) |> ignore)
         peer_ids ;
       Lwt.return pool
-  | Error err ->
-      Event.(emit parse_error) err >>= fun () -> Lwt.return pool
+  | Error err -> Event.(emit parse_error) err >>= fun () -> Lwt.return pool
 
-let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
-  Event.(emit saving_metadata) config.peers_file
-  >>= fun () ->
+let save_peers {config; peer_meta_config; known_peer_ids; _} =
+  Event.(emit saving_metadata) config.peers_file >>= fun () ->
   P2p_peer_state.Info.File.save
     config.peers_file
     peer_meta_config.peer_meta_encoding
     (P2p_peer.Table.fold (fun _ a b -> a :: b) known_peer_ids [])
-  >>= (function
-        | Error err ->
-            Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
-        | Ok () ->
-            Lwt.return_unit)
-  >>= fun () ->
+  >>= function
+  | Error err -> Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
+  | Ok () -> Lwt.return_unit
+
+let tear_down_connections {known_peer_ids; known_points; _} =
   P2p_peer.Table.iter_p
     (fun _peer_id peer_info ->
       match P2p_peer_state.get peer_info with
-      | Accepted {cancel; _} ->
-          Error_monad.cancel_with_exceptions cancel
-      | Running {data = conn; _} ->
-          P2p_conn.disconnect conn
-      | Disconnected ->
-          Lwt.return_unit)
+      | Accepted {cancel; _} -> Error_monad.cancel_with_exceptions cancel
+      | Running {data = conn; _} -> P2p_conn.disconnect conn
+      | Disconnected -> Lwt.return_unit)
     known_peer_ids
   >>= fun () ->
   P2p_point.Table.iter_p
@@ -566,11 +534,11 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
       match P2p_point_state.get point_info with
       | Requested {cancel} | Accepted {cancel; _} ->
           Error_monad.cancel_with_exceptions cancel
-      | Running {data = conn; _} ->
-          P2p_conn.disconnect conn
-      | Disconnected ->
-          Lwt.return_unit)
+      | Running {data = conn; _} -> P2p_conn.disconnect conn
+      | Disconnected -> Lwt.return_unit)
     known_points
+
+let destroy pool = save_peers pool >>= fun () -> tear_down_connections pool
 
 let add_to_id_points t point =
   P2p_point.Table.add t.my_id_points point () ;
@@ -601,22 +569,21 @@ let sample best other points =
     in
     let indexes = best_indexes @ other_indexes in
     (* Note: we are doing a [fold_left_i] by hand, passing [i] manually *)
-    (fun (_, _, result) -> result)
-    @@ List.fold_left
-         (fun (i, indexes, acc) point ->
-           match indexes with
-           | [] ->
-               (0, [], acc) (* TODO: early return *)
-           | index :: indexes when i >= index ->
-               (* We compare `i >= index` (rather than `i = index`) to avoid a
+    List.fold_left_e (* [_e] is for early return *)
+      (fun (i, indexes, acc) point ->
+        match indexes with
+        | [] -> Error acc (* early return *)
+        | index :: indexes when i >= index ->
+            (* We compare `i >= index` (rather than `i = index`) to avoid a
                 corner case whereby two identical `index`es are present in the
                 list. In that case, using `>=` makes it so that if `i` overtakes
                 `index` we still pick elements. *)
-               (succ i, indexes, point :: acc)
-           | _ ->
-               (succ i, indexes, acc))
-         (0, indexes, [])
-         points
+            Ok (succ i, indexes, point :: acc)
+        | _ -> Ok (succ i, indexes, acc))
+      (0, indexes, [])
+      points
+    |> function
+    | Ok (_, _, result) | Error result -> result
 
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)
@@ -627,28 +594,19 @@ let compare_known_point_info p1 p2 =
     match
       (P2p_point_state.Info.last_seen p1, P2p_point_state.Info.last_seen p2)
     with
-    | (None, None) ->
-        (Random.int 2 * 2) - 1 (* HACK... *)
-    | (Some _, None) ->
-        1
-    | (None, Some _) ->
-        -1
+    | (None, None) -> (Random.int 2 * 2) - 1 (* HACK... *)
+    | (Some _, None) -> 1
+    | (None, Some _) -> -1
     | (Some (_, time1), Some (_, time2)) -> (
-      match compare time1 time2 with
-      | 0 ->
-          (Random.int 2 * 2) - 1 (* HACK... *)
-      | x ->
-          x )
+        match compare time1 time2 with
+        | 0 -> (Random.int 2 * 2) - 1 (* HACK... *)
+        | x -> x)
   in
   match (disconnected1, disconnected2) with
-  | (false, false) ->
-      compare_last_seen p1 p2
-  | (false, true) ->
-      -1
-  | (true, false) ->
-      1
-  | (true, true) ->
-      compare_last_seen p2 p1
+  | (false, false) -> compare_last_seen p1 p2
+  | (false, true) -> -1
+  | (true, false) -> 1
+  | (true, true) -> compare_last_seen p2 p1
 
 let list_known_points ~ignore_private ?(size = 50) pool =
   if size < 0 then Lwt.fail (Invalid_argument "P2p_pool.list_known_points")

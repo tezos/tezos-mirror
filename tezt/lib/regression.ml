@@ -30,10 +30,10 @@ let capture_output : out_channel option ref = ref None
 (* Capture a string into a regression output. *)
 let capture line =
   match !capture_output with
-  | None ->
-      ()
+  | None -> ()
   | Some channel ->
-      output_string channel line ; output_string channel "\n"
+      output_string channel line ;
+      output_string channel "\n"
 
 let hooks =
   Process.
@@ -41,47 +41,9 @@ let hooks =
       on_spawn =
         (fun command arguments ->
           let message = Log.quote_shell_command command arguments in
-          capture "" ; capture message);
+          capture "" ;
+          capture message);
       on_log = capture;
-    }
-
-(* Replace variables that may change between different runs by constants *)
-let replace_variables string =
-  let replacements =
-    [ ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
-      ("edpk\\w{50}", "[PUBLIC_KEY]");
-      ("KT1\\w{33}", "[CONTRACT_HASH]");
-      ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]") ]
-  in
-  List.fold_left
-    (fun string (replace, by) ->
-      replace_string ~all:true (rex replace) ~by string)
-    string
-    replacements
-
-let scrubbing_hooks =
-  Process.
-    {
-      on_spawn =
-        (fun command arguments ->
-          (* remove arguments that shouldn't be captured in regression output *)
-          let (arguments, _) =
-            List.fold_left
-              (fun (acc, scrub_next) arg ->
-                if scrub_next then (acc, false)
-                else
-                  match arg with
-                  (* scrub client global options *)
-                  | "--base-dir" | "-d" | "--endpoint" | "-E" ->
-                      (acc, true)
-                  | _ ->
-                      (acc @ [replace_variables arg], false))
-              ([], (* scrub_next *) false)
-              arguments
-          in
-          let message = Log.quote_shell_command command arguments in
-          capture "" ; capture message);
-      on_log = (fun output -> replace_variables output |> capture);
     }
 
 (* Run [f] and capture the output of ran processes into the [output_file]. *)
@@ -90,7 +52,7 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
       create_parent parent ;
-      if not (Sys.file_exists parent) then Unix.mkdir parent 0o755 )
+      if not (Sys.file_exists parent) then Unix.mkdir parent 0o755)
   in
   create_parent output_file ;
   let channel = open_out output_file in
@@ -108,14 +70,10 @@ let log_regression_diff diff =
       else
         let color =
           match line.[0] with
-          | '+' ->
-              Log.Color.FG.green
-          | '-' ->
-              Log.Color.FG.red
-          | '@' ->
-              Log.Color.FG.cyan
-          | _ ->
-              Log.Color.reset
+          | '+' -> Log.Color.FG.green
+          | '-' -> Log.Color.FG.red
+          | '@' -> Log.Color.FG.cyan
+          | _ -> Log.Color.reset
         in
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
@@ -128,16 +86,16 @@ let register ~__FILE__ ~title ~tags ~output_file
   Test.register ~__FILE__ ~title ~tags (fun () ->
       (* when the stored output doesn't already exists, must reset regressions *)
       if
-        not
-          (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
+        not (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
       then
         Test.fail
           "No existing regression output file found (%s). To generate it, run \
            with option \"--reset-regressions\""
           stored_output_file ;
       let capture_f ~output_file =
-        run_and_capture_output ~output_file
-        @@ fun () -> capture stored_output_file ; f ()
+        run_and_capture_output ~output_file @@ fun () ->
+        capture stored_output_file ;
+        f ()
       in
       if Cli.options.reset_regressions then
         capture_f ~output_file:stored_output_file
@@ -151,18 +109,19 @@ let register ~__FILE__ ~title ~tags ~output_file
             ~log_status_on_exit:false
             ~log_output:false
             "diff"
-            [ "--unified=0";
+            [
+              "--unified=0";
               "--label";
               "stored";
               "--label";
               "actual";
               stored_output_file;
-              temp_output_file ]
+              temp_output_file;
+            ]
         in
         let* status = Process.wait diff_process in
         match status with
-        | WEXITED 0 ->
-            unit
+        | WEXITED 0 -> unit
         | _ ->
             let stream = Lwt_io.read_lines (Process.stdout diff_process) in
             let buffer = Buffer.create 1024 in

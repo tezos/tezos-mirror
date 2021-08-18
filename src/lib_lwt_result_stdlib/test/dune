@@ -1,60 +1,22 @@
-(executables
+(tests
  (names
   test_hashtbl
   test_list_basic
+  test_seq_basic
   test_generic
   test_fuzzing_seq
   test_fuzzing_list
   test_fuzzing_set
+  test_fuzzing_seq_tiered
+  test_fuzzing_option
  )
  (libraries
             tezos-lwt-result-stdlib
             tezos-lwt-result-stdlib.examples.traces
             lwt.unix
             alcotest-lwt
-            crowbar)
- (flags (:standard -open Tezos_lwt_result_stdlib)))
-
-(alias
- (name buildtest)
- (deps
-  test_hashtbl.exe
-  test_generic.exe
-  test_list_basic.exe
-  test_fuzzing_seq.exe
-  test_fuzzing_list.exe
-  test_fuzzing_set.exe
- ))
-
-(rule
- (alias runtest_hashtbl)
- (action (run %{exe:test_hashtbl.exe})))
-(rule
- (alias runtest_generic)
- (action (run %{exe:test_generic.exe})))
-(rule
- (alias runtest_list_basic)
- (action (run %{exe:test_list_basic.exe})))
-(rule
- (alias runtest_fuzzing_seq)
- (action (run %{exe:test_fuzzing_seq.exe})))
-(rule
- (alias runtest_fuzzing_list)
- (action (run %{exe:test_fuzzing_list.exe})))
-(rule
- (alias runtest_fuzzing_set)
- (action (run %{exe:test_fuzzing_set.exe})))
-
-(rule
- (alias runtest)
+            qcheck-alcotest
+            tezos-test-helpers)
+ (flags (:standard -open Tezos_lwt_result_stdlib))
  (package tezos-lwt-result-stdlib)
- (deps
-  (alias runtest_hashtbl)
-  (alias runtest_generic)
-  (alias runtest_list_basic)
-  (alias runtest_fuzzing_seq)
-  (alias runtest_fuzzing_list)
-  (alias runtest_fuzzing_set)
- )
- (action (progn))
 )

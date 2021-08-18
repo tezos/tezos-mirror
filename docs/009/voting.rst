@@ -11,8 +11,11 @@ protocol before activating it.
 Delegates take part in the amendment procedure with an influence
 proportional to their stake, one roll one vote.
 
-The procedure consists of five periods, each of 20480 blocks (or
-~two weeks), for a total of approximately 2 months and a half.
+The procedure consists of five `voting periods`, each of 20480 blocks
+(5 cycles, or ~two weeks), for a total of approximately 2 months and a half.
+Voting periods do not align perfectly with cycles, instead start a
+level earlier; that is, the first block of a voting period is the last
+block of a cycle.
 
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium.
@@ -38,14 +41,14 @@ The voting procedure works as follows:
 - `Cooldown period`: The only purpose of this period is to let some
   time elapse before the promotion period.
 - `Promotion period`: delegates can cast one vote to promote or not
-   the proposal using the `ballot` operation.  At the end of a
-   promotion period if participation reaches the quorum and the
-   proposal has a super-majority in favor, we proceed to adoption
-   period. Otherwise we go back to a proposal period.
+  the proposal using the `ballot` operation.  At the end of a
+  promotion period if participation reaches the quorum and the
+  proposal has a super-majority in favor, we proceed to adoption
+  period. Otherwise we go back to a proposal period.
 - `Adoption period`: at the end of the period the proposal is activated
   as the new protocol and we go back to a proposal period.
 
-Each of the periods above are called a `voting period`. It is important to note
+It is important to note
 that the stake of each delegate is computed at the beginning of each voting
 period, and if the delegate owns one roll or more, its stake in number of rolls is
 stored in a list called the `voting listings`.
@@ -68,7 +71,7 @@ the current participation with the following coefficients::
   newQ = oldQ * 8/10 + participation * 2/10
 
 More details can be found in the file
-``src/proto_009_PsFLoren/lib_protocol/amendment.ml``.
+:src:`src/proto_009_PsFLoren/lib_protocol/amendment.ml`.
 
 Operations
 ----------
@@ -93,11 +96,11 @@ maximum number of proposals for that delegate.
 However duplicates from the same delegate are not tallied at the end
 of the proposal period.
 
-For example, a delegate submits a proposals operation for protocol A
+For example, a delegate submits a ``proposals`` operation for protocols A
 and B early in the proposal period, later a new protocol C is revealed
-and the delegate submits another proposals operation for protocol B
+and the delegate submits another ``proposals`` operation for protocols B
 and C.
-The list of submissions that will be tallied is [A,B,C] and the
+The list of submissions that will be tallied is [A,B,C].
 
 A ballot operation can only be submitted during one of the voting
 periods, and only once per period.
@@ -117,7 +120,7 @@ The pass vote allows a delegate to not influence a vote but still
 allowing it to reach quorum.
 
 More details can be found, as for all operations, in
-``src/proto_009_PsFLoren/lib_protocol/operation_repr.ml``.
+:src:`src/proto_009_PsFLoren/lib_protocol/operation_repr.ml`.
 The binary format is described by ``tezos-client describe unsigned
 operation``.
 
@@ -186,8 +189,8 @@ Other resources
 For more details on the client commands refer to the manual at
 :ref:`client_manual_009`.
 
-For vote related RPCs check the :ref:`rpc_index_009` under the prefix
-``vote/``.
+For vote related RPCs check the :doc:`rpc` under the prefix
+``votes/``.
 
 For Ledger support refer to Obsidian Systems' `documentation
 <https://github.com/obsidiansystems/ledger-app-tezos#proposals-and-voting>`_.

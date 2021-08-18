@@ -77,12 +77,9 @@ module Test_disk_table_hash = struct
 
   let known (st : store) (k : test_key) = Lwt.return (mem st k)
 
-  let read st k =
-    Lwt.return
-      (Option.fold
-         ~some:(fun v -> Ok v)
-         ~none:(Error_monad.error_exn Not_found)
-         (find st k))
+  let not_found = Error_monad.error_of_exn Not_found
+
+  let read st k = Lwt.return (Option.to_result ~none:not_found (find st k))
 
   let read_opt st k = Lwt.return (find st k)
 end
@@ -125,8 +122,7 @@ module Test_request = struct
 
   let active (_ : param) = P2p_peer.Set.of_list [P2p_peer.Id.zero]
 
-  let registered_requests : (param * P2p_peer.Id.t * key list) list ref =
-    ref []
+  let registered_requests : (param * P2p_peer.Id.t * key list) list ref = ref []
 
   let send (requester : param) (id : P2p_peer.Id.t) (kl : key list) =
     registered_requests := (requester, id, kl) :: !registered_requests ;
@@ -188,10 +184,8 @@ let test_full_requester () = ignore (init_full_requester ())
 *)
 let test_full_requester_create _ () =
   let requester = init_full_requester () in
-  Test_Requester.inject requester "foo" 1
-  >>= fun _ ->
-  Test_Requester.known requester "foo"
-  >>= fun r ->
+  Test_Requester.inject requester "foo" 1 >>= fun _ ->
+  Test_Requester.known requester "foo" >>= fun r ->
   assert_true "injected value is known" r ;
   Lwt.return_unit
 
@@ -211,17 +205,12 @@ let test_full_requester_create_with_global_input _ () =
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
   let f2 = Test_Requester.fetch requester "bar" precheck_pass in
   (* Notify the two values *)
-  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
-  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2 >>= fun () ->
   (* resolve promises *)
-  f1
-  >>= fun _ ->
-  f2
-  >>= fun _ ->
-  Lwt_stream.nget 2 stream
-  >>= fun stream_list ->
+  f1 >>= fun _ ->
+  f2 >>= fun _ ->
+  Lwt_stream.nget 2 stream >>= fun stream_list ->
   check
     (list (pair string int))
     "obtained stream"
@@ -241,26 +230,20 @@ let test_read_known_read_opt _ () =
   Test_Requester.known requester "baz"
   >>= lwt_assert_false "empty requester has no values"
   >>= fun () ->
-  Test_Requester.read requester "baz"
-  >>= fun r ->
+  Test_Requester.read requester "baz" >>= fun r ->
   check
     (tzresults testable_test_value)
     "missing data"
     (Error [Test_Requester.Missing_data "baz"; Exn Not_found])
     r ;
-  Test_Requester.read_opt requester "baz"
-  >>= fun ro ->
+  Test_Requester.read_opt requester "baz" >>= fun ro ->
   check (option testable_test_value) "should be none" None ro ;
-  Test_Requester.inject requester "baz" 1
-  >>= fun _ ->
-  Test_Requester.known requester "baz"
-  >>= lwt_assert_true "baz is now known"
+  Test_Requester.inject requester "baz" 1 >>= fun _ ->
+  Test_Requester.known requester "baz" >>= lwt_assert_true "baz is now known"
   >>= fun () ->
-  Test_Requester.read requester "baz"
-  >>= fun r ->
+  Test_Requester.read requester "baz" >>= fun r ->
   check (tzresults testable_test_value) "baz can be read" (Ok 1) r ;
-  Test_Requester.read_opt requester "baz"
-  >>= fun ro ->
+  Test_Requester.read_opt requester "baz" >>= fun ro ->
   check (option testable_test_value) "read_opt baz is (Some 1)" (Some 1) ro ;
   Lwt.return_unit
 
@@ -290,8 +273,7 @@ let test_full_requester_disk_found_value _ () =
 let test_full_requester_fetch_timeout _ () =
   let requester = init_full_requester () in
   let do_timeout t v =
-    Test_Requester.fetch ~timeout:t requester v precheck_pass
-    >>= fun res ->
+    Test_Requester.fetch ~timeout:t requester v precheck_pass >>= fun res ->
     check
       (tzresults testable_test_value)
       "should timeout"
@@ -299,8 +281,7 @@ let test_full_requester_fetch_timeout _ () =
       res ;
     Lwt.return_unit
   in
-  do_timeout (Ptime.Span.of_int_s 0) "foo"
-  >>= fun () ->
+  do_timeout (Ptime.Span.of_int_s 0) "foo" >>= fun () ->
   do_timeout
     (WithExceptions.Option.to_exn ~none:Not_found (Ptime.Span.of_float_s 0.1))
     "foo"
@@ -328,8 +309,7 @@ let test_full_fetch_issues_request _ () =
       "baz"
       precheck_pass
   in
-  f1
-  >>= fun _ ->
+  f1 >>= fun _ ->
   (* expects 5 requests *)
   check
     int
@@ -340,8 +320,8 @@ let test_full_fetch_issues_request _ () =
     (tuple3 unit p2p_peer_id (list testable_test_key))
     "should have sent a request"
     ((), P2p_peer.Id.zero, ["baz"])
-    ( WithExceptions.Option.get ~loc:__LOC__
-    @@ List.hd !Test_request.registered_requests ) ;
+    (WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd !Test_request.registered_requests) ;
   Lwt.cancel f1 ;
   Lwt.return_unit
 
@@ -350,13 +330,13 @@ let test_full_fetch_issues_request _ () =
 *)
 let test_clear_or_cancel_removes _ () =
   let requester = init_full_requester () in
-  Test_Requester.inject requester "foo" 1
-  >>= (fun _ -> Test_Requester.known requester "foo")
+  ( Test_Requester.inject requester "foo" 1 >>= fun _ ->
+    Test_Requester.known requester "foo" )
   >>= fun r ->
   assert_true "injected value is known" r ;
   Test_Requester.clear_or_cancel requester "foo" ;
-  Test_Requester.known requester "foo"
-  >>= fun r -> lwt_assert_false "injected value is cleared" r
+  Test_Requester.known requester "foo" >>= fun r ->
+  lwt_assert_false "injected value is cleared" r
 
 (** Creates a requester. Key "foo" is unknown yet. It is fetched,
     thereby pending. It is cancelled, thereby no longer pending. As of
@@ -375,11 +355,9 @@ let test_clear_or_cancel_cancels _ () =
   assert_false
     "value is no longer pending after cancellation"
     (Test_Requester.pending requester "foo") ;
-  Test_Requester.known requester "foo"
-  >>= fun r ->
+  Test_Requester.known requester "foo" >>= fun r ->
   assert_false "injected value is cleared" r ;
-  f1
-  >>= fun res ->
+  f1 >>= fun res ->
   check
     (tzresults testable_test_value)
     "fetch returns cancellation"
@@ -417,8 +395,7 @@ let test_pending_notified _ () =
   assert_true
     "value is pending after fetch"
     (Test_Requester.pending requester "foo") ;
-  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 >>= fun () ->
   lwt_assert_false
     "value is no longer pending after notification"
     (Test_Requester.pending requester "foo")
@@ -442,8 +419,7 @@ let test_pending_timeout _ () =
   assert_true
     "value is pending after fetch"
     (Test_Requester.pending requester "foo") ;
-  f1
-  >>= fun res ->
+  f1 >>= fun res ->
   assert (res = Error [Test_Requester.Timeout "foo"]) ;
   lwt_assert_false
     "value is no longer pending after timeout"
@@ -462,17 +438,12 @@ let test_full_requester_test_simple_watch _ () =
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
   let f2 = Test_Requester.fetch requester "bar" precheck_pass in
   (* Notify the two values *)
-  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
-  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2 >>= fun () ->
   (* resolve promises *)
-  f1
-  >>= fun _ ->
-  f2
-  >>= fun _ ->
-  Lwt_stream.nget 2 stream
-  >>= fun stream_list ->
+  f1 >>= fun _ ->
+  f2 >>= fun _ ->
+  Lwt_stream.nget 2 stream >>= fun stream_list ->
   check
     (list (pair string int))
     "obtained stream"
@@ -489,8 +460,7 @@ let test_full_requester_test_notify_non_fetched_watch _ () =
   let (stream, stopper) = Test_Requester.watch requester in
   (* Notify the a value that not been requested, should be ignored and
      hence not visible to the watcher. *)
-  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 >>= fun () ->
   Lwt_watcher.shutdown stopper ;
   Lwt_stream.is_empty stream
   >>= lwt_assert_true "obtained stream should be empty"
@@ -505,34 +475,27 @@ let test_full_requester_test_double_watcher _ () =
   (* Fetch a values *)
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
   (* Notify the value *)
-  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 >>= fun () ->
   (* resolve promises *)
-  f1
-  >>= fun _ ->
+  f1 >>= fun _ ->
   (* check first stream *)
-  Lwt_stream.nget 1 stream1
-  >>= fun stream_list1 ->
+  Lwt_stream.nget 1 stream1 >>= fun stream_list1 ->
   (check (list (pair string int))) "obtained stream1" [("foo", 1)] stream_list1 ;
   (* check second stream *)
-  Lwt_stream.nget 1 stream2
-  >>= fun stream_list2 ->
+  Lwt_stream.nget 1 stream2 >>= fun stream_list2 ->
   (check (list (pair string int))) "obtained stream2" [("foo", 1)] stream_list2 ;
   (* shutdown first stream *)
   Lwt_watcher.shutdown stopper1 ;
   (* Fetch a values *)
   let f2 = Test_Requester.fetch requester "bar" precheck_pass in
   (* Notify the value *)
-  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2
-  >>= fun () ->
+  Test_Requester.notify requester P2p_peer.Id.zero "bar" 2 >>= fun () ->
   (* resolve promises *)
-  f2
-  >>= fun _ ->
+  f2 >>= fun _ ->
   (* verify that the first stream is empty *)
   assert_true "stream1 is empty" (Lwt_stream.is_closed stream1) ;
   (* check second stream received the value *)
-  Lwt_stream.nget 1 stream2
-  >>= fun stream_list2 ->
+  Lwt_stream.nget 1 stream2 >>= fun stream_list2 ->
   (check (list (pair string int)))
     "obtained second value in stream2 "
     [("bar", 2)]
@@ -595,8 +558,7 @@ let test_full_requester_test_notify_invalid _ () =
   (* Fetch invalid value  *)
   let f1 = Test_Requester.fetch req "foo" precheck_fail in
   (* Notify value *)
-  Test_Requester.notify req P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify req P2p_peer.Id.zero "foo" 1 >>= fun () ->
   Test_Requester.known req "foo"
   >>= lwt_assert_false "fetched value is still not known"
   >>= fun () -> lwt_assert_true "promise is still pending" (is_pending f1)
@@ -609,11 +571,11 @@ let test_full_requester_test_notify_valid _ () =
   (* Fetch valid value  *)
   let f1 = Test_Requester.fetch req "foo" precheck_pass in
   (* Notify value *)
-  Test_Requester.notify req P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify req P2p_peer.Id.zero "foo" 1 >>= fun () ->
   Test_Requester.known req "foo"
   >>= lwt_assert_true "fetched value is now known"
-  >>= Lwt_unix.yield (* Ensure that [f1] is scheduled *)
+  >>= Lwt_unix.yield
+  (* Ensure that [f1] is scheduled *)
   >>= fun () -> lwt_assert_true "promise is resolved" (is_resolved f1)
 
 (** Notifies a value that has not been fetched. The notification is
@@ -622,8 +584,7 @@ let test_full_requester_test_notify_valid _ () =
 let test_full_requester_test_notify_unfetched _ () =
   let req = init_full_requester () in
   (* Notify value that has not been fetched *)
-  Test_Requester.notify req P2p_peer.Id.zero "foo" 1
-  >>= fun () ->
+  Test_Requester.notify req P2p_peer.Id.zero "foo" 1 >>= fun () ->
   Test_Requester.known req "foo"
   >>= lwt_assert_false "fetched value is not known"
 
@@ -646,8 +607,7 @@ let test_full_requester_test_notify_disk_duplicate _ () =
 let test_full_requester_test_notify_memory_duplicate _ () =
   let req = init_full_requester () in
   (* Put value in memory *)
-  Test_Requester.inject req "foo" 1
-  >>= fun _ ->
+  Test_Requester.inject req "foo" 1 >>= fun _ ->
   (* Fetch valid value  *)
   ignore (Test_Requester.fetch req "foo" precheck_pass) ;
   (* Notify the value *)
@@ -665,34 +625,34 @@ let test_full_requester_test_pending_requests _ () =
   in
   let with_request key k =
     Lwt.join
-      [ Test_Requester.fetch req key precheck_pass >|= ignore;
+      [
+        Test_Requester.fetch req key precheck_pass >|= ignore;
         (* Ensure that the request is registered before [k] is scheduled. *)
-        Lwt_main.yield () >>= k ]
+        Lwt_main.yield () >>= k;
+      ]
   in
   (* Variant of [with_request] for requests that are never satisfied. When [k]
      returns, the request is left pending. *)
   let with_unmet_request key k =
     Lwt.choose
-      [ ( Test_Requester.fetch req key precheck_pass
-        >|= fun _ -> Alcotest.fail "Request should not have been satisfied" );
-        Lwt_main.yield () >>= k ]
+      [
+        ( Test_Requester.fetch req key precheck_pass >|= fun _ ->
+          Alcotest.fail "Request should not have been satisfied" );
+        Lwt_main.yield () >>= k;
+      ]
   in
   (* Fetch value  *)
   check_pending_count "0 pending requests" 0 ;
   let foo_cancelled : unit Lwt.t =
-    with_request "foo"
-    @@ fun () ->
+    with_request "foo" @@ fun () ->
     check_pending_count "1 pending requests" 1 ;
-    with_unmet_request "bar"
-    @@ fun () ->
+    with_unmet_request "bar" @@ fun () ->
     check_pending_count "2 pending requests" 2 ;
-    with_unmet_request "bar"
-    @@ fun () ->
+    with_unmet_request "bar" @@ fun () ->
     check_pending_count "still 2 pending requests" 2 ;
     Lwt.return (Test_Requester.clear_or_cancel req "foo")
   in
-  foo_cancelled
-  >|= fun () -> check_pending_count "back to 1 pending requests" 1
+  foo_cancelled >|= fun () -> check_pending_count "back to 1 pending requests" 1
 
 (** Test memory_table_length *)
 
@@ -700,20 +660,13 @@ let test_full_requester_test_pending_requests _ () =
 let test_full_requester_test_memory_table_length _ () =
   let req = init_full_requester () in
   (check int) "0 cached values" 0 (Test_Requester.memory_table_length req) ;
-  Test_Requester.inject req "foo" 1
-  >>= fun _ ->
+  Test_Requester.inject req "foo" 1 >>= fun _ ->
   (check int) "1 cached values" 1 (Test_Requester.memory_table_length req) ;
-  Test_Requester.inject req "bar" 2
-  >>= fun _ ->
+  Test_Requester.inject req "bar" 2 >>= fun _ ->
   (check int) "2 cached values" 2 (Test_Requester.memory_table_length req) ;
-  Test_Requester.inject req "bar" 2
-  >>= fun _ ->
-  (check int)
-    "still 2 cached values"
-    2
-    (Test_Requester.memory_table_length req) ;
-  Test_Requester.inject req "baz" 3
-  >>= fun _ ->
+  Test_Requester.inject req "bar" 2 >>= fun _ ->
+  (check int) "still 2 cached values" 2 (Test_Requester.memory_table_length req) ;
+  Test_Requester.inject req "baz" 3 >>= fun _ ->
   (check int) "now 3 cached values" 3 (Test_Requester.memory_table_length req) ;
   Lwt.return_unit
 
@@ -726,8 +679,10 @@ let test_full_requester_shutdown _ () =
 let () =
   Alcotest_lwt.run
     "tezos-requester"
-    [ ( "all",
-        [ Alcotest_lwt.test_case_sync
+    [
+      ( "all",
+        [
+          Alcotest_lwt.test_case_sync
             "test create: simple"
             `Quick
             test_full_requester;
@@ -834,5 +789,7 @@ let () =
           Alcotest_lwt.test_case
             "test shutdown"
             `Quick
-            test_full_requester_shutdown ] ) ]
+            test_full_requester_shutdown;
+        ] );
+    ]
   |> Lwt_main.run

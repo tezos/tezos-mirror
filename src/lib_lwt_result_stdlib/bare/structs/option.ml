@@ -74,12 +74,35 @@ let value_e o ~error = to_result ~none:error o
 
 let value_f o ~default = match o with None -> default () | Some v -> v
 
-let value_fe o ~error =
-  match o with None -> Error (error ()) | Some v -> Ok v
+let value_fe o ~error = match o with None -> Error (error ()) | Some v -> Ok v
 
 let either oa ob = match oa with Some _ -> oa | None -> ob
 
 let either_f oa ob = match oa with Some _ -> oa | None -> ob ()
+
+let merge f oa ob =
+  match (oa, ob) with
+  | (None, None) -> None
+  | (Some r, None) | (None, Some r) -> Some r
+  | (Some a, Some b) -> Some (f a b)
+
+let merge_e f oa ob =
+  match (oa, ob) with
+  | (None, None) -> none_e
+  | (Some r, None) | (None, Some r) -> some_e r
+  | (Some a, Some b) -> f a b >>? some_e
+
+let merge_s f oa ob =
+  match (oa, ob) with
+  | (None, None) -> none_s
+  | (Some r, None) | (None, Some r) -> some_s r
+  | (Some a, Some b) -> f a b >>= some_s
+
+let merge_es f oa ob =
+  match (oa, ob) with
+  | (None, None) -> none_es
+  | (Some r, None) | (None, Some r) -> some_es r
+  | (Some a, Some b) -> f a b >>=? some_es
 
 let map_s f o =
   match o with None -> Lwt.return_none | Some v -> f v >>= Lwt.return_some
@@ -91,6 +114,37 @@ let map_es f o = match o with None -> none_es | Some v -> f v >|=? some
 let fold_s ~none ~some = function None -> Lwt.return none | Some v -> some v
 
 let fold_f ~none ~some = function None -> none () | Some v -> some v
+
+let filter p o = match o with Some x when p x -> o | Some _ | None -> None
+
+let filter_s p o =
+  match o with
+  | None -> none_s
+  | Some x -> ( p x >>= function true -> Lwt.return o | false -> none_s)
+
+let filter_e p o =
+  match o with
+  | None -> none_e
+  | Some x -> ( p x >>? function true -> Ok o | false -> none_e)
+
+let filter_es p o =
+  match o with
+  | None -> none_es
+  | Some x -> ( p x >>=? function true -> Monad.return o | false -> none_es)
+
+let filter_map f o = bind o f
+
+let filter_map_s f o = match o with None -> none_s | Some x -> f x
+
+let filter_map_e f o = match o with None -> none_e | Some x -> f x
+
+let filter_map_es f o = match o with None -> none_es | Some x -> f x
+
+let filter_ok = function Some (Ok x) -> Some x | Some (Error _) | None -> None
+
+let filter_error = function
+  | Some (Error x) -> Some x
+  | Some (Ok _) | None -> None
 
 let iter_s f = function None -> Lwt.return_unit | Some v -> f v
 

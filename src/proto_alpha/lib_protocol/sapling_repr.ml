@@ -1,24 +1,27 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type transaction = Sapling.UTXO.transaction
 
@@ -44,17 +47,15 @@ let diff_encoding =
   conv
     (fun d -> (d.commitments_and_ciphertexts, d.nullifiers))
     (fun (commitments_and_ciphertexts, nullifiers) ->
-      ( match commitments_and_ciphertexts with
-      | [] ->
-          ()
+      (match commitments_and_ciphertexts with
+      | [] -> ()
       | (_cm_hd, ct_hd) :: rest ->
           let memo_size = Sapling.Ciphertext.get_memo_size ct_hd in
           List.iter
             (fun (_cm, ct) ->
               assert (
-                Compare.Int.(Sapling.Ciphertext.get_memo_size ct = memo_size)
-              ))
-            rest ) ;
+                Compare.Int.(Sapling.Ciphertext.get_memo_size ct = memo_size)))
+            rest) ;
       {commitments_and_ciphertexts; nullifiers})
     (obj2
        (req
@@ -75,8 +76,8 @@ module Memo_size = struct
 
   let err =
     Error
-      ( "a positive 16-bit integer (between 0 and " ^ string_of_int max_uint16
-      ^ ")" )
+      ("a positive 16-bit integer (between 0 and " ^ string_of_int max_uint16
+     ^ ")")
 
   let parse_z z =
     if Compare.Z.(Z.zero <= z) && Compare.Z.(z <= max_uint16_z) then
@@ -88,8 +89,7 @@ end
 
 let transaction_get_memo_size (transaction : Sapling.UTXO.transaction) =
   match transaction.outputs with
-  | [] ->
-      None
+  | [] -> None
   | {ciphertext; _} :: _ ->
       (* Encoding ensures all ciphertexts have the same memo size. *)
       Some (Sapling.Ciphertext.get_memo_size ciphertext)

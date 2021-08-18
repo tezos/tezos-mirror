@@ -93,6 +93,8 @@ module Period : sig
 
   val to_seconds : period -> int64
 
+  val add : period -> period -> period tzresult
+
   val mult : int32 -> period -> period tzresult
 
   val zero : period
@@ -102,6 +104,8 @@ module Period : sig
   val one_minute : period
 
   val one_hour : period
+
+  val compare : period -> period -> int
 end
 
 module Timestamp : sig
@@ -122,6 +126,8 @@ module Timestamp : sig
   val to_seconds_string : time -> string
 
   val current : context -> time
+
+  val predecessor : context -> time
 end
 
 module Raw_level : sig
@@ -167,7 +173,9 @@ module Cycle : sig
 end
 
 module Gas : sig
-  module Arith : Fixed_point_repr.Safe
+  module Arith :
+    Fixed_point_repr.Safe
+      with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
 
   type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
@@ -175,7 +183,7 @@ module Gas : sig
 
   val pp : Format.formatter -> t -> unit
 
-  type cost
+  type cost = Saturation_repr.may_saturate Saturation_repr.t
 
   val cost_encoding : cost Data_encoding.encoding
 
@@ -207,20 +215,43 @@ module Gas : sig
 
   val ( +@ ) : cost -> cost -> cost
 
-  val check_limit : context -> 'a Arith.t -> unit tzresult
+  (** Checks that the given gas limit does not exceed the hard gas limit
+      per operation *)
+  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
 
+  (** Consumes gas equal to the given operation gas limit in the current
+      block gas level of the context. May fail if not enough gas remains
+      in the block *)
+  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
+
+  (** Sets a limit to the consumable operation gas *)
   val set_limit : context -> 'a Arith.t -> context
 
+  (** Allows unlimited gas consumption *)
   val set_unlimited : context -> context
 
+  (** Consumes operation gas. May fail if not enough gas remains for the
+      operation *)
   val consume : context -> cost -> context tzresult
 
-  val check_enough : context -> cost -> unit tzresult
+  (** Returns the current gas counter. *)
+  val remaining_operation_gas : context -> Arith.fp
 
+  (** Update gas counter in the context. *)
+  val update_remaining_operation_gas : context -> Arith.fp -> context
+
+  (** Triggers an error in case of gas exhaustion. *)
+  val gas_exhausted_error : context -> 'a tzresult
+
+  (** Returns operation gas level *)
   val level : context -> t
 
+  (** Returns the operation gas level difference between two contexts.
+      Returns [Arith.zero] if any of the contexts are set to unlimited
+      gas *)
   val consumed : since:context -> until:context -> Arith.fp
 
+  (** Returns block gas level *)
   val block_level : context -> Arith.fp
 
   val cost_of_repr : Gas_limit_repr.cost -> cost
@@ -424,31 +455,13 @@ module Script : sig
 
   val lazy_expr_encoding : lazy_expr Data_encoding.t
 
+  val deserialization_cost_estimated_from_bytes : int -> Gas.cost
+
   val deserialized_cost : expr -> Gas.cost
 
   val serialized_cost : bytes -> Gas.cost
 
-  val traversal_cost : node -> Gas.cost
-
-  val int_node_cost : Z.t -> Gas.cost
-
-  val int_node_cost_of_numbits : int -> Gas.cost
-
-  val string_node_cost : string -> Gas.cost
-
-  val string_node_cost_of_length : int -> Gas.cost
-
   val bytes_node_cost : bytes -> Gas.cost
-
-  val bytes_node_cost_of_length : int -> Gas.cost
-
-  val prim_node_cost_nonrec : expr list -> annot -> Gas.cost
-
-  val seq_node_cost_nonrec : expr list -> Gas.cost
-
-  val seq_node_cost_nonrec_of_length : int -> Gas.cost
-
-  val minimal_deserialize_cost : lazy_expr -> Gas.cost
 
   val force_decode_in_context :
     context -> lazy_expr -> (expr * context) tzresult
@@ -457,8 +470,6 @@ module Script : sig
     context -> lazy_expr -> (bytes * context) tzresult
 
   val unit_parameter : lazy_expr
-
-  val micheline_nodes : node -> int
 
   val strip_locations_cost : node -> Gas.cost
 end
@@ -495,6 +506,7 @@ module Constants : sig
     blocks_per_roll_snapshot : int32;
     blocks_per_voting_period : int32;
     time_between_blocks : Period.t list;
+    minimal_block_delay : Period.t;
     endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas.Arith.integral;
     hard_gas_limit_per_block : Gas.Arith.integral;
@@ -514,6 +526,9 @@ module Constants : sig
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period.t;
+    liquidity_baking_subsidy : Tez.t;
+    liquidity_baking_sunset_level : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -522,15 +537,9 @@ module Constants : sig
 
   val preserved_cycles : context -> int
 
-  val blocks_per_cycle : context -> int32
-
-  val blocks_per_commitment : context -> int32
-
-  val blocks_per_roll_snapshot : context -> int32
-
-  val blocks_per_voting_period : context -> int32
-
   val time_between_blocks : context -> Period.t list
+
+  val minimal_block_delay : context -> Period.t
 
   val endorsers_per_block : context -> int
 
@@ -569,6 +578,12 @@ module Constants : sig
   val quorum_max : context -> int32
 
   val min_proposal_quorum : context -> int32
+
+  val liquidity_baking_subsidy : context -> Tez.t
+
+  val liquidity_baking_sunset_level : context -> int32
+
+  val liquidity_baking_escape_ema_threshold : context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {fixed : fixed; parametric : parametric}
@@ -611,20 +626,9 @@ module Level : sig
 
   val last_allowed_fork_level : context -> Raw_level.t
 
-  type compat_t = {
-    level : Raw_level.t;
-    level_position : int32;
-    cycle : Cycle.t;
-    cycle_position : int32;
-    voting_period : int32;
-    voting_period_position : int32;
-    expected_commitment : bool;
-  }
+  val dawn_of_a_new_cycle : context -> Cycle.t option
 
-  val compat_encoding : compat_t Data_encoding.t
-
-  val to_deprecated_type :
-    t -> voting_period_index:int32 -> voting_period_position:int32 -> compat_t
+  val may_snapshot_rolls : context -> bool
 end
 
 module Fitness : sig
@@ -673,8 +677,7 @@ end
 module Seed : sig
   type seed
 
-  type error +=
-    | Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+  type error += Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
 
   val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
 
@@ -714,6 +717,22 @@ module Big_map : sig
     context ->
     Id.t ->
     (context * (Script.expr * Script.expr) option) tzresult Lwt.t
+
+  (** [list_values ?offset ?length ctxt id] lists all values stored in big map [id].
+
+      The first [offset] values are ignored (if passed). Negative offsets are treated as [0].
+
+      There will be no more than [length] values in the result list (if passed).
+      Negative values are treated as [0].
+
+      The returned {!context} takes into account gas consumption of loading values.
+  *)
+  val list_values :
+    ?offset:int ->
+    ?length:int ->
+    context ->
+    Id.t ->
+    (context * Script.expr list) tzresult Lwt.t
 
   type update = {
     key : Script_repr.expr;
@@ -766,7 +785,7 @@ module Sapling : sig
   (**
     Returns a [state] with fields filled accordingly.
     [id] should only be used by [extract_lazy_storage_updates].
-  *)
+   *)
   val empty_state : ?id:Id.t -> memo_size:Memo_size.t -> unit -> state
 
   type transaction = Sapling.UTXO.transaction
@@ -777,7 +796,7 @@ module Sapling : sig
 
   (**
     Tries to fetch a state from the storage.
-  *)
+   *)
   val state_from_id : context -> Id.t -> (state * context) tzresult Lwt.t
 
   val rpc_arg : Id.t RPC_arg.t
@@ -818,9 +837,7 @@ module Lazy_storage : sig
   module IdSet : sig
     type t
 
-    type 'acc fold_f = {
-      f : 'i 'a 'u. ('i, 'a, 'u) Kind.t -> 'i -> 'acc -> 'acc;
-    }
+    type 'acc fold_f = {f : 'i 'a 'u. ('i, 'a, 'u) Kind.t -> 'i -> 'acc -> 'acc}
 
     val empty : t
 
@@ -982,7 +999,7 @@ module Receipt : sig
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
-  type update_origin = Block_application | Protocol_migration
+  type update_origin = Block_application | Protocol_migration | Subsidy
 
   type balance_updates = (balance * balance_update * update_origin) list
 
@@ -1096,11 +1113,9 @@ module Voting_period : sig
 
   val pp_info : Format.formatter -> info -> unit
 
-  val get_current_info : context -> info tzresult Lwt.t
+  val get_rpc_current_info : context -> info tzresult Lwt.t
 
-  val get_rpc_fixed_current_info : context -> info tzresult Lwt.t
-
-  val get_rpc_fixed_succ_info : context -> info tzresult Lwt.t
+  val get_rpc_succ_info : context -> info tzresult Lwt.t
 end
 
 module Vote : sig
@@ -1177,6 +1192,7 @@ module Block_header : sig
     priority : int;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
+    liquidity_baking_escape_vote : bool;
   }
 
   type protocol_data = {contents : contents; signature : Signature.t}
@@ -1368,6 +1384,9 @@ module Fees : sig
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
+  val record_paid_storage_space_subsidy :
+    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
   val start_counting_storage_fees : context -> context
 
   val burn_storage_fees :
@@ -1427,8 +1446,7 @@ module Operation : sig
 
   type error += Invalid_signature (* `Permanent *)
 
-  val check_signature :
-    public_key -> Chain_id.t -> _ operation -> unit tzresult
+  val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
@@ -1456,8 +1474,7 @@ module Operation : sig
 
     val endorsement_with_slot_case : Kind.endorsement_with_slot case
 
-    val double_endorsement_evidence_case :
-      Kind.double_endorsement_evidence case
+    val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
 
@@ -1483,8 +1500,7 @@ module Operation : sig
             tag : int;
             name : string;
             encoding : 'a Data_encoding.t;
-            select :
-              packed_manager_operation -> 'kind manager_operation option;
+            select : packed_manager_operation -> 'kind manager_operation option;
             proj : 'kind manager_operation -> 'a;
             inj : 'a -> 'kind manager_operation;
           }
@@ -1524,8 +1540,7 @@ module Roll : sig
 
   val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val count_rolls :
-    context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
+  val count_rolls : context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
 
   val get_change :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
@@ -1539,8 +1554,7 @@ module Commitment : sig
 
   val encoding : t Data_encoding.t
 
-  val find :
-    context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
+  val find : context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
 
   val remove_existing :
     context -> Blinded_public_key_hash.t -> context tzresult Lwt.t
@@ -1556,11 +1570,23 @@ module Global : sig
   val set_block_priority : context -> int -> context tzresult Lwt.t
 end
 
+val max_operations_ttl : int
+
+module Migration : sig
+  type origination_result = {
+    balance_updates : Receipt.balance_updates;
+    originated_contracts : Contract.t list;
+    storage_size : Z.t;
+    paid_storage_size_diff : Z.t;
+  }
+end
+
 val prepare_first_block :
   Context.t ->
-  typecheck:(context ->
-            Script.t ->
-            ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
+  typecheck:
+    (context ->
+    Script.t ->
+    ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
@@ -1572,7 +1598,9 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  (context * Receipt.balance_updates * Migration.origination_result list)
+  tzresult
+  Lwt.t
 
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
@@ -1637,4 +1665,16 @@ module Parameters : sig
   }
 
   val encoding : t Data_encoding.t
+end
+
+module Liquidity_baking : sig
+  val get_cpmm_address : context -> Contract.t tzresult Lwt.t
+
+  type escape_ema = Int32.t
+
+  val on_subsidy_allowed :
+    context ->
+    escape_vote:bool ->
+    (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
+    (context * 'a list * escape_ema) tzresult Lwt.t
 end

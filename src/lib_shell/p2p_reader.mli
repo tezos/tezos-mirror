@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -89,8 +89,8 @@
   - [Get_current_head chain_id]:
     message is ignored if the chain [chain_id] is inactive for the remote peer.
     Otherwise, replies with [Current_head (chain_id, head, mempool)] where
-    [head] is the current head for the requested chain. [mempool is the current
-    [mempool], or an empty mempool if the remote peer's mempool is disabled.
+    [head] is the current head for the requested chain. [mempool] is the current
+    mempool, or an empty mempool if the remote peer's mempool is disabled.
 
   - [Current_head (chain_id, header, mempool)]:
     message is ignored if the chain [chain_id] is inactive for the remote peer.
@@ -155,15 +155,19 @@ type callback = {
 }
 
 type chain_db = {
-  chain_state : State.Chain.t;
+  chain_store : Store.Chain.t;
   operation_db : Distributed_db_requester.Raw_operation.t;
   block_header_db : Distributed_db_requester.Raw_block_header.t;
   operations_db : Distributed_db_requester.Raw_operations.t;
-  mutable callback : callback;
+  callback : callback;
   active_peers : P2p_peer.Set.t ref;
       (** Set of remote peers for which this chain is active. *)
   active_connections : connection P2p_peer.Table.t;
 }
+
+(** Lookup for block header in any active chains *)
+val read_block_header :
+  t -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
 (** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
     runs an answering worker on a p2p connection [connection]. [peer_id] is
@@ -176,7 +180,7 @@ val run :
   register:(t -> unit) ->
   unregister:(unit -> unit) ->
   p2p ->
-  State.t ->
+  Store.t ->
   Distributed_db_requester.Raw_protocol.t ->
   chain_db Chain_id.Table.t ->
   P2p_peer.Id.t ->

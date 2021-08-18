@@ -1,3 +1,9 @@
+; tezos-crypto depends on the tezos glue packages that
+; are dune virtual packages and require an implementation.
+
+; tezos-base.unix is used in many executables as a proxy to
+; force linking of the unix implementation of the tezos crypto libraries
+
 (library
  (name tezos_base_unix)
  (public_name tezos-base.unix)
@@ -9,12 +15,10 @@
                    -open Data_encoding))
  (libraries data-encoding
             tezos-crypto
+            bls12-381-unix
+            ; unix implementation of hacl
+            tezos-hacl-glue-unix
             tezos-base
             tezos-stdlib
             tezos-stdlib-unix
             tezos-error-monad))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -43,8 +43,8 @@ module Private_answerer = struct
     Events.(emit private_node_new_peers) conn.peer_id
 
   let bootstrap conn _request =
-    Events.(emit private_node_peers_request) conn.peer_id
-    >>= fun () -> return_unit
+    Events.(emit private_node_peers_request) conn.peer_id >>= fun () ->
+    return_unit
 
   let swap_request conn _request _new_point _peer =
     Events.(emit private_node_swap_request) conn.peer_id
@@ -83,44 +83,36 @@ module Default_answerer = struct
     if conn.is_private then
       Events.(emit private_node_request) conn.peer_id >>= fun () -> return_unit
     else
-      P2p_pool.list_known_points ~ignore_private:true config.pool
-      >>= function
-      | [] ->
-          return_unit
+      P2p_pool.list_known_points ~ignore_private:true config.pool >>= function
+      | [] -> return_unit
       | points -> (
-        match conn.write_advertise points with
-        | Ok true ->
-            log (Advertise_sent {source = source_peer_id}) ;
-            return_unit
-        | Ok false ->
-            (* if not sent then ?? TODO count dropped message ?? *)
-            return_unit
-        | Error err ->
-            Events.(emit advertise_sending_failed) (source_peer_id, err)
-            >>= fun () -> Lwt.return (Error err) )
+          match conn.write_advertise points with
+          | Ok true ->
+              log (Advertise_sent {source = source_peer_id}) ;
+              return_unit
+          | Ok false ->
+              (* if not sent then ?? TODO count dropped message ?? *)
+              return_unit
+          | Error err ->
+              Events.(emit advertise_sending_failed) (source_peer_id, err)
+              >>= fun () -> Lwt.return (Error err))
 
   let swap t pool source_peer_id ~connect current_peer_id new_point =
     t.latest_accepted_swap <- Systime_os.now () ;
-    connect new_point
-    >>= function
+    connect new_point >>= function
     | Ok _new_conn -> (
         t.latest_successful_swap <- Systime_os.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
-        Events.(emit swap_succeeded) new_point
-        >>= fun () ->
+        Events.(emit swap_succeeded) new_point >>= fun () ->
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
-        | None ->
-            Lwt.return_unit
-        | Some conn ->
-            P2p_conn.disconnect conn )
+        | None -> Lwt.return_unit
+        | Some conn -> P2p_conn.disconnect conn)
     | Error err -> (
         t.latest_accepted_swap <- t.latest_successful_swap ;
         t.log (Swap_failure {source = source_peer_id}) ;
         match err with
-        | [Timeout] ->
-            Events.(emit swap_interrupted) (new_point, err)
-        | _ ->
-            Events.(emit swap_failed) (new_point, err) )
+        | [Timeout] -> Events.(emit swap_interrupted) (new_point, err)
+        | _ -> Events.(emit swap_failed) (new_point, err))
 
   let swap_ack config conn request new_point _peer =
     let source_peer_id = conn.peer_id in
@@ -128,18 +120,15 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
-    Events.(emit swap_ack_received) source_peer_id
-    >>= fun () ->
+    Events.(emit swap_ack_received) source_peer_id >>= fun () ->
     match request.last_sent_swap_request with
-    | None ->
-        Lwt.return_unit (* ignore *)
+    | None -> Lwt.return_unit (* ignore *)
     | Some (_time, proposed_peer_id) -> (
-      match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
-      | None ->
-          swap config pool source_peer_id ~connect proposed_peer_id new_point
-          >>= fun () -> Lwt.return_unit
-      | Some _ ->
-          Lwt.return_unit )
+        match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
+        | None ->
+            swap config pool source_peer_id ~connect proposed_peer_id new_point
+            >>= fun () -> Lwt.return_unit
+        | Some _ -> Lwt.return_unit)
 
   let swap_request config conn _request new_point _peer =
     let source_peer_id = conn.peer_id in
@@ -148,8 +137,7 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
-    Events.(emit swap_request_received) source_peer_id
-    >>= fun () ->
+    Events.(emit swap_request_received) source_peer_id >>= fun () ->
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
       Ptime.diff
@@ -164,21 +152,24 @@ module Default_answerer = struct
       || not (P2p_point_state.is_disconnected new_point_info)
     then (
       log (Swap_request_ignored {source = source_peer_id}) ;
-      Events.(emit swap_request_ignored) source_peer_id )
+      Events.(emit swap_request_ignored) source_peer_id)
     else
       match P2p_pool.Connection.random_addr pool ~no_private:true with
-      | None ->
-          Events.(emit no_swap_candidate) source_peer_id
+      | None -> Events.(emit no_swap_candidate) source_peer_id
       | Some (proposed_point, proposed_peer_id) -> (
-        match conn.write_swap_ack proposed_point proposed_peer_id with
-        | Ok true ->
-            log (Swap_ack_sent {source = source_peer_id}) ;
-            swap config pool source_peer_id ~connect proposed_peer_id new_point
-            >>= fun () -> Lwt.return_unit
-        | Ok false ->
-            Lwt.return_unit
-        | Error _ ->
-            Lwt.return_unit )
+          match conn.write_swap_ack proposed_point proposed_peer_id with
+          | Ok true ->
+              log (Swap_ack_sent {source = source_peer_id}) ;
+              swap
+                config
+                pool
+                source_peer_id
+                ~connect
+                proposed_peer_id
+                new_point
+              >>= fun () -> Lwt.return_unit
+          | Ok false -> Lwt.return_unit
+          | Error _ -> Lwt.return_unit)
 
   let create config conn =
     P2p_answerer.

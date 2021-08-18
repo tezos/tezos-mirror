@@ -28,8 +28,7 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
   object (self)
     method load_passwords =
       match password_filename with
-      | None ->
-          None
+      | None -> None
       | Some filename ->
           if Sys.file_exists filename then Some (Lwt_io.lines_of_file filename)
           else None
@@ -37,8 +36,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
     method read_file path =
       Lwt.catch
         (fun () ->
-          Lwt_io.(with_file ~mode:Input path read)
-          >>= fun content -> return content)
+          Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+          return content)
         (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
 
     method private filename alias_name =
@@ -61,20 +60,20 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
             Lwt_unix.[O_CREAT; O_WRONLY]
             0o644
           >>= fun fd ->
-          Lwt_unix.lockf fd Unix.F_LOCK 0
-          >>= fun () ->
+          Lwt_unix.lockf fd Unix.F_LOCK 0 >>= fun () ->
           let sighandler =
             Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd)
           in
           Lwt.return (fd, sighandler)
         in
-        lock ()
-        >>= fun (fd, sh) ->
+        lock () >>= fun (fd, sh) ->
         (* catch might be useless if f always uses the error monad *)
-        Lwt.catch f (function e -> Lwt.return (unlock fd ; raise e))
+        Lwt.catch f (function e ->
+            Lwt.return
+              (unlock fd ;
+               raise e))
         >>= fun res ->
-        Lwt.return (unlock fd)
-        >>= fun () ->
+        Lwt.return (unlock fd) >>= fun () ->
         Lwt_unix.disable_signal_handler sh ;
         Lwt.return res
 
@@ -94,16 +93,14 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
                 alias_name
                 filename
                 (Printexc.to_string e)
-          | data ->
-              return data
+          | data -> return data
 
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       fun alias_name list encoding ->
         Lwt.catch
           (fun () ->
-            Lwt_utils_unix.create_dir base_dir
-            >>= fun () ->
+            Lwt_utils_unix.create_dir base_dir >>= fun () ->
             let filename = self#filename alias_name in
             let json = Data_encoding.Json.construct encoding list in
             Lwt_utils_unix.Json.write_file filename json)
@@ -129,6 +126,8 @@ class unix_prompter : Client_context.prompter =
             else read_line ()
           in
           return (Bytes.of_string line))
+
+    method multiple_password_retries = true
   end
 
 class unix_logger ~base_dir : Client_context.printer =
@@ -136,13 +135,14 @@ class unix_logger ~base_dir : Client_context.printer =
   let log channel msg =
     match channel with
     | "stdout" ->
-        print_endline msg ; Lwt.return_unit
+        print_endline msg ;
+        Lwt.return_unit
     | "stderr" ->
-        prerr_endline msg ; Lwt.return_unit
+        prerr_endline msg ;
+        Lwt.return_unit
     | log ->
         let open Filename.Infix in
-        Lwt_utils_unix.create_dir (base_dir // "logs" // log)
-        >>= fun () ->
+        Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
         Lwt_io.with_file
           ~flags:Unix.[O_APPEND; O_CREAT; O_WRONLY]
           ~mode:Lwt_io.Output
@@ -182,7 +182,8 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
 
     inherit
       Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config Media_type.all_media_types
+        rpc_config
+        Media_type.all_media_types
 
     inherit unix_ui
 
@@ -204,7 +205,11 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
 
     inherit
       Tezos_mockup.RPC_client.mockup_ctxt
-        base_dir mem_only mockup_env chain_id rpc_context
+        base_dir
+        mem_only
+        mockup_env
+        chain_id
+        rpc_context
 
     inherit unix_ui
 
@@ -216,7 +221,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
   end
 
 class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
-  ~rpc_config ~proxy_env : Client_context.full =
+  ~rpc_config ~mode ~proxy_env : Client_context.full =
   object
     inherit unix_logger ~base_dir
 
@@ -230,6 +235,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
         (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
            rpc_config
            Media_type.all_media_types)
+        mode
         proxy_env
 
     inherit unix_ui

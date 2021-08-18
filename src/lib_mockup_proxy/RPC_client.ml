@@ -66,20 +66,26 @@ let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
   object
     method base = base
 
-    method generic_json_call meth ?body uri =
-      C.generic_json_call meth ?body uri
+    method generic_json_call meth ?body uri = C.generic_json_call meth ?body uri
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       fun service params query body ->
         C.call_service media_types ~base service params query body
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
         C.call_streamed_service

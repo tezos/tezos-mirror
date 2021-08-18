@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (gas costs)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas cost functions$"
+    Invocation: dune exec src/proto_010_PtGRANAD/lib_protocol/test/main.exe -- test "^gas cost functions$"
     Subject:    Gas costs
                 Current limitations: for maps, sets & compare, we only test
                 integer comparable keys.
@@ -64,7 +64,8 @@ let free = ["balance"; "bool"; "parsing_unit"; "unparsing_unit"]
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_interpreter_costs =
   let open Michelson_v1_gas.Cost_of.Interpreter in
-  [ ("drop", drop);
+  [
+    ("drop", drop);
     ("dup", dup);
     ("swap", swap);
     ("cons_some", cons_some);
@@ -167,12 +168,14 @@ let all_interpreter_costs =
     ("self_address", self_address);
     ("amount", amount);
     ("chain_id", chain_id);
-    ("unpack_failed", unpack_failed (Bytes.of_string "dummy")) ]
+    ("unpack_failed", unpack_failed (Bytes.of_string "dummy"));
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_parsing_costs =
   let open Michelson_v1_gas.Cost_of.Typechecking in
-  [ ("public_key_optimized", public_key_optimized);
+  [
+    ("public_key_optimized", public_key_optimized);
     ("public_key_readable", public_key_readable);
     ("key_hash_optimized", key_hash_optimized);
     ("key_hash_readable", key_hash_readable);
@@ -193,12 +196,14 @@ let all_parsing_costs =
     ("timestamp_readable", timestamp_readable);
     ("contract", contract);
     ("contract_exists", contract_exists);
-    ("proof_argument", proof_argument 42) ]
+    ("proof_argument", proof_argument 42);
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_unparsing_costs =
   let open Michelson_v1_gas.Cost_of.Unparsing in
-  [ ("public_key_optimized", public_key_optimized);
+  [
+    ("public_key_optimized", public_key_optimized);
     ("public_key_readable", public_key_readable);
     ("key_hash_optimized", key_hash_optimized);
     ("key_hash_readable", key_hash_readable);
@@ -215,17 +220,20 @@ let all_unparsing_costs =
     ("unparse_data_cycle", unparse_data_cycle);
     ("unparsing_unit", unit);
     ("contract", contract);
-    ("operation", operation dummy_bytes) ]
+    ("operation", operation dummy_bytes);
+  ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
 let all_io_costs =
   let open Storage_costs in
-  [ ("read_access 0 0", read_access ~path_length:0 ~read_bytes:0);
+  [
+    ("read_access 0 0", read_access ~path_length:0 ~read_bytes:0);
     ("read_access 1 0", read_access ~path_length:1 ~read_bytes:0);
     ("read_access 0 1", read_access ~path_length:0 ~read_bytes:1);
     ("read_access 1 1", read_access ~path_length:1 ~read_bytes:1);
     ("write_access 0", write_access ~written_bytes:0);
-    ("write_access 1", write_access ~written_bytes:1) ]
+    ("write_access 1", write_access ~written_bytes:1);
+  ]
 
 (* Here we're using knowledge of the internal representation of costs to
    cast them to S ... *)
@@ -238,7 +246,8 @@ let test_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
       if S.(cost > S.zero) then return_unit
-      else if S.equal cost S.zero && List.mem cost_name free then return_unit
+      else if S.equal cost S.zero && List.mem ~equal:String.equal cost_name free
+      then return_unit
       else
         fail
           (Exn
@@ -253,7 +262,8 @@ let test_costs_are_all_positive list () =
   test_cost_reprs_are_all_positive list ()
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "Positivity of interpreter costs"
       `Quick
       (test_costs_are_all_positive all_interpreter_costs);
@@ -268,4 +278,5 @@ let tests =
     Test_services.tztest
       "Positivity of io costs"
       `Quick
-      (test_cost_reprs_are_all_positive all_io_costs) ]
+      (test_cost_reprs_are_all_positive all_io_costs);
+  ]

@@ -1,6 +1,15 @@
 (executables
- (names test_mockup_args test_fuzzing_mockup_args test_persistence)
- (libraries tezos_mockup tezos_mockup_registration tezos-test-services crowbar alcotest
+ (names
+   test_mockup_args
+   test_fuzzing_mockup_args
+   test_persistence)
+ (libraries
+   tezos_mockup
+   tezos_mockup_registration
+   tezos-client-base
+   tezos-test-services
+   qcheck-alcotest
+   tezos-test-helpers
    alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives)))

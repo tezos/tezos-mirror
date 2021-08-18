@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_shell_services
+
 let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
-    (proto_hash : Protocol_hash.t)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) : unit tzresult Lwt.t =
-  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+    (proto_hash : Protocol_hash.t) (chain : Block_services.chain)
+    (block : Block_services.block) : unit tzresult Lwt.t =
+  Block_services.protocols rpc_context ~chain ~block ()
   >>=? fun {current_protocol; _} ->
   if Protocol_hash.equal current_protocol proto_hash then return_unit
   else
@@ -39,10 +40,9 @@ let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
       current_protocol
 
 let get_node_protocol (rpc_context : #RPC_context.simple)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
+    (chain : Block_services.chain) (block : Block_services.block) :
     Protocol_hash.t tzresult Lwt.t =
-  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+  Block_services.protocols rpc_context ~chain ~block ()
   >>=? fun {current_protocol; _} -> return current_protocol
 
 module type Proxy_sig = sig
@@ -54,18 +54,28 @@ module type Proxy_sig = sig
   (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
   val hash :
     #RPC_context.simple ->
-    ?chain:Tezos_shell_services.Block_services.chain ->
-    ?block:Tezos_shell_services.Block_services.block ->
+    ?chain:Block_services.chain ->
+    ?block:Block_services.block ->
     unit ->
     Block_hash.t tzresult Lwt.t
 
   (** How to build the context to execute RPCs on *)
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->
+    (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
-    Tezos_shell_services.Block_services.chain ->
-    Tezos_shell_services.Block_services.block ->
+    Proxy.mode ->
+    Block_services.chain ->
+    Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
+
+  val time_between_blocks :
+    RPC_context.json ->
+    Block_services.chain ->
+    Block_services.block ->
+    int64 option tzresult Lwt.t
+
+  include Light_proto.PROTO_RPCS
 end
 
 type proxy_environment = (module Proxy_sig)
@@ -89,22 +99,23 @@ let register_proxy_context m =
   else registered := m :: !registered
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : #RPC_context.simple)
-    (protocol_hash_opt : Protocol_hash.t option)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
+    (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
+    ?(chain = `Main) ?(block = `Head 0)
+    (protocol_hash_opt : Protocol_hash.t option) :
     proxy_environment tzresult Lwt.t =
-  ( match protocol_hash_opt with
+  let mode_str =
+    match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
+  in
+  (match protocol_hash_opt with
   | None ->
-      get_node_protocol rpc_context chain block
-      >>=? fun protocol_hash ->
+      get_node_protocol rpc_context chain block >>=? fun protocol_hash ->
       printer#warning
-        "protocol of proxy unspecified, using the node's protocol: %a"
+        "protocol of %s unspecified, using the node's protocol: %a"
+        mode_str
         Protocol_hash.pp
         protocol_hash
       >>= fun _ -> return protocol_hash
-  | Some protocol_hash ->
-      return protocol_hash )
+  | Some protocol_hash -> return protocol_hash)
   >>=? fun protocol_hash ->
   check_client_node_proto_agree rpc_context protocol_hash chain block
   >>=? fun _ ->
@@ -116,27 +127,29 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
       available
   in
   match proxy_opt with
-  | Some proxy ->
-      return proxy
+  | Some proxy -> return proxy
   | None -> (
-    match available with
-    | [] ->
-        failwith
-          "There are no proxy environments registered. --mode proxy cannot be \
-           honored."
-    | fst_available :: _ ->
-        let (module Proxy : Proxy_sig) = fst_available in
-        let fst_available_proto = Proxy.protocol_hash in
-        printer#warning
-          "requested protocol (%a) not found in available proxy environments: \
-           %a@;\
-           Proceeding with the first available protocol (%a). This will work \
-           if the mismatch is harmless, otherwise deserialization is the \
-           failure most likely to happen."
-          Protocol_hash.pp
-          protocol_hash
-          (Format.pp_print_list ~pp_sep:Format.pp_print_space Protocol_hash.pp)
-          ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash)) available)
-          Protocol_hash.pp
-          fst_available_proto
-        >>= fun () -> return fst_available )
+      match available with
+      | [] ->
+          failwith
+            "There are no proxy environments registered. --mode proxy cannot \
+             be honored."
+      | fst_available :: _ ->
+          let (module Proxy : Proxy_sig) = fst_available in
+          let fst_available_proto = Proxy.protocol_hash in
+          printer#warning
+            "requested protocol (%a) not found in available proxy \
+             environments: %a@;\
+             Proceeding with the first available protocol (%a). This will work \
+             if the mismatch is harmless, otherwise deserialization is the \
+             failure most likely to happen."
+            Protocol_hash.pp
+            protocol_hash
+            (Format.pp_print_list
+               ~pp_sep:Format.pp_print_space
+               Protocol_hash.pp)
+            ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash))
+               available)
+            Protocol_hash.pp
+            fst_available_proto
+          >>= fun () -> return fst_available)

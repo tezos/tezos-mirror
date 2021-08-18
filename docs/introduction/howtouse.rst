@@ -1,9 +1,11 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _howtouse:
 
-How to use Tezos
-================
+Getting started with Tezos
+==========================
 
-This How To illustrates the use of the various Tezos binaries as well
+This short tutorial illustrates the use of the various Tezos binaries as well
 as some concepts about the network.
 
 .. _tezos_binaries:
@@ -13,34 +15,40 @@ The Binaries
 
 After a successful compilation, you should have the following binaries:
 
-- ``tezos-node``: the tezos daemon itself;
-- ``tezos-client``: a command-line client and basic wallet;
+- ``tezos-node``: the tezos daemon itself (see `Node`_);
+- ``tezos-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node;
 - ``tezos-{baker,endorser,accuser}-*``: daemons to bake, endorse and
   accuse on the Tezos network (see :ref:`howtorun`);
+- ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
+- ``tezos-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
+- ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
+- ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
-The daemons are suffixed with the name of the protocol they are
-bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
-for the Carthage protocol, and ``tezos-baker-alpha`` is the baker
-of the development protocol. See also the `Node Protocol`_ section below.
+The daemons other than the node are suffixed with the name of the protocol they are
+bound to. For instance, ``tezos-baker-009-PsFLoren`` is the baker
+for the Florence protocol, and ``tezos-baker-alpha`` is the baker
+of the development protocol.
+The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
 
 
 Read The Manual
 ---------------
 
-The manual of each binary can be obtained with the command ``man`` and
-the verbosity can be increased with ``-v``::
+All the Tezos binaries provide the ``--help`` option to display information about their usage, including the available options and the possible parameters.
+
+Additionally, most of the above binaries (i.e., all but the node, the validator, and the compiler) provide a textual manual that can be obtained with the command ``man``,
+whose verbosity can be increased with ``-v``, for example::
 
     tezos-client man -v 3
 
-It is also possible to search a keyword in the manual with ``man <keyword>``::
+It is also possible to get information on a specific command in the manual with ``man <command>``::
 
    tezos-client man set
 
-To use one specific command, type the command without arguments to see
-possible completions and options::
+To see the usage of one specific command, you may also type the command without arguments, which display its possible completions and options::
 
    tezos-client transfer
 
@@ -53,7 +61,7 @@ node. In the last case, the above command generates a warning::
     Warning:
       Failed to acquire the protocol version from the node
 
-To get the manual of a command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
+To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
     tezos-client --protocol ProtoALphaALph man transfer
 
@@ -61,8 +69,8 @@ Note that you can get the list of protocols known to the client with::
 
     tezos-client list understood protocols
 
-The full command line documentation of the Tezos client is also available
-online: :ref:`client_manual`.
+The full command line documentation of the Tezos binaries supporting the ``man`` command is also available
+online: :doc:`../shell/cli-commands`.
 
 Node
 ----
@@ -92,7 +100,7 @@ its own new operations when instructed by the ``tezos-client`` and even
 send new blocks when guided by the ``tezos-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
-:ref:`proof-of-stake`).
+:doc:`../active/proof_of_stake`).
 
 
 Node Identity
@@ -140,13 +148,13 @@ Throughout the documentation, `Alpha` refers to the protocol in the
 ``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
 for the currently active protocol. The Alpha protocol is used by
 default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
-suites. Its git history is also more detailed.
+suites.
 
 
 Storage
 ~~~~~~~
 
-All blockchain data is stored under ``$HOME/.tezos-node/``.
+All blockchain data is stored by the node under a data directory, which by default is ``$HOME/.tezos-node/``.
 
 If for some reason your node is misbehaving or there has been an
 upgrade of the network, it is safe to remove this directory, it just
@@ -154,16 +162,16 @@ means that your node will take some time to resync the chain.
 
 If removing this directory, please note that if it took you a long time to
 compute your node identity, keep the ``identity.json`` file and instead only
-remove the child ``store`` and ``context`` directories.
+remove its child ``store``, ``context`` and ``protocol`` (if any) sub-directories.
 
-If you are also running a baker, make sure that it has access to the
-``.tezos-node`` directory of the node.
+If you are also running a baker, make sure that it is configured to access the
+data directory of the node (see :ref:`how to run a baker <baker_run>`).
 
 
 RPC Interface
 ~~~~~~~~~~~~~
 
-The only interface to the node is through JSON RPC calls and it is disabled by
+The only programming interface to the node is through JSON RPC calls and it is disabled by
 default.  More detailed documentation can be found in the :ref:`RPC index.
 <rpc>` The RPC interface must be enabled for the clients
 to communicate with the node but it should not be publicly accessible on the
@@ -191,8 +199,27 @@ The list of configurable options can be obtained using the following command::
 
 You can read more about the :ref:`node configuration <node-conf>` and its :ref:`private mode <private-mode>`.
 
-The node listens to connections from peers on port ``9732``, so it's advisable to
+Besides listening from requests from the client,
+the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
 open incoming connections to that port.
+
+Summing up
+~~~~~~~~~~
+
+Putting together all the above instructions, you may want to run a node as follows:
+
+.. code-block:: shell
+
+    # Download a snapshot for your target network, e.g. <test-net>:
+    wget <snapshot-url> -O <snapshot-file>
+    # Configure the node for running on <test-net>:
+    tezos-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
+    # Import the snapshot into the node data directory:
+    tezos-node snapshot --data-dir ~/.tezos-node-<test-net> import --block <block-hash> <snapshot-file>
+    # Run the node:
+    tezos-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
+
+.. _howtouse_tezos_client:
 
 Client
 ------
@@ -200,58 +227,23 @@ Client
 Tezos client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
 For example, after starting your node you can check if it has finished
-synchronizing using::
+synchronizing (see :doc:`../shell/sync`) using::
 
    tezos-client bootstrapped
 
-This call will hang and return only when the node is synchronized.
-We can now check what is the current timestamp of the head of the
+This call will hang and return only when the node is synchronized
+(recall that this is much faster when starting a node from a snapshot).
+Once the above command returns,
+we can check what is the current timestamp of the head of the
 chain (time is in UTC so it may differ from your local time)::
 
    tezos-client get timestamp
 
+You can also use the above command before the node is bootstrapped, from another terminal.
 However, recall that the commands available on the client depend on the specific
 protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
-
-A Simple Wallet
-~~~~~~~~~~~~~~~
-
-The client is also a basic wallet and after the activation above you
-will notice that the directory ``.tezos-client`` has been populated with
-3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
-The content of each file is in JSON and keeps the mapping between
-aliases (``alice`` in the subsequent commands) and what you would expect from the name
-of the file.
-Secret keys are stored on disk encrypted with a password except when
-using a hardware wallet (see :ref:`ledger`).
-An additional file ``contracts`` contains the addresses of smart
-contracts, which have the form *KT1…*.
-
-We can, for example, generate a new pair of keys, which can be used locally
-with the alias *bob*::
-
-      $ tezos-client gen keys bob
-
-To check the contract has been created::
-
-      $ tezos-client list known contracts
-
-Tezos support three different ECC schemes: *Ed25519*, *secp256k1* (the
-one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
-latter curves have been added for interoperability with Bitcoin and
-Hardware Security Modules (*HSMs*) mostly. Unless your use case
-requires those, you should probably use *Ed25519*. We use a verified
-library for Ed25519, and it is generally recommended over other curves
-by the crypto community, for performance and security reasons.
-
-Make sure to make a back-up of this directory and that the password
-protecting your secret keys is properly managed.
-
-For more advanced key management we offer :ref:`ledger support
-<ledger>` and a :ref:`remote signer<signer>`.
-
 
 .. _faucet:
 
@@ -262,33 +254,76 @@ To test the networks and help users get familiar with the system, on
 :doc:`test networks<test_networks>` you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
-This will provide a wallet in the form of a JSON file
+This will provide a faucet account in the form of a JSON file
 ``tz1__xxxxxxxxx__.json``, that can be activated with the following
 command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you use the ``tezos-docker-manager.sh`` script (renamed as ``edo2net.sh``
-to run the Edo2net test network for instance), you should prefix the file
-with ``container:`` in order to copy it into the docker image:
-``./edo2net.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
+If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``florencenet.sh``
+to run the Florencenet test network for instance), you should prefix the file
+with ``container:`` in order to copy it into the docker image::
+
+    ./florencenet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
 Please preserve the JSON file. It will be necessary in order to
-reactivate the wallet when migrating between test networks, e.g., from
+reactivate the faucet account when migrating between test networks, e.g., from
 one protocol to the next, or in the event the test network is reset.
 
 Please drink carefully and don't abuse the faucet: it only contains
-30,000 wallets for a total amount of ꜩ760,000,000.
+30,000 faucet accounts for a total amount of ꜩ760,000,000.
+
+A Simple Wallet
+~~~~~~~~~~~~~~~
+
+The client is also a basic wallet and after the activation above you
+will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
+3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
+The content of each file is in JSON and keeps the mapping between
+aliases (e.g., ``alice``) and the kind of keys indicated by the name
+of each file.
+Secret keys should be stored on disk encrypted with a password except when
+using a hardware wallet (see :ref:`ledger`).
+An additional file ``contracts`` contains the addresses of smart
+contracts, which have the form *KT1…*.
+
+We can, for example, generate a new pair of keys, which can be used locally
+with the alias *bob*::
+
+      $ tezos-client gen keys bob
+
+To check the account (also called a contract) for Bob has been created::
+
+      $ tezos-client list known contracts
+
+Notice that by default, the keys were stored unencrypted, which is fine in our test example.
+In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
+
+      $ tezos-client gen keys tom --encrypted
+
+Tezos support three different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
+one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
+latter curves have been added for interoperability with Bitcoin and
+Hardware Security Modules (*HSMs*) mostly. Unless your use case
+requires those, you should probably use *Ed25519*. We use a verified
+library for Ed25519, and it is generally recommended over other curves
+by the crypto community, for performance and security reasons.
+
+Make sure to make a back-up of the client data directory and that the password
+protecting your secret keys is properly managed (if you stored them encrypted).
+
+For more advanced key management we offer :ref:`ledger support
+<ledger>` and a :ref:`remote signer<signer>`.
 
 
 Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
 
-To fund our newly created account, we need to transfer some
+To fund our newly created account for Bob, we need to transfer some
 tez using the `transfer` operation.
 Every operation returns a `receipt` that recapitulates all the effects
 of the operation on the blockchain.
@@ -306,13 +341,13 @@ Let's try::
 
 The client asks the node to validate the operation (without sending
 it) and obtains an error.
-The reason is that when we fund a new address we are also creating it
+The reason is that when we fund a new address we are also storing it
 on the blockchain.
 Any storage on chain has a cost associated to it which should be
 accounted for either by paying a fee to a baker or by destroying
 (`burning`) some tez.
 This is particularly important to protect the system from spam.
-Because creating an address requires burning ꜩ0.257 and the client has
+Because storing an address requires burning ꜩ0.257 and the client has
 a default of 0, we need to explicitly set a cap on the amount that we
 allow to burn::
 
@@ -377,10 +412,10 @@ The last important bit of our receipt is the balance updates that
 resume which address is being debited or credited of a certain amount.
 We see in this case that baker ``tz1Ke...yU`` is being credited one
 fee for each operation, that Bob's address ``tz1Rk...Ph`` gets 1 tez
-and that Alice pays the two fees, the transfer, and the burn.
+and that Alice pays the transfer, the burn, and the two fees.
 
 Now that we have a clear picture of what we are going to pay we can
-execute the transfer for real, without the dry-run option.
+execute the transfer for real, without the ``dry-run`` option.
 You will notice that the client hangs for a few seconds before
 producing the receipt because after injecting the operation in your
 local node it is waiting for it to be included by some baker on the
@@ -389,10 +424,10 @@ Once it receives a block with the operation inside it will return the
 receipt.
 
 It is advisable to wait for several blocks to consider the transaction as
-final, for an important operation we advise to wait for 60 blocks.
+final, and for an important operation we advise to wait for 60 blocks.
 
 In the rare case when an operation is lost, how can we be sure that it
-will not be included in any future block and re-emit it?
+will not be included in any future block, and then we may re-emit it?
 After 60 blocks a transaction is considered invalid and can't be
 included anymore in a block.
 Furthermore each operation has a counter (explained in more detail
@@ -419,19 +454,22 @@ In Tezos there are two kinds of accounts: *implicit accounts* and *smart contrac
 Let's originate our first contract and call it *id*::
 
     tezos-client originate contract id transferring 1 from alice \
-                 running ./tests_python/contracts/attic/id.tz \
+                 running ./tests_python/contracts_alpha/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
 The initial balance is ꜩ1, generously provided by implicit account
-*alice*. The contract stores a Michelson program ``id.tz``, with
+*alice*. The contract stores a Michelson program ``id.tz``
+(found in file :src:`./tests_python/contracts_alpha/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
 needed to avoid shell expansion). The parameter ``--burn-cap``
 specifies the maximal fee the user is willing to pay for this
 operation, the actual fee being determined by the system.
 
-A Michelson contract is semantically a pure function, mapping a pair
-``(parameter, storage)`` to a pair ``(list_of_operations, storage)``. It can
-be seen equivalently as an object with a single method, and a single attribute.
+A Michelson contract is expressed as a pure function, mapping a pair
+``(parameter, storage)`` to a pair ``(list_of_operations, storage)``.
+However, when this pure function is applied
+to the blockchain state, it can
+be seen as an object with a single method taking one parameter (``parameter``), and with a single attribute (``storage``).
 The method updates the state (the storage), and submits operations as a side
 effect.
 
@@ -445,12 +483,12 @@ For the sake of this example, here is the `id.tz` contract:
 
 It specifies the types for the parameter and storage, and implements a
 function which updates the storage with the value passed as a parameter
-and returns the storage unchanged together with an empty list of
+and returns this new storage together with an empty list of
 operations.
 
 
-Gas and Storage Cost Model
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Gas and Storage Costs
+~~~~~~~~~~~~~~~~~~~~~
 
 A quick look at the balance updates on the receipt shows that on top of
 funding the contract with ꜩ1, *alice* was also charged an extra cost
@@ -487,25 +525,26 @@ the fee offered versus the gas and fees of other transactions.
 If you are happy with the gas and storage of your transaction you can
 run it for real, however it is always a good idea to set an explicit
 limit for both. The transaction fails if any of the two limits are passed.
+Note that the storage limit sets an upper bound to the storage size *difference*, so in our case, it may be 0 because our new value does not increase at all the storage size.
 
 ::
 
    tezos-client transfer 0 from alice to id --arg '"world"' \
                                             --gas-limit 11375 \
-                                            --storage-limit 46
+                                            --storage-limit 0
 
 A baker is more likely to include an operation with lower gas and
 storage limits because it takes fewer resources to execute so it is in
 the best interest of the user to pick limits that are as close as
 possible to the actual use. In this case, you may have to specify some
-fees as the baker is expecting some for the resource
+fees (using option ``--fee``) as the baker is expecting some for the resource
 usage. Otherwise, you can force a low fee operation using the
-`--force-low-fee`, with the risk that no baker will include it.
+``--force-low-fee``, with the risk that no baker will include it.
 
 More test contracts can be found in directory
-:src:`tests_python/contracts_007/`.
+:src:`tests_python/contracts_alpha/`.
 Advanced documentation of the smart contract language is available
-:ref:`here<michelson>`.
+:doc:`here<../active/michelson>`.
 
 
 Validation
@@ -514,15 +553,16 @@ Validation
 The node allows validating an operation before submitting it to the
 network by simply simulating the application of the operation to the
 current context.
-In general, if you just send an invalid operation e.g. sending more
-tokens that what you own, the node will broadcast it and when it is
-included in a block you'll have to pay the usual fee even if it won't
+Without this mechanism, if you just send an invalid operation (e.g. sending more
+tokens than you own), the node would broadcast it and when it is
+included in a block you would have to pay the usual fee even if it won't
 have an effect on the context.
 To avoid this case the client first asks the node to validate the
-transaction and then sends it.
+transaction and only then sends it.
 
-The same validation is used when you pass the option ``--dry-run``,
+The same validation is used when you pass the option ``--dry-run``:
 the receipt that you see is actually a simulated one.
+The only difference is that, when this option is supplied, the transaction is not sent even if it proves to be valid.
 
 Another important use of validation is to determine gas and storage
 limits.
@@ -540,8 +580,8 @@ It's RPCs all the Way Down
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The client communicates with the node uniquely through RPC calls so
-make sure that the node is listening and that the ports are
-correct.
+make sure that the node is listening on the right ports and that the ports are
+open.
 For example the ``get timestamp`` command above is a shortcut for::
 
    tezos-client rpc get /chains/main/blocks/head/header/shell
@@ -597,3 +637,69 @@ cycle as many delegates receive back part of their unfrozen accounts.
 
 
 You can find more info in the :ref:`RPCs' page. <rpc>`
+
+Environment variables for the client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behavior of the client can be configured using the following environment variables:
+
+- `TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER`: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
+- `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
+  Its value is overridden by option ``-d``.
+- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>`.
+  Its value is overwritten by option ``-d``.
+- `TEZOS_CLIENT_RPC_TIMEOUT_SECONDS`: This variable controls how long (in seconds, as an integer)
+  the client will wait for a response from the node, for each of the two RPC calls made during startup.
+  If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
+  The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
+  (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
+
+Other binaries
+--------------
+
+In this short tutorial we will not use some other binaries, but let as briefly review their roles.
+
+Validator
+~~~~~~~~~
+
+The Tezos validator (``tezos-validator``) is an auxiliary daemon that is launched by ``tezos-node`` in order to validate operations in parallel to its main process (unless the option ``--singleprocess`` is given).
+It also applies the valid operations in a block and computes the resulting context.
+
+It is not meant to be invoked directly by users.
+
+Codec
+~~~~~
+
+The Tezos codec (``tezos-codec``) is a utility that:
+
+- provides documentation for all the encodings used in the ``tezos-node`` (and other binaries), and
+- allows to convert from JSON to binary and vice-versa for all these encodings.
+
+It is meant to be used by developers for tests, for generating documentation when writing libraries that share data with the node, for light scripting, etc.
+For more details on its usage, refer to its :ref:`online manual <codec_manual>` and to :doc:`../developer/encodings`.
+
+Protocol compiler
+~~~~~~~~~~~~~~~~~
+
+The protocol compiler (``tezos-protocol-compiler``) can compile protocols within the limited environment that the shell provides.
+This environment is limited to a restricted set of libraries in order to constrain the possible behavior of the protocols.
+
+It is meant to be used:
+
+- by developers to compile the protocol under developement,
+- by the packaging process to compile protocols that are pre-linked in the binaries,
+- by the Tezos node when there is an on-chain update to a protocol that is not pre-linked with the binary.
+
+Summary
+-------
+
+In this tutorial, you have learned:
+
+- to start a Tezos node and set up its basic configuration;
+- to use the Tezos client to create implict accounts and do transfers between them;
+- to deploy and interact with a simple predefined smart contract;
+- to distinguish between the various costs associated to transactions such as burnt tez, fees, storage costs, and gas consumption;
+- some further concepts such as transaction validation and the RPC interface;
+- the role of other binaries, less frequently used than the client and the node.
+
+You may now explore Tezos further, and enjoy using it!

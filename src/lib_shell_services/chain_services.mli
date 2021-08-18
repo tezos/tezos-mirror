@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,11 +32,7 @@ val to_string : chain -> string
 
 val chain_arg : chain RPC_arg.t
 
-type invalid_block = {
-  hash : Block_hash.t;
-  level : Int32.t;
-  errors : error list;
-}
+type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = unit * chain
 
@@ -141,12 +138,6 @@ module S : sig
       RPC_service.t
 
     val delete :
-      ( [`DELETE],
-        prefix,
-        prefix * Block_hash.t,
-        unit,
-        unit,
-        unit )
-      RPC_service.t
+      ([`DELETE], prefix, prefix * Block_hash.t, unit, unit, unit) RPC_service.t
   end
 end

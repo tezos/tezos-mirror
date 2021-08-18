@@ -16,8 +16,3 @@
                    -open Tezos_client_009_PsFLoren_commands
                    -open Tezos_protocol_009_PsFLoren
                    -open Tezos_protocol_environment_009_PsFLoren)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

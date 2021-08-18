@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Updater_logging
 open Filename.Infix
+module Events = Updater_events
 
 (** Compiler *)
 
@@ -33,17 +33,19 @@ let datadir = ref None
 let get_datadir () =
   match !datadir with
   | None ->
-      fatal_error "Node not initialized" ;
+      Events.(emit node_uninitialized) () >>= fun () ->
       Lwt_exit.exit_and_raise 1
-  | Some m ->
-      m
+  | Some m -> Lwt.return m
 
 let init dir = datadir := Some dir
+
+(* An optimization trick to avoid allocating meaningless promisses. *)
+let then_false () = Lwt.return_false
 
 let compiler_name = "tezos-protocol-compiler"
 
 let do_compile hash p =
-  let datadir = get_datadir () in
+  get_datadir () >>= fun datadir ->
   let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
   let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
   let plugin_file =
@@ -51,49 +53,38 @@ let do_compile hash p =
     // Protocol_hash.to_short_b58check hash
     // Format.asprintf "protocol_%a" Protocol_hash.pp hash
   in
-  Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p
-  >>=? (fun () ->
-         let compiler_command =
-           ( Sys.executable_name,
-             Array.of_list
-               [compiler_name; "-register"; "-o"; plugin_file; source_dir] )
-         in
-         let fd =
-           Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644)
-         in
-         Lwt_process.exec
-           ~stdin:`Close
-           ~stdout:(`FD_copy fd)
-           ~stderr:(`FD_move fd)
-           compiler_command
-         >>= return)
-  >|= function
-  | Error err ->
-      log_error "Error %a" pp_print_error err ;
-      false
+  ( Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p >>=? fun () ->
+    let compiler_command =
+      ( Sys.executable_name,
+        Array.of_list
+          [compiler_name; "-register"; "-o"; plugin_file; source_dir] )
+    in
+    let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
+    Lwt_process.exec
+      ~stdin:`Close
+      ~stdout:(`FD_copy fd)
+      ~stderr:(`FD_move fd)
+      compiler_command
+    >>= return )
+  >>= function
+  | Error err -> Events.(emit compiler_exit_error) err >>= then_false
   | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
-      log_error "INTERRUPTED COMPILATION (%s)" log_file ;
-      false
+      Events.(emit compilation_interrupted) log_file >>= then_false
   | Ok (Unix.WEXITED x) when x <> 0 ->
-      log_error "COMPILATION ERROR (%s)" log_file ;
-      false
+      Events.(emit compilation_error) log_file >>= then_false
   | Ok (Unix.WEXITED _) -> (
-    try
-      Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
-      true
-    with Dynlink.Error err ->
-      log_error
-        "Can't load plugin: %s (%s)"
-        (Dynlink.error_message err)
-        plugin_file ;
-      false )
+      try
+        Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
+        Lwt.return_true
+      with Dynlink.Error err ->
+        Events.(emit dynlink_error) (plugin_file, Dynlink.error_message err)
+        >>= then_false)
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true
   else
-    do_compile hash p
-    >>= fun success ->
+    do_compile hash p >>= fun success ->
     let loaded = Tezos_protocol_registerer.Registerer.mem hash in
     if success && not loaded then
-      log_error "Internal error while compiling %a" Protocol_hash.pp hash ;
-    Lwt.return loaded
+      Events.(emit internal_error) hash >>= fun () -> Lwt.return loaded
+    else Lwt.return loaded

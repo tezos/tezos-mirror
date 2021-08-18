@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -55,9 +55,9 @@ type db = t
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
-val create : State.t -> p2p -> t
+val create : Store.t -> p2p -> t
 
-val state : db -> State.t
+val store : db -> Store.t
 
 val shutdown : t -> unit Lwt.t
 
@@ -66,12 +66,26 @@ val shutdown : t -> unit Lwt.t
 (** An instance of the distributed DB for a given chain *)
 type chain_db
 
-(** The first call to [activate t chain] activates [chain], creates a [chain_db]
-    and sends a [Get_current_branch chain_id] message to all neighbors,
-    where [chain_id] is the identifier of [chain]. This informs the neighbors
-    that this node expects notifications for new heads/mempools. Subsequent
-    calls simply return the existing [chain_db]. *)
-val activate : t -> State.Chain.t -> chain_db
+(** The first call to [activate t chain callbacks] activates [chain],
+   creates a [chain_db] and sends a [Get_current_branch chain_id]
+   message to all neighbors, where [chain_id] is the identifier of
+   [chain]. This informs the neighbors that this node expects
+   notifications for new heads/mempools. The given [callbacks] are
+   given to the [P2p_reader] for each [peer]:
+
+    - [notify_branch peer locator] is called when the [P2p_reader]
+   receives the message [Current_branch (chain, locator)] from peer
+   [peer].
+
+    - [notify_head peer head] is called when the [P2p_reader] receives
+   the message [Current_head (chain, head, mempool)] from peer [peer].
+
+    - [Disconnection peer] is called when the [P2p_reader] receives
+   the message [Deactivate chain] from peer [peer] or when the
+   [P2p_reader] associated to [peer] is shutdown.
+
+    Subsequent calls simply return the existing [chain_db]. *)
+val activate : t -> Store.Chain.t -> P2p_reader.callback -> chain_db
 
 (** Look for the database of an active chain. *)
 val get_chain : t -> Chain_id.t -> chain_db option
@@ -81,17 +95,15 @@ val get_chain : t -> Chain_id.t -> chain_db option
     in messages for this chain *)
 val deactivate : chain_db -> unit Lwt.t
 
-(** Register all the possible callback from the distributed DB to the
-    validator. *)
-val set_callback : chain_db -> P2p_reader.callback -> unit
-
 (** Kick a given peer. *)
 val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Greylist a given peer. *)
 val greylist : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
-val chain_state : chain_db -> State.Chain.t
+(** Various accessors. *)
+
+val chain_store : chain_db -> Store.chain_store
 
 val db : chain_db -> db
 
@@ -125,7 +137,7 @@ module Advertise : sig
       active peers for this chain. If [mempool] isn't specified, or if
       remote peer has disabled its mempool, [mempool] is empty. [chain_id] is
       the identifier for this [chain_db]. *)
-  val current_head : chain_db -> ?mempool:Mempool.t -> State.Block.t -> unit
+  val current_head : chain_db -> ?mempool:Mempool.t -> Store.Block.t -> unit
 
   (** [current_branch chain_db] sends a
       [Current_branch (chain_id, locator)] message to all known active peers
@@ -148,10 +160,6 @@ module Block_header : sig
        and type param := unit
 end
 
-(** Lookup for block header in any active chains *)
-val read_block_header :
-  db -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
-
 (** Index of all the operations of a given block (per validation pass).
 
     For instance, [fetch chain_db (block_hash, validation_pass)
@@ -171,14 +179,9 @@ val commit_block :
   chain_db ->
   Block_hash.t ->
   Block_header.t ->
-  Bytes.t ->
   Operation.t list list ->
-  Bytes.t list list ->
-  Block_metadata_hash.t option ->
-  Operation_metadata_hash.t list list option ->
-  Block_validation.validation_store ->
-  forking_testchain:bool ->
-  State.Block.t option tzresult Lwt.t
+  Block_validation.result ->
+  Store.Block.t option tzresult Lwt.t
 
 (** Store on disk all the data associated to an invalid block. *)
 val commit_invalid_block :
@@ -186,11 +189,7 @@ val commit_invalid_block :
   Block_hash.t ->
   Block_header.t ->
   Error_monad.error list ->
-  bool tzresult Lwt.t
-
-(** Monitor all the fetched block headers (for all activate chains). *)
-val watch_block_header :
-  t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
+  unit tzresult Lwt.t
 
 (** {2 Operations index} *)
 
@@ -207,12 +206,7 @@ module Operation : sig
 end
 
 (** Inject a new operation in the local index (memory only). *)
-val inject_operation :
-  chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
-
-(** Monitor all the fetched operations (for all activate chains). *)
-val watch_operation :
-  t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
+val inject_operation : chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
 
 (** {2 Protocol index} *)
 
@@ -229,5 +223,4 @@ module Protocol : sig
 end
 
 (** Store on disk protocol sources. *)
-val commit_protocol :
-  db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t
+val commit_protocol : db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t

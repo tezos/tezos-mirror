@@ -71,9 +71,7 @@ let test_proof_raw () =
       ~amount:vlue
   in
   let bindingsig = R.make_binding_sig ctx_prove ~balance:Int64.zero sighash in
-  let check_output =
-    R.check_output ctx_verif cv_output cm epk zkproof_output
-  in
+  let check_output = R.check_output ctx_verif cv_output cm epk zkproof_output in
   assert check_output ;
   let final_check = R.final_check ctx_verif 0L bindingsig sighash in
   assert final_check ;
@@ -105,6 +103,7 @@ let test_full_transaction () =
   let cm_1 = Commitment.compute addr1 ~amount:10L rcm_1 in
   (* insertion of the first note in the merkle tree (ie. 1 created 10 out of thin air) *)
   let t_1 = T.add T.empty [cm_1] in
+
   (* ---------------1 transfers 10 to B--------------------- *)
 
   (* 1 gets pkd2 and diversifier_2 from 2 offline *)
@@ -172,7 +171,8 @@ let test_full_transaction () =
     let open R in
     Bytes.concat
       Bytes.empty
-      [ of_cv cv_spend_1;
+      [
+        of_cv cv_spend_1;
         of_nullifier nf_1;
         of_rk rk_1;
         of_spend_proof zkproof_spend_1;
@@ -180,7 +180,8 @@ let test_full_transaction () =
         of_commitment cm_2;
         of_epk epk_1;
         of_output_proof zkproof_output_1;
-        ciphertext_1 ]
+        ciphertext_1;
+      ]
   in
   let sighash_1 =
     R.to_sighash
@@ -195,6 +196,7 @@ let test_full_transaction () =
   let bindingsig_1 = R.make_binding_sig ctx_prove_1 ~balance:0L sighash_1 in
   (* The context can now be freed *)
   let () = R.proving_ctx_free ctx_prove_1 in
+
   (* 1 puts on the blockchain:
      For spending cm_1 : cv_spend_1, root_1, nf_1, rk_1, zkproof_spend_1, signature_1
      For creating cm_2 : cv_output_1, cm_2, epk, zkproof_output_1,
@@ -227,6 +229,7 @@ let test_full_transaction () =
   let () = R.verification_ctx_free ctx_verif_1 in
   (* The validator updates the merkle tree *)
   let t_2 = T.add t_1 [cm_2] in
+
   (* The validator insert the nullifier in a list, and check that is wasn't
      inserted before *)
 
@@ -312,16 +315,14 @@ let test_forge () =
   let output = Forge.make_output addr1 10L Bytes.empty in
   let state = Storage.empty ~memo_size:0 in
   let t1 = Forge.forge_transaction [] [output] sk1 key state in
-  Example.Validator.verify_update t1 state key
-  >>=? fun (_, state) ->
+  Example.Validator.verify_update t1 state key >>=? fun (_, state) ->
   let forge_input_opt = Forge.Input.get state 0L vk1 in
   let (_msg, forge_input) = Stdlib.Option.get @@ forge_input_opt in
   let forge_output = Forge.make_output addr2 10L Bytes.empty in
   let transaction =
     Forge.forge_transaction [forge_input] [forge_output] sk1 key state
   in
-  Example.Validator.verify_update transaction state key
-  >>= function
+  Example.Validator.verify_update transaction state key >>= function
   | Error l ->
       pp_print_error Format.err_formatter l ;
       assert false
@@ -337,16 +338,14 @@ let test_forge () =
           key
           state
       in
-      Example.Validator.verify_update transaction state key
-      >>= function
-      | Ok _ ->
-          assert false
+      Example.Validator.verify_update transaction state key >>= function
+      | Ok _ -> assert false
       | Error l ->
           assert (
             List.mem
               (Example.Validator.Input_spent (List.nth transaction.inputs 1))
-              l ) ;
-          return_unit )
+              l) ;
+          return_unit)
 
 let test_simple_client () =
   let module CL = Example.Client in
@@ -360,8 +359,7 @@ let test_simple_client () =
   let addr_b = new_address wb in
   (*a gives 2 to b and 1 (of change) to himself with 3 transparent money*)
   let (t1, wa) = pay wa addr_b 2L (Bytes.of_string "t1") 3L state key in
-  Example.Validator.verify_update t1 state key
-  >>=? fun (balance, state) ->
+  Example.Validator.verify_update t1 state key >>=? fun (balance, state) ->
   assert (balance = -3L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -370,8 +368,7 @@ let test_simple_client () =
   let addr_a = new_address wa in
   (* b gives 1 to a and 1 (of change) to himself with 2 transparent money*)
   let (t2, wb) = pay wb addr_a 1L (Bytes.of_string "t2") 2L state key in
-  Example.Validator.verify_update t2 state key
-  >>=? fun (balance, state) ->
+  Example.Validator.verify_update t2 state key >>=? fun (balance, state) ->
   assert (balance = -2L) ;
   (* before scanning b still has 2*)
   assert (wb.balance = 2L) ;
@@ -382,8 +379,7 @@ let test_simple_client () =
   (*  b gives 1 to a with shielded money *)
   let addr_a = new_address wa in
   let (t3, wb) = pay wb addr_a 1L (Bytes.of_string "t3") 0L state key in
-  Example.Validator.verify_update t3 state key
-  >>=? fun (balance, state) ->
+  Example.Validator.verify_update t3 state key >>=? fun (balance, state) ->
   assert (balance = 0L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -395,8 +391,7 @@ let test_simple_client () =
     pay wa addr_a 0L (Bytes.of_string "t4") Int64.minus_one state key
   in
   assert (wa.balance = 2L) ;
-  Example.Validator.verify_update t4 state key
-  >>=? fun (balance, state) ->
+  Example.Validator.verify_update t4 state key >>=? fun (balance, state) ->
   assert (balance = 1L) ;
   let l_a =
     scan_ovk
@@ -427,15 +422,18 @@ let test_replay () =
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
   let (t1, _) = pay wa addr 2L (Bytes.of_string "t1") 3L state right_string in
-  Example.Validator.verify_update t1 state wrong_string
-  >>= function Error _ -> return_unit | _ -> assert false
+  Example.Validator.verify_update t1 state wrong_string >>= function
+  | Error _ -> return_unit
+  | _ -> assert false
 
 let tests =
-  [ Alcotest_lwt.test_case_sync "test_get_memo_size" `Quick test_get_memo_size;
+  [
+    Alcotest_lwt.test_case_sync "test_get_memo_size" `Quick test_get_memo_size;
     Alcotest_lwt.test_case_sync "full_transaction" `Quick test_full_transaction;
     Alcotest_lwt.test_case_sync "proof_raw" `Quick test_proof_raw;
     Test_services.tztest "forge" `Quick test_forge;
     Test_services.tztest "simple_client" `Quick test_simple_client;
-    Test_services.tztest "anti-replay" `Quick test_replay ]
+    Test_services.tztest "anti-replay" `Quick test_replay;
+  ]
 
 let () = Alcotest_lwt.run "sapling" [("sapling", tests)] |> Lwt_main.run

@@ -23,7 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tezos Protocol Implementation - Low level Repr. of Operations *)
+(** Tezos Protocol Implementation - Low level Repr. of Operations
+
+    Defines kinds of operations that can be performed on chain:
+    - endorsement (should now always be wrapped in endorsement_with_slot)
+    - endorsement_with_slot
+    - double endorsement evidence
+    - seed nonce revelation
+    - double baking evidence
+    - account activation
+    - proposal (see: [Voting_repr])
+    - ballot (see: [Voting_repr])
+    - failing noop
+    - manager operation (which in turn has several types):
+      - revelation
+      - transaction
+      - origination
+      - delegation
+
+    Each of them can be encoded as raw bytes. Operations are distinguished at
+    type level using phantom type parameters. [packed_operation] type allows
+    for unifying them when required, for instance to put them on a single
+    list. *)
 
 module Kind : sig
   type seed_nonce_revelation = Seed_nonce_revelation_kind

@@ -39,7 +39,9 @@ let get_signing_slots cctxt ~chain ~block delegate level =
     ~levels:[level]
     ~delegates:[delegate]
     (chain, block)
-  >>=? function [{slots; _}] -> return_some slots | _ -> return_none
+  >>=? function
+  | [{slots; _}] -> return_some slots
+  | _ -> return_none
 
 let inject_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
     ~block hash level delegate_sk delegate_pkh =
@@ -64,17 +66,11 @@ let inject_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
             ~delegate:delegate_pkh
             level
           >>=? fun () -> return_true
-      | false ->
-          return_false)
+      | false -> return_false)
   >>=? fun is_allowed_to_endorse ->
   if is_allowed_to_endorse then
-    Chain_services.chain_id cctxt ~chain ()
-    >>=? fun chain_id ->
-    Client_keys.append
-      cctxt
-      delegate_sk
-      ~watermark:(Endorsement chain_id)
-      bytes
+    Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+    Client_keys.append cctxt delegate_sk ~watermark:(Endorsement chain_id) bytes
     >>=? fun signed_bytes ->
     Shell_services.Injection.operation cctxt ?async ~chain signed_bytes
     >>=? fun oph -> return oph
@@ -92,12 +88,10 @@ let forge_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt ~chain ~block ()
   >>=? fun {protocol_data = {level = {level; _}; _}; _} ->
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh
   >>=? fun oph ->
-  Client_keys.get_key cctxt src_pkh
-  >>=? fun (name, _pk, _sk) ->
+  Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
   lwt_log_notice
     Tag.DSL.(
       fun f ->
@@ -134,17 +128,14 @@ let create_state delegates delay = {delegates; delay; pending = None}
 let get_delegates cctxt state =
   match state.delegates with
   | [] ->
-      Client_keys.get_keys cctxt
-      >>=? fun keys ->
+      Client_keys.get_keys cctxt >>=? fun keys ->
       let delegates = List.map (fun (_, pkh, _, _) -> pkh) keys in
       return Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
-  | _ :: _ as delegates ->
-      return delegates
+  | _ :: _ as delegates -> return delegates
 
 let endorse_for_delegate cctxt block delegate_pkh =
   let {Client_baking_blocks.hash; level; chain_id; _} = block in
-  Client_keys.get_key cctxt delegate_pkh
-  >>=? fun (name, _pk, delegate_sk) ->
+  Client_keys.get_key cctxt delegate_pkh >>=? fun (name, _pk, delegate_sk) ->
   lwt_debug
     Tag.DSL.(
       fun f ->
@@ -171,8 +162,7 @@ let endorse_for_delegate cctxt block delegate_pkh =
   >>= fun () -> return_unit
 
 let allowed_to_endorse cctxt bi delegate =
-  Client_keys.Public_key_hash.name cctxt delegate
-  >>=? fun name ->
+  Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
   lwt_debug
     Tag.DSL.(
       fun f ->
@@ -184,8 +174,7 @@ let allowed_to_endorse cctxt bi delegate =
   let chain = `Hash bi.chain_id in
   let block = `Hash (bi.hash, 0) in
   let level = bi.level in
-  get_signing_slots cctxt ~chain ~block delegate level
-  >>=? function
+  get_signing_slots cctxt ~chain ~block delegate level >>=? function
   | None | Some [] ->
       lwt_debug
         Tag.DSL.(
@@ -222,8 +211,7 @@ let allowed_to_endorse cctxt bi delegate =
                 -% t event "previously_endorsed"
                 -% a level_tag level)
           >>= fun () -> return_false
-      | true ->
-          return_true )
+      | true -> return_true)
 
 let prepare_endorsement ~(max_past : int64) ()
     (cctxt : #Protocol_client_context.full) state bi =
@@ -253,37 +241,34 @@ let prepare_endorsement ~(max_past : int64) ()
         (Time.System.to_protocol (Systime_os.now ()))
         state.delay
     in
-    get_delegates cctxt state
-    >>=? fun delegates ->
-    List.filter_ep (allowed_to_endorse cctxt bi) delegates
-    >>=? fun delegates ->
+    get_delegates cctxt state >>=? fun delegates ->
+    List.filter_ep (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {time; block = bi; delegates} ;
     return_unit
 
 let compute_timeout state =
   match state.pending with
-  | None ->
-      Lwt_utils.never_ending ()
+  | None -> Lwt_utils.never_ending ()
   | Some {time; block; delegates} -> (
-    match Client_baking_scheduling.sleep_until time with
-    | None ->
-        Lwt.return (block, delegates)
-    | Some timeout ->
-        let timespan =
+      match Client_baking_scheduling.sleep_until time with
+      | None -> Lwt.return (block, delegates)
+      | Some timeout ->
           let timespan =
-            Ptime.diff (Time.System.of_protocol_exn time) (Systime_os.now ())
+            let timespan =
+              Ptime.diff (Time.System.of_protocol_exn time) (Systime_os.now ())
+            in
+            if Ptime.Span.compare timespan Ptime.Span.zero > 0 then timespan
+            else Ptime.Span.zero
           in
-          if Ptime.Span.compare timespan Ptime.Span.zero > 0 then timespan
-          else Ptime.Span.zero
-        in
-        lwt_log_info
-          Tag.DSL.(
-            fun f ->
-              f "Waiting until %a (%a) to inject endorsements"
-              -% t event "wait_before_injecting"
-              -% a timestamp_tag (Time.System.of_protocol_exn time)
-              -% a timespan_tag timespan)
-        >>= fun () -> timeout >>= fun () -> Lwt.return (block, delegates) )
+          lwt_log_info
+            Tag.DSL.(
+              fun f ->
+                f "Waiting until %a (%a) to inject endorsements"
+                -% t event "wait_before_injecting"
+                -% a timestamp_tag (Time.System.of_protocol_exn time)
+                -% a timespan_tag timespan)
+          >>= fun () ->
+          timeout >>= fun () -> Lwt.return (block, delegates))
 
 let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
     delegates block_stream =
@@ -295,10 +280,8 @@ let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
     state.pending <- None ;
     List.iter_es
       (fun delegate ->
-        endorse_for_delegate cctxt block delegate
-        >>= function
-        | Ok () ->
-            return_unit
+        endorse_for_delegate cctxt block delegate >>= function
+        | Ok () -> return_unit
         | Error errs ->
             lwt_log_error
               Tag.DSL.(

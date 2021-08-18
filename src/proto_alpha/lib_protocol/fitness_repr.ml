@@ -38,7 +38,8 @@ let () =
 
 let int64_to_bytes i =
   let b = Bytes.make 8 '0' in
-  TzEndian.set_int64 b 0 i ; b
+  TzEndian.set_int64 b 0 i ;
+  b
 
 let int64_of_bytes b =
   if Compare.Int.(Bytes.length b <> 8) then error Invalid_fitness
@@ -56,7 +57,5 @@ let to_int64 = function
     when Compare.String.(
            Bytes.to_string version = Constants_repr.version_number_004) ->
       ok 0L
-  | [] ->
-      ok 0L
-  | _ ->
-      error Invalid_fitness
+  | [] -> ok 0L
+  | _ -> error Invalid_fitness

@@ -25,8 +25,9 @@
 
 module Parameters = struct
   type persistent_state = {
+    runner : Runner.t option;
     base_dir : string;
-    node_rpc_port : int;
+    node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -36,13 +37,13 @@ module Parameters = struct
 
   let default_colors =
     Log.Color.
-      [|BG.yellow ++ FG.black; BG.yellow ++ FG.white; BG.yellow ++ FG.blue|]
+      [|BG.yellow ++ FG.black; BG.yellow ++ FG.gray; BG.yellow ++ FG.blue|]
 end
 
 open Parameters
 include Daemon.Make (Parameters)
 
-let node_rpc_port accuser = accuser.persistent_state.node_rpc_port
+let node_rpc_port accuser = Node.rpc_port accuser.persistent_state.node
 
 let trigger_ready accuser value =
   let pending = accuser.persistent_state.pending_ready in
@@ -50,23 +51,18 @@ let trigger_ready accuser value =
   List.iter (fun pending -> Lwt.wakeup_later pending value) pending
 
 let set_ready accuser =
-  ( match accuser.status with
-  | Not_running ->
-      ()
-  | Running status ->
-      status.session_state.ready <- true ) ;
+  (match accuser.status with
+  | Not_running -> ()
+  | Running status -> status.session_state.ready <- true) ;
   trigger_ready accuser (Some ())
 
 let handle_raw_stdout accuser line =
   match line with
   (* The accuser is ready when it communicates with a bootstrapped node. *)
-  | "Accuser started." ->
-      set_ready accuser
-  | _ ->
-      ()
+  | "Accuser started." -> set_ready accuser
+  | _ -> ()
 
-let create ~protocol ?name ?color ?event_pipe ?base_dir node =
-  let node_rpc_port = Node.rpc_port node in
+let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -77,30 +73,35 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir node =
       ?name:(Some name)
       ?color
       ?event_pipe
-      {base_dir; node_rpc_port; pending_ready = []}
+      ?runner
+      {runner; base_dir; node; pending_ready = []}
   in
   on_stdout accuser (handle_raw_stdout accuser) ;
   accuser
 
 let run accuser =
-  ( match accuser.status with
-  | Not_running ->
-      ()
-  | Running _ ->
-      Test.fail "accuser %s is already running" accuser.name ) ;
+  (match accuser.status with
+  | Not_running -> ()
+  | Running _ -> Test.fail "accuser %s is already running" accuser.name) ;
+  let runner = accuser.persistent_state.runner in
+  let node_runner = Node.runner accuser.persistent_state.node in
+  let node_rpc_port = node_rpc_port accuser in
+  let address = "http://" ^ Runner.address ?from:runner node_runner ^ ":" in
   let arguments =
-    [ "-E";
-      "http://localhost:"
-      ^ string_of_int accuser.persistent_state.node_rpc_port;
+    [
+      "-E";
+      address ^ string_of_int node_rpc_port;
       "--base-dir";
       accuser.persistent_state.base_dir;
-      "run" ]
+      "run";
+    ]
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
-    trigger_ready accuser None ; unit
+    trigger_ready accuser None ;
+    unit
   in
-  run accuser {ready = false} arguments ~on_terminate
+  run accuser {ready = false} arguments ~on_terminate ?runner
 
 let check_event ?where accuser name promise =
   let* result = promise in
@@ -108,22 +109,22 @@ let check_event ?where accuser name promise =
   | None ->
       raise
         (Terminated_before_event {daemon = accuser.name; event = name; where})
-  | Some x ->
-      return x
+  | Some x -> return x
 
 let wait_for_ready accuser =
   match accuser.status with
-  | Running {session_state = {ready = true; _}; _} ->
-      unit
+  | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       let (promise, resolver) = Lwt.task () in
       accuser.persistent_state.pending_ready <-
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?base_dir node =
+let init ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let* () = Node.wait_for_ready node in
-  let accuser = create ~protocol ?name ?color ?event_pipe ?base_dir node in
+  let accuser =
+    create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node
+  in
   let* () = run accuser in
   return accuser
 

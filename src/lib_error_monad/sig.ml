@@ -31,21 +31,15 @@ type error_category =
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
 let string_of_category = function
-  | `Permanent ->
-      "permanent"
-  | `Temporary ->
-      "temporary"
-  | `Branch ->
-      "branch"
+  | `Permanent -> "permanent"
+  | `Temporary -> "temporary"
+  | `Branch -> "branch"
 
 let combine_category c1 c2 =
   match (c1, c2) with
-  | (`Permanent, _) | (_, `Permanent) ->
-      `Permanent
-  | (`Branch, _) | (_, `Branch) ->
-      `Branch
-  | (`Temporary, `Temporary) ->
-      `Temporary
+  | (`Permanent, _) | (_, `Permanent) -> `Permanent
+  | (`Branch, _) | (_, `Branch) -> `Branch
+  | (`Temporary, `Temporary) -> `Temporary
 
 module type PREFIX = sig
   (** The identifier for parts of the code that need their own error monad. It
@@ -131,6 +125,14 @@ module type EXT = sig
 
   val pp_info : Format.formatter -> error_info -> unit
 
+  (**
+     [find_info_of_error e] retrieves the `error_info` associated with the
+     given error `e`.
+     @raise [Invalid_argument] if the error is a wrapped error from another monad
+     @raise [Not_found] if the error's constructor has not been registered
+  *)
+  val find_info_of_error : error -> error_info
+
   (** Retrieves information of registered errors *)
   val get_registered_errors : unit -> error_info list
 end
@@ -139,17 +141,41 @@ module type WITH_WRAPPED = sig
   type error
 
   module type Wrapped_error_monad = sig
+    (**
+       The purpose of this module is to wrap a specific error monad [E]
+       into a more general error monad [Eg].
+
+       The user implementing such an interface is responsible to
+       maintain the following assertions
+       - The [Eg] error is extended locally with a specific constructor [C]
+       - [unwrapped] is equal to the [error] type of [E]
+       - [wrap] builds an [Eg] [error] value from an [E] [error] value
+       - [unwrap] matches on [Eg] error cases and extracts [E]
+         error value from [C]
+
+       As a reference implementation,
+       see src/lib_protocol_environment/environment_V3.ml
+    *)
+
     type unwrapped = ..
 
     include CORE with type error := unwrapped
 
     include EXT with type error := unwrapped
 
+    (** [unwrap e] returns [Some] when [e] matches variant constructor [C]
+        and [None] otherwise *)
     val unwrap : error -> unwrapped option
 
+    (** [wrap e] returns a general [error] from a specific [unwrapped] error
+    [e] *)
     val wrap : unwrapped -> error
   end
 
+  (** Same as [register_error_kind] but for a wrapped error monad.
+      The codec is defined in the module parameter. It makes the category
+      of the error [Wrapped] instead of [Main].
+  *)
   val register_wrapped_error_kind :
     (module Wrapped_error_monad) ->
     id:string ->
@@ -251,17 +277,11 @@ module type TRACE = sig
 
   (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   (** [pp_print_top] pretty-prints the top errors of the trace *)
   val pp_print_top :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val encoding : 'error Data_encoding.t -> 'error trace Data_encoding.t
 
@@ -398,14 +418,10 @@ module type MONAD = sig
   val fail_when : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
   val unless :
-    bool ->
-    (unit -> (unit, 'trace) result Lwt.t) ->
-    (unit, 'trace) result Lwt.t
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
   val when_ :
-    bool ->
-    (unit -> (unit, 'trace) result Lwt.t) ->
-    (unit, 'trace) result Lwt.t
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
   (** Wrapper around [Lwt_utils.dont_wait] *)
   val dont_wait :

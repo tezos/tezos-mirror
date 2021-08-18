@@ -71,21 +71,12 @@ type validation_state = {context : Context.t; fitness : Fitness.t}
 let current_context {context; _} = return context
 
 let begin_application ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_fitness (raw_block : block_header) =
+    ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header) =
   let fitness = raw_block.shell.fitness in
-  Logging.log_notice
-    "begin_application: pred_fitness = %a  block_fitness = %a%!"
-    Fitness.pp
-    predecessor_fitness
-    Fitness.pp
-    fitness ;
-  (* Note: Logging is only available for debugging purposes and should
-     not appear in a real protocol. *)
   return {context; fitness}
 
-let begin_partial_application ~chain_id ~ancestor_context
-    ~predecessor_timestamp ~predecessor_fitness block_header =
-  Logging.log_notice "begin_partial_application%!" ;
+let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
+    ~predecessor_fitness block_header =
   begin_application
     ~chain_id
     ~predecessor_context:ancestor_context
@@ -97,32 +88,38 @@ let version_number = "\001"
 
 let int64_to_bytes i =
   let b = Bytes.make 8 '0' in
-  TzEndian.set_int64 b 0 i ; b
+  TzEndian.set_int64 b 0 i ;
+  b
 
 let fitness_from_level level =
   [Bytes.of_string version_number; int64_to_bytes level]
 
 let begin_construction ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness
+    ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness:_
     ~predecessor:_ ~timestamp:_ ?protocol_data () =
   let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
-  let mode =
+  let _mode =
     match protocol_data with Some _ -> "block" | None -> "mempool"
   in
-  Logging.log_notice
-    "begin_construction (%s): pred_fitness = %a  constructed fitness = %a%!"
-    mode
-    Fitness.pp
-    predecessor_fitness
-    Fitness.pp
-    fitness ;
   return {context; fitness}
 
-let apply_operation _state _op = Lwt.return (Error [])
+type error += No_error
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"no-error"
+    ~title:"No error"
+    ~description:"There is no error, this is a no-op protocol"
+    ~pp:(fun ppf () -> Format.fprintf ppf "@[<h 0>No error in no-op protocol@]")
+    Data_encoding.unit
+    (function No_error -> Some () | _ -> None)
+    (fun () -> No_error)
+
+let apply_operation _state _op = fail No_error
 
 let finalize_block state =
   let fitness = state.fitness in
-  Logging.log_notice "finalize_block: fitness = %a%!" Fitness.pp fitness ;
   return
     ( {
         Updater.message = None;
@@ -136,7 +133,6 @@ let finalize_block state =
 let init context block_header =
   let open Block_header in
   let fitness = block_header.fitness in
-  Logging.log_notice "init: fitness = %a%!" Fitness.pp fitness ;
   return
     {
       Updater.message = None;

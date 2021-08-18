@@ -25,10 +25,8 @@
 
 let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
     ~tries f x =
-  f x
-  >>= function
-  | Ok _ as r ->
-      Lwt.return r
+  f x >>= function
+  | Ok _ as r -> Lwt.return r
   | Error
       (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
     as err
@@ -36,11 +34,12 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
       cctxt#message "Connection refused, retrying in %.2f seconds..." delay
       >>= fun () ->
       Lwt.pick
-        [ (Lwt_unix.sleep delay >|= fun () -> `Continue);
-          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed) ]
+        [
+          (Lwt_unix.sleep delay >|= fun () -> `Continue);
+          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed);
+        ]
       >>= function
-      | `Killed ->
-          Lwt.return err
+      | `Killed -> Lwt.return err
       | `Continue ->
           let next_delay = delay *. factor in
           let delay =
@@ -49,23 +48,19 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
               ~some:(fun max_delay -> Float.min next_delay max_delay)
               max_delay
           in
-          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x )
-  | Error _ as err ->
-      Lwt.return err
+          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x)
+  | Error _ as err -> Lwt.return err
 
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
-  f ()
-  >>= function
-  | Ok () ->
-      return_unit
+  f () >>= function
+  | Ok () -> return_unit
   | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
       cctxt#warning
         "Lost connection with the node. Retrying to establish connection..."
       >>= fun () ->
       (* Wait forever when the node stops responding... *)
       Client_confirmations.wait_for_bootstrapped
-        ~retry:
-          (retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
+        ~retry:(retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
         cctxt
       >>=? fun () -> retry_on_disconnection cctxt f
   | Error err ->
@@ -80,8 +75,7 @@ module Endorser = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Endorser started."
-      >>= fun () ->
+      cctxt#message "Endorser started." >>= fun () ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream
     in
     Client_confirmations.wait_for_bootstrapped
@@ -103,8 +97,7 @@ module Baker = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Baker started."
-      >>= fun () ->
+      cctxt#message "Baker started." >>= fun () ->
       Client_baking_forge.create
         cctxt
         ~user_activated_upgrades
@@ -134,8 +127,7 @@ module Accuser = struct
         ~chains:[chain]
         ()
       >>=? fun valid_blocks_stream ->
-      cctxt#message "Accuser started."
-      >>= fun () ->
+      cctxt#message "Accuser started." >>= fun () ->
       Client_baking_denunciation.create
         cctxt
         ~preserved_levels

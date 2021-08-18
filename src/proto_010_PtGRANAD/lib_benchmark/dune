@@ -22,9 +22,4 @@
                    -open Tezos_benchmark_type_inference_010_PtGRANAD
                    -open Tezos_protocol_010_PtGRANAD
                    -open Tezos_crypto
-		   -open Tezos_010_PtGRANAD_test_helpers)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+                   -open Tezos_010_PtGRANAD_test_helpers)))

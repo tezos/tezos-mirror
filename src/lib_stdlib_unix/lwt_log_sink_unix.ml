@@ -34,114 +34,61 @@ module Output = struct
     | Syslog of Lwt_log.syslog_facility
 
   let to_string : t -> string = function
-    | Null ->
-        "/dev/null"
-    | Stdout ->
-        "stdout"
-    | Stderr ->
-        "stderr"
-    | File fp ->
-        fp
-    | Syslog `Auth ->
-        "syslog:auth"
-    | Syslog `Authpriv ->
-        "syslog:authpriv"
-    | Syslog `Cron ->
-        "syslog:cron"
-    | Syslog `Daemon ->
-        "syslog:daemon"
-    | Syslog `FTP ->
-        "syslog:ftp"
-    | Syslog `Kernel ->
-        "syslog:kernel"
-    | Syslog `Local0 ->
-        "syslog:local0"
-    | Syslog `Local1 ->
-        "syslog:local1"
-    | Syslog `Local2 ->
-        "syslog:local2"
-    | Syslog `Local3 ->
-        "syslog:local3"
-    | Syslog `Local4 ->
-        "syslog:local4"
-    | Syslog `Local5 ->
-        "syslog:local5"
-    | Syslog `Local6 ->
-        "syslog:local6"
-    | Syslog `Local7 ->
-        "syslog:local7"
-    | Syslog `LPR ->
-        "syslog:lpr"
-    | Syslog `Mail ->
-        "syslog:mail"
-    | Syslog `News ->
-        "syslog:news"
-    | Syslog `Syslog ->
-        "syslog:syslog"
-    | Syslog `User ->
-        "syslog:user"
-    | Syslog `UUCP ->
-        "syslog:uucp"
-    | Syslog `NTP ->
-        "syslog:ntp"
-    | Syslog `Security ->
-        "syslog:security"
-    | Syslog `Console ->
-        "syslog:console"
+    | Null -> "/dev/null"
+    | Stdout -> "stdout"
+    | Stderr -> "stderr"
+    | File fp -> fp
+    | Syslog `Auth -> "syslog:auth"
+    | Syslog `Authpriv -> "syslog:authpriv"
+    | Syslog `Cron -> "syslog:cron"
+    | Syslog `Daemon -> "syslog:daemon"
+    | Syslog `FTP -> "syslog:ftp"
+    | Syslog `Kernel -> "syslog:kernel"
+    | Syslog `Local0 -> "syslog:local0"
+    | Syslog `Local1 -> "syslog:local1"
+    | Syslog `Local2 -> "syslog:local2"
+    | Syslog `Local3 -> "syslog:local3"
+    | Syslog `Local4 -> "syslog:local4"
+    | Syslog `Local5 -> "syslog:local5"
+    | Syslog `Local6 -> "syslog:local6"
+    | Syslog `Local7 -> "syslog:local7"
+    | Syslog `LPR -> "syslog:lpr"
+    | Syslog `Mail -> "syslog:mail"
+    | Syslog `News -> "syslog:news"
+    | Syslog `Syslog -> "syslog:syslog"
+    | Syslog `User -> "syslog:user"
+    | Syslog `UUCP -> "syslog:uucp"
+    | Syslog `NTP -> "syslog:ntp"
+    | Syslog `Security -> "syslog:security"
+    | Syslog `Console -> "syslog:console"
 
   let of_string : string -> t = function
-    | "/dev/null" | "null" ->
-        Null
-    | "stdout" ->
-        Stdout
-    | "stderr" ->
-        Stderr
-    | "syslog:auth" ->
-        Syslog `Auth
-    | "syslog:authpriv" ->
-        Syslog `Authpriv
-    | "syslog:cron" ->
-        Syslog `Cron
-    | "syslog:daemon" ->
-        Syslog `Daemon
-    | "syslog:ftp" ->
-        Syslog `FTP
-    | "syslog:kernel" ->
-        Syslog `Kernel
-    | "syslog:local0" ->
-        Syslog `Local0
-    | "syslog:local1" ->
-        Syslog `Local1
-    | "syslog:local2" ->
-        Syslog `Local2
-    | "syslog:local3" ->
-        Syslog `Local3
-    | "syslog:local4" ->
-        Syslog `Local4
-    | "syslog:local5" ->
-        Syslog `Local5
-    | "syslog:local6" ->
-        Syslog `Local6
-    | "syslog:local7" ->
-        Syslog `Local7
-    | "syslog:lpr" ->
-        Syslog `LPR
-    | "syslog:mail" ->
-        Syslog `Mail
-    | "syslog:news" ->
-        Syslog `News
-    | "syslog:syslog" ->
-        Syslog `Syslog
-    | "syslog:user" ->
-        Syslog `User
-    | "syslog:uucp" ->
-        Syslog `UUCP
-    | "syslog:ntp" ->
-        Syslog `NTP
-    | "syslog:security" ->
-        Syslog `Security
-    | "syslog:console" ->
-        Syslog `Console
+    | "/dev/null" | "null" -> Null
+    | "stdout" -> Stdout
+    | "stderr" -> Stderr
+    | "syslog:auth" -> Syslog `Auth
+    | "syslog:authpriv" -> Syslog `Authpriv
+    | "syslog:cron" -> Syslog `Cron
+    | "syslog:daemon" -> Syslog `Daemon
+    | "syslog:ftp" -> Syslog `FTP
+    | "syslog:kernel" -> Syslog `Kernel
+    | "syslog:local0" -> Syslog `Local0
+    | "syslog:local1" -> Syslog `Local1
+    | "syslog:local2" -> Syslog `Local2
+    | "syslog:local3" -> Syslog `Local3
+    | "syslog:local4" -> Syslog `Local4
+    | "syslog:local5" -> Syslog `Local5
+    | "syslog:local6" -> Syslog `Local6
+    | "syslog:local7" -> Syslog `Local7
+    | "syslog:lpr" -> Syslog `LPR
+    | "syslog:mail" -> Syslog `Mail
+    | "syslog:news" -> Syslog `News
+    | "syslog:syslog" -> Syslog `Syslog
+    | "syslog:user" -> Syslog `User
+    | "syslog:uucp" -> Syslog `UUCP
+    | "syslog:ntp" -> Syslog `NTP
+    | "syslog:security" -> Syslog `Security
+    | "syslog:console" -> Syslog `Console
     (* | s when start_with "syslog:" FIXME error or warning. *)
     | fp ->
         (* TODO check absolute path *)
@@ -157,10 +104,8 @@ module Output = struct
 
   let to_string output =
     match Data_encoding.Json.construct encoding output with
-    | `String res ->
-        res
-    | #Data_encoding.json ->
-        assert false
+    | `String res -> res
+    | #Data_encoding.json -> assert false
 
   let pp fmt output = Format.fprintf fmt "%s" (to_string output)
 end
@@ -192,8 +137,8 @@ let cfg_encoding =
        (dft
           "output"
           ~description:
-            "Output for the logging function. Either 'stdout', 'stderr' or \
-             the name of a log file ."
+            "Output for the logging function. Either 'stdout', 'stderr' or the \
+             name of a log file ."
           Output.encoding
           default_cfg.output)
        (dft
@@ -216,37 +161,31 @@ let cfg_encoding =
           "template"
           ~description:
             "Format for the log file, see \
-             http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
+             https://github.com/ocsigen/lwt_log/blob/1.1.1/src/core/lwt_log_core.mli#L229."
           string
           default_cfg.template))
 
 let init ?(template = default_template) output =
   let open Output in
-  ( match output with
+  (match output with
   | Stderr ->
       Lwt.return
       @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
   | Stdout ->
       Lwt.return
       @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
-  | File file_name ->
-      Lwt_log.file ~file_name ~template ()
-  | Null ->
-      Lwt.return @@ Lwt_log.null
-  | Syslog facility ->
-      Lwt.return @@ Lwt_log.syslog ~template ~facility () )
+  | File file_name -> Lwt_log.file ~file_name ~template ()
+  | Null -> Lwt.return @@ Lwt_log.null
+  | Syslog facility -> Lwt.return @@ Lwt_log.syslog ~template ~facility ())
   >>= fun logger ->
   Lwt_log.default := logger ;
   Lwt.return_unit
 
 let find_log_rules default =
   match Sys.(getenv_opt "TEZOS_LOG", getenv_opt "LWT_LOG") with
-  | (Some rules, None) ->
-      ("environment variable TEZOS_LOG", Some rules)
-  | (None, Some rules) ->
-      ("environment variable LWT_LOG", Some rules)
-  | (None, None) ->
-      ("configuration file", default)
+  | (Some rules, None) -> ("environment variable TEZOS_LOG", Some rules)
+  | (None, Some rules) -> ("environment variable LWT_LOG", Some rules)
+  | (None, None) -> ("configuration file", default)
   | (Some rules, Some _) ->
       Format.eprintf
         "@[<v 2>@{<warning>@{<title>Warning@}@} Both environment variables \
@@ -257,14 +196,13 @@ let find_log_rules default =
 let initialize ?(cfg = default_cfg) () =
   Lwt_log_core.add_rule "*" (Internal_event.Level.to_lwt_log cfg.default_level) ;
   let (origin, rules) = find_log_rules cfg.rules in
-  ( match rules with
-  | None ->
-      Lwt.return_unit
+  (match rules with
+  | None -> Lwt.return_unit
   | Some rules -> (
-    try
-      Lwt_log_core.load_rules rules ~fail_on_error:true ;
-      Lwt.return_unit
-    with _ ->
-      Printf.ksprintf Lwt.fail_with "Incorrect log rules defined in %s" origin
-    ) )
+      try
+        Lwt_log_core.load_rules rules ~fail_on_error:true ;
+        Lwt.return_unit
+      with _ ->
+        Printf.ksprintf Lwt.fail_with "Incorrect log rules defined in %s" origin
+      ))
   >>= fun () -> init ~template:cfg.template cfg.output

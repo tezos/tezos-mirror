@@ -1,24 +1,27 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** This module implements all the core functionalities. It contains also the low
     level Rustzcash type equalities and should be used in its Raw form only for
@@ -142,10 +145,8 @@ module Raw = struct
            R.of_diversifier
            (fun b ->
              match R.to_diversifier b with
-             | Some diversifier ->
-                 diversifier
-             | None ->
-                 raise (Invalid_argument "diversifier_encoding: decoding"))
+             | Some diversifier -> diversifier
+             | None -> raise (Invalid_argument "diversifier_encoding: decoding"))
            (Fixed.bytes 11)
 
     (** Full viewing key contains ak, nsk, ovk *)
@@ -221,19 +222,22 @@ module Raw = struct
     (* diversifier_index is 11 bytes long but we treat is as 8 byte long int64 *)
     type index = R.diversifier_index
 
+    let compare_index = R.compare_diversifier_index
+
     (* partial function to convert an 11 byte index to a 8 byte int64 *)
     let index_to_int64 idx =
       let b = R.of_diversifier_index idx in
       assert (
         Bytes.get b 8 = '\000'
         && Bytes.get b 9 = '\000'
-        && Bytes.get b 10 = '\000' ) ;
+        && Bytes.get b 10 = '\000') ;
       Bytes.get_int64_le b 0
 
     (* int64 is padded back to 11 bytes *)
     let index_of_int64 i =
       let b = Bytes.make 11 '\000' in
-      Bytes.set_int64_le b 0 i ; R.to_diversifier_index b
+      Bytes.set_int64_le b 0 i ;
+      R.to_diversifier_index b
 
     let index_encoding =
       let open Data_encoding in
@@ -264,13 +268,8 @@ module Raw = struct
           (Data_encoding.Binary.to_bytes_exn address_encoding address)
       in
       let of_raw str =
-        match
-          Data_encoding.Binary.of_bytes address_encoding (Bytes.of_string str)
-        with
-        | Ok x ->
-            Some x
-        | Error _ ->
-            None
+        Option.of_result
+        @@ Data_encoding.Binary.of_bytes address_encoding (Bytes.of_string str)
       in
       Base58.register_encoding
         ~prefix:Base58.Prefix.sapling_address
@@ -283,10 +282,8 @@ module Raw = struct
 
     let new_address vk j =
       match R.zip32_xfvk_address vk j with
-      | None ->
-          failwith "Exhausted available indices for the sapling key."
-      | Some (i, diversifier, pkd) ->
-          (i, {diversifier; pkd})
+      | None -> failwith "Exhausted available indices for the sapling key."
+      | Some (i, diversifier, pkd) -> (i, {diversifier; pkd})
 
     let to_ivk xfvk = R.crh_ivk xfvk.fvk.ak xfvk.fvk.nk
 
@@ -296,10 +293,8 @@ module Raw = struct
          likely to be short. *)
       let rec random_diversifier () =
         match R.to_diversifier @@ Hacl.Rand.gen 11 with
-        | Some diversifier ->
-            diversifier
-        | None ->
-            random_diversifier ()
+        | Some diversifier -> diversifier
+        | None -> random_diversifier ()
       in
       let diversifier = random_diversifier () in
       (* A random ivk is 32 bytes with the first 5 bits set to 0 (if in big
@@ -457,10 +452,10 @@ module Raw = struct
       let open Data_encoding in
       let payload_out_size =
         Binary.(
-          ( WithExceptions.Option.get ~loc:__LOC__
-          @@ fixed_length DH.esk_encoding )
-          + ( WithExceptions.Option.get ~loc:__LOC__
-            @@ fixed_length DH.epk_encoding )
+          (WithExceptions.Option.get ~loc:__LOC__
+          @@ fixed_length DH.esk_encoding)
+          + (WithExceptions.Option.get ~loc:__LOC__
+            @@ fixed_length DH.epk_encoding)
           + Crypto_box.tag_length)
       in
       def "sapling.transaction.ciphertext"
@@ -513,11 +508,11 @@ module Raw = struct
          of the variable length field memo. *)
       let size_besides_memo =
         let open Data_encoding in
-        ( WithExceptions.Option.get ~loc:__LOC__
-        @@ Binary.fixed_length Viewing_key.diversifier_encoding )
+        (WithExceptions.Option.get ~loc:__LOC__
+        @@ Binary.fixed_length Viewing_key.diversifier_encoding)
         + (WithExceptions.Option.get ~loc:__LOC__ @@ Binary.fixed_length int64)
-        + ( WithExceptions.Option.get ~loc:__LOC__
-          @@ Binary.fixed_length Rcm.encoding )
+        + (WithExceptions.Option.get ~loc:__LOC__
+          @@ Binary.fixed_length Rcm.encoding)
         + Crypto_box.tag_length + 4
       in
       payload_size - size_besides_memo
@@ -538,12 +533,7 @@ module Raw = struct
         let plaintext_enc =
           Data_encoding.Binary.to_bytes_exn
             plaintext_encoding
-            {
-              diversifier = Viewing_key.(address.diversifier);
-              amount;
-              rcm;
-              memo;
-            }
+            {diversifier = Viewing_key.(address.diversifier); amount; rcm; memo}
         in
         Crypto_box.Secretbox.secretbox key_agreed_enc plaintext_enc nonce_enc
       in
@@ -661,10 +651,12 @@ module Raw = struct
           to_bytes
             (hash_bytes
                ~key
-               [ R.of_cv cv;
+               [
+                 R.of_cv cv;
                  R.of_nullifier nf;
                  R.of_rk rk;
-                 R.of_spend_proof proof ]))
+                 R.of_spend_proof proof;
+               ]))
       in
       R.to_sighash h
 
@@ -763,8 +755,7 @@ module Raw = struct
       let check_memo_size outputs =
         let size =
           match outputs with
-          | o :: _ ->
-              Ciphertext.get_memo_size o.ciphertext
+          | o :: _ -> Ciphertext.get_memo_size o.ciphertext
           | _ ->
               (* never actually used *)
               -1
@@ -934,9 +925,7 @@ module Raw = struct
          the cm *)
       let check_cm i existing_cm =
         Rcm.assert_valid i.rcm ;
-        let computed_cm =
-          Commitment.compute i.address ~amount:i.amount i.rcm
-        in
+        let computed_cm = Commitment.compute i.address ~amount:i.amount i.rcm in
         if existing_cm = computed_cm then true else false
     end
 

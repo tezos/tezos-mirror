@@ -43,17 +43,21 @@ class ClientRegression(client.Client):
     def set_regtest(self, regtest):
         self.regtest = regtest
 
-    def run(
+    def run_generic(
         self,
         params: List[str],
         admin: bool = False,
         check: bool = True,
         trace: bool = False,
+        stdin: str = "",
+        env_change: dict = None,
     ):
         stderr_output = ''
         caught_exc = None
         try:
-            output = super().run(params, admin, check, trace)
+            output, stderr, retcode = super().run_generic(
+                params, admin, check, trace
+            )
         except subprocess.CalledProcessError as exc:
             output = exc.args[2]
             stderr_output = exc.args[3]
@@ -63,4 +67,4 @@ class ClientRegression(client.Client):
             self.regtest.write(stderr_output)
         if caught_exc is not None:
             raise caught_exc
-        return output
+        return output, stderr, retcode

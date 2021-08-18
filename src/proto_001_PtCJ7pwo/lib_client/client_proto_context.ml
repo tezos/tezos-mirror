@@ -28,12 +28,12 @@ open Alpha_context
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block
-    contract =
+let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
+    =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block
-    contract =
+let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
+    =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
 let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
@@ -41,35 +41,24 @@ let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
-  Alpha_services.Contract.list cctxt (chain, block)
-  >>=? fun contracts ->
+  Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   List.map_es
     (fun h ->
-      ( match Contract.is_implicit h with
+      (match Contract.is_implicit h with
       | Some m -> (
-          Public_key_hash.rev_find cctxt m
-          >>=? function
-          | None ->
-              return ""
+          Public_key_hash.rev_find cctxt m >>=? function
+          | None -> return ""
           | Some nm -> (
-              RawContractAlias.find_opt cctxt nm
-              >>=? function
-              | None ->
-                  return (" (known as " ^ nm ^ ")")
-              | Some _ ->
-                  return (" (known as key:" ^ nm ^ ")") ) )
+              RawContractAlias.find_opt cctxt nm >>=? function
+              | None -> return (" (known as " ^ nm ^ ")")
+              | Some _ -> return (" (known as key:" ^ nm ^ ")")))
       | None -> (
-          RawContractAlias.rev_find cctxt h
-          >>=? function
-          | None -> return "" | Some nm -> return (" (known as " ^ nm ^ ")") )
-      )
+          RawContractAlias.rev_find cctxt h >>=? function
+          | None -> return ""
+          | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
       let kind =
-        match Contract.is_implicit h with
-        | Some _ ->
-            " (implicit)"
-        | None ->
-            ""
+        match Contract.is_implicit h with Some _ -> " (implicit)" | None -> ""
       in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
@@ -81,8 +70,7 @@ let message_added_contract (cctxt : #Alpha_client_context.full) name =
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh
-  >>=? fun (src_name, src_pk, src_sk) ->
+  Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
 let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
@@ -93,8 +81,7 @@ let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
     ~predecessors
     operation_hash
   >>=? function
-  | None ->
-      return_none
+  | None -> return_none
   | Some (block, i, j) ->
       cctxt#message
         "Operation found in block: %a (pass: %d, offset: %d)"

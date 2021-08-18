@@ -29,8 +29,7 @@ open Protocol_client_context
 (** Retrieve the manager key in a contract storage.
     The storage has to be of type `pair key_hash 'a`.
 *)
-val get_contract_manager :
-  #full -> Contract.t -> public_key_hash tzresult Lwt.t
+val get_contract_manager : #full -> Contract.t -> public_key_hash tzresult Lwt.t
 
 (** Builds a delegation operation ready for injection *)
 val build_delegate_operation :
@@ -54,6 +53,7 @@ val set_delegate :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   fee_parameter:Injection.fee_parameter ->
   ?fee:Tez.t ->
@@ -92,6 +92,7 @@ val transfer :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
@@ -109,3 +110,16 @@ val transfer :
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
   Lwt.t
+
+val build_lambda_for_set_delegate : delegate:public_key_hash option -> string
+
+val build_lambda_for_transfer_to_implicit :
+  destination:public_key_hash -> amount:Tez.t -> string
+
+val build_lambda_for_transfer_to_originated :
+  destination:Contract.t ->
+  entrypoint:string ->
+  amount:Tez.t ->
+  parameter_type:Script.expr ->
+  parameter:Script.expr ->
+  string

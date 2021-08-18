@@ -6,8 +6,6 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "bls12-381"
-  "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-stdlib"
   "data-encoding" { >= "0.3" & < "0.4" }
@@ -16,17 +14,16 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "hacl-star" { >= "0.3" & < "0.4"}
+  "bls12-381" { < "0.5" }
+  "tezos-hacl-glue"
+  "tezos-hacl-glue-unix" {with-test}
   "zarith"
   "secp256k1-internal"
-  "uecc"
   "ringo" { = "0.5" }
-  "alcotest" { with-test & >= "1.1.0" }
+  "bls12-381-unix" { with-test }
+  "qcheck-alcotest" { with-test }
+  "tezos-test-helpers" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "mirage-crypto" {= "0.10.2"}
-]
-conflicts: [
-  "hacl_x25519"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

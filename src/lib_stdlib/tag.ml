@@ -62,7 +62,7 @@ end
 type 'a def = (module DEF with type t = 'a)
 
 let def (type a) ?(doc = "undocumented") name pp =
-  ( module Def (struct
+  (module Def (struct
     let name = name
 
     type t = a
@@ -71,7 +71,7 @@ let def (type a) ?(doc = "undocumented") name pp =
 
     let pp = pp
   end) : DEF
-    with type t = a )
+    with type t = a)
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
@@ -160,8 +160,7 @@ let rem = remove
 type merger = {merger : 'a. 'a def -> 'a option -> 'a option -> 'a option}
 
 let merge f =
-  TagSet.merge
-  @@ function
+  TagSet.merge @@ function
   | Key.V tag ->
       fun a b -> veil tag @@ f.merger tag (unveil tag a) (unveil tag b)
 
@@ -173,12 +172,9 @@ let union f =
       merger =
         (fun tag a b ->
           match (a, b) with
-          | (Some aa, Some bb) ->
-              Some (f.unioner tag aa bb)
-          | (Some _, None) ->
-              a
-          | (None, _) ->
-              b);
+          | (Some aa, Some bb) -> Some (f.unioner tag aa bb)
+          | (Some _, None) -> a
+          | (None, _) -> b);
     }
 
 (* no compare and equal, compare especially makes little sense *)
@@ -222,12 +218,10 @@ let find_opt tag s = option_bind (reveal tag) @@ TagSet.find_opt (Key.V tag) s
 (* This would usually be called `find` but `Logs` has it with this name.  We can't
    have it at both named because `Logs` has `find_opt` as `find`. *)
 let get tag s =
-  find_opt tag s
-  |> function
+  find_opt tag s |> function
   | None ->
       invalid_arg (Format.asprintf "tag named %s not found in set" (name tag))
-  | Some v ->
-      v
+  | Some v -> v
 
 let find_first p s = snd @@ TagSet.find_first p s
 
@@ -265,8 +259,7 @@ module DSL = struct
 
   let ( -% ) :
       type a d.
-      (?tags:set -> a) -> (a, Format.formatter, unit, d) arg -> ?tags:set -> d
-      =
+      (?tags:set -> a) -> (a, Format.formatter, unit, d) arg -> ?tags:set -> d =
    fun f -> function
     | A (tag, v) ->
         fun [@warning "-16"] ?(tags = empty) ->

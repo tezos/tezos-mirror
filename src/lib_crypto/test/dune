@@ -11,20 +11,19 @@
         test_prop_signature
         test_prop_hacl_hash
         test_deterministic_nonce
-        test_signature)
+        test_signature
+        test_timelock)
  (libraries tezos-stdlib
             tezos-crypto
+            bls12-381-unix
+            zarith
+            tezos-hacl-glue-unix
             data-encoding
-            alcotest
             alcotest-lwt
-            crowbar)
+            qcheck-alcotest
+            tezos-test-helpers)
  (package tezos-crypto)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_error_monad.TzLwtreslib
                    -open Data_encoding)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

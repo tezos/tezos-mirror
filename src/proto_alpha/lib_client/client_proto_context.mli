@@ -36,6 +36,7 @@ val get_storage :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
@@ -51,6 +52,7 @@ val get_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Big_map.Id.t ->
   Script_expr_hash.t ->
   Script.expr tzresult Lwt.t
@@ -59,8 +61,16 @@ val get_script :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Contract.t ->
   Script.t option tzresult Lwt.t
+
+val get_script_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Script_expr_hash.t option tzresult Lwt.t
 
 val get_balance :
   #Protocol_client_context.rpc_context ->
@@ -83,6 +93,7 @@ val set_delegate :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
@@ -152,6 +163,7 @@ val transfer :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
@@ -213,8 +225,7 @@ type batch_transfer_operation = {
   entrypoint : string option;
 }
 
-val batch_transfer_operation_encoding :
-  batch_transfer_operation Data_encoding.t
+val batch_transfer_operation_encoding : batch_transfer_operation Data_encoding.t
 
 val activate_account :
   #Protocol_client_context.full ->

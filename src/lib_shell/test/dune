@@ -1,9 +1,10 @@
 (executables
- (names test
+ (names test_shell
         test_locator
         test_synchronisation_heuristic_fuzzy)
  (libraries tezos-base
-            tezos-storage
+            tezos-store
+            tezos-context
             tezos-shell-context
             tezos-p2p
             tezos-p2p-services
@@ -14,10 +15,12 @@
             tezos-stdlib-unix
             tezos-validation
             tezos-test-services
+	    tezos-test-helpers
             alcotest-lwt
             crowbar)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_storage
+                   -open Tezos_store
+                   -open Tezos_context
                    -open Tezos_shell_context
                    -open Tezos_protocol_updater
                    -open Tezos_p2p
@@ -31,14 +34,14 @@
 
 (rule
  (alias buildtest)
- (deps test.exe
+ (deps test_shell.exe
        test_locator.exe
        test_synchronisation_heuristic_fuzzy.exe)
  (action (progn)))
 
 (rule
  (alias runtest_shell)
- (action (run %{exe:test.exe})))
+ (action (run %{exe:test_shell.exe})))
 
 (rule
  (alias runtest_locator)
@@ -59,8 +62,3 @@
        (alias runtest_locator)
        (alias runtest_synchronisation))
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

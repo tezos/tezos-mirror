@@ -1,3 +1,5 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _multinetwork:
 
 Multinetwork Node
@@ -32,11 +34,20 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your node configuration. For instance, to run on Edo2net::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Florencenet::
 
-  tezos-node config init --data-dir ~/tezos-edonet --network edo2net
+  tezos-node config init --data-dir ~/tezos-edonet --network florencenet
   tezos-node identity generate --data-dir ~/tezos-edonet
   tezos-node run --data-dir ~/tezos-edonet
+
+.. note::
+   Once initialized, the node remembers its network settings on subsequent runs
+   and reconnects to the same network every time you run it. If you specify a
+   different network when running the node again, it will refuse to start. In
+   order to switch to a different network you need to either reinitialize it
+   with a different data directory using the ``--data-dir`` option or remove
+   everything from the existing data directory, which defaults to ``~/.tezos-node``
+   (and also initialize again).
 
 The ``--network`` option is not case-sensitive and can be used with
 the following built-in networks:
@@ -45,24 +56,40 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``edo2net`` (available from version 8.3)
+- ``florencenet`` (available from version 9.0)
+
+- ``granadanet`` (available from version 9.2)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Edo2net::
+it runs on Florencenet::
 
-  tezos-node run --data-dir ~/tezos-edonet --network edo2net
+  tezos-node run --data-dir ~/tezos-edonet --network florencenet
 
-This command will fail with an error if the configured network is not Edo2net.
+This command will fail with an error if the configured network is not Florencenet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
+Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
 Custom Networks
 ---------------
 
 If the network you want to connect to is not in the list of built-in networks,
-you can configure a custom network in the configuration file.
+you need a corresponding network configuration file. There are several ways to
+get that. If you have an appropriate file, you can specify it with ``--network``
+argument when you initialize your node configuration (see above), and the node will load it. If you know a URL from which the file can be
+downloaded, you can also specify it with ``--network``. The node will then
+download the config automatically. The network configuration should be in JSON format,
+containing an object matching the contents of the ``network`` field in
+``config.json`` (see below for an example, and the :doc:`node configuration <./node-configuration>` documentation for reference).
+
+.. note::
+   The contents of the network configuration file will be saved in your node
+   configuration file ``config.json``, so it won't be downloaded again on
+   subsequent runs of the node.
+
+Finally you can manually edit the main configuration file of the node (``config.json``).
 Here is an example configuration file for Mainnet::
 
   {
@@ -174,11 +201,11 @@ Alias Versus Explicit Configuration
 
 If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Edo2net, it will contain something like::
+to connect to Florencenet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "edo2net"
+    "network": "florencenet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -190,7 +217,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``edo2net``. Instead,
+no longer contain an alias such as ``mainnet`` or ``florencenet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.

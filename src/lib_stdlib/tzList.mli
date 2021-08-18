@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,17 +45,6 @@ val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
     exactly [n] elements, [j] is [l] and [k] is [[]]. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** Bounded sequence: keep only the [n] greatest elements. *)
-module Bounded (E : Set.OrderedType) : sig
-  type t
-
-  val create : int -> t
-
-  val insert : E.t -> t -> unit
-
-  val get : t -> E.t list
-end
-
 (** [select n l] is ([n]th element of [l], [l] without that element) *)
 val select : int -> 'a list -> 'a * 'a list
 
@@ -91,3 +81,11 @@ val shuffle : 'a list -> 'a list
 
 (** Get the index of an element in a list. *)
 val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
+
+(** [find_map f l] applies [f] to the elements of [l] in order, and
+    returns the first result of the form [Some v], or [None] if none
+    exist.
+
+    Present in OCaml 4.10: this function can be removed once we catch
+    up. *)
+val find_map : ('a -> 'b option) -> 'a list -> 'b option

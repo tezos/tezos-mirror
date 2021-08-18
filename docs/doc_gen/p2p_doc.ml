@@ -36,7 +36,8 @@ let main _node =
   (* include/copy usage.rst from input  *)
   let rec loop () =
     let s = read_line () in
-    Format.printf "%s@\n" s ; loop ()
+    Format.printf "%s@\n" s ;
+    loop ()
   in
   (try loop () with End_of_file -> ()) ;
   Format.printf "@\n" ;
@@ -58,10 +59,8 @@ let main _node =
       let hash = Protocol_hash.of_b58check_exn hash in
       let (module Proto) =
         match Registered_protocol.get hash with
-        | None ->
-            assert false
-        | Some proto ->
-            proto
+        | None -> assert false
+        | Some proto -> proto
       in
       Format.printf
         "%a@\n@\n%a@\n@."

@@ -27,19 +27,12 @@ open Protocol
 
 let error ~loc v f =
   match v with
-  | Error err when List.exists f err ->
-      return_unit
-  | Ok _ ->
-      failwith "Unexpected successful result (%s)" loc
-  | Error err ->
-      failwith "@[Unexpected error (%s): %a@]" loc pp_print_error err
+  | Error err when List.exists f err -> return_unit
+  | Ok _ -> failwith "Unexpected successful result (%s)" loc
+  | Error err -> failwith "@[Unexpected error (%s): %a@]" loc pp_print_error err
 
 let proto_error ~loc v f =
-  error ~loc v (function
-      | Environment.Ecoproto_error err ->
-          f err
-      | _ ->
-          false)
+  error ~loc v (function Environment.Ecoproto_error err -> f err | _ -> false)
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   if not (cmp a b) then
@@ -51,6 +44,67 @@ let not_equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
     failwith "@[@[[%s]@] - @[%s : %a is equal to %a@]@]" loc msg pp a pp b
   else return_unit
 
+module Int32 = struct
+  include Int32
+
+  let pp pp v = Format.pp_print_int pp (Int32.to_int v)
+end
+
+module Int64 = struct
+  include Int64
+
+  let pp pp v = Format.pp_print_int pp (Int64.to_int v)
+end
+
+(* int *)
+let equal_int ~loc (a : int) (b : int) =
+  equal ~loc ( = ) "Integers aren't equal" Format.pp_print_int a b
+
+(* int32 *)
+let equal_int32 ~loc (a : int32) (b : int32) =
+  equal ~loc Int32.equal "int32s (%a and %a) aren't equal" Int32.pp a b
+
+let not_equal_int ~loc (a : int) (b : int) =
+  not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
+
+let leq_int ~loc (a : int) (b : int) =
+  if a > b then
+    failwith
+      "@[@[[%s]@] - @[Integers aren't less than or equal : %a is greater than  \
+       %a@]@]"
+      loc
+      Format.pp_print_int
+      a
+      Format.pp_print_int
+      b
+  else return_unit
+
+(* int64 *)
+let equal_int64 ~loc (a : int64) (b : int64) =
+  equal
+    ~loc
+    ( = )
+    "Integers aren't equal"
+    Format.pp_print_string
+    (Int64.to_string a)
+    (Int64.to_string b)
+
+let not_equal_int64 ~loc (a : int64) (b : int64) =
+  not_equal
+    ~loc
+    ( = )
+    "Integers are equal"
+    Format.pp_print_string
+    (Int64.to_string a)
+    (Int64.to_string b)
+
+(* bool *)
+let equal_bool ~loc (a : bool) (b : bool) =
+  equal ~loc ( = ) "Booleans aren't equal" Format.pp_print_bool a b
+
+let not_equal_bool ~loc (a : bool) (b : bool) =
+  not_equal ~loc ( = ) "Booleans are equal" Format.pp_print_bool a b
+
 (* tez *)
 let equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
   let open Alpha_context in
@@ -59,20 +113,6 @@ let equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
 let not_equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
   let open Alpha_context in
   not_equal ~loc Tez.( = ) "Tez are equal" Tez.pp a b
-
-(* int *)
-let equal_int ~loc (a : int) (b : int) =
-  equal ~loc ( = ) "Integers aren't equal" Format.pp_print_int a b
-
-let not_equal_int ~loc (a : int) (b : int) =
-  not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
-
-(* bool *)
-let equal_bool ~loc (a : bool) (b : bool) =
-  equal ~loc ( = ) "Booleans aren't equal" Format.pp_print_bool a b
-
-let not_equal_bool ~loc (a : bool) (b : bool) =
-  not_equal ~loc ( = ) "Booleans are equal" Format.pp_print_bool a b
 
 (* pkh *)
 let equal_pkh ~loc (a : Signature.Public_key_hash.t)
@@ -94,8 +134,8 @@ open Context
     Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
     [Rewards] for the others. *)
 let balance_is ~loc b contract ?(kind = Contract.Main) expected =
-  Contract.balance b contract ~kind
-  >>=? fun balance -> equal_tez ~loc balance expected
+  Contract.balance b contract ~kind >>=? fun balance ->
+  equal_tez ~loc balance expected
 
 (** [balance_was_operated ~operand b c old_balance amount] checks that the
     current balance of contract [c] is [operand old_balance amount] and
@@ -104,26 +144,21 @@ let balance_is ~loc b contract ?(kind = Contract.Main) expected =
     [Rewards] for the others. *)
 let balance_was_operated ~operand ~loc b contract ?(kind = Contract.Main)
     old_balance amount =
-  operand old_balance amount |> Environment.wrap_tzresult
-  >>?= fun expected -> balance_is ~loc b contract ~kind expected
+  operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
+  balance_is ~loc b contract ~kind expected
 
 let balance_was_credited =
   balance_was_operated ~operand:Alpha_context.Tez.( +? )
 
-let balance_was_debited =
-  balance_was_operated ~operand:Alpha_context.Tez.( -? )
+let balance_was_debited = balance_was_operated ~operand:Alpha_context.Tez.( -? )
 
 (* debug *)
 
 let print_balances ctxt id =
-  Contract.balance ~kind:Main ctxt id
-  >>=? fun main ->
-  Contract.balance ~kind:Deposit ctxt id
-  >>=? fun deposit ->
-  Contract.balance ~kind:Fees ctxt id
-  >>=? fun fees ->
-  Contract.balance ~kind:Rewards ctxt id
-  >|=? fun rewards ->
+  Contract.balance ~kind:Main ctxt id >>=? fun main ->
+  Contract.balance ~kind:Deposit ctxt id >>=? fun deposit ->
+  Contract.balance ~kind:Fees ctxt id >>=? fun fees ->
+  Contract.balance ~kind:Rewards ctxt id >|=? fun rewards ->
   Format.printf
     "\nMain: %s\nDeposit: %s\nFees: %s\nRewards: %s\n"
     (Alpha_context.Tez.to_string main)

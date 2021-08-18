@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,8 +40,7 @@ let valid_char c =
   match c with
   | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' | '@' | '-' | '_' | '+' | '=' | '~' ->
       true
-  | _ ->
-      false
+  | _ -> false
 
 let check_name_exn : string -> (string -> char -> exn) -> unit =
  fun name make_exn ->
@@ -82,11 +82,17 @@ module Level = struct
          (fun l -> (to_string l, l))
          [Debug; Info; Notice; Warning; Error; Fatal])
 
-  let compare = compare
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Stdlib.compare
+  end)
 end
 
 module Section : sig
   type t
+
+  include Compare.S with type t := t
 
   val empty : t
 
@@ -99,8 +105,18 @@ module Section : sig
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
+
+  val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
 end = struct
   type t = {path : string list; lwt_log_section : Lwt_log_core.section}
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Stdlib.compare
+  end)
 
   let empty = {path = []; lwt_log_section = Lwt_log_core.Section.make ""}
 
@@ -129,6 +145,8 @@ end = struct
   let encoding =
     let open Data_encoding in
     conv (fun {path; _} -> path) (fun l -> make l) (list string)
+
+  let pp fmt section = Format.fprintf fmt "%s" (String.concat "." section.path)
 end
 
 let registered_sections = ref TzString.Set.empty
@@ -143,6 +161,8 @@ let register_section section =
 
 module type EVENT_DEFINITION = sig
   type t
+
+  val section : Section.t option
 
   val name : string
 
@@ -237,13 +257,16 @@ module All_sinks = struct
       ~id:"internal-event-activation-error"
       ~title
       ~description
-      ~pp:(fun ppf -> function Missing_uri_scheme uri ->
-            Format.fprintf ppf "%s: Missing URI scheme %S" title uri
-        | Uri_scheme_not_registered uri ->
-            Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
+      ~pp:
+        (fun ppf -> function
+          | Missing_uri_scheme uri ->
+              Format.fprintf ppf "%s: Missing URI scheme %S" title uri
+          | Uri_scheme_not_registered uri ->
+              Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
       Data_encoding.(
         union
-          [ case
+          [
+            case
               ~title:"missing-uri-scheme"
               (Tag 0)
               (obj1 (req "missing-uri-scheme" (obj1 (req "uri" string))))
@@ -253,30 +276,26 @@ module All_sinks = struct
               ~title:"non-registered-uri-scheme"
               (Tag 2)
               (obj1 (req "non-registered-uri-scheme" (obj1 (req "uri" string))))
-              (function
-                | Uri_scheme_not_registered uri -> Some uri | _ -> None)
-              (fun uri -> Uri_scheme_not_registered uri) ])
+              (function Uri_scheme_not_registered uri -> Some uri | _ -> None)
+              (fun uri -> Uri_scheme_not_registered uri);
+          ])
       (function Activation_error reason -> Some reason | _ -> None)
       (fun reason -> Activation_error reason)
 
   let activate uri =
     match Uri.scheme uri with
-    | None ->
-        fail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
+    | None -> fail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
     | Some scheme_to_activate ->
         let activate (type a) scheme definition =
           let module S = (val definition : SINK with type t = a) in
-          S.configure uri
-          >>=? fun sink ->
+          S.configure uri >>=? fun sink ->
           return (Active {scheme; configuration = uri; definition; sink})
         in
-        ( match find_registered scheme_to_activate with
-        | Some (Registered {scheme; definition}) ->
-            activate scheme definition
+        (match find_registered scheme_to_activate with
+        | Some (Registered {scheme; definition}) -> activate scheme definition
         | None ->
             fail
-              (Activation_error (Uri_scheme_not_registered (Uri.to_string uri)))
-        )
+              (Activation_error (Uri_scheme_not_registered (Uri.to_string uri))))
         >>=? fun act ->
         active := act :: !active ;
         return_unit
@@ -308,7 +327,9 @@ module All_sinks = struct
       fprintf fmt "%s: [" name ;
       pp_print_cut fmt () ;
       pp_print_list
-        ~pp_sep:(fun fmt () -> pp_print_string fmt "," ; pp_print_space fmt ())
+        ~pp_sep:(fun fmt () ->
+          pp_print_string fmt "," ;
+          pp_print_space fmt ())
         pp
         fmt
         list ;
@@ -333,13 +354,16 @@ module All_sinks = struct
 end
 
 module Generic = struct
-  type definition = Definition : (string * 'a event_definition) -> definition
+  type definition =
+    | Definition :
+        (Section.t option * string * 'a event_definition)
+        -> definition
 
   type event = Event : (string * 'a event_definition * 'a) -> event
 
   type with_name = < doc : string ; name : string >
 
-  let json_schema (Definition (_, d)) :
+  let json_schema (Definition (_, _, d)) :
       < schema : Json_schema.schema ; with_name > =
     let aux (type a) (ev : a event_definition) =
       let module E = (val ev : EVENT_DEFINITION with type t = a) in
@@ -383,19 +407,32 @@ module All_definitions = struct
 
   let add (type a) ev =
     let module E = (val ev : EVENT_DEFINITION with type t = a) in
-    match List.find (function Definition (n, _) -> E.name = n) !all with
+    match
+      List.find
+        (function Definition (s, n, _) -> E.section = s && E.name = n)
+        !all
+    with
     | Some _ ->
-        raise (registration_exn "duplicate Event name: %S" E.name)
+        raise
+          (registration_exn
+             "duplicate Event name: %a %S"
+             (Format.pp_print_option (fun fmt ss ->
+                  Format.fprintf
+                    fmt
+                    "%s"
+                    (String.concat "." (Section.to_string_list ss))))
+             E.section
+             E.name)
     | None ->
         check_name_exn
           E.name
           (registration_exn "invalid event name: %S contains '%c'") ;
-        all := Definition (E.name, ev) :: !all
+        all := Definition (E.section, E.name, ev) :: !all
 
   let get () = !all
 
   let find match_name =
-    List.find (function Definition (n, _) -> match_name n) !all
+    List.find (function Definition (_, n, _) -> match_name n) !all
 end
 
 module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
@@ -421,18 +458,17 @@ module Simple = struct
     Lwt.try_bind
       (fun () -> simple_event parameters)
       (function
-        | Ok () ->
-            Lwt.return_unit
+        | Ok () -> Lwt.return_unit
         | Error trace ->
             (* Having to handle errors when sending events would make the
-              code very heavy. We are much more likely to just use [>>=?]
-              to propagate the error, assuming that sending events cannot
-              fail. But consider this example:
-              - we log that we are going to do some cleanup, like remove
-                temporary directories...
-              - and then because we failed to log, we don't actually
-                clean the temporary directories.
-              Instead we just print the error on stderr. *)
+               code very heavy. We are much more likely to just use [>>=?]
+               to propagate the error, assuming that sending events cannot
+               fail. But consider this example:
+               - we log that we are going to do some cleanup, like remove
+                 temporary directories...
+               - and then because we failed to log, we don't actually
+                 clean the temporary directories.
+               Instead we just print the error on stderr. *)
             Format.eprintf
               "@[<hv 2>Failed to send event:@ %a@]@."
               Error_monad.pp_print_error
@@ -452,11 +488,11 @@ module Simple = struct
 
   let make_section names =
     match names with
-    | None ->
-        None
+    | None -> None
     | Some names ->
         let section = Section.make_sanitized names in
-        register_section section ; Some section
+        register_section section ;
+        Some section
 
   let pp_print_compact_float fmt value = Format.fprintf fmt "%g" value
 
@@ -508,83 +544,56 @@ module Simple = struct
             'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
     fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
      match encoding.encoding with
-     | Null ->
-         if never_empty then Format.pp_print_string fmt "N/A"
-     | Empty ->
-         if never_empty then Format.pp_print_string fmt "N/A"
-     | Ignore ->
-         if never_empty then Format.pp_print_string fmt "N/A"
-     | Constant name ->
-         pp_print_shortened_string fmt name
-     | Bool ->
-         Format.pp_print_bool fmt value
-     | Int8 ->
-         Format.pp_print_int fmt value
-     | Uint8 ->
-         Format.pp_print_int fmt value
-     | Int16 ->
-         Format.pp_print_int fmt value
-     | Uint16 ->
-         Format.pp_print_int fmt value
-     | Int31 ->
-         Format.pp_print_int fmt value
-     | Int32 ->
-         Format.fprintf fmt "%ld" value
-     | Int64 ->
-         Format.fprintf fmt "%Ld" value
-     | N ->
-         Format.pp_print_string fmt (Z.to_string value)
-     | Z ->
-         Format.pp_print_string fmt (Z.to_string value)
-     | RangedInt _ ->
-         Format.pp_print_int fmt value
-     | RangedFloat _ ->
-         pp_print_compact_float fmt value
-     | Float ->
-         pp_print_compact_float fmt value
-     | Bytes _ ->
-         pp_print_shortened_string fmt (Bytes.unsafe_to_string value)
-     | String _ ->
-         pp_print_shortened_string fmt value
-     | Padded (encoding, _) ->
-         pp_human_readable ~never_empty encoding fmt value
+     | Null -> if never_empty then Format.pp_print_string fmt "N/A"
+     | Empty -> if never_empty then Format.pp_print_string fmt "N/A"
+     | Ignore -> if never_empty then Format.pp_print_string fmt "N/A"
+     | Constant name -> pp_print_shortened_string fmt name
+     | Bool -> Format.pp_print_bool fmt value
+     | Int8 -> Format.pp_print_int fmt value
+     | Uint8 -> Format.pp_print_int fmt value
+     | Int16 -> Format.pp_print_int fmt value
+     | Uint16 -> Format.pp_print_int fmt value
+     | Int31 -> Format.pp_print_int fmt value
+     | Int32 -> Format.fprintf fmt "%ld" value
+     | Int64 -> Format.fprintf fmt "%Ld" value
+     | N -> Format.pp_print_string fmt (Z.to_string value)
+     | Z -> Format.pp_print_string fmt (Z.to_string value)
+     | RangedInt _ -> Format.pp_print_int fmt value
+     | RangedFloat _ -> pp_print_compact_float fmt value
+     | Float -> pp_print_compact_float fmt value
+     | Bytes _ -> pp_print_shortened_string fmt (Bytes.unsafe_to_string value)
+     | String _ -> pp_print_shortened_string fmt value
+     | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (
-       match Stdlib.Hashtbl.find_opt table value with
-       | None ->
-           if never_empty then Format.pp_print_string fmt "N/A"
-       | Some (name, _) ->
-           pp_print_shortened_string fmt name )
-     | Array _ ->
-         if never_empty then Format.pp_print_string fmt "<array>"
-     | List _ ->
-         if never_empty then Format.pp_print_string fmt "<list>"
+         match Stdlib.Hashtbl.find_opt table value with
+         | None -> if never_empty then Format.pp_print_string fmt "N/A"
+         | Some (name, _) -> pp_print_shortened_string fmt name)
+     | Array _ -> if never_empty then Format.pp_print_string fmt "<array>"
+     | List _ -> if never_empty then Format.pp_print_string fmt "<list>"
      | Obj (Req {encoding; _} | Dft {encoding; _}) ->
          pp_human_readable ~never_empty encoding fmt value
      | Obj (Opt {encoding; _}) ->
          Option.iter (pp_human_readable ~never_empty encoding fmt) value
-     | Objs _ ->
-         if never_empty then Format.pp_print_string fmt "<obj>"
-     | Tup encoding ->
-         pp_human_readable ~never_empty encoding fmt value
-     | Tups _ ->
-         if never_empty then Format.pp_print_string fmt "<tuple>"
+     | Objs _ -> if never_empty then Format.pp_print_string fmt "<obj>"
+     | Tup encoding -> pp_human_readable ~never_empty encoding fmt value
+     | Tups _ -> if never_empty then Format.pp_print_string fmt "<tuple>"
      | Union
-         { cases =
-             [ Case {encoding; proj; _};
-               Case {encoding = {encoding = Null; _}; _} ];
-           _ } -> (
-       (* Probably an [option] type or similar.
-          We only print the value if it is not null,
-          unless [never_empty] is [true]. *)
-       match proj value with
-       | None ->
-           if never_empty then Format.pp_print_string fmt "null"
-       | Some value ->
-           pp_human_readable ~never_empty encoding fmt value )
-     | Union _ ->
-         if never_empty then Format.pp_print_string fmt "<union>"
-     | Mu _ ->
-         if never_empty then Format.pp_print_string fmt "<recursive>"
+         {
+           cases =
+             [
+               Case {encoding; proj; _};
+               Case {encoding = {encoding = Null; _}; _};
+             ];
+           _;
+         } -> (
+         (* Probably an [option] type or similar.
+            We only print the value if it is not null,
+            unless [never_empty] is [true]. *)
+         match proj value with
+         | None -> if never_empty then Format.pp_print_string fmt "null"
+         | Some value -> pp_human_readable ~never_empty encoding fmt value)
+     | Union _ -> if never_empty then Format.pp_print_string fmt "<union>"
+     | Mu _ -> if never_empty then Format.pp_print_string fmt "<recursive>"
      | Conv {proj; encoding; _} ->
          (* TODO: it may be worth it to take a look at [encoding]
             before calling [proj], to try and predict whether the value
@@ -593,28 +602,22 @@ module Simple = struct
      | Describe {encoding; _} ->
          pp_human_readable ~never_empty encoding fmt value
      | Splitted {json_encoding; _} -> (
-       (* Generally, [Splitted] nodes imply that the JSON encoding
-          is more human-friendly, as JSON is a human-friendly
-          format. A typical example is Blake2B hashes.
-          So for log outputs we use the JSON encoding.
-          Unfortunately, [Json_encoding.t] is abstract so we have
-          to [construct] the JSON value and continue from here. *)
-       (* TODO: it may be worth it to take a look at [encoding]
-          before constructing the JSON value, to try and predict
-          whether the value will actually be printed (same as [Conv]). *)
-       match Json_encoding.construct json_encoding value with
-       | `Null ->
-           if never_empty then Format.pp_print_string fmt "N/A"
-       | `Bool value ->
-           Format.pp_print_bool fmt value
-       | `Float value ->
-           pp_print_compact_float fmt value
-       | `String value ->
-           pp_print_shortened_string fmt value
-       | `A _ ->
-           if never_empty then Format.pp_print_string fmt "<list>"
-       | `O _ ->
-           if never_empty then Format.pp_print_string fmt "<obj>" )
+         (* Generally, [Splitted] nodes imply that the JSON encoding
+            is more human-friendly, as JSON is a human-friendly
+            format. A typical example is Blake2B hashes.
+            So for log outputs we use the JSON encoding.
+            Unfortunately, [Json_encoding.t] is abstract so we have
+            to [construct] the JSON value and continue from here. *)
+         (* TODO: it may be worth it to take a look at [encoding]
+            before constructing the JSON value, to try and predict
+            whether the value will actually be printed (same as [Conv]). *)
+         match Json_encoding.construct json_encoding value with
+         | `Null -> if never_empty then Format.pp_print_string fmt "N/A"
+         | `Bool value -> Format.pp_print_bool fmt value
+         | `Float value -> pp_print_compact_float fmt value
+         | `String value -> pp_print_shortened_string fmt value
+         | `A _ -> if never_empty then Format.pp_print_string fmt "<list>"
+         | `O _ -> if never_empty then Format.pp_print_string fmt "<obj>")
      | Dynamic_size {encoding; _} ->
          pp_human_readable ~never_empty encoding fmt value
      | Check_size {encoding; _} ->
@@ -679,23 +682,19 @@ module Simple = struct
     Format.fprintf fmt "@[<hov 2>" ;
     (* First, print [msg], including interpolated variables. *)
     let pp_msg_atom = function
-      | Text text ->
-          Format.pp_print_string fmt text
+      | Text text -> Format.pp_print_string fmt text
       | Variable index -> (
-        match List.nth_opt fields index with
-        | None ->
-            (* Not supposed to happen, by construction.
-               But it's just logging, no need to fail here. *)
-            Format.pp_print_string fmt "???"
-        | Some (Parameter (_name, enc, value, pp), used) -> (
-            used := true ;
-            match pp with
-            | None ->
-                pp_human_readable ~never_empty:true enc fmt value
-            | Some pp ->
-                pp fmt value ) )
-      | Space ->
-          Format.pp_print_space fmt ()
+          match List.nth_opt fields index with
+          | None ->
+              (* Not supposed to happen, by construction.
+                 But it's just logging, no need to fail here. *)
+              Format.pp_print_string fmt "???"
+          | Some (Parameter (_name, enc, value, pp), used) -> (
+              used := true ;
+              match pp with
+              | None -> pp_human_readable ~never_empty:true enc fmt value
+              | Some pp -> pp fmt value))
+      | Space -> Format.pp_print_space fmt ()
     in
     List.iter pp_msg_atom msg ;
     (* Then, print variables that were not used by [msg]. *)
@@ -705,17 +704,15 @@ module Simple = struct
         let value =
           let pp =
             match pp with
-            | None ->
-                pp_human_readable ~never_empty:false enc
-            | Some pp ->
-                pp
+            | None -> pp_human_readable ~never_empty:false enc
+            | Some pp -> pp
           in
           Format.asprintf "%a" pp value
         in
         if String.length value > 0 then
           if !first_field then (
             first_field := false ;
-            Format.fprintf fmt "@ (%s = %s" name value )
+            Format.fprintf fmt "@ (%s = %s" name value)
           else Format.fprintf fmt ",@ %s = %s" name value
     in
     if not short then List.iter print_field fields ;
@@ -733,6 +730,8 @@ module Simple = struct
       type t = unit
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -753,6 +752,8 @@ module Simple = struct
       type t = a
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -780,6 +781,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2) =
@@ -787,8 +790,10 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
-            Parameter (f2_name, f2_enc, f2, pp2) ]
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+          ]
 
       let encoding =
         with_version ~name
@@ -812,6 +817,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3) =
@@ -819,9 +826,11 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
-            Parameter (f3_name, f3_enc, f3, pp3) ]
+            Parameter (f3_name, f3_enc, f3, pp3);
+          ]
 
       let encoding =
         with_version ~name
@@ -848,6 +857,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3, f4) =
@@ -855,10 +866,12 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
             Parameter (f3_name, f3_enc, f3, pp3);
-            Parameter (f4_name, f4_enc, f4, pp4) ]
+            Parameter (f4_name, f4_enc, f4, pp4);
+          ]
 
       let encoding =
         with_version ~name
@@ -889,6 +902,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3, f4, f5) =
@@ -896,11 +911,13 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
             Parameter (f3_name, f3_enc, f3, pp3);
             Parameter (f4_name, f4_enc, f4, pp4);
-            Parameter (f5_name, f5_enc, f5, pp5) ]
+            Parameter (f5_name, f5_enc, f5, pp5);
+          ]
 
       let encoding =
         with_version ~name
@@ -933,6 +950,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3, f4, f5, f6) =
@@ -940,12 +959,14 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
             Parameter (f3_name, f3_enc, f3, pp3);
             Parameter (f4_name, f4_enc, f4, pp4);
             Parameter (f5_name, f5_enc, f5, pp5);
-            Parameter (f6_name, f6_enc, f6, pp6) ]
+            Parameter (f6_name, f6_enc, f6, pp6);
+          ]
 
       let encoding =
         with_version ~name
@@ -982,6 +1003,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7) =
@@ -989,13 +1012,15 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
             Parameter (f3_name, f3_enc, f3, pp3);
             Parameter (f4_name, f4_enc, f4, pp4);
             Parameter (f5_name, f5_enc, f5, pp5);
             Parameter (f6_name, f6_enc, f6, pp6);
-            Parameter (f7_name, f7_enc, f7, pp7) ]
+            Parameter (f7_name, f7_enc, f7, pp7);
+          ]
 
       let encoding =
         with_version ~name
@@ -1034,6 +1059,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
@@ -1041,14 +1068,16 @@ module Simple = struct
           ~short
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1, pp1);
+          [
+            Parameter (f1_name, f1_enc, f1, pp1);
             Parameter (f2_name, f2_enc, f2, pp2);
             Parameter (f3_name, f3_enc, f3, pp3);
             Parameter (f4_name, f4_enc, f4, pp4);
             Parameter (f5_name, f5_enc, f5, pp5);
             Parameter (f6_name, f6_enc, f6, pp6);
             Parameter (f7_name, f7_enc, f7, pp7);
-            Parameter (f8_name, f8_enc, f8, pp8) ]
+            Parameter (f8_name, f8_enc, f8, pp8);
+          ]
 
       let encoding =
         with_version ~name
@@ -1092,8 +1121,7 @@ module Legacy_logging = struct
 
     val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
-    val lwt_fatal_error :
-      ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+    val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
 
   open Tezos_stdlib
@@ -1187,10 +1215,11 @@ module Legacy_logging = struct
       let doc = "Generic event legacy / string-based information logging."
 
       let level {level; _} = level
+
+      let section = Some section
     end
 
-    let () =
-      registered_sections := TzString.Set.add P.name !registered_sections
+    let () = registered_sections := TzString.Set.add P.name !registered_sections
 
     module Event = Make (Definition)
 
@@ -1216,10 +1245,8 @@ module Legacy_logging = struct
           (fun message ->
             Event.emit ~section (fun () -> Definition.make ?tags level message)
             >>= function
-            | Ok () ->
-                Lwt.return_unit
-            | Error el ->
-                Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
+            | Ok () -> Lwt.return_unit
+            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
           fmt
       else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
   end
@@ -1314,6 +1341,8 @@ module Error_event = struct
     {message; trace; severity}
 
   module Definition = struct
+    let section = None
+
     let name = "error-event"
 
     type nonrec t = t
@@ -1349,21 +1378,17 @@ module Error_event = struct
   include (Make (Definition) : EVENT with type t := t)
 
   let log_error_and_recover ?section ?message ?severity f =
-    f ()
-    >>= function
-    | Ok () ->
-        Lwt.return_unit
+    f () >>= function
+    | Ok () -> Lwt.return_unit
     | Error el -> (
-        emit ?section (fun () -> make ?message ?severity el ())
-        >>= function
-        | Ok () ->
-            Lwt.return_unit
+        emit ?section (fun () -> make ?message ?severity el ()) >>= function
+        | Ok () -> Lwt.return_unit
         | Error el ->
             Format.kasprintf
               Lwt_log_core.error
               "Error while emitting error logging event !! %a"
               pp_print_error
-              el )
+              el)
 end
 
 module Debug_event = struct
@@ -1379,6 +1404,8 @@ module Debug_event = struct
       (obj2 (req "message" string) (req "attachment" json))
 
   module Definition = struct
+    let section = None
+
     let name = "debug-event"
 
     type nonrec t = t
@@ -1411,7 +1438,8 @@ module Lwt_worker_event = struct
          (req
             "event"
             (union
-               [ case
+               [
+                 case
                    ~title:"started"
                    (Tag 0)
                    (obj1 (req "kind" (constant "started")))
@@ -1430,9 +1458,12 @@ module Lwt_worker_event = struct
                       (req "kind" (constant "failed"))
                       (req "exception" string))
                    (function `Failed s -> Some ((), s) | _ -> None)
-                   (fun ((), s) -> `Failed s) ])))
+                   (fun ((), s) -> `Failed s);
+               ])))
 
   module Definition = struct
+    let section = None
+
     let name = "lwt-worker-event"
 
     type nonrec t = t
@@ -1446,8 +1477,10 @@ module Lwt_worker_event = struct
         ppf
         "Worker %s:@ %a"
         name
-        (fun fmt -> function `Failed msg -> fprintf ppf "Failed with %s" msg
-          | `Ended -> fprintf fmt "Ended" | `Started -> fprintf fmt "Started")
+        (fun fmt -> function
+          | `Failed msg -> fprintf ppf "Failed with %s" msg
+          | `Ended -> fprintf fmt "Ended"
+          | `Started -> fprintf fmt "Started")
         event
 
     let doc = "Generic event for callers of the function Lwt_utils.worker."

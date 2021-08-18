@@ -36,10 +36,8 @@ let check_connections_below_cap () =
 
 let on_terminate resolver status =
   match status with
-  | Unix.WEXITED x when x = 1 ->
-      Lwt.wakeup resolver ()
-  | _ ->
-      ()
+  | Unix.WEXITED x when x = 1 -> Lwt.wakeup resolver ()
+  | _ -> ()
 
 let check_connections_above_cap () =
   Test.register

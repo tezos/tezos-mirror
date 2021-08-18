@@ -1,11 +1,9 @@
-.. _proof-of-stake_alpha:
-
 Proof-of-stake in Tezos
 =======================
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm as implemented in the current protocol
-(namely `PsCARTHA` on `mainnet`).
+on `mainnet`.
 
 Brief Overview
 --------------
@@ -94,7 +92,7 @@ Protocol header
    the block was baked.
 -  ``seed_nonce_hash``: a commitment to a random number, used to
    generate entropy on the chain. Present in only one out of
-   ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
+   ``BLOCKS_PER_COMMITMENT`` = 64 blocks.
 -  ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
    proof-of-work for the block, as a spam prevention measure.
 
@@ -125,7 +123,7 @@ Cycles
 ------
 
 Blocks in Tezos are grouped into *cycles* of
-``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
+``BLOCKS_PER_CYCLE`` = 8,192 blocks. Since blocks are at least
 ``TIME_BETWEEN_BLOCKS[0]`` = one minute apart, this means a cycle lasts *at
 least* 2 days, 20 hours, and 16 minutes. In the following description,
 the current cycle is referred to as ``n``, it is the ``n``-th cycle from the
@@ -221,7 +219,7 @@ Roll snapshots
 ~~~~~~~~~~~~~~
 
 Roll snapshots represent the state of rolls for a given block. Roll
-snapshots are taken every ``BLOCKS_PER_ROLL_SNAPSHOT`` = 256 blocks,
+snapshots are taken every ``BLOCKS_PER_ROLL_SNAPSHOT`` = 512 blocks,
 which is 16 times per cycle. There is a tradeoff between memory
 consumption and economic efficiency. If roll snapshots are too frequent,
 they will consume a lot of memory. If they are too rare, strategic
@@ -262,8 +260,8 @@ Endorsements
 ~~~~~~~~~~~~
 
 To each level, we associate a list of ``ENDORSERS_PER_BLOCK`` =
-32 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
-selecting 32 active rolls with replacement.
+256 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
+selecting 256 active rolls with replacement.
 
 Each endorser verifies the last block that was baked, say at the level
 ``n``, and emits an endorsement operation. The endorsement operations
@@ -279,22 +277,34 @@ endorsement slots covered by the contained endorsement
 operations. (In the code base, the number of filled endorsement slots
 is called the block's endorsing power.)
 
-Minimal block delays
-~~~~~~~~~~~~~~~~~~~~
+Minimal block delay formula
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A block is valid only if its timestamp has a minimal delay with
-respect to the previous block’s timestamp. The minimal delay is given
-by the following expression: ``TIME_BETWEEN_BLOCKS[0] +
-TIME_BETWEEN_BLOCKS[1] * p +`` ``DELAY_PER_MISSING_ENDORSEMENT * MAX
-(0, INITIAL_ENDORSERS - e)`` where ``TIME_BETWEEN_BLOCKS[0]`` = 60
+A block is valid only if its timestamp has a minimal delay with respect to the
+previous block’s timestamp. For a block with priority ``p`` and containing ``e``
+endorsements, the minimal delay is given by the following formula:
+
+``if p = 0 and e >= 3*ENDORSERS_PER_BLOCK/5``
+``then MINIMAL_BLOCK_DELAY``
+``else TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p``
+``+ DELAY_PER_MISSING_ENDORSEMENT * MAX
+(0, INITIAL_ENDORSERS - e)``
+
+where ``MINIMAL_BLOCK_DELAY`` = 30 seconds, ``TIME_BETWEEN_BLOCKS[0]`` = 60
 seconds, ``TIME_BETWEEN_BLOCKS[1]`` = 40 seconds,
-``DELAY_PER_MISSING_ENDORSEMENT`` = 8 seconds, ``INITIAL_ENDORSERS`` =
-24, ``p`` is the block's priority at which the block was baked, and
-``e`` is the number of endorsements the block contains. That is, the
-higher the priority and the fewer endorsements a block carries the
-longer it takes before it can be considered valid. However, if the
-block contains more than ``INITIAL_ENDORSERS`` then there is no time
-penalty.
+``DELAY_PER_MISSING_ENDORSEMENT`` = 4 seconds, and ``INITIAL_ENDORSERS`` =
+192.
+
+The formula says that:
+
+-  if the block is baked at priority 0 and it contains at least 60% of
+   the endorsements (namely, at least 153 endorsements) then the
+   minimal delay is 30 seconds;
+-  otherwise, the higher the priority and the fewer endorsements a
+   block carries with respect to the 192 endorsements threshold, the
+   longer it takes before it can be considered valid, where the delay
+   of 60 seconds is incremented by 40 seconds with each missed priority
+   and with 4 seconds with each missed endorsement.
 
 Rewards
 ~~~~~~~
@@ -302,28 +312,28 @@ Rewards
 Baking a block gives a block reward of ``e *
 BAKING_REWARD_PER_ENDORSEMENT[p']`` plus all fees paid by the
 transactions contained in the block, where
-``BAKING_REWARD_PER_ENDORSEMENT`` = ``[1.250ꜩ, 0.1875ꜩ]``,
+``BAKING_REWARD_PER_ENDORSEMENT`` = ``[0.078125ꜩ, 0.011719ꜩ]``,
 ``e`` is the number of endorsements the block contains, ``p`` is the
 priority at which the block was baked, and ``p'`` is 0 if ``p`` is
 0 and is 1 if ``p`` is bigger than 0.  That is, a delegate
-producing a block of priority 0 will be rewarded ``e * 1.25``
+producing a block of priority 0 will be rewarded ``e * 0.078125``
 ꜩ. If a delegate produces a block at priority 1 or higher, then
-the reward is ``e * 0.1875`` ꜩ.
+the reward is ``e * 0.011719`` ꜩ.
 
 Endorsers also receive a reward (at the same time as block creators
 do). The reward is ``ENDORSEMENT_REWARD[p']``, where
-``ENDORSEMENT_REWARD`` = ``[1.250ꜩ, 0.833333ꜩ]``, where ``p'``
+``ENDORSEMENT_REWARD`` = ``[0.078125ꜩ, 0.052083ꜩ]``, where ``p'``
 is as above.  That is, a delegate endorsing a block of priority 0
-will be rewarded ``e * 1.25`` ꜩ, with ``e`` the number of endorsement
+will be rewarded ``e * 0.078125`` ꜩ, with ``e`` the number of endorsement
 slots attributed to the delegate for this level. Moreover, endorsing
-blocks of priority 1 or higher will be rewarded ``e * 0.8333333``
+blocks of priority 1 or higher will be rewarded ``e * 0.052083``
 ꜩ.
 
 Security deposits
 ~~~~~~~~~~~~~~~~~
 
-The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 ꜩ
-per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 ꜩ per
+The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 640 ꜩ
+per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 2.5 ꜩ per
 endorsement slot.
 
 Each delegate key has an associated security deposit account.
@@ -341,8 +351,7 @@ the amount of staked tokens is 720,000,000 ꜩ, then roughly 8.74% of
 this amount is stored in security deposits. This percentage also gives
 an indication of the minimal amount of tokens a delegate should own in
 order to not miss out on creating a block or an endorsement.  Please
-refer to `this section
-<https://tezos.gitlab.io/introduction/howtorun.html#deposits-and-over-delegation>`_
+refer to :ref:`this section <over_delegation>`
 of the documentation for a discussion on (over-)delegation.
 
 Inflation
@@ -351,7 +360,7 @@ Inflation
 Inflation from block rewards and endorsement reward is at most
 ``ENDORSERS_PER_BLOCK`` \* (``ENDORSEMENT_REWARD[0]`` +
 ``BAKING_REWARD_PER_ENDORSEMENT[0]``) =
-80 ꜩ. This means at most 5.51% annual inflation.
+40 ꜩ. This means at most 5.51% annual inflation.
 
 Random seed
 ~~~~~~~~~~~
@@ -363,7 +372,7 @@ the baking and endorsing rights in cycle ``n+PRESERVED_CYCLES``.
 
 The random seed for cycle ``n`` is a 256-bit number generated at the
 very end of cycle ``n-1`` from nonces to which delegates commit during
-cycle ``n-2``. One out of every ``BLOCKS_PER_COMMITMENT`` = 32 blocks
+cycle ``n-2``. One out of every ``BLOCKS_PER_COMMITMENT`` = 64 blocks
 can contain a commitment. There are therefore at most
 ``BLOCKS_PER_CYCLE / BLOCKS_PER_COMMITMENT`` = 128 commitments. A
 commitment is the hash of a nonce. The commitment is generated by the

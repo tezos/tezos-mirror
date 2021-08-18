@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 module Make (C : sig
-  val cctxt : Client_context.prompter
+  val cctxt : Client_context.io
 end) : Client_keys.SIGNER
 
 val decrypt :
-  #Client_context.prompter ->
+  #Client_context.io ->
   ?name:string ->
   Client_keys.sk_uri ->
   Signature.secret_key tzresult Lwt.t
@@ -38,7 +38,12 @@ val decrypt_all : #Client_context.io_wallet -> unit tzresult Lwt.t
 val decrypt_list :
   #Client_context.io_wallet -> string list -> unit tzresult Lwt.t
 
-val encrypt :
+(** Encrypts a secret key using the given password *)
+val encrypt : Signature.secret_key -> bytes -> Client_keys.sk_uri tzresult Lwt.t
+
+(** Prompts password twice to user for confirmation and returns
+    the corresponding encrypted secret key *)
+val prompt_twice_and_encrypt :
   #Client_context.io ->
   Signature.secret_key ->
   Client_keys.sk_uri tzresult Lwt.t

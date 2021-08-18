@@ -75,7 +75,7 @@ def check_mempool_contains_operations(
     return set(operation_hashes).issubset(res)
 
 
-@retry(timeout=1.0, attempts=20)
+@retry(timeout=2.0, attempts=120)
 def check_protocol(
     client: Client, proto: str, params: List[str] = None
 ) -> bool:
@@ -419,21 +419,22 @@ def contract_name_of_file(contract_path: str) -> str:
     return os.path.splitext(os.path.basename(contract_path))[0]
 
 
-def bake(client: Client) -> BakeForResult:
-    return client.bake(
-        'bootstrap1',
-        [
-            '--max-priority',
-            '512',
-            '--minimal-timestamp',
-            '--minimal-fees',
-            '0',
-            '--minimal-nanotez-per-byte',
-            '0',
-            '--minimal-nanotez-per-gas-unit',
-            '0',
-        ],
-    )
+def bake(
+    client: Client, bake_for='bootstrap1', bake_args: List[str] = None
+) -> BakeForResult:
+    default_bake_args = [
+        '--max-priority',
+        '1024',
+        '--minimal-timestamp',
+        '--minimal-fees',
+        '0',
+        '--minimal-nanotez-per-byte',
+        '0',
+        '--minimal-nanotez-per-gas-unit',
+        '0',
+    ]
+    bake_args = bake_args or default_bake_args
+    return client.bake(bake_for, bake_args)
 
 
 def init_with_transfer(
@@ -564,3 +565,105 @@ def assert_transfer_failwith(
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)
+
+
+# Checks that the node's checkpoint, savepoint and caboose are the
+# expected ones after a snapshot import.
+def node_consistency_after_import(
+    node_id,
+    sandbox,
+    expected_level,
+    expected_checkpoint,
+    expected_savepoint,
+    expected_caboose,
+):
+    level = sandbox.client(node_id).get_head()['header']['level']
+    checkpoint = sandbox.client(node_id).get_checkpoint()['block']['level']
+    savepoint = sandbox.client(node_id).get_savepoint()
+    caboose = sandbox.client(node_id).get_caboose()
+    assert level == expected_level
+    assert checkpoint == expected_checkpoint
+    assert savepoint == expected_savepoint
+    assert caboose == expected_caboose
+    # the metadata of genesis are available
+    assert get_block_at_level(sandbox.client(node_id), 0)
+
+
+# Checks the availability of blocks and its metadata for a full node.
+# We assume that:
+# - genesis is available with metadata
+# - all block headers are available,
+# - blocks before the savepoint (excluded) have pruned metadata,
+# - blocks from the savepoint (included) have metadata.
+def full_node_blocks_availability(node_id, sandbox, savepoint, head):
+    # Error that must be raised when a block is not available
+    expected_command_error = 'Command failed: Unable to find block'
+    # Genesis is available with metadata
+    assert get_block_at_level(sandbox.client(node_id), 0)
+    # [1;…;savepoint[ headers are available but metadata are not
+    for i in range(1, savepoint):
+        get_block_header_at_level(sandbox.client(node_id), i)
+        with assert_run_failure(expected_command_error):
+            get_block_metadata_at_level(sandbox.client(node_id), i)
+    # [savepoint;…;head] are available with metadata
+    for i in range(savepoint, head + 1):
+        get_block_metadata_at_level(sandbox.client(node_id), i)
+
+
+# Checks the availability of blocks and its metadata for a rolling node.
+# We assume that:
+# - genesis is available with metadata
+# - blocks before caboose (excluded) are unknown,
+# - blocks from the caboose (included) and before the savepoint (excluded)
+#   have pruned metadata,
+# - blocks after the savepoint (included) have metadata.
+def rolling_node_blocks_availability(
+    node_id, sandbox, savepoint, caboose, head
+):
+    # Error that must be raised when a block is unknown
+    expected_service_error = 'Did not find service'
+    # Genesis is available with metadata
+    assert get_block_at_level(sandbox.client(node_id), 0)
+    if caboose == 0:
+        pass
+    else:
+        # [1;…;caboose[ blocks are unknown
+        for i in range(1, caboose):
+            with assert_run_failure(expected_service_error):
+                get_block_at_level(sandbox.client(node_id), i)
+    # [savepoint;…;head] are available with metadata
+    for i in range(savepoint + 1, head):
+        get_block_header_at_level(sandbox.client(node_id), i)
+
+
+def file_basename(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+# pylint: disable=dangerous-default-value
+# Generic piece of code to originate a contract
+def originate(
+    client: Client,
+    session: dict,
+    contract: str,
+    init_storage: str,
+    amount: int,
+    contract_name=None,
+    sender='bootstrap1',
+    baker='bootstrap5',
+    burn_cap='10.0',
+    arguments=None,
+):
+    if contract_name is None:
+        contract_name = file_basename(contract)
+
+    args = ['--init', init_storage, '--burn-cap', burn_cap]
+    if arguments is not None:
+        args += arguments
+    origination = client.originate(
+        contract_name, amount, sender, contract, args
+    )
+    session['contract'] = origination.contract
+    bake(client, baker)
+    assert check_block_contains_operations(client, [origination.operation_hash])
+    return origination

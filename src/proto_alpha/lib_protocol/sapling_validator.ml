@@ -1,41 +1,42 @@
-(* The MIT License (MIT)
- *
- * Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. *)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* Check that each nullifier is not already present in the state and add it.
    Important to avoid spending the same input twice in a transaction. *)
 let rec check_and_update_nullifiers ctxt state inputs =
   match inputs with
-  | [] ->
-      return (ctxt, Some state)
+  | [] -> return (ctxt, Some state)
   | input :: inputs -> (
       Sapling_storage.nullifiers_mem ctxt state Sapling.UTXO.(input.nf)
       >>=? function
-      | (ctxt, true) ->
-          return (ctxt, None)
+      | (ctxt, true) -> return (ctxt, None)
       | (ctxt, false) ->
           let state =
             Sapling_storage.nullifiers_add state Sapling.UTXO.(input.nf)
           in
-          check_and_update_nullifiers ctxt state inputs )
+          check_and_update_nullifiers ctxt state inputs)
 
 let verify_update :
     Raw_context.t ->
@@ -62,14 +63,11 @@ let verify_update :
   if not pass then return (ctxt, None)
   else
     (* Check the root is a recent state *)
-    Sapling_storage.root_mem ctxt state transaction.root
-    >>=? fun pass ->
+    Sapling_storage.root_mem ctxt state transaction.root >>=? fun pass ->
     if not pass then return (ctxt, None)
     else
-      check_and_update_nullifiers ctxt state transaction.inputs
-      >|=? function
-      | (ctxt, None) ->
-          (ctxt, None)
+      check_and_update_nullifiers ctxt state transaction.inputs >|=? function
+      | (ctxt, None) -> (ctxt, None)
       | (ctxt, Some state) ->
           Sapling.Verification.with_verification_ctx (fun vctx ->
               let pass =

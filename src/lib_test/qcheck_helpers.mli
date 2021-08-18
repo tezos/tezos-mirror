@@ -24,7 +24,12 @@
 (*****************************************************************************)
 
 (** Wrap QCheck tests into Alcotests. *)
-val qcheck_wrap : QCheck.Test.t list -> unit Alcotest.test_case list
+val qcheck_wrap :
+  ?verbose:bool ->
+  ?long:bool ->
+  ?rand:Random.State.t ->
+  QCheck.Test.t list ->
+  unit Alcotest.test_case list
 
 (** [qcheck_eq pp cmp eq a b] evaluates whether [a] and [b] are equal, and if they
     are not, raises a failure and prints an error message.
@@ -78,3 +83,79 @@ val of_option_gen : 'a option QCheck.Gen.t -> 'a QCheck.Gen.t
     Be careful: if [None] is always returned, this hangs forever!
 *)
 val of_option_arb : 'a option QCheck.arbitrary -> 'a QCheck.arbitrary
+
+(** [uint16] is an arbitrary of unsigned [int16] arbitrary *)
+val uint16 : int QCheck.arbitrary
+
+(** [int16] is an arbitrary of signed int16 arbitrary *)
+val int16 : int QCheck.arbitrary
+
+(** [uint8] is an arbitrary of unsigned [int8] values *)
+val uint8 : int QCheck.arbitrary
+
+(** [int8] is an arbitrary of signed int8 values  *)
+val int8 : int QCheck.arbitrary
+
+(** [string_fixed n] is an arbitrary of string of length [n]. *)
+val string_fixed : int -> string QCheck.arbitrary
+
+(** [of_option_shrink shrink_opt] returns a shrinker from an optional one.
+    This is typically useful when extracting a shrinker from an [arbitrary]
+    to compose a bigger shrinker.
+
+    If [shrink_opt] is [None] then no shrinking happens. *)
+val of_option_shrink : 'a QCheck.Shrink.t option -> 'a QCheck.Shrink.t
+
+(** [bytes_arb] is a [QCheck.arbitrary] for [bytes]. *)
+val bytes_arb : bytes QCheck.arbitrary
+
+(** [endpoint_arb] is a [QCheck.arbitrary] for endpoints (such as
+    [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
+    [(http|https)://(string\.)+(:port)?]. It is by no means the most
+    general [Uri.t] generator. Generalize it if needed. *)
+val endpoint_arb : Uri.t QCheck.arbitrary
+
+(** Map-related arbitraries/generators. *)
+module MakeMapArb (Map : Stdlib.Map.S) : sig
+  (** [arb_of_size size_gen key_arb val_arb] is an arbitrary of Map
+      where the keys are generated with [key_arb] and the values with [val_arb].
+
+      The number of entries in the map is decided by [size_gen].
+
+      The arbitrary shrinks on the number of entries as well as on entries
+      if either the key or value arbitrary has a shrinker. *)
+  val arb_of_size :
+    int QCheck.Gen.t ->
+    Map.key QCheck.arbitrary ->
+    'v QCheck.arbitrary ->
+    'v Map.t QCheck.arbitrary
+
+  (** [arb key_arb val_arb] is an arbitrary of Map where the keys are
+      generated with [key_arb] and the values with [val_arb].
+
+      The arbitrary shrinks on the number of entries as well as on entries
+      if either the key or value arbitrary has a shrinker. *)
+  val arb :
+    Map.key QCheck.arbitrary -> 'v QCheck.arbitrary -> 'v Map.t QCheck.arbitrary
+
+  (** [gen_of_size size_gen key_gen val_gen] is a generator of Map where the keys
+      are generated with [key_gen] and the values with [val_gen].
+      The number of entries in the map is decided by [size_gen]. *)
+  val gen_of_size :
+    int QCheck.Gen.t ->
+    Map.key QCheck.Gen.t ->
+    'v QCheck.Gen.t ->
+    'v Map.t QCheck.Gen.t
+
+  (** [gen key_gen arb_gen] is a generator of Map where the keys
+      are generated with [key_arb] and the values with [val_arb]. *)
+  val gen : Map.key QCheck.Gen.t -> 'v QCheck.Gen.t -> 'v Map.t QCheck.Gen.t
+
+  (** [shrink ?key ?value] shrinks a Map using the optional [key] and [value]
+      shrinkers. Shrinking first attempts smaller Maps (less entries), then
+      shrinks keys and values. *)
+  val shrink :
+    ?key:Map.key QCheck.Shrink.t ->
+    ?value:'v QCheck.Shrink.t ->
+    'v Map.t QCheck.Shrink.t
+end

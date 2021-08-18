@@ -1,3 +1,5 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _howtoget:
 
 How to get Tezos
@@ -10,12 +12,12 @@ Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 There are several options for getting the binaries, depending on how you plan to use Tezos:
 
 - :ref:`getting static binaries <getting_static_binaries>`.
-  This is the easiest way to get native binaries for the latest stable version,
+  This is the easiest way to get native binaries for the latest stable release,
   requiring no dependencies, under Linux.
 - :ref:`installing binaries <installing_binaries>`.
-  This is the easiest way to install native binaries for the latest stable version, together with their dependencies, using a package manager.
+  This is the easiest way to install native binaries for the latest stable release, together with their dependencies, using a package manager.
 - :ref:`using docker images <using_docker_images>`.
-  This is the easiest way to run the latest stable versions of the binaries in
+  This is the easiest way to run the latest stable release of the binaries in
   Docker containers, on any OS supported by Docker.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
@@ -30,12 +32,14 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
-When choosing between these options, you may take into account the
+Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current developement version (see :doc:`../releases/releases` for more information).
+
+When choosing between the installation options, you may take into account the
 convenience of the installation step (and of upgrading steps), but also
 efficiency and security considerations. For instance, static binaries have a
 different memory footprint compared to dynamically-linked binaries. Also,
 compiling the sources in the official Tezos
-repository is more secure than installing OPAM packages from a repository which
+repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
 
 .. _getting_static_binaries:
@@ -82,7 +86,7 @@ Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 32 and 31. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
+Currently it supports Fedora 32 and 33. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
@@ -112,27 +116,27 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Edo2net, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Florencenet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Edo2net test network with the latest release:
+For example, to run Tezos on the Florencenet test network with the latest release:
 
-.. literalinclude:: use-docker-edo2net.sh
+.. literalinclude:: use-docker-florencenet.sh
    :language: shell
-   :start-after: [get edo2net]
-   :end-before: [start edo2net]
+   :start-after: [get florencenet]
+   :end-before: [start florencenet]
 
 Alternatively, to run on Mainnet::
 
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the Edo2net test network.
+In the following we assume you are running on the florencenet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-edo2net.sh
+.. literalinclude:: use-docker-florencenet.sh
    :language: shell
-   :start-after: [start edo2net]
+   :start-after: [start florencenet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -141,26 +145,25 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``edo2net.sh`` will check for updates of the node and
+Every call to ``florencenet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./edo2net.sh restart
+    ./florencenet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./edo2net.sh --help`` for more information about the
-script. In particular see ``./edo2net.sh client --help`` or the
+See ``./florencenet.sh --help`` for more information about the
+script. In particular see ``./florencenet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./edo2net.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./edo2net.sh admin-client``.
+executed by using ``./florencenet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./florencenet.sh admin-client``.
 
 
-.. _build_from_sources:
 .. _building_with_opam:
 
 Building from sources via OPAM
@@ -168,6 +171,8 @@ Building from sources via OPAM
 
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
+
+.. _build_environment:
 
 Environment
 ~~~~~~~~~~~
@@ -203,14 +208,14 @@ release) directly as OPAM packages.
 .. note::
 
    Every file related to OPAM is (by default) in ``$HOME/.opam`` which
-   means that, first, OPAM installs are user specific and, second, you
+   means that, first, OPAM installs are user-specific and, second, you
    can get rid of everything by removing this directory (+ updating
    your rc files (``$HOME/.bashrc``, ``$HOME/.profile``,
    ``$HOME/.zshrc``, ``$HOME/.emacs``, ...) if you asked/allowed OPAM
    to add some lines in them).
 
-The binaries need a specific version of the OCaml compiler (currently
-4.09.1). To get an environment with it do:
+The binaries need a specific version of the OCaml compiler (see the value
+of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an environment with it do:
 
 .. literalinclude:: install-opam.sh
   :language: shell
@@ -223,7 +228,8 @@ The binaries need a specific version of the OCaml compiler (currently
    variables. OPAM will suggest to add it in your rc file. If, at any
    point, you get an error like ``tezos-something: command not
    found``, first thing to try is to (re)run ``eval $(opam
-   env --switch 4.09.1)`` to see if it fixes the problem.
+   env --switch $ocaml_version)`` (replace ``$ocaml_version`` with its value
+   in ``scripts/version.sh``) to see if it fixes the problem.
 
 In order to get the system dependencies of the binaries, do:
 
@@ -246,7 +252,7 @@ Now, install all the binaries by:
   :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-endorser-008-PtEdo2Zk``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
+install tezos-endorser-009-PsFLoren``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 
@@ -284,6 +290,7 @@ Identified situations where it will be more tricky are:
   The solution will be defined when delivering the first release with Rust
   dependencies.
 
+.. _build_from_sources:
 .. _compiling_with_make:
 
 Setting up the development environment from scratch
@@ -308,10 +315,7 @@ The following sections describe the individual steps above in more detail.
 Install Rust
 ~~~~~~~~~~~~
 
-For compiling pre-8.0 releases, you don't need Rust, so you can skip this
-section.
-
-Starting from version 8.0, compiling Tezos requires the Rust compiler,
+Compiling Tezos requires the Rust compiler,
 version 1.44.0, and the Cargo package manager to be installed. If you
 have `rustup <https://rustup.rs/>`_ installed, it should work without
 any additional steps on your side. You can use `rustup
@@ -339,7 +343,12 @@ installed Cargo in ``$HOME/.cargo``, but this may change depending on how
 you installed rustup. See the documentation of your rustup distribution
 if file ``.cargo`` does not exist in your home directory.
 
-Finally, Tezos binaries requires the Zcash parameter files to run.
+.. _setup_zcash_params:
+
+Install Zcash Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tezos binaries require the Zcash parameter files to run.
 Docker images come with those files, and the source distribution also
 includes those files. But if you compile from source and move Tezos to
 another location (such as ``/usr/local/bin``), the Tezos binaries may
@@ -347,6 +356,34 @@ prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
    https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+
+The node will try to find Zcash parameters in the following directories,
+in this order:
+
+#. ``$XDG_DATA_HOME/.local/share/zcash-params``
+#. ``$XDG_DATA_DIRS/zcash-params`` (if ``$XDG_DATA_DIRS`` contains
+   several paths separated by colons ``:``, each path is considered)
+#. ``$OPAM_SWITCH_PREFIX/share/zcash-params``
+#. ``./_opam/share/zcash-params``
+#. ``~/.zcash-params``
+#. ``~/.local/share/zcash-params``
+#. ``/usr/local/share/zcash-params``
+#. ``/usr/share/zcash-params``
+
+If the node complains that it cannot find Zcash parameters, check that
+at least one of those directories contains both files ``sapling-spend.params``
+and ``sapling-output.params``. Here is where you should expect to find those files:
+
+* if you are compiling from source, parameters should be in
+  ``_opam/share/zcash-params`` (you may need to run ``eval $(opam env)``
+  before running the node);
+
+* if you used ``fetch-params.sh``, parameters should be in ``~/.zcash-params``.
+
+.. note::
+
+   Some operating systems may not be covered by the list of directories above.
+   If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
 
 Get the sources
 ~~~~~~~~~~~~~~~
@@ -366,7 +403,7 @@ Install the OCaml compiler and the libraries that Tezos depends on::
 
    make build-deps
 
-Alternatively, if you want to to install extra
+Alternatively, if you want to install extra
 development packages such as ``merlin``, you may use the following
 command instead:
 
@@ -381,9 +418,12 @@ command instead:
      dependencies are compiled and installed (this takes a while but it's
      only done once).
 
-   * Be sure to ``eval $(opam env)`` when you ``cd``
+   * Be sure to ``eval $(scripts/env.sh)`` when you ``cd``
      into the repository in order to be sure to load this local
      environment.
+
+   * As the opam hook would overwrite the effects of ``eval $(scripts/env.sh)``
+     the script will disable the opam hook temporarily.
 
    * OPAM is meant to handle correctly the OCaml libraries but it is
      not always able to handle all external C libraries we depend
@@ -405,7 +445,7 @@ refer to the new switch and compile the project:
   :start-after: [compile sources]
   :end-before: [optional setup]
 
-Lastly you can also add the Tezos binaries to your ``PATH`` variable,
+Lastly, you can also add the Tezos binaries to your ``PATH`` variable,
 and after reading the Disclaimer a few
 hundred times you are allowed to disable it with
 ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y``.

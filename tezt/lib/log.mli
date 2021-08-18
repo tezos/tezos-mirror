@@ -65,7 +65,7 @@ module Color : sig
 
     val cyan : t
 
-    val white : t
+    val gray : t
   end
 
   (** Background colors. *)
@@ -84,7 +84,7 @@ module Color : sig
 
     val cyan : t
 
-    val white : t
+    val gray : t
   end
 end
 
@@ -121,14 +121,22 @@ val warn : ('a, unit, string, unit) format4 -> 'a
 (** Same as [log ~level:Error ~color:red ~prefix:"error"]. *)
 val error : ('a, unit, string, unit) format4 -> 'a
 
-type test_result = Successful | Failed | Aborted
+(** Whether a test succeeded, failed or was aborted by the user.
+
+    [Failed] comes with the error message, which is a string version
+    of the exception that was raised (usually with [Test.fail]).
+    This message is unused by the [Log] module itself. *)
+type test_result = Successful | Failed of string | Aborted
 
 (** Log the result of a test.
+
+    [progress_state] is the current progress state for this test.
 
     [iteration] is the index of the iteration count to display in [--loop] mode.
 
     The [string] argument is the name of the test. *)
-val test_result : iteration:int -> test_result -> string -> unit
+val test_result :
+  progress_state:Progress.t -> iteration:int -> test_result -> string -> unit
 
 (** Log a command which will be run.
 

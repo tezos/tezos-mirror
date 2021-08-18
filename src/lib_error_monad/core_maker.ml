@@ -32,6 +32,8 @@ let json_pp id description encoding ppf data =
   in
   Data_encoding.Json.construct pp_encoding (id, description, data)
 
+(* This is a global variable because it is shared amongst all the error monads (the
+   shell's and the protocols'). See below for use. *)
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
 module Make (Prefix : Sig.PREFIX) : sig
@@ -97,39 +99,44 @@ end = struct
     List.flatten
       (List.map
          (function
-           | Error_kind {id = ""; _} ->
-               []
+           | Error_kind {id = ""; _} -> []
            | Error_kind
-               { id;
+               {
+                 id;
                  title;
                  description;
                  category = Main category;
                  encoding_case;
-                 _ } -> (
-             match encoding_case with
-             | Non_recursive encoding_case ->
-                 [ {
-                     id;
-                     title;
-                     description;
-                     category;
-                     schema =
-                       Data_encoding.Json.schema
-                         (Data_encoding.union [encoding_case]);
-                   } ]
-             | Recursive make_encoding_case ->
-                 [ {
-                     id;
-                     title;
-                     description;
-                     category;
-                     schema =
-                       Data_encoding.Json.schema
-                         ( Data_encoding.mu error_encoding_name
-                         @@ fun error_encoding ->
-                         Data_encoding.union [make_encoding_case error_encoding]
-                         );
-                   } ] )
+                 _;
+               } -> (
+               match encoding_case with
+               | Non_recursive encoding_case ->
+                   [
+                     {
+                       id;
+                       title;
+                       description;
+                       category;
+                       schema =
+                         Data_encoding.Json.schema
+                           (Data_encoding.union [encoding_case]);
+                     };
+                   ]
+               | Recursive make_encoding_case ->
+                   [
+                     {
+                       id;
+                       title;
+                       description;
+                       category;
+                       schema =
+                         Data_encoding.Json.schema
+                           ( Data_encoding.mu error_encoding_name
+                           @@ fun error_encoding ->
+                             Data_encoding.union
+                               [make_encoding_case error_encoding] );
+                     };
+                   ])
            | Error_kind {category = Wrapped (module WEM); _} ->
                List.map
                  (fun {WEM.id; title; description; category; schema} ->
@@ -140,19 +147,16 @@ end = struct
   let error_encoding_cache = ref None
 
   let () =
-    let cont = !set_error_encoding_cache_dirty in
+    let set_older_caches_dirty = !set_error_encoding_cache_dirty in
     set_error_encoding_cache_dirty :=
       fun () ->
-        cont () ;
+        set_older_caches_dirty () ;
         error_encoding_cache := None
 
   let string_of_category = function
-    | `Permanent ->
-        "permanent"
-    | `Temporary ->
-        "temporary"
-    | `Branch ->
-        "branch"
+    | `Permanent -> "permanent"
+    | `Temporary -> "temporary"
+    | `Branch -> "branch"
 
   let pp_info ppf {category; id; title; description; schema} =
     Format.fprintf
@@ -177,8 +181,7 @@ end = struct
     let category = Main `Temporary in
     let to_error msg = Unclassified msg in
     let from_error = function
-      | Unclassified msg ->
-          Some msg
+      | Unclassified msg -> Some msg
       | error ->
           let msg = Obj.Extension_constructor.(name @@ of_val error) in
           Some ("Unclassified error: " ^ msg ^ ". Was the error registered?")
@@ -190,9 +193,9 @@ end = struct
       case
         Json_only
         ~title:"Generic error"
-        ( def "generic_error" ~title ~description
+        (def "generic_error" ~title ~description
         @@ conv (fun x -> ((), x)) (fun ((), x) -> x)
-        @@ obj2 (req "kind" (constant "generic")) (req "error" string) )
+        @@ obj2 (req "kind" (constant "generic")) (req "error" string))
         from_error
         to_error
     in
@@ -211,10 +214,8 @@ end = struct
     let category = Main `Temporary in
     let to_error msg = Unregistered_error msg in
     let from_error = function
-      | Unregistered_error json ->
-          Some json
-      | _ ->
-          None
+      | Unregistered_error json -> Some json
+      | _ -> None
     in
     let encoding_case =
       let open Data_encoding in
@@ -255,21 +256,16 @@ end = struct
     let encoding_case =
       let unwrap err =
         match WEM.unwrap err with
-        | Some (WEM.Unclassified _) ->
-            None
-        | Some (WEM.Unregistered_error _) ->
-            None
-        | res ->
-            res
+        | Some (WEM.Unclassified _) -> None
+        | Some (WEM.Unregistered_error _) -> None
+        | res -> res
       in
       let wrap err =
         match err with
-        | WEM.Unclassified _ ->
-            failwith "ignore wrapped error when serializing"
+        | WEM.Unclassified _ -> failwith "ignore wrapped error when serializing"
         | WEM.Unregistered_error _ ->
             failwith "ignore wrapped error when deserializing"
-        | res ->
-            WEM.wrap res
+        | res -> WEM.wrap res
       in
       Non_recursive (case Json_only ~title:name WEM.error_encoding unwrap wrap)
     in
@@ -375,16 +371,13 @@ end = struct
     | None ->
         let encoding =
           if !has_recursive_error then
-            Data_encoding.mu error_encoding_name
-            @@ fun error_encoding ->
+            Data_encoding.mu error_encoding_name @@ fun error_encoding ->
             let cases =
               List.map
                 (fun (Error_kind {encoding_case; _}) ->
                   match encoding_case with
-                  | Non_recursive case ->
-                      case
-                  | Recursive make ->
-                      make error_encoding)
+                  | Non_recursive case -> case
+                  | Recursive make -> make error_encoding)
                 !error_kinds
             in
             let union_encoding = Data_encoding.union cases in
@@ -402,10 +395,8 @@ end = struct
               List.map
                 (fun (Error_kind {encoding_case; _}) ->
                   match encoding_case with
-                  | Non_recursive case ->
-                      case
-                  | Recursive _ ->
-                      assert false)
+                  | Non_recursive case -> case
+                  | Recursive _ -> assert false)
                 !error_kinds
             in
             let union_encoding = Data_encoding.union cases in
@@ -421,8 +412,7 @@ end = struct
         in
         error_encoding_cache := Some encoding ;
         encoding
-    | Some encoding ->
-        encoding
+    | Some encoding -> encoding
 
   let error_encoding = Data_encoding.delayed error_encoding
 
@@ -430,24 +420,60 @@ end = struct
 
   let error_of_json json = Data_encoding.Json.destruct error_encoding json
 
+  let find_info_of_error error =
+    List.find
+      (fun (Error_kind {from_error; _}) -> Option.is_some (from_error error))
+      !error_kinds
+    |> function
+    | Error_kind {id; title; description; category; encoding_case; _} -> (
+        match category with
+        | Wrapped (module WEM) -> (
+            match WEM.unwrap error with
+            | None -> failwith "incorrectly registered wrapped error"
+            | Some error ->
+                let {WEM.id; title; description; category; schema} =
+                  WEM.find_info_of_error error
+                in
+                {id; title; description; category; schema})
+        | Main category -> (
+            match encoding_case with
+            | Non_recursive encoding_case ->
+                {
+                  id;
+                  title;
+                  description;
+                  category;
+                  schema =
+                    Data_encoding.Json.schema
+                      (Data_encoding.union [encoding_case]);
+                }
+            | Recursive make_encoding_case ->
+                {
+                  id;
+                  title;
+                  description;
+                  category;
+                  schema =
+                    Data_encoding.Json.schema
+                      ( Data_encoding.mu error_encoding_name
+                      @@ fun error_encoding ->
+                        Data_encoding.union [make_encoding_case error_encoding]
+                      );
+                }))
+
   let classify_error error =
     let rec find e = function
-      | [] ->
-          `Temporary
+      | [] -> `Temporary
       | Error_kind {from_error; category; _} :: rest -> (
-        match from_error e with
-        | Some _ -> (
-          match category with
-          | Main error_category ->
-              error_category
-          | Wrapped (module WEM) -> (
-            match WEM.unwrap e with
-            | Some e ->
-                WEM.classify_error e
-            | None ->
-                find e rest ) )
-        | None ->
-            find e rest )
+          match from_error e with
+          | Some _ -> (
+              match category with
+              | Main error_category -> error_category
+              | Wrapped (module WEM) -> (
+                  match WEM.unwrap e with
+                  | Some e -> WEM.classify_error e
+                  | None -> find e rest))
+          | None -> find e rest)
     in
     find error !error_kinds
 
@@ -459,7 +485,7 @@ end = struct
             "An unspecified error happened, the component that threw it did \
              not provide a specific trace. This should be reported."
       | Error_kind {from_error; pp; _} :: errors -> (
-        match from_error error with None -> find errors | Some x -> pp ppf x )
+          match from_error error with None -> find errors | Some x -> pp ppf x)
     in
     find !error_kinds
 end

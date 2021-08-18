@@ -47,17 +47,16 @@ let () =
     ~pp:(fun ppf s -> Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
     Data_encoding.(obj1 (req "msg" string))
     (function
-      | Exn (Failure msg) ->
-          Some msg
-      | Exn exn ->
-          Some (Printexc.to_string exn)
-      | _ ->
-          None)
+      | Exn (Failure msg) -> Some msg
+      | Exn exn -> Some (Printexc.to_string exn)
+      | _ -> None)
     (fun msg -> Exn (Failure msg))
 
 let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
+
+let error_of_exn e = TzTrace.make @@ Exn e
 
 let error_exn s = Error (TzTrace.make @@ Exn s)
 
@@ -98,42 +97,34 @@ let () =
 
 let protect_no_canceler ?on_error t =
   let res = Lwt.catch t (fun exn -> fail (Exn exn)) in
-  res
-  >>= function
-  | Ok _ ->
-      res
+  res >>= function
+  | Ok _ -> res
   | Error trace -> (
-    match on_error with
-    | None ->
-        res
-    | Some on_error ->
-        Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+      match on_error with
+      | None -> res
+      | Some on_error ->
+          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)))
 
 let protect_canceler ?on_error canceler t =
   let cancellation =
     Lwt_canceler.when_canceling canceler >>= fun () -> fail Canceled
   in
   let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
-  res
-  >>= function
-  | Ok _ ->
-      res
+  res >>= function
+  | Ok _ -> res
   | Error trace -> (
       let trace =
         if Lwt_canceler.canceled canceler then TzTrace.make Canceled else trace
       in
       match on_error with
-      | None ->
-          Lwt.return_error trace
+      | None -> Lwt.return_error trace
       | Some on_error ->
-          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)) )
+          Lwt.catch (fun () -> on_error trace) (fun exn -> fail (Exn exn)))
 
 let protect ?on_error ?canceler t =
   match canceler with
-  | None ->
-      protect_no_canceler ?on_error t
-  | Some canceler ->
-      protect_canceler ?on_error canceler t
+  | None -> protect_no_canceler ?on_error t
+  | Some canceler -> protect_canceler ?on_error canceler t
 
 type error += Timeout
 
@@ -150,16 +141,18 @@ let () =
 
 let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
   let target = f canceler in
-  Lwt.choose [timeout; (target >|= fun _ -> ())]
-  >>= fun () ->
-  if Lwt.state target <> Lwt.Sleep then (Lwt.cancel timeout ; target)
+  Lwt.choose [timeout; (target >|= fun _ -> ())] >>= fun () ->
+  if Lwt.state target <> Lwt.Sleep then (
+    Lwt.cancel timeout ;
+    target)
   else
-    Lwt_canceler.cancel canceler
-    >>= function Ok () | Error [] -> fail Timeout | Error (h :: _) -> raise h
+    Lwt_canceler.cancel canceler >>= function
+    | Ok () | Error [] -> fail Timeout
+    | Error (h :: _) -> raise h
 
 let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
 
 let cancel_with_exceptions canceler =
-  Lwt_canceler.cancel canceler
-  >>= function
-  | Ok () | Error [] -> Lwt.return_unit | Error (h :: _) -> raise h
+  Lwt_canceler.cancel canceler >>= function
+  | Ok () | Error [] -> Lwt.return_unit
+  | Error (h :: _) -> raise h

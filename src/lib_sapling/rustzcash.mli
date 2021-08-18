@@ -39,16 +39,42 @@ val valid_balance : int64 -> bool
     The string list is the list of locations where they were looked up. *)
 exception Params_not_found of string list
 
-(** Loads the parameters for our instance of Groth16.
+(** Location of parameter files for our instance of Groth16.
+
+    We are only using and loading sapling parameters. *)
+type parameter_files = {spend_path : string; output_path : string}
+
+(** Find parameter files.
 
     The parameters are searched in:
-    - [/usr/share/zcash-params]
-    - [${OPAM_SWITCH_PREFIX}/share/zcash-params]
-    - [${HOME}/.zcash-params]
+    - [$XDG_DATA_HOME/.local/share/zcash-params];
+    - [$XDG_DATA_DIRS/zcash-params] (splitting on the [:] character);
+    - [$OPAM_SWITCH_PREFIX/share/zcash-params];
+    - [_opam/share/zcash-params];
+    - [$HOME/.zcash-params];
+    - [$HOME/.local/share/zcash-params];
+    - [/usr/local/share/zcash-params];
+    - [/usr/share/zcash-params];
+    in this order.
 
-    @raise Params_not_found if parameters could not be found at any of those locations.
+    This function uses [getenv_opt], [getcwd] and [file_exists] from the [Sys]
+    module. You can use the corresponding optional arguments to override their
+    behavior, for instance with a mock for testing purposes.
 
-    Only sapling parameters are loaded. *)
+    @raise [Params_not_found] if parameters could not be found
+    at any of those locations. *)
+val find_params :
+  ?getenv_opt:(string -> string option) ->
+  ?getcwd:(unit -> string) ->
+  ?file_exists:(string -> bool) ->
+  unit ->
+  parameter_files
+
+(** Load parameter files.
+
+    @raise [Params_not_found] if parameters could not be found
+    (see {!find_params} for information regarding how parameter files
+    are looked up). *)
 val init_params : unit -> unit
 
 (** Derives the nullifier pk corresponding to a nullifier sk *)

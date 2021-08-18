@@ -53,7 +53,8 @@ struct
     let open Data_encoding in
     Time.System.stamped_encoding
     @@ union
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Event"
              (obj2
@@ -105,11 +106,11 @@ struct
              ~title:"Duplicate"
              string
              (function Duplicate n -> Some n | _ -> None)
-             (fun n -> Duplicate n) ]
+             (fun n -> Duplicate n);
+         ]
 
   let pp base_name ppf = function
-    | WorkerEvent (evt, _) ->
-        Format.fprintf ppf "%a" Event.pp evt
+    | WorkerEvent (evt, _) -> Format.fprintf ppf "%a" Event.pp evt
     | Request (view, {pushed; treated; completed}, None) ->
         Format.fprintf
           ppf
@@ -128,8 +129,7 @@ struct
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
           errors
-    | Terminated ->
-        Format.fprintf ppf "@[Worker terminated [%s] @]" base_name
+    | Terminated -> Format.fprintf ppf "@[Worker terminated [%s] @]" base_name
     | Timeout ->
         Format.fprintf ppf "@[Worker terminated with timeout [%s] @]" base_name
     | Crashed errs ->
@@ -139,12 +139,9 @@ struct
           base_name
           (Format.pp_print_list Error_monad.pp)
           errs
-    | Started None ->
-        Format.fprintf ppf "Worker started"
-    | Started (Some n) ->
-        Format.fprintf ppf "Worker started for %s" n
-    | Triggering_shutdown ->
-        Format.fprintf ppf "Triggering shutdown"
+    | Started None -> Format.fprintf ppf "Worker started"
+    | Started (Some n) -> Format.fprintf ppf "Worker started for %s" n
+    | Triggering_shutdown -> Format.fprintf ppf "Triggering shutdown"
     | Duplicate name ->
         let full_name =
           if name = "" then base_name
@@ -153,6 +150,8 @@ struct
         Format.fprintf ppf "Worker.launch: duplicate worker %s" full_name
 
   module Definition : Internal_event.EVENT_DEFINITION with type t = t = struct
+    let section = None
+
     let name = Static.worker_name
 
     type nonrec t = t
@@ -169,20 +168,13 @@ struct
 
     let level (status : t) =
       match status.data with
-      | WorkerEvent (_, level) ->
-          level
-      | Request _ ->
-          Internal_event.Debug
-      | Timeout ->
-          Internal_event.Notice
-      | Terminated | Started _ ->
-          Internal_event.Info
-      | Crashed _ ->
-          Internal_event.Error
-      | Triggering_shutdown ->
-          Internal_event.Debug
-      | Duplicate _ ->
-          Internal_event.Error
+      | WorkerEvent (_, level) -> level
+      | Request _ -> Internal_event.Debug
+      | Timeout -> Internal_event.Notice
+      | Terminated | Started _ -> Internal_event.Info
+      | Crashed _ -> Internal_event.Error
+      | Triggering_shutdown -> Internal_event.Debug
+      | Duplicate _ -> Internal_event.Error
   end
 
   module LogEvent : Internal_event.EVENT with type t = t =

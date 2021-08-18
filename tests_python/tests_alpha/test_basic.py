@@ -1,12 +1,12 @@
 from os import path
 import pytest
 from client.client import Client
+from tools import utils
 from tools.paths import ACCOUNT_PATH
 from tools.utils import assert_run_failure
 from .contract_paths import CONTRACT_PATH
 
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 TRANSFER_ARGS = ['--burn-cap', '0.257']
 
 
@@ -36,7 +36,7 @@ class TestRawContext:
             '/chains/main/blocks/head/context/raw/bytes/'
             'non-existent?depth=-1'
         )
-        expected = 'Command failed : Extraction depth -1 is invalid'
+        expected = 'Command failed: Extraction depth -1 is invalid'
         with assert_run_failure(expected):
             client.rpc('get', path)
 
@@ -46,7 +46,7 @@ class TestRawContext:
             client.rpc('get', path)
 
     def test_bake(self, client: Client):
-        client.bake('bootstrap4', BAKE_ARGS)
+        utils.bake(client, 'bootstrap4')
 
     @pytest.mark.parametrize(
         "identity, message, expected_signature",
@@ -163,11 +163,11 @@ class TestRawContext:
 
     def test_transfers(self, client: Client, session):
         client.transfer(1000, 'bootstrap1', session['keys'][0], TRANSFER_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         client.transfer(2000, 'bootstrap1', session['keys'][1], TRANSFER_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         client.transfer(3000, 'bootstrap1', session['keys'][2], TRANSFER_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_balances(self, client: Client, session):
         assert client.get_balance(session['keys'][0]) == 1000
@@ -176,36 +176,14 @@ class TestRawContext:
 
     def test_transfer_bar_foo(self, client: Client, session):
         client.reveal(session['keys'][1], ['--fee', '0', '--force-low-fee'])
-        client.bake(
-            'bootstrap1',
-            BAKE_ARGS
-            + [
-                '--minimal-fees',
-                '0',
-                '--minimal-nanotez-per-byte',
-                '0',
-                '--minimal-nanotez-per-gas-unit',
-                '0',
-            ],
-        )
+        utils.bake(client)
         client.transfer(
             1000,
             session['keys'][1],
             session['keys'][0],
             ['--fee', '0', '--force-low-fee'],
         )
-        client.bake(
-            'bootstrap1',
-            BAKE_ARGS
-            + [
-                '--minimal-fees',
-                '0',
-                '--minimal-nanotez-per-byte',
-                '0',
-                '--minimal-nanotez-per-gas-unit',
-                '0',
-            ],
-        )
+        utils.bake(client)
 
     def test_balances_bar_foo(self, client: Client, session):
         assert client.get_balance(session['keys'][0]) == 2000
@@ -213,22 +191,11 @@ class TestRawContext:
 
     def test_transfer_foo_bar(self, client: Client, session):
         client.reveal(session['keys'][0], ['--fee', '0', '--force-low-fee'])
-        client.bake(
-            'bootstrap1',
-            BAKE_ARGS
-            + [
-                '--minimal-fees',
-                '0',
-                '--minimal-nanotez-per-byte',
-                '0',
-                '--minimal-nanotez-per-gas-unit',
-                '0',
-            ],
-        )
+        utils.bake(client)
         client.transfer(
             1000, session['keys'][0], session['keys'][1], ['--fee', '0.05']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_balances_foo_bar(self, client: Client, session):
         # 999.95 = 1000 - transfer fees
@@ -246,11 +213,11 @@ class TestRawContext:
         client.originate(
             'noop', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_transfer_to_noop(self, client: Client):
         client.transfer(10, 'bootstrap1', 'noop', ['--arg', 'Unit'])
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_contract_hardlimit(self, client: Client):
         contract = path.join(CONTRACT_PATH, 'mini_scenarios', 'hardlimit.tz')
@@ -261,11 +228,11 @@ class TestRawContext:
             contract,
             ['--init', '3', '--burn-cap', '0.341'],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         client.transfer(10, 'bootstrap1', 'hardlimit', ['--arg', 'Unit'])
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         client.transfer(10, 'bootstrap1', 'hardlimit', ['--arg', 'Unit'])
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_transfers_bootstraps5_bootstrap1(self, client: Client):
         assert client.get_balance('bootstrap5') == 4000000
@@ -275,31 +242,31 @@ class TestRawContext:
             'bootstrap1',
             ['--fee', '0', '--force-low-fee'],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         client.transfer(
             400000,
             'bootstrap1',
             'bootstrap5',
             ['--fee', '0', '--force-low-fee'],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         assert client.get_balance('bootstrap5') == 4000000
 
     def test_activate_accounts(self, client: Client, session):
         account = f"{ACCOUNT_PATH}/king_commitment.json"
         session['keys'] += ['king', 'queen']
         client.activate_account(session['keys'][3], account)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         account = f"{ACCOUNT_PATH}/queen_commitment.json"
         client.activate_account(session['keys'][4], account)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
         assert client.get_balance(session['keys'][3]) == 23932454.669343
         assert client.get_balance(session['keys'][4]) == 72954577.464032
 
     def test_transfer_king_queen(self, client: Client, session):
         keys = session['keys']
         client.transfer(10, keys[3], keys[4], TRANSFER_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_duplicate_alias(self, client: Client):
         client.add_address("baz", "foo", force=True)
@@ -372,21 +339,21 @@ class TestRememberContract:
         client.originate(
             'bytes', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that operations under 16KB can be injected in the node.
     def test_operation_size_small(self, client: Client):
         bytes_arg = "0x" + ("00" * 6 * 1024)  # 6 KB of data.
 
         client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that operations between 16KB and 32KB can be injected in the node.
     def test_operation_size_medium(self, client: Client):
         bytes_arg = "0x" + ("00" * 24 * 1024)  # 24 KB of data.
 
         client.transfer(10, 'bootstrap1', 'bytes', ['--arg', bytes_arg])
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that operations above 32KB fail to be injected.
     def test_operation_size_oversized(self, client: Client):
@@ -404,7 +371,7 @@ class TestRememberContract:
         client.originate(
             'munch', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that a large operation under 32KB can be injected in the node
     # (variant using a lambda with deep nesting).
@@ -419,7 +386,7 @@ class TestRememberContract:
             'munch',
             ['--arg', big_arg, "--entrypoint", "lambda"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that a large operation over 32KB cannot be injected in the node,
     # and the error is not a stack overflow
@@ -450,7 +417,7 @@ class TestRememberContract:
             'munch',
             ['--arg', big_arg, "--entrypoint", "list_nat"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     def test_operation_size_with_list_syntax_error(self, client: Client):
         # Each element in the list takes 2 bytes so about 30KB in total
@@ -507,7 +474,7 @@ class TestRememberContract:
             'munch',
             ['--arg', f"{big_arg}", "--entrypoint", "nat"],
         )
-        client.bake('bootstrap1', BAKE_ARGS)
+        utils.bake(client)
 
     # Test that a large operation over 32KB cannot be injected in the node,
     # and the error is not a stack overflow

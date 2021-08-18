@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,45 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Declaration order must respect the version order. *)
-type t = Edo | Alpha
+(* Declaration order must respect the version order. *)
+type t = Edo | Florence | Alpha
 
-let name = function Alpha -> "Alpha" | Edo -> "Edo"
+type constants = Constants_sandbox | Constants_mainnet | Constants_test
+
+let name = function Alpha -> "Alpha" | Edo -> "Edo" | Florence -> "Florence"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
-  | Alpha ->
-      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Edo ->
-      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+  | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+  | Edo -> "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+  | Florence -> "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
 
-let parameter_file = function
-  | Alpha ->
-      "src/proto_alpha/parameters/sandbox-parameters.json"
-  | Edo ->
-      "src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json"
+let default_constants = Constants_sandbox
+
+let parameter_file ?(constants = default_constants) protocol =
+  let name =
+    match constants with
+    | Constants_sandbox -> "sandbox"
+    | Constants_mainnet -> "mainnet"
+    | Constants_test -> "test"
+  in
+  let directory =
+    match protocol with
+    | Alpha -> "proto_alpha"
+    | Edo -> "proto_008_PtEdo2Zk"
+    | Florence -> "proto_009_PsFLoren"
+  in
+  sf "src/%s/parameters/%s-parameters.json" directory name
 
 let accuser = function
-  | Alpha ->
-      "./tezos-accuser-alpha"
-  | Edo ->
-      "./tezos-accuser-008-PtEdo2Zk"
+  | Alpha -> "./tezos-accuser-alpha"
+  | Edo -> "./tezos-accuser-008-PtEdo2Zk"
+  | Florence -> "./tezos-accuser-009-PsFLoren"
 
-let daemon_name = function Alpha -> "alpha" | Edo -> "008-PtEdo2Zk"
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Edo -> "008-PtEdo2Zk"
+  | Florence -> "009-PsFLoren"
 
-(* The encoding prefix is the part which is added at the beginning of all encoding names.
-   It turns out this is equal to what the [daemon_name] function returns. *)
 let encoding_prefix = daemon_name
 
-(** Protocol parameters overrides are pairs of JSON paths and optional values
-    that can be used to override or remove (when the value is [None]) the
-    default parameters when activating protocol. *)
 type parameter_overrides = (string list * string option) list
 
-(** Write a file with protocol parameters, overriding the defaults with
-    [parameter_overrides] *)
 let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
  fun ~protocol parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
@@ -81,13 +88,45 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   let* overriden_parameters_out =
     Lwt_io.open_file ~mode:Output overriden_parameters
   in
-  let* () =
-    Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters
-  in
+  let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
   Lwt.return overriden_parameters
 
-let next_protocol = function Edo -> Some Alpha | Alpha -> None
+let next_protocol = function
+  | Edo -> Some Florence
+  | Florence -> Some Alpha
+  | Alpha -> None
 
-let all = [Alpha; Edo]
+let previous_protocol = function
+  | Alpha -> Some Florence
+  | Florence -> Some Edo
+  | Edo -> None
+
+let all = [Alpha; Edo; Florence]
 
 let current_mainnet = Edo
+
+(* Used to ensure that [register_test] and [register_regression_test]
+   share the same conventions. *)
+let add_to_test_parameters protocol title tags =
+  (name protocol ^ ": " ^ title, tag protocol :: tags)
+
+let register_test ~__FILE__ ~title ~tags body ~protocols =
+  let register_with_protocol protocol =
+    let (title, tags) = add_to_test_parameters protocol title tags in
+    Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  in
+  List.iter register_with_protocol protocols
+
+let register_regression_test ~__FILE__ ~title ~tags ~output_file
+    ?regression_output_path body ~protocols =
+  let register_with_protocol protocol =
+    let (title, tags) = add_to_test_parameters protocol title tags in
+    Regression.register
+      ~__FILE__
+      ~title
+      ~tags
+      ~output_file
+      ?regression_output_path
+      (fun () -> body protocol)
+  in
+  List.iter register_with_protocol protocols

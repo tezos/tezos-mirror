@@ -29,7 +29,7 @@
 let () =
   if Sys.word_size <> 64 then (
     prerr_endline "Non-64 bit architectures are not supported." ;
-    exit 1 )
+    exit 1)
 
 let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (
@@ -39,7 +39,7 @@ let () =
       Stdlib.exit 0
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Stdlib.exit 1 )
+      Stdlib.exit 1)
 
 let () =
   if Filename.basename Sys.argv.(0) = "tezos-validator" then (
@@ -56,27 +56,31 @@ let () =
            'tezos-validator --socket-dir <dir>'." ;
       Stdlib.exit
         (Lwt_main.run
-           ( Lwt_exit.wrap_and_exit
-             @@ Validator.main ~socket_dir:Sys.argv.(2) ()
-           >>= function
-           | Ok () -> Lwt_exit.exit_and_wait 0 | Error _ -> Lwt.return 1 ))
+           (Lwt_exit.wrap_and_exit @@ Validator.main ~socket_dir:Sys.argv.(2) ()
+            >>= function
+            | Ok () -> Lwt_exit.exit_and_wait 0
+            | Error _ -> Lwt.return 1))
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Stdlib.exit 1 )
+      Stdlib.exit 1)
 
 let term =
   let open Cmdliner.Term in
   ret (const (`Help (`Pager, None)))
 
 let description =
-  [ `S "DESCRIPTION";
+  [
+    `S "DESCRIPTION";
     `P "Entry point for initializing, configuring and running a Tezos node.";
     `P Node_identity_command.Manpage.command_description;
     `P Node_run_command.Manpage.command_description;
+    `P Node_replay_command.Manpage.command_description;
     `P Node_config_command.Manpage.command_description;
     `P Node_upgrade_command.Manpage.command_description;
     `P Node_snapshot_command.Manpage.command_description;
-    `P Node_reconstruct_command.Manpage.command_description ]
+    `P Node_reconstruct_command.Manpage.command_description;
+    `P Node_storage_command.Manpage.command_description;
+  ]
 
 let man = description @ Node_run_command.Manpage.examples
 
@@ -85,12 +89,16 @@ let info =
   Cmdliner.Term.info ~doc:"The Tezos node" ~man ~version "tezos-node"
 
 let commands =
-  [ Node_run_command.cmd;
+  [
+    Node_run_command.cmd;
+    Node_replay_command.cmd;
     Node_config_command.cmd;
     Node_identity_command.cmd;
     Node_upgrade_command.cmd;
     Node_snapshot_command.cmd;
-    Node_reconstruct_command.cmd ]
+    Node_reconstruct_command.cmd;
+    Node_storage_command.cmd;
+  ]
 
 (* This call is not strictly necessary as the parameters are initialized
    lazily the first time a Sapling operation (validation or forging) is
@@ -110,11 +118,7 @@ let () =
 let () =
   Random.self_init () ;
   match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ ->
-      exit 1
-  | `Help ->
-      exit 0
-  | `Version ->
-      exit 0
-  | `Ok () ->
-      exit 0
+  | `Error _ -> exit 1
+  | `Help -> exit 0
+  | `Version -> exit 0
+  | `Ok () -> exit 0

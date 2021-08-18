@@ -51,7 +51,8 @@ type messages = {
 let sent_requests_encoding =
   let open Data_encoding in
   (conv
-     (fun { branch;
+     (fun {
+            branch;
             head;
             block_header;
             operations;
@@ -61,7 +62,8 @@ let sent_requests_encoding =
             checkpoint;
             protocol_branch;
             predecessor_header;
-            other } ->
+            other;
+          } ->
        ( branch,
          head,
          block_header,
@@ -98,7 +100,8 @@ let sent_requests_encoding =
          other;
        }))
     (union
-       [ case
+       [
+         case
            ~title:"peer_metadata.v1"
            Json_only
            (merge_objs
@@ -135,7 +138,8 @@ let sent_requests_encoding =
               (req "other" counter))
            (fun _ -> None) (* Never used for encoding *)
            (fun (a, b, c, d, e, f, g, h) ->
-             (a, b, c, d, e, f, g, zero, zero, zero, h)) ])
+             (a, b, c, d, e, f, g, zero, zero, zero, h));
+       ])
 
 type requests_kind =
   | Branch
@@ -189,7 +193,8 @@ type prevalidator_results = {
 let prevalidator_results_encoding =
   let open Data_encoding in
   conv
-    (fun { cannot_download;
+    (fun {
+           cannot_download;
            cannot_parse;
            refused_by_prefilter;
            refused_by_postfilter;
@@ -198,7 +203,8 @@ let prevalidator_results_encoding =
            branch_refused;
            refused;
            duplicate;
-           outdated } ->
+           outdated;
+         } ->
       ( cannot_download,
         cannot_parse,
         refused_by_prefilter,
@@ -348,8 +354,7 @@ type t = {
   mutable old_heads : counter;  (** previously validated blocks from a peer *)
   mutable prevalidator_results : prevalidator_results;
       (** prevalidator metadata *)
-  mutable unactivated_chains : counter;
-      (** requests from unactivated chains *)
+  mutable unactivated_chains : counter;  (** requests from unactivated chains *)
   mutable inactive_chains : counter;  (** advertise inactive chains *)
   mutable future_blocks_advertised : counter;  (** future blocks *)
   mutable unadvertised : unadvertised;
@@ -418,7 +423,8 @@ let empty () =
 let encoding =
   let open Data_encoding in
   (conv
-     (fun { responses;
+     (fun {
+            responses;
             requests;
             valid_blocks;
             old_heads;
@@ -427,7 +433,8 @@ let encoding =
             inactive_chains;
             future_blocks_advertised;
             unadvertised;
-            advertisements } ->
+            advertisements;
+          } ->
        ( ( responses,
            requests,
            valid_blocks,
@@ -474,85 +481,60 @@ let encoding =
 
 let incr_requests (msgs : messages) (req : requests_kind) =
   match req with
-  | Branch ->
-      msgs.branch <- msgs.branch + one
-  | Head ->
-      msgs.head <- msgs.head + one
-  | Block_header ->
-      msgs.block_header <- msgs.block_header + one
-  | Operations ->
-      msgs.operations <- msgs.operations + one
-  | Protocols ->
-      msgs.protocols <- msgs.protocols + one
+  | Branch -> msgs.branch <- msgs.branch + one
+  | Head -> msgs.head <- msgs.head + one
+  | Block_header -> msgs.block_header <- msgs.block_header + one
+  | Operations -> msgs.operations <- msgs.operations + one
+  | Protocols -> msgs.protocols <- msgs.protocols + one
   | Operation_hashes_for_block ->
       msgs.operation_hashes_for_block <- msgs.operation_hashes_for_block + one
   | Operations_for_block ->
       msgs.operations_for_block <- msgs.operations_for_block + one
-  | Checkpoint ->
-      msgs.checkpoint <- msgs.checkpoint + one
-  | Protocol_branch ->
-      msgs.protocol_branch <- msgs.protocol_branch + one
+  | Checkpoint -> msgs.checkpoint <- msgs.checkpoint + one
+  | Protocol_branch -> msgs.protocol_branch <- msgs.protocol_branch + one
   | Predecessor_header ->
       msgs.predecessor_header <- msgs.predecessor_header + one
-  | Other ->
-      msgs.other <- msgs.other + one
+  | Other -> msgs.other <- msgs.other + one
 
 let incr_unadvertised {unadvertised = u; _} = function
-  | Block ->
-      u.block <- u.block + one
-  | Operations ->
-      u.operations <- u.operations + one
-  | Protocol ->
-      u.protocol <- u.protocol + one
+  | Block -> u.block <- u.block + one
+  | Operations -> u.operations <- u.operations + one
+  | Protocol -> u.protocol <- u.protocol + one
 
 let incr ({responses = rsps; requests = rqst; _} as m) metadata =
   match metadata with
   (* requests *)
-  | Received_request req ->
-      incr_requests rqst.received req
-  | Sent_request req ->
-      incr_requests rqst.sent req
-  | Scheduled_request req ->
-      incr_requests rqst.scheduled req
-  | Failed_request req ->
-      incr_requests rqst.failed req
+  | Received_request req -> incr_requests rqst.received req
+  | Sent_request req -> incr_requests rqst.sent req
+  | Scheduled_request req -> incr_requests rqst.scheduled req
+  | Failed_request req -> incr_requests rqst.failed req
   (* responses *)
-  | Received_response req ->
-      incr_requests rsps.received req
-  | Sent_response req ->
-      incr_requests rsps.sent req
-  | Unexpected_response ->
-      rsps.unexpected <- rsps.unexpected + one
-  | Outdated_response ->
-      rsps.outdated <- rsps.outdated + one
+  | Received_response req -> incr_requests rsps.received req
+  | Sent_response req -> incr_requests rsps.sent req
+  | Unexpected_response -> rsps.unexpected <- rsps.unexpected + one
+  | Outdated_response -> rsps.outdated <- rsps.outdated + one
   (* Advertisements *)
   | Sent_advertisement ad -> (
-    match ad with
-    | Head ->
-        m.advertisements.sent.head <- m.advertisements.sent.head + one
-    | Branch ->
-        m.advertisements.sent.branch <- m.advertisements.sent.branch + one )
+      match ad with
+      | Head -> m.advertisements.sent.head <- m.advertisements.sent.head + one
+      | Branch ->
+          m.advertisements.sent.branch <- m.advertisements.sent.branch + one)
   | Received_advertisement ad -> (
-    match ad with
-    | Head ->
-        m.advertisements.received.head <- m.advertisements.received.head + one
-    | Branch ->
-        m.advertisements.received.branch <-
-          m.advertisements.received.branch + one )
+      match ad with
+      | Head ->
+          m.advertisements.received.head <- m.advertisements.received.head + one
+      | Branch ->
+          m.advertisements.received.branch <-
+            m.advertisements.received.branch + one)
   (* Unexpected erroneous msg *)
-  | Unactivated_chain ->
-      m.unactivated_chains <- m.unactivated_chains + one
-  | Inactive_chain ->
-      m.inactive_chains <- m.inactive_chains + one
+  | Unactivated_chain -> m.unactivated_chains <- m.unactivated_chains + one
+  | Inactive_chain -> m.inactive_chains <- m.inactive_chains + one
   | Future_block ->
       m.future_blocks_advertised <- m.future_blocks_advertised + one
-  | Unadvertised u ->
-      incr_unadvertised m u
+  | Unadvertised u -> incr_unadvertised m u
   (* Peer validator *)
-  | Valid_blocks ->
-      m.valid_blocks <- m.valid_blocks + one
-  | Old_heads ->
-      m.old_heads <- m.old_heads + one
+  | Valid_blocks -> m.valid_blocks <- m.valid_blocks + one
+  | Old_heads -> m.old_heads <- m.old_heads + one
   (* prevalidation *)
   | Cannot_download ->
       m.prevalidator_results <-
@@ -619,16 +601,12 @@ let incr ({responses = rsps; requests = rqst; _} as m) metadata =
 
 (* shortcuts to update sent/failed requests/responses *)
 let update_requests {requests = {sent; failed; _}; _} kind = function
-  | true ->
-      incr_requests sent kind
-  | false ->
-      incr_requests failed kind
+  | true -> incr_requests sent kind
+  | false -> incr_requests failed kind
 
 let update_responses {responses = {sent; failed; _}; _} kind = function
-  | true ->
-      incr_requests sent kind
-  | false ->
-      incr_requests failed kind
+  | true -> incr_requests sent kind
+  | false -> incr_requests failed kind
 
 (* Scores computation *)
 (* TODO:

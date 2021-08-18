@@ -32,7 +32,7 @@ type rpc_context = {
   context : t;
 }
 
-val rpc_init : Updater.rpc_context -> (rpc_context, error trace) result Lwt.t
+val rpc_init : Updater.rpc_context -> rpc_context Error_monad.tzresult Lwt.t
 
 val register0 :
   ( [< RPC_service.meth],
@@ -42,30 +42,12 @@ val register0 :
     'b,
     'c )
   RPC_service.t ->
-  (t ->
-  'a ->
-  'b ->
-  ('c, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t) ->
+  (t -> 'a -> 'b -> 'c Error_monad.tzresult Lwt.t) ->
   unit
 
 val register0_noctxt :
   ([< RPC_service.meth], Updater.rpc_context, 'a, 'b, 'c, 'd) RPC_service.t ->
   ('b -> 'c -> 'd Error_monad.tzresult Lwt.t) ->
-  unit
-
-val register1_fullctxt :
-  ( [< RPC_service.meth],
-    Updater.rpc_context,
-    Updater.rpc_context * 'a,
-    'b,
-    'c,
-    'd )
-  RPC_service.t ->
-  (rpc_context ->
-  'a ->
-  'b ->
-  'c ->
-  ('d, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t) ->
   unit
 
 val register1 :
@@ -76,11 +58,7 @@ val register1 :
     'c,
     'd )
   RPC_service.t ->
-  (t ->
-  'a ->
-  'b ->
-  'c ->
-  ('d, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t) ->
+  (t -> 'a -> 'b -> 'c -> 'd Error_monad.tzresult Lwt.t) ->
   unit
 
 val register2 :
@@ -91,12 +69,40 @@ val register2 :
     'd,
     'e )
   RPC_service.t ->
-  (t ->
-  'a ->
-  'b ->
-  'c ->
-  'd ->
-  ('e, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t) ->
+  (t -> 'a -> 'b -> 'c -> 'd -> 'e Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register0 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    Updater.rpc_context,
+    'a,
+    'b,
+    'c )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c option Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register1 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    Updater.rpc_context * 'a,
+    'b,
+    'c,
+    'd )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c -> 'd option Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register2 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    (Updater.rpc_context * 'a) * 'b,
+    'c,
+    'd,
+    'e )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c -> 'd -> 'e option Error_monad.tzresult Lwt.t) ->
   unit
 
 val get_rpc_services : unit -> Updater.rpc_context RPC_directory.directory

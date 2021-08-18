@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,11 +34,7 @@ let to_string = Block_services.chain_to_string
 
 let parse_chain = Block_services.parse_chain
 
-type invalid_block = {
-  hash : Block_hash.t;
-  level : Int32.t;
-  errors : error list;
-}
+type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = Block_services.chain_prefix
 
@@ -45,8 +42,8 @@ let path = Block_services.chain_path
 
 let checkpoint_encoding =
   obj4
-    (req "block" Block_header.encoding)
-    (req "save_point" int32)
+    (req "block" (dynamic_size Block_header.encoding))
+    (req "savepoint" int32)
     (req "caboose" int32)
     (req "history_mode" History_mode.encoding)
 
@@ -114,8 +111,8 @@ module S = struct
       |+ opt_field
            "length"
            ~descr:
-             "The requested number of predecessors to return (per request; \
-              see next argument)."
+             "The requested number of predecessors to return (per request; see \
+              next argument)."
            RPC_arg.int
            (fun x -> x#length)
       |+ multi_field

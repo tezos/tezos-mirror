@@ -1,0 +1,24 @@
+(tests
+ (names test_proxy_server_config)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-proxy-server-config
+  tezos-test-services
+  tezos-test-helpers
+  qcheck-alcotest
+  alcotest-lwt)
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_test_services)))
+
+(rule
+ (alias runtest_proxy_server_config)
+ (action
+  (run %{exe:test_proxy_server_config.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-proxy-server-config)
+ (deps
+  (alias runtest_proxy_server_config))
+ (action progn))

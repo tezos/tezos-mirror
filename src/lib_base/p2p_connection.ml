@@ -37,16 +37,12 @@ module Id = struct
 
   let pp ppf (addr, port) =
     match port with
-    | None ->
-        Format.fprintf ppf "[%a]:??" Ipaddr.V6.pp addr
-    | Some port ->
-        Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp addr port
+    | None -> Format.fprintf ppf "[%a]:??" Ipaddr.V6.pp addr
+    | Some port -> Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp addr port
 
   let pp_opt ppf = function
-    | None ->
-        Format.pp_print_string ppf "none"
-    | Some point ->
-        pp ppf point
+    | None -> Format.pp_print_string ppf "none"
+    | Some point -> pp ppf point
 
   let to_string t = Format.asprintf "%a" pp t
 
@@ -57,16 +53,12 @@ module Id = struct
   let of_point (addr, port) = (addr, Some port)
 
   let to_point = function
-    | (_, None) ->
-        None
-    | (addr, Some port) ->
-        Some (addr, port)
+    | (_, None) -> None
+    | (addr, Some port) -> Some (addr, port)
 
   let to_point_exn = function
-    | (_, None) ->
-        invalid_arg "to_point_exn"
-    | (addr, Some port) ->
-        (addr, port)
+    | (_, None) -> invalid_arg "to_point_exn"
+    | (addr, Some port) -> (addr, port)
 
   let encoding =
     let open Data_encoding in
@@ -97,14 +89,16 @@ module Info = struct
   let encoding metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { incoming;
+      (fun {
+             incoming;
              peer_id;
              id_point;
              remote_socket_port;
              announced_version;
              private_node;
              local_metadata;
-             remote_metadata } ->
+             remote_metadata;
+           } ->
         ( incoming,
           peer_id,
           id_point,
@@ -142,20 +136,20 @@ module Info = struct
          (req "remote_metadata" metadata_encoding))
 
   let pp pp_meta ppf
-      { incoming;
+      {
+        incoming;
         id_point = (remote_addr, remote_port);
         remote_socket_port;
         peer_id;
         announced_version;
         private_node;
         local_metadata = _;
-        remote_metadata } =
+        remote_metadata;
+      } =
     let point =
       match remote_port with
-      | None ->
-          (remote_addr, remote_socket_port)
-      | Some port ->
-          (remote_addr, port)
+      | None -> (remote_addr, remote_socket_port)
+      | Some port -> (remote_addr, port)
     in
     Format.fprintf
       ppf
@@ -205,20 +199,16 @@ module P2p_event = struct
 
   let pp ppf (event : t) =
     match event with
-    | Too_few_connections ->
-        Format.pp_print_string ppf "Too_few_connections"
-    | Too_many_connections ->
-        Format.pp_print_string ppf "Too_many_connections"
+    | Too_few_connections -> Format.pp_print_string ppf "Too_few_connections"
+    | Too_many_connections -> Format.pp_print_string ppf "Too_many_connections"
     | New_point p ->
         Format.pp_print_string ppf "New_point " ;
         P2p_point.Id.pp ppf p
     | New_peer p ->
         Format.pp_print_string ppf "New_peer " ;
         P2p_peer_id.pp ppf p
-    | Gc_points ->
-        Format.pp_print_string ppf "Gc_points"
-    | Gc_peer_ids ->
-        Format.pp_print_string ppf "Gc_peer_ids"
+    | Gc_points -> Format.pp_print_string ppf "Gc_points"
+    | Gc_peer_ids -> Format.pp_print_string ppf "Gc_peer_ids"
     | Incoming_connection p ->
         Format.pp_print_string ppf "Incoming_connection " ;
         P2p_point.Id.pp ppf p
@@ -292,11 +282,12 @@ module P2p_event = struct
       "p2p_connection.pool_event"
       ~description:
         "An event that may happen during maintenance of and other operations \
-         on the p2p connection pool. Typically, it includes connection \
-         errors, peer swaps, etc."
+         on the p2p connection pool. Typically, it includes connection errors, \
+         peer swaps, etc."
     @@ union
          ~tag_size:`Uint8
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Too_few_connections"
              (branch_encoding "too_few_connections" empty)
@@ -358,10 +349,7 @@ module P2p_event = struct
                    (req "id_point" Id.encoding)
                    (req "peer_id" P2p_peer_id.encoding)))
              (function
-               | Accepting_request (p, id_p, g) ->
-                   Some (p, id_p, g)
-               | _ ->
-                   None)
+               | Accepting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
              (fun (p, id_p, g) -> Accepting_request (p, id_p, g));
            case
              (Tag 8)
@@ -373,10 +361,7 @@ module P2p_event = struct
                    (req "id_point" Id.encoding)
                    (req "peer_id" P2p_peer_id.encoding)))
              (function
-               | Rejecting_request (p, id_p, g) ->
-                   Some (p, id_p, g)
-               | _ ->
-                   None)
+               | Rejecting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
              (fun (p, id_p, g) -> Rejecting_request (p, id_p, g));
            case
              (Tag 9)
@@ -499,8 +484,7 @@ module P2p_event = struct
              (branch_encoding
                 "bootstrap_received"
                 (obj1 (req "source" P2p_peer_id.encoding)))
-             (function
-               | Bootstrap_received {source} -> Some source | _ -> None)
+             (function Bootstrap_received {source} -> Some source | _ -> None)
              (fun source -> Bootstrap_received {source});
            case
              (Tag 24)
@@ -516,9 +500,9 @@ module P2p_event = struct
              (branch_encoding
                 "advertise_received"
                 (obj1 (req "source" P2p_peer_id.encoding)))
-             (function
-               | Advertise_received {source} -> Some source | _ -> None)
-             (fun source -> Advertise_received {source}) ]
+             (function Advertise_received {source} -> Some source | _ -> None)
+             (fun source -> Advertise_received {source});
+         ]
 end
 
 let () =

@@ -171,17 +171,13 @@ module Event = struct
   let report t =
     let errors = List.filter is_error t in
     let warnings = List.filter is_warning t in
-    ( match errors with
-    | [] ->
-        Lwt.return_unit
-    | xs ->
-        emit error_event () >>= fun () -> emit_all xs )
+    (match errors with
+    | [] -> Lwt.return_unit
+    | xs -> emit error_event () >>= fun () -> emit_all xs)
     >>= fun () ->
     match warnings with
-    | [] ->
-        Lwt.return_unit
-    | xs ->
-        emit warning_event () >>= fun () -> emit_all xs
+    | [] -> Lwt.return_unit
+    | xs -> emit warning_event () >>= fun () -> emit_all xs
 end
 
 let mk_alert ~event ~payload = Alert {event; payload}
@@ -236,21 +232,17 @@ let cannot_resolve_addr =
     ("field", Data_encoding.string)
 
 let validate_addr ~field ~addr ~resolver =
-  resolver addr
-  >>= function
+  resolver addr >>= function
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
       return_some
         (mk_alert ~event:cannot_parse_addr ~payload:(addr, field, why))
   | Ok [] ->
       return_some (mk_alert ~event:cannot_resolve_addr ~payload:(addr, field))
-  | Ok _ ->
-      return_none
-  | Error _ as e ->
-      Lwt.return e
+  | Ok _ -> return_none
+  | Error _ as e -> Lwt.return e
 
 let validate_addr_opt ~field ~addr ~resolver =
-  Option.fold addr ~none:return_none ~some:(fun addr ->
-      validate_addr ~field ~addr ~resolver)
+  Option.filter_map_es (fun addr -> validate_addr ~field ~addr ~resolver) addr
   >|=? Option.to_list
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =
@@ -294,10 +286,12 @@ let validate_addresses config : t tzresult Lwt.t =
   List.fold_left_es
     (fun acc f -> f config >>=? fun res -> return (res @ acc))
     empty
-    [ validate_rpc_listening_addrs;
+    [
+      validate_rpc_listening_addrs;
       validate_p2p_bootstrap_peers;
       validate_p2p_listening_addrs;
-      validate_p2p_discovery_addr ]
+      validate_p2p_discovery_addr;
+    ]
 
 (* Validate connections setup. *)
 
@@ -307,9 +301,9 @@ let connections_min_expected =
     ~level:Error
     ~msg:
       (Format.sprintf
-         "the minimum number of connections found in field '%s' ({minimum}) \
-          is greater than the expected number of connections found in field \
-          '%s' ({expected})."
+         "the minimum number of connections found in field '%s' ({minimum}) is \
+          greater than the expected number of connections found in field '%s' \
+          ({expected})."
          "p2p.limits.min-connections"
          "p2p.limits.expected-connections")
     ("minimum", Data_encoding.int16)
@@ -374,8 +368,8 @@ let target_number_of_known_points_lower_than_maximum_conn =
     ~msg:
       (Format.sprintf
          "the target number of known point ids ({target}) found in field '%s' \
-          is lower than the maximum number of connections ({maximum}) found \
-          in '%s'."
+          is lower than the maximum number of connections ({maximum}) found in \
+          '%s'."
          "p2p.limits.max_known_points"
          "p2p.limits.max-connections")
     ("target", Data_encoding.int16)
@@ -434,8 +428,7 @@ let check config =
   if config.Node_config_file.disable_config_validation then
     Event.(emit disabled_event ()) >>= fun () -> return_unit
   else
-    validate_passes config
-    >>=? fun t ->
+    validate_passes config >>=? fun t ->
     if has_error t then
       Event.report t >>= fun () -> fail Invalid_node_configuration
     else if has_warning t then Event.report t >>= fun () -> return_unit

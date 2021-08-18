@@ -41,34 +41,19 @@ let is_operation_in_applied_mempool mempool oph =
   List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
 
 (* Matches events where the message is of the form:
-   "Double baking evidence injected <operation_hash>".
+   "double baking evidence injected <operation_hash>".
    For example:
 
     "event": {
-      "legacy_logging_event-alpha-baking-denunciation.v0": {
-        "message": "Double baking evidence injected onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx",
-        "section": [
-          "alpha",
-          "baking",
-          "denunciation"
-        ],
-        "level": "notice",
-        "tags": "{(tag:Operation_hash onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx)\n (tag:signed_operation\n  aede0aa...000000)\n (tag:event double_baking_denounced)}"
+      "double_baking_denounced.v0": {
+        "hash": "onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx",
+        "bytes": "..."
       }
     }
  *)
 let wait_for_denunciation accuser =
-  let filter json =
-    match JSON.(json |-> "message" |> as_string_opt) with
-    | Some s ->
-        s =~* rex "Double baking evidence injected (\\S*)$"
-    | None ->
-        None
-  in
-  Accuser.wait_for
-    accuser
-    "legacy_logging_event-alpha-baking-denunciation.v0"
-    filter
+  let filter json = JSON.(json |-> "hash" |> as_string_opt) in
+  Accuser.wait_for accuser "double_baking_denounced.v0" filter
 
 (* Matches events which contain an injection request.
    For example:
@@ -99,13 +84,10 @@ let wait_for_denunciation accuser =
 let wait_for_denunciation_injection node client oph_promise =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when s = "inject" ->
-        Some s
-    | Some _ | None ->
-        None
+    | Some s when s = "inject" -> Some s
+    | Some _ | None -> None
   in
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   let* oph = oph_promise in
@@ -138,12 +120,12 @@ let wait_for_denunciation_injection node client oph_promise =
 
    The test is successful if the double baking evidence can be found
    in the last baked block. *)
-let double_bake protocol =
-  Test.register
+let double_bake =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: double baking with accuser" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "double"; "baking"; "accuser"; "node"]
-  @@ fun () ->
+    ~title:"double baking with accuser"
+    ~tags:["double"; "baking"; "accuser"; "node"]
+  @@ fun protocol ->
   (* Step 1 and 2 *)
   (* Note: we start all nodes with [--private] to prevent the [connect address]
      command from [node_2] to [node_3] from failing due to an "already connected"
@@ -151,8 +133,8 @@ let double_bake protocol =
      This means that we need to use [trust address] too. *)
   let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
   and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
-  let* client_1 = Client.init ~node:node_1 ()
-  and* client_2 = Client.init ~node:node_2 () in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
@@ -185,7 +167,7 @@ let double_bake protocol =
   let* () = Node.wait_for_ready node_1 in
   (* Step 6 *)
   let* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
-  let* client_3 = Client.init ~node:node_3 () in
+  let* client_3 = Client.init ~endpoint:(Node node_3) () in
   let* accuser_3 = Accuser.init ~protocol node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
@@ -213,4 +195,4 @@ let double_bake protocol =
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"
 
-let register protocol = double_bake protocol
+let register ~protocols = double_bake ~protocols

@@ -29,8 +29,7 @@ open Protocol_client_context
 (** Retrieve the manager key in a contract storage.
     The storage has to be of type `pair key_hash 'a`.
 *)
-val get_contract_manager :
-  #full -> Contract.t -> public_key_hash tzresult Lwt.t
+val get_contract_manager : #full -> Contract.t -> public_key_hash tzresult Lwt.t
 
 (** Set the delegate of a manageable contract.
     For a contract with a `do`entrypoint, it builds the lambda that set

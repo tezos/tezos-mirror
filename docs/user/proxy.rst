@@ -4,7 +4,7 @@ Proxy mode
 ----------
 
 The ``tezos-client`` described
-`here <https://tezos.gitlab.io/introduction/howtouse.html#client>`_ forwards all RPCs to a node.
+:ref:`here <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *proxy* mode, a mode where the client
 performs protocol RPCs locally. For the computations to be correct,
 the proxy client requests the data it needs from the node, and uses
@@ -22,13 +22,9 @@ The CLI interface of the client in proxy mode (the *proxy client* in short)
 is the same as the default client. To turn proxy mode ON,
 pass ``--mode proxy`` to ``tezos-client``.
 
-Because computations done locally are protocol dependent, the proxy mode
-does not support all protocols. At the time of writing it supports
-the following protocols:
-
-* ``ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im``
-* ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``
-* ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``
+Because computations done locally are protocol dependent, the proxy mode does not support all protocols.
+It is expected than, at any given time, the proxy mode supports ``Alpha`` and the three protocols before that.
+In doubt, execute ``find src/ -name "proxy.ml" | grep 'proto_'`` to find the supported protocols.
 
 If ``--protocol`` is omitted when calling the proxy client, it
 tries to match the node's protocol. On the one hand, this is handy when

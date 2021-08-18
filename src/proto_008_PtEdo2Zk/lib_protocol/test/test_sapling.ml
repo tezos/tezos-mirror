@@ -26,8 +26,9 @@
 open Protocol
 
 let list_init n f =
-  List.init ~when_negative_length:() n f
-  |> function Error () -> assert false | Ok r -> r
+  List.init ~when_negative_length:() n f |> function
+  | Error () -> assert false
+  | Ok r -> r
 
 module Raw_context_tests = struct
   open Sapling_helpers.Common
@@ -36,8 +37,7 @@ module Raw_context_tests = struct
      constant value `uncommitted` for which we know the corresponding root and
      tests that the returned root is as expected. *)
   let commitments_add_uncommitted () =
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -49,19 +49,13 @@ module Raw_context_tests = struct
     let module H = Tezos_sapling.Core.Client.Hash in
     let cm = H.uncommitted ~height:0 in
     let expected_root = H.uncommitted ~height:32 in
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size:0
-    >>= wrap
-    >>=? fun ctx ->
+    Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
     List.fold_left_es
       (fun ctx pos ->
-        Sapling_storage.Commitments.get_root ctx id
-        >>= wrap
+        Sapling_storage.Commitments.get_root ctx id >>= wrap
         >>=? fun (ctx, root) ->
         assert (root = expected_root) ;
         Sapling_storage.Commitments.add
@@ -71,8 +65,7 @@ module Raw_context_tests = struct
           (Int64.of_int pos)
         >>= wrap
         >>=? fun (ctx, _size) ->
-        Sapling_storage.Commitments.get_root ctx id
-        >>= wrap
+        Sapling_storage.Commitments.get_root ctx id >>= wrap
         >|=? fun (ctx, root) ->
         assert (root = expected_root) ;
         ctx)
@@ -84,8 +77,7 @@ module Raw_context_tests = struct
      however committing to disk twice the same nf causes a storage error by
      trying to initialize the same key twice. *)
   let nullifier_double () =
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -94,15 +86,10 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size:0
-    >>= wrap
-    >>=? fun ctx ->
+    Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
     let nf = gen_nf () in
     let open Sapling_storage in
     let state =
@@ -111,9 +98,7 @@ module Raw_context_tests = struct
     let state = nullifiers_add state nf in
     let state = nullifiers_add state nf in
     assert (List.length state.diff.nullifiers = 2) ;
-    Sapling_storage.Nullifiers.size ctx id
-    >>= wrap
-    >>=? fun disk_size ->
+    Sapling_storage.Nullifiers.size ctx id >>= wrap >>=? fun disk_size ->
     assert (disk_size = 0L) ;
     Sapling_storage.apply_diff ctx id state.diff |> assert_error
 
@@ -122,8 +107,7 @@ module Raw_context_tests = struct
      memory). We then check that nullifier_mem answers true for those two lists
      and false for a third one. *)
   let nullifier_test () =
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -132,15 +116,10 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size:0
-    >>= wrap
-    >>=? fun ctx ->
+    Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
     let nf_list_ctx = list_init 10 (fun _ -> gen_nf ()) in
     let state =
       List.fold_left
@@ -148,9 +127,7 @@ module Raw_context_tests = struct
         {id = Some id; diff = Sapling_storage.empty_diff; memo_size = 0}
         nf_list_ctx
     in
-    Sapling_storage.apply_diff ctx id state.diff
-    >>= wrap
-    >>=? fun (ctx, _) ->
+    Sapling_storage.apply_diff ctx id state.diff >>= wrap >>=? fun (ctx, _) ->
     let nf_list_diff = list_init 10 (fun _ -> gen_nf ()) in
     let state =
       List.fold_left
@@ -160,8 +137,7 @@ module Raw_context_tests = struct
     in
     List.iter_ep
       (fun nf ->
-        Sapling_storage.nullifiers_mem ctx state nf
-        >>= wrap
+        Sapling_storage.nullifiers_mem ctx state nf >>= wrap
         >>=? fun (_, bool) ->
         assert bool ;
         return_unit)
@@ -170,8 +146,7 @@ module Raw_context_tests = struct
     let nf_list_absent = list_init 10 (fun _ -> gen_nf ()) in
     List.iter_ep
       (fun nf ->
-        Sapling_storage.nullifiers_mem ctx state nf
-        >>= wrap
+        Sapling_storage.nullifiers_mem ctx state nf >>= wrap
         >>=? fun (_, bool) ->
         assert (not bool) ;
         return_unit)
@@ -182,8 +157,7 @@ module Raw_context_tests = struct
   let cm_cipher_test () =
     Random.self_init () ;
     let memo_size = Random.int 200 in
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -192,33 +166,22 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size
-    >>= wrap
-    >>=? fun ctx ->
-    Sapling_storage.state_from_id ctx id
-    >>= wrap
-    >>=? fun (diff, ctx) ->
+    Sapling_storage.init ctx id ~memo_size >>= wrap >>=? fun ctx ->
+    Sapling_storage.state_from_id ctx id >>= wrap >>=? fun (diff, ctx) ->
     let list_added = list_init 10 (fun _ -> gen_cm_cipher ~memo_size ()) in
     let state = Sapling_storage.add diff list_added in
-    Sapling_storage.apply_diff ctx id state.diff
-    >>= wrap
-    >>=? fun (ctx, _) ->
+    Sapling_storage.apply_diff ctx id state.diff >>= wrap >>=? fun (ctx, _) ->
     let rec test_from from until expected =
       if from > until then return_unit
       else
-        Sapling_storage.Ciphertexts.get_from ctx id from
-        >>= wrap
+        Sapling_storage.Ciphertexts.get_from ctx id from >>= wrap
         >>=? fun (ctx, result) ->
         let expected_cipher = List.map snd expected in
         assert (result = expected_cipher) ;
-        Sapling_storage.Commitments.get_from ctx id from
-        >>= wrap
+        Sapling_storage.Commitments.get_from ctx id from >>= wrap
         >>=? fun result ->
         let expected_cm = List.map fst expected in
         assert (result = expected_cm) ;
@@ -234,8 +197,7 @@ module Raw_context_tests = struct
   let list_insertion_test () =
     Random.self_init () ;
     let memo_size = Random.int 200 in
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -244,15 +206,10 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id_one_by_one) ->
-    Sapling_storage.init ctx id_one_by_one ~memo_size
-    >>= wrap
-    >>=? fun ctx ->
+    Sapling_storage.init ctx id_one_by_one ~memo_size >>= wrap >>=? fun ctx ->
     let list_to_add =
       fst @@ List.split @@ list_init 33 (fun _ -> gen_cm_cipher ~memo_size ())
     in
@@ -263,8 +220,10 @@ module Raw_context_tests = struct
         Sapling_storage.Commitments.add
           ctx
           id_one_by_one
-          [ WithExceptions.Option.get ~loc:__LOC__
-            @@ List.nth list_to_add counter ]
+          [
+            WithExceptions.Option.get ~loc:__LOC__
+            @@ List.nth list_to_add counter;
+          ]
           (Int64.of_int counter)
         >>= wrap
         (* create a new tree and add a list of cms *)
@@ -275,8 +234,7 @@ module Raw_context_tests = struct
           ctx
         >>= wrap
         >>=? fun (ctx, id_all_at_once) ->
-        Sapling_storage.init ctx id_all_at_once ~memo_size
-        >>= wrap
+        Sapling_storage.init ctx id_all_at_once ~memo_size >>= wrap
         >>=? fun ctx ->
         Sapling_storage.Commitments.add
           ctx
@@ -286,11 +244,9 @@ module Raw_context_tests = struct
           0L
         >>= wrap
         >>=? fun (ctx, _size) ->
-        Sapling_storage.Commitments.get_root ctx id_one_by_one
-        >>= wrap
+        Sapling_storage.Commitments.get_root ctx id_one_by_one >>= wrap
         >>=? fun (ctx, root_one_by_one) ->
-        Sapling_storage.Commitments.get_root ctx id_all_at_once
-        >>= wrap
+        Sapling_storage.Commitments.get_root ctx id_all_at_once >>= wrap
         >>=? fun (ctx, root_all_at_once) ->
         assert (root_all_at_once = root_one_by_one) ;
         test (counter + 1) ctx
@@ -314,8 +270,7 @@ module Raw_context_tests = struct
         (Int32.to_int Sapling_storage.Roots.size + 10)
         (fun _ -> gen_root ())
     in
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -324,21 +279,14 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size:0
-    >>= wrap
-    >>=? fun ctx ->
+    Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
     (* Add one root per level to the context *)
     List.fold_left_es
       (fun (ctx, cnt) root ->
-        Sapling_storage.Roots.add ctx id root
-        >>= wrap
-        >>=? fun ctx ->
+        Sapling_storage.Roots.add ctx id root >>= wrap >>=? fun ctx ->
         (* Very low level way to "bake" a block. It would be better to use the
            helpers functions but they complicate the access to the raw_context. *)
         Raw_context.prepare
@@ -359,9 +307,7 @@ module Raw_context_tests = struct
     in
     List.fold_left_es
       (fun i root ->
-        Sapling_storage.root_mem ctx state root
-        >>= wrap
-        >|=? fun bool ->
+        Sapling_storage.root_mem ctx state root >>= wrap >|=? fun bool ->
         assert (if i < 10 then not bool else bool) ;
         i + 1)
       0
@@ -376,9 +322,7 @@ module Raw_context_tests = struct
     >>=? fun ctx ->
     List.fold_left_es
       (fun (i, ctx) root ->
-        Sapling_storage.root_mem ctx state root
-        >>= wrap
-        >|=? fun bool ->
+        Sapling_storage.root_mem ctx state root >>= wrap >|=? fun bool ->
         assert (if i < 9 then not bool else bool) ;
         (i + 1, ctx))
       (0, ctx)
@@ -386,8 +330,7 @@ module Raw_context_tests = struct
     >>=? fun _ -> return_unit
 
   let test_get_memo_size () =
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -396,18 +339,12 @@ module Raw_context_tests = struct
       ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
-    Lazy_storage_diff.fresh
-      Lazy_storage_kind.Sapling_state
-      ~temporary:false
-      ctx
+    Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
     >>= wrap
     >>=? fun (ctx, id) ->
-    Sapling_storage.init ctx id ~memo_size:0
-    >>= wrap
-    >>=? fun ctx ->
-    Sapling_storage.get_memo_size ctx id
-    >>= wrap
-    >|=? fun memo_size -> assert (memo_size = 0)
+    Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
+    Sapling_storage.get_memo_size ctx id >>= wrap >|=? fun memo_size ->
+    assert (memo_size = 0)
 end
 
 module Alpha_context_tests = struct
@@ -416,8 +353,7 @@ module Alpha_context_tests = struct
   (* Create a transaction with memo_size 1, test that is validates with a newly
      created empty_state with memo_size 1 and does not with memo_size 0. *)
   let test_verify_memo () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let sk =
       Tezos_sapling.Core.Wallet.Spending_key.of_seed
         (Tezos_crypto.Hacl.Rand.gen 32)
@@ -433,25 +369,21 @@ module Alpha_context_tests = struct
         "anti-replay"
         ps
     in
-    verify_update ctx vt ~memo_size:0
-    |> assert_some
-    >>=? fun _ -> verify_update ctx vt ~memo_size:1 |> assert_none
+    verify_update ctx vt ~memo_size:0 |> assert_some >>=? fun _ ->
+    verify_update ctx vt ~memo_size:1 |> assert_none
 
   (* Bench the proving and validation time of shielding and transferring several
      tokens. *)
   let test_bench_phases () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let rounds = 5 in
     Printf.printf "\nrounds: %d\n" rounds ;
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id) ->
-    client_state_alpha ctx id
-    >>=? fun cs ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id) ->
+    client_state_alpha ctx id >>=? fun cs ->
     let start = Unix.gettimeofday () in
     let vts = List.map (fun _ -> transfer w cs []) (1 -- rounds) in
     let ctime_shields = Unix.gettimeofday () -. start in
@@ -465,8 +397,7 @@ module Alpha_context_tests = struct
     >>=? fun ctx ->
     let vtime_shields = Unix.gettimeofday () -. start in
     Printf.printf "valdtr_shields %f\n" vtime_shields ;
-    client_state_alpha ctx id
-    >>=? fun cs ->
+    client_state_alpha ctx id >>=? fun cs ->
     let start = Unix.gettimeofday () in
     let vts = List.map (fun i -> transfer w cs [i]) (1 -- rounds) in
     let ctime_transfers = Unix.gettimeofday () -. start in
@@ -483,24 +414,21 @@ module Alpha_context_tests = struct
 
   (* Transfer several times the same token. *)
   let test_bench_fold_over_same_token () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let rounds = 5 in
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id) ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id) ->
     let rec loop cnt ctx =
       if cnt >= rounds then return_unit
       else
         (* inefficient: re-synch from scratch at each round *)
-        client_state_alpha ctx id
-        >>=? fun cs ->
+        client_state_alpha ctx id >>=? fun cs ->
         let vt = transfer w cs [cnt] in
-        verify_update ctx ~id vt |> assert_some
-        >>=? fun (ctx, _id) -> loop (cnt + 1) ctx
+        verify_update ctx ~id vt |> assert_some >>=? fun (ctx, _id) ->
+        loop (cnt + 1) ctx
     in
     loop 0 ctx
 
@@ -514,41 +442,32 @@ module Alpha_context_tests = struct
 
   (* Test that double spending the same input fails the nf check. *)
   let test_double_spend_same_input () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* one verify_update to get the id *)
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id) ->
-    client_state_alpha ctx id
-    >>=? fun cs ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id) ->
+    client_state_alpha ctx id >>=? fun cs ->
     let vt = transfer w cs [0] in
-    verify_update ctx ~id vt |> assert_some
-    >>=? fun (_ctx, id) ->
+    verify_update ctx ~id vt |> assert_some >>=? fun (_ctx, id) ->
     let vt = transfer w cs [0; 0] in
     verify_update ctx ~id vt |> assert_none
 
   let test_verifyupdate_one_transaction () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id) ->
-    client_state_alpha ctx id
-    >>=? fun cs ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id) ->
+    client_state_alpha ctx id >>=? fun cs ->
     let vt = transfer w cs [0] in
     (* fails sig check because of wrong balance *)
     let vt_broken =
       Tezos_sapling.Core.Validator.UTXO.
         {vt with balance = Int64.(succ vt.balance)}
     in
-    verify_update ctx ~id vt_broken
-    |> assert_none
-    >>=? fun () ->
+    verify_update ctx ~id vt_broken |> assert_none >>=? fun () ->
     (* randomize one output to fail check outputs *)
     (* don't randomize the ciphertext as it is not part of the proof *)
     let open Tezos_sapling.Core.Client.UTXO in
@@ -562,9 +481,7 @@ module Alpha_context_tests = struct
     let vt_broken =
       Tezos_sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cm]}
     in
-    verify_update ctx ~id vt_broken
-    |> assert_none
-    >>=? fun () ->
+    verify_update ctx ~id vt_broken |> assert_none >>=? fun () ->
     (* position inside the cv *)
     let pos = Random.int 32 in
     let o_wrong_cv =
@@ -583,36 +500,27 @@ module Alpha_context_tests = struct
     verify_update ctx ~id vt_broken |> assert_none
 
   let test_verifyupdate_two_transactions () =
-    init ()
-    >>=? fun ctx ->
+    init () >>=? fun ctx ->
     let w = wallet_gen () in
     let cs = Tezos_sapling.Storage.empty ~memo_size:8 in
     (* generate the first storage *)
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id1) ->
-    client_state_alpha ctx id1
-    >>=? fun cs1 ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id1) ->
+    client_state_alpha ctx id1 >>=? fun cs1 ->
     let vt1 = transfer w cs1 [0] in
     (* generate the second storage *)
     let vt = transfer w cs [] in
-    verify_update ctx vt |> assert_some
-    >>=? fun (ctx, id2) ->
-    client_state_alpha ctx id2
-    >>=? fun cs2 ->
+    verify_update ctx vt |> assert_some >>=? fun (ctx, id2) ->
+    client_state_alpha ctx id2 >>=? fun cs2 ->
     let vt2 = transfer w cs2 [0] in
     (* fail root check *)
-    verify_update ctx ~id:id1 vt2
-    |> assert_none
-    >>=? fun () ->
+    verify_update ctx ~id:id1 vt2 |> assert_none >>=? fun () ->
     (* Swap the root so that it passes the root_mem check but fails
-     the input check *)
+       the input check *)
     let vt1_broken =
       Tezos_sapling.Core.Validator.UTXO.{vt2 with root = vt1.root}
     in
-    verify_update ctx ~id:id1 vt1_broken
-    |> assert_none
-    >>=? fun () ->
+    verify_update ctx ~id:id1 vt1_broken |> assert_none >>=? fun () ->
     (* fail the sig check *)
     let vt1_broken =
       Tezos_sapling.Core.Validator.UTXO.{vt1 with outputs = vt2.outputs}
@@ -636,8 +544,7 @@ module Interpreter_tests = struct
      transfer all of b inputs to a while adding dummy inputs and outputs.
      At last we fail we make a failing transaction. *)
   let test_shielded_tez () =
-    init ()
-    >>=? fun (b, baker, src0, src1) ->
+    init () >>=? fun (b, baker, src0, src1) ->
     let memo_size = 8 in
     originate_contract "contracts/sapling_contract.tz" "{ }" src0 b baker
     >>=? fun (dst, b, anti_replay) ->
@@ -670,8 +577,7 @@ module Interpreter_tests = struct
     transac_and_sync ~memo_size b parameters total src0 dst baker
     >>=? fun (b, ctx, state) ->
     (* address that will receive an unshield *)
-    Alpha_context.Contract.get_balance ctx src1
-    >>= wrap
+    Alpha_context.Contract.get_balance ctx src1 >>= wrap
     >>=? fun balance_before_shield ->
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
@@ -680,8 +586,8 @@ module Interpreter_tests = struct
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
-              ( Tezos_sapling.Forge.Input.get state pos wa.vk
-              |> WithExceptions.Option.get ~loc:__LOC__ )
+              (Tezos_sapling.Forge.Input.get state pos wa.vk
+              |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
     in
@@ -704,8 +610,8 @@ module Interpreter_tests = struct
     in
     let hex_pkh =
       to_hex
-        ( Alpha_context.Contract.is_implicit src1
-        |> WithExceptions.Option.get ~loc:__LOC__ )
+        (Alpha_context.Contract.is_implicit src1
+        |> WithExceptions.Option.get ~loc:__LOC__)
         Signature.Public_key_hash.encoding
     in
     let string =
@@ -717,8 +623,7 @@ module Interpreter_tests = struct
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
     >>=? fun (b, ctx, state) ->
-    Alpha_context.Contract.get_balance ctx src1
-    >>= wrap
+    Alpha_context.Contract.get_balance ctx src1 >>= wrap
     >>=? fun balance_after_shield ->
     let diff =
       Int64.sub
@@ -732,8 +637,8 @@ module Interpreter_tests = struct
           let pos = Int64.of_int (i + 14 + 14) in
           let forge_input =
             snd
-              ( Tezos_sapling.Forge.Input.get state pos wb.vk
-              |> WithExceptions.Option.get ~loc:__LOC__ )
+              (Tezos_sapling.Forge.Input.get state pos wb.vk
+              |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
     in
@@ -764,8 +669,7 @@ module Interpreter_tests = struct
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
     >>=? fun (b, _ctx, _state) ->
     (* Here we fail by doing the same transaction again*)
-    Incremental.begin_construction b
-    >>=? fun incr ->
+    Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.Tez.of_int 10 in
     Op.transaction ~fee (B b) src0 dst Test_tez.Tez.zero ~parameters
     >>=? fun operation ->
@@ -778,7 +682,8 @@ module Interpreter_tests = struct
   let test_push_sapling_state_should_be_forbidden () =
     init ()
     (* Originating a contract to get a sapling_state with ID 0, used in the next contract *)
-    >>=? fun (block, baker, src, _) ->
+    >>=?
+    fun (block, baker, src, _) ->
     originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
     >>=? fun _ ->
     (* Originating the next contract should fail *)
@@ -790,24 +695,23 @@ module Interpreter_tests = struct
       baker
     >>= function
     | Error
-        [ Environment.Ecoproto_error (Script_tc_errors.Ill_typed_contract _);
+        [
+          Environment.Ecoproto_error (Script_tc_errors.Ill_typed_contract _);
           Environment.Ecoproto_error
-            (Script_tc_errors.Unexpected_lazy_storage _) ] ->
+            (Script_tc_errors.Unexpected_lazy_storage _);
+        ] ->
         return_unit
-    | _ ->
-        assert false
+    | _ -> assert false
 
   let test_use_state_from_other_contract_and_transact () =
     (*
      Attempt to use a sapling state of a contract A in a contract B
      *)
-    init ()
-    (* Originating the contracts *)
-    >>=? fun (block, baker, src, _) ->
+    init () (* Originating the contracts *) >>=? fun (block, baker, src, _) ->
     let memo_size = 8 in
     (* originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
-    >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
-             -> *)
+       >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
+                -> *)
     originate_contract
       "contracts/sapling_use_existing_state.tz"
       "{ }"
@@ -843,8 +747,7 @@ module Interpreter_tests = struct
       existing_state_contract_address
       baker
     >|= function
-    | Ok _ ->
-        Alcotest.failf "Unexpected operations success"
+    | Ok _ -> Alcotest.failf "Unexpected operations success"
     | Error errs ->
         assert (
           List.exists
@@ -853,17 +756,15 @@ module Interpreter_tests = struct
                   (Tezos_raw_protocol_008_PtEdo2Zk.Script_tc_errors
                    .Unexpected_forged_value _) ->
                   true
-              | _ ->
-                  false)
-            errs ) ;
+              | _ -> false)
+            errs) ;
         ok_unit
 
   (* In this test we do two transactions in one block and same two in two block.
      We check that the sate is the same expect for roots.
      The second transaction is possible only if the first one is done. *)
   let test_transac_and_block () =
-    init ()
-    >>=? fun (b, baker, src, _) ->
+    init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
     originate_contract "contracts/sapling_contract.tz" "{ }" src b baker
     >>=? fun (dst, block_start, anti_replay) ->
@@ -885,9 +786,11 @@ module Interpreter_tests = struct
       "0x"
       ^ to_hex
           (Tezos_sapling.Forge.forge_transaction
-             [ snd
-                 ( Tezos_sapling.Forge.Input.get state 0L vk
-                 |> WithExceptions.Option.get ~loc:__LOC__ ) ]
+             [
+               snd
+                 (Tezos_sapling.Forge.Input.get state 0L vk
+                 |> WithExceptions.Option.get ~loc:__LOC__);
+             ]
              [output]
              sk
              anti_replay
@@ -910,8 +813,7 @@ module Interpreter_tests = struct
       ()
     >>=? fun (_root, diff_1) ->
     let fee = Test_tez.Tez.of_int 10 in
-    Test_tez.Tez.(one_mutez *? Int64.of_int 15)
-    >>?= fun amount_tez ->
+    Test_tez.Tez.(one_mutez *? Int64.of_int 15) >>?= fun amount_tez ->
     Op.transaction
       ~fee
       (B block_start)
@@ -920,19 +822,15 @@ module Interpreter_tests = struct
       amount_tez
       ~parameters:parameters_1
     >>=? fun operation ->
-    Incremental.begin_construction block_start
-    >>=? fun incr ->
-    Incremental.add_operation incr operation
-    >>=? fun incr ->
+    Incremental.begin_construction block_start >>=? fun incr ->
+    Incremental.add_operation incr operation >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
     let pkh =
       Alpha_context.Contract.is_implicit src
       |> WithExceptions.Option.get ~loc:__LOC__
     in
-    Alpha_context.Contract.get_counter ctx pkh
-    >>= wrap
-    >>=? fun counter ->
+    Alpha_context.Contract.get_counter ctx pkh >>= wrap >>=? fun counter ->
     Op.transaction
       ~counter
       ~fee
@@ -942,10 +840,8 @@ module Interpreter_tests = struct
       Test_tez.Tez.zero
       ~parameters:parameters_2
     >>=? fun operation ->
-    Incremental.add_operation incr operation
-    >>=? fun incr ->
-    Incremental.finalize_block incr
-    >>=? fun block_2 ->
+    Incremental.add_operation incr operation >>=? fun incr ->
+    Incremental.finalize_block incr >>=? fun block_2 ->
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block_2
@@ -957,11 +853,9 @@ module Interpreter_tests = struct
     (* We check that the same transactions have passed *)
     assert (diff_1 = diff_2) ;
     let is_root_in block dst root =
-      Incremental.begin_construction block
-      >>=? fun incr ->
+      Incremental.begin_construction block >>=? fun incr ->
       let ctx_2 = Incremental.alpha_ctxt incr in
-      Alpha_services.Contract.script Block.rpc_ctxt block dst
-      >>=? fun script ->
+      Alpha_services.Contract.script Block.rpc_ctxt block dst >>=? fun script ->
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script
         ctx_without_gas_2
@@ -991,17 +885,11 @@ module Interpreter_tests = struct
     in
     (* We check that the second state did not store the root in between
          transactions. *)
-    is_root_in block_2 dst intermediary_root
-    |> assert_false
-    >>=? fun () ->
+    is_root_in block_2 dst intermediary_root |> assert_false >>=? fun () ->
     (* We check that the second state did store the final root. *)
-    is_root_in block_2 dst final_root
-    |> assert_true
-    >>=? fun () ->
+    is_root_in block_2 dst final_root |> assert_true >>=? fun () ->
     (* We check that the first state did store the final root. *)
-    is_root_in block_1 dst final_root
-    |> assert_true
-    >>=? fun () ->
+    is_root_in block_1 dst final_root |> assert_true >>=? fun () ->
     (* We check that the first state did store the root in between transactions. *)
     is_root_in block_1 dst intermediary_root |> assert_true
 
@@ -1010,8 +898,7 @@ module Interpreter_tests = struct
      drops the result. We make several shields in the same list (since the state
      is drop). *)
   let test_drop () =
-    init ()
-    >>=? fun (b, baker, src, _) ->
+    init () >>=? fun (b, baker, src, _) ->
     originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b baker
     >>=? fun (dst, b, anti_replay) ->
     let {sk; vk} = wallet_gen () in
@@ -1026,7 +913,8 @@ module Interpreter_tests = struct
       dst
       Test_tez.Tez.zero
       ~parameters
-    >>=? fun operation -> next_block b operation >>=? fun _b -> return_unit
+    >>=? fun operation ->
+    next_block b operation >>=? fun _b -> return_unit
 
   (* We use a contrac with two states. Its parameter is two transactions and a
      bool. The two transactions are tested valid against the two states, but
@@ -1035,8 +923,7 @@ module Interpreter_tests = struct
      At each transactions both are applied but only state is updated.
      We then check that the first state is updated in the correct way. *)
   let test_double () =
-    init ()
-    >>=? fun (b, baker, src, _) ->
+    init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
     originate_contract
       "contracts/sapling_contract_double.tz"
@@ -1064,32 +951,16 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string str_2))
     in
     let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction
-      ~fee
-      (B b)
-      src
-      dst
-      Test_tez.Tez.zero
-      ~parameters:parameters_1
+    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters:parameters_1
     >>=? fun operation ->
-    next_block b operation
-    >>=? fun b ->
-    Op.transaction
-      ~fee
-      (B b)
-      src
-      dst
-      Test_tez.Tez.zero
-      ~parameters:parameters_2
+    next_block b operation >>=? fun b ->
+    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters:parameters_2
     >>=? fun operation ->
-    next_block b operation
-    >>=? fun b ->
-    Incremental.begin_construction b
-    >>=? fun incr ->
+    next_block b operation >>=? fun b ->
+    Incremental.begin_construction b >>=? fun incr ->
     let ctx = Incremental.alpha_ctxt incr in
     let ctx_without_gas = Alpha_context.Gas.set_unlimited ctx in
-    Alpha_services.Contract.storage Block.rpc_ctxt b dst
-    >>=? fun storage ->
+    Alpha_services.Contract.storage Block.rpc_ctxt b dst >>=? fun storage ->
     let storage_lazy_expr = Alpha_context.Script.lazy_expr storage in
     let tytype =
       let memo_size = memo_size_of_int memo_size in
@@ -1120,10 +991,8 @@ module Interpreter_tests = struct
       >>= wrap
       >|=? fun diff -> client_state_of_diff ~memo_size diff
     in
-    local_state_from_disk state_1 ctx
-    >>=? fun state_1 ->
-    local_state_from_disk state_2 ctx
-    >|=? fun state_2 ->
+    local_state_from_disk state_1 ctx >>=? fun state_1 ->
+    local_state_from_disk state_2 ctx >|=? fun state_2 ->
     (* we check that first state contains 15 to addr_1 but not 15 to addr_2*)
     assert (Option.is_some @@ Tezos_sapling.Forge.Input.get state_1 0L wa.vk) ;
     assert (Option.is_some @@ Tezos_sapling.Forge.Input.get state_2 0L wa.vk) ;
@@ -1131,8 +1000,7 @@ module Interpreter_tests = struct
     assert (Option.is_none @@ Tezos_sapling.Forge.Input.get state_2 0L wb.vk)
 
   let test_state_as_arg () =
-    init ()
-    >>=? fun (b, baker, src, _) ->
+    init () >>=? fun (b, baker, src, _) ->
     originate_contract
       "contracts/sapling_contract_state_as_arg.tz"
       "None"
@@ -1151,8 +1019,7 @@ module Interpreter_tests = struct
     let fee = Test_tez.Tez.of_int 10 in
     Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters
     >>=? fun operation ->
-    next_block b operation
-    >>=? fun b ->
+    next_block b operation >>=? fun b ->
     let contract = "0x" ^ to_hex dst Alpha_context.Contract.encoding in
     let hex_transac_2 = hex_shield ~memo_size:8 w anti_replay_2 in
     let string = "(Pair " ^ contract ^ " " ^ hex_transac_2 ^ ")" in
@@ -1160,11 +1027,13 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string))
     in
     Op.transaction ~fee (B b) src dst_2 Test_tez.Tez.zero ~parameters
-    >>=? fun operation -> next_block b operation >>=? fun _b -> return_unit
+    >>=? fun operation ->
+    next_block b operation >>=? fun _b -> return_unit
 end
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "commitments_add_uncommitted"
       `Quick
       Raw_context_tests.commitments_add_uncommitted;
@@ -1234,4 +1103,5 @@ let tests =
     Test_services.tztest
       "test_state_as_arg"
       `Quick
-      Interpreter_tests.test_state_as_arg ]
+      Interpreter_tests.test_state_as_arg;
+  ]

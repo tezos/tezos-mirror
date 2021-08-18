@@ -1,5 +1,3 @@
-.. _michelson_alpha:
-
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
@@ -304,6 +302,8 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
+.. _michelson_type_system:
+
 Introduction to the type system and notations
 ---------------------------------------------
 
@@ -485,14 +485,15 @@ Core data types and notations
    of type ``(t)`` that we write ``{ Elt key value ; ... }``, with keys
    sorted.
 
-- ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)``. These maps should be used if one
-   intends to store large amounts of data in a map. They have higher
-   gas costs than standard maps as data is lazily deserialized. A
-   ``big_map`` cannot appear inside another ``big_map``. See the
-   section on :ref:`operations on big maps <OperationsOnBigMaps_alpha>`
-   for a description of the syntax of values of type ``big_map (k)
-   (t)`` and available operations.
+-  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
+   ``(k)`` of values of type ``(t)``.
+   These maps should be used if you intend to store large amounts of data in a map.
+   Using ``big_map`` can reduce gas costs significantly compared to standard maps, as data is lazily deserialized.
+   Note however that individual operations on ``big_map`` have higher gas costs than those over standard maps.
+   A ``big_map`` also has a lower storage cost than a standard map of the same size, when large keys are used, since only the hash of each key is stored in a ``big_map``.
+
+   A ``big_map`` cannot appear inside another ``big_map``.
+   See the section on :ref:`operations on big maps <OperationsOnBigMaps_alpha>` for a description of the syntax of values of type ``big_map (k) (t)`` and available operations.
 
 Core instructions
 -----------------
@@ -578,7 +579,7 @@ result (second rule below). Its type is thus completely generic.
     > DIP code / x : S  =>  x : S'
         where    code / S  =>  S'
 
-- ``DIP n code``: Runs code protecting the ``n`` topmost elements of
+-  ``DIP n code``: Runs code protecting the ``n`` topmost elements of
    the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
    and ``DIP 1 code`` is equivalent to ``DIP code``.
 
@@ -1718,9 +1719,9 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
--  ``sapling_transaction ms``: A :ref:`Sapling<sapling_dev_alpha>` transaction
+-  ``sapling_transaction ms``: A :doc:`Sapling <sapling>` transaction
 
--  ``sapling_state ms``: A :ref:`Sapling<sapling_dev_alpha>` state
+-  ``sapling_state ms``: A :doc:`Sapling <sapling>` state
 
 -  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
 
@@ -1872,15 +1873,15 @@ contract, unit for an account.
     :: option key_hash : 'S   ->   operation : 'S
 
 Using this instruction is the only way to modify the delegation of a
-smart contract. If the parameter is `None` then the delegation of the
-current contract is withdrawn; if it is `Some kh` where `kh` is the
+smart contract. If the parameter is ``None`` then the delegation of the
+current contract is withdrawn; if it is ``Some kh`` where ``kh`` is the
 key hash of a registered delegate that is not the current delegate of
 the contract, then this operation sets the delegate of the contract to
-this registered delegate. The operation fails if `kh` is the current
-delegate of the contract or if `kh` is not a registered delegate.
+this registered delegate. The operation fails if ``kh`` is the current
+delegate of the contract or if ``kh`` is not a registered delegate.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
-    contract, including any mutez added by the calling transaction.
+   contract, including any mutez added by the calling transaction.
 
 ::
 
@@ -1966,7 +1967,7 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
-- ``VOTING_POWER``: Return the voting power of a given contract. This voting power
+-  ``VOTING_POWER``: Return the voting power of a given contract. This voting power
    coincides with the weight of the contract in the voting listings (i.e., the rolls
    count) which is calculated at the beginning of every voting period.
 
@@ -1977,9 +1978,11 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 Special operations
 ~~~~~~~~~~~~~~~~~~
 
--  ``NOW``: Push the timestamp of the block whose validation triggered
-   this execution (does not change during the execution of the
-   contract).
+-  ``NOW``: Push the minimal injection time for the current block,
+   namely the block whose validation triggered this execution. The
+   minimal injection time is 60 seconds after the timestamp of the
+   predecessor block. This value does not change during the execution
+   of the contract.
 
 ::
 
@@ -2169,7 +2172,7 @@ BLS12-381 primitives
     :: bls12_381_g2 : bls12_381_g2 : 'S -> bls12_381_g2 : 'S
     :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
 
-- ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
+-  ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
    elements can be built from naturals by multiplying by the unit of Fr using ``PUSH bls12_381_fr 1; MUL``. Note
    that the multiplication will be computed using the natural modulo the order
    of Fr.
@@ -2202,7 +2205,7 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :ref:`Sapling integration<sapling_dev_alpha>` page for a more
+Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 
 -  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
@@ -2981,7 +2984,7 @@ stack accept ``n`` variable annotations.
    > CA(\rest=[AD]+)R @annot %field_name / S  =>  CAR ; C(\rest)R @annot %field_name / S
    > CD(\rest=[AD]+)R @annot %field_name / S  =>  CDR ; C(\rest)R @annot %field_name / S
 
-   ``CMP{EQ|NEQ|LT|GT|LE|GE}`` @annot
+   CMP{EQ|NEQ|LT|GT|LE|GE} @annot
    > CMP(\op) @annot / S  =>  COMPARE ; (\op) @annot / S
 
 The variable annotation on ``SET_C[AD]+R`` and ``MAP_C[AD]+R`` annotates

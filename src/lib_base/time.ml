@@ -50,24 +50,18 @@ module Protocol = struct
       else (days, ps)
     in
     match Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span with
-    | None ->
-        invalid_arg "Time.Protocol.to_ptime"
-    | Some ptime ->
-        ptime
+    | None -> invalid_arg "Time.Protocol.to_ptime"
+    | Some ptime -> ptime
 
   let of_notation s =
     match Ptime.of_rfc3339 s with
-    | Ok (t, _, _) ->
-        Some (of_ptime t)
-    | Error _ ->
-        None
+    | Ok (t, _, _) -> Some (of_ptime t)
+    | Error _ -> None
 
   let of_notation_exn s =
     match Ptime.(rfc3339_error_to_msg (of_rfc3339 s)) with
-    | Error (`Msg msg) ->
-        invalid_arg ("Time.Protocol.of_notation: " ^ msg)
-    | Ok (t, _, _) ->
-        of_ptime t
+    | Error (`Msg msg) -> invalid_arg ("Time.Protocol.of_notation: " ^ msg)
+    | Ok (t, _, _) -> of_ptime t
 
   let to_notation t = Ptime.to_rfc3339 ~frac_s:0 ~tz_offset_s:0 (to_ptime t)
 
@@ -85,8 +79,7 @@ module Protocol = struct
          to_notation
          (fun s ->
            match of_notation s with
-           | Some s ->
-               s
+           | Some s -> s
            | None ->
                Data_encoding.Json.cannot_destruct "Time.Protocol.of_notation")
          string
@@ -104,16 +97,14 @@ module Protocol = struct
       ( Json.wrap_error
       (* NOTE: this encoding is only used as a building block for a json
           encoding so we can raise the json exception directly. *)
-      @@ fun s ->
-      match of_notation s with
-      | Some i ->
-          i
-      | None -> (
-        match Int64.of_string_opt s with
-        | Some i ->
-            i
-        | None ->
-            raise (Invalid_argument "Time.Protocol.decoding") ) )
+      @@
+      fun s ->
+        match of_notation s with
+        | Some i -> i
+        | None -> (
+            match Int64.of_string_opt s with
+            | Some i -> i
+            | None -> raise (Invalid_argument "Time.Protocol.decoding")) )
       string
 
   let encoding =
@@ -130,14 +121,12 @@ module Protocol = struct
       ~name:"date"
       ~descr:"A date in seconds from epoch"
       ~destruct:(function
-        | "none" | "epoch" ->
-            Ok epoch
+        | "none" | "epoch" -> Ok epoch
         | s -> (
-          match Int64.of_string s with
-          | t ->
-              Ok t
-          | exception _ ->
-              Error (Format.asprintf "failed to parse time (epoch): %S" s) ))
+            match Int64.of_string s with
+            | t -> Ok t
+            | exception _ ->
+                Error (Format.asprintf "failed to parse time (epoch): %S" s)))
       ~construct:Int64.to_string
       ()
 
@@ -166,10 +155,8 @@ module System = struct
 
     let of_seconds_exn f =
       match Ptime.Span.of_float_s f with
-      | None ->
-          invalid_arg "Time.System.Span.of_seconds_exn"
-      | Some s ->
-          s
+      | None -> invalid_arg "Time.System.Span.of_seconds_exn"
+      | Some s -> s
 
     let pp_hum = Ptime.Span.pp
 
@@ -182,10 +169,8 @@ module System = struct
            Ptime.Span.to_float_s
            (fun f ->
              match Ptime.Span.of_float_s f with
-             | None ->
-                 invalid_arg "Time.System.Span.encoding"
-             | Some s ->
-                 s)
+             | None -> invalid_arg "Time.System.Span.encoding"
+             | Some s -> s)
            float
 
     let rpc_arg =
@@ -194,10 +179,8 @@ module System = struct
         ~descr:"A span of time in seconds"
         ~destruct:(fun s ->
           match Ptime.Span.of_float_s (float_of_string s) with
-          | Some t ->
-              Ok t
-          | None ->
-              Error (Format.asprintf "failed to parse timespan: %S" s)
+          | Some t -> Ok t
+          | None -> Error (Format.asprintf "failed to parse timespan: %S" s)
           | exception _ ->
               Error (Format.asprintf "failed to parse timespan: %S" s))
         ~construct:(fun s -> string_of_float (Ptime.Span.to_float_s s))
@@ -209,8 +192,7 @@ module System = struct
     let days = Int64.to_int (Int64.div x 86_400L) in
     let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
     match Ptime.Span.of_d_ps (days, ps) with
-    | None ->
-        None
+    | None -> None
     | Some span ->
         let span =
           if Compare.Int64.(seconds < 0L) then Ptime.Span.neg span else span
@@ -219,10 +201,8 @@ module System = struct
 
   let of_seconds_exn x =
     match of_seconds_opt x with
-    | Some t ->
-        t
-    | None ->
-        invalid_arg "Time.of_seconds"
+    | Some t -> t
+    | None -> invalid_arg "Time.of_seconds"
 
   let to_seconds x =
     let (days, ps) = Ptime.(Span.to_d_ps (to_span x)) in
@@ -240,10 +220,8 @@ module System = struct
 
   let of_notation_exn s =
     match Ptime.(rfc3339_error_to_msg (of_rfc3339 s)) with
-    | Ok (t, _, _) ->
-        t
-    | Error (`Msg msg) ->
-        invalid_arg ("Time.of_notation: " ^ msg)
+    | Ok (t, _, _) -> t
+    | Error (`Msg msg) -> invalid_arg ("Time.of_notation: " ^ msg)
 
   let to_notation t = Ptime.to_rfc3339 ~frac_s t
 
@@ -257,10 +235,8 @@ module System = struct
          to_notation
          (fun s ->
            match of_notation_opt s with
-           | Some s ->
-               s
-           | None ->
-               Data_encoding.Json.cannot_destruct "Time.of_notation")
+           | Some s -> s
+           | None -> Data_encoding.Json.cannot_destruct "Time.of_notation")
          string
 
   let encoding =
@@ -268,7 +244,8 @@ module System = struct
     let binary = conv to_seconds of_seconds_exn int64 in
     let json =
       union
-        [ case
+        [
+          case
             Json_only
             ~title:"RFC encoding"
             rfc_encoding
@@ -279,7 +256,8 @@ module System = struct
             ~title:"Second since epoch"
             int64
             (fun _ -> None)
-            (fun i -> of_seconds_exn i) ]
+            (fun i -> of_seconds_exn i);
+        ]
     in
     def
       "timestamp.system"
@@ -293,19 +271,16 @@ module System = struct
       ~name:"date"
       ~descr:"A date in seconds from epoch"
       ~destruct:(function
-        | "none" | "epoch" ->
-            Ok Ptime.epoch
+        | "none" | "epoch" -> Ok Ptime.epoch
         | s -> (
-          match of_notation_opt s with
-          | Some t ->
-              Ok t
-          | None -> (
-            match of_seconds_exn (Int64.of_string s) with
-            | t ->
-                Ok t
-            | exception _ ->
-                Error (Format.asprintf "failed to parse time (epoch): %S" s) )
-          ))
+            match of_notation_opt s with
+            | Some t -> Ok t
+            | None -> (
+                match of_seconds_exn (Int64.of_string s) with
+                | t -> Ok t
+                | exception _ ->
+                    Error (Format.asprintf "failed to parse time (epoch): %S" s)
+                )))
       ~construct:to_notation
       ()
 
@@ -327,12 +302,9 @@ module System = struct
 
   let recent a1 a2 =
     match (a1, a2) with
-    | (None, None) ->
-        None
-    | (None, (Some _ as a)) | ((Some _ as a), None) ->
-        a
-    | (Some (_, t1), Some (_, t2)) ->
-        if t1 < t2 then a2 else a1
+    | (None, None) -> None
+    | (None, (Some _ as a)) | ((Some _ as a), None) -> a
+    | (Some (_, t1), Some (_, t2)) -> if t1 < t2 then a2 else a1
 
   let hash t = Int64.to_int (to_seconds t)
 

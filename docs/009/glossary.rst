@@ -108,6 +108,7 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+.. _glossary_michelson:
 .. _glossary_michelson_009:
 
 Michelson
@@ -145,9 +146,10 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-_`Voting period` Any of the ``proposal``, ``exploration``,
-    ``cooldown``, ``promotion`` or ``adoption`` stages in the voting
-    procedure when ammending the `economic protocol`_.
+_`Voting period`
+    Any of the ``proposal``, ``exploration``, ``cooldown``,
+    ``promotion`` or ``adoption`` stages in the voting procedure when
+    ammending the `economic protocol`_.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains

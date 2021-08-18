@@ -1,0 +1,25 @@
+(library
+ (name tezos_hacl_glue_js)
+ (public_name tezos-hacl-glue-js)
+ (modules hacl)
+ (implements tezos-hacl-glue)
+ (libraries hacl-star-raw-empty)
+)
+
+(library
+ (name            hacl_star_raw_empty)
+ (public_name     hacl-star-raw-empty)
+ (modules)
+ (foreign_stubs
+  (language c)
+  (names hacl_star))
+)
+
+(install
+  (section lib)
+  (package tezos-hacl-glue-js)
+  (files
+    ; stubs for the js code that's based on externals
+    hacl_stubs.js
+  )
+)

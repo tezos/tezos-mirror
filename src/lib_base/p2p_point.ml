@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,16 +35,12 @@ module Id = struct
 
   let pp ppf (addr, port) =
     match Ipaddr.v4_of_v6 addr with
-    | Some addr ->
-        Format.fprintf ppf "%a:%d" Ipaddr.V4.pp addr port
-    | None ->
-        Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp addr port
+    | Some addr -> Format.fprintf ppf "%a:%d" Ipaddr.V4.pp addr port
+    | None -> Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp addr port
 
   let pp_opt ppf = function
-    | None ->
-        Format.pp_print_string ppf "none"
-    | Some point ->
-        pp ppf point
+    | None -> Format.pp_print_string ppf "none"
+    | Some point -> pp ppf point
 
   let pp_list ppf point_list =
     Format.pp_print_list ~pp_sep:Format.pp_print_space pp ppf point_list
@@ -59,20 +55,16 @@ module Id = struct
 
   let addr_port_id_to_string {addr; port; peer_id} =
     match (port, peer_id) with
-    | (None, None) ->
-        addr
-    | (None, Some peer_id) ->
-        addr ^ "#" ^ P2p_peer_id.to_b58check peer_id
-    | (Some port, None) ->
-        addr ^ ":" ^ string_of_int port
+    | (None, None) -> addr
+    | (None, Some peer_id) -> addr ^ "#" ^ P2p_peer_id.to_b58check peer_id
+    | (Some port, None) -> addr ^ ":" ^ string_of_int port
     | (Some port, Some peer_id) ->
         addr ^ ":" ^ string_of_int port ^ "#" ^ P2p_peer_id.to_b58check peer_id
 
   let of_string_exn ?default_port str =
     let {addr; port; _} =
       match parse_addr_port_id str with
-      | Ok r ->
-          r
+      | Ok r -> r
       | Error err ->
           invalid_arg
             (Format.asprintf
@@ -82,37 +74,29 @@ module Id = struct
     in
     let port =
       match (port, default_port) with
-      | (Some port, _) ->
-          port
-      | (None, Some port) ->
-          port
-      | (None, None) ->
-          invalid_arg "P2p_point.of_string_exn: no port"
+      | (Some port, _) -> port
+      | (None, Some port) -> port
+      | (None, None) -> invalid_arg "P2p_point.of_string_exn: no port"
     in
     match Ipaddr.of_string_exn addr with
-    | V4 addr ->
-        (Ipaddr.v6_of_v4 addr, port)
-    | V6 addr ->
-        (addr, port)
+    | V4 addr -> (Ipaddr.v6_of_v4 addr, port)
+    | V6 addr -> (addr, port)
 
   let of_string ?default_port str =
     try Ok (of_string_exn ?default_port str) with
-    | Invalid_argument s ->
-        Error s
-    | Failure s ->
-        Error s
-    | _ ->
-        Error "P2p_point.of_string"
+    | Invalid_argument s -> Error s
+    | Failure s -> Error s
+    | _ -> Error "P2p_point.of_string"
 
   let to_string saddr = Format.asprintf "%a" pp saddr
 
   let encoding =
     let open Data_encoding in
     check_size
-      ( 4 (* Uint30 that gives the size of the encoded string *)
+      (4 (* Uint30 that gives the size of the encoded string *)
       + (8 (*number of IPv6 chunks *) * (*size of IPv6 chunks*) 4)
       + (*IPv6 chunk separators*) 7 + (*optional enclosing bracket*) 2
-      + (*port separator*) 1 + (*size of port number*) 5 )
+      + (*port separator*) 1 + (*size of port number*) 5)
     @@ def "p2p_point.id" ~description:"Identifier for a peer point"
     @@ conv to_string of_string_exn string
 
@@ -123,6 +107,8 @@ module Id = struct
       ~destruct:of_string
       ~construct:to_string
       ()
+
+  let hash = Hashtbl.hash
 end
 
 module Map = Map.Make (Id)
@@ -143,25 +129,16 @@ module Filter = struct
     RPC_arg.make
       ~name:"p2p.point.state_filter"
       ~destruct:(function
-        | "requested" ->
-            Ok Requested
-        | "accepted" ->
-            Ok Accepted
-        | "running" ->
-            Ok Running
-        | "disconnected" ->
-            Ok Disconnected
-        | s ->
-            Error (Format.asprintf "Invalid state: %s" s))
+        | "requested" -> Ok Requested
+        | "accepted" -> Ok Accepted
+        | "running" -> Ok Running
+        | "disconnected" -> Ok Disconnected
+        | s -> Error (Format.asprintf "Invalid state: %s" s))
       ~construct:(function
-        | Requested ->
-            "requested"
-        | Accepted ->
-            "accepted"
-        | Running ->
-            "running"
-        | Disconnected ->
-            "disconnected")
+        | Requested -> "requested"
+        | Accepted -> "accepted"
+        | Running -> "running"
+        | Disconnected -> "disconnected")
       ()
 end
 
@@ -173,37 +150,24 @@ module State = struct
     | Disconnected
 
   let of_p2p_peer_id = function
-    | Requested ->
-        None
-    | Accepted pi ->
-        Some pi
-    | Running pi ->
-        Some pi
-    | Disconnected ->
-        None
+    | Requested -> None
+    | Accepted pi -> Some pi
+    | Running pi -> Some pi
+    | Disconnected -> None
 
   let of_peerid_state state pi =
     match (state, pi) with
-    | (Requested, _) ->
-        Requested
-    | (Accepted _, Some pi) ->
-        Accepted pi
-    | (Running _, Some pi) ->
-        Running pi
-    | (Disconnected, _) ->
-        Disconnected
-    | _ ->
-        invalid_arg "state_of_state_peerid"
+    | (Requested, _) -> Requested
+    | (Accepted _, Some pi) -> Accepted pi
+    | (Running _, Some pi) -> Running pi
+    | (Disconnected, _) -> Disconnected
+    | _ -> invalid_arg "state_of_state_peerid"
 
   let pp_digram ppf = function
-    | Requested ->
-        Format.fprintf ppf "⚎"
-    | Accepted _ ->
-        Format.fprintf ppf "⚍"
-    | Running _ ->
-        Format.fprintf ppf "⚌"
-    | Disconnected ->
-        Format.fprintf ppf "⚏"
+    | Requested -> Format.fprintf ppf "⚎"
+    | Accepted _ -> Format.fprintf ppf "⚍"
+    | Running _ -> Format.fprintf ppf "⚌"
+    | Disconnected -> Format.fprintf ppf "⚏"
 
   let encoding =
     let open Data_encoding in
@@ -221,7 +185,8 @@ module State = struct
          (connection already established), disconnected (no connection)."
     @@ union
          ~tag_size:`Uint8
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Requested"
              (branch_encoding "requested" empty)
@@ -248,26 +213,22 @@ module State = struct
              ~title:"Disconnected"
              (branch_encoding "disconnected" empty)
              (function Disconnected -> Some () | _ -> None)
-             (fun () -> Disconnected) ]
+             (fun () -> Disconnected);
+         ]
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
-    | (Requested, Requested) ->
-        true
+    | (Requested, Requested) -> true
     | (Requested, (Accepted _ | Running _ | Disconnected))
     | ((Accepted | Running | Disconnected), Requested) ->
         false
-    | (Accepted, Accepted _) ->
-        true
+    | (Accepted, Accepted _) -> true
     | (Accepted, (Running _ | Disconnected))
     | ((Running | Disconnected), Accepted _) ->
         false
-    | (Running, Running _) ->
-        true
-    | (Disconnected, Disconnected) ->
-        true
-    | (Running, Disconnected) | (Disconnected, Running _) ->
-        false
+    | (Running, Running _) -> true
+    | (Disconnected, Disconnected) -> true
+    | (Running, Disconnected) | (Disconnected, Running _) -> false
 
   let filter filters state = List.exists (fun f -> raw_filter f state) filters
 end
@@ -294,7 +255,8 @@ module Info = struct
         "Information about a peer point. Includes flags, state, and records \
          about past events."
     @@ conv
-         (fun { trusted;
+         (fun {
+                trusted;
                 reconnection_time;
                 state;
                 last_failed_connection;
@@ -303,7 +265,8 @@ module Info = struct
                 last_disconnection;
                 last_seen;
                 last_miss;
-                expected_peer_id } ->
+                expected_peer_id;
+              } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
            ( ( trusted,
                reconnection_time,
@@ -383,7 +346,8 @@ module Pool_event = struct
     in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Outgoing_request"
           (branch_encoding "outgoing_request" empty)
@@ -423,10 +387,7 @@ module Pool_event = struct
              "rejecting_request"
              (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
           (function
-            | Connection_established p2p_peer_id ->
-                Some p2p_peer_id
-            | _ ->
-                None)
+            | Connection_established p2p_peer_id -> Some p2p_peer_id | _ -> None)
           (fun p2p_peer_id -> Connection_established p2p_peer_id);
         case
           (Tag 5)
@@ -434,8 +395,7 @@ module Pool_event = struct
           (branch_encoding
              "rejecting_request"
              (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
-          (function
-            | Disconnection p2p_peer_id -> Some p2p_peer_id | _ -> None)
+          (function Disconnection p2p_peer_id -> Some p2p_peer_id | _ -> None)
           (fun p2p_peer_id -> Disconnection p2p_peer_id);
         case
           (Tag 6)
@@ -444,11 +404,9 @@ module Pool_event = struct
              "rejecting_request"
              (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
           (function
-            | External_disconnection p2p_peer_id ->
-                Some p2p_peer_id
-            | _ ->
-                None)
-          (fun p2p_peer_id -> External_disconnection p2p_peer_id) ]
+            | External_disconnection p2p_peer_id -> Some p2p_peer_id | _ -> None)
+          (fun p2p_peer_id -> External_disconnection p2p_peer_id);
+      ]
 
   type t = kind Time.System.stamped
 
@@ -456,9 +414,8 @@ module Pool_event = struct
     Data_encoding.def
       "p2p_point.pool_event"
       ~description:
-        "Events happening during maintenance of and operations on a peer \
-         point pool (such as connections, disconnections, connection \
-         requests)."
+        "Events happening during maintenance of and operations on a peer point \
+         pool (such as connections, disconnections, connection requests)."
     @@ Time.System.stamped_encoding kind_encoding
 end
 

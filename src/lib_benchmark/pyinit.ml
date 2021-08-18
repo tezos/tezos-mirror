@@ -29,8 +29,7 @@
 
 let handle_python_error msg closure =
   match closure () with
-  | result ->
-      result
+  | result -> result
   | exception Py.E (x, y) ->
       let s =
         Printf.sprintf
@@ -50,19 +49,19 @@ let pyinit () =
   if not (Py.is_initialized ()) then (
     Printf.eprintf "Initializing python... " ;
     Py.initialize ~interpreter ~version:3 () ;
-    Printf.eprintf "Done.\n%!" )
+    Printf.eprintf "Done.\n%!")
 
 let numpy () =
   pyinit () ;
-  handle_python_error "While initializing numpy"
-  @@ fun () -> Py.Import.import_module "numpy"
+  handle_python_error "While initializing numpy" @@ fun () ->
+  Py.Import.import_module "numpy"
 
 let linear_model () =
   pyinit () ;
-  handle_python_error "While initializing sklearn.linear_model"
-  @@ fun () -> Py.Import.import_module "sklearn.linear_model"
+  handle_python_error "While initializing sklearn.linear_model" @@ fun () ->
+  Py.Import.import_module "sklearn.linear_model"
 
 let scipy_optimize () =
   pyinit () ;
-  handle_python_error "While initializing scipy.optimize"
-  @@ fun () -> Py.Import.import_module "scipy.optimize"
+  handle_python_error "While initializing scipy.optimize" @@ fun () ->
+  Py.Import.import_module "scipy.optimize"

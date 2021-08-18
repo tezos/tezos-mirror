@@ -9,13 +9,9 @@
             staTz
             benchmark-utils
             pyml-plot ;; because of Matrix module... pyml-plot should be split further
+            ocaml-migrate-parsetree
             )
  (flags (:standard
                  -open Tezos_base__TzPervasives
                  -open StaTz
                  -open Tezos_stdlib_unix)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

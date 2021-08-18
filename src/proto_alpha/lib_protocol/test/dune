@@ -1,23 +1,24 @@
 (executables
- (names main saturation_fuzzing test_gas_properties)
+ (names main saturation_fuzzing test_gas_properties test_tez_repr)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
             tezos-test-helpers
             qcheck-alcotest
-            crowbar
             tezos-alpha-test-helpers
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-alpha-parameters
             tezos-test-services
             tezos-sapling
-            astring)
+            astring
+            tezos-protocol-plugin-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_alpha
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_environment_alpha
                    -open Tezos_alpha_test_helpers
                    -open Tezos_test_services)))
@@ -52,12 +53,12 @@
  (action (run %{exe:saturation_fuzzing.exe})))
 
 (rule
- (alias runtest)
+ (alias runtest_test_tez_repr)
  (package tezos-protocol-alpha-tests)
- (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing))
- (action (progn)))
+ (action (run %{exe:test_tez_repr.exe})))
 
 (rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing) (alias runtest_test_tez_repr))
+ (action (progn)))

@@ -26,7 +26,8 @@
 let () =
   Alcotest_lwt.run
     "protocol_008_PtEdo2Zk"
-    [ ("transfer", Transfer.tests);
+    [
+      ("transfer", Transfer.tests);
       ("origination", Origination.tests);
       ("activation", Activation.tests);
       ("revelation", Reveal.tests);
@@ -48,5 +49,6 @@ let () =
       ("lazy storage diff", Lazy_storage_diff.tests);
       ("sapling", Test_sapling.tests);
       ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("script deserialize gas", Script_gas.tests) ]
+      ("script deserialize gas", Script_gas.tests);
+    ]
   |> Lwt_main.run

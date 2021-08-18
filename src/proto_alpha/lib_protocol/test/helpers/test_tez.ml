@@ -41,24 +41,18 @@ module Tez = struct
 
   let ( + ) t1 t2 =
     match t1 +? t2 with
-    | Ok r ->
-        r
-    | Error _ ->
-        Pervasives.failwith "adding tez"
+    | Ok r -> r
+    | Error _ -> Pervasives.failwith "adding tez"
 
   let of_int x =
     match Tez.of_mutez (Int64.mul (Int64.of_int x) 1_000_000L) with
-    | None ->
-        invalid_arg "tez_of_int"
-    | Some x ->
-        x
+    | None -> invalid_arg "tez_of_int"
+    | Some x -> x
 
   let of_mutez_exn x =
-    match Tez.of_mutez x with
-    | None ->
-        invalid_arg "tez_of_mutez"
-    | Some x ->
-        x
+    match Tez.of_mutez x with None -> invalid_arg "tez_of_mutez" | Some x -> x
+
+  let to_mutez = Tez.to_mutez
 
   let max_tez =
     match Tez.of_mutez Int64.max_int with None -> assert false | Some p -> p

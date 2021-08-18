@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,17 +25,15 @@
 (*****************************************************************************)
 
 let patch_context (genesis : Genesis.t) key_json ctxt =
-  ( match key_json with
-  | None ->
-      Lwt.return ctxt
+  (match key_json with
+  | None -> Lwt.return ctxt
   | Some (key, json) ->
-      Tezos_storage.Context.add
+      Tezos_context.Context.add
         ctxt
         [key]
-        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json))
   >>= fun ctxt ->
-  Registered_protocol.get_result genesis.protocol
-  >>=? fun proto ->
+  Registered_protocol.get_result genesis.protocol >>=? fun proto ->
   let module Proto = (val proto) in
   let ctxt = Shell_context.wrap_disk_context ctxt in
   Proto.init

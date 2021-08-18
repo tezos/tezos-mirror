@@ -233,6 +233,9 @@ class Client:
             params += ['--legacy']
         return self.run(params)
 
+    def get_script(self, contract: str) -> str:
+        return self.run(['get', 'contract', 'code', 'for', contract])
+
     def run_script(
         self,
         contract: str,
@@ -267,15 +270,32 @@ class Client:
             cmd += ['--gas', '%d' % gas]
         return client_output.RunScriptResult(self.run(cmd))
 
-    def gen_key(self, alias: str, args: List[str] = None) -> str:
+    def hash_script(self, contract: str) -> str:
+        params = ['hash', 'script', contract]
+        return self.run(params)
+
+    def get_script_hash(self, contract: str) -> str:
+        params = ['get', 'contract', 'script', 'hash', 'for', contract]
+        return self.run(params)
+
+    def gen_key(
+        self, alias: str, args: List[str] = None, stdin: str = ""
+    ) -> str:
         cmd = ['gen', 'keys', alias]
         if args is None:
             args = []
         cmd += args
-        return self.run(cmd)
+        stdout, _, _ = self.run_generic(cmd, stdin=stdin)
+        return stdout
 
-    def import_secret_key(self, name: str, secret: str) -> str:
-        return self.run(['import', 'secret', 'key', name, secret])
+    def import_secret_key(
+        self, name: str, secret: str, password: str = None
+    ) -> str:
+        prms = ['import', 'secret', 'key', name, secret]
+        stdout, _, _ = self.run_generic(
+            prms, stdin=f"{password}" if password else ""
+        )
+        return stdout
 
     def add_address(self, name: str, address: str, force: bool = False):
         cmd = ['add', 'address', name, address]
@@ -448,7 +468,7 @@ class Client:
     def sign_message(self, data: str, identity: str, block=None) -> str:
         cmd = ['sign', 'message', data, 'for', identity]
         if block is not None:
-            cmd += ["--block", block]
+            cmd += ["--branch", block]
         return client_output.SignMessageResult(self.run(cmd)).signature
 
     def check_message(self, data: str, identity: str, signature: str) -> bool:
@@ -485,17 +505,17 @@ class Client:
         giver: str,
         receiver: str,
         args: List[str] = None,
+        stdin: str = "",
         chain: str = None,
     ) -> client_output.TransferResult:
         cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
         if chain is not None:
             cmd = ['--chain', chain] + cmd
-
         if args is None:
             args = []
         cmd += args
-        res = self.run(cmd)
-        return client_output.TransferResult(res)
+        stdout, _, _ = self.run_generic(cmd, stdin=stdin)
+        return client_output.TransferResult(stdout)
 
     def transfer_json(
         self, amount: int, giver: str, receiver: str, args: List[str] = None
@@ -651,6 +671,9 @@ class Client:
 
     def get_block(self, block_hash) -> dict:
         return self.rpc('get', f'/chains/main/blocks/{block_hash}')
+
+    def get_operations(self, block_hash='head') -> dict:
+        return self.rpc('get', f'/chains/main/blocks/{block_hash}/operations')
 
     def get_ballot_list(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/ballot_list')
@@ -830,7 +853,13 @@ class Client:
         return client_output.OriginationResult(self.run(cmd))
 
     def msig_sign_transfer(
-        self, msig_name: str, amount: float, dest: str, secret_key: str
+        self,
+        msig_name: str,
+        amount: float,
+        dest: str,
+        secret_key: str,
+        args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'sign',
@@ -847,6 +876,33 @@ class Client:
             'key',
             secret_key,
         ]
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_sign_lambda(
+        self, msig_name: str, lam: str, secret_key: str, args: List[str] = None
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'running',
+            'lambda',
+            lam,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
+        if args is None:
+            args = []
+        cmd += args
         res = self.run(cmd)
         return res[:-1]
 
@@ -944,11 +1000,13 @@ class Client:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignBytesResult(self.run(cmd)).signature
 
-    def sign_bytes(self, to_sign: bytes, key: str) -> str:
-        return self.sign_bytes_of_string(str(to_sign), key)
-
     def msig_prepare_transfer(
-        self, msig_name: str, amount: float, dest: str, args: List[str] = None
+        self,
+        msig_name: str,
+        amount: float,
+        dest: str,
+        args: List[str] = None,
+        expected_warning: str = "",
     ):
         cmd = [
             'prepare',
@@ -960,6 +1018,26 @@ class Client:
             str(amount),
             'to',
             dest,
+        ]
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_prepare_lambda(
+        self, msig_name: str, lam: str, args: List[str] = None
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'running',
+            'lambda',
+            lam,
         ]
         if args is None:
             args = []
@@ -1038,6 +1116,7 @@ class Client:
         src: str,
         signatures: List[str],
         args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'from',
@@ -1048,6 +1127,36 @@ class Client:
             str(amount),
             'to',
             dest,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_run_lambda(
+        self,
+        msig_name: str,
+        lam: str,
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'from',
+            'multisig',
+            'contract',
+            msig_name,
+            'run',
+            'lambda',
+            lam,
             'on',
             'behalf',
             'of',
@@ -1121,6 +1230,8 @@ class Client:
         transaction: bytes,
         src: str,
         signatures: List[str],
+        args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'run',
@@ -1137,7 +1248,12 @@ class Client:
             'with',
             'signatures',
         ] + signatures
-        return self.run(cmd)
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
 
     def msig_set_threshold(
         self,
@@ -1169,6 +1285,226 @@ class Client:
             args = []
         cmd += args
         return self.run(cmd)
+
+    def fa12_check(self, fa_name: str) -> client_output.FA12CheckResult:
+        cmd = ['check', 'contract', fa_name, 'implements', 'fa1.2']
+        try:
+            output = self.run(cmd)
+            return client_output.FA12CheckResult(output)
+        except subprocess.CalledProcessError as exc:
+            return client_output.FA12CheckResult(exc.stderr)
+
+    def fa12_transfer(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'transfer',
+            str(amount),
+            'from',
+            src,
+            'to',
+            dst,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_transfer_as(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        as_: str,
+        args: List[str],
+    ) -> str:
+        args = ['--as', as_] + args
+        return self.fa12_transfer(contract_name, amount, src, dst, args)
+
+    def fa12_approve(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'as',
+            src,
+            'approve',
+            str(amount),
+            'from',
+            dst,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_balance_offchain(
+        self, contract_name: str, src: str, args: List[str]
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'balance',
+            'for',
+            src,
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_allowance_offchain(
+        self,
+        contract_name: str,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'allowance',
+            'on',
+            src,
+            'as',
+            dst,
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_total_supply_offchain(
+        self, contract_name: str, args: List[str]
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'total',
+            'supply',
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_balance_callback(
+        self, contract_name: str, src: str, callback: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'balance',
+            'for',
+            src,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_allowance_callback(
+        self,
+        contract_name: str,
+        src: str,
+        dst: str,
+        callback: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'allowance',
+            'on',
+            src,
+            'as',
+            dst,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_total_supply_callback(
+        self, contract_name: str, src: str, callback: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'total',
+            'supply',
+            'as',
+            src,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_deploy_viewer(
+        self, viewer_name: str, typ: str, src: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'deploy',
+            'viewer',
+            'contract',
+            viewer_name,
+            'of',
+            'type',
+            typ,
+            'from',
+            src,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_mk_batch_transfer(self, dst: str, token: str, amount: int):
+        json_obj = [
+            {"destination": dst, "amount": str(amount), "token_contract": token}
+        ]
+        return json_obj
+
+    def fa12_multiple_tokens_transfers(
+        self, src: str, ops: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'multiple',
+            'fa1.2',
+            'transfers',
+            'from',
+            src,
+            'using',
+            ops,
+        ] + args
+        res = self.run(cmd)
+        return res
+
+    def fa12_multiple_tokens_transfers_as(
+        self, src: str, as_: str, ops: str, args: List[str]
+    ) -> str:
+        args = ['--as', as_] + args
+        res = self.fa12_multiple_tokens_transfers(src, ops, args)
+        return res
 
     def check_node_listening(
         self, timeout: float = 1, attempts: int = 20
@@ -1417,3 +1753,26 @@ class Client:
     def sapling_list_keys(self) -> List[str]:
         cmd = ['sapling', 'list', 'keys']
         return self.run(cmd).strip().split("\n")
+
+    def run_view(
+        self,
+        entrypoint: str,
+        contract: str,
+        parameter: str,
+        args: List[str] = None,
+    ) -> client_output.ViewResult:
+        cmd = [
+            'run',
+            'tzip4',
+            'view',
+            entrypoint,
+            'on',
+            'contract',
+            contract,
+            'with',
+            'input',
+            parameter,
+        ]
+        args = args or []
+        cmd += args
+        return client_output.ViewResult(self.run(cmd))

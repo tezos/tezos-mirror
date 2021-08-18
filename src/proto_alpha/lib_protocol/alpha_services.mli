@@ -40,10 +40,14 @@ end
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
-module Helpers = Helpers_services
-module Forge = Helpers_services.Forge
-module Parse = Helpers_services.Parse
 module Voting = Voting_services
 module Sapling = Sapling_services
+
+module Liquidity_baking : sig
+  val get_cpmm_address :
+    'a #RPC_context.simple ->
+    'a ->
+    Alpha_context.Contract.t shell_tzresult Lwt.t
+end
 
 val register : unit -> unit

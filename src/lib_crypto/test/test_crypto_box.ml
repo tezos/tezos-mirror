@@ -46,8 +46,7 @@ let chkey = Crypto_box.precompute sk pk
 let test_check_pow () =
   let open Lwt.Infix in
   let target = Crypto_box.make_pow_target 2. in
-  Crypto_box.generate_proof_of_work pk target
-  >|= fun pow ->
+  Crypto_box.generate_proof_of_work pk target >|= fun pow ->
   Alcotest.(check bool)
     "check_pow"
     (Crypto_box.check_proof_of_work pk pow target)
@@ -94,16 +93,17 @@ let test_fast_box msg () =
   match Crypto_box.fast_box_open chkey zero_nonce cmsg with
   | Some decrypted_msg ->
       Alcotest.check check_bytes "test_fast_box" msg decrypted_msg
-  | None ->
-      Alcotest.fail "Box: Decryption error"
+  | None -> Alcotest.fail "Box: Decryption error"
 
 let tests =
-  [ ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
+  [
+    ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
     ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
     ( "HACL* box (noalloc)",
       `Quick,
       test_fast_box_noalloc (Bytes.of_string "test") );
-    ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test")) ]
+    ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test"));
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("crypto_box", tests)]
 
