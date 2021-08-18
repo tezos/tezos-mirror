@@ -235,6 +235,11 @@ let shell_header ?endpoint ?chain ?block client =
   spawn_shell_header ?endpoint ?chain ?block client
   |> Process.check_and_read_stdout
 
+let level ?endpoint ?chain ?block client =
+  let* shell = shell_header ?endpoint ?chain ?block client in
+  let json = JSON.parse ~origin:"level" shell in
+  JSON.get "level" json |> JSON.as_int |> return
+
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 
@@ -827,6 +832,12 @@ let spawn_migrate_mockup ~next_protocol client =
 
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
+
+let spawn_sign_block client block_hex ~delegate =
+  spawn_command client ["sign"; "block"; block_hex; "for"; delegate]
+
+let sign_block client block_hex ~delegate =
+  spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   let client =

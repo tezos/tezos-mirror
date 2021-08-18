@@ -188,6 +188,10 @@ val shell_header :
 val spawn_shell_header :
   ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> Process.t
 
+(** Run [shell_header] and retrieves the level. *)
+val level :
+  ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> int Lwt.t
+
 (** {2 Admin Client Commands} *)
 
 module Admin : sig
@@ -625,6 +629,12 @@ val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [migrate_mockup], but do not wait for the process to exit. *)
 val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
+
+(** Run [tezos-client sign block <hexdata> for <delegate>]. *)
+val sign_block : t -> string -> delegate:string -> string Lwt.t
+
+(** Same as [sign_block], but do not wait for the process to exit. *)
+val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
 (** {2 High-Level Functions} *)
 
