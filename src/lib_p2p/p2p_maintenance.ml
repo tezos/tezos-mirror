@@ -26,8 +26,6 @@
 
 module Events = P2p_events.P2p_maintainance
 
-let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
-
 type bounds = {
   min_threshold : int;
   min_target : int;
@@ -41,6 +39,7 @@ type config = {
   min_connections : int;
   max_connections : int;
   expected_connections : int;
+  time_between_looking_for_peers : Ptime.span;
 }
 
 type ('msg, 'meta, 'meta_conn) t = {
@@ -189,7 +188,9 @@ let try_to_contact t min_to_contact max_to_contact =
 let ask_for_more_contacts t =
   if t.config.private_mode then
     protect ~canceler:t.canceler (fun () ->
-        Lwt_unix.sleep time_between_looking_for_peers >>= fun () -> return_unit)
+        Lwt_unix.sleep
+          (Ptime.Span.to_float_s t.config.time_between_looking_for_peers)
+        >>= fun () -> return_unit)
   else (
     broadcast_bootstrap_msg t ;
     Option.iter P2p_discovery.wakeup t.discovery ;
@@ -200,7 +201,8 @@ let ask_for_more_contacts t =
             P2p_trigger.wait_new_point t.triggers;
             (* TODO exponential back-off, or wait for the existence
                of a non grey-listed peer? *)
-            Lwt_unix.sleep time_between_looking_for_peers;
+            Lwt_unix.sleep
+              (Ptime.Span.to_float_s t.config.time_between_looking_for_peers);
           ]
         >>= fun () -> return_unit))
 

@@ -60,6 +60,10 @@ type config = {
   min_connections : int;  (** Strict minimum number of connections *)
   max_connections : int;  (** Maximum number of connections *)
   expected_connections : int;  (** Targeted number of connections to reach *)
+  time_between_looking_for_peers : Ptime.span;
+      (** The maximum time between two bootstrap message broadcasts when
+      there are not enough active connections and no new peer or point have
+      been discovered. *)
 }
 
 (** Type of a maintenance worker. *)
