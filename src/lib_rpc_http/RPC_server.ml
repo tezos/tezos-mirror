@@ -103,8 +103,6 @@ module Acl = struct
 
   let empty_policy = []
 
-  let default_policy = []
-
   let match_address_and_port point1 point2 =
     let open P2p_point.Id in
     point1.addr = point2.addr && point1.port = point2.port
@@ -195,7 +193,7 @@ module Acl = struct
     let open Data_encoding in
     Json.construct policy_encoding policy |> Json.to_string
 
-  let find_policy policies (address, port) =
+  let find_policy policy (address, port) =
     let match_addr searched_port searched_addr (endpoint, acl) =
       let open P2p_point.Id in
       match (endpoint.addr = searched_addr, endpoint.port, searched_port) with
@@ -204,12 +202,33 @@ module Acl = struct
           Some acl
       | _ -> None
     in
-    List.find_map (match_addr port address) policies
-
-  let find_policy_by_domain_name policies hostname =
-    match P2p_point.Id.parse_addr_port_id hostname with
-    | Error _ -> None
-    | Ok {addr; port; _} -> find_policy policies (addr, port)
+    List.find_map (match_addr port address) policy
 
   let acl_type = function Allow_all _ -> `Blacklist | Deny_all _ -> `Whitelist
+
+  module Internal_for_test = struct
+    type nonrec endpoint = endpoint
+
+    let rec resolve_domain_names resolve = function
+      | [] -> Lwt.return []
+      | (endpoint, acl) :: remainder ->
+          let open P2p_point.Id in
+          resolve endpoint
+          >|= List.map (fun (ip_addr, _) ->
+                  ( {
+                      endpoint with
+                      addr = Format.asprintf "%a" Ipaddr.V6.pp ip_addr;
+                    },
+                    acl ))
+          >>= fun resolved ->
+          resolve_domain_names resolve remainder >|= fun rem -> resolved @ rem
+  end
+
+  let resolve_domain_names =
+    let open P2p_point.Id in
+    let resolve endpoint =
+      let service = Option.fold ~none:"" ~some:Int.to_string endpoint.port in
+      Lwt_utils_unix.getaddrinfo ~node:endpoint.addr ~service ~passive:false
+    in
+    Internal_for_test.resolve_domain_names resolve
 end
