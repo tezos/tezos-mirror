@@ -40,6 +40,9 @@ type z = Integer_tag
 (** Natural zero. *)
 val zero_n : n num
 
+(** Natural one. *)
+val one_n : n num
+
 (** Relative zero. *)
 val zero : z num
 

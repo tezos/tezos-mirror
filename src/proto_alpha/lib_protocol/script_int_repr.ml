@@ -35,6 +35,8 @@ let zero = Z.zero
 
 let zero_n = Z.zero
 
+let one_n = Z.one
+
 let to_string x = Z.to_string x
 
 let of_string s = Option.catch (fun () -> Z.of_string s)
