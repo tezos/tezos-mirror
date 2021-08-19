@@ -352,34 +352,16 @@ let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
 
 let bake_for ?endpoint ?protocol ?key ?minimal_timestamp ?mempool ?force
     ?context_path client =
-  let* () =
-    spawn_bake_for
-      ?endpoint
-      ?key
-      ?minimal_timestamp
-      ?mempool
-      ?force
-      ?context_path
-      ?protocol
-      client
-    |> Process.check
-  in
-  match client.mode with
-  | Light (_min_agreement, Node node :: other_endpoints) ->
-      (* In Light mode there are checks that data retrieved from the first node is consistent with data of other nodes. This makes tests flaky if data (blocks) propagate to other nodes {e after} the next command, as the Light mode will complain (and fail) thinking that there are rogue nodes.
-
-         To circumvent this problem, we wait for other nodes to reach the same level as the "main" one before returning.
-
-         Note that technically there is still a race condition if [Node.get_current_level] returns an outdated level.
-      *)
-      let* level = Node.get_current_level node in
-      Lwt_list.iter_p
-        (function
-          | Node node ->
-              Lwt.map (Fun.const ()) @@ Node.wait_for_level node level
-          | _ -> Lwt.return_unit)
-        other_endpoints
-  | _ -> Lwt.return_unit
+  spawn_bake_for
+    ?endpoint
+    ?key
+    ?minimal_timestamp
+    ?mempool
+    ?force
+    ?context_path
+    ?protocol
+    client
+  |> Process.check
 
 let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
 
