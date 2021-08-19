@@ -1,7 +1,7 @@
-Version 10.0~rc3
-================
+Version 10.0
+============
 
-**This release candidate changes the storage backend and requires
+**This version changes the storage backend and requires
 specific care when updating.**
 
 The new storage backend uses a different file format for storing
@@ -11,14 +11,16 @@ storage size. As a result, the block history maintained by a Mainnet
 node in full mode requires around 6GB of disk space, compared to more
 than 22GB before that. In archive mode, it drops from 30 to 60GB down
 to 9GB. It also reduces by a factor of more than 2 the time needed to
-export and import snapshots.
+export and import snapshots. Note that this does not reduce the size
+of the ``context`` folder, which can still take more than 100GB for
+an archive node. Only the size of the ``store`` folder was reduced.
 
-**This release candidate also introduces a significant breaking change
+**This version also introduces a significant breaking change
 for public nodes: by default, many RPCs are no longer available
 unless you activate them using the new Access Control List (ACL)
 feature.**
 
-If you are running a public node, you will probably want to configure
+If you are running a public node, you may want to configure
 your node to make the Access Control List less restrictive. Note that
 this only impacts RPC calls from remote hosts, not RPCs calls on the
 ``localhost`` network interface. See the `Changelog`_ for more details
@@ -35,17 +37,18 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v10.0-rc3
+  git checkout v10.0
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v10.0-rc3`` Docker images of Tezos.
+If you are using Docker instead, use the ``v10.0`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 10.0 <../CHANGES.html#version-10-0>`_
 - `Version 10.0~rc3 <../CHANGES.html#version-10-0-rc3>`_
 - `Version 10.0~rc2 <../CHANGES.html#version-10-0-rc2>`_
 - `Version 10.0~rc1 <../CHANGES.html#version-10-0-rc1>`_
