@@ -402,7 +402,7 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       Gas.cost
 
-    val open_chest : Timelock.chest -> Z.t -> Gas.cost
+    val open_chest : chest:Timelock.chest -> time:Z.t -> Gas.cost
 
     module Control : sig
       val nil : Gas.cost
