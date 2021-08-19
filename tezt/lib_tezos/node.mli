@@ -286,14 +286,6 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
-(** [get_current_level node] returns the current level of the node {e that {!Node} is aware of}.
-
-    Because [Node] keeps track of the current level of the real node asynchronously via events, keep in mind that this function may not return the most up-to-date information.
-
-    The result is wrapped in an {!Lwt.t} in case the node is not ready yet.
-*)
-val get_current_level : t -> int Lwt.t
-
 (** Wait for the node to read its identity.
 
     More precisely, wait until a [read_identity] event occurs.
