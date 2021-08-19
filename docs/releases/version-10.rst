@@ -43,7 +43,10 @@ To update from sources::
   eval $(opam env)
   make
 
+Then upgrade your store by following the instructions in `Storage Upgrade`_.
+
 If you are using Docker instead, use the ``v10.0`` Docker images of Tezos.
+Then upgrade your store by following the instructions in `Guide for Docker Users`_.
 
 Changelog
 ---------
