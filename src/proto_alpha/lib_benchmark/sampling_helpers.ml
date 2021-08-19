@@ -29,16 +29,13 @@
 type 'a sampler = Random.State.t -> 'a
 
 module M = struct
-  (* Restore the following line, as well as all occurences of its usage,
-       once ocamlformat has been updated in master *)
-  (*
-    let ( let* ) : 'a sampler -> ('a -> 'b sampler) -> 'b sampler =
-     *)
-  let let_star : 'a sampler -> ('a -> 'b sampler) -> 'b sampler =
+  let ( let* ) : 'a sampler -> ('a -> 'b sampler) -> 'b sampler =
    fun sampler f rng_state ->
     let x = sampler rng_state in
     f x rng_state
    [@@inline]
+
+  let bind = ( let* )
 
   let return x _ = x
 end
