@@ -161,7 +161,7 @@ test-python-alpha: all
 test-flextesa:
 	@$(MAKE) -f sandbox.Makefile
 
-.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v test-tezt-timeout
 test-tezt:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
 test-tezt-i:
@@ -170,6 +170,8 @@ test-tezt-c:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 test-tezt-v:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
+test-tezt-timeout:
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --test-timeout 1800
 
 .PHONY: test-code
 test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
