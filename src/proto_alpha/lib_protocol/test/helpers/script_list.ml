@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
+open Protocol.Script_typed_ir (* For record fields *)
 
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+let of_list xs = {elements = xs; length = List.length xs}
