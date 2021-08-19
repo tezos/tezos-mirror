@@ -30,7 +30,7 @@ type t = {
   string_size : Base_samplers.range;
   bytes_size : Base_samplers.range;
   stack_size : Base_samplers.range;
-  type_depth : Base_samplers.range;
+  type_size : Base_samplers.range;
   list_size : Base_samplers.range;
   set_size : Base_samplers.range;
   map_size : Base_samplers.range;
@@ -45,7 +45,7 @@ let encoding =
            string_size;
            bytes_size;
            stack_size;
-           type_depth;
+           type_size;
            list_size;
            set_size;
            map_size;
@@ -54,7 +54,7 @@ let encoding =
         string_size,
         bytes_size,
         stack_size,
-        type_depth,
+        type_size,
         list_size,
         set_size,
         map_size ))
@@ -62,7 +62,7 @@ let encoding =
            string_size,
            bytes_size,
            stack_size,
-           type_depth,
+           type_size,
            list_size,
            set_size,
            map_size ) ->
@@ -71,7 +71,7 @@ let encoding =
         string_size;
         bytes_size;
         stack_size;
-        type_depth;
+        type_size;
         list_size;
         set_size;
         map_size;
@@ -81,7 +81,7 @@ let encoding =
        (req "string_size" range)
        (req "bytes_size" range)
        (req "stack_size" range)
-       (req "michelson_type_depth" range)
+       (req "michelson_type_size" range)
        (req "list_size" range)
        (req "set_size" range)
        (req "map_size" range))

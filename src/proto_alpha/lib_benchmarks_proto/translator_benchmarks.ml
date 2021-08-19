@@ -737,16 +737,16 @@ let check_printable_benchmark =
 let () = Registration_helpers.register check_printable_benchmark
 
 module Merge_types : Benchmark.S = struct
-  type config = {max_depth : int}
+  type config = {max_size : int}
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {max_depth} -> max_depth)
-      (fun max_depth -> {max_depth})
-      (obj1 (req "max_depth" int31))
+      (fun {max_size} -> max_size)
+      (fun max_size -> {max_size})
+      (obj1 (req "max_size" int31))
 
-  let default_config = {max_depth = 64}
+  let default_config = {max_size = 64}
 
   type workload = Merge_types_workload of {nodes : int; consumed : Size.t}
 
@@ -794,7 +794,7 @@ module Merge_types : Benchmark.S = struct
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
 
-  let merge_type_benchmark rng_state (ty : Script_ir_translator.ex_ty) =
+  let merge_type_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
     let open Error_monad in
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
@@ -802,7 +802,6 @@ module Merge_types : Benchmark.S = struct
         match ty with
         | Ex_ty ty ->
             let dummy_loc = 0 in
-            let nodes = 9999 (* ??? *) in
             Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
             >|= Environment.wrap_tzresult
             >>=? fun (_, ctxt') ->
@@ -819,17 +818,18 @@ module Merge_types : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let make_bench sampler rng_state cfg () =
-    let ty = sampler ~max_depth:cfg.max_depth in
-    merge_type_benchmark rng_state ty
+  let make_bench rng_state (cfg : config) () =
+    let nodes =
+      Base_samplers.(
+        sample_in_interval ~range:{min = 1; max = cfg.max_size} rng_state)
+    in
+    let ty =
+      Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
+    in
+    merge_type_benchmark rng_state nodes ty
 
   let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat
-      bench_num
-      (make_bench
-         (Michelson_generation.Samplers.Random_type.m_type rng_state)
-         rng_state
-         config)
+    List.repeat bench_num (make_bench rng_state config)
 end
 
 let () = Registration_helpers.register (module Merge_types)

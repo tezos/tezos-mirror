@@ -264,36 +264,28 @@ let comparable_non_atomic_type_names_count =
 
 open Sampling_helpers
 
-let uniform_type_name : type_name sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state type_names_count in
-  all_type_names.(i)
+let uniform : 'a array -> 'a sampler =
+ fun arr rng_state ->
+  let i = Random.State.int rng_state (Array.length arr) in
+  arr.(i)
+
+let uniform_type_name : type_name sampler = uniform all_type_names
 
 let uniform_atomic_type_name : atomic_type_name sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state atomic_type_names_count in
-  all_atomic_type_names.(i)
+  uniform all_atomic_type_names
 
 let uniform_non_atomic_type_name : non_atomic_type_name sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state non_atomic_type_names_count in
-  all_non_atomic_type_names.(i)
+  uniform all_non_atomic_type_names
 
 let uniform_comparable_type_name : comparable_type_name sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state comparable_type_names_count in
-  all_comparable_type_names.(i)
+  uniform all_comparable_type_names
 
 let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state comparable_atomic_type_names_count in
-  all_comparable_atomic_type_names.(i)
+  uniform all_comparable_atomic_type_names
 
 let uniform_comparable_non_atomic_type_name :
     'a comparable_and_non_atomic sampler =
- fun rng_state ->
-  let i = Random.State.int rng_state comparable_non_atomic_type_names_count in
-  all_comparable_non_atomic_type_names.(i)
+  uniform all_comparable_non_atomic_type_names
 
 (* ------------------------------------------------------------------------- *)
 (* Existentially packed typed value. *)
@@ -332,12 +324,9 @@ module type S = sig
   end
 
   module Random_type : sig
-    val m_type : max_depth:int -> Script_ir_translator.ex_ty sampler
+    val m_type : size:int -> Script_ir_translator.ex_ty sampler
 
     val m_comparable_type :
-      max_depth:int -> Script_ir_translator.ex_comparable_ty sampler
-
-    val m_comparable_type_by_size :
       size:int -> Script_ir_translator.ex_comparable_ty sampler
   end
 
@@ -355,6 +344,16 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
   let memo_size =
     Alpha_context.Sapling.Memo_size.parse_z Z.zero |> Result.get_ok
+
+  let pick_split : int -> (int * int) sampler =
+   fun x rng_state ->
+    if x <= 0 || x = 1 || x = 2 then invalid_arg "pick_split"
+    else
+      (* x >= 3 *)
+      let left = 1 + Random.State.int rng_state (x - 1) in
+      let right = x - left in
+      assert (left + right = x) ;
+      (left, right)
 
   (* Random generation of Michelson types. *)
   module Random_type = struct
@@ -399,179 +398,126 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       | `TKey -> Ex_comparable_ty (key_key ~annot:None)
       | `TChain_id -> Ex_comparable_ty (chain_id_key ~annot:None)
 
-    let rec m_type ~max_depth : Script_ir_translator.ex_ty sampler =
+    let rec m_type ~size : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in
       let open M in
-      if max_depth = 0 then
-        (* let* at_tn = uniform_atomic_type_name in
-           return (type_of_atomic_type_name at_tn) *)
+      if size <= 0 then Stdlib.failwith "m_type: size <= 0"
+      else if size = 1 then
+        (* only atomic types can have size 1 *)
         let_star uniform_atomic_type_name (fun at_tn ->
             return (type_of_atomic_type_name at_tn))
+      else if size = 2 then
+        let_star (uniform [|`TOption; `TList; `TSet|]) @@ function
+        | `TOption -> (
+            let_star (m_type ~size:1) @@ fun (Ex_ty t) ->
+            match option_t (-1) t ~annot:None with
+            | Error _ -> assert false
+            | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TList -> (
+            let_star (m_type ~size:1) @@ fun (Ex_ty t) ->
+            match list_t (-1) t ~annot:None with
+            | Error _ -> assert false
+            | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TSet -> (
+            let_star (m_comparable_type ~size:1) @@ fun (Ex_comparable_ty t) ->
+            match set_t (-1) t ~annot:None with
+            | Error _ -> assert false
+            | Ok res_ty -> return @@ Ex_ty res_ty)
       else
         (* let* tn = uniform_type_name in *)
-        let_star uniform_type_name (fun tn ->
-            match tn with
-            | #atomic_type_name as at_tn ->
-                return (type_of_atomic_type_name at_tn)
-            | `TPair ->
-                let max_depth = max_depth - 1 in
-                (*let* Ex_ty left = m_type ~max_depth in
-                  let* Ex_ty right = m_type ~max_depth in*)
-                let_star (m_type ~max_depth) (fun (Ex_ty left) ->
-                    let_star (m_type ~max_depth) (fun (Ex_ty right) ->
-                        match
-                          pair_t
-                            (-1)
-                            (left, None, None)
-                            (right, None, None)
-                            ~annot:None
-                        with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_ty res_ty))
-            | `TLambda ->
-                let max_depth = max_depth - 1 in
-                (*let* Ex_ty domain = m_type ~max_depth in
-                  let* Ex_ty range = m_type ~max_depth in*)
-                let_star (m_type ~max_depth) (fun (Ex_ty domain) ->
-                    let_star (m_type ~max_depth) (fun (Ex_ty range) ->
-                        match lambda_t (-1) domain range ~annot:None with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_ty res_ty))
-            | `TUnion ->
-                let max_depth = max_depth - 1 in
-                (* let* Ex_ty left = m_type ~max_depth in
-                   let* Ex_ty right = m_type ~max_depth in *)
-                let_star (m_type ~max_depth) (fun (Ex_ty left) ->
-                    let_star (m_type ~max_depth) (fun (Ex_ty right) ->
-                        match
-                          union_t (-1) (left, None) (right, None) ~annot:None
-                        with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_ty res_ty))
-            | `TOption ->
-                (* let* Ex_ty t = m_type ~max_depth:(max_depth - 1) in *)
-                let_star
-                  (m_type ~max_depth:(max_depth - 1))
-                  (fun (Ex_ty t) ->
-                    match option_t (-1) t ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
-                    | Ok res_ty -> return @@ Ex_ty res_ty)
-            | `TMap ->
-                let max_depth = max_depth - 1 in
-                (* let* Ex_comparable_ty key = m_comparable_type ~max_depth in
-                   let* Ex_ty elt = m_type ~max_depth in *)
-                let_star
-                  (m_comparable_type ~max_depth)
-                  (fun (Ex_comparable_ty key) ->
-                    let_star (m_type ~max_depth) (fun (Ex_ty elt) ->
-                        match map_t (-1) key elt ~annot:None with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_ty res_ty))
-            | `TSet ->
-                (*let* Ex_comparable_ty key_ty =
-                  m_comparable_type ~max_depth:(max_depth - 1)
-                                    in*)
-                let_star
-                  (m_comparable_type ~max_depth:(max_depth - 1))
-                  (fun (Ex_comparable_ty key_ty) ->
-                    match set_t (-1) key_ty ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
-                    | Ok res_ty -> return @@ Ex_ty res_ty)
-            | `TList ->
-                (* let* Ex_ty elt = m_type ~max_depth:(max_depth - 1) in *)
-                let_star
-                  (m_type ~max_depth:(max_depth - 1))
-                  (fun (Ex_ty elt) ->
-                    match list_t (-1) elt ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
-                    | Ok res_ty -> return @@ Ex_ty res_ty)
-            | `TTicket ->
-                (* let* Ex_comparable_ty contents =
-                     m_comparable_type ~max_depth:(max_depth - 1)
-                   in*)
-                let_star
-                  (m_comparable_type ~max_depth:(max_depth - 1))
-                  (fun (Ex_comparable_ty contents) ->
-                    match ticket_t (-1) contents ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
-                    | Ok res_ty -> return @@ Ex_ty res_ty)
-            | `TContract | `TOperation | `TBig_map ->
-                (* Don't know what to do with theses. Redraw. *)
-                m_type ~max_depth)
+        let_star (uniform all_non_atomic_type_names) @@ function
+        | `TPair ->
+            let size = size - 1 in
+            let_star (pick_split size) @@ fun (lsize, rsize) ->
+            (* let* Ex_ty left = m_type ~max_depth in
+               let* Ex_ty right = m_type ~max_depth in*)
+            let_star (m_type ~size:lsize) (fun (Ex_ty left) ->
+                let_star (m_type ~size:rsize) (fun (Ex_ty right) ->
+                    match
+                      pair_t
+                        (-1)
+                        (left, None, None)
+                        (right, None, None)
+                        ~annot:None
+                    with
+                    | Error _ -> assert false
+                    | Ok res_ty -> return @@ Ex_ty res_ty))
+        | `TLambda ->
+            let size = size - 1 in
+            let_star (pick_split size) @@ fun (lsize, rsize) ->
+            (*let* Ex_ty domain = m_type ~max_depth in
+              let* Ex_ty range = m_type ~max_depth in*)
+            let_star (m_type ~size:lsize) (fun (Ex_ty domain) ->
+                let_star (m_type ~size:rsize) (fun (Ex_ty range) ->
+                    match lambda_t (-1) domain range ~annot:None with
+                    | Error _ -> assert false
+                    | Ok res_ty -> return @@ Ex_ty res_ty))
+        | `TUnion ->
+            let size = size - 1 in
+            let_star (pick_split size) @@ fun (lsize, rsize) ->
+            (* let* Ex_ty left = m_type ~max_depth in
+               let* Ex_ty right = m_type ~max_depth in *)
+            let_star (m_type ~size:lsize) (fun (Ex_ty left) ->
+                let_star (m_type ~size:rsize) (fun (Ex_ty right) ->
+                    match
+                      union_t (-1) (left, None) (right, None) ~annot:None
+                    with
+                    | Error _ -> assert false
+                    | Ok res_ty -> return @@ Ex_ty res_ty))
+        | `TOption ->
+            (* let* Ex_ty t = m_type ~max_depth:(max_depth - 1) in *)
+            let_star
+              (m_type ~size:(size - 1))
+              (fun (Ex_ty t) ->
+                match option_t (-1) t ~annot:None with
+                | Error _ -> assert false
+                | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TMap ->
+            let size = size - 1 in
+            let_star (pick_split size) @@ fun (lsize, rsize) ->
+            (* let* Ex_comparable_ty key = m_comparable_type ~max_depth in
+               let* Ex_ty elt = m_type ~max_depth in *)
+            let_star
+              (m_comparable_type ~size:lsize)
+              (fun (Ex_comparable_ty key) ->
+                let_star (m_type ~size:rsize) (fun (Ex_ty elt) ->
+                    match map_t (-1) key elt ~annot:None with
+                    | Error _ -> assert false
+                    | Ok res_ty -> return @@ Ex_ty res_ty))
+        | `TSet ->
+            (*let* Ex_comparable_ty key_ty =
+              m_comparable_type ~max_depth:(max_depth - 1)
+                                in*)
+            let_star
+              (m_comparable_type ~size:(size - 1))
+              (fun (Ex_comparable_ty key_ty) ->
+                match set_t (-1) key_ty ~annot:None with
+                | Error _ -> assert false
+                | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TList ->
+            (* let* Ex_ty elt = m_type ~max_depth:(max_depth - 1) in *)
+            let_star
+              (m_type ~size:(size - 1))
+              (fun (Ex_ty elt) ->
+                match list_t (-1) elt ~annot:None with
+                | Error _ -> assert false
+                | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TTicket ->
+            (* let* Ex_comparable_ty contents =
+                 m_comparable_type ~max_depth:(max_depth - 1)
+               in *)
+            let_star
+              (m_comparable_type ~size:(size - 1))
+              (fun (Ex_comparable_ty contents) ->
+                match ticket_t (-1) contents ~annot:None with
+                | Error _ -> assert false
+                | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TContract | `TBig_map ->
+            (* Don't know what to do with theses. Redraw. *)
+            m_type ~size
 
-    and m_comparable_type ~max_depth :
-        Script_ir_translator.ex_comparable_ty sampler =
-      let open M in
-      let open Script_ir_translator in
-      if max_depth = 0 then
-        (* let* at_tn = uniform_comparable_atomic_type_name in *)
-        let_star uniform_comparable_atomic_type_name (fun at_tn ->
-            return (comparable_type_of_comparable_atomic_type_name at_tn))
-      else
-        (* let* cmp_tn = uniform_comparable_type_name in *)
-        let_star uniform_comparable_type_name (fun cmp_tn ->
-            match cmp_tn with
-            | `TString -> return (Ex_comparable_ty (string_key ~annot:None))
-            | `TNat -> return (Ex_comparable_ty (nat_key ~annot:None))
-            | `TPair ->
-                let max_depth = max_depth - 1 in
-                (*let* Ex_comparable_ty l = m_comparable_type ~max_depth in
-                  let* Ex_comparable_ty r = m_comparable_type ~max_depth in*)
-                let_star
-                  (m_comparable_type ~max_depth)
-                  (fun (Ex_comparable_ty l) ->
-                    let_star
-                      (m_comparable_type ~max_depth)
-                      (fun (Ex_comparable_ty r) ->
-                        match pair_key (-1) (l, None) (r, None) ~annot:None with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_comparable_ty res_ty))
-            | `TKey -> return (Ex_comparable_ty (key_key ~annot:None))
-            | `TUnion ->
-                let max_depth = max_depth - 1 in
-                (* let* Ex_comparable_ty l = m_comparable_type ~max_depth in
-                   let* Ex_comparable_ty r = m_comparable_type ~max_depth in *)
-                let_star
-                  (m_comparable_type ~max_depth)
-                  (fun (Ex_comparable_ty l) ->
-                    let_star
-                      (m_comparable_type ~max_depth)
-                      (fun (Ex_comparable_ty r) ->
-                        match
-                          union_key (-1) (l, None) (r, None) ~annot:None
-                        with
-                        | Error _ ->
-                            (* what should be done here? *) assert false
-                        | Ok res_ty -> return @@ Ex_comparable_ty res_ty))
-            | `TOption ->
-                let max_depth = max_depth - 1 in
-                (* let* Ex_comparable_ty t = m_comparable_type ~max_depth in *)
-                let_star
-                  (m_comparable_type ~max_depth)
-                  (fun (Ex_comparable_ty t) ->
-                    match option_key (-1) t ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
-                    | Ok res_ty -> return @@ Ex_comparable_ty res_ty)
-            | `TBytes -> return (Ex_comparable_ty (bytes_key ~annot:None))
-            | `TChain_id -> return (Ex_comparable_ty (chain_id_key ~annot:None))
-            | `TBool -> return (Ex_comparable_ty (bool_key ~annot:None))
-            | `TAddress -> return (Ex_comparable_ty (address_key ~annot:None))
-            | `TTimestamp ->
-                return (Ex_comparable_ty (timestamp_key ~annot:None))
-            | `TKey_hash -> return (Ex_comparable_ty (key_hash_key ~annot:None))
-            | `TMutez -> return (Ex_comparable_ty (mutez_key ~annot:None))
-            | `TSignature ->
-                return (Ex_comparable_ty (signature_key ~annot:None))
-            | `TUnit -> return (Ex_comparable_ty (unit_key ~annot:None))
-            | `TInt -> return (Ex_comparable_ty (int_key ~annot:None)))
-
-    let rec m_comparable_type_by_size ~size :
-        Script_ir_translator.ex_comparable_ty sampler =
+    and m_comparable_type ~size : Script_ir_translator.ex_comparable_ty sampler
+        =
       let open M in
       let open Script_ir_translator in
       let atomic_case () =
@@ -580,7 +526,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       in
       let option_case size =
         let size = size - 1 in
-        let_star (m_comparable_type_by_size ~size) (fun (Ex_comparable_ty t) ->
+        let_star (m_comparable_type ~size) (fun (Ex_comparable_ty t) ->
             match option_key (-1) t ~annot:None with
             | Error _ -> (* what should be done here? *) assert false
             | Ok res_ty -> return @@ Ex_comparable_ty res_ty)
@@ -592,13 +538,13 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
           (fun size_left ->
             let size_right = size - size_left in
             let_star
-              (m_comparable_type_by_size ~size:size_left)
+              (m_comparable_type ~size:size_left)
               (fun (Ex_comparable_ty l) ->
                 let_star
-                  (m_comparable_type_by_size ~size:size_right)
+                  (m_comparable_type ~size:size_right)
                   (fun (Ex_comparable_ty r) ->
                     match pair_key (-1) (l, None) (r, None) ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
+                    | Error _ -> assert false
                     | Ok res_ty -> return @@ Ex_comparable_ty res_ty)))
       in
       let union_case size =
@@ -608,13 +554,13 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
           (fun size_left ->
             let size_right = size - size_left in
             let_star
-              (m_comparable_type_by_size ~size:size_left)
+              (m_comparable_type ~size:size_left)
               (fun (Ex_comparable_ty l) ->
                 let_star
-                  (m_comparable_type_by_size ~size:size_right)
+                  (m_comparable_type ~size:size_right)
                   (fun (Ex_comparable_ty r) ->
                     match union_key (-1) (l, None) (r, None) ~annot:None with
-                    | Error _ -> (* what should be done here? *) assert false
+                    | Error _ -> assert false
                     | Ok res_ty -> return @@ Ex_comparable_ty res_ty)))
       in
 

@@ -88,7 +88,7 @@ module Default_config = struct
           string_size = {min = 1 lsl 10; max = 1 lsl 17};
           bytes_size = {min = 1 lsl 10; max = 1 lsl 17};
           stack_size = {min = 3; max = 3};
-          type_depth = {min = 3; max = 3};
+          type_size = {min = 1; max = 3};
           list_size = {min = 10; max = 1000};
           set_size = {min = 10; max = 1000};
           map_size = {min = 10; max = 1000};
@@ -2021,13 +2021,13 @@ module Registration_section = struct
         ~kinstr_and_stack_sampler:(fun cfg rng_state ->
           let (module Samplers) = make_default_samplers cfg.sampler in
           fun () ->
-            let max_depth =
+            let size =
               Base_samplers.sample_in_interval
                 rng_state
-                ~range:cfg.sampler.type_depth
+                ~range:cfg.sampler.type_size
             in
             let (Script_ir_translator.Ex_comparable_ty cmp_ty) =
-              Samplers.Random_type.m_comparable_type ~max_depth rng_state
+              Samplers.Random_type.m_comparable_type ~size rng_state
             in
             let ty = Michelson_samplers.comparable_downcast cmp_ty in
             let value = Samplers.Random_value.comparable cmp_ty rng_state in

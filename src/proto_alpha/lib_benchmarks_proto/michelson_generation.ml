@@ -111,7 +111,7 @@ let michelson_samplers =
         string_size = {min = 8; max = 128};
         bytes_size = {min = 8; max = 128};
         stack_size = {min = 3; max = 8};
-        type_depth = {min = 0; max = 3};
+        type_size = {min = 1; max = 3};
         list_size = {min = 0; max = 1000};
         set_size = {min = 0; max = 1000};
         map_size = {min = 0; max = 1000};
