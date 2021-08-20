@@ -160,9 +160,6 @@ module Bounded : sig
   (** [is_empty q] is [true] if [q] is empty, [false] otherwise. *)
   val is_empty : 'a t -> bool
 
-  (** [empty q] is a promise that resolves when [q] becomes empty. *)
-  val empty : 'a t -> unit Lwt.t
-
   (** [close q] the write-end of [q]:
 
     - Pending and future write attempts will fail with {!Closed}.
@@ -279,9 +276,6 @@ module Unbounded : sig
 
   (** [is_empty q] is [true] if [q] is empty, [false] otherwise. *)
   val is_empty : 'a t -> bool
-
-  (** [empty q] is a promise that resolves when [q] becomes empty. *)
-  val empty : 'a t -> unit Lwt.t
 
   (** [close q] the write-end of [q]:
 
@@ -415,9 +409,6 @@ module MaybeBounded : sig
 
   (** [is_empty q] is [true] if [q] is empty, [false] otherwise. *)
   val is_empty : 'a t -> bool
-
-  (** [empty q] is a promise that resolves when [q] becomes empty. *)
-  val empty : 'a t -> unit Lwt.t
 
   (** [close q] the write-end of [q]:
 

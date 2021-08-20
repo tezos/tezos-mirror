@@ -169,7 +169,6 @@ module Bounded = struct
   let introspect () =
     let q = Lwt_pipe.Bounded.create ~max_size:4 ~compute_size:(fun n -> n) () in
     assert (Lwt_pipe.Bounded.is_empty q) ;
-    assert (Lwt.state @@ Lwt_pipe.Bounded.empty q = Lwt.Return ()) ;
     let peek_0 = Lwt_pipe.Bounded.peek q in
     assert (Lwt.state peek_0 = Lwt.Sleep) ;
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
@@ -180,8 +179,6 @@ module Bounded = struct
     (* can push 4 and then even more because of weight 0 *)
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
-    let empty_0 = Lwt_pipe.Bounded.empty q in
-    assert (Lwt.state empty_0 = Lwt.Sleep) ;
     assert (Lwt_pipe.Bounded.peek_all_now q = [0; 0; 0; 0; 0]) ;
     let pop_0 = Lwt_pipe.Bounded.pop q in
     assert (Lwt.state pop_0 = Lwt.Return 0) ;
@@ -191,7 +188,6 @@ module Bounded = struct
     let pop_234 = Lwt_pipe.Bounded.pop_all q in
     assert (Lwt.state pop_234 = Lwt.Return [0; 0; 0]) ;
     Lwt.pause () >>= fun () ->
-    assert (Lwt.state empty_0 = Lwt.Return ()) ;
     let () = assert (Lwt_pipe.Bounded.push_now q 1) in
     let peek_0 = Lwt_pipe.Bounded.peek q in
     assert (Lwt.state peek_0 = Lwt.Return 1) ;

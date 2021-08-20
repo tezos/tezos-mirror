@@ -36,7 +36,6 @@ module Bounded = struct
     mutable closed : bool;
     mutable push_waiter : (unit Lwt.t * unit Lwt.u) option;
     mutable pop_waiter : (unit Lwt.t * unit Lwt.u) option;
-    empty : unit Lwt_condition.t;
   }
 
   let is_closed {closed; _} = closed
@@ -54,7 +53,6 @@ module Bounded = struct
       closed = false;
       push_waiter = None;
       pop_waiter = None;
-      empty = Lwt_condition.create ();
     }
 
   let notify_push q =
@@ -91,10 +89,6 @@ module Bounded = struct
 
   let is_empty {queue; _} = Queue.is_empty queue
 
-  let rec empty q =
-    if is_empty q then Lwt.return_unit
-    else Lwt_condition.wait q.empty >>= fun () -> empty q
-
   let rec push ({closed; queue; current_size; max_size; compute_size; _} as q)
       elt =
     let elt_size = compute_size elt in
@@ -117,12 +111,11 @@ module Bounded = struct
      notify_push q ;
      true)
 
-  let rec pop ({closed; queue; empty; current_size; _} as q) =
+  let rec pop ({closed; queue; current_size; _} as q) =
     if not (Queue.is_empty queue) then (
       let (elt_size, elt) = Queue.pop queue in
       notify_pop q ;
       q.current_size <- current_size - elt_size ;
-      if Queue.is_empty queue then Lwt_condition.signal empty () ;
       Lwt.return elt)
     else if closed then Lwt.fail Closed
     else wait_push q >>= fun () -> pop q
@@ -153,14 +146,13 @@ module Bounded = struct
     else if closed then raise Closed
     else []
 
-  let pop_now ({closed; queue; empty; current_size; _} as q) =
+  let pop_now ({closed; queue; current_size; _} as q) =
     (* We only check for closed-ness when the queue is empty to allow reading from
        a closed pipe. This is because closing is just closing the write-end of the
        pipe. *)
     if Queue.is_empty queue && closed then raise Closed ;
     Queue.take_opt queue
     |> Stdlib.Option.map (fun (elt_size, elt) ->
-           if Queue.is_empty queue then Lwt_condition.signal empty () ;
            q.current_size <- current_size - elt_size ;
            notify_pop q ;
            elt)
@@ -177,7 +169,6 @@ module Bounded = struct
   let pop_all q =
     if not (Queue.is_empty q.queue) then (
       let elements = pop_all_queue q.queue in
-      Lwt_condition.signal q.empty () ;
       q.current_size <- 0 ;
       notify_pop q ;
       Lwt.return (List.map snd elements))
@@ -185,7 +176,6 @@ module Bounded = struct
     else
       wait_push q >>= fun () ->
       let (_, element) = Queue.pop q.queue in
-      Lwt_condition.signal q.empty () ;
       q.current_size <- 0 ;
       notify_pop q ;
       Lwt.return [element]
@@ -193,7 +183,6 @@ module Bounded = struct
   let pop_all_now q =
     if not (Queue.is_empty q.queue) then (
       let elements = pop_all_queue q.queue in
-      Lwt_condition.signal q.empty () ;
       q.current_size <- 0 ;
       notify_pop q ;
       List.map snd elements)
@@ -212,18 +201,11 @@ module Unbounded = struct
     queue : 'a Queue.t;
     mutable closed : bool;
     mutable push_waiter : (unit Lwt.t * unit Lwt.u) option;
-    empty : unit Lwt_condition.t;
   }
 
   let is_closed {closed; _} = closed
 
-  let create () =
-    {
-      queue = Queue.create ();
-      closed = false;
-      push_waiter = None;
-      empty = Lwt_condition.create ();
-    }
+  let create () = {queue = Queue.create (); closed = false; push_waiter = None}
 
   let notify_push q =
     match q.push_waiter with
@@ -244,21 +226,14 @@ module Unbounded = struct
 
   let is_empty {queue; _} = Queue.is_empty queue
 
-  let rec empty q =
-    if is_empty q then Lwt.return_unit
-    else Lwt_condition.wait q.empty >>= fun () -> empty q
-
   let push ({closed; queue; _} as q) elt =
     if closed then raise Closed
     else (
       Queue.push elt queue ;
       notify_push q)
 
-  let rec pop ({closed; queue; empty; _} as q) =
-    if not (Queue.is_empty queue) then (
-      let elt = Queue.pop queue in
-      if Queue.is_empty queue then Lwt_condition.signal empty () ;
-      Lwt.return elt)
+  let rec pop ({closed; queue; _} as q) =
+    if not (Queue.is_empty queue) then Lwt.return @@ Queue.pop queue
     else if closed then Lwt.fail Closed
     else wait_push q >>= fun () -> pop q
 
@@ -286,15 +261,12 @@ module Unbounded = struct
     else if closed then raise Closed
     else []
 
-  let pop_now {closed; queue; empty; _} =
+  let pop_now {closed; queue; _} =
     (* We only check for closed-ness when the queue is empty to allow reading from
        a closed pipe. This is because closing is just closing the write-end of the
        pipe. *)
     if Queue.is_empty queue && closed then raise Closed ;
     Queue.take_opt queue
-    |> Stdlib.Option.map (fun elt ->
-           if Queue.is_empty queue then Lwt_condition.signal empty () ;
-           elt)
 
   let pop_all_queue : type a. a Queue.t -> a list =
     fun (type a) q ->
@@ -306,22 +278,15 @@ module Unbounded = struct
      try aux [] with Local rev_acc -> List.rev rev_acc
 
   let pop_all q =
-    if not (Queue.is_empty q.queue) then (
-      let elements = pop_all_queue q.queue in
-      Lwt_condition.signal q.empty () ;
-      Lwt.return elements)
+    if not (Queue.is_empty q.queue) then Lwt.return @@ pop_all_queue q.queue
     else if q.closed then Lwt.fail Closed
     else
       wait_push q >>= fun () ->
       let element = Queue.pop q.queue in
-      Lwt_condition.signal q.empty () ;
       Lwt.return [element]
 
   let pop_all_now q =
-    if not (Queue.is_empty q.queue) then (
-      let elements = pop_all_queue q.queue in
-      Lwt_condition.signal q.empty () ;
-      elements)
+    if not (Queue.is_empty q.queue) then pop_all_queue q.queue
     else if q.closed then raise Closed
     else []
 
