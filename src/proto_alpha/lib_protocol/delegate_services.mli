@@ -105,25 +105,12 @@ val grace_period :
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int32 shell_tzresult Lwt.t
 
-module Endorsing_power : sig
-  val get :
-    'a #RPC_context.simple ->
-    'a ->
-    Alpha_context.packed_operation ->
-    Chain_id.t ->
-    int shell_tzresult Lwt.t
-end
-
 module Minimal_valid_time : sig
   val get :
     'a #RPC_context.simple -> 'a -> int -> int -> Time.t shell_tzresult Lwt.t
 end
 
-val endorsing_power :
-  Alpha_context.t ->
-  Alpha_context.packed_operation * Chain_id.t ->
-  int tzresult Lwt.t
-
+(* temporary export for deprecated unit test *)
 val minimal_valid_time :
   Alpha_context.t -> int -> int -> Time.t -> Time.t tzresult
 

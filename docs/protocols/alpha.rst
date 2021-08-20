@@ -30,6 +30,14 @@ Bug fixes
 
 - A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
 
+RPC changes
+-----------
+
+- Deprecated RPC ``POST ../endorsing_power`` has been removed. Clients
+  already used ``GET ../helpers/endorsement_rights`` which is clearer, as
+  powerful and equaly costly in term of computation for the
+  node. (MR :gl: `!3395`)
+
 Minor changes
 -------------
 
