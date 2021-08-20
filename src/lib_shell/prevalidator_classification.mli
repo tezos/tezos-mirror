@@ -96,3 +96,12 @@ val add :
   Operation.t ->
   t ->
   unit
+
+(** [validation_result t] returns an instance of [Preapply_result.t] whose
+    fields are as follows:
+
+    - [applied] is [t.applied_rev] reversed
+    - [branch_delayed] is [t.branch_delayed]'s map
+    - [branch_refused] is [t.branch_refused]'s map
+    - [refused] is empty *)
+val validation_result : t -> error Preapply_result.t

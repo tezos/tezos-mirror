@@ -142,3 +142,11 @@ let add ~notify classification oph op classes =
   | `Applied -> handle_applied oph op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->
       handle_error oph op classification classes
+
+let validation_result classes =
+  {
+    Preapply_result.applied = List.rev classes.applied;
+    branch_delayed = classes.branch_delayed.map;
+    branch_refused = classes.branch_refused.map;
+    refused = Operation_hash.Map.empty;
+  }

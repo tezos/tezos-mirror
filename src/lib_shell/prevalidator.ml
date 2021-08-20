@@ -118,8 +118,6 @@ module type T = sig
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  val validation_result : types_state -> error Preapply_result.t
-
   val fitness : unit -> Fitness.t Lwt.t
 
   val initialization_errors : unit tzresult Lwt.t
@@ -392,16 +390,6 @@ module Make
       || Operation_hash.Set.mem oph shell.fetching
       || Operation_hash.Set.mem oph shell.live_operations
       || Operation_hash.Set.mem oph shell.classification.in_mempool
-
-  let validation_result (state : types_state) =
-    {
-      Preapply_result.applied = List.rev state.shell.classification.applied;
-      branch_delayed =
-        Classification.map state.shell.classification.branch_delayed;
-      branch_refused =
-        Classification.map state.shell.classification.branch_refused;
-      refused = Operation_hash.Map.empty;
-    }
 
   let advertise (w : worker) pv mempool =
     match pv.advertisement with
@@ -1014,7 +1002,8 @@ module Make
         ~live_blocks
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
-           (Preapply_result.operations (validation_result pv))
+           (Preapply_result.operations
+              (Classification.validation_result pv.shell.classification))
            pv.shell.pending)
       >>= fun pending ->
       Classification.clear pv.shell.classification ;
@@ -1293,7 +1282,7 @@ let operations (t : t) =
   let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
   ( {
-      (Prevalidator.validation_result pv) with
+      (Classification.validation_result pv.shell.classification) with
       applied = List.rev pv.shell.classification.applied;
     },
     pv.shell.pending )
@@ -1302,7 +1291,10 @@ let pending (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
-  let ops = Preapply_result.operations (Prevalidator.validation_result pv) in
+  let ops =
+    Preapply_result.operations
+      (Classification.validation_result pv.shell.classification)
+  in
   Lwt.return ops
 
 let timestamp (t : t) =
