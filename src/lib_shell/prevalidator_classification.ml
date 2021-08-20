@@ -79,37 +79,25 @@ let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 let is_applied oph classes =
   List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied
 
-let remove_applied to_remove classes =
-  if not (is_applied to_remove classes) then None
-  else
-    (* At first sight, all the op classified before [oph] are still
-       valid and their classification won't change. However, in
-       practice we don't have the [Context.t] associated to this
-       prefix and so we just remove all the applied operations. *)
-    let to_reclassify =
-      List.fold_left
-        (fun to_reclassify (oph, op) ->
-          if Operation_hash.(oph <> to_remove) then
-            ( Operation_hash.Set.add oph (fst to_reclassify),
-              Operation_hash.Map.add oph op (snd to_reclassify) )
-          else to_reclassify)
-        (Operation_hash.Set.empty, Operation_hash.Map.empty)
-        classes.applied
-    in
-    classes.in_mempool <-
-      Operation_hash.Set.diff
-        classes.in_mempool
-        (Operation_hash.Set.add to_remove (fst to_reclassify)) ;
-    classes.applied <- [] ;
-    Some (snd to_reclassify)
+(* Removing an operation is currently used for operations which are
+   banned (this can only be achieved by the adminstrator of the
+   node). However, removing an operation which is applied invalidates
+   the classification of all the operations. Hence, the
+   classifications of all the operations should be reset. Currently,
+   this is not enforced by the function and has to be done by the
+   caller.
 
-let remove_not_applied oph classes =
+   Later on, it would be probably better if this function returns a
+   set of pending operations instead. *)
+let remove oph classes =
   classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;
   classes.branch_refused.map <-
     Operation_hash.Map.remove oph classes.branch_refused.map ;
   classes.branch_delayed.map <-
     Operation_hash.Map.remove oph classes.branch_delayed.map ;
-  classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool
+  classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool ;
+  classes.applied <-
+    List.filter (fun (op, _) -> Operation_hash.(op <> oph)) classes.applied
 
 let handle_applied oph op classes =
   classes.applied <- (oph, op) :: classes.applied ;

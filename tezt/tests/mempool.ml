@@ -30,6 +30,10 @@
    Subject:      .
 *)
 
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/1657
+
+   Some refactorisation is needed. *)
+
 let check_operation_is_in_applied_mempool ops oph =
   let open JSON in
   let ops_list = as_list (ops |-> "applied") in
@@ -205,7 +209,7 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
   in
   let signature = sign_operation ~signer op_str_hex in
   let* oph = inject_operation ~client op_str_hex signature in
-  return (Some oph)
+  return oph
 
 let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client ~node n =
@@ -225,9 +229,7 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
             ~client
         in
         let* () = transfer_1 in
-        let oph_list =
-          match oph with None -> oph_list | Some oph -> oph :: oph_list
-        in
+        let oph_list = oph :: oph_list in
         loop (oph_list, counter + 1) (pred n)
   in
   loop ([], counter + 1) n
@@ -415,6 +417,145 @@ let flush_mempool =
   in
   Check.((mempool_count_after_third_flush.refused = 1) int ~error_msg) ;
   unit
+
+(** This test tries to ban an operation and check that a branch
+   refused operation is classified again.
+
+   Scenario:
+
+   + Node 1 activates a protocol and synchronise with Node 2
+
+   + Forge and inject an operation on Node 1 and Node 2 with the same
+   source and same counter
+
+   + Check that the operations are in the mempool
+
+   + Bake an empty block to enforce mempool synchronisation between Node 1 and Node 2
+
+   + Ban the operation which was applied on Node 1 (or Node 2)
+
+   + Check that the other operation which was branch refused becomes applied *)
+let ban_operation_branch_refused_reevaluated =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"ban_operation_branch_refused_reevaluated"
+    ~tags:["flush"; "mempool"; "ban"]
+  @@ fun protocol ->
+  let* node_1 = Node.init [Synchronisation_threshold 0] in
+  let* node_2 = Node.init [Synchronisation_threshold 0] in
+  let endpoint_1 = Client.(Node node_1) in
+  let endpoint_2 = Client.(Node node_2) in
+  let* client_1 = Client.init ~endpoint:endpoint_1 () in
+  let* client_2 = Client.init ~endpoint:endpoint_2 () in
+  let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "activated protocol" ;
+  let* _ = Node.wait_for_level node_1 1 in
+  let* _ = Node.wait_for_level node_2 1 in
+  let* node2_identity = Node.wait_for_identity node_2 in
+  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
+  Log.info "nodes are at level 1" ;
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int counter in
+  let* branch = RPC.get_branch client_1 in
+  let branch = JSON.as_string branch in
+  let injection_waiter = wait_for_injection node_1 in
+  let* oph =
+    forge_and_inject_operation
+      ~branch
+      ~fee:1000
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_1
+  in
+  let* () = injection_waiter in
+  Log.info "%s injected on node 1" JSON.(oph |> as_string) ;
+  let* mempool_after_injections = RPC.get_mempool_pending_operations client_1 in
+  check_operation_is_in_applied_mempool mempool_after_injections oph ;
+  Log.info "Forged operation are applied in the mempool" ;
+  let injection_waiter = wait_for_injection node_2 in
+  let* oph2 =
+    forge_and_inject_operation
+      ~branch
+      ~fee:1000
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap3.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_2
+  in
+  let* () = injection_waiter in
+  Log.info
+    "%s injected on node 2 with the same counter as %s"
+    JSON.(oph2 |> as_string)
+    JSON.(oph |> as_string) ;
+  let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
+  let empty_mempool_file = Temp.file "mempool.json" in
+  let* _ =
+    let empty_mempool =
+      {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+    in
+    Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
+        Lwt_io.write oc empty_mempool)
+  in
+  let flush_waiter_1 = wait_for_flush node_1 in
+  let flush_waiter_2 = wait_for_flush node_2 in
+  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () = flush_waiter_1 and* () = flush_waiter_2 in
+  Log.info "bake block to ensure mempool synchronisation" ;
+  let* mempool_after_injections_1 =
+    RPC.get_mempool_pending_operations client_1
+  in
+  let mempool_count_after_injections_1 =
+    count_mempool mempool_after_injections_1
+  in
+  let* mempool_after_injections_2 =
+    RPC.get_mempool_pending_operations client_2
+  in
+  let mempool_count_after_injections_2 =
+    count_mempool mempool_after_injections_2
+  in
+  let (oph_to_ban, oph_remaining, client) =
+    let oph_applied =
+      JSON.(mempool_after_injections_1 |-> "applied" |=> 0 |-> "hash")
+    in
+    let oph_refused =
+      JSON.(mempool_after_injections_1 |-> "branch_refused" |=> 0 |=> 0)
+    in
+    (* It may be possible that node 1 is never aware of the second
+       operation if:
+
+       - Node 2 receives the blocks
+
+       - Node 2 evaluates the operations and classify the second
+       operation as branch refused.
+
+       However, this is unlikely for the moment since node 2 will
+       advertise its mempool before flushing. *)
+    if mempool_count_after_injections_1.total = 2 then
+      (oph_applied, oph_refused, client_1)
+    else if mempool_count_after_injections_2.total = 2 then
+      (oph_refused, oph_applied, client_2)
+    else
+      Test.fail
+        "A problem occured during the test (probably a flakyness issue)."
+  in
+  Log.info "ban operation %s" JSON.(oph_to_ban |> as_string) ;
+  let* _ =
+    RPC.mempool_ban_operation
+      ~data:(`String JSON.(oph_to_ban |> as_string))
+      client
+  in
+  let* mempool_after_injections = RPC.get_mempool_pending_operations client in
+  Log.info "check operation %s is applied" JSON.(oph_remaining |> as_string) ;
+  check_operation_is_in_applied_mempool mempool_after_injections oph_remaining ;
+  Lwt.return_unit
 
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
@@ -1113,9 +1254,7 @@ let check_applied_ophs_is client expected_ophs =
       injected by both nodes in alternance).
     - Step 3: Ban one of these operations from node_1 (arbitrarily, the third
       in the list of applied operations in the mempool of node_1).
-    - Step 4: Check that applied operations in node_1 remain the same, except
-      for the banned operation which has been removed. In particular,
-      their order in the list should be the same.
+    - Step 4: Check that applied operations in node_1 are still applied
 
     Note: the chosen operations are commutative, so that none of them
     becomes branch_delayed instead of applied when one of them is banned.
@@ -1196,10 +1335,7 @@ let ban_operation_and_check_applied =
   Log.info "Operation to ban: %s" oph_to_ban ;
   let* _ = RPC.mempool_ban_operation ~data:(`String oph_to_ban) client_1 in
   Log.info "Operation %s is now banned." oph_to_ban ;
-  Log.info
-    "Step 4: Check that applied operations in node_1 remain the same, except \
-     for the banned operation which has been removed. In particular, their \
-     order in the list should be the same." ;
+  Log.info "Step 4: Check that applied operations in node_1 are still applied." ;
   let expected_reapplied_ophs =
     List.filter (fun oph -> not (String.equal oph_to_ban oph)) applied_ophs
   in
@@ -1515,4 +1651,5 @@ let register ~protocols =
   ban_operation ~protocols ;
   ban_operation_and_check_applied ~protocols ;
   unban_operation_and_reinject ~protocols ;
-  unban_all_operations ~protocols
+  unban_all_operations ~protocols ;
+  ban_operation_branch_refused_reevaluated ~protocols

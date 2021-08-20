@@ -69,17 +69,14 @@ val is_in_mempool : Operation_hash.t -> t -> bool
       in field [applied] of [classes]. *)
 val is_applied : Operation_hash.t -> t -> bool
 
-(** [remove_applied oph classes] removes operation of hash [oph] from
-   fields [applied] and [in_mempool] of [classes]. The operations
-   which were applied but not the one removed are sent back to the
-   caller as a map. Consequently, the order in which these operations
-   were applied might be lost. *)
-val remove_applied :
-  Operation_hash.t -> t -> Operation.t Operation_hash.Map.t option
+(** [remove oph classes] removes operation of hash [oph] from all
+   fields of [classes].
 
-(** [remove_not_applied oph classes] removes operation of hash [oph]
-      from all fields of [classes] except from [applied]. *)
-val remove_not_applied : Operation_hash.t -> t -> unit
+    {b Warning:} If an operation is removed from the [applied] field,
+   this may invalidate the classification of all the other
+   operations. It is left to the caller to restore a consistent
+   state. *)
+val remove : Operation_hash.t -> t -> unit
 
 (** [add ~notify class oph op classes] adds the operation [op] with
    hash [oph] classified as [class] to the classifier [classes]. The
