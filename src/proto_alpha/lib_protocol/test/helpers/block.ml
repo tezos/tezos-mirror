@@ -105,21 +105,31 @@ let dispatch_policy = function
 
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
-let get_endorsing_power b =
-  List.fold_left_es
-    (fun acc (op : Operation.packed) ->
-      let (Operation_data data) = op.protocol_data in
-      match data.contents with
-      | Single (Endorsement _) ->
-          Alpha_services.Delegate.Endorsing_power.get
-            rpc_ctxt
-            b
-            op
-            Chain_id.zero
-          >|=? fun endorsement_power -> acc + endorsement_power
-      | _ -> return acc)
+let compute_endorsement_powers ~block =
+  Plugin.RPC.Endorsing_rights.get rpc_ctxt block >|=? fun endorsing_rights ->
+  List.filter_map
+    (function
+      | {Plugin.RPC.Endorsing_rights.slots = top :: _ as slots; _} ->
+          Some (top, List.length slots)
+      | {Plugin.RPC.Endorsing_rights.slots = []; _} -> None)
+    endorsing_rights
+
+let get_endorsing_power block =
+  compute_endorsement_powers ~block >|=? fun endorsement_powers ->
+  List.fold_left
+    (fun sum -> function
+      | {
+          Alpha_context.protocol_data =
+            Operation_data
+              {contents = Single (Endorsement_with_slot {slot; _}); _};
+          _;
+        } -> (
+          match List.assoc ~equal:Compare.Int.equal slot endorsement_powers with
+          | None -> sum
+          | Some pow -> sum + pow)
+      | _ -> sum)
     0
-    b.operations
+    block.operations
 
 module Forge = struct
   type header = {
