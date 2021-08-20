@@ -1115,8 +1115,8 @@ module Instructions = struct
 
   let log = ir_sized_step N_ILog nullary
 
-  let open_chest time size =
-    ir_sized_step N_IOpen_chest (binary "time" time "size" size)
+  let open_chest log_time size =
+    ir_sized_step N_IOpen_chest (binary "log_time" log_time "size" size)
 end
 
 module Control = struct
@@ -1469,7 +1469,7 @@ let extract_ir_sized_step :
   | (ILog _, _) -> Instructions.log
   | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
       let plaintext_size = Timelock.get_plaintext_size chest - 1 in
-      let log_time = Z.log2 Z.(one + pow (Script_int_repr.to_zint time) 10) in
+      let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
       Instructions.open_chest log_time plaintext_size
 
 let extract_control_trace (type bef_top bef aft_top aft)

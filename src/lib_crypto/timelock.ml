@@ -190,15 +190,17 @@ let ciphertext_encoding =
           (req "timelock.nonce" Crypto_box.nonce_encoding)
           (req "timelock.payload" bytes))
 
+let min_rsa_modulus = Z.(shift_left (of_int 2) 2000)
+
 let chest_encoding =
   let open Data_encoding in
   def "timelock.chest"
   @@ conv_with_guard
        (fun chest -> (chest.locked_value, chest.rsa_public, chest.ciphertext))
        (fun (locked_value, rsa_public, ciphertext) ->
-         if Z.(locked_value < zero || locked_value >= rsa_public) then
+         if Z.Compare.(locked_value < Z.zero || locked_value >= rsa_public) then
            Error "locked value is not in the rsa group"
-         else if Z.(rsa_public <= shift_left (of_int 2) 2000) then
+         else if Z.leq rsa_public min_rsa_modulus then
            Error "rsa modulus is too small"
          else Ok {locked_value; rsa_public; ciphertext})
        (obj3
