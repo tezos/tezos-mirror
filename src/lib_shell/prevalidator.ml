@@ -825,20 +825,8 @@ module Make
                | None -> (
                    Lwt_stream.get op_stream >>= function
                    | Some (kind, shell, protocol_data) when filter_result kind
-                     -> (
-                       (* NOTE: Should the protocol change, a new Prevalidation
-                        * context would  be created. Thus, we use the same Proto. *)
-                       match
-                         Data_encoding.Binary.to_bytes_opt
-                           Proto.operation_data_encoding
-                           protocol_data
-                       with
-                       | None -> Lwt.return_none
-                       | Some proto_bytes -> (
-                           match Prevalidation.parse_unsafe proto_bytes with
-                           | Error _ -> Lwt.return_none
-                           | Ok protocol_data ->
-                               Lwt.return_some [{Proto.shell; protocol_data}]))
+                     ->
+                       Lwt.return_some [{Proto.shell; protocol_data}]
                    | Some _ -> next ()
                    | None -> Lwt.return_none)
              in
