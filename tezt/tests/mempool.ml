@@ -1254,9 +1254,7 @@ let check_applied_ophs_is client expected_ophs =
       injected by both nodes in alternance).
     - Step 3: Ban one of these operations from node_1 (arbitrarily, the third
       in the list of applied operations in the mempool of node_1).
-    - Step 4: Check that applied operations in node_1 remain the same, except
-      for the banned operation which has been removed. In particular,
-      their order in the list should be the same.
+    - Step 4: Check that applied operations in node_1 are still applied
 
     Note: the chosen operations are commutative, so that none of them
     becomes branch_delayed instead of applied when one of them is banned.
@@ -1337,10 +1335,7 @@ let ban_operation_and_check_applied =
   Log.info "Operation to ban: %s" oph_to_ban ;
   let* _ = RPC.mempool_ban_operation ~data:(`String oph_to_ban) client_1 in
   Log.info "Operation %s is now banned." oph_to_ban ;
-  Log.info
-    "Step 4: Check that applied operations in node_1 remain the same, except \
-     for the banned operation which has been removed. In particular, their \
-     order in the list should be the same." ;
+  Log.info "Step 4: Check that applied operations in node_1 are still applied." ;
   let expected_reapplied_ophs =
     List.filter (fun oph -> not (String.equal oph_to_ban oph)) applied_ophs
   in
