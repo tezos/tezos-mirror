@@ -38,14 +38,6 @@ let empty =
     branch_delayed = Operation_hash.Map.empty;
   }
 
-let map f r =
-  {
-    applied = r.applied;
-    refused = Operation_hash.Map.map f r.refused;
-    branch_refused = Operation_hash.Map.map f r.branch_refused;
-    branch_delayed = Operation_hash.Map.map f r.branch_delayed;
-  }
-
 let encoding error_encoding =
   let open Data_encoding in
   let operation_encoding =
