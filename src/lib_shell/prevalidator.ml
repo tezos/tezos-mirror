@@ -1001,10 +1001,26 @@ module Make
       Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
     let on_flush w pv predecessor live_blocks live_operations =
+      pv.shell.predecessor <- predecessor ;
+      pv.shell.live_blocks <- live_blocks ;
+      pv.shell.live_operations <- live_operations ;
       Lwt_watcher.shutdown_input pv.operation_stream ;
+      pv.operation_stream <- Lwt_watcher.create_input () ;
+      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
+      pv.shell.timestamp <- timestamp_system ;
+      let timestamp = Time.System.to_protocol timestamp_system in
       let chain_store =
         Distributed_db.chain_store pv.shell.parameters.chain_db
       in
+      Prevalidation.create
+        chain_store
+        ~predecessor
+        ~live_blocks
+        ~live_operations
+        ~timestamp
+        ()
+      >>= fun validation_state ->
+      pv.validation_state <- validation_state ;
       list_pendings
         pv.shell.parameters.chain_db
         ~from_block:pv.shell.predecessor
@@ -1015,6 +1031,7 @@ module Make
            (Preapply_result.operations (validation_result pv))
            pv.shell.pending)
       >>= fun pending ->
+      Classification.clear pv.shell.classification ;
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
@@ -1025,28 +1042,11 @@ module Make
         pending
         Operation_hash.Map.empty
       >>= fun pending ->
-      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
-      let timestamp = Time.System.to_protocol timestamp_system in
-      Prevalidation.create
-        chain_store
-        ~predecessor
-        ~live_blocks
-        ~live_operations
-        ~timestamp
-        ()
-      >>= fun validation_state ->
       Worker.log_event
         w
         (Operations_not_flushed (Operation_hash.Map.cardinal pending))
       >>= fun () ->
-      pv.shell.predecessor <- predecessor ;
-      pv.shell.live_blocks <- live_blocks ;
-      pv.shell.live_operations <- live_operations ;
-      pv.shell.timestamp <- timestamp_system ;
       pv.shell.pending <- pending ;
-      Classification.clear pv.shell.classification ;
-      pv.validation_state <- validation_state ;
-      pv.operation_stream <- Lwt_watcher.create_input () ;
       set_mempool pv.shell Mempool.empty
 
     let on_advertise pv =
