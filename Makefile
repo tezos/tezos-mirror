@@ -130,7 +130,7 @@ PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
 PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
 
 $(PROTO_TARGETS): %.test_proto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*))
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) $(COVERAGE_OPTIONS)
 
 .PHONY: test-proto-unit
 test-proto-unit: $(PROTO_TARGETS)
@@ -141,7 +141,7 @@ NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
 NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
 
 $(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*)))
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) $(COVERAGE_OPTIONS)
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit: $(NONPROTO_TARGETS)
