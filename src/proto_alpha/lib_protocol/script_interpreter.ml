@@ -1430,14 +1430,14 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (* If the time is not an integer we then consider the proof as
              incorrect. Indeed the verification asks for an integer for practical reasons.
              Therfore no proof can be correct.*)
-          let (accu, stack) =
+          let accu =
             match Alpha_context.Script_int.to_int time_z with
-            | None -> (R false, stack)
+            | None -> R false
             | Some time -> (
                 match open_chest chest chest_key ~time with
-                | Correct bytes -> (L bytes, stack)
-                | Bogus_cipher -> (R false, stack)
-                | Bogus_opening -> (R true, stack))
+                | Correct bytes -> L bytes
+                | Bogus_cipher -> R false
+                | Bogus_opening -> R true)
           in
           (step [@ocaml.tailcall]) g gas k ks accu stack)
 
