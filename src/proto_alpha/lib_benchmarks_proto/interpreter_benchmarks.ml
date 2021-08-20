@@ -88,7 +88,7 @@ module Default_config = struct
           string_size = {min = 1 lsl 10; max = 1 lsl 17};
           bytes_size = {min = 1 lsl 10; max = 1 lsl 17};
           stack_size = {min = 3; max = 3};
-          type_size = {min = 1; max = 3};
+          type_size = {min = 1; max = 15};
           list_size = {min = 10; max = 1000};
           set_size = {min = 10; max = 1000};
           map_size = {min = 10; max = 1000};
