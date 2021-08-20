@@ -379,31 +379,41 @@ let flush_mempool =
     <> mempool_count_after_endorsement.applied
   then Test.fail "Endorsement was not applied" ;
   (* Step 7 *)
-  (* Bake with an empty mempool to force synchronisation *)
+  (* Bake twice with an empty mempool to force synchronisation *)
+  let flush_waiter = wait_for_flush node_1 in
+  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () = flush_waiter in
   let flush_waiter = wait_for_flush node_1 in
   let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
   let* () = flush_waiter in
   Log.info "Baking done and mempool flushed" ;
-  let* mempool_after_second_flush =
+  let* mempool_after_third_flush =
     RPC.get_mempool_pending_operations client_1
   in
-  let mempool_count_after_second_flush =
-    count_mempool mempool_after_second_flush
+  let mempool_count_after_third_flush =
+    count_mempool mempool_after_third_flush
   in
   Format.kasprintf
     (Log.info "%s")
-    "Mempool count after second flush: %a"
+    "Mempool count after third flush: %a"
     pp_mempool_count
-    mempool_count_after_second_flush ;
-  (* Check that we did not lost any operation during the second flush *)
-  if
-    mempool_count_after_endorsement.total
-    <> mempool_count_after_second_flush.total
-  then
-    Test.fail
-      "Operations were lost after the second flush: expected %d, got %d"
-      mempool_count_after_endorsement.total
-      mempool_count_after_second_flush.total ;
+    mempool_count_after_third_flush ;
+  let error_msg =
+    "An operation in the mempool was lost after the third flush: expected %L, \
+     got %R"
+  in
+  Check.(
+    (mempool_count_after_endorsement.total
+   = mempool_count_after_third_flush.total)
+      int
+      ~error_msg) ;
+  (* Check that we did not lost the endorsement after the third flush
+     because it was classified as refused. *)
+  let error_msg =
+    "the endorsement was declared as outdated (classified as refused) after \
+     the third flush: expected %L, got %R"
+  in
+  Check.((mempool_count_after_third_flush.refused = 1) int ~error_msg) ;
   unit
 
 (* TODO: add a test than ensure that we cannot have more than 1000
