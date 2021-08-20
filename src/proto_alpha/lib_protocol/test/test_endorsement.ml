@@ -87,13 +87,13 @@ let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
 
 let delegates_with_slots endorsers =
   List.map
-    (fun (endorser : Delegate_services.Endorsing_rights.t) ->
+    (fun (endorser : Plugin.RPC.Endorsing_rights.t) ->
       (endorser.delegate, endorser.slots))
     endorsers
 
 let endorsing_power endorsers =
   List.fold_left
-    (fun sum (endorser : Delegate_services.Endorsing_rights.t) ->
+    (fun sum (endorser : Plugin.RPC.Endorsing_rights.t) ->
       sum + List.length endorser.slots)
     0
     endorsers
@@ -131,13 +131,12 @@ let test_max_endorsement () =
     (List.length
        (List.concat
           (List.map
-             (fun {Alpha_services.Delegate.Endorsing_rights.slots; _} -> slots)
+             (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
              endorsers)))
     endorsers_per_block
   >>=? fun () ->
   List.fold_left_es
-    (fun (delegates, ops, balances)
-         (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
+    (fun (delegates, ops, balances) (endorser : Plugin.RPC.Endorsing_rights.t) ->
       let delegate = endorser.delegate in
       Context.Contract.balance (B b) (Contract.implicit_contract delegate)
       >>=? fun balance ->
@@ -176,7 +175,7 @@ let test_consistent_priorities () =
       Context.get_endorsers (B b) >>=? fun endorsers ->
       let endorser =
         List.find_opt
-          (fun (e : Delegate_services.Endorsing_rights.t) ->
+          (fun (e : Plugin.RPC.Endorsing_rights.t) ->
             not (Signature.Public_key_hash.Set.mem e.delegate used_pkhes))
           endorsers
       in
@@ -319,7 +318,7 @@ let test_reward_retrieval_two_endorsers () =
   Context.get_endorsers (B b) >>=? fun endorsers ->
   let same_endorser2 endorser =
     Signature.Public_key_hash.(
-      endorser.Delegate_services.Endorsing_rights.delegate = endorser2.delegate)
+      endorser.Plugin.RPC.Endorsing_rights.delegate = endorser2.delegate)
   in
   let endorser2 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.find same_endorser2 endorsers
@@ -455,7 +454,7 @@ let test_non_normalized_slot_wrapper () =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun endorser ->
-           List.length endorser.Delegate_services.Endorsing_rights.slots > 1)
+           List.length endorser.Plugin.RPC.Endorsing_rights.slots > 1)
          endorsers
   in
   let (delegate, slots) = (endorser.delegate, endorser.slots) in

@@ -33,8 +33,7 @@ val branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-val get_endorsers :
-  t -> Alpha_services.Delegate.Endorsing_rights.t list tzresult Lwt.t
+val get_endorsers : t -> Plugin.RPC.Endorsing_rights.t list tzresult Lwt.t
 
 val get_endorser : t -> (public_key_hash * int list) tzresult Lwt.t
 

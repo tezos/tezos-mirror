@@ -29,7 +29,7 @@ open Protocol_client_context
 module Events = Delegate_events.Endorsement
 
 let get_signing_slots cctxt ~chain ~block delegate level =
-  Alpha_services.Delegate.Endorsing_rights.get
+  Plugin.RPC.Endorsing_rights.get
     cctxt
     ~levels:[level]
     ~delegates:[delegate]
@@ -40,7 +40,7 @@ let get_signing_slots cctxt ~chain ~block delegate level =
 
 let inject_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
     ~block hash level delegate_sk delegate_pkh =
-  Alpha_services.Delegate.Endorsing_rights.get
+  Plugin.RPC.Endorsing_rights.get
     cctxt
     ~levels:[level]
     ~delegates:[delegate_pkh]

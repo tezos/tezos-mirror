@@ -116,12 +116,10 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
-let get_endorsers ctxt =
-  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
+let get_endorsers ctxt = Plugin.RPC.Endorsing_rights.get rpc_ctxt ctxt
 
 let get_endorser ctxt =
-  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
-  >|=? fun endorsers ->
+  Plugin.RPC.Endorsing_rights.get rpc_ctxt ctxt >|=? fun endorsers ->
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
@@ -130,9 +128,9 @@ let get_voting_power = Alpha_services.Delegate.voting_power rpc_ctxt
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 
 let get_bakers ctxt =
-  Alpha_services.Delegate.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
+  Plugin.RPC.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
   >|=? fun bakers ->
-  List.map (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate) bakers
+  List.map (fun p -> p.Plugin.RPC.Baking_rights.delegate) bakers
 
 let get_seed_nonce_hash ctxt =
   let header =

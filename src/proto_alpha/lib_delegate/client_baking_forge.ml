@@ -482,7 +482,7 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
   | `Auto (src_pkh, max_priority) -> (
       Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
-      Alpha_services.Delegate.Baking_rights.get
+      Plugin.RPC.Baking_rights.get
         cctxt
         ?max_priority
         ~levels:[level]
@@ -491,10 +491,10 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
       >>=? fun possibilities ->
       match
         List.find
-          (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
+          (fun p -> p.Plugin.RPC.Baking_rights.level = level)
           possibilities
       with
-      | Some {Alpha_services.Delegate.Baking_rights.priority = prio; _} ->
+      | Some {Plugin.RPC.Baking_rights.priority = prio; _} ->
           Alpha_services.Delegate.Minimal_valid_time.get
             cctxt
             (chain, block)
@@ -544,7 +544,7 @@ let error_of_op (result : error Preapply_result.t) op =
           | None -> None))
 
 let compute_endorsement_powers cctxt constants ~chain ~block =
-  Delegate_services.Endorsing_rights.get
+  Plugin.RPC.Endorsing_rights.get
     cctxt
     ~levels:[block.Client_baking_blocks.level]
     (chain, `Hash (block.hash, 0))
@@ -552,7 +552,7 @@ let compute_endorsement_powers cctxt constants ~chain ~block =
   let slots_arr = Array.make constants.Constants.endorsers_per_block 0 in
   (* Populate the array *)
   List.iter
-    (fun {Delegate_services.Endorsing_rights.slots; _} ->
+    (fun {Plugin.RPC.Endorsing_rights.slots; _} ->
       let endorsing_power = List.length slots in
       List.iter (fun slot -> slots_arr.(slot) <- endorsing_power) slots)
     endorsing_rights ;
@@ -1468,7 +1468,7 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
   let chain = `Hash new_head.Client_baking_blocks.chain_id in
   let block = `Hash (new_head.hash, 0) in
   let level = Raw_level.succ new_head.level in
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     cctxt
     ~max_priority
     ~levels:[level]
@@ -1482,8 +1482,7 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
       let slots =
         List.filter_map
           (function
-            | {Alpha_services.Delegate.Baking_rights.timestamp = None; _} ->
-                None
+            | {Plugin.RPC.Baking_rights.timestamp = None; _} -> None
             | {timestamp = Some timestamp; priority; delegate; _} ->
                 Some (timestamp, (new_head, priority, delegate)))
           slots

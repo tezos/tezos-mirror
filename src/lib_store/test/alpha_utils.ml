@@ -153,52 +153,38 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_priority ctxt priority block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     (rpc_ctxt ctxt)
     ~all:true
     ~max_priority:(priority + 1)
     block
   >>=? fun bakers ->
-  let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
     List.find
-      (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
-        p = priority)
+      (fun {Plugin.RPC.Baking_rights.priority = p; _} -> p = priority)
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_by_account ctxt pkh block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     (rpc_ctxt ctxt)
     ~delegates:[pkh]
     ~max_priority:256
     block
   >>=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_excluding ctxt excludes block =
-  Alpha_services.Delegate.Baking_rights.get
-    (rpc_ctxt ctxt)
-    ~max_priority:256
-    block
+  Plugin.RPC.Baking_rights.get (rpc_ctxt ctxt) ~max_priority:256 block
   >>=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     List.find
-      (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+      (fun {Plugin.RPC.Baking_rights.delegate; _} ->
         not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
