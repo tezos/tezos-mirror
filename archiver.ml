@@ -154,18 +154,26 @@ let write filename encoding value =
     filename
     (Data_encoding.Json.construct encoding value)
 
-let files_in_use = ref []
+module StringMap = Map.Make(Compare.String)
+
+let files_in_use = ref StringMap.empty
 
 let get_file_mutex filename =
-  match List.assoc_opt filename !files_in_use with
+  match StringMap.find filename !files_in_use with
   | None ->
       let x = Lwt_mutex.create () in
-      let () = files_in_use := (filename, x) :: !files_in_use in
+      let () = files_in_use := StringMap.add filename  x !files_in_use in
       x
   | Some x -> x
 
 let drop_file_mutex filename =
-  files_in_use := List.filter (fun (name,mutex) -> not (String.equal name filename && Lwt_mutex.is_empty mutex)) !files_in_use
+  files_in_use :=
+    StringMap.filter
+      (fun name mutex ->
+        not
+          ( String.equal name filename
+          && not (Lwt_mutex.is_locked mutex) && Lwt_mutex.is_empty mutex) )
+      !files_in_use
 
 let dump_anomalies path level anomalies =
   let filename =
@@ -311,7 +319,11 @@ let dump_received path ?unaccurate level items =
   Lwt_mutex.with_lock mutex (fun () ->
       Lwt_io.printl
         (Format.asprintf
-      "Locked %s from [%a]" filename (Format.pp_print_list (fun f (x,_) -> Format.pp_print_string f x)) (!files_in_use)) >>= fun () ->
+           "Locked %s from [%a]"
+           filename
+           (Format.pp_print_seq (fun f (x, _) -> Format.pp_print_string f x))
+           (StringMap.to_seq !files_in_use))
+      >>= fun () ->
       load filename encoding empty >>=? fun infos ->
       let (updated_known, unknown) =
         List.fold_left
