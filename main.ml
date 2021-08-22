@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Block_services = Protocol_client_context.Alpha_block_services
-open Tezos_protocol_009_PsFLoren
+open Tezos_protocol_010_PtGRANAD
 
 let dump_my_current_endorsements cctxt ?unaccurate ~full block level errors ops
     =
@@ -37,7 +37,7 @@ let dump_my_current_endorsements cctxt ?unaccurate ~full block level errors ops
       Protocol.Delegate_services.Endorsing_rights.(
         fun (acc, rights) (delay, slot) ->
           match
-            List.partition (fun right -> List.mem slot right.slots) rights
+            List.partition (fun right -> List.mem ~equal:Int.equal slot right.slots) rights
           with
           | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
@@ -231,7 +231,7 @@ let blocks_loop cctxt =
                   { contents =
                       Single_result
                         (Protocol.Apply_results.Endorsement_with_slot_result
-                          (Tezos_raw_protocol_009_PsFLoren.Apply_results
+                          (Tezos_raw_protocol_010_PtGRANAD.Apply_results
                            .Endorsement_result { delegate; _ }))
                   }) ->
                 Some delegate
