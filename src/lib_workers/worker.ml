@@ -328,7 +328,12 @@ struct
         | Lwt_dropbox.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
             fail (Closed {base = base_name; name})
-        | exn -> fail (Exn exn))
+        | exn ->
+            (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
+               We don't want to catch any other exception but we cannot use an
+               incomplete pattern like we would in a [try]-[with] construct so
+               we must explicitly match and re-raise [exn]. *)
+            raise exn)
 
   module type BOX = sig
     type t
@@ -397,7 +402,7 @@ struct
               | Lwt_pipe.Closed ->
                   let name = Format.asprintf "%a" Name.pp w.name in
                   fail (Closed {base = base_name; name})
-              | exn -> fail (Exn exn))
+              | exn -> raise exn)
 
     let pending_requests (type a) (w : a queue t) =
       let peeked =
