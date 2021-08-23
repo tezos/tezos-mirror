@@ -1,7 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 <test-package> <test-name> [<additional dune options>]"
+    echo
+    echo "Runs the tests in <test-package>, redirecting the output to \`tests_results/<test-name>.log\`."
+    echo "In addition, it outputs a rudimentary JUnit test report file to \`tests_results/<test-name>.xml\`."
+    echo
+    echo "Example: $0 src/lib_p2p p2p"
+    exit 1
+fi
 
 nametest=${1:?}
-name=${2:?}
+shift
+name=${1:?}
+shift
 
 mkdir -p test_results
 
@@ -9,7 +21,8 @@ echo "Running test \"dune build @$nametest/runtest\" ..."
 
 START=$(date +%s.%N)
 
-dune build "@$nametest/runtest" > "test_results/$name.log" 2>&1
+dune build "$@" "@$nametest/runtest" > "test_results/$name.log" 2>&1
+
 EXITCODE=$?
 
 END=$(date +%s.%N)

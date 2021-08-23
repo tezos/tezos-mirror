@@ -47,7 +47,6 @@ stages:
   - build_release
   - publish_release
   - test_coverage
-  - publish_coverage
   - manual
 
 # Basic, specialised, minimal, orthogonal templates
@@ -156,11 +155,15 @@ stages:
         - /.gitlab-ci.yml
       when: always
     - when: never
+
 .rules_template__development_coverage:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - when: never
+    - if: '$CI_COMMIT_BRANCH =~ /coverage/'
+      when: always
+    - when: manual
+      allow_failure: true
 
 .rules_template__extended_test_pipeline:
   rules:

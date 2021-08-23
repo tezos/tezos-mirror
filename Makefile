@@ -130,7 +130,7 @@ PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
 PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
 
 $(PROTO_TARGETS): %.test_proto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*))
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) $(COVERAGE_OPTIONS)
 
 .PHONY: test-proto-unit
 test-proto-unit: $(PROTO_TARGETS)
@@ -141,7 +141,7 @@ NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
 NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
 
 $(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*)))
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) $(COVERAGE_OPTIONS)
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit: $(NONPROTO_TARGETS)
@@ -153,11 +153,15 @@ test-unit: test-nonproto-unit test-proto-unit
 test-python: all
 	@$(MAKE) -C tests_python all
 
+.PHONY: test-python-alpha
+test-python-alpha: all
+	@make -C tests_python alpha
+
 .PHONY: test-flextesa
 test-flextesa:
 	@$(MAKE) -f sandbox.Makefile
 
-.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v test-tezt-timeout
 test-tezt:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
 test-tezt-i:
@@ -166,6 +170,8 @@ test-tezt-c:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 test-tezt-v:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
+test-tezt-timeout:
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --test-timeout 1800
 
 .PHONY: test-code
 test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt

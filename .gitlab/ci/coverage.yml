@@ -7,15 +7,30 @@ test_coverage:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development_coverage
   stage: test_coverage
+  needs: []
+  parallel:
+    matrix:
+      # Set up tests suites to run. Note that each of these make will
+      # create a separate report.
+      - TEST_TARGET:
+        - test-unit
+        # Running the full set of python tests take more than 4 hours
+        # triggering a timeout. We only run the tests for tests_alpha
+        # in the mean time
+        - test-python-alpha
+        # Tezt tests are run with an individual timeout, to work around
+        # https://gitlab.com/tezos/tezos/-/issues/1652
+        - test-tezt-timeout
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   script:
     - make
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
     # A failing test shouldn't prevent the generation of the report (|| true)
-    - BISECT_FILE=$(pwd)/_coverage_output/ make test-coverage || true
+    - make $TEST_TARGET || true
     - make coverage-report
     - make coverage-report-summary
     # hack to capture script success in after_script script
