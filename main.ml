@@ -137,10 +137,9 @@ let rec valid_endorsements_loop cctxt unaccurate =
         timed_ops
       >>=? fun () -> next
 
-let errors_of_operation cctxt op =
+let errors_of_operation cctxt op_hash =
   Block_services.Mempool.pending_operations cctxt ~chain:cctxt#chain ()
   >|=? fun { refused; branch_refused; branch_delayed; _ } ->
-  let op_hash = Protocol.Alpha_context.Operation.hash_packed op in
   match Operation_hash.Map.find op_hash branch_delayed with
   | Some (_, err) -> err
   | None -> (
@@ -150,6 +149,12 @@ let errors_of_operation cctxt op =
           match Operation_hash.Map.find op_hash refused with
           | Some (_, err) -> err
           | None -> [] ) )
+
+module EndorsementLRU =
+  (val Ringo.set_maker ~replacement:Ringo.FIFO ~overflow:Ringo.Weak ~accounting:Ringo.Sloppy)
+  (Operation_hash)
+
+let known_problems = EndorsementLRU.create 25000
 
 let rec invalid_endorsements_loop cctxt =
   Block_services.Mempool.monitor_operations
@@ -169,7 +174,12 @@ let rec invalid_endorsements_loop cctxt =
       | (_, None) -> Lwt.return acc
       | (None, Some _) -> assert false
       | (Some (block, level), Some news) ->
-          errors_of_operation cctxt op >>=? fun errors ->
+         let op_hash = Protocol.Alpha_context.Operation.hash_packed op in
+         if EndorsementLRU.mem known_problems op_hash then
+           Lwt.return acc
+         else
+           let () = EndorsementLRU.add known_problems op_hash in
+           errors_of_operation cctxt op_hash >>=? fun errors ->
           Lwt.return
             (acc >|? fun l -> (block, level, errors, (delay, news)) :: l))
     op_stream
