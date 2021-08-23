@@ -73,16 +73,21 @@ val endorsement_rights :
   Level.t ->
   (public_key * int list * bool) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-(** Check that the operation was signed by a the delegate allowed to
+(** Check that the operation was signed by the delegate allowed to
    endorse at the given slot and at the level specified by the
-   endorsement. The slot should be the smallest among the delegate's
-   slots. *)
-val check_endorsement_rights :
+   endorsement. Returns the delegate. *)
+val check_endorsement_right :
   context ->
   Chain_id.t ->
   slot:int ->
   Kind.endorsement Operation.t ->
-  (public_key_hash * int list * bool) tzresult Lwt.t
+  public_key_hash tzresult Lwt.t
+
+(** Check that, at current level, the given slot is the smallest among
+   the delegate's slots. Returns all the slots of the delegate and "if
+   the slot has been used already" *)
+val check_endorsement_slots_at_current_level :
+  context -> slot:int -> public_key_hash -> (int list * bool) tzresult Lwt.t
 
 (** Returns the baking reward calculated w.r.t a given priority [p] and a
     number [e] of included endorsements *)

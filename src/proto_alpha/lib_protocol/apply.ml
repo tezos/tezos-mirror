@@ -1206,8 +1206,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       else
         let operation = unslotted (* shadow the slot box *) in
         let block = operation.shell.branch in
-        Baking.check_endorsement_rights ctxt chain_id operation ~slot
-        >>=? fun (delegate, slots, used) ->
+        Baking.check_endorsement_right ctxt chain_id operation ~slot
+        >>=? fun delegate ->
         error_unless
           (Block_hash.equal block pred_block)
           (Wrong_endorsement_predecessor (pred_block, block))
@@ -1217,6 +1217,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Raw_level.(succ level = current_level)
           Invalid_endorsement_level
         >>?= fun () ->
+        Baking.check_endorsement_slots_at_current_level ctxt ~slot delegate
+        >>=? fun (slots, used) ->
         if used then fail (Duplicate_endorsement delegate)
         else
           let ctxt = record_endorsement ctxt delegate in
@@ -1283,10 +1285,10 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
             (Outdated_double_endorsement_evidence
                {level = level.level; last = oldest_level})
           >>=? fun () ->
-          Baking.check_endorsement_rights ctxt chain_id op1 ~slot
-          >>=? fun (delegate1, _, _) ->
-          Baking.check_endorsement_rights ctxt chain_id op2 ~slot
-          >>=? fun (delegate2, _, _) ->
+          Baking.check_endorsement_right ctxt chain_id op1 ~slot
+          >>=? fun delegate1 ->
+          Baking.check_endorsement_right ctxt chain_id op2 ~slot
+          >>=? fun delegate2 ->
           fail_unless
             (Signature.Public_key_hash.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence {delegate1; delegate2})

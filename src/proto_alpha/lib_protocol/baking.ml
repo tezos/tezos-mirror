@@ -325,33 +325,31 @@ let endorsement_rights ctxt level =
     (0 --> (Constants.endorsers_per_block ctxt - 1))
     Signature.Public_key_hash.Map.empty
 
-let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
+let[@coq_axiom_with_reason "gadt"] check_endorsement_right ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
   if
     Compare.Int.(slot < 0 (* should not happen because of binary format *))
     || Compare.Int.(slot >= Constants.endorsers_per_block ctxt)
   then fail (Invalid_endorsement_slot slot)
   else
-    let current_level = Level.current ctxt in
     let (Single (Endorsement {level; _})) = op.protocol_data.contents in
     Roll.endorsement_rights_owner ctxt (Level.from_raw ctxt level) ~slot
     >>=? fun pk ->
     let pkh = Signature.Public_key.hash pk in
     match Operation.check_signature pk chain_id op with
     | Error _ -> fail Unexpected_endorsement
-    | Ok () -> (
-        (if Raw_level.(succ level = current_level.level) then
-         return (Alpha_context.allowed_endorsements ctxt)
-        else endorsement_rights ctxt (Level.from_raw ctxt level))
-        >>=? fun endorsements ->
-        match Signature.Public_key_hash.Map.find pkh endorsements with
-        | None -> fail Unexpected_endorsement (* unexpected *)
-        | Some (_pk, (top_slot :: _ as slots), v) ->
-            error_unless
-              Compare.Int.(slot = top_slot)
-              (Unexpected_endorsement_slot slot)
-            >>?= fun () -> return (pkh, slots, v)
-        | Some (_pk, [], _) -> fail (Unexpected_endorsement_slot slot))
+    | Ok () -> return pkh
+
+let check_endorsement_slots_at_current_level ctxt ~slot pkh =
+  let endorsements = Alpha_context.allowed_endorsements ctxt in
+  match Signature.Public_key_hash.Map.find pkh endorsements with
+  | None -> fail Unexpected_endorsement (* unexpected *)
+  | Some (_pk, (top_slot :: _ as slots), v) ->
+      error_unless
+        Compare.Int.(slot = top_slot)
+        (Unexpected_endorsement_slot slot)
+      >>?= fun () -> return (slots, v)
+  | Some (_pk, [], _) -> fail (Unexpected_endorsement_slot slot)
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =

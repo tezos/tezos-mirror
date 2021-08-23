@@ -293,40 +293,6 @@ let grace_period ctxt block pkh =
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
 
-module Endorsing_power = struct
-  let endorsing_power ctxt (operation, chain_id) =
-    let (Operation_data data) = operation.protocol_data in
-    match data.contents with
-    | Single (Endorsement_with_slot {endorsement; slot}) ->
-        Baking.check_endorsement_rights ctxt chain_id endorsement ~slot
-        >|=? fun (_, slots, _) -> List.length slots
-    | _ -> failwith "Operation is not a wrapped endorsement"
-
-  module S = struct
-    let endorsing_power =
-      let open Data_encoding in
-      RPC_service.post_service
-        ~description:
-          "Get the endorsing power of an endorsement, that is, the number of \
-           slots that the endorser has"
-        ~query:RPC_query.empty
-        ~input:
-          (obj2
-             (req "endorsement_operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding))
-        ~output:int31
-        RPC_path.(open_root / "endorsing_power")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 ~chunked:false S.endorsing_power (fun ctxt () (op, chain_id) ->
-        endorsing_power ctxt (op, chain_id))
-
-  let get ctxt block op chain_id =
-    RPC_context.make_call0 S.endorsing_power ctxt block () (op, chain_id)
-end
-
 module Minimal_valid_time = struct
   let minimal_valid_time ctxt ~priority ~endorsing_power ~predecessor_timestamp
       =
@@ -381,11 +347,7 @@ end
 
 let register () =
   delegate_register () ;
-  Endorsing_power.register () ;
   Minimal_valid_time.register ()
-
-let endorsing_power ctxt operation =
-  Endorsing_power.endorsing_power ctxt operation
 
 let minimal_valid_time ctxt priority endorsing_power predecessor_timestamp =
   Minimal_valid_time.minimal_valid_time

@@ -30,6 +30,14 @@ Bug fixes
 
 - A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
 
+RPC changes
+-----------
+
+- Deprecated RPC ``POST ../endorsing_power`` has been removed. Clients
+  already used ``GET ../helpers/endorsement_rights`` which is clearer, as
+  powerful and equaly costly in term of computation for the
+  node. (MR :gl: `!3395`)
+
 Minor changes
 -------------
 
@@ -37,6 +45,10 @@ Minor changes
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
   :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266`)
+
+- Check order in the validation of endorsements has changed to not
+  compute all endorsement slots of a level if the endorsement is
+  invalid. (MR :gl: `!3395`)
 
 New Features
 ------------
