@@ -418,17 +418,18 @@ struct
               | exn -> fail (Exn exn))
 
     let pending_requests (type a) (w : a queue t) =
-      match w.buffer with
-      | Queue_buffer message_queue ->
-          List.map
-            (function (t, Message (req, _)) -> (t, Request.view req))
-            (try Lwt_pipe.Unbounded.peek_all_now message_queue
-             with Lwt_pipe.Closed -> [])
-      | Bounded_buffer message_queue ->
-          List.map
-            (function (t, Message (req, _)) -> (t, Request.view req))
-            (try Lwt_pipe.Bounded.peek_all_now message_queue
-             with Lwt_pipe.Closed -> [])
+      let peeked =
+        try
+          match w.buffer with
+          | Queue_buffer message_queue ->
+              Lwt_pipe.Unbounded.peek_all_now message_queue
+          | Bounded_buffer message_queue ->
+              Lwt_pipe.Bounded.peek_all_now message_queue
+        with Lwt_pipe.Closed -> []
+      in
+      List.map
+        (function (t, Message (req, _)) -> (t, Request.view req))
+        peeked
 
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =
