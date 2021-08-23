@@ -980,19 +980,42 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       in
       fetch_operations w pv ~peer to_fetch
 
-    let on_flush w pv predecessor live_blocks live_operations =
+    let on_flush w pv new_predecessor new_live_blocks new_live_operations =
+      let old_predecessor = pv.predecessor in
+      pv.predecessor <- new_predecessor ;
+      pv.live_blocks <- new_live_blocks ;
+      pv.live_operations <- new_live_operations ;
       Lwt_watcher.shutdown_input pv.operation_stream ;
+      pv.operation_stream <- Lwt_watcher.create_input () ;
+      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
+      pv.timestamp <- timestamp_system ;
+      let timestamp = Time.System.to_protocol timestamp_system in
       let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+      Prevalidation.create
+        chain_store
+        ~predecessor:new_predecessor
+        ~live_blocks:new_live_blocks
+        ~live_operations:new_live_operations
+        ~timestamp
+        ()
+      >>= fun validation_state ->
+      pv.validation_state <- validation_state ;
       list_pendings
         pv.parameters.chain_db
-        ~from_block:pv.predecessor
-        ~to_block:predecessor
-        ~live_blocks
+        ~from_block:old_predecessor
+        ~to_block:new_predecessor
+        ~live_blocks:new_live_blocks
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
            (Preapply_result.operations (validation_result pv))
            pv.pending)
       >>= fun pending ->
+      pv.in_mempool <- Operation_hash.Set.empty ;
+      Ringo.Ring.clear pv.branch_delayed.ring ;
+      pv.branch_delayed.map <- Operation_hash.Map.empty ;
+      Ringo.Ring.clear pv.branch_refused.ring ;
+      pv.branch_refused.map <- Operation_hash.Map.empty ;
+      pv.applied <- [] ;
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
@@ -1003,34 +1026,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         pending
         Operation_hash.Map.empty
       >>= fun pending ->
-      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
-      let timestamp = Time.System.to_protocol timestamp_system in
-      Prevalidation.create
-        chain_store
-        ~predecessor
-        ~live_blocks
-        ~live_operations
-        ~timestamp
-        ()
-      >>= fun validation_state ->
       Worker.log_event
         w
         (Operations_not_flushed (Operation_hash.Map.cardinal pending))
       >>= fun () ->
-      pv.predecessor <- predecessor ;
-      pv.live_blocks <- live_blocks ;
-      pv.live_operations <- live_operations ;
-      pv.timestamp <- timestamp_system ;
       pv.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.pending <- pending ;
-      pv.in_mempool <- Operation_hash.Set.empty ;
-      Ringo.Ring.clear pv.branch_delayed.ring ;
-      pv.branch_delayed.map <- Operation_hash.Map.empty ;
-      Ringo.Ring.clear pv.branch_refused.ring ;
-      pv.branch_refused.map <- Operation_hash.Map.empty ;
-      pv.applied <- [] ;
-      pv.validation_state <- validation_state ;
-      pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
 
     let on_advertise pv =
