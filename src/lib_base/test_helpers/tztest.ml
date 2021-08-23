@@ -31,8 +31,10 @@ open Tezos_event_logging_test_helpers
 
 (** Transform a function running in the error monad into an Alcotest, taking
     care of failing the test if the function results is an error.
-    Note that the given function must still take care of test assertions. *)
-let tztest name speed f =
+    Note that the given function must still take care of test assertions,
+    e.g. by using [Alcotest.check]. *)
+let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
+    : unit Alcotest_lwt.test_case =
   Alcotest_lwt.test_case name speed (fun _sw () ->
       f () >>= function
       | Ok () -> Lwt.return_unit
