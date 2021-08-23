@@ -407,10 +407,10 @@ struct
             fail (Closed {base = base_name; name}))
       | Bounded_buffer message_queue ->
           let (t, u) = Lwt.wait () in
-          Lwt.catch
+          Lwt.try_bind
             (fun () ->
-              Lwt_pipe.Bounded.push message_queue (queue_item ~u request)
-              >>= fun () -> t)
+              Lwt_pipe.Bounded.push message_queue (queue_item ~u request))
+            (fun () -> t)
             (function
               | Lwt_pipe.Closed ->
                   let name = Format.asprintf "%a" Name.pp w.name in
