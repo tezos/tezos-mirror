@@ -522,12 +522,6 @@ let ban_operation_branch_refused_reevaluated =
     count_mempool mempool_after_injections_2
   in
   let (oph_to_ban, oph_remaining, client) =
-    let oph_applied =
-      JSON.(mempool_after_injections_1 |-> "applied" |=> 0 |-> "hash")
-    in
-    let oph_refused =
-      JSON.(mempool_after_injections_1 |-> "branch_refused" |=> 0 |=> 0)
-    in
     (* It may be possible that node 1 is never aware of the second
        operation if:
 
@@ -538,13 +532,18 @@ let ban_operation_branch_refused_reevaluated =
 
        However, this is unlikely for the moment since node 2 will
        advertise its mempool before flushing. *)
-    if mempool_count_after_injections_1.total = 2 then
-      (oph_applied, oph_refused, client_1)
-    else if mempool_count_after_injections_2.total = 2 then
-      (oph_refused, oph_applied, client_2)
-    else
-      Test.fail
-        "A problem occured during the test (probably a flakyness issue)."
+    let (mempool, client) =
+      if mempool_count_after_injections_1.total = 2 then
+        (mempool_after_injections_1, client_1)
+      else if mempool_count_after_injections_2.total = 2 then
+        (mempool_after_injections_2, client_2)
+      else
+        Test.fail
+          "A problem occured during the test (probably a flakyness issue)."
+    in
+    let oph_applied = JSON.(mempool |-> "applied" |=> 0 |-> "hash") in
+    let oph_refused = JSON.(mempool |-> "branch_refused" |=> 0 |=> 0) in
+    (oph_refused, oph_applied, client)
   in
   Log.info "ban operation %s" JSON.(oph_to_ban |> as_string) ;
   let* _ =
@@ -552,9 +551,9 @@ let ban_operation_branch_refused_reevaluated =
       ~data:(`String JSON.(oph_to_ban |> as_string))
       client
   in
-  let* mempool_after_injections = RPC.get_mempool_pending_operations client in
+  let* mempool_after_ban = RPC.get_mempool_pending_operations client in
   Log.info "check operation %s is applied" JSON.(oph_remaining |> as_string) ;
-  check_operation_is_in_applied_mempool mempool_after_injections oph_remaining ;
+  check_operation_is_in_applied_mempool mempool_after_ban oph_remaining ;
   Lwt.return_unit
 
 (* TODO: add a test than ensure that we cannot have more than 1000
