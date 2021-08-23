@@ -158,21 +158,12 @@ module type T = sig
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    (** With [BOUNDED_QUEUE]s, you can push requests in the queue tentatively *)
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox : sig
     include BOX with type t := dropbox t
   end
 
   module Queue : sig
     include QUEUE with type 'a t := 'a queue t
-
-    include BOUNDED_QUEUE with type t := bounded queue t
 
     (** Adds a message to the queue immediately. *)
     val push_request_now : infinite queue t -> 'a Request.t -> unit

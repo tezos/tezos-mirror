@@ -163,20 +163,12 @@ module type T = sig
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox : sig
     include BOX with type t := dropbox t
   end
 
   module Queue : sig
     include QUEUE with type 'a t := 'a queue t
-
-    include BOUNDED_QUEUE with type t := bounded queue t
 
     (** Adds a message to the queue immediately. *)
     val push_request_now : infinite queue t -> 'a Request.t -> unit
@@ -358,12 +350,6 @@ struct
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox = struct
     let put_request (w : dropbox t) request =
       let (Dropbox {merge}) = w.table.buffer_kind in
@@ -390,10 +376,6 @@ struct
       let (Queue_buffer message_queue) = w.buffer in
       if Lwt_pipe.Unbounded.is_closed message_queue then ()
       else Lwt_pipe.Unbounded.push message_queue (queue_item request)
-
-    let try_push_request_now (w : bounded queue t) request =
-      let (Bounded_buffer message_queue) = w.buffer in
-      Lwt_pipe.Bounded.push_now message_queue (queue_item request)
 
     let push_request_and_wait (type a) (w : a queue t) request =
       match w.buffer with
