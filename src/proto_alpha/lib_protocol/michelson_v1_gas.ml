@@ -1293,7 +1293,7 @@ module Cost_of = struct
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
     (* FIXME *)
-    let open_chest _chest_key _chest = atomic_step_cost (S.safe_int 3)
+    let open_chest ~chest:_ ~time:_ = atomic_step_cost (S.safe_int 3)
 
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)

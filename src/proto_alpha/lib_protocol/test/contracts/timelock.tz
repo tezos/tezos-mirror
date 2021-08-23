@@ -1,7 +1,7 @@
 # This contract takes a chest and chest key as parameter.
-# It tries to open it and stores the resulting bytes if successfull.
-# Otherwise if stores some harcoded bytes to test that we are in
-#the expected branch
+# It tries to open it and stores the resulting bytes if successful.
+# Otherwise it stores some hardcoded bytes to test that we are in
+# the expected branch
 storage (bytes);
 parameter (pair (chest_key) (chest));
 code {
@@ -11,13 +11,13 @@ code {
        DIIP {PUSH nat 1000};
        OPEN_CHEST;
        IF_LEFT
-         { # successfull case
+         { # successful case
            NIL operation;
            PAIR ;
          }
          {
            IF
-             { #first type of failure
+             { # first type of failure
                PUSH bytes 0x01;
                NIL operation;
                PAIR;

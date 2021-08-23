@@ -560,6 +560,7 @@ let unparse_with_data_encoding ctxt s unparse_cost encoding =
     ( Gas.consume ctxt unparse_cost >|? fun ctxt ->
       let bytes = Data_encoding.Binary.to_bytes_exn encoding s in
       (Bytes (-1, bytes), ctxt) )
+
 (* -- Unparsing data of complex types -- *)
 
 type ('ty, 'depth) comb_witness =
@@ -5371,7 +5372,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (t, _, _) ) ->
       serialize_ty_for_error ctxt t >>?= fun (t, _ctxt) ->
       fail (Undefined_unop (loc, name, t))
-  | (Prim (loc, ((I_UPDATE | I_SLICE) as name), [], _), stack) ->
+  | (Prim (loc, ((I_UPDATE | I_SLICE | I_OPEN_CHEST) as name), [], _), stack) ->
       Lwt.return
         ( serialize_stack_for_error ctxt stack >>? fun (stack, _ctxt) ->
           error (Bad_stack (loc, name, 3, stack)) )
@@ -5391,7 +5392,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            | I_LE | I_GE | I_SIZE | I_FAILWITH | I_RENAME | I_PACK | I_ISNAT
            | I_ADDRESS | I_SET_DELEGATE | I_CAST | I_MAP | I_ITER | I_LOOP_LEFT
            | I_UNPACK | I_CONTRACT | I_NEVER | I_KECCAK | I_SHA3 | I_READ_TICKET
-           | I_JOIN_TICKETS | I_OPEN_CHEST ) as name),
+           | I_JOIN_TICKETS ) as name),
           _,
           _ ),
       stack ) ->
