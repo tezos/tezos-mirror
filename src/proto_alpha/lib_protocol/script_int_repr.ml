@@ -65,6 +65,8 @@ let ediv x y = Option.catch (fun () -> Z.ediv_rem x y)
 
 let add_n = add
 
+let succ_n = Z.succ
+
 let mul_n = mul
 
 let ediv_n = ediv
