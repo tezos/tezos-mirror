@@ -715,6 +715,8 @@ module Instructions = struct
 
   let if_none = ir_sized_step N_IIf_none nullary
 
+  let opt_map = ir_sized_step N_IIf_none nullary
+
   let left = ir_sized_step N_ILeft nullary
 
   let right = ir_sized_step N_IRight nullary
@@ -1087,6 +1089,9 @@ module Control = struct
 
   let view_exit = cont_sized_step N_KView_exit nullary
 
+  (* TODO: Benchmark this! *)
+  let map_head = cont_sized_step N_KReturn nullary
+
   let undip = cont_sized_step N_KUndip nullary
 
   let loop_in = cont_sized_step N_KLoop_in nullary
@@ -1179,6 +1184,7 @@ let extract_ir_sized_step :
   | (ICons_some (_, _), _) -> Instructions.cons_some
   | (ICons_none (_, _), _) -> Instructions.cons_none
   | (IIf_none _, _) -> Instructions.if_none
+  | (IOpt_map _, _) -> Instructions.opt_map
   | (ICons_left (_, _), _) -> Instructions.left
   | (ICons_right (_, _), _) -> Instructions.right
   | (IIf_left _, _) -> Instructions.if_left
@@ -1430,6 +1436,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KNil -> Control.nil
   | KCons _ -> Control.cons
   | KReturn _ -> Control.return
+  | KMap_head (_, _) -> Control.map_head
   | KUndip _ -> Control.undip
   | KLoop_in _ -> Control.loop_in
   | KLoop_in_left _ -> Control.loop_in_left

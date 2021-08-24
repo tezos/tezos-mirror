@@ -336,6 +336,9 @@ module Cost_of = struct
     (* model N_IIf_none *)
     let cost_N_IIf_none = S.safe_int 10
 
+    (* TODO benchmarking required *)
+    let cost_opt_map = S.safe_int 10
+
     (* model N_IImplicit_account *)
     let cost_N_IImplicit_account = S.safe_int 10
 
@@ -708,6 +711,9 @@ module Cost_of = struct
     (* model N_KView_exit *)
     let cost_N_KView_exit = S.safe_int 15
 
+    (* TODO: Benchmark and update the cost *)
+    let const_N_KMap_head = S.safe_int 1
+
     (* model N_KUndip *)
     let cost_N_KUndip = S.safe_int 15
 
@@ -946,6 +952,9 @@ module Cost_of = struct
     let cons_none = atomic_step_cost cost_N_ICons_none
 
     let if_none = atomic_step_cost cost_N_IIf_none
+
+    (* TODO Benchmark this! *)
+    let opt_map = atomic_step_cost cost_opt_map
 
     let cons_pair = atomic_step_cost cost_N_ICons_pair
 
@@ -1481,6 +1490,8 @@ module Cost_of = struct
       let return = atomic_step_cost cost_N_KReturn
 
       let view_exit = atomic_step_cost cost_N_KView_exit
+
+      let map_head = atomic_step_cost const_N_KMap_head
 
       let undip = atomic_step_cost cost_N_KUndip
 

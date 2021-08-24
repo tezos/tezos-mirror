@@ -41,6 +41,8 @@ module Cost_of : sig
 
     val if_none : Gas.cost
 
+    val opt_map : Gas.cost
+
     val cons_pair : Gas.cost
 
     val unpair : Gas.cost
@@ -367,6 +369,8 @@ module Cost_of : sig
       val return : Gas.cost
 
       val view_exit : Gas.cost
+
+      val map_head : Gas.cost
 
       val undip : Gas.cost
 

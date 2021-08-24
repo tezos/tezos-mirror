@@ -230,6 +230,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ICons_some _ -> Interp_costs.cons_some
   | ICons_none _ -> Interp_costs.cons_none
   | IIf_none _ -> Interp_costs.if_none
+  | IOpt_map _ -> Interp_costs.opt_map
   | ICons_pair _ -> Interp_costs.cons_pair
   | IUnpair _ -> Interp_costs.unpair
   | ICar _ -> Interp_costs.car
@@ -339,6 +340,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KNil -> Interp_costs.Control.nil
   | KCons (_, _) -> Interp_costs.Control.cons
   | KReturn _ -> Interp_costs.Control.return
+  | KMap_head (_, _) -> Interp_costs.Control.map_head
   | KUndip (_, _) -> Interp_costs.Control.undip
   | KLoop_in (_, _) -> Interp_costs.Control.loop_in
   | KLoop_in_left (_, _) -> Interp_costs.Control.loop_in_left

@@ -413,6 +413,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
+  | IOpt_map : {
+      kinfo : ('a option, 's) kinfo;
+      body : ('a, 's, 'b, 's) kinstr;
+      k : ('b option, 's, 'c, 't) kinstr;
+    }
+      -> ('a option, 's, 'c, 't) kinstr
   (*
      Unions
      ------
@@ -1033,6 +1039,9 @@ and (_, _, _, _) continuation =
   | KReturn :
       's * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
+  | KMap_head :
+      ('a -> 'b) * ('b, 's, 'r, 'f) continuation
+      -> ('a, 's, 'r, 'f) continuation
   | KUndip :
       'b * ('b, 'a * 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
@@ -1244,6 +1253,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ICons_some (kinfo, _) -> kinfo
   | ICons_none (kinfo, _) -> kinfo
   | IIf_none {kinfo; _} -> kinfo
+  | IOpt_map {kinfo; _} -> kinfo
   | ICons_left (kinfo, _) -> kinfo
   | ICons_right (kinfo, _) -> kinfo
   | IIf_left {kinfo; _} -> kinfo
@@ -1414,6 +1424,10 @@ let kinstr_rewritek :
           branch_if_some = f.apply branch_if_some;
           k = f.apply k;
         }
+  | IOpt_map {kinfo; body; k} ->
+      let body = f.apply body in
+      let k = f.apply k in
+      IOpt_map {kinfo; body; k}
   | ICons_left (kinfo, k) -> ICons_left (kinfo, f.apply k)
   | ICons_right (kinfo, k) -> ICons_right (kinfo, f.apply k)
   | IIf_left {kinfo; branch_if_left; branch_if_right; k} ->
@@ -1828,6 +1842,7 @@ let kinstr_traverse i init f =
     | ICons_none (_, k) -> (next [@ocaml.tailcall]) k
     | IIf_none {kinfo = _; branch_if_none = k1; branch_if_some = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
+    | IOpt_map {kinfo = _; body; k} -> (next2 [@ocaml.tailcall]) body k
     | ICons_left (_, k) -> (next [@ocaml.tailcall]) k
     | ICons_right (_, k) -> (next [@ocaml.tailcall]) k
     | IIf_left {kinfo = _; branch_if_left = k1; branch_if_right = k2; k} ->

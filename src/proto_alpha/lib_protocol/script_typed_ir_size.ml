@@ -434,6 +434,7 @@ and kinstr_size :
     | ICons_some (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICons_none (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IIf_none {kinfo; _} -> ret_succ_adding accu (base kinfo)
+    | IOpt_map {kinfo; _} -> ret_succ_adding accu (base kinfo)
     | ICons_left (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICons_right (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IIf_left {kinfo; _} -> ret_succ_adding accu (base kinfo)
