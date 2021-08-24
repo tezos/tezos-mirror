@@ -97,11 +97,11 @@ let transfer_and_wait_for_injection node client amount_int giver_key
 
 (* Bake for [client] and wait for a flush event on [node] (which should
    be the node associated to this client). If [level] is provided, also
-   wait for the node to reach this level.
+   wait for the node to reach this level. A specific [mempool] can be provided.
 *)
-let bake_wait_log ?level node client =
+let bake_wait_log ?level ?mempool node client =
   let baked = wait_for_flush node in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for ?mempool client in
   let* _ = baked in
   Log.info "Baked." ;
   match level with

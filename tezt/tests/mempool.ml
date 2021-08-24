@@ -1642,6 +1642,17 @@ let unban_all_operations =
   in
   unit
 
+let wait_for_flushed_event node =
+  let filter json =
+    match
+      JSON.(json |=> 1 |-> "event" |-> "operations_not_flushed" |> as_int_opt)
+    with
+    | Some i -> Some i
+    | None -> None
+  in
+  let* i = Node.wait_for node "node_prevalidator.v0" filter in
+  return i
+
 (** This test tries to check that branch_refused operation stays in the mempool after an head increment but is removed from it when a new branch is received.
 
    Scenario:
@@ -1650,25 +1661,30 @@ let unban_all_operations =
 
    + Disconnection of node_1 and node_2
 
-   + Bake on both node to force different branches
+   + Recover counter and branch
 
-   + Reconnection of node_1 and node_2
+   + Inject operation on node_1
 
-   + Endorse on node_1
+   + Check that this operation is applied
 
-   + Check that endorsement is applied on node_1 and branch_refused on node_2
+   + Inject operation on node 2 with the same counter as previous operation from the same source
+
+   + Reconnect and sync nodes
+
+   + Check that node_1 mempool's contain one applied and one branch_refused operation
 
    + Disconnect node_1 and node_2
 
-   + Bake on both nodes
+   + Bake on node_1 (head increment) and checks that branch_refused operation is not reclassify
 
-   + Check that the branch_refused operation on node_2 is still branch_refused after head increment
+   + Check that branch_refused operation is still branch_refused after head increment
+
+   + Bake on node_2 to force higher fitness
 
    + Reconnect node_1 and node_2
 
-   + Bake on node_1 and check on node_2 that the branch_refused operation has been removed from the mempool
-
- *)
+   + Check that branch_refused operation is set to be reclassified on new head
+*)
 let recycling_branch_refused =
   Protocol.register_test
     ~__FILE__
@@ -1679,7 +1695,10 @@ let recycling_branch_refused =
   @@ fun protocol ->
   (* Step 1 *)
   (* Connect and initialise two nodes *)
-  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
+  let* node_1 =
+    Node.init
+      ?event_level:(Some "debug")
+      [Synchronisation_threshold 0; Private_mode]
   and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) () in
@@ -1689,68 +1708,117 @@ let recycling_branch_refused =
   let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
-  Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
-  (* Disconnect node_1 and node_2 *)
-  let* node_2_id = Node.wait_for_identity node_2
-  and* node_1_id = Node.wait_for_identity node_1 in
-  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
-  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in
+  (* Disconnect nodes *)
+  let* node2_identity = Node.wait_for_identity node_2 in
+  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
+  Log.info "nodes are at level 1" ;
   (* Step 3 *)
-  (* Bake on both nodes. This will force different branches *)
-  let bake_waiter_1 = wait_for_flush node_1
-  and bake_waiter_2 = wait_for_flush node_2 in
-  let* () = Client.bake_for client_1
-  and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in
-  let* () = bake_waiter_1 and* () = bake_waiter_2 in
+  (* Recover counter and branch *)
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int counter in
+  let* branch = RPC.get_branch client_1 in
+  let branch = JSON.as_string branch in
   (* Step 4 *)
-  (* Reconnect node_1 and node_2 *)
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  (* Inject operation on node 1 *)
+  let injection_waiter = wait_for_injection node_1 in
+  let* oph =
+    forge_and_inject_operation
+      ~branch
+      ~fee:1000
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_1
+  in
+  let* () = injection_waiter in
+  Log.info "%s injected on node 1" JSON.(oph |> as_string) ;
   (* Step 5 *)
-  (* Endorse on node_1 *)
-  let endorser_waiter = wait_for_injection node_1 in
-  let* () = Client.endorse_for client_1 in
-  let* () = endorser_waiter in
-  Log.info "Endorsement on node_1 done" ;
+  (* Check that operation is applied *)
+  let* mempool_after_injections = RPC.get_mempool_pending_operations client_1 in
+  check_operation_is_in_applied_mempool mempool_after_injections oph ;
+  Log.info "Forged operation is applied in the mempool" ;
   (* Step 6 *)
-  (* Check that endorsement is applied on node_1 and refused on node_2 *)
-  let* pending_op_1 = RPC.get_mempool_pending_operations client_1 in
-  let oph = get_endorsement_hash pending_op_1 in
-  Log.info "Endorsement found in node_1 applied mempool" ;
-  let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in
-  let () = check_if_op_is_branch_refused pending_op_2 oph in
-  Log.info "Endorsement found in branch_refused of node_2 mempool" ;
+  (* Inject operation on node 2 with the same counter from the same source *)
+  let injection_waiter = wait_for_injection node_2 in
+  let* oph2 =
+    forge_and_inject_operation
+      ~branch
+      ~fee:1000
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap3.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_2
+  in
+  let* () = injection_waiter in
+  Log.info
+    "%s injected on node 2 with the same counter as %s"
+    JSON.(oph2 |> as_string)
+    JSON.(oph |> as_string) ;
   (* Step 7 *)
-  (* Disconnect node_1 and node_2 *)
-  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
-  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in
+  (* Reconnect and sync nodes *)
+  let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
+  let empty_mempool_file = Temp.file "mempool.json" in
+  let* _ =
+    let empty_mempool =
+      {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+    in
+    Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
+        Lwt_io.write oc empty_mempool)
+  in
+  let flush_waiter_1 = wait_for_flush node_1 in
+  let flush_waiter_2 = wait_for_flush node_2 in
+  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () = flush_waiter_1 and* () = flush_waiter_2 in
+  Log.info "bake block to ensure mempool synchronisation" ;
   (* Step 8 *)
-  (*  Bake on both nodes *)
-  let bake_waiter_1 = wait_for_flush node_1
-  and bake_waiter_2 = wait_for_flush node_2 in
-  let* () = Client.bake_for client_1
-  and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in
-  let* () = bake_waiter_1 and* () = bake_waiter_2 in
+  (* Check that node_1 mempool's contain one applied and one branch_refused operation *)
+  let* mempool = RPC.get_mempool_pending_operations client_1 in
+  let mempool_count = count_mempool mempool in
+  assert (mempool_count.branch_refused = 1 && mempool_count.applied = 1) ;
+  let _oph_applied = JSON.(mempool |-> "applied" |=> 0 |-> "hash") in
+  let oph_branch_refused =
+    JSON.(mempool |-> "branch_refused" |=> 0 |=> 0 |> as_string)
+  in
   (* Step 9 *)
-  (* Check that branch_refused operation is still branch_refused after head increment *)
-  let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in
-  let () = check_if_op_is_branch_refused pending_op_2 oph in
+  (* Disconnect node_1 and node_2 *)
+  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
   (* Step 10 *)
-  (* Reconnect node_1 and node_2 *)
+  (*  Bake on node_1 (head increment) and checks that branch_refused operation is not reclassify *)
+  let bake_waiter_1 = wait_for_flushed_event node_1 in
+  let* () = Client.bake_for client_1 in
+  let* pending = bake_waiter_1 in
+  if pending > 1 then Test.fail "Branch_refused operation should not be pending" ;
+  (* Step 11 *)
+  (* Check that branch_refused operation is still branch_refused after head increment *)
+  let* pending_op = RPC.get_mempool_pending_operations client_1 in
+  let () = check_if_op_is_branch_refused pending_op oph_branch_refused in
+  (* Step 12  *)
+  (* Bake on node_2 to force higher fitness  *)
+  let* () =
+    repeat 2 (fun () ->
+        Node_event_level.bake_wait_log
+          ~mempool:empty_mempool_file
+          node_2
+          client_2)
+  in
+  (* Step 13 *)
+  (* Reconnect node_1 and node_2  *)
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let bake_waiter_1 = wait_for_flushed_event node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  (* Step 11 *)
-  (* Bake on node_1 and check that branch_refused operation on node_2 has been removed from the mempool *)
-  let bake_waiter_1 = wait_for_flush node_1 in
-  let* () = Client.bake_for client_1 in
-  let* () = bake_waiter_1 in
-  let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in
-  let count_branch_refused_2 = (count_mempool pending_op_2).branch_refused in
-  if count_branch_refused_2 <> 0 then
-    Test.fail "branch refused operation should have been recycled" ;
+  (* Step 14 *)
+  (* Check that branch_refused operation is set to be reclassified on new head*)
+  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* pending = bake_waiter_1 in
+  if pending <> 2 then Test.fail "the two operations should be reclassified" ;
   unit
 
 let register ~protocols =

@@ -299,7 +299,7 @@ module Event = struct
         case
           (Tag 7)
           ~title:"operations_not_flushed"
-          int31
+          (obj1 (req "operations_not_flushed" int31))
           (function Operations_not_flushed n -> Some n | _ -> None)
           (fun n -> Operations_not_flushed n);
         case
