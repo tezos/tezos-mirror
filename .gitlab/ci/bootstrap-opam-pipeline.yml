@@ -4,7 +4,7 @@ opam:list_packages:
     - .image_template__runtime_build_test_dependencies_template
   stage: bootstrap
   script:
-    - . ./scripts/opam-pin.sh && echo PACKAGES=$(echo $packages | tr '\n' ' ') >> opam.env
+    - . ./scripts/opam-pin.sh && echo PACKAGES=$(echo $packages | tr '\n' ' ') > opam.env
     - ./scripts/detect-opam-changes.sh
   artifacts:
     reports:
