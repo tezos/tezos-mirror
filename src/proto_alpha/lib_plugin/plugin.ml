@@ -1189,7 +1189,7 @@ module RPC = struct
 
     *)
     let simulate_operation_service ctxt () (op, chain_id, time_in_blocks) =
-      let ctxt = Cache.future_cache_expectation ctxt ~time_in_blocks in
+      let ctxt = Cache.Admin.future_cache_expectation ctxt ~time_in_blocks in
       run_operation_service ctxt () (op, chain_id)
 
     let register () =

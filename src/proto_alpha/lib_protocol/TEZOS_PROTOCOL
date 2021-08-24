@@ -72,7 +72,7 @@
         "Sapling_validator",
 
         "Global_constants_storage",
-        
+
         "Alpha_context",
 
         "Script_typed_ir",
@@ -85,6 +85,7 @@
         "Script_set",
         "Script_map",
         "Script_ir_translator",
+        "Script_cache",
         "Script_tc_errors_registration",
         "Script_interpreter_defs",
         "Script_interpreter",

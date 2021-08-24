@@ -46,7 +46,10 @@
    2. The in-memory cache must be completely determined by the
    storage.
 
-   3. The loading of the cache should not introduce any latency.
+   3. The loading of the cache should introduce minimal latency during
+   node reboots, RPC processing, or other operations. The cache should
+   also have similar reactivity time on every node, independently of
+   the fact that the node has just been rebooted or not.
 
    This module implements the core logic of the cache mechanism (not
    the storage) part. The implementation provided to the protocol is
@@ -262,10 +265,9 @@ val sync : 'value t -> cache_nonce:Bytes.t -> 'value t * domain
    cache. *)
 val number_of_caches : 'value t -> int
 
-(** [list_keys cache ~cache_index] returns the list of keys (as
-   identifier) along with their size recorded into the subcache with
-   index [cache_index]. *)
-val list_keys : 'value t -> cache_index:index -> (identifier * size) list
+(** [list_keys cache ~cache_index] returns the list of keys along with
+   their age recorded into the subcache with index [cache_index]. *)
+val list_keys : 'value t -> cache_index:index -> (key * int) list
 
 (** [key_rank cache key] returns the rank of the value associated to
    the given [key]. The rank is defined as the number of values older

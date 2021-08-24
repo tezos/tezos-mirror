@@ -15,7 +15,7 @@ The main novelties in the Alpha protocol are:
 - Context storage flattening for better context access performance.  Hex-nested
   directories like `/12/af/83/3d/` are removed from the context.  (MR :gl:`!2771`)
 - Gas calculation fix based on the new flattend context layout (MR :gl:`!2771`)
-- Caching of smart contracts source code loading and typechecking (MR :gl:`!3234`)
+- Caching of smart contracts loading and typechecking (MR :gl:`!3234`)
 
 .. contents:: Here is the complete list of changes:
 
@@ -98,3 +98,20 @@ Global constants
 
 - `TZIP: <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
 - `MR: <https://gitlab.com/tezos/tezos/-/merge_requests/2962>`__
+
+Cache
+-----
+
+- A chain-sensitive cache is now available to the protocol developers.
+  This cache can be seen as an in-memory context providing fast access
+  to the most recently used values.
+
+- The protocol now keeps contracts' source code and storage in the
+  cache. This reduces the gas consumption for the most recently used
+  contracts.
+
+- The new RPC ``context/cache/contracts`` provides the list of contracts
+  in the cache.
+
+- The new RPC ``context/cache/contract_rank`` gives the number of contracts
+  older than the one provided as argument.

@@ -181,7 +181,7 @@ let remove_cache_entry cache key entry =
     removed_entries = KeySet.add key cache.removed_entries;
   }
 
-(* TODO: <https://gitlab.com/tezos/tezos/-/issues/1591>
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
 
    Make sure that inserting a large cache entry is costly.
 
@@ -303,7 +303,7 @@ let list_keys t ~cache_index =
   in
   xs
   |> List.sort (fun (_, _, b1) (_, _, b2) -> Int64.compare b1 b2)
-  |> List.map (fun (k, s, _) -> (string_of_key k, s))
+  |> List.map (fun (k, s, _) -> (k, s))
 
 let rec enforce_size_limit cache =
   if cache.size > cache.limit then

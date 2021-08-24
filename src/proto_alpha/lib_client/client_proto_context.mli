@@ -337,17 +337,15 @@ val display_receipt_for_operation :
   Operation_list_hash.elt ->
   unit tzresult Lwt.t
 
-val list_cached_keys :
+val cached_contracts :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  cache_index:int ->
-  (Alpha_context.Cache.identifier * int) list tzresult Lwt.t
+  (Contract.t * int) trace Environment.Error_monad.shell_tzresult Lwt.t
 
-val get_key_rank :
+val contract_rank :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  cache_index:int ->
-  identifier:Alpha_context.Cache.identifier ->
-  int option tzresult Lwt.t
+  Contract.t ->
+  int option Environment.Error_monad.shell_tzresult Lwt.t

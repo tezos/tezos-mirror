@@ -125,39 +125,37 @@ end
 
 module Cache = struct
   module S = struct
-    let list_keys =
+    let cached_contracts =
       RPC_service.get_service
-        ~description:"Return the list of cached keys"
+        ~description:"Return the list of cached contracts"
         ~query:RPC_query.empty
         ~output:
-          Data_encoding.(
-            list @@ tup2 Alpha_context.Cache.identifier_encoding int31)
-        RPC_path.(custom_root / "context" / "cache" /: RPC_arg.int / "keys")
+          Data_encoding.(list @@ tup2 Alpha_context.Contract.encoding int31)
+        RPC_path.(custom_root / "context" / "cache" / "contracts")
 
-    let key_rank =
+    let contract_rank =
       RPC_service.post_service
         ~description:
-          "Return the number of cache keys older than the provided key"
+          "Return the number of cached contracts older than the provided \
+           contract"
         ~query:RPC_query.empty
-        ~input:Alpha_context.Cache.identifier_encoding
+        ~input:Alpha_context.Contract.encoding
         ~output:Data_encoding.(option int31)
-        RPC_path.(custom_root / "context" / "cache" /: RPC_arg.int / "rank")
+        RPC_path.(custom_root / "context" / "cache" / "contract_rank")
   end
 
   let register () =
     let open Services_registration in
-    register1 ~chunked:true S.list_keys (fun ctxt cache_index () () ->
-        Alpha_context.Cache.list_keys ctxt ~cache_index |> return) ;
-    register1 ~chunked:false S.key_rank (fun ctxt cache_index () identifier ->
-        Alpha_context.Cache.(
-          let key = key_of_identifier ~cache_index identifier in
-          key_rank ctxt key |> return))
+    register0 ~chunked:true S.cached_contracts (fun ctxt () () ->
+        Script_cache.entries ctxt |> Lwt.return) ;
+    register0 ~chunked:false S.contract_rank (fun ctxt () contract ->
+        Script_cache.contract_rank ctxt contract |> return)
 
-  let list_keys ctxt block ~cache_index =
-    RPC_context.make_call1 S.list_keys ctxt block cache_index () ()
+  let cached_contracts ctxt block =
+    RPC_context.make_call0 S.cached_contracts ctxt block () ()
 
-  let key_rank ctxt block ~cache_index ~identifier =
-    RPC_context.make_call1 S.key_rank ctxt block cache_index () identifier
+  let contract_rank ctxt block contract =
+    RPC_context.make_call0 S.contract_rank ctxt block () contract
 end
 
 let register () =
