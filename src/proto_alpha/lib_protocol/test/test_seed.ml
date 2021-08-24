@@ -121,7 +121,7 @@ let test_revelation_early_wrong_right_twice () =
   |> fun operation ->
   Block.bake ~operation b >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Unexpected_nonce -> true
+      | Nonce_storage.Inconsistent_nonce -> true
       | _ -> false)
   >>=? fun () ->
   (* reveals correctly *)

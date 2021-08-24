@@ -33,7 +33,7 @@ type error +=
   | Too_late_revelation
   | Too_early_revelation
   | Previously_revealed_nonce
-  | Unexpected_nonce
+  | Inconsistent_nonce
 
 let () =
   register_error_kind
@@ -67,8 +67,8 @@ let () =
     (fun () -> Previously_revealed_nonce) ;
   register_error_kind
     `Branch
-    ~id:"nonce.unexpected"
-    ~title:"Unexpected nonce"
+    ~id:"nonce.inconsistent"
+    ~title:"Inconsistent nonce"
     ~description:
       "The provided nonce is inconsistent with the committed nonce hash."
     ~pp:(fun ppf () ->
@@ -77,8 +77,8 @@ let () =
         "This nonce revelation is invalid (inconsistent with the committed \
          hash)")
     Data_encoding.unit
-    (function Unexpected_nonce -> Some () | _ -> None)
-    (fun () -> Unexpected_nonce)
+    (function Inconsistent_nonce -> Some () | _ -> None)
+    (fun () -> Inconsistent_nonce)
 
 (* checks that the level of a revelation is not too early or too late wrt to the
    current context and that a nonce has not been already revealed for that level *)
@@ -104,7 +104,7 @@ let reveal ctxt level nonce =
   get_unrevealed ctxt level >>=? fun unrevealed ->
   error_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
-    Unexpected_nonce
+    Inconsistent_nonce
   >>?= fun () -> Storage.Seed.Nonce.update ctxt level (Revealed nonce)
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
