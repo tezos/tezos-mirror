@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(**
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+   This module implements arrays equipped with accessors that cannot
+   raise exceptions. Reading out of the bounds of the arrays return a
+   fallback value fixed at array construction time, writing out of the
+   bounds of the arrays is ignored.
 
-and env_version = V0 | V1 | V2 | V3 | V4
+*)
 
-val component_encoding : component Data_encoding.t
+(** The type for array containing values of type ['a]. *)
+type 'a t
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+(** [make len v] builds an array [a] initialized [len] cells with
+   [v]. The value [v] is the fallback value for [a]. *)
+val make : int -> 'a -> 'a t
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+(** [fallback a] returns the fallback value for [a]. *)
+val fallback : 'a t -> 'a
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
+(** [length a] returns the length of [a]. *)
+val length : 'a t -> int
 
-val env_version_encoding : env_version Data_encoding.t
+(** [get a idx] returns the contents of the cell of index [idx] in
+   [a]. If [idx] < 0 or [idx] >= [length a], [get a idx] =
+   [fallback a]. *)
+val get : 'a t -> int -> 'a
 
-val pp_ocaml : Format.formatter -> t -> unit
+(** [set a idx value] updates the cell of index [idx] with [value].
+    If [idx] < 0 or [idx] >= [length a], [a] is unchanged. *)
+val set : 'a t -> int -> 'a -> unit
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+(** [iter f a] iterates [f] over the cells of [a] from the
+   cell indexed [0] to the cell indexed [length a - 1]. *)
+val iter : ('a -> unit) -> 'a t -> unit
 
-val of_bytes_exn : Bytes.t -> t
+(** [map f a] computes a new array obtained by applying [f] to each
+   cell contents of [a]. Notice that the fallback value of the new
+   array is [f (fallback a)]. *)
+val map : ('a -> 'b) -> 'a t -> 'b t
 
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+(** [fold a init f] traverses [a] from the cell indexed [0] to the
+   cell indexed [length a - 1] and transforms [accu] into [f accu x]
+   where [x] is the content of the cell under focus. [accu] is
+   [init] on the first iteration. *)
+val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b

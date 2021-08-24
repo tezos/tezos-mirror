@@ -23,47 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type 'a encoding
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+val simple_decode : 'a encoding -> string -> 'a option
 
-and env_version = V0 | V1 | V2 | V3 | V4
+val simple_encode : 'a encoding -> 'a -> string
 
-val component_encoding : component Data_encoding.t
+type data = ..
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+val register_encoding :
+  prefix:string ->
+  length:int ->
+  to_raw:('a -> string) ->
+  of_raw:(string -> 'a option) ->
+  wrap:('a -> data) ->
+  'a encoding
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+val decode : string -> data option

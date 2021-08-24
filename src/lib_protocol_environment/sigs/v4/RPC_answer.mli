@@ -23,47 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Return type for service handler *)
+type 'o t =
+  [ `Ok of 'o (* 200 *)
+  | `OkChunk of 'o (* 200 but send answer as chunked transfer encoding *)
+  | `OkStream of 'o stream (* 200 *)
+  | `Created of string option (* 201 *)
+  | `No_content (* 204 *)
+  | `Unauthorized of error list option (* 401 *)
+  | `Forbidden of error list option (* 403 *)
+  | `Not_found of error list option (* 404 *)
+  | `Conflict of error list option (* 409 *)
+  | `Error of error list option (* 500 *) ]
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 
-and env_version = V0 | V1 | V2 | V3 | V4
+val return : 'o -> 'o t Lwt.t
 
-val component_encoding : component Data_encoding.t
+(** [return_chunked] is identical to [return] but it indicates to the server
+    that the result might be long and that the serialisation should be done in
+    mutliple chunks.
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+    You should use [return_chunked] when returning an (unbounded or potentially
+    large) list, array, map, or other such set. *)
+val return_chunked : 'o -> 'o t Lwt.t
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+val return_stream : 'o stream -> 'o t Lwt.t
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
+val not_found : 'o t Lwt.t
 
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+val fail : error list -> 'a t Lwt.t

@@ -16,6 +16,7 @@
           Environment_V1
           Environment_V2
           Environment_V3
+          Environment_V4
           Environment_cache
           Environment_context
           Environment_context_intf
@@ -24,6 +25,7 @@
           Environment_protocol_T_V1
           Environment_protocol_T_V2
           Environment_protocol_T_V3
+          Environment_protocol_T_V4
           Dummy_context
           Memory_context
           Proxy_context))

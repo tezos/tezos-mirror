@@ -23,47 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Committed context hashes / IDs. *)
+include S.HASH
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+(** The module for representing the hash version of a context *)
+module Version : sig
+  (** The type for hash versions. *)
+  type t = private int
 
-and env_version = V0 | V1 | V2 | V3 | V4
+  include Compare.S with type t := t
 
-val component_encoding : component Data_encoding.t
+  (** [pp] is the pretty-printer for hash versions. *)
+  val pp : Format.formatter -> t -> unit
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
-
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
-
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
+  (** [encoding] is the data encoding for hash versions. *)
   val encoding : t Data_encoding.t
+
+  (** [of_int i] is the hash version equivalent to [i].
+      This function raises [Invalid_argument] if [i] is not an unsigned 16-bit integer. *)
+  val of_int : int -> t
 end
+
+type version = Version.t

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Contains a value (the decryption of the ciphertext) that can be provably
+recovered in [time] sequential operation or with the rsa secret. *)
+type chest
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+val chest_encoding : chest Data_encoding.t
 
-and env_version = V0 | V1 | V2 | V3 | V4
+(** Provably opens a chest in a short time. *)
+type chest_key
 
-val component_encoding : component Data_encoding.t
+val chest_key_encoding : chest_key Data_encoding.t
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+(** Result of the opening of a chest.
+    The opening can fail in two way which we distinguish to blame the right person.
+    One can provide a false unlocked_value or unlocked_proof, in which case
+    we return [Bogus_opening] and the provider of the chest key is at fault.
+    Otherwise, one can lock the wrong key or put garbage in the ciphertext in which case
+    we return [Bogus_cipher] and the provider of the chest is at fault.
+    Otherwise we return [Correct payload] where payload was what had
+    originally been put in the chest. *)
+type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+(** Takes a chest, chest key and time and tries to recover the underlying
+    plaintext. See the documentation of opening_result. *)
+val open_chest : chest -> chest_key -> time:int -> opening_result
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+(** Gives the size of the underlying plaintext in a chest in bytes.
+    Used for gas accounting*)
+val get_plaintext_size : chest -> int

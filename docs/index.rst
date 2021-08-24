@@ -194,6 +194,7 @@ in the :ref:`introduction <howtoget>`.
    developer/michelson_anti_patterns
    developer/entering_alpha
    developer/protocol_environment
+   developer/protocol_environment_upgrade
    developer/testing_index
    developer/profiling
    developer/snoop

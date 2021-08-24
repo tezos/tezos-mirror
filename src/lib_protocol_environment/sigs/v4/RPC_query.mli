@@ -23,47 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type 'a t
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+type 'a query = 'a t
 
-and env_version = V0 | V1 | V2 | V3 | V4
+val empty : unit query
 
-val component_encoding : component Data_encoding.t
+type ('a, 'b) field
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+val field :
+  ?descr:string -> string -> 'a RPC_arg.t -> 'a -> ('b -> 'a) -> ('b, 'a) field
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+val opt_field :
+  ?descr:string ->
+  string ->
+  'a RPC_arg.t ->
+  ('b -> 'a option) ->
+  ('b, 'a option) field
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
+val flag : ?descr:string -> string -> ('b -> bool) -> ('b, bool) field
 
-val env_version_encoding : env_version Data_encoding.t
+val multi_field :
+  ?descr:string ->
+  string ->
+  'a RPC_arg.t ->
+  ('b -> 'a list) ->
+  ('b, 'a list) field
 
-val pp_ocaml : Format.formatter -> t -> unit
+type ('a, 'b, 'c) open_query
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val query : 'b -> ('a, 'b, 'b) open_query
 
-val of_bytes_exn : Bytes.t -> t
+val ( |+ ) :
+  ('a, 'b, 'c -> 'd) open_query -> ('a, 'c) field -> ('a, 'b, 'd) open_query
 
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
+val seal : ('a, 'b, 'a) open_query -> 'a t
 
-val module_name_of_env_version : env_version -> string
+type untyped = (string * string) list
 
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
+exception Invalid of string
 
-  val encoding : t Data_encoding.t
-end
+val parse : 'a query -> untyped -> 'a
