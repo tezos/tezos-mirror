@@ -111,6 +111,10 @@ coverage-report:
 coverage-report-summary:
 	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
 
+.PHONY: enable-time-measurement
+enable-time-measurement:
+	@$(MAKE) build PROFILE=dev DUNE_INSTRUMENT_WITH=tezos-time-measurement
+
 .PHONY: build-sandbox
 build-sandbox:
 	@dune build src/bin_sandbox/main.exe

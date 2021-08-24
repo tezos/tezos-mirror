@@ -1,0 +1,12 @@
+(library
+ (name tezos_time_measurement_runtime)
+ (public_name tezos-time-measurement)
+ (libraries unix
+            data-encoding
+            tezos-event-logging
+            lwt)
+ (instrumentation.backend (ppx tezos-time-measurement.ppx))
+ (flags (:standard
+          -open Tezos_event_logging
+          -open Data_encoding
+          -open Lwt)))
