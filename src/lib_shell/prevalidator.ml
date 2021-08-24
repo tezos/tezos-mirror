@@ -962,10 +962,11 @@ module Make
       List.iter may_fetch_operation mempool.Mempool.known_valid ;
       Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
-    let on_flush w pv predecessor live_blocks live_operations =
-      pv.shell.predecessor <- predecessor ;
-      pv.shell.live_blocks <- live_blocks ;
-      pv.shell.live_operations <- live_operations ;
+    let on_flush w pv new_predecessor new_live_blocks new_live_operations =
+      let old_predecessor = pv.shell.predecessor in
+      pv.shell.predecessor <- new_predecessor ;
+      pv.shell.live_blocks <- new_live_blocks ;
+      pv.shell.live_operations <- new_live_operations ;
       Lwt_watcher.shutdown_input pv.operation_stream ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
@@ -976,18 +977,18 @@ module Make
       in
       Prevalidation.create
         chain_store
-        ~predecessor
-        ~live_blocks
-        ~live_operations
+        ~predecessor:new_predecessor
+        ~live_blocks:new_live_blocks
+        ~live_operations:new_live_operations
         ~timestamp
         ()
       >>= fun validation_state ->
       pv.validation_state <- validation_state ;
       list_pendings
         pv.shell.parameters.chain_db
-        ~from_block:pv.shell.predecessor
-        ~to_block:predecessor
-        ~live_blocks
+        ~from_block:old_predecessor
+        ~to_block:new_predecessor
+        ~live_blocks:new_live_blocks
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
            (Preapply_result.operations
