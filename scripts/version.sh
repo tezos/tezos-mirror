@@ -12,15 +12,15 @@
 
 ocaml_version=4.12.0
 opam_version=2.0
-recommended_rust_version=1.52.0
+recommended_rust_version=1.52.1
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-full_opam_repository_tag=5cf7fff7b9a7bda3695954b06c0c7ff58c5e2a05
+full_opam_repository_tag=aad0f94dee43a430df1f6844690ab429ab089a3c
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab-ci.yml
-opam_repository_tag=10fc0091425f01e5496ad6d5ed32364f944bf18e
+opam_repository_tag=6aeb7cb2edc4b876fb206751e852fd071836b520
 opam_repository_url=https://gitlab.com/tezos/opam-repository
 opam_repository_git=$opam_repository_url.git
 opam_repository=$opam_repository_git\#$opam_repository_tag
