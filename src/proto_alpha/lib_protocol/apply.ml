@@ -1657,18 +1657,13 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
     ~endorsing_power:included_endorsements
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
-  add_deposit ctxt delegate deposit >>?= fun ctxt ->
+  Delegate.freeze_deposit ctxt delegate deposit >>=? fun ctxt ->
   Baking.baking_reward
     ctxt
     ~block_priority:protocol_data.priority
     ~included_endorsements
   >>?= fun reward ->
   add_rewards ctxt reward >>?= fun ctxt ->
-  Signature.Public_key_hash.Map.fold_es
-    (fun delegate deposit ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
-    (get_deposits ctxt)
-    ctxt
-  >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->

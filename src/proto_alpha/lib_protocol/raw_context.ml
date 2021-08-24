@@ -62,7 +62,6 @@ type back = {
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
   fitness : Int64.t;
-  deposits : Tez_repr.t Signature.Public_key_hash.Map.t;
   included_endorsements : int;
   allowed_endorsements :
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
@@ -120,8 +119,6 @@ let[@inline] fees ctxt = ctxt.back.fees
 
 let[@inline] origination_nonce ctxt = ctxt.back.origination_nonce
 
-let[@inline] deposits ctxt = ctxt.back.deposits
-
 let[@inline] allowed_endorsements ctxt = ctxt.back.allowed_endorsements
 
 let[@inline] included_endorsements ctxt = ctxt.back.included_endorsements
@@ -162,9 +159,6 @@ let[@inline] update_constants ctxt constants =
 
 let[@inline] update_fitness ctxt fitness =
   update_back ctxt {ctxt.back with fitness}
-
-let[@inline] update_deposits ctxt deposits =
-  update_back ctxt {ctxt.back with deposits}
 
 let[@inline] update_allowed_endorsements ctxt allowed_endorsements =
   update_back ctxt {ctxt.back with allowed_endorsements}
@@ -280,19 +274,6 @@ let add_fees ctxt fees' = Tez_repr.(fees ctxt +? fees') >|? update_fees ctxt
 
 let add_rewards ctxt rewards' =
   Tez_repr.(rewards ctxt +? rewards') >|? update_rewards ctxt
-
-let add_deposit ctxt delegate deposit =
-  let open Signature.Public_key_hash.Map in
-  let previous =
-    match find delegate (deposits ctxt) with
-    | Some tz -> tz
-    | None -> Tez_repr.zero
-  in
-  Tez_repr.(previous +? deposit) >|? fun deposit ->
-  let deposits = add delegate deposit (deposits ctxt) in
-  update_deposits ctxt deposits
-
-let get_deposits = deposits
 
 let get_rewards = rewards
 
@@ -688,7 +669,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         included_endorsements = 0;
         fees = Tez_repr.zero;
         rewards = Tez_repr.zero;
-        deposits = Signature.Public_key_hash.Map.empty;
         storage_space_to_pay = None;
         allocated_contracts = None;
         origination_nonce = None;
