@@ -186,8 +186,18 @@ let test_revelation_early_wrong_right_twice () =
   balance_is ~loc:__LOC__ (B b) id ~kind:Rewards Tez.zero
 
 (** - a committer at cycle 0, which doesn't reveal at cycle 1,
-      at the end of the cycle 1 looses the bond and the reward
-    - revealing too late produces an error *)
+      at the end of the cycle 1 looses the fees and the reward
+    - revealing too late produces an error.
+
+    The parameters allow to consider different scenarios:
+    - when [with_fees] is [true] an operation is included to generate non null
+      fees for the baker before it commits to a nonce hash
+    - when [with_rewards] is [true] an operation is included to generate a non
+      null reward for the baker before it commits to a nonce hash
+    - when [double_step] is true, operations are also included after the baker
+      commits to a nonce hash (depending on parameters [with_fees] and
+      [with_rewards]) so that the baker's fees and reward exceed the baker's
+      commitments. *)
 let test_revelation_missing_and_late ~with_fees ~with_rewards ~double_step () =
   let open Context in
   let open Assert in
@@ -342,6 +352,47 @@ let test_revelation_missing_and_late ~with_fees ~with_rewards ~double_step () =
       | Nonce_storage.Too_late_revelation -> true
       | _ -> false)
 
+let wrap e = e >|= Environment.wrap_tzresult
+
+(** Test that the amount reported in balance updates is the actual amount burned
+    when the committed amount is greater than the available amount. *)
+let test_unrevealed () =
+  let accounts = Account.generate_accounts 1 in
+  let total_rewards = Tez.of_int 250 in
+  let total_fees = Tez.of_int 550 in
+  let committed_rewards = Tez.of_int 1000 in
+  let committed_fees = Tez.of_int 1500 in
+  let open Alpha_context in
+  Block.alpha_context accounts >>=? fun ctxt ->
+  match accounts with
+  | [({pkh; _}, _)] ->
+      (* Freeze rewards and fees for cycle 0. *)
+      wrap (Delegate.freeze_rewards ctxt pkh total_rewards) >>=? fun ctxt ->
+      wrap (Delegate.freeze_fees ctxt pkh total_fees) >>=? fun ctxt ->
+      let unrevealed =
+        Nonce.
+          {
+            nonce_hash = Nonce_hash.zero;
+            delegate = pkh;
+            rewards = committed_rewards;
+            fees = committed_fees;
+          }
+      in
+      (* Simulate an end-of-cycle event. *)
+      wrap (Delegate.cycle_end ctxt (Cycle.add Cycle.root 1) [unrevealed])
+      >>=? fun (_ctxt, bupds, _) ->
+      (* Check that balance updates indicate what has been burned,
+         i.e. all fees and rewards. *)
+      let expected_bupds =
+        Receipt.
+          [
+            (Fees (pkh, Cycle.root), Debited total_fees, Block_application);
+            (Rewards (pkh, Cycle.root), Debited total_rewards, Block_application);
+          ]
+      in
+      Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true
+  | _ -> (* Exactly one account has been generated. *) assert false
+
 let tests =
   [
     Tztest.tztest "no commitment" `Quick test_no_commitment;
@@ -405,4 +456,5 @@ let tests =
          ~with_fees:true
          ~with_rewards:true
          ~double_step:true);
+    Tztest.tztest "test unrevealed" `Quick test_unrevealed;
   ]
