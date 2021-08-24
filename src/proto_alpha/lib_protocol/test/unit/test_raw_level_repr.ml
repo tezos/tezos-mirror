@@ -28,8 +28,8 @@ open Tztest
 
 (** Testing
     -------
-    Component:    Raw_level_repr 
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Raw_level_repr 
+    Component:    Raw_level_repr
+    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Raw_level_repr
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in raw_level_repr.ml as individual units, particularly
@@ -56,6 +56,15 @@ module Test_raw_level_repr = struct
            e)
     >>=? fun v ->
     Assert.equal_int ~loc:__LOC__ (Int32.to_int (Raw_level_repr.to_int32 v)) 0
+    >>=? fun () ->
+    Bytes.set_int32_ne bytes 0 (-1l) ;
+    Data_encoding.Binary.of_bytes encoding bytes |> function
+    | Error _ -> return_unit
+    | Ok x ->
+        failwith
+          "Data_encoding.Binary.read shouldn't have succed with %a"
+          Raw_level_repr.pp
+          x
 
   (* TODO rpc_arg. RPC_arg needs to be unit tested separately. Preferably, with a functor *)
   (* let rpc_arg () = () *)
@@ -68,10 +77,15 @@ module Test_raw_level_repr = struct
     Assert.equal_int32 ~loc:__LOC__ (Raw_level_repr.to_int32 raw_level) int32v
     >>=? fun () ->
     let int32v = -1l in
-    Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
-    >>= function
-    | Ok _ -> failwith "Negative int32s should not be coerced into raw_level"
-    | Error _ -> return_unit
+    (Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
+     >>= function
+     | Ok _ -> failwith "Negative int32s should not be coerced into raw_level"
+     | Error _ -> return_unit)
+    >>=? fun () ->
+    try
+      let _ = Raw_level_repr.of_int32_exn int32v in
+      failwith "Negative int32s should not be coerced into raw_level"
+    with Invalid_argument _ -> return_unit
 
   (** Asserting [root]'s runtime value. Expected to be [0l] *)
   let test_root () =

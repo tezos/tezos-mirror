@@ -29,8 +29,11 @@ val previous : Raw_context.t -> Level_repr.t
 
 val root : Raw_context.t -> Level_repr.t
 
-val from_raw :
-  Raw_context.t -> ?offset:int32 -> Raw_level_repr.t -> Level_repr.t
+val from_raw : Raw_context.t -> Raw_level_repr.t -> Level_repr.t
+
+(**  Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative. *)
+val from_raw_with_offset :
+  Raw_context.t -> offset:int32 -> Raw_level_repr.t -> Level_repr.t tzresult
 
 val pred : Raw_context.t -> Level_repr.t -> Level_repr.t option
 

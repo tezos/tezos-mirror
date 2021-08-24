@@ -30,6 +30,7 @@ type t
 
 type raw_level = t
 
+(** @raise Invalid_argument when the level to encode is not positive *)
 val encoding : raw_level Data_encoding.t
 
 val rpc_arg : raw_level RPC_arg.arg
@@ -40,8 +41,10 @@ include Compare.S with type t := raw_level
 
 val to_int32 : raw_level -> int32
 
+(** @raise Invalid_argument when the level to encode is negative *)
 val of_int32_exn : int32 -> raw_level
 
+(** Can trigger Unexpected_level error when the level to encode is negative *)
 val of_int32 : int32 -> raw_level tzresult
 
 val diff : raw_level -> raw_level -> int32

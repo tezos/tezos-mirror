@@ -194,7 +194,7 @@ let test_level_from_raw () =
           Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
           >>?= fun cycle_eras ->
           let level_from_raw =
-            Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
+            Protocol.Level_repr.from_raw ~cycle_eras raw_level
           in
           Assert.equal_int
             ~loc:__LOC__
@@ -219,7 +219,22 @@ let test_level_from_raw () =
           Assert.equal_bool
             ~loc:__LOC__
             level_from_raw.expected_commitment
-            expected_commitment)
+            expected_commitment
+          >>=? fun () ->
+          let offset =
+            Int32.neg (Int32.add Int32.one (Int32.of_int input_level))
+          in
+          let res =
+            Level_repr.from_raw_with_offset ~cycle_eras ~offset raw_level
+          in
+          Assert.proto_error
+            ~loc:__LOC__
+            (Environment.wrap_tzresult res)
+            (fun err ->
+              let error_info =
+                Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+              in
+              error_info.title = "Negative sum of level and offset"))
         test_cases)
     [test_case_1; test_case_2; test_case_3]
 

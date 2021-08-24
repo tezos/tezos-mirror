@@ -253,13 +253,34 @@ let level_from_raw_aux ~cycle_eras level =
   let era = era_of_level ~cycle_eras level in
   level_from_raw_with_era era ~first_level_in_alpha_family level
 
-let level_from_raw ~cycle_eras ?offset l =
-  let l =
-    match offset with
-    | None -> l
-    | Some o -> Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
-  in
-  level_from_raw_aux ~cycle_eras l
+let from_raw ~cycle_eras l = level_from_raw_aux ~cycle_eras l
+
+type error += Negative_level_and_offset_sum of int32 * int32
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"negative_level_and_offset_sum"
+    ~title:"Negative sum of level and offset"
+    ~description:"Negative sum of level and offset"
+    ~pp:(fun ppf (level, offset) ->
+      Format.fprintf
+        ppf
+        "Sum of level : %ld and offset : %ld is negative"
+        level
+        offset)
+    Data_encoding.(obj2 (req "level" int32) (req "offset" int32))
+    (function
+      | Negative_level_and_offset_sum (level, offset) -> Some (level, offset)
+      | _ -> None)
+    (fun (level, offset) -> Negative_level_and_offset_sum (level, offset))
+
+let from_raw_with_offset ~cycle_eras ~offset l =
+  let res = Raw_level_repr.(of_int32 (Int32.add (to_int32 l) offset)) in
+  match res with
+  | Ok l -> Ok (level_from_raw_aux ~cycle_eras l)
+  | Error _ ->
+      error (Negative_level_and_offset_sum (Raw_level_repr.to_int32 l, offset))
 
 let first_level_in_cycle_from_eras ~cycle_eras cycle =
   let first_level_in_alpha_family =

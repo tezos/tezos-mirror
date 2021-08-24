@@ -56,11 +56,11 @@
        - position  = n - (n + 1) = -1
        - remaining = blocks_per_voting_period
 
-  To work around this issue, two RPCs were added 
-  `Voting_period_storage.get_rpc_current_info`, which returns the correct 
-  info also for the last context of a period, and 
-  `Voting_period_storage.get_rpc_succ_info`, which can be used at the last 
-  context of a period to craft operations that will be valid for the first 
+  To work around this issue, two RPCs were added
+  `Voting_period_storage.get_rpc_current_info`, which returns the correct
+  info also for the last context of a period, and
+  `Voting_period_storage.get_rpc_succ_info`, which can be used at the last
+  context of a period to craft operations that will be valid for the first
   block of the new period.
 
   This odd behaviour could be fixed if [Amendment.may_start_new_voting_period]
@@ -172,12 +172,14 @@ let get_rpc_current_info ctxt =
   else return voting_period_info
 
 let get_rpc_succ_info ctxt =
+  Level_storage.from_raw_with_offset
+    ctxt
+    ~offset:1l
+    (Level_storage.current ctxt).level
+  >>?= fun level ->
   get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
-  in
-  let level =
-    Level_storage.from_raw ctxt ~offset:1l (Level_storage.current ctxt).level
   in
   let position = Voting_period_repr.position_since level voting_period in
   let remaining =

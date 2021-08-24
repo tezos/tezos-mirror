@@ -57,6 +57,8 @@ Minor changes
   compute all endorsement slots of a level if the endorsement is
   invalid. (MR :gl: `!3395`)
 
+-   Fix handling of potential negative integer in ``Raw_level_repr`` encoding. (MR :gl:`!3273`)
+
 New Features
 ------------
 

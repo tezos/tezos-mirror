@@ -2420,8 +2420,11 @@ module RPC = struct
     Baking_rights.register () ;
     Endorsing_rights.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
-        Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level
-        |> return) ;
+        Lwt.return
+          (Level.from_raw_with_offset
+             ctxt
+             ~offset:q.offset
+             (Level.current ctxt).level)) ;
     Registration.opt_register0
       ~chunked:true
       S.levels_in_current_cycle
