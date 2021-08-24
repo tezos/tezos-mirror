@@ -1,0 +1,5 @@
+File "test_more_than_once_input.ml", line 1, characters 37-57:
+1 | let _ = (1 + 3) [@time.duration cat] [@time.duration dog]
+                                         ^^^^^^^^^^^^^^^^^^^^
+Error: time_measurement_ppx: Attribute [@time.duration] detected several times on the same expression.
+Hint: A same expression can only be annotated once with [@time.duration] attribute.
