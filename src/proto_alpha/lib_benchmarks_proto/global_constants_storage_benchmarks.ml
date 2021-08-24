@@ -28,7 +28,7 @@
    The other main function exported by [Global_constants_storage] is [register];
    however, [register] calls [expand] and does little else, and thus does
    not need to be further carbonated.
-   
+
    In the process of creating these benchmarks, we benchmarked several OCaml
    stdlib functions and [Script_expr_hash.of_b58check_opt]. While these cost
    models are not used in the protocol, they are kept here to ensure the
@@ -72,18 +72,10 @@ let node_to_hash node =
 
 (* An ad-hoc sampler for Micheline values. Boltzmann sampling would do well
    here.
-   
+
    Copied from lib_micheline and modified to use [Michelson_v1_primitives.prim]. *)
 module Micheline_sampler = struct
-  type width_function = depth:int -> int Base_samplers.sampler
-
   type node = Alpha_context.Script.node
-
-  type node_kind = Int_node | String_node | Bytes_node | Seq_node | Prim_node
-
-  (* We skew the distribution towards non-leaf nodes by repeating the
-     relevant kinds ;) *)
-  let all_kinds = [|Int_node; String_node; Bytes_node; Seq_node; Prim_node|]
 
   let prims =
     let open Protocol.Michelson_v1_primitives in
@@ -234,62 +226,26 @@ module Micheline_sampler = struct
       (* H_constant; *);
     |]
 
-  let sample_kind : node_kind Base_samplers.sampler =
-   fun rng_state ->
-    let i = Random.State.int rng_state (Array.length all_kinds) in
-    all_kinds.(i)
+  module Sampler = Micheline_sampler.Make (struct
+    type prim = Michelson_v1_primitives.prim
 
-  let sample_prim : Michelson_v1_primitives.prim Base_samplers.sampler =
-   fun rng_state ->
-    let i = Random.State.int rng_state (Array.length all_kinds) in
-    prims.(i)
+    let sample_prim : Michelson_v1_primitives.prim Base_samplers.sampler =
+     fun rng_state ->
+      let i = Random.State.int rng_state (Array.length prims) in
+      prims.(i)
 
-  let sample_string _ = ""
+    let sample_annots : string list Base_samplers.sampler = fun _rng_state -> []
 
-  let sample_bytes _ = Bytes.empty
+    let sample_string _ = ""
 
-  let sample_z _ = Z.zero
+    let sample_bytes _ = Bytes.empty
 
-  let sample (w : width_function) rng_state =
-    let rec sample depth rng_state k =
-      match sample_kind rng_state with
-      | Int_node -> k (Micheline.Int (0, sample_z rng_state))
-      | String_node -> k (Micheline.String (0, sample_string rng_state))
-      | Bytes_node -> k (Micheline.Bytes (0, sample_bytes rng_state))
-      | Seq_node ->
-          let width = w ~depth rng_state in
-          sample_list
-            depth
-            width
-            []
-            (fun terms -> k (Micheline.Seq (0, terms)))
-            rng_state
-      | Prim_node ->
-          let prim = sample_prim rng_state in
-          let width = w ~depth rng_state in
-          sample_list
-            depth
-            width
-            []
-            (fun terms -> k (Micheline.Prim (0, prim, terms, [])))
-            rng_state
-    and sample_list depth width acc k rng_state =
-      if width < 0 then invalid_arg "sample_list: negative width"
-      else if width = 0 then k (List.rev acc)
-      else
-        sample (depth + 1) rng_state (fun x ->
-            sample_list depth (width - 1) (x :: acc) k rng_state)
-    in
-    sample 0 rng_state (fun x -> x)
+    let sample_z _ = Z.zero
 
-  let reasonable_width_function ~depth rng_state =
-    (* Entirely ad-hoc *)
-    Base_samplers.(
-      sample_in_interval
-        ~range:{min = 0; max = 20 / (Bits.numbits depth + 1)}
-        rng_state)
+    let width_function = Micheline_sampler.reasonable_width_function
+  end)
 
-  let sample = sample reasonable_width_function
+  let sample = Sampler.sample
 
   type size = {nodes : int; bytes : int}
 
@@ -604,7 +560,7 @@ let () =
       hash.
     - Branch 3: When no constant is found, the cost is merely that of pattern matching
       and calling the continuation (similar to that of [Micheline.strip_locations]).
-      
+
     Because we don't know the full size of node being traversed ahead of time (because they
     are retrieved from storage), it is impossible to calculate the full gas cost upfront.
     However, each time we find a new expression to traverse, we can calculate its size upfront
