@@ -1,5 +1,12 @@
 #! /bin/sh
 
+# This script detects changes on files that could potentially affect the opam related jobs.
+#
+# The check is done as a whole for a merge request instead of separate commits.
+#
+# If one of the files was modified the `TZ_OPAM_FILES_MODIFIED` is set to `true` in order for the opam
+# pipeline to be generated.
+
 FILES="test"
 
 if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
