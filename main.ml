@@ -26,7 +26,7 @@
 module Block_services = Protocol_client_context.Alpha_block_services
 open Tezos_protocol_010_PtGRANAD
 
-let dump_my_current_endorsements cctxt ?unaccurate ~full block level errors ops
+let dump_my_current_endorsements cctxt ?unaccurate ~full block level ops
     =
   Protocol.Delegate_services.Endorsing_rights.get
     cctxt
@@ -35,7 +35,7 @@ let dump_my_current_endorsements cctxt ?unaccurate ~full block level errors ops
   let (items, missing) =
     List.fold_left
       Protocol.Delegate_services.Endorsing_rights.(
-        fun (acc, rights) (delay, slot) ->
+        fun (acc, rights) (errors,delay, slot) ->
           match
             List.partition (fun right -> List.mem ~equal:Int.equal slot right.slots) rights
           with
@@ -118,7 +118,7 @@ let rec valid_endorsements_loop cctxt unaccurate =
     (fun op (infos, l) ->
       let delay = Systime_os.now () in
       let (vv, news) = extract_endorsement infos op in
-      (vv, Option.fold ~some:(fun x -> (delay, x) :: l) ~none:l news))
+      (vv, Option.fold ~some:(fun x -> ([],delay, x) :: l) ~none:l news))
     op_stream
     (None, [])
   >>= fun out ->
@@ -133,7 +133,6 @@ let rec valid_endorsements_loop cctxt unaccurate =
         ~full:true
         block
         level
-        []
         timed_ops
       >>=? fun () -> next
 
@@ -181,21 +180,24 @@ let rec invalid_endorsements_loop cctxt =
            let () = EndorsementLRU.add known_problems op_hash in
            errors_of_operation cctxt op_hash >>=? fun errors ->
           Lwt.return
-            (acc >|? fun l -> (block, level, errors, (delay, news)) :: l))
+            (acc >|? fun m ->
+                     Block_hash.Map.update block (function
+                         | Some (_,l) -> Some (level, (errors, delay, news) :: l)
+                         | None -> Some(level, [errors, delay, news]))
+                       m))
     op_stream
-    (ok [])
+    (ok Block_hash.Map.empty)
   >>=? fun out ->
   let next = invalid_endorsements_loop cctxt in
-  List.iter_ep
-    (fun (block, level, errors, endorsement) ->
+  Block_hash.Map.iter_ep
+    (fun block (level, endorsements) ->
       let level = Protocol.Alpha_context.Raw_level.to_int32 level in
       dump_my_current_endorsements
         cctxt
         ~full:false
         block
         level
-        errors
-        [endorsement])
+        endorsements)
     out
   >>=? fun () -> next
 
