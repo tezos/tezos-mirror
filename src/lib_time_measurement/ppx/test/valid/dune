@@ -1,0 +1,28 @@
+(executable
+ (name pp)
+ (modules pp)
+ (libraries tezos-time-measurement.ppx ppxlib))
+
+(executable
+ (name gen_dune_rules)
+ (modules gen_dune_rules)
+ (libraries tezos_time_measurement_ppx_test)
+ (flags (:standard -open Tezos_time_measurement_ppx_test)))
+
+(rule
+ (targets dune.inc.gen)
+ (deps
+  (:gen gen_dune_rules.exe)
+  (source_tree .))
+ (action
+  (with-stdout-to
+    %{targets}
+   (run %{gen}))))
+
+(include dune.inc)
+
+(rule
+ (alias runtest)
+ (package tezos-time-measurement)
+ (action (diff dune.inc dune.inc.gen)))
+
