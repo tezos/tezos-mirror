@@ -18,7 +18,7 @@ fi
 
 echo Files changed: "$FILES"
 
-MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune.inc|.*.opam|scripts/version.sh|gitlab-ci.yml")
+MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune\.inc|.*\.opam|scripts/version\.sh|\.gitlab-ci\.yml")
 
 echo Matches found: "$MATCHES"
 
