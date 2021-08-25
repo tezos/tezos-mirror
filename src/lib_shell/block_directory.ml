@@ -24,30 +24,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec read_partial_context context path depth =
-  (* non tail-recursive *)
-  if depth = 0 then Lwt.return Block_services.Cut
-  else
-    (* try to read as file *)
-    Context.find context path >>= function
-    | Some v -> Lwt.return (Block_services.Key v)
-    | None ->
-        (* try to read as directory *)
-        Context.fold
-          ~depth:(`Eq 1)
-          context
-          path
-          ~init:TzString.Map.empty
-          ~f:(fun k _ acc ->
-            match path @ k with
-            | [] ->
-                (* This is an invariant of {!Context.fold} *)
-                assert false
-            | khd :: ktl as k ->
-                read_partial_context context k (depth - 1) >>= fun v ->
-                let k = List.last khd ktl in
-                Lwt.return (TzString.Map.add k v acc))
-        >|= fun map -> Block_services.Dir map
+let read_partial_context =
+  let init = Block_services.Dir TzString.Map.empty in
+  fun context path depth ->
+    if depth = 0 then Lwt.return Block_services.Cut
+    else
+      (* According to the documentation of Context.fold,
+         "[f] is never called with an empty key for values; i.e.,
+           folding over a value is a no-op".
+         Therefore, we first need to check that whether its a value.
+      *)
+      Context.find context path >>= function
+      | Some v -> Lwt.return (Block_services.Key v)
+      | None ->
+          (* try to read as directory *)
+          Context.fold
+            ~depth:(`Le depth)
+            context
+            path
+            ~init
+            ~f:(fun k tree acc ->
+              let open Block_services in
+              if List.compare_length_with k depth >= 0 then
+                (* only [=] case is possible because [~depth] is [(`Le depth)] *)
+                Lwt.return (raw_context_insert (k, Cut) acc)
+              else
+                Context.Tree.to_value tree >|= function
+                | None -> acc
+                | Some v -> raw_context_insert (k, Key v) acc)
 
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let dir :
@@ -333,7 +337,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       Context.mem context path >>= fun mem ->
       Context.mem_tree context path >>= fun dir_mem ->
       if not (mem || dir_mem) then Lwt.fail Not_found
-      else read_partial_context context path depth >>= fun dir -> return dir) ;
+      else read_partial_context context path depth >>= Lwt.return_ok) ;
   register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
       Store.Block.context_opt chain_store block >>= function
       | None -> return None
