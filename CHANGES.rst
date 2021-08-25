@@ -57,8 +57,12 @@ Client
    force the indentation check, the new ``--enforce-indentation``
    command line switch can be used.
 
--  Made mode light ``--endpoint``/``--sources`` consistency check happen earlier,
-   so that it is guaranteed to catch mismatchs.
+-  Added admin commands ``ban operation <operation_hash>``,
+   ``unban operation <operation_hash>``, and ``unban all operations``
+   that call the corresponding RPCs.
+
+-  Made mode light ``--endpoint``/``--sources`` consistency check
+   happen earlier, so that it is guaranteed to catch mismatches.
 
 
 Baker / Endorser / Accuser
@@ -91,6 +95,16 @@ Docker Images
 
 Miscellaneous
 -------------
+
+Version 10.1
+============
+
+-  Really added the CLI option ``--allow-all-rpc`` to enable full
+   access to all RPC endpoints on a given listening address.
+
+-  Fixed recycling of operations in the mempool when the node changes
+   its head. Broadcasting of endorsements received earlier than the
+   end of the validation of the endorsed block is restored.
 
 Version 10.0
 ============
@@ -304,9 +318,6 @@ Client
    assets contracts using the ``from fa1.2 contract ...`` commands, and
    support for running the view entrypoints offchain.
 
--  Added admin commands ``ban operation <operation_hash>``,
-   ``unban operation <operation_hash>``, and ``unban all operations``
-   that call the corresponding RPCs.
 
 -  Added a ``--legacy`` flag to the ``convert script`` command. This flag permits to use the
    legacy typechecking mode when the input of the command is typechecked.
