@@ -57,6 +57,9 @@ Client
    force the indentation check, the new ``--enforce-indentation``
    command line switch can be used.
 
+-  Made mode light ``--endpoint``/``--sources`` consistency check happen earlier,
+   so that it is guaranteed to catch mismatchs.
+
 
 Baker / Endorser / Accuser
 --------------------------

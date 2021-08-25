@@ -52,16 +52,17 @@ type sources = private {
           (one for data retrieval, one for check). *)
 }
 
-(** [sources_config] smart constructor: checks that passed values
-    fulfill the required invariants, return [Error] otherwise.
-    See [sources_config] for documentation of these invariants. *)
-val mk_sources_config :
-  min_agreement:float -> uris:Uri.t list -> (sources_config, string) result
+(** An example content of the [--sources] file *)
+val example_sources : string
 
 (** Ad-hoc type safe JSON parsing function until [json-data-encoding]
     library provides a [result]-returning alternative. *)
 val destruct_sources_config :
   Data_encoding.json -> (sources_config, string) result
+
+(** [sources_config_to_uris sources] returns the {!Uri}s contained
+ *  in [sources]. *)
+val sources_config_to_uris : sources_config -> Uri.t list
 
 (** [sources_config_to_sources f config] transforms the value [config]
     (which was obtained by parsing the CLI) into a value used

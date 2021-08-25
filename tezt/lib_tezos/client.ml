@@ -96,27 +96,25 @@ let sources_file client =
   | Mockup | Client _ | Proxy _ -> assert false
   | Light _ -> client.base_dir // "sources.json"
 
+(** [mode_to_endpoint mode] returns the {!endpoint} within a {!mode}
+  *  (if any) *)
+let mode_to_endpoint = function
+  | Client None | Mockup | Light (_, []) -> None
+  | Client (Some endpoint) | Light (_, endpoint :: _) | Proxy endpoint ->
+      Some endpoint
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
    that contains a list of endpoints.
 *)
 let endpoint_arg ?(endpoint : endpoint option) client =
-  match (client.mode, endpoint) with
-  | (Mockup, _) | (Client None, None) | (Light (_, []), _) -> []
-  | (Client _, Some endpoint)
-  | (Client (Some endpoint), None)
-  | (Light (_, endpoint :: _), None)
-  | (Light _, Some endpoint)
-  | (Proxy _, Some endpoint)
-  | (Proxy endpoint, None) ->
-      [
-        "--endpoint";
-        Printf.sprintf
-          "http://%s:%d"
-          (address ~hostname:true endpoint)
-          (rpc_port endpoint);
-      ]
+  let either o1 o2 = match (o1, o2) with (Some _, _) -> o1 | _ -> o2 in
+  (* pass [?endpoint] first: it has precedence over client.mode *)
+  match either endpoint (mode_to_endpoint client.mode) with
+  | None -> []
+  | Some e ->
+      ["--endpoint"; sf "http://%s:%d" (address ~hostname:true e) (rpc_port e)]
 
 let mode_arg client =
   match client.mode with
@@ -711,6 +709,19 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   set_mode Mockup client ;
   return client
 
+let write_sources_file ~min_agreement ~uris client =
+  (* Create a services.json file in the base directory with correctly
+     JSONified data *)
+  Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
+      let obj =
+        `O
+          [
+            ("min_agreement", `Float min_agreement);
+            ("uris", `A (List.map (fun s -> `String s) uris));
+          ]
+      in
+      Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     ?(nodes_args = []) () =
   let filter_node_arg = function
@@ -733,26 +744,15 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?base_dir
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
-  (* Create a services.json file in the base directory with correctly
-     JSONified data *)
   let* () =
-    Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
-        let obj =
-          `O
-            [
-              ("min_agreement", `Float min_agreement);
-              ( "uris",
-                `A
-                  (List.map
-                     (fun node ->
-                       `String
-                         (Printf.sprintf
-                            "http://localhost:%d"
-                            (Node.rpc_port node)))
-                     nodes) );
-            ]
-        in
-        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+    write_sources_file
+      ~min_agreement
+      ~uris:
+        (List.map
+           (fun node ->
+             sf "http://%s:%d" (Node.rpc_host node) (Node.rpc_port node))
+           nodes)
+      client
   in
   let json = JSON.parse_file (sources_file client) in
   Log.info "%s" @@ JSON.encode json ;

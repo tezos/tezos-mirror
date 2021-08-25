@@ -37,7 +37,7 @@ The ``sources.json`` file contains:
   To avoid being surprised by the automatic addition of the default endpoint,
   it is recommended to supply option ``--endpoint`` whenever ``--sources`` is supplied,
   valued as one member of the ``uris`` field in ``--sources`` (e.g., the first member).
-  At some point, an automatic check will be implemented to enforce this recommendation.
+  An automatic check makes sure this recommendation is ensured.
 * An optional ``min_agreement`` field, which must be a float from ``0.0`` (excluded) to ``1.0`` (included).
   This field specifies the ratio of endpoints that must agree for data
   to be accepted. The default value is ``1.0``, which means that
