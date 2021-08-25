@@ -1958,12 +1958,49 @@ module Chain = struct
     | None -> Lwt.return_none
     | Some {Protocol_levels.protocol; _} -> Lwt.return_some protocol
 
-  let may_update_protocol_level chain_store ~protocol_level
+  let may_update_protocol_level chain_store ?pred ?protocol_level
       (block, protocol_hash) =
-    find_activation_block chain_store ~protocol_level >>= function
-    | Some _ -> return_unit
-    | None ->
-        set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+    (match pred with
+    | None -> Block.read_predecessor chain_store block
+    | Some pred -> return pred)
+    >>=? fun pred ->
+    let prev_proto_level = Block.proto_level pred in
+    let protocol_level =
+      Option.value ~default:(Block.proto_level block) protocol_level
+    in
+    if Compare.Int.(prev_proto_level < protocol_level) then
+      find_activation_block chain_store ~protocol_level >>= function
+      | Some {block = (bh, _); _} ->
+          if Block_hash.(bh <> Block.hash block) then
+            set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+          else return_unit
+      | None ->
+          set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+    else return_unit
+
+  let may_update_ancestor_protocol_level chain_store ~head =
+    let head_proto_level = Block.proto_level head in
+    find_activation_block chain_store ~protocol_level:head_proto_level
+    >>= function
+    | None -> return_unit
+    | Some {block; protocol; _} -> (
+        savepoint chain_store >>= fun (_, savepoint_level) ->
+        if Compare.Int32.(savepoint_level > snd block) then
+          (* the block is too far in the past *)
+          return_unit
+        else
+          is_ancestor chain_store ~head:(Block.descriptor head) ~ancestor:block
+          >>= function
+          | true -> (* nothing to do *) return_unit
+          | false -> (
+              let distance =
+                Int32.(sub (Block.level head) (snd block) |> to_int)
+              in
+              Block.read_block_opt chain_store ~distance (Block.hash head)
+              >>= function
+              | None -> return_unit
+              | Some ancestor ->
+                  may_update_protocol_level chain_store (ancestor, protocol)))
 
   let all_protocol_levels chain_store =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
@@ -2528,6 +2565,9 @@ module Unsafe = struct
 
   let set_caboose chain_store new_caboose =
     Chain.unsafe_set_caboose chain_store new_caboose
+
+  let set_protocol_level chain_store ~protocol_level (b, ph) =
+    Chain.set_protocol_level chain_store ~protocol_level (b, ph)
 
   let load_testchain = Chain.load_testchain
 

@@ -214,6 +214,7 @@ let may_update_protocol_table legacy_chain_store chain_store ~prev_block ~block
     assert (Int32.equal transition_level block_level) ;
     Store.Chain.may_update_protocol_level
       chain_store
+      ~pred:(Store.Unsafe.block_of_repr prev_block)
       ~protocol_level:proto_level
       (Store.Unsafe.block_of_repr block, proto_hash))
   else return_unit
@@ -621,7 +622,7 @@ let import_protocols history_mode legacy_store legacy_chain_state store
           legacy_chain_state
           transition_hash)
       >>=? fun transition_block ->
-      Store.Chain.may_update_protocol_level
+      Store.Unsafe.set_protocol_level
         chain_store
         ~protocol_level
         (Store.Unsafe.block_of_repr transition_block, protocol_hash)
