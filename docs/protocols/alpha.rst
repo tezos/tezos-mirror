@@ -40,9 +40,9 @@ RPC changes
 -----------
 
 - Deprecated RPC ``POST ../endorsing_power`` has been removed. Clients
-  already used ``GET ../helpers/endorsement_rights`` which is clearer, as
-  powerful and equaly costly in term of computation for the
-  node. (MR :gl: `!3395`)
+  already used ``GET ../helpers/endorsing_rights`` which is clearer, as
+  powerful and equally costly in terms of computation for the
+  node. (MR :gl:`!3395`)
 
 Minor changes
 -------------
@@ -57,7 +57,14 @@ Minor changes
   compute all endorsement slots of a level if the endorsement is
   invalid. (MR :gl: `!3395`)
 
--   Fix handling of potential negative integer in ``Raw_level_repr`` encoding. (MR :gl:`!3273`)
+- Fix handling of potential negative integer in ``Raw_level_repr``
+  encoding. (MR :gl:`!3273`)
+
+- RPCs ``GET ../helpers/endorsing_rights`` and ``GET ../helpers/baking_rewards``
+  have been moved into the RPC plugin. Nothing has changed from the
+  end-user perspective for now but further improvements to their
+  performance will become easier now that they are decoupled from the
+  protocol development cycle. (MR :gl:`!3368`)
 
 New Features
 ------------

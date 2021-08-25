@@ -62,7 +62,7 @@ module Test_raw_level_repr = struct
     | Error _ -> return_unit
     | Ok x ->
         failwith
-          "Data_encoding.Binary.read shouldn't have succed with %a"
+          "Data_encoding.Binary.read shouldn't have succeeded with %a"
           Raw_level_repr.pp
           x
 
