@@ -417,17 +417,9 @@ let on_validation_request w start_testchain active_chains spawn_child block =
   let head_header = Store.Block.header head
   and head_hash = Store.Block.hash head
   and block_header = Store.Block.header block in
-  (match nv.prevalidator with
-  | None -> Lwt.return head_header.shell.fitness
-  | Some pv -> Prevalidator.fitness pv)
-  >>= fun context_fitness ->
   let head_fitness = head_header.shell.fitness in
   let new_fitness = block_header.shell.fitness in
-  let accepted_head =
-    if Fitness.(context_fitness = head_fitness) then
-      Fitness.(new_fitness > head_fitness)
-    else Fitness.(new_fitness >= context_fitness)
-  in
+  let accepted_head = Fitness.(new_fitness > head_fitness) in
   if not accepted_head then return Event.Ignored_head
   else
     Store.Chain.set_head chain_store block >>=? function

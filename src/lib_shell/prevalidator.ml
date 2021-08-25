@@ -118,8 +118,6 @@ module type T = sig
 
   val validation_result : types_state -> error Preapply_result.t
 
-  val fitness : unit -> Fitness.t Lwt.t
-
   val initialization_errors : unit tzresult Lwt.t
 
   val worker : worker Lazy.t
@@ -1170,16 +1168,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (match Lwt.state worker_promise with
       | Lwt.Return (Ok worker) -> worker
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
-
-  let fitness () =
-    let w = Lazy.force worker in
-    let pv = Worker.state w in
-    ( Lwt.return pv.validation_state >>=? fun state ->
-      Prevalidation.status state >>=? fun status ->
-      return status.block_result.fitness )
-    >>= function
-    | Ok fitness -> Lwt.return fitness
-    | Error _ -> Lwt.return (Store.Block.fitness pv.predecessor)
 end
 
 module ChainProto_registry = Map.Make (struct
@@ -1260,10 +1248,6 @@ let timestamp (t : t) =
   let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
   pv.timestamp
-
-let fitness (t : t) =
-  let module Prevalidator : T = (val t) in
-  Prevalidator.fitness ()
 
 let inject_operation (t : t) op =
   let module Prevalidator : T = (val t) in
