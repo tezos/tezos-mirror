@@ -72,7 +72,7 @@ let fixed_encoding =
         c.max_proposals_per_delegate,
         c.max_micheline_node_count,
         c.max_micheline_bytes_limit,
-        max_allowed_global_constant_depth ))
+        c.max_allowed_global_constant_depth ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
            max_anon_ops_per_block,
