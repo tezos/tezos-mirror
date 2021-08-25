@@ -324,8 +324,6 @@ module type T = sig
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  val fitness : unit -> Fitness.t Lwt.t
-
   val initialization_errors : unit tzresult Lwt.t
 
   val worker : worker Lazy.t
@@ -1277,16 +1275,6 @@ module Make
       (match Lwt.state worker_promise with
       | Lwt.Return (Ok worker) -> worker
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
-
-  let fitness () =
-    let w = Lazy.force worker in
-    let pv = Worker.state w in
-    ( pv.validation_state >>?= fun state ->
-      Prevalidation.status state None >>=? fun status ->
-      return status.block_result.fitness )
-    >|= function
-    | Ok fitness -> fitness
-    | Error _ -> Store.Block.fitness pv.shell.predecessor
 end
 
 module ChainProto_registry = Map.Make (struct
@@ -1348,10 +1336,6 @@ let notify_operations (t : t) peer mempool =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
-
-let fitness (t : t) =
-  let module Prevalidator : T = (val t) in
-  Prevalidator.fitness ()
 
 let inject_operation (t : t) op =
   let module Prevalidator : T = (val t) in

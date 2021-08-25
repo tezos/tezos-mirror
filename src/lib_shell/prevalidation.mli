@@ -78,15 +78,6 @@ module type T = sig
 
   val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
-  type status = {
-    applied_operations :
-      (Proto.operation_data operation * Proto.operation_receipt) list;
-    block_result : Tezos_protocol_environment.validation_result;
-    block_metadata : Proto.block_header_metadata;
-  }
-
-  val status : t -> Block_header.shell_header option -> status tzresult Lwt.t
-
   val validation_state : t -> Proto.validation_state
 
   val pp_result : Format.formatter -> result -> unit
