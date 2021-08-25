@@ -23,40 +23,8 @@ be documented here either.
 Node
 ----
 
--  Better handling of mempool cache in the `distributed_db` which
-   should make the `distributed_db` RAM consumption strongly
-   correlated to the one of the mempool.
-
--  Fixed wrong error message in case of p2p network address binding collision.
-
--  Updated the output of the ``/stats/gc`` RPC entry point: it now also
-   reports the number of full major collections made by the OCaml
-   garbage collector. Because this changes the JSON schema of this
-   existing RPC entry point, it is a breaking change.
-
--  Added new RPCs to ban/unban operations locally:
-
-   -  POST ``/chains/<chain_id>/mempool/ban_operation``: Ban a given
-      operation hash. The operation is removed from the mempool, and
-      its effect is reverted if it was applied. It is also added to
-      the prevalidator's set of banned operations, to prevent it from
-      being fetched/processed/injected in the future.
-   -  POST ``/chains/<chain_id>/mempool/unban_operation``: Unban a given
-      operation hash, removing it from the prevalidator's set of banned
-      operations. Nothing happens if the operation was not banned.
-   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
-      all operations, i.e. clear the set of banned operations.
-
 Client
 ------
-
--  Disabled indentation checking by default in the ``tezos-client
-   convert script`` and ``tezos-client hash script`` commands. In
-   particular, ``tezos-client convert script <script> from Michelson
-   to Michelson`` can now be used as a Michelson script formatter. To
-   force the indentation check, the new ``--enforce-indentation``
-   command line switch can be used.
-
 
 Baker / Endorser / Accuser
 --------------------------
@@ -67,19 +35,6 @@ Proxy server
 Protocol Compiler And Environment
 ---------------------------------
 
--  Added a new version of the protocol environment (V3).
-
-   -  Update some dependency libraries that have had releases since V2
-
-   -  Improve safety by removing access to some potentially dangerous functions
-      (functions that make assumptions about their input, functions that rely on
-      implicit comparison, etc.)
-
-   -  New features: Timelock, FallbackArray
-
-   -  New feature: chunked transfer encoded RPCs to allow RPCs with large
-      responses to be processed in chunks.
-
 Codec
 -----
 
@@ -88,6 +43,16 @@ Docker Images
 
 Miscellaneous
 -------------
+
+Version 10.1
+============
+
+-  Really added the CLI option ``--allow-all-rpc`` to enable full
+   access to all RPC endpoints on a given listening address.
+
+-  Fixed recycling of operations in the mempool when the node changes
+   its head. Broadcasting of endorsements received earlier than the
+   end of the validation of the endorsed block is restored.
 
 Version 10.0
 ============
@@ -298,9 +263,6 @@ Client
    assets contracts using the ``from fa1.2 contract ...`` commands, and
    support for running the view entrypoints offchain.
 
--  Added admin commands ``ban operation <operation_hash>``,
-   ``unban operation <operation_hash>``, and ``unban all operations``
-   that call the corresponding RPCs.
 
 -  Added a ``--legacy`` flag to the ``convert script`` command. This flag permits to use the
    legacy typechecking mode when the input of the command is typechecked.
