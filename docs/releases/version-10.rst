@@ -144,7 +144,7 @@ Docker users can run the upgrade procedure using the
 ``tezos-upgrade-storage`` command as follows (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc3 tezos-upgrade-tezos
+    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc3 tezos-upgrade-storage
 
 Users who use ``storage-docker-manager.sh`` can simply execute the built-in
 upgrade command, such as (for Mainnet): ``./mainnet.sh node upgrade``
