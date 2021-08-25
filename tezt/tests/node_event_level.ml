@@ -53,13 +53,11 @@
 *)
 let wait_for_request_kind (request_kind : string) node =
   let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
-    with
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when String.equal s request_kind -> Some ()
     | Some _ | None -> None
   in
-  Node.wait_for node "node_prevalidator.v0" filter
+  Node.wait_for node "request_completed.v0" filter
 
 (* Wait for the request signaling the injection of a new operation in
    the mempool. This event has level "notice".

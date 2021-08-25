@@ -101,13 +101,11 @@ let pp_mempool_count fmt
  *)
 let wait_for_injection node =
   let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
-    with
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when s = "inject" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  let* _ = Node.wait_for node "request_completed.v0" filter in
   return ()
 
 (** Matches events which contain an flush request.
@@ -131,13 +129,11 @@ let wait_for_injection node =
 *)
 let wait_for_flush node =
   let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
-    with
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when s = "flush" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  let* _ = Node.wait_for node "request_completed.v0" filter in
   return ()
 
 let operation_json ~fee ~gas_limit ~source ~destination ~counter =
@@ -865,15 +861,7 @@ let forge_pre_filtered_operation =
   ]}
 *)
 let wait_for_failed_fetch node =
-  let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "operation_not_fetched" |> as_string_opt)
-    with
-    | Some s -> Some s
-    | None -> None
-  in
-  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
-  return ()
+  Node.wait_for node "operation_not_fetched.v0" (fun _ -> Some ())
 
 let set_config_operations_timeout node timeout =
   let chain_validator_config =
@@ -1030,16 +1018,13 @@ let check_op_not_in_baked_block client op =
 ]} *)
 let wait_for_banned_operation_injection node oph =
   let filter json =
-    let open JSON in
-    let obj = json |=> 1 |-> "event" |-> "banned_operation_encountered" in
     match
-      ( obj |-> "situation" |> as_string_opt,
-        obj |-> "operation" |> as_string_opt )
+      JSON.(json |-> "origin" |> as_string_opt, json |-> "oph" |> as_string_opt)
     with
     | (Some "injected", Some h) when String.equal h oph -> Some ()
     | _ -> None
   in
-  Node.wait_for node "node_prevalidator.v0" filter
+  Node.wait_for node "banned_operation_encountered.v0" filter
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_mempool client =
@@ -1509,17 +1494,16 @@ let unban_operation_and_reinject =
 let wait_for_arrival_of_ophash ophash node =
   let filter json =
     let open JSON in
-    let request_body = json |=> 1 |-> "event" |-> "request" in
     match
-      ( request_body |-> "request" |> as_string_opt,
-        request_body |-> "operation_hash" |> as_string_opt )
+      ( json |-> "view" |-> "request" |> as_string_opt,
+        json |-> "view" |-> "operation_hash" |> as_string_opt )
     with
     | (Some "arrived", Some s) when String.equal s ophash ->
         Log.info "Witnessed arrival of operation %s" ophash ;
         Some ()
     | _ -> None
   in
-  Node.wait_for node "node_prevalidator.v0" filter
+  Node.wait_for node "request_completed.v0" filter
 
 (** Test.
 
@@ -1643,15 +1627,8 @@ let unban_all_operations =
   unit
 
 let wait_for_flushed_event node =
-  let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "operations_not_flushed" |> as_int_opt)
-    with
-    | Some i -> Some i
-    | None -> None
-  in
-  let* i = Node.wait_for node "node_prevalidator.v0" filter in
-  return i
+  let filter json = JSON.(json |> as_int_opt) in
+  Node.wait_for node "operations_not_flushed.v0" filter
 
 (** This test tries to check that branch_refused operation stays in the mempool after an head increment but is removed from it when a new branch is received.
 

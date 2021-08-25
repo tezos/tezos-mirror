@@ -30,6 +30,9 @@
    Subject:      Detect double baking through the accuser.
 *)
 
+(* This test is duplicated in [remote_tests/double_baking.ml]. Any modification
+   to this test should be reported there too. *)
+
 let is_operation_in_operations ops oph =
   let open JSON in
   let ops_list = ops |=> 2 |> as_list in
@@ -83,13 +86,11 @@ let wait_for_denunciation accuser =
  *)
 let wait_for_denunciation_injection node client oph_promise =
   let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
-    with
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when s = "inject" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  let* _ = Node.wait_for node "request_completed.v0" filter in
   let* oph = oph_promise in
   let* mempool = RPC.get_mempool_pending_operations client in
   if is_operation_in_applied_mempool mempool oph then some oph else none

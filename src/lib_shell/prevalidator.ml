@@ -28,6 +28,7 @@
    This module should not use [Prevalidation.parse_unsafe] *)
 
 open Prevalidator_worker_state
+module Event = Prevalidator_event
 
 type limits = {
   max_refused_operations : int;
@@ -60,8 +61,18 @@ module Name = struct
     Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
 end
 
+module Dummy_event = struct
+  type t = unit
+
+  let pp = Format.pp_print_cut
+
+  let encoding = Data_encoding.unit
+
+  let level () = Internal_event.Debug
+end
+
 module Logger =
-  Worker_logger.Make (Event) (Request)
+  Worker_logger.Make (Dummy_event) (Request)
     (struct
       let worker_name = "node_prevalidator"
     end)
@@ -112,7 +123,7 @@ module type T = sig
 
   module Worker :
     Worker.T
-      with type Event.t = Event.t
+      with type Event.t = Dummy_event.t
        and type 'a Request.t = 'a Request.t
        and type Request.view = Request.view
        and type Types.state = types_state
@@ -326,14 +337,12 @@ module Make
   module Worker :
     Worker.T
       with type Name.t = Name.t
-       and type Event.t = Event.t
+       and type Event.t = Dummy_event.t
        and type 'a Request.t = 'a Request.t
        and type Request.view = Request.view
        and type Types.state = Types.state
        and type Types.parameters = Types.parameters =
-    Worker.Make (Name) (Prevalidator_worker_state.Event)
-      (Prevalidator_worker_state.Request)
-      (Types)
+    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
       (Logger)
 
   open Types
@@ -385,10 +394,12 @@ module Make
       outdated ;
     Lwt.return new_mempool
 
-  let already_handled ?(situation = Operation_encountered.Other) w shell oph =
+  let already_handled ~origin shell oph =
     if Operation_hash.Set.mem oph shell.banned_operations then (
-      Lwt.ignore_result
-        (Worker.log_event w (Banned_operation_encountered (situation, oph))) ;
+      (* FIXME: this is to match with previous behavior but will be changed in a
+         further commit. *)
+      Event.(emit__dont_wait__use_with_care ban_operation_encountered)
+        (origin, oph) ;
       true)
     else
       Operation_hash.Map.mem oph shell.pending
@@ -420,7 +431,7 @@ module Make
       {shell = op.raw.shell; protocol_data = op.protocol_data}
     = [0]
 
-  let filter_config w pv =
+  let filter_config pv =
     try
       match Protocol_hash.Map.find Proto.hash pv.filter_config with
       | Some config ->
@@ -428,8 +439,8 @@ module Make
             (Data_encoding.Json.destruct Filter.Mempool.config_encoding config)
       | None -> Lwt.return Filter.Mempool.default_config
     with _ ->
-      Worker.log_event w Invalid_mempool_filter_configuration >>= fun () ->
-      Lwt.return Filter.Mempool.default_config
+      Event.(emit invalid_mempool_filter_configuration) () >|= fun () ->
+      Filter.Mempool.default_config
 
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
@@ -446,14 +457,14 @@ module Make
     | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
         Classification.add ~notify kind hash raw pv.shell.classification
 
-  let pre_filter w pv oph raw =
+  let pre_filter pv oph raw =
     match Prevalidation.parse raw with
     | Error _ ->
-        Worker.log_event w (Unparsable_operation oph) >>= fun () ->
+        Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel
           pv.shell.parameters.chain_db
           oph ;
-        Lwt.return_false
+        false
     | Ok parsed_op -> (
         let op =
           {
@@ -461,7 +472,7 @@ module Make
             protocol_data = parsed_op.protocol_data;
           }
         in
-        filter_config w pv.shell >>= fun config ->
+        filter_config pv.shell >>= fun config ->
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
@@ -484,9 +495,9 @@ module Make
             Lwt.return_false
         | `Undecided -> Lwt.return_true)
 
-  let post_filter w pv ~validation_state_before ~validation_state_after op
-      receipt =
-    filter_config w pv >>= fun config ->
+  let post_filter pv ~validation_state_before ~validation_state_after op receipt
+      =
+    filter_config pv >>= fun config ->
     Filter.Mempool.post_filter
       config
       ~validation_state_before
@@ -501,7 +512,7 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let classify_operation w pv validation_state mempool op oph =
+  let classify_operation pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
         handle pv (`Unparsed (oph, op)) (`Refused errors) ;
@@ -510,7 +521,6 @@ module Make
         Prevalidation.apply_operation validation_state op >>= function
         | Applied (new_validation_state, receipt) ->
             post_filter
-              w
               pv.shell
               ~validation_state_before:
                 (Prevalidation.validation_state validation_state)
@@ -574,7 +584,7 @@ module Make
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
           pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-          classify_operation w pv acc_validation_state acc_mempool op oph
+          classify_operation pv acc_validation_state acc_mempool op oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
       pv.shell.pending
@@ -600,7 +610,7 @@ module Make
         match Operation_hash.Map.cardinal pv.shell.pending with
         | 0 -> Lwt.return_unit
         | n ->
-            Worker.log_event w (Processing_n_operations n) >>= fun () ->
+            Event.(emit processing_n_operations) n >>= fun () ->
             classify_pending_operations w pv state
             >>= fun (state, advertised_mempool) ->
             let remaining_pendings =
@@ -876,10 +886,9 @@ module Make
       | Error _ -> None
 
     let on_arrived w (pv : state) oph op =
-      if already_handled ~situation:Operation_encountered.Arrived w pv.shell oph
-      then return_unit
+      if already_handled ~origin:"arrived" pv.shell oph then return_unit
       else
-        pre_filter w pv oph op >>= function
+        pre_filter pv oph op >>= function
         | true ->
             if
               not
@@ -906,11 +915,10 @@ module Make
               return_unit)
         | false -> return_unit
 
-    let on_inject w (pv : state) op =
+    let on_inject (pv : state) op =
       let oph = Operation.hash op in
-      if
-        already_handled ~situation:Operation_encountered.Injected w pv.shell oph
-      then return_unit (* FIXME : is this an error ? *)
+      if already_handled ~origin:"injected" pv.shell oph then return_unit
+        (* FIXME : is this an error ? *)
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
@@ -933,7 +941,7 @@ module Make
        [distributed_db]. On errors, we emit an event and proceed as
        usual. *)
     let fetch_operation w pv ?peer oph =
-      Worker.log_event w (Fetching_operation oph) >>= fun () ->
+      Event.(emit fetching_operation) oph >|= fun () ->
       Distributed_db.Operation.fetch
         ~timeout:pv.parameters.limits.operation_timeout
         pv.parameters.chain_db
@@ -945,10 +953,10 @@ module Make
           Worker.Queue.push_request_now w (Arrived (oph, op)) ;
           Lwt.return_unit
       | Error (Distributed_db.Operation.Canceled _ :: _) ->
-          Worker.log_event w (Operation_included oph)
+          Event.(emit operation_included) oph
       | Error _ ->
           (* This may happen if the peer timed out for example. *)
-          Worker.log_event w (Operation_not_fetched oph)
+          Event.(emit operation_not_fetched) oph
 
     (* This function fetches an operation if it is not already handled
        by the mempool. To ensure we fetch at most a given operation,
@@ -962,8 +970,12 @@ module Make
        fetching operations. This is to ensure that if an error
        happened, we can still fetch this operation in the future. *)
     let may_fetch_operation w pv peer oph =
-      let situation = Operation_encountered.Notified peer in
-      if not @@ already_handled ~situation w pv oph then
+      let origin =
+        match peer with
+        | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
+        | None -> "leftover from previous run"
+      in
+      if not @@ already_handled ~origin pv oph then
         (* Do not wait the operation to be fetched. The
            [fetch_operation] will push a worker request if the
            operation is fetched succesffuly. *)
@@ -981,7 +993,7 @@ module Make
       List.iter may_fetch_operation mempool.Mempool.known_valid ;
       Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
-    let on_flush w ~handle_branch_refused pv new_predecessor new_live_blocks
+    let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
       let old_predecessor = pv.shell.predecessor in
       pv.shell.predecessor <- new_predecessor ;
@@ -1024,15 +1036,13 @@ module Make
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
         (fun oph op pending ->
-          pre_filter w pv oph op >>= function
+          pre_filter pv oph op >>= function
           | true -> Lwt.return (Operation_hash.Map.add oph op pending)
           | false -> Lwt.return pending)
         pending
         Operation_hash.Map.empty
       >>= fun pending ->
-      Worker.log_event
-        w
-        (Operations_not_flushed (Operation_hash.Map.cardinal pending))
+      Event.(emit operations_not_flushed) (Operation_hash.Map.cardinal pending)
       >>= fun () ->
       pv.shell.pending <- pending ;
       set_mempool pv.shell Mempool.empty
@@ -1051,7 +1061,7 @@ module Make
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
       | `None -> `None
 
-    let on_ban w pv oph_to_ban =
+    let on_ban pv oph_to_ban =
       Distributed_db.Operation.clear_or_cancel
         pv.shell.parameters.chain_db
         oph_to_ban ;
@@ -1070,7 +1080,6 @@ module Make
              reclassification of all the operations except the one
              banned. *)
           on_flush
-            w
             ~handle_branch_refused:false
             pv
             pv.shell.predecessor
@@ -1104,19 +1113,19 @@ module Make
               | Head_increment | Ignored_head -> false
               | Branch_switch -> true)
           in
-          on_flush w ~handle_branch_refused pv block live_blocks live_operations
+          on_flush ~handle_branch_refused pv block live_blocks live_operations
       | Request.Notify (peer, mempool) ->
           on_notify w pv.shell peer mempool ;
           return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject op -> on_inject w pv op
+      | Request.Inject op -> on_inject pv op
       | Request.Arrived (oph, op) -> on_arrived w pv oph op
       | Request.Advertise ->
           on_advertise pv.shell ;
           return_unit
-      | Request.Ban oph -> on_ban w pv oph)
+      | Request.Ban oph -> on_ban pv oph)
       >>=? fun r ->
       handle_unprocessed w pv >>= fun () -> return r
 
@@ -1186,15 +1195,12 @@ module Make
       Operation_hash.Set.iter (may_fetch_operation w pv.shell None) fetching ;
       return pv
 
-    let on_error w r st errs =
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      match r with
-      | Request.(View (Inject _)) -> return_unit
-      | _ -> Lwt.return_error errs
+    let on_error _w r st errs =
+      Event.(emit request_failed) (r, st, errs) >|= fun () ->
+      match r with Request.(View (Inject _)) -> ok_unit | _ -> Error errs
 
-    let on_completion w r _ st =
-      Worker.record_event w (Event.Request (Request.view r, st, None)) ;
-      Lwt.return_unit
+    let on_completion _w r _ st =
+      Event.(emit request_completed) (Request.view r, st)
 
     let on_no_request _ = return_unit
   end
@@ -1327,10 +1333,10 @@ let current_request (t : t) =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.current_request w
 
-let last_events (t : t) =
-  let module Prevalidator : T = (val t) in
-  let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.last_events w
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/1266
+
+   This function is legacy and should be removed.  *)
+let last_events (_t : t) = []
 
 let protocol_hash (t : t) =
   let module Prevalidator : T = (val t) in
