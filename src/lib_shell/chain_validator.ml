@@ -218,14 +218,16 @@ let with_activated_peer_validator w peer_id f =
   | Worker_types.Launching _ ->
       return_unit
 
-let may_update_protocol_level chain_store ~prev ~block =
-  let prev_proto_level = Store.Block.proto_level prev in
+let may_update_protocol_level chain_store ~block =
+  Store.Block.read_predecessor chain_store block >>=? fun pred ->
+  let prev_proto_level = Store.Block.proto_level pred in
   let new_proto_level = Store.Block.proto_level block in
   if Compare.Int.(prev_proto_level < new_proto_level) then
     Store.Block.context chain_store block >>=? fun context ->
     Context.get_protocol context >>= fun new_protocol ->
     Store.Chain.may_update_protocol_level
       chain_store
+      ~pred
       ~protocol_level:new_proto_level
       (block, new_protocol)
   else return_unit
@@ -429,17 +431,24 @@ let on_validation_request w start_testchain active_chains spawn_child block =
         return Event.Ignored_head
     | Some previous ->
         broadcast_head w ~previous block >>= fun () ->
-        may_update_protocol_level chain_store ~prev:previous ~block
-        >>=? fun () ->
-        may_flush_or_update_prevalidator nv ~prev:previous ~block >>=? fun () ->
+        may_update_protocol_level chain_store ~block >>=? fun () ->
         (if start_testchain then
          may_switch_test_chain w active_chains spawn_child block
         else Lwt.return_unit)
         >>= fun () ->
         Lwt_watcher.notify nv.new_head_input block ;
-        if Block_hash.equal head_hash block_header.shell.predecessor then
-          return Event.Head_increment
-        else return Event.Branch_switch
+        let is_branch_switch =
+          Block_hash.equal head_hash block_header.shell.predecessor
+        in
+        let event =
+          if is_branch_switch then Event.Head_increment else Event.Branch_switch
+        in
+        (if is_branch_switch then
+         Store.Chain.may_update_ancestor_protocol_level chain_store ~head:block
+        else return_unit)
+        >>=? fun () ->
+        may_flush_or_update_prevalidator nv ~prev:previous ~block >|=? fun () ->
+        event
 
 let on_notify_branch w peer_id locator =
   let (block, _) = (locator : Block_locator.t :> _ * _) in
