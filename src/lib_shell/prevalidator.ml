@@ -155,6 +155,14 @@ type t = (module T)
    head. We use the [Chain_validator_worker_state.Event.update] for that purpose
    (see {on_flush}).
 
+   Plugins may be used as an anti-spam protection mechanism. They are optional
+   and specific to a protocol, however they are of the shell. The plugin allows
+   to [pre_filter] and [post_filter] operations. The [pre_filter] is applied
+   when an operation is received for the first time through the network or is
+   reclassified after a flush. The [post_filter] is applied everytime an
+   operation is classified as [`Applied].
+
+
    Error classification:
 
      An operation can be classified as [`Refused; `Branch_refused;
