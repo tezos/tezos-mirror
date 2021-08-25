@@ -394,18 +394,16 @@ module Make
       outdated ;
     Lwt.return new_mempool
 
+  (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
-    if Operation_hash.Set.mem oph shell.banned_operations then (
-      (* FIXME: this is to match with previous behavior but will be changed in a
-         further commit. *)
-      Event.(emit__dont_wait__use_with_care ban_operation_encountered)
-        (origin, oph) ;
-      true)
+    if Operation_hash.Set.mem oph shell.banned_operations then
+      Event.(emit ban_operation_encountered) (origin, oph) >|= fun () -> true
     else
-      Operation_hash.Map.mem oph shell.pending
-      || Operation_hash.Set.mem oph shell.fetching
-      || Operation_hash.Set.mem oph shell.live_operations
-      || Operation_hash.Set.mem oph shell.classification.in_mempool
+      Lwt.return
+        (Operation_hash.Map.mem oph shell.pending
+        || Operation_hash.Set.mem oph shell.fetching
+        || Operation_hash.Set.mem oph shell.live_operations
+        || Operation_hash.Set.mem oph shell.classification.in_mempool)
 
   let advertise (w : worker) pv mempool =
     match pv.advertisement with
@@ -886,7 +884,8 @@ module Make
       | Error _ -> None
 
     let on_arrived w (pv : state) oph op =
-      if already_handled ~origin:"arrived" pv.shell oph then return_unit
+      already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
+      if already_handled then return_unit
       else
         pre_filter pv oph op >>= function
         | true ->
@@ -917,8 +916,8 @@ module Make
 
     let on_inject (pv : state) op =
       let oph = Operation.hash op in
-      if already_handled ~origin:"injected" pv.shell oph then return_unit
-        (* FIXME : is this an error ? *)
+      already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
+      if already_handled then return_unit (* FIXME : is this an error ? *)
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
@@ -975,10 +974,8 @@ module Make
         | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
         | None -> "leftover from previous run"
       in
-      if not @@ already_handled ~origin pv oph then
-        (* Do not wait the operation to be fetched. The
-           [fetch_operation] will push a worker request if the
-           operation is fetched succesffuly. *)
+      already_handled ~origin pv oph >>= fun already_handled ->
+      if not already_handled then
         ignore
           (Lwt.finalize
              (fun () ->
@@ -986,12 +983,15 @@ module Make
                fetch_operation w pv ?peer oph)
              (fun () ->
                pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
-               Lwt.return_unit))
+               Lwt.return_unit)) ;
+      Lwt.return_unit
 
     let on_notify w pv peer mempool =
       let may_fetch_operation = may_fetch_operation w pv (Some peer) in
-      List.iter may_fetch_operation mempool.Mempool.known_valid ;
-      Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
+      List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
+      Seq.iter_s
+        may_fetch_operation
+        (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
     let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
@@ -1115,8 +1115,7 @@ module Make
           in
           on_flush ~handle_branch_refused pv block live_blocks live_operations
       | Request.Notify (peer, mempool) ->
-          on_notify w pv.shell peer mempool ;
-          return_unit
+          on_notify w pv.shell peer mempool >>= fun () -> return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
@@ -1192,8 +1191,10 @@ module Make
           rpc_directory = build_rpc_directory w;
         }
       in
-      Operation_hash.Set.iter (may_fetch_operation w pv.shell None) fetching ;
-      return pv
+      Seq.iter_s
+        (may_fetch_operation w pv.shell None)
+        (Operation_hash.Set.to_seq fetching)
+      >>= fun () -> return pv
 
     let on_error _w r st errs =
       Event.(emit request_failed) (r, st, errs) >|= fun () ->
