@@ -85,9 +85,6 @@ val flush :
   Operation_hash.Set.t ->
   unit tzresult Lwt.t
 
-(** Returns the fitness of the current prevalidation context *)
-val fitness : t -> Fitness.t Lwt.t
-
 (** Returns the list of prevalidation contexts running and their associated chain *)
 val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 
