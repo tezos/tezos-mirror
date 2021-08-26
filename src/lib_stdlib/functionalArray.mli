@@ -95,3 +95,11 @@ val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
    where [x] is the content of the cell under focus. [accu] is
    [init] on the first iteration. *)
 val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+
+(** [fold_map f a init fallback] traverses [a] from the cell indexed
+   [0] to the cell indexed [length a - 1] and transforms [accu] into
+   [fst (f accu x)] where [x] is the content of the cell under
+   focus. [accu] is [init] on the first iteration. The function also
+   returns a fresh array containing [snd (f accu x)] for each [x] and
+   initialized with the given [fallback]. *)
+val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t

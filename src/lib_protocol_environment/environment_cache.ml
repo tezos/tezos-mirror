@@ -364,18 +364,15 @@ let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list (dynamic_size subcache_domain_encoding))
 
 let sync t ~cache_nonce =
-  with_caches t (fun caches ->
-      let fresh_caches =
-        FunctionalArray.make (FunctionalArray.length caches) empty_cache
-      in
-      FunctionalArray.fold
-        (fun (i, acc, caches) cache ->
-          let (cache, domain) = sync_cache cache ~cache_nonce in
-          let caches = FunctionalArray.set caches i cache in
-          (i + 1, domain :: acc, caches))
-        caches
-        (0, [], fresh_caches)
-      |> fun (_, domains, caches) -> (Some caches, List.rev domains))
+  with_caches t @@ fun caches ->
+  FunctionalArray.fold_map
+    (fun acc cache ->
+      let (cache, domain) = sync_cache cache ~cache_nonce in
+      (domain :: acc, cache))
+    caches
+    []
+    empty_cache
+  |> fun (domains, caches) -> (Some caches, List.rev domains)
 
 let update_cache_key t key value meta =
   with_caches t @@ fun caches ->
