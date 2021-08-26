@@ -5,7 +5,7 @@
 # Basic configuration to guard against double-pipelines
 workflow:
   rules:
-    # This workflow entry allows allows pipelines for schedules events in which case it checks the
+    # This workflow entry allows pipelines for schedules events in which case it checks the
     # TZ_SCHEDULE_KIND which must be set in the pipeline scheduling interface
     # In either case it sets the TZ_PIPELINE_KIND variable to allow jobs to
     # selectively run on some pipelines but not all.
