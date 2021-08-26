@@ -22,7 +22,7 @@ pass ``--mode proxy`` to ``tezos-client``.
 
 Because computations done locally are protocol dependent, the proxy mode does not support all protocols.
 It is expected than, at any given time, the proxy mode supports ``Alpha`` and the three protocols before that.
-In doubt, execute ``find src/ -name "proxy.ml" | grep 'proto_'`` to find the supported protocols.
+In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the proxy client, it
 tries to match the node's protocol. On the one hand, this is handy when

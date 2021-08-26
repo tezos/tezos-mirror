@@ -77,6 +77,10 @@ type proxy_environment = (module Proxy_sig)
     for the given protocol exists already. *)
 val register_proxy_context : proxy_environment -> unit
 
+(** [get_all_registered ()] returns all proxy environments that have been
+    registered so far with {!register_proxy_context} *)
+val get_all_registered : unit -> proxy_environment list
+
 (** Returns a proxy environment for the given protocol (or the
     first one in the list of registered protocols
     if the [Protocol_hash.t] is [None], see the [Registration] module). *)

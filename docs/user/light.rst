@@ -59,7 +59,8 @@ Here is an example valid ``--sources`` file:
 Because computations done locally are protocol dependent, the light mode
 does not support all protocols. However, at any given time, it should
 support the protocol being developed (``alpha``) and the three most
-recent protocols.
+recent protocols. Execute ``tezos-client list light protocols``
+to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the light client, it
 tries to match the node's protocol. On the one hand, this is handy when
