@@ -165,6 +165,7 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
+(** Create an empty big_map *)
 val empty_big_map :
   'a Script_typed_ir.comparable_ty ->
   'b Script_typed_ir.ty ->
@@ -182,6 +183,7 @@ val big_map_get :
   ('key, 'value) Script_typed_ir.big_map ->
   ('value option * context) tzresult Lwt.t
 
+(** Update a big map. See {!big_map_get_and_update} for details. *)
 val big_map_update :
   context ->
   'key ->
@@ -189,6 +191,10 @@ val big_map_update :
   ('key, 'value) Script_typed_ir.big_map ->
   (('key, 'value) Script_typed_ir.big_map * context) tzresult Lwt.t
 
+(** Update a big map, returning the old value of the given key and the new map.
+
+    This does {i not} modify the underlying storage, only the diff table.
+ *)
 val big_map_get_and_update :
   context ->
   'key ->
@@ -421,6 +427,9 @@ type lazy_storage_ids
 
 val no_lazy_storage_id : lazy_storage_ids
 
+(** Traverse the given type, producing a {!lazy_storage_ids} for
+    use with {!extract_lazy_storage_diff}.
+ *)
 val collect_lazy_storage :
   context ->
   'a Script_typed_ir.ty ->
@@ -429,6 +438,21 @@ val collect_lazy_storage :
 
 val list_of_big_map_ids : lazy_storage_ids -> Big_map.Id.t list
 
+(** Produce a lazy storage diff, containing in-memory writes to
+    lazy data structures such as big_maps yet to be committed.
+
+    The resulting diff can be committed to the underlying storage
+    (context) using [Lazy_storage_diff.apply].
+
+ @param to_duplicate
+    Lazy data structure reference produced via {!collect_lazy_storage}
+    that can not be reused. Typically collected via traversing
+    the parameters to a smart contract.
+ @param to_update
+    Lazy data structure reference produced via {!collect_lazy_storage}
+    that can be reused. Typically collected via traversing the previous
+    storage of a smart contract.
+ *)
 val extract_lazy_storage_diff :
   context ->
   unparsing_mode ->
