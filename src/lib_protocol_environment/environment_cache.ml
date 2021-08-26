@@ -389,7 +389,8 @@ let key_rank ctxt key =
   let cache = cache_of_key ctxt key in
   let rec length_until x n = function
     | [] -> Some n
-    | y :: ys -> if x = y then Some n else length_until x (n + 1) ys
+    | y :: ys ->
+        if Key.compare x y = 0 then Some n else length_until x (n + 1) ys
   in
   if not @@ KeyMap.mem key cache.map then None
   else Int64Map.bindings cache.lru |> List.map snd |> length_until key 0
