@@ -124,17 +124,57 @@ let qcheck_eq_false ~actual =
 let test_clear_empties_all =
   let open QCheck in
   Test.make
-    ~name:"[clear] empties everything except [refused]"
+    ~name:
+      "[clear ~handle_branch_refused:true] empties everything except [refused]"
     (make Generators.t_gen)
   @@ fun t ->
   let refused_before = t.refused |> Prevalidator_classification.map in
-  Prevalidator_classification.clear t ;
+  Prevalidator_classification.clear ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Prevalidator_classification.map in
   let bounded_map_is_empty bounded_map =
     bounded_map |> Prevalidator_classification.map
     |> Operation_hash.Map.is_empty
   in
   qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_refused) ;
+  qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_delayed) ;
+  qcheck_eq_true ~actual:(t.applied_rev = []) ;
+  qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
+  qcheck_eq'
+    ~pp:Operation_map.pp
+    ~eq:Operation_map.eq
+    ~expected:refused_before
+    ~actual:refused_after
+    ()
+
+let test_clear_empties_all_except_branch_refused =
+  let open QCheck in
+  Test.make
+    ~name:
+      "[clear ~handle_branch_refused:false] empties everything except \
+       [refused] and [branch_refused]"
+    (make Generators.t_gen)
+  @@ fun t ->
+  let refused_before = t.refused |> Prevalidator_classification.map in
+  let branch_refused_before =
+    t.branch_refused |> Prevalidator_classification.map
+  in
+  Prevalidator_classification.clear ~handle_branch_refused:false t ;
+  let refused_after = t.refused |> Prevalidator_classification.map in
+  let branch_refused_after =
+    t.branch_refused |> Prevalidator_classification.map
+  in
+  let bounded_map_is_empty bounded_map =
+    bounded_map |> Prevalidator_classification.map
+    |> Operation_hash.Map.is_empty
+  in
+  let _ =
+    qcheck_eq'
+      ~pp:Operation_map.pp
+      ~eq:Operation_map.eq
+      ~expected:branch_refused_before
+      ~actual:branch_refused_after
+      ()
+  in
   qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_delayed) ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
@@ -394,6 +434,7 @@ let () =
         qcheck_wrap
           [
             test_clear_empties_all;
+            test_clear_empties_all_except_branch_refused;
             test_is_in_mempool_remove;
             test_is_applied;
             test_validation_result;

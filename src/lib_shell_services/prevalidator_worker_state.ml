@@ -26,7 +26,12 @@
 
 module Request = struct
   type 'a t =
-    | Flush : Block_hash.t * Block_hash.Set.t * Operation_hash.Set.t -> unit t
+    | Flush :
+        Block_hash.t
+        * Chain_validator_worker_state.Event.update
+        * Block_hash.Set.t
+        * Operation_hash.Set.t
+        -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
     | Inject : Operation.t -> unit t
@@ -45,12 +50,17 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Flush"
-          (obj2
+          (obj3
              (req "request" (constant "flush"))
-             (req "block" Block_hash.encoding))
-          (function View (Flush (hash, _, _)) -> Some ((), hash) | _ -> None)
-          (fun ((), hash) ->
-            View (Flush (hash, Block_hash.Set.empty, Operation_hash.Set.empty)));
+             (req "block" Block_hash.encoding)
+             (req "event" Chain_validator_worker_state.Event.update_encoding))
+          (function
+            | View (Flush (hash, event, _, _)) -> Some ((), hash, event)
+            | _ -> None)
+          (fun ((), hash, event) ->
+            View
+              (Flush
+                 (hash, event, Block_hash.Set.empty, Operation_hash.Set.empty)));
         case
           (Tag 1)
           ~title:"Notify"
@@ -104,7 +114,7 @@ module Request = struct
 
   let pp ppf (View r) =
     match r with
-    | Flush (hash, _, _) ->
+    | Flush (hash, _, _, _) ->
         Format.fprintf ppf "switching to new head %a" Block_hash.pp hash
     | Notify (id, {Mempool.known_valid; pending}) ->
         Format.fprintf
@@ -289,7 +299,7 @@ module Event = struct
         case
           (Tag 7)
           ~title:"operations_not_flushed"
-          int31
+          (obj1 (req "operations_not_flushed" int31))
           (function Operations_not_flushed n -> Some n | _ -> None)
           (fun n -> Operations_not_flushed n);
         case

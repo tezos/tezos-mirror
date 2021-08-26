@@ -74,9 +74,12 @@ val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 (** Notify the prevalidator worker of a new injected operation. *)
 val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
 
-(** Notify the prevalidator that a new head has been selected. *)
+(** Notify the prevalidator that a new head has been selected.
+    [update] is used as an optimisation to know which operations
+    previously classified require to be prevalidated again. *)
 val flush :
   t ->
+  Chain_validator_worker_state.Event.update ->
   Block_hash.t ->
   Block_hash.Set.t ->
   Operation_hash.Set.t ->
