@@ -88,6 +88,10 @@ let init_test_chain ctxt forked_header =
       | None -> fail (Missing_test_protocol protocol))
       >>=? fun (module Proto_test) ->
       let test_ctxt = Shell_context.wrap_disk_context ctxt in
+      Validation_events.(emit new_protocol_initialisation protocol)
+      >>= fun () ->
+      Proto_test.set_log_message_consumer
+        (Protocol_logging.make_log_message_consumer ()) ;
       Proto_test.init test_ctxt forked_header.Block_header.shell
       >>=? fun {context = test_ctxt; _} ->
       let test_ctxt = Shell_context.unwrap_disk_context test_ctxt in
@@ -365,6 +369,8 @@ module Make (Proto : Registered_protocol.T) = struct
             Proto.environment_version
             NewProto.environment_version
           >>?= fun () ->
+          Validation_events.(emit new_protocol_initialisation new_protocol)
+          >>= fun () ->
           NewProto.set_log_message_consumer
             (Protocol_logging.make_log_message_consumer ()) ;
           NewProto.init validation_result.context block_header.shell
