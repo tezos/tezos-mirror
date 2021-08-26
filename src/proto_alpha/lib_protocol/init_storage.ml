@@ -25,8 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* do nothing for now *)
-let log fmt = Format.kasprintf (fun _ -> ()) fmt
+let log fmt = Logging.log Notice fmt
 
 (* Remove me after protocol H *)
 module Flatten_storage_for_H = struct
@@ -67,7 +66,8 @@ module Flatten_storage_for_H = struct
         >>= fun tree -> Raw_context.add_tree ctxt (abs_key @ key) tree)
 
   let flatten_storage ctxt =
-    log "Flattening the context storage.  It takes several minutes." ;
+    log
+      "flattening the context storage: this operation may take several minutes" ;
     let rec drop n xs =
       match (n, xs) with
       | (0, _) -> xs
@@ -246,7 +246,7 @@ module Flatten_storage_for_H = struct
       ~depth:7
       ~rename:rename_public_key_hash
     >|= fun ctxt ->
-    log "Flattened the context storage." ;
+    log "context storage flattening completed" ;
     ctxt
 end
 
