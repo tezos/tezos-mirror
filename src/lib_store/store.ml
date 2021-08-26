@@ -1946,7 +1946,12 @@ module Chain = struct
                     commit_info = commit_info_opt;
                   }
                   protocol_levels))
-        >>=? fun () -> return_unit)
+        >>=? fun () ->
+        Store_events.(
+          emit
+            update_protocol_table
+            (protocol_hash, protocol_level, Block.hash block, Block.level block))
+        >>= fun () -> return_unit)
 
   let find_activation_block chain_store ~protocol_level =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
