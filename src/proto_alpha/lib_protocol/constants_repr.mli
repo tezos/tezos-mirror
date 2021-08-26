@@ -136,6 +136,7 @@ module Proto_previous : sig
     blocks_per_roll_snapshot : int32;
     blocks_per_voting_period : int32;
     time_between_blocks : Period_repr.t list;
+    minimal_block_delay : Period_repr.t;
     endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -150,13 +151,15 @@ module Proto_previous : sig
     endorsement_reward : Tez_repr.t list;
     cost_per_byte : Tez_repr.t;
     hard_storage_limit_per_operation : Z.t;
-    test_chain_duration : int64;
     (* in seconds *)
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period_repr.t;
+    liquidity_baking_subsidy : Tez_repr.t;
+    liquidity_baking_sunset_level : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.encoding

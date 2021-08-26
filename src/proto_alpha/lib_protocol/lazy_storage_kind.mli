@@ -153,9 +153,6 @@ module Temp_ids : sig
 
   val init : t
 
-  (* Remove me after Granada *)
-  val threshold_for_edo_florence_dangling_lazy_storage_cleanup : t
-
   val fresh : ('i, 'a, 'u) kind -> t -> t * 'i
 
   val fold_s :

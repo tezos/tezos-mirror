@@ -464,11 +464,6 @@ module Votes = struct
     let path = sub_path ~chain ~block "ballot_list" in
     Client.rpc ?endpoint ?hooks GET path client
 
-  let get_current_period_kind ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") client =
-    let path = sub_path ~chain ~block "current_period_kind" in
-    Client.rpc ?endpoint ?hooks GET path client
-
   let get_ballots ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = sub_path ~chain ~block "ballots" in
     Client.rpc ?endpoint ?hooks GET path client

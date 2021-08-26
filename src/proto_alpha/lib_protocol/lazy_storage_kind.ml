@@ -30,9 +30,6 @@ module type TEMP_ID = sig
 
   val init : t
 
-  (* Remove me after Granada *)
-  val threshold_for_edo_florence_dangling_lazy_storage_cleanup : t
-
   val next : t -> t
 end
 
@@ -135,9 +132,6 @@ module MakeId (Title : Title) : TitleWithId = struct
     let equal = Z.equal
 
     let init = Z.of_int ~-1
-
-    (* Remove me after Granada *)
-    let threshold_for_edo_florence_dangling_lazy_storage_cleanup = Z.of_int ~-99
 
     let next z = Z.sub z Z.one
   end
@@ -243,16 +237,6 @@ module Temp_ids = struct
 
   let init =
     {big_map = Big_map.Temp_id.init; sapling_state = Sapling_state.Temp_id.init}
-
-  (* Remove me after Granada *)
-  let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
-    {
-      big_map =
-        Big_map.Temp_id.threshold_for_edo_florence_dangling_lazy_storage_cleanup;
-      sapling_state =
-        Sapling_state.Temp_id
-        .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
-    }
 
   let fresh : type i a u. (i, a, u) kind -> t -> t * i =
    fun kind temp_ids ->

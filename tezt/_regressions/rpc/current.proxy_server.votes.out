@@ -10,9 +10,6 @@ tezt/_regressions/rpc/current.proxy_server.votes.out
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 2, "remaining": 1 }
 
-./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
-"proposal"
-
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_proposal
 null
 
@@ -45,12 +42,8 @@ null
 { "yay": 500, "nay": 500, "pass": 500 }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period
-{ "voting_period":
-    { "index": 1, "kind": "testing_vote", "start_position": 4 },
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 1, "remaining": 2 }
-
-./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
-"testing_vote"
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_proposal
 "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
@@ -69,8 +62,7 @@ null
 []
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/successor_period
-{ "voting_period":
-    { "index": 1, "kind": "testing_vote", "start_position": 4 },
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 2, "remaining": 1 }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/total_voting_power

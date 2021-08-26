@@ -36,9 +36,8 @@ let wait_for_voting_period ?level_within_period state ~protocol ~client
           >>= fun json ->
           try
             let voting_period_position =
-              Jqo.field ~k:"level" json
-              |> Jqo.field ~k:"voting_period_position"
-              |> Jqo.get_int
+              Jqo.field ~k:"voting_period_info" json
+              |> Jqo.field ~k:"position" |> Jqo.get_int
             in
             return (voting_period_position >= lvl)
           with e ->

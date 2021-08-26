@@ -513,23 +513,11 @@ let version_value = "alpha_current"
 
 let version = "v1"
 
-(* DEPRECATED: remove after activation of G *)
-let first_level_key = [version; "first_level"]
-
 let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]
 
 let protocol_param_key = ["protocol_parameters"]
-
-(* DEPRECATED: remove after activation of G *)
-let get_first_level ctxt =
-  Context.find ctxt first_level_key >|= function
-  | None -> storage_error (Missing_key (first_level_key, Get))
-  | Some bytes -> (
-      match Data_encoding.Binary.of_bytes_opt Raw_level_repr.encoding bytes with
-      | None -> storage_error (Corrupted_data first_level_key)
-      | Some level -> ok level)
 
 let get_cycle_eras ctxt =
   Context.find ctxt cycle_eras_key >|= function
@@ -682,7 +670,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Florence_009
+type previous_protocol = Genesis of Parameters_repr.t | Granada_010
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -694,15 +682,14 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "florence_009") then
-         return (Florence_009, ctxt)
+       else if Compare.String.(s = "granada_010") then return (Granada_010, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
   ok (previous_proto, ctxt)
 
 (* only for the migration *)
-let get_previous_protocol_constants ctxt =
+let[@warning "-32"] get_previous_protocol_constants ctxt =
   Context.find ctxt constants_key >>= function
   | None ->
       failwith
@@ -747,98 +734,45 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Florence_009 ->
-      get_first_level ctxt >>=? fun first_level ->
-      Context.remove ctxt first_level_key >>= fun ctxt ->
+  | Granada_010 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let time_between_blocks_at_first_priority =
-        (match c.time_between_blocks with
-        | [] -> Period_repr.one_minute
-        | first_time_between_blocks :: _ -> first_time_between_blocks)
-        |> Period_repr.to_seconds
-      in
-      let mainnet_constants = Compare.Int.(c.initial_endorsers = 24) in
       let constants =
+        (* removes michelson_maximum_type_size *)
         Constants_repr.
           {
-            minimal_block_delay =
-              Period_repr.of_seconds_exn
-                (if Compare.Int64.(time_between_blocks_at_first_priority = 1L)
-                then 1L
-                else (Int64.div time_between_blocks_at_first_priority) 2L);
+            minimal_block_delay = c.minimal_block_delay;
             preserved_cycles = c.preserved_cycles;
-            blocks_per_cycle =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_cycle
-              else c.blocks_per_cycle);
-            blocks_per_commitment =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_commitment
-              else c.blocks_per_commitment);
-            blocks_per_roll_snapshot =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_roll_snapshot
-              else c.blocks_per_roll_snapshot);
-            blocks_per_voting_period =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_voting_period
-              else c.blocks_per_voting_period);
+            blocks_per_cycle = c.blocks_per_cycle;
+            blocks_per_commitment = c.blocks_per_commitment;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
+            blocks_per_voting_period = c.blocks_per_voting_period;
             time_between_blocks = c.time_between_blocks;
-            endorsers_per_block = 256;
+            endorsers_per_block = c.endorsers_per_block;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
-            hard_gas_limit_per_block =
-              Gas_limit_repr.Arith.(integral_of_int_exn 5_200_000);
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
-            block_security_deposit = Tez_repr.(mul_exn one 640);
-            endorsement_security_deposit = Tez_repr.(mul_exn one_cent 250);
-            baking_reward_per_endorsement =
-              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 11_719L];
-            endorsement_reward =
-              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 52_083L];
+            block_security_deposit = c.block_security_deposit;
+            endorsement_security_deposit = c.endorsement_security_deposit;
+            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
+            endorsement_reward = c.endorsement_reward;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
             cost_per_byte = c.cost_per_byte;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            initial_endorsers =
-              (if mainnet_constants then 192 else c.initial_endorsers);
-            delay_per_missing_endorsement =
-              (if mainnet_constants then Period_repr.of_seconds_exn 4L
-              else c.delay_per_missing_endorsement);
-            liquidity_baking_subsidy = Tez_repr.of_mutez_exn 2_500_000L;
-            (* Approximately 6 month after the first activation of Liquidity Baking on mainnet *)
-            liquidity_baking_sunset_level = 2_032_928l;
-            liquidity_baking_escape_ema_threshold = 1_000_000l;
+            initial_endorsers = c.initial_endorsers;
+            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
+            liquidity_baking_subsidy = c.liquidity_baking_subsidy;
+            liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
+            liquidity_baking_escape_ema_threshold =
+              c.liquidity_baking_escape_ema_threshold;
           }
       in
-      add_constants ctxt constants >>= fun ctxt ->
-      let first_cycle_era =
-        Level_repr.
-          {
-            first_level;
-            first_cycle = Cycle_repr.root;
-            blocks_per_cycle = c.blocks_per_cycle;
-            blocks_per_commitment = c.blocks_per_commitment;
-          }
-      in
-      let current_cycle =
-        let level_position =
-          Int32.sub level (Raw_level_repr.to_int32 first_level)
-        in
-        Cycle_repr.of_int32_exn (Int32.div level_position c.blocks_per_cycle)
-      in
-      let second_cycle_era =
-        Level_repr.
-          {
-            first_level =
-              Raw_level_repr.of_int32_exn (Int32.succ (Int32.succ level));
-            first_cycle = Cycle_repr.succ current_cycle;
-            blocks_per_cycle = constants.blocks_per_cycle;
-            blocks_per_commitment = constants.blocks_per_commitment;
-          }
-      in
-      Level_repr.create_cycle_eras [second_cycle_era; first_cycle_era]
-      >>?= fun cycle_eras -> set_cycle_eras ctxt cycle_eras)
+      add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)

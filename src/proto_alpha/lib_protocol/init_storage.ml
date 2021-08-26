@@ -25,8 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* do nothing for now *)
-let log fmt = Format.kasprintf (fun _ -> ()) fmt
+let log fmt = Logging.log Notice fmt
 
 (* Remove me after protocol H *)
 module Flatten_storage_for_H = struct
@@ -67,7 +66,8 @@ module Flatten_storage_for_H = struct
         >>= fun tree -> Raw_context.add_tree ctxt (abs_key @ key) tree)
 
   let flatten_storage ctxt =
-    log "Flattening the context storage.  It takes several minutes." ;
+    log
+      "flattening the context storage: this operation may take several minutes" ;
     let rec drop n xs =
       match (n, xs) with
       | (0, _) -> xs
@@ -246,7 +246,7 @@ module Flatten_storage_for_H = struct
       ~depth:7
       ~rename:rename_public_key_hash
     >|= fun ctxt ->
-    log "Flattened the context storage." ;
+    log "context storage flattening completed" ;
     ctxt
 end
 
@@ -304,38 +304,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Liquidity_baking_migration.init ctxt ~typecheck
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
-  | Florence_009 ->
-      Flatten_storage_for_H.flatten_storage ctxt >>= fun ctxt ->
-      (* Only the starting position of the voting period is shifted by
-         one level into the future, so that voting periods are again
-         aligned with cycles. The period kind does not change, as a new
-         voting period has just started. *)
-      Voting_period_storage.get_current ctxt >>=? fun voting_period ->
-      Storage.Vote.Current_period.update
-        ctxt
-        {
-          voting_period with
-          start_position = Int32.succ voting_period.start_position;
-        }
-      >>=? fun ctxt ->
-      Lazy_storage_diff.cleanup_edo_florence_dangling_lazy_storage ctxt
-      >>= fun ctxt ->
-      (* Add balance updates receipts to be attached on the first block of this
-         protocol - see [[prepare]] function below. Any balance updates attached
-         in the migration should use the [[Receipt_repr.Migration]] constructor.
-      *)
-      (* To add invoices, use something like that:
-          invoice_contract
-            ctxt
-            ~address:"tz1..."
-            ~amount_mutez:123_456L
-          >>= fun (ctxt, balance_updates) ->
-          Storage.Pending_migration_balance_updates.init ctxt balance_updates
-      *)
-      (* Must be called after other originations since it unsets the origination nonce.*)
-      Liquidity_baking_migration.init ctxt ~typecheck
-      >>=? fun (ctxt, operation_results) ->
-      Storage.Pending_migration.Operation_results.init ctxt operation_results
+  | Granada_010 -> Flatten_storage_for_H.flatten_storage ctxt >>= return
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt

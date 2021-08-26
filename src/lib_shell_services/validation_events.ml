@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2021 DaiLambda, Inc. <contact@dailambda.jp>                 *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [make_asynchronous_log_message_consumer ()] returns a function
-    that can be used with the Protocol's
-    [set_log_message_consumer]. The partial application (with a single
-    [()] argument) sets up the necessary machinery (message buffer,
-    error management, etc.) to handle the protocol's messages. *)
-val make_asynchronous_log_message_consumer :
-  unit -> Internal_event.level -> string -> unit
+include Internal_event.Simple
 
-(** [make_log_message_consumer ()] returns a function that can be used
-    with the Protocol's [set_log_message_consumer]. This implementation
-    is synchronous. *)
-val make_log_message_consumer : unit -> Internal_event.level -> string -> unit
+let section = ["validation"]
+
+let new_protocol_initialisation =
+  declare_1
+    ~section
+    ~name:"new_protocol_initialisation"
+    ~msg:"initializing protocol {proto_hash}..."
+    ~level:Notice
+    ~pp1:Protocol_hash.pp_short
+    ("proto_hash", Protocol_hash.encoding)

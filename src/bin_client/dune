@@ -82,6 +82,10 @@
               (tezos-baking-010-PtGRANAD-commands.registration -> void_for_linking-baking-010-PtGRANAD.empty)
               (-> void_for_linking-baking-010-PtGRANAD.empty))
 
+            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+            ; If you modify this file around here, modify src/bin_proxy_server/dune too! ;
+            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
             (select void_for_linking-007-PsDELPH1-protocol-plugin from
               (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
               (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))

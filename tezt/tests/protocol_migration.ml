@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2021 DaiLambda, Inc. <contact@dailambda.jp>                 *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,15 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [make_asynchronous_log_message_consumer ()] returns a function
-    that can be used with the Protocol's
-    [set_log_message_consumer]. The partial application (with a single
-    [()] argument) sets up the necessary machinery (message buffer,
-    error management, etc.) to handle the protocol's messages. *)
-val make_asynchronous_log_message_consumer :
-  unit -> Internal_event.level -> string -> unit
+(* Testing
+   -------
+   Component:    Protocol
+   Invocation:   dune exec tezt/tests/main.exe -- protocol migration
+   Subject:      Checks the migration of protocol alpha
+*)
 
-(** [make_log_message_consumer ()] returns a function that can be used
-    with the Protocol's [set_log_message_consumer]. This implementation
-    is synchronous. *)
-val make_log_message_consumer : unit -> Internal_event.level -> string -> unit
+let test_protocol_migration ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration"
+    ~tags:["protocol"; "migration"; "sandbox"]
+  @@ fun () ->
+  let node = Node.create [] in
+  let* () = Node.config_init node [] in
+  Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+    node
+    [(3, migrate_to)] ;
+  Log.info "Node starting" ;
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  Log.info "Node initialized" ;
+  let* client = Client.(init ~endpoint:(Node node) ()) in
+  let* () = Client.activate_protocol ~protocol:migrate_from client in
+  Log.info "Protocol activated" ;
+  (* Bake until migration *)
+  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  (* Ensure that we did migrate *)
+  let* migration_block = RPC.get_block_metadata ~block:"2" client in
+  let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
+  Log.info "checking migration block consistency" ;
+  Check.(
+    (protocol = Protocol.hash migrate_from)
+      string
+      ~error_msg:"expected protocol = %R, got %L") ;
+  let next_protocol = JSON.(migration_block |-> "next_protocol" |> as_string) in
+  Check.(
+    (next_protocol = Protocol.hash migrate_from)
+      string
+      ~error_msg:"expected next_protocol = %R, got %L") ;
+  (* Test that we can still bake after migration *)
+  let* () = repeat 5 (fun () -> Client.bake_for client) in
+  unit
+
+let register ~migrate_from ~migrate_to =
+  test_protocol_migration ~migrate_from ~migrate_to

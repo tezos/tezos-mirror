@@ -67,7 +67,3 @@ val fresh :
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val cleanup_temporaries : Raw_context.t -> Raw_context.t Lwt.t
-
-(* Remove me after Granada *)
-val cleanup_edo_florence_dangling_lazy_storage :
-  Raw_context.t -> Raw_context.t Lwt.t

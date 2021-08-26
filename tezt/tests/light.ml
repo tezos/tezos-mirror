@@ -284,7 +284,7 @@ let test_compare_light =
       ("proxy_getter", "debug");
     ]
   in
-  check_equivalence ~tz_log protocol alt_mode clients
+  check_equivalence ~tz_log alt_mode clients
 
 let register_protocol_independent () =
   test_no_endpoint () ;

@@ -49,14 +49,21 @@ let () =
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
-  Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
+  Mockup.register_constant_migration
+    ~migrate_from:Protocol.current_mainnet
+    ~migrate_to:Alpha ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
-  User_activated_upgrade.register ~migrate_from:Edo ~migrate_to:Florence ;
+  Protocol_migration.register
+    ~migrate_from:Protocol.current_mainnet
+    ~migrate_to:Alpha ;
+  User_activated_upgrade.register
+    ~migrate_from:Protocol.current_mainnet
+    ~migrate_to:Alpha ;
   (* TODO: the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run

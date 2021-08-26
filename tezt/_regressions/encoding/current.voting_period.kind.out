@@ -1,25 +1,25 @@
 tezt/_regressions/encoding/current.voting_period.kind.out
 
-./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"promotion_vote"'
+./tezos-codec encode 010-PtGRANAD.voting_period.kind from '"promotion"'
 03
 
-./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 03
-"promotion_vote"
+./tezos-codec decode 010-PtGRANAD.voting_period.kind from 03
+"promotion"
 
-./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"proposal"'
+./tezos-codec encode 010-PtGRANAD.voting_period.kind from '"proposal"'
 00
 
-./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 00
+./tezos-codec decode 010-PtGRANAD.voting_period.kind from 00
 "proposal"
 
-./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"testing_vote"'
+./tezos-codec encode 010-PtGRANAD.voting_period.kind from '"exploration"'
 01
 
-./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 01
-"testing_vote"
+./tezos-codec decode 010-PtGRANAD.voting_period.kind from 01
+"exploration"
 
-./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"testing"'
+./tezos-codec encode 010-PtGRANAD.voting_period.kind from '"cooldown"'
 02
 
-./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 02
-"testing"
+./tezos-codec decode 010-PtGRANAD.voting_period.kind from 02
+"cooldown"
