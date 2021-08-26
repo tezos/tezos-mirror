@@ -10,7 +10,7 @@ export OPAMYES=yes
 echo
 echo "## Pinning tezos packages..."
 
-opams=$(find vendors src -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
 bin_packages=
 lib_packages=

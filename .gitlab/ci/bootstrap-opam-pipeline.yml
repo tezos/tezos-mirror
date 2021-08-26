@@ -4,10 +4,8 @@ opam:create_pipeline:
     - .image_template__runtime_build_test_dependencies_template
   stage: bootstrap
   script:
-    - . ./scripts/opam-pin.sh
-    - export PACKAGES=$(echo $packages | tr '\n' ' ')
     - . ./scripts/detect-opam-changes.sh
-    - ./scripts/generate_opam_pipeline.sh > opam-ci.yml
+    - ./scripts/generate_opam_pipeline.sh
     - cat opam-ci.yml
   artifacts:
     paths:
