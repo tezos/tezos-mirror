@@ -66,6 +66,8 @@ Client
 -  Made mode light ``--endpoint``/``--sources`` consistency check
    happen earlier, so that it is guaranteed to catch mismatches.
 
+-  Added commands ``list proxy protocols`` and ``list light protocols``,
+   to get the list of protocols supported by ``--mode proxy`` and ``--mode light``
 
 Baker / Endorser / Accuser
 --------------------------
