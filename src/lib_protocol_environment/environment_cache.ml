@@ -341,25 +341,17 @@ let update_entry entry nonce =
 (* [finalize_cache ctxt cache nonce] saves the domain of [cache] in
    the storage. This function returns the cache for the next block. *)
 let finalize_cache ({map; _} as cache) nonce =
-  let (metamap, map) =
-    KeyMap.fold
-      (fun key (e, entry) (meta_map, map) ->
-        let entry = update_entry entry nonce in
-        (KeyMap.add key entry meta_map, KeyMap.add key (e, entry) map))
-      map
-      (KeyMap.empty, KeyMap.empty)
-  in
+  let map = KeyMap.map (fun (e, entry) -> (e, update_entry entry nonce)) map in
+  let metamap = KeyMap.map snd map in
   ({cache with map}, metamap)
 
-let sync_cache :
-    'a cache -> cache_nonce:Bytes.t -> 'a cache * value_metadata KeyMap.t =
- fun cache ~cache_nonce ->
+type domain = value_metadata KeyMap.t list
+
+let sync_cache cache ~cache_nonce =
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
   let (cache, new_entries) = finalize_cache cache cache_nonce in
   (cache, new_entries)
-
-type domain = value_metadata KeyMap.t list
 
 let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
   Data_encoding.(
@@ -371,8 +363,7 @@ let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list (dynamic_size subcache_domain_encoding))
 
-let sync : 'a t -> cache_nonce:Bytes.t -> 'a t * domain =
- fun t ~cache_nonce ->
+let sync t ~cache_nonce =
   with_caches t (fun caches ->
       let fresh_caches =
         FunctionalArray.make (FunctionalArray.length caches) empty_cache
