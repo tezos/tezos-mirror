@@ -329,7 +329,7 @@ let perform_migration ~protocol ~next_protocol ~next_constants ~pre_migration
 let get_candidates_to_migration () =
   let* mockup_protocols =
     let transient = Client.create_with_mode Client.Mockup in
-    Client.list_mockup_protocols transient
+    Client.list_protocols `Mockup transient
   in
   (* Find all registered mockup protocols which declare a next protocol *)
   let result =

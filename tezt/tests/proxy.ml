@@ -30,6 +30,8 @@
    Subject: Tests of the client's --mode proxy.
   *)
 
+let ( >|= ) = Lwt.( >|= )
+
 (** [matches re s] checks if [s] matches [re]. Note in particular that this supports multiline strings. *)
 let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false
 
@@ -573,6 +575,103 @@ module Location = struct
     let clients = {vanilla; alternative} in
     check_equivalence alt_mode clients
 end
+
+module Equalable_String_set : Check.EQUALABLE with type t = String_set.t =
+struct
+  type t = String_set.t
+
+  let equal = String_set.equal
+
+  let pp fmt set =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "|")
+      Format.pp_print_string
+      fmt
+      (String_set.elements set)
+end
+
+let string_set = Check.equalable_module (module Equalable_String_set)
+
+let show_mode mode = match mode with `Proxy -> "proxy" | `Light -> "light"
+
+(** Test that, at any point in time, the proxy mode and the light mode
+    supports the same list of protocols as the mockup (genesis being
+    ignored). The point it to help release managers, protocol freezing,
+    protocol support drop; to not forget a component. *)
+let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
+  let mode_str = show_mode mode in
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "%s supported protocols are the same as the mockup protocols"
+         mode_str)
+    ~tags:["client"; mode_str; "list"; "protocols"]
+  @@ fun () ->
+  let client = Client.create () in
+  let* mockup_protocols =
+    Client.list_protocols `Mockup client >|= String_set.of_list
+  in
+  let* mode_protocols =
+    Client.list_protocols mode client
+    (* Filter out Genesis, which the mockup doesn't support; but which light and
+       proxy modes do. We want to compare the other protocols. *)
+    >|= List.filter (fun str -> str =~! rex "Genesis.*")
+    >|= String_set.of_list
+  in
+  let error_msg =
+    "Mockup protocols list is %L, but " ^ mode_str ^ " protocols list is %R"
+  in
+  Check.((mockup_protocols = mode_protocols) string_set ~error_msg) ;
+  unit
+
+(** Test that, at any point in time, the proxy mode and the light mode
+    support Alpha and at least three other protocols (genesis being ignored).
+    This is stated in the public documentation. *)
+let test_support_four_protocols (mode : [< `Proxy | `Light]) =
+  let mode_str = show_mode mode in
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s supports alpha and at least 3 immutable protocols" mode_str)
+    ~tags:["client"; mode_str; "list"; "protocols"]
+  @@ fun () ->
+  let client = Client.create () in
+  let* mode_protocols =
+    Client.list_protocols mode client
+    >|= (* Filter out Genesis. We are interested in other protocols. *)
+    List.filter (fun str -> str =~! rex "Genesis.*")
+    >|= String_set.of_list
+  in
+  let non_alpha_protocols =
+    String_set.filter (fun str -> str =~! rex "^ProtoALpha.*") mode_protocols
+  in
+  let alpha_error_msg =
+    Format.asprintf
+      "Alpha should be supported, but it's not found in the list of protocols: \
+       %a"
+      Equalable_String_set.pp
+      mode_protocols
+  in
+  Check.(
+    (String_set.cardinal non_alpha_protocols
+    = String_set.cardinal mode_protocols - 1)
+      int
+      ~error_msg:alpha_error_msg) ;
+  let error_msg =
+    Format.asprintf
+      "%s should support at least three non-alpha protocols, but non-alpha \
+       supported protocols are %a"
+      mode_str
+      Equalable_String_set.pp
+      non_alpha_protocols
+  in
+  let nb_non_alpha_protocols = String_set.cardinal non_alpha_protocols in
+  Check.((nb_non_alpha_protocols >= 3) int ~error_msg) ;
+  unit
+
+let register_protocol_independent () =
+  test_supported_protocols_like_mockup `Proxy ;
+  test_support_four_protocols `Proxy
 
 let register ~protocols =
   test_bake ~protocols ;
