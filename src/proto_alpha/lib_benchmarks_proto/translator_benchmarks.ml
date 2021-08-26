@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Script_typed_ir
 
 module Config = struct
   type config = {
@@ -801,14 +802,7 @@ module Merge_types : Benchmark.S = struct
         match ty with
         | Ex_ty ty ->
             let dummy_loc = 0 in
-            let nodes =
-              let max_type_size = 9999 in
-              let remaining =
-                Script_type_size.deduce_type_size ~remaining:max_type_size ty
-              in
-              assert (remaining >= 0) ;
-              max_type_size - remaining
-            in
+            let nodes = 9999 (* ??? *) in
             Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
             >|= Environment.wrap_tzresult
             >>=? fun (_, ctxt') ->
@@ -843,22 +837,25 @@ let () = Registration_helpers.register (module Merge_types)
 (* A dummy type generator, sampling linear terms of a given size. *)
 let rec dummy_type_generator depth =
   let open Script_ir_translator in
-  if depth = 0 then Ex_ty (Unit_t None)
+  if depth = 0 then Ex_ty (unit_t ~annot:None)
   else
     match dummy_type_generator (depth - 1) with
-    | Ex_ty something -> Ex_ty (List_t (something, None))
+    | Ex_ty something -> Ex_ty (Michelson_types.list something)
 
 (* Generate combs; the size of a comb of depth d should be
    d * 2 + 1. *)
 let rec dummy_comparable_type_generator depth =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if depth = 0 then Ex_comparable_ty (Unit_key None)
+  if depth = 0 then Ex_comparable_ty (unit_key ~annot:None)
   else
     match dummy_comparable_type_generator (depth - 1) with
     | Ex_comparable_ty r ->
-        let l = Unit_key None in
-        Ex_comparable_ty (Pair_key ((l, None), (r, None), None))
+        let l = unit_key ~annot:None in
+        Ex_comparable_ty
+          (match pair_key (-1) (l, None) (r, None) ~annot:None with
+          | Error _ -> assert false
+          | Ok t -> t)
 
 module Parse_type_shared = struct
   type config = {max_size : int}

@@ -403,9 +403,6 @@ let[@coq_axiom_with_reason "gadt"] register () =
       let key_type_node = Micheline.root key_type in
       Script_ir_translator.parse_comparable_ty ctxt key_type_node
       >>?= fun (Ex_comparable_ty key_type, ctxt) ->
-      let loc = Micheline.location key_type_node in
-      Script_type_size.check_comparable_type_size ~legacy:false ~loc key_type
-      >>?= fun () ->
       Script_ir_translator.parse_comparable_data
         ctxt
         key_type

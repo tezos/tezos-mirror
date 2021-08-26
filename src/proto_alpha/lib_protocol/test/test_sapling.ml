@@ -33,6 +33,11 @@
 
 open Protocol
 
+let ( >>??= ) x y =
+  match x with
+  | Ok s -> y s
+  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+
 module Raw_context_tests = struct
   open Sapling_helpers.Common
 
@@ -1004,12 +1009,12 @@ module Interpreter_tests = struct
     let ctx_without_gas = Alpha_context.Gas.set_unlimited ctx in
     Alpha_services.Contract.storage Block.rpc_ctxt b dst >>=? fun storage ->
     let storage_lazy_expr = Alpha_context.Script.lazy_expr storage in
-    let tytype =
-      let memo_size = memo_size_of_int memo_size in
-      let open Script_typed_ir in
-      let state_ty = Sapling_state_t (memo_size, None) in
-      Pair_t ((state_ty, None, None), (state_ty, None, None), None)
-    in
+
+    (let memo_size = memo_size_of_int memo_size in
+     let open Script_typed_ir in
+     let state_ty = sapling_state_t ~memo_size ~annot:None in
+     pair_t (-1) (state_ty, None, None) (state_ty, None, None) ~annot:None)
+    >>??= fun tytype ->
     Script_ir_translator.parse_storage
       ctx_without_gas
       ~legacy:true

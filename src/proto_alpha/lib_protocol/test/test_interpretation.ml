@@ -15,6 +15,11 @@ let ( >>=?? ) x y =
   | Ok s -> y s
   | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
 
+let ( >>??= ) x y =
+  match x with
+  | Ok s -> y s
+  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+
 let test_context () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
@@ -124,7 +129,9 @@ let test_stack_overflow () =
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
-  let kinfo' = {iloc = -1; kstack_ty = Item_t (Bool_t None, stack, None)} in
+  let kinfo' =
+    {iloc = -1; kstack_ty = Item_t (bool_t ~annot:None, stack, None)}
+  in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -146,19 +153,17 @@ let test_stack_overflow_in_lwt () =
   test_context () >>=? fun ctxt ->
   let stack = Bot_t in
   let item ty s = Item_t (ty, s, None) in
-  let unit_t = Unit_t None in
-  let unit_k = Unit_key None in
-  let bool_t = Bool_t None in
-  let big_map_t = Big_map_t (unit_k, unit_t, None) in
+  let unit_t = unit_t ~annot:None in
+  let unit_k = unit_key ~annot:None in
+  let bool_t = bool_t ~annot:None in
+  big_map_t (-1) unit_k unit_t ~annot:None >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo s = {iloc = -1; kstack_ty = s} in
   let stack1 = item big_map_t Bot_t in
   let stack2 = item big_map_t (item big_map_t Bot_t) in
   let stack3 = item unit_t stack2 in
   let stack4 = item bool_t stack1 in
-  let push_empty_big_map k =
-    IEmpty_big_map (kinfo stack, Unit_key None, Unit_t None, k)
-  in
+  let push_empty_big_map k = IEmpty_big_map (kinfo stack, unit_k, unit_t, k) in
   let large_mem_seq n =
     let rec aux n acc =
       if n = 0 then acc

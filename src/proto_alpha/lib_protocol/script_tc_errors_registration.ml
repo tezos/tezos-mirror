@@ -558,6 +558,17 @@ let () =
     (function
       | Comparable_type_expected (loc, ty) -> Some (loc, ty) | _ -> None)
     (fun (loc, ty) -> Comparable_type_expected (loc, ty)) ;
+  (* Inconsistent type sizes *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.inconsistent_type_sizes"
+    ~title:"Inconsistent type sizes"
+    ~description:
+      "Two types were expected to be equal but they have different sizes."
+    (obj2 (req "first_type_size" int31) (req "other_type_size" int31))
+    (function
+      | Inconsistent_type_sizes (tya, tyb) -> Some (tya, tyb) | _ -> None)
+    (fun (tya, tyb) -> Inconsistent_type_sizes (tya, tyb)) ;
   (* Inconsistent types *)
   register_error_kind
     `Permanent
@@ -567,11 +578,13 @@ let () =
       "This is the basic type clash error, that appears in several places \
        where the equality of two types have to be proven, it is always \
        accompanied with another error that provides more context."
-    (obj2
+    (obj3
+       (opt "loc" Script.location_encoding)
        (req "first_type" Script.expr_encoding)
        (req "other_type" Script.expr_encoding))
-    (function Inconsistent_types (tya, tyb) -> Some (tya, tyb) | _ -> None)
-    (fun (tya, tyb) -> Inconsistent_types (tya, tyb)) ;
+    (function
+      | Inconsistent_types (loc, tya, tyb) -> Some (loc, tya, tyb) | _ -> None)
+    (fun (loc, tya, tyb) -> Inconsistent_types (loc, tya, tyb)) ;
   (* Inconsistent memo_sizes *)
   register_error_kind
     `Permanent

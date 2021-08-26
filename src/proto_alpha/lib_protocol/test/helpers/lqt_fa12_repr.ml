@@ -216,7 +216,10 @@ module Storage = struct
     get ctxt ~contract >>=? fun storage ->
     let tokens = storage.tokens in
     get_alpha_context ctxt >>=? fun ctxt ->
-    Script_ir_translator.hash_data ctxt Script_typed_ir.(Address_t None) owner
+    Script_ir_translator.hash_data
+      ctxt
+      Script_typed_ir.(address_t ~annot:None)
+      owner
     >|= Environment.wrap_tzresult
     >>=? fun (address_hash, ctxt) ->
     Big_map.get_opt ctxt tokens address_hash >|= Environment.wrap_tzresult

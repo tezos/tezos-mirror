@@ -977,7 +977,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IImplicit_account (_, k) ->
           let key = accu in
           let contract = Contract.implicit_contract key in
-          let res = (Unit_t None, (contract, "default")) in
+          let res = (unit_t ~annot:None, (contract, "default")) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IView (_, View_signature {name; input_ty; output_ty}, k) -> (
           let input = accu in
@@ -1030,6 +1030,12 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           kinstr;
                         },
                         _script_view ) -> (
+                      pair_t
+                        kloc
+                        (input_ty, None, None)
+                        (storage_type, None, None)
+                        ~annot:None
+                      >>?= fun pair_ty ->
                       let open Gas_monad in
                       let io_ty =
                         Script_ir_translator.merge_types
@@ -1044,10 +1050,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           ~legacy:true
                           kloc
                           bef_ty
-                          (Pair_t
-                             ( (input_ty, None, None),
-                               (storage_type, None, None),
-                               None ))
+                          pair_ty
                         >|$ fun (in_eq, _ty) -> (out_eq, in_eq)
                       in
                       Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->

@@ -615,6 +615,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               ty1
               print_ty
               ty2
+        | Inconsistent_type_sizes (size1, size2) ->
+            Format.fprintf
+              ppf
+              "@[<v 2>The two types have different sizes, the first one is of \
+               size %d while the other one is of size %d@]"
+              size1
+              size2
         | Unexpected_annotation loc ->
             Format.fprintf ppf "@[<v 2>%aunexpected annotation." print_loc loc
         | Ungrouped_annotations loc ->
@@ -710,11 +717,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
               print_ty
               ty
-        | Inconsistent_types (tya, tyb) ->
+        | Inconsistent_types (opt_loc, tya, tyb) ->
             Format.fprintf
               ppf
-              "@[<hov 0>@[<hov 2>Type@ %a@]@ @[<hov 2>is not compatible with \
+              "@[<hov 0>@[<hov 2>%aType@ %a@]@ @[<hov 2>is not compatible with \
                type@ %a.@]@]"
+              (fun fmt -> function None -> () | Some loc -> print_loc fmt loc)
+              opt_loc
               print_ty
               tya
               print_ty
