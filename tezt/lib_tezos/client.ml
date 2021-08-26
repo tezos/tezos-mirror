@@ -679,7 +679,7 @@ let list_mockup_protocols client =
   let process = spawn_list_mockup_protocols client in
   let* () = Process.check process
   and* output = Lwt_io.read (Process.stdout process) in
-  return (String.split_on_char '\n' output)
+  return (String.split_on_char '\n' output |> List.filter (fun s -> s <> ""))
 
 let spawn_migrate_mockup ~next_protocol client =
   spawn_command
