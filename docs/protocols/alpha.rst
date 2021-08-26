@@ -35,6 +35,7 @@ Bug fixes
 ---------
 
 - A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
+- Fix balance updates that indicate inaccurate burned amounts in some scenarios (MR :gl:`!3407`)
 
 RPC changes
 -----------
