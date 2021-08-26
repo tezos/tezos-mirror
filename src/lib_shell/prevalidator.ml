@@ -470,7 +470,7 @@ module Make
             protocol_data = parsed_op.protocol_data;
           }
         in
-        filter_config pv.shell >>= fun config ->
+        filter_config pv.shell >|= fun config ->
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
@@ -484,14 +484,14 @@ module Make
         with
         | `Branch_delayed errors ->
             handle pv (`Parsed parsed_op) (`Branch_delayed errors) ;
-            Lwt.return_false
+            false
         | `Branch_refused errors ->
             handle pv (`Parsed parsed_op) (`Branch_refused errors) ;
-            Lwt.return_false
+            false
         | `Refused errors ->
             handle pv (`Parsed parsed_op) (`Refused errors) ;
-            Lwt.return_false
-        | `Undecided -> Lwt.return_true)
+            false
+        | `Undecided -> true)
 
   let post_filter pv ~validation_state_before ~validation_state_after op receipt
       =
