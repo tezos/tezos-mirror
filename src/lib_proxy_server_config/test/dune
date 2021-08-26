@@ -1,5 +1,6 @@
 (tests
  (names test_proxy_server_config)
+ (package tezos-proxy-server-config)
  (libraries
   tezos-base
   tezos-base.unix
@@ -15,10 +16,3 @@
  (alias runtest_proxy_server_config)
  (action
   (run %{exe:test_proxy_server_config.exe})))
-
-(rule
- (alias runtest)
- (package tezos-proxy-server-config)
- (deps
-  (alias runtest_proxy_server_config))
- (action progn))
