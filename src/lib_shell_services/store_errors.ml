@@ -977,6 +977,10 @@ let () =
 type error +=
   | Unexpected_missing_block of {block_name : string}
   | Unexpected_missing_block_metadata of {block_name : string}
+  | Unexpected_missing_activation_block of {
+      block : Block_hash.t;
+      protocol : Protocol_hash.t;
+    }
   | Inconsistent_genesis of {expected : Block_hash.t; got : Block_hash.t}
   | Inconsistent_cementing_highwatermark of {
       highest_cemented_level : Int32.t;
@@ -1015,6 +1019,30 @@ let () =
       | Unexpected_missing_block_metadata {block_name} -> Some block_name
       | _ -> None)
     (fun block_name -> Unexpected_missing_block_metadata {block_name}) ;
+  register_error_kind
+    `Permanent
+    ~id:"store.unexpected_missing_activation_block"
+    ~title:"Unexpected missing activaiton block"
+    ~description:"An activation block is unexpectedly missing from the store."
+    ~pp:(fun ppf (block, proto) ->
+      Format.fprintf
+        ppf
+        "The block %a activating protocol %a is unexpectedly missing from the \
+         store."
+        Block_hash.pp
+        block
+        Protocol_hash.pp
+        proto)
+    Data_encoding.(
+      obj2
+        (req "block" Block_hash.encoding)
+        (req "protocol" Protocol_hash.encoding))
+    (function
+      | Unexpected_missing_activation_block {block; protocol} ->
+          Some (block, protocol)
+      | _ -> None)
+    (fun (block, protocol) ->
+      Unexpected_missing_activation_block {block; protocol}) ;
   register_error_kind
     `Permanent
     ~id:"store.inconsistent_genesis"
