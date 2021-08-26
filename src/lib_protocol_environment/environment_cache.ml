@@ -316,14 +316,14 @@ let rec enforce_size_limit cache =
 
 let record_entries_removals cache =
   let entries_removals =
-    cache.entries_removals @ [KeySet.cardinal cache.removed_entries]
-  in
-  let entries_removals =
-    if List.length entries_removals > entries_removals_window_width then
-      match entries_removals with
+    if List.length cache.entries_removals >= entries_removals_window_width then
+      match cache.entries_removals with
       | [] -> assert false
       | _ :: entries_removals -> entries_removals
-    else entries_removals
+    else cache.entries_removals
+  in
+  let entries_removals =
+    entries_removals @ [KeySet.cardinal cache.removed_entries]
   in
   {cache with entries_removals; removed_entries = KeySet.empty}
 
