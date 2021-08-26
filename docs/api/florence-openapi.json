@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "9.2"
+    "version": "10.1"
   },
   "paths": {
     "/": {
@@ -2320,6 +2320,105 @@
                   "type": "integer",
                   "minimum": -2147483648,
                   "maximum": 2147483647
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/merkle_tree": {
+      "get": {
+        "description": "Returns the merkle tree of a piece of context.",
+        "parameters": [
+          {
+            "name": "holey",
+            "in": "query",
+            "description": "Send only hashes, omit data of key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            },
+                            {
+                              "oneOf": [
+                                {
+                                  "title": "Hash",
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "title": "Data",
+                                  "nullable": true,
+                                  "oneOf": [
+                                    {
+                                      "title": "Key",
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9]+$"
+                                    },
+                                    {
+                                      "title": "Dir",
+                                      "type": "object",
+                                      "properties": {},
+                                      "additionalProperties": {
+                                        "$ref": "#/components/schemas/raw_context"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "Continue",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/merkle_tree"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -6716,6 +6815,243 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/009-PsFLoren.operation.alpha.operation_with_metadata"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/scripts/run_view": {
+      "post": {
+        "description": "Simulate a call to a view following the TZIP-4 standard. See https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contract": {
+                    "$ref": "#/components/schemas/009-PsFLoren.contract_id"
+                  },
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/unistring"
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.009-PsFLoren.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/009-PsFLoren.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.009-PsFLoren.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "chain_id": {
+                    "$ref": "#/components/schemas/Chain_id"
+                  },
+                  "source": {
+                    "$ref": "#/components/schemas/009-PsFLoren.contract_id"
+                  },
+                  "payer": {
+                    "$ref": "#/components/schemas/009-PsFLoren.contract_id"
+                  },
+                  "gas": {
+                    "$ref": "#/components/schemas/bignum"
+                  },
+                  "unparsing_mode": {
+                    "oneOf": [
+                      {
+                        "title": "Readable",
+                        "type": "string",
+                        "enum": [
+                          "Readable"
+                        ]
+                      },
+                      {
+                        "title": "Optimized",
+                        "type": "string",
+                        "enum": [
+                          "Optimized"
+                        ]
+                      },
+                      {
+                        "title": "Optimized_legacy",
+                        "type": "string",
+                        "enum": [
+                          "Optimized_legacy"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "contract",
+                  "entrypoint",
+                  "input",
+                  "chain_id",
+                  "unparsing_mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "title": "Int",
+                          "type": "object",
+                          "properties": {
+                            "int": {
+                              "$ref": "#/components/schemas/bignum"
+                            }
+                          },
+                          "required": [
+                            "int"
+                          ]
+                        },
+                        {
+                          "title": "String",
+                          "type": "object",
+                          "properties": {
+                            "string": {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          },
+                          "required": [
+                            "string"
+                          ]
+                        },
+                        {
+                          "title": "Bytes",
+                          "type": "object",
+                          "properties": {
+                            "bytes": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9]+$"
+                            }
+                          },
+                          "required": [
+                            "bytes"
+                          ]
+                        },
+                        {
+                          "title": "Sequence",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/micheline.009-PsFLoren.michelson_v1.expression"
+                          }
+                        },
+                        {
+                          "title": "Generic prim (any number of args with or without annot)",
+                          "type": "object",
+                          "properties": {
+                            "prim": {
+                              "$ref": "#/components/schemas/009-PsFLoren.michelson.v1.primitives"
+                            },
+                            "args": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/micheline.009-PsFLoren.michelson_v1.expression"
+                              }
+                            },
+                            "annots": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "prim"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }
@@ -15893,6 +16229,64 @@
         "title": "64 bit integers",
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
+      },
+      "merkle_tree": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/unistring"
+              },
+              {
+                "oneOf": [
+                  {
+                    "title": "Hash",
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "title": "Data",
+                    "nullable": true,
+                    "oneOf": [
+                      {
+                        "title": "Key",
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9]+$"
+                      },
+                      {
+                        "title": "Dir",
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {
+                          "$ref": "#/components/schemas/raw_context"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Continue",
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/merkle_tree"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
       },
       "micheline.009-PsFLoren.michelson_v1.expression": {
         "oneOf": [
