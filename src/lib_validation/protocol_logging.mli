@@ -24,8 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [make_log_message_consumer ()] returns a function that can be used with the
-    Protocol's [set_log_message_consumer]. The partial application (with a single
-    [()] argument) sets up the necessary machinery (message buffer, error
-    management, etc.) to handle the protocol's messages. *)
+(** [make_asynchronous_log_message_consumer ()] returns a function
+    that can be used with the Protocol's
+    [set_log_message_consumer]. The partial application (with a single
+    [()] argument) sets up the necessary machinery (message buffer,
+    error management, etc.) to handle the protocol's messages. *)
+val make_asynchronous_log_message_consumer :
+  unit -> Internal_event.level -> string -> unit
+
+(** [make_log_message_consumer ()] returns a function that can be used
+    with the Protocol's [set_log_message_consumer]. This implementation
+    is synchronous. *)
 val make_log_message_consumer : unit -> Internal_event.level -> string -> unit

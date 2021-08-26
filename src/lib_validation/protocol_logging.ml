@@ -58,7 +58,7 @@ let logging_failure =
     ~level:Error
     ("exc", Data_encoding.string)
 
-let make_log_message_consumer () =
+let make_asynchronous_log_message_consumer () =
   let (stream, push) = Lwt_stream.create () in
   let alive = ref true in
   Lwt.dont_wait
@@ -90,3 +90,20 @@ let make_log_message_consumer () =
     if !alive then
       try push (Some (level, s)) with Lwt_stream.Closed -> alive := false
     else ()
+
+let make_log_message_consumer () level s =
+  Lwt.dont_wait
+    (fun () ->
+      match level with
+      | Internal_event.Debug -> emit debug s
+      | Info -> emit info s
+      | Notice -> emit notice s
+      | Warning -> emit warning s
+      | Error -> emit error s
+      | Fatal -> emit fatal s)
+    (fun exc ->
+      Lwt.dont_wait
+        (fun () -> emit logging_failure (Printexc.to_string exc))
+        (fun _exn ->
+          (* Ignoring: everything went wrong*)
+          ()))
