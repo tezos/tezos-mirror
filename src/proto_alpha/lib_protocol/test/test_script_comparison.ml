@@ -97,7 +97,7 @@ struct
   let atom_size_range : Tezos_benchmark.Base_samplers.range =
     {min = 0; max = 10}
 
-  let type_depth : Tezos_benchmark.Base_samplers.range = {min = 0; max = 1000}
+  let type_size : Tezos_benchmark.Base_samplers.range = {min = 1; max = 1000}
 
   let other_size : Tezos_benchmark.Base_samplers.range = {min = 0; max = 100}
 
@@ -107,7 +107,7 @@ struct
       string_size = atom_size_range;
       bytes_size = atom_size_range;
       stack_size = other_size;
-      type_depth;
+      type_size;
       list_size = other_size;
       set_size = other_size;
       map_size = other_size;
@@ -130,7 +130,7 @@ let ex_comparable_data_sampler :
       random_state
   in
   let (Ex_comparable_ty ty) =
-    Samplers.Random_type.m_comparable_type_by_size ~size random_state
+    Samplers.Random_type.m_comparable_type ~size random_state
   in
   let x = Samplers.Random_value.comparable ty random_state in
   Ex_comparable_data (ty, x)
@@ -144,7 +144,7 @@ let ex_comparable_data_2_sampler :
       random_state
   in
   let (Ex_comparable_ty ty) =
-    Samplers.Random_type.m_comparable_type_by_size ~size random_state
+    Samplers.Random_type.m_comparable_type ~size random_state
   in
   let x = Samplers.Random_value.comparable ty random_state in
   let y = Samplers.Random_value.comparable ty random_state in
@@ -159,7 +159,7 @@ let ex_comparable_data_3_sampler :
       random_state
   in
   let (Ex_comparable_ty ty) =
-    Samplers.Random_type.m_comparable_type_by_size ~size random_state
+    Samplers.Random_type.m_comparable_type ~size random_state
   in
   let x = Samplers.Random_value.comparable ty random_state in
   let y = Samplers.Random_value.comparable ty random_state in
