@@ -107,7 +107,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       | None ->
           Log.warn
             "Need to compute expr of key %s: prefer to put this in \
-             Big_map_perf_data"
+             Proxy_server_test_data"
             index ;
           compute_index_expr index
       | Some res -> Lwt.return res
