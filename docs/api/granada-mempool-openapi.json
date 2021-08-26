@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "9.2"
+    "version": "10.1"
   },
   "paths": {
     "/pending_operations": {

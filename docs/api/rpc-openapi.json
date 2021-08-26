@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "9.2"
+    "version": "10.1"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -193,7 +193,7 @@
                     "block": {
                       "$ref": "#/components/schemas/block_header"
                     },
-                    "save_point": {
+                    "savepoint": {
                       "type": "integer",
                       "minimum": -2147483648,
                       "maximum": 2147483647
@@ -204,17 +204,12 @@
                       "maximum": 2147483647
                     },
                     "history_mode": {
-                      "type": "string",
-                      "enum": [
-                        "full",
-                        "archive",
-                        "rolling"
-                      ]
+                      "$ref": "#/components/schemas/history_mode"
                     }
                   },
                   "required": [
                     "block",
-                    "save_point",
+                    "savepoint",
                     "caboose",
                     "history_mode"
                   ]
@@ -526,6 +521,52 @@
                               "$ref": "#/components/schemas/unistring"
                             }
                           ]
+                        },
+                        "acl": {
+                          "description": "A list of RPC ACLs for specific listening addresses.",
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "title": "Whitelist",
+                                "type": "object",
+                                "properties": {
+                                  "address": {
+                                    "$ref": "#/components/schemas/unistring"
+                                  },
+                                  "whitelist": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/unistring"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "address",
+                                  "whitelist"
+                                ]
+                              },
+                              {
+                                "title": "Blacklist",
+                                "type": "object",
+                                "properties": {
+                                  "address": {
+                                    "$ref": "#/components/schemas/unistring"
+                                  },
+                                  "blacklist": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/unistring"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "address",
+                                  "blacklist"
+                                ]
+                              }
+                            ]
+                          }
                         }
                       }
                     },
@@ -545,7 +586,7 @@
                           }
                         },
                         "listen-addr": {
-                          "description": "Host to listen to. If the port is not specified, the default port 8732 will be assumed.",
+                          "description": "Host to listen to. If the port is not specified, the default port 9732 will be assumed.",
                           "oneOf": [
                             {
                               "$ref": "#/components/schemas/unistring"
@@ -821,7 +862,7 @@
                           ]
                         },
                         "template": {
-                          "description": "Format for the log file, see http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates.",
+                          "description": "Format for the log file, see https://github.com/ocsigen/lwt_log/blob/1.1.1/src/core/lwt_log_core.mli#L229.",
                           "oneOf": [
                             {
                               "$ref": "#/components/schemas/unistring"
@@ -1005,12 +1046,7 @@
                           ]
                         },
                         "history_mode": {
-                          "type": "string",
-                          "enum": [
-                            "full",
-                            "archive",
-                            "rolling"
-                          ]
+                          "$ref": "#/components/schemas/history_mode"
                         }
                       }
                     },
@@ -2095,6 +2131,88 @@
                 "schema": {
                   "type": "object",
                   "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/network/greylist/ips": {
+      "get": {
+        "description": "Returns an object that contains a list of IP and the field \"not_reliable_since\".\n           If the field \"not_reliable_since\" is None then the list contains the currently greylisted IP addresses.\n           If the field \"not_reliable_since\" Contains a date, this means that the greylist has been overflowed and it is no more possible to obtain the exact list of greylisted IPs. Since the greylist of IP addresses has been design to work whatever his size, there is no security issue related to this overflow.\n          Reinitialize the ACL structure by calling \"delete /network/greylist\" to get back this list reliable.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ips": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/p2p_address"
+                      }
+                    },
+                    "not_reliable_since": {
+                      "nullable": true,
+                      "oneOf": [
+                        {
+                          "title": "Some",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/timestamp.system"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ips",
+                    "not_reliable_since"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/network/greylist/peers": {
+      "get": {
+        "description": "List of the last greylisted peers.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                  }
                 }
               }
             }
@@ -9977,6 +10095,86 @@
           "type": "string",
           "pattern": "^[a-zA-Z0-9]+$"
         }
+      },
+      "history_mode": {
+        "title": "history mode",
+        "description": "Storage mode for the Tezos shell.",
+        "oneOf": [
+          {
+            "title": "archive",
+            "description": "Archive mode retains every block and operations since the genesis block including their metadata and their associated contexts.",
+            "type": "string",
+            "enum": [
+              "archive"
+            ]
+          },
+          {
+            "title": "full",
+            "description": "Full mode retains every block and operations since the genesis block but periodically prunes older blocks' metadata to reduce the storage size.",
+            "type": "object",
+            "properties": {
+              "full": {
+                "type": "object",
+                "properties": {
+                  "additional_cycles": {
+                    "title": "additional cycles",
+                    "description": "Number of additional cycles preserved below the savepoint. By default: 5 additional cycles will be stored.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "additional_cycles"
+                ]
+              }
+            },
+            "required": [
+              "full"
+            ]
+          },
+          {
+            "title": "rolling",
+            "description": "Rolling mode only retain the most recent cycles by periodically periodically discarding older blocks to reduce the storage size.",
+            "type": "object",
+            "properties": {
+              "rolling": {
+                "type": "object",
+                "properties": {
+                  "additional_cycles": {
+                    "title": "additional cycles",
+                    "description": "Number of additional cycles preserved below the savepoint. By default: 5 additional cycles will be stored.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "additional_cycles"
+                ]
+              }
+            },
+            "required": [
+              "rolling"
+            ]
+          },
+          {
+            "title": "full_alias",
+            "description": "Full mode with default number of additional cycles.",
+            "type": "string",
+            "enum": [
+              "full"
+            ]
+          },
+          {
+            "title": "rolling_alias",
+            "description": "Rolling mode with default number of additional cycles.",
+            "type": "string",
+            "enum": [
+              "rolling"
+            ]
+          }
+        ]
       },
       "int64": {
         "title": "64 bit integers",

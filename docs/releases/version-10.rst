@@ -1,4 +1,4 @@
-Version 10.0
+Version 10.1
 ============
 
 **This version changes the storage backend and requires
@@ -31,13 +31,17 @@ client, and a new executable
 :doc:`tezos-proxy-server<../user/proxy-server>`.  See full
 `Changelog`_ for more details.
 
+Version 10.1 restores the broadcasting of endorsements received before
+the validation of their endorsed block. It also really adds advertized
+but forgotten CLI option ``--allow-all-rpc``.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v10.0
+  git checkout v10.1
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
@@ -45,12 +49,13 @@ To update from sources::
 
 Then upgrade your store by following the instructions in `Storage Upgrade`_.
 
-If you are using Docker instead, use the ``v10.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v10.1`` Docker images of Tezos.
 Then upgrade your store by following the instructions in `Guide for Docker Users`_.
 
 Changelog
 ---------
 
+- `Version 10.1 <../CHANGES.html#version-10-1>`_
 - `Version 10.0 <../CHANGES.html#version-10-0>`_
 - `Version 10.0~rc3 <../CHANGES.html#version-10-0-rc3>`_
 - `Version 10.0~rc2 <../CHANGES.html#version-10-0-rc2>`_
@@ -144,7 +149,7 @@ Docker users can run the upgrade procedure using the
 ``tezos-upgrade-storage`` command as follows (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc3 tezos-upgrade-storage
+    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.1 tezos-upgrade-storage
 
 Users who use ``storage-docker-manager.sh`` can simply execute the built-in
 upgrade command, such as (for Mainnet): ``./mainnet.sh node upgrade``
@@ -154,7 +159,7 @@ now safely remove the backup of the previous store version.
 To do so, start a shell using (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.0-rc3
+    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.1
 
 Once you have a shell, remove the backup using::
 

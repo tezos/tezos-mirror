@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "9.2"
+    "version": "10.1"
   },
   "paths": {
     "/": {
@@ -2491,6 +2491,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/merkle_tree": {
+      "get": {
+        "description": "Returns the merkle tree of a piece of context.",
+        "parameters": [
+          {
+            "name": "holey",
+            "in": "query",
+            "description": "Send only hashes, omit data of key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            },
+                            {
+                              "oneOf": [
+                                {
+                                  "title": "Hash",
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "title": "Data",
+                                  "nullable": true,
+                                  "oneOf": [
+                                    {
+                                      "title": "Key",
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9]+$"
+                                    },
+                                    {
+                                      "title": "Dir",
+                                      "type": "object",
+                                      "properties": {},
+                                      "additionalProperties": {
+                                        "$ref": "#/components/schemas/raw_context"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "Continue",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/merkle_tree"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -6051,6 +6150,783 @@
         }
       }
     },
+    "/helpers/scripts/run_code/normalized": {
+      "post": {
+        "description": "Deprecated alias of the .../helpers/scripts/run_code RPC",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "storage": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "amount": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                  },
+                  "balance": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                  },
+                  "chain_id": {
+                    "$ref": "#/components/schemas/Chain_id"
+                  },
+                  "source": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "payer": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "gas": {
+                    "$ref": "#/components/schemas/bignum"
+                  },
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/unistring"
+                  },
+                  "unparsing_mode": {
+                    "oneOf": [
+                      {
+                        "title": "Readable",
+                        "type": "string",
+                        "enum": [
+                          "Readable"
+                        ]
+                      },
+                      {
+                        "title": "Optimized",
+                        "type": "string",
+                        "enum": [
+                          "Optimized"
+                        ]
+                      },
+                      {
+                        "title": "Optimized_legacy",
+                        "type": "string",
+                        "enum": [
+                          "Optimized_legacy"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "script",
+                  "storage",
+                  "input",
+                  "amount",
+                  "balance",
+                  "chain_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "storage": {
+                      "oneOf": [
+                        {
+                          "title": "Int",
+                          "type": "object",
+                          "properties": {
+                            "int": {
+                              "$ref": "#/components/schemas/bignum"
+                            }
+                          },
+                          "required": [
+                            "int"
+                          ]
+                        },
+                        {
+                          "title": "String",
+                          "type": "object",
+                          "properties": {
+                            "string": {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          },
+                          "required": [
+                            "string"
+                          ]
+                        },
+                        {
+                          "title": "Bytes",
+                          "type": "object",
+                          "properties": {
+                            "bytes": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9]+$"
+                            }
+                          },
+                          "required": [
+                            "bytes"
+                          ]
+                        },
+                        {
+                          "title": "Sequence",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                          }
+                        },
+                        {
+                          "title": "Generic prim (any number of args with or without annot)",
+                          "type": "object",
+                          "properties": {
+                            "prim": {
+                              "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                            },
+                            "args": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                              }
+                            },
+                            "annots": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "prim"
+                          ]
+                        }
+                      ]
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.internal_operation"
+                      }
+                    },
+                    "big_map_diff": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "title": "update",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "update"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "key_hash": {
+                                "$ref": "#/components/schemas/script_expr"
+                              },
+                              "key": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "value": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map",
+                              "key_hash",
+                              "key"
+                            ]
+                          },
+                          {
+                            "title": "remove",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "remove"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map"
+                            ]
+                          },
+                          {
+                            "title": "copy",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "copy"
+                                ]
+                              },
+                              "source_big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "destination_big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "source_big_map",
+                              "destination_big_map"
+                            ]
+                          },
+                          {
+                            "title": "alloc",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "alloc"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "key_type": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "value_type": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map",
+                              "key_type",
+                              "value_type"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "lazy_storage_diff": {
+                      "$ref": "#/components/schemas/010-PtGRANAD.lazy_storage_diff"
+                    }
+                  },
+                  "required": [
+                    "storage",
+                    "operations"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/scripts/run_operation": {
       "post": {
         "description": "Run an operation without signature checks",
@@ -6119,9 +6995,1027 @@
         }
       }
     },
+    "/helpers/scripts/run_view": {
+      "post": {
+        "description": "Simulate a call to a view following the TZIP-4 standard. See https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contract": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/unistring"
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "chain_id": {
+                    "$ref": "#/components/schemas/Chain_id"
+                  },
+                  "source": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "payer": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "gas": {
+                    "$ref": "#/components/schemas/bignum"
+                  },
+                  "unparsing_mode": {
+                    "oneOf": [
+                      {
+                        "title": "Readable",
+                        "type": "string",
+                        "enum": [
+                          "Readable"
+                        ]
+                      },
+                      {
+                        "title": "Optimized",
+                        "type": "string",
+                        "enum": [
+                          "Optimized"
+                        ]
+                      },
+                      {
+                        "title": "Optimized_legacy",
+                        "type": "string",
+                        "enum": [
+                          "Optimized_legacy"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "contract",
+                  "entrypoint",
+                  "input",
+                  "chain_id",
+                  "unparsing_mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "title": "Int",
+                          "type": "object",
+                          "properties": {
+                            "int": {
+                              "$ref": "#/components/schemas/bignum"
+                            }
+                          },
+                          "required": [
+                            "int"
+                          ]
+                        },
+                        {
+                          "title": "String",
+                          "type": "object",
+                          "properties": {
+                            "string": {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          },
+                          "required": [
+                            "string"
+                          ]
+                        },
+                        {
+                          "title": "Bytes",
+                          "type": "object",
+                          "properties": {
+                            "bytes": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9]+$"
+                            }
+                          },
+                          "required": [
+                            "bytes"
+                          ]
+                        },
+                        {
+                          "title": "Sequence",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                          }
+                        },
+                        {
+                          "title": "Generic prim (any number of args with or without annot)",
+                          "type": "object",
+                          "properties": {
+                            "prim": {
+                              "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                            },
+                            "args": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                              }
+                            },
+                            "annots": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "prim"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/scripts/trace_code": {
       "post": {
         "description": "Run a piece of code in the current context, keeping a trace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "storage": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "input": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9]+$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  },
+                  "amount": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                  },
+                  "balance": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                  },
+                  "chain_id": {
+                    "$ref": "#/components/schemas/Chain_id"
+                  },
+                  "source": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "payer": {
+                    "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                  },
+                  "gas": {
+                    "$ref": "#/components/schemas/bignum"
+                  },
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/unistring"
+                  },
+                  "unparsing_mode": {
+                    "oneOf": [
+                      {
+                        "title": "Readable",
+                        "type": "string",
+                        "enum": [
+                          "Readable"
+                        ]
+                      },
+                      {
+                        "title": "Optimized",
+                        "type": "string",
+                        "enum": [
+                          "Optimized"
+                        ]
+                      },
+                      {
+                        "title": "Optimized_legacy",
+                        "type": "string",
+                        "enum": [
+                          "Optimized_legacy"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "script",
+                  "storage",
+                  "input",
+                  "amount",
+                  "balance",
+                  "chain_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "storage": {
+                      "oneOf": [
+                        {
+                          "title": "Int",
+                          "type": "object",
+                          "properties": {
+                            "int": {
+                              "$ref": "#/components/schemas/bignum"
+                            }
+                          },
+                          "required": [
+                            "int"
+                          ]
+                        },
+                        {
+                          "title": "String",
+                          "type": "object",
+                          "properties": {
+                            "string": {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          },
+                          "required": [
+                            "string"
+                          ]
+                        },
+                        {
+                          "title": "Bytes",
+                          "type": "object",
+                          "properties": {
+                            "bytes": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9]+$"
+                            }
+                          },
+                          "required": [
+                            "bytes"
+                          ]
+                        },
+                        {
+                          "title": "Sequence",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                          }
+                        },
+                        {
+                          "title": "Generic prim (any number of args with or without annot)",
+                          "type": "object",
+                          "properties": {
+                            "prim": {
+                              "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                            },
+                            "args": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                              }
+                            },
+                            "annots": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "prim"
+                          ]
+                        }
+                      ]
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.internal_operation"
+                      }
+                    },
+                    "trace": {
+                      "$ref": "#/components/schemas/010-PtGRANAD.scripted.trace"
+                    },
+                    "big_map_diff": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "title": "update",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "update"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "key_hash": {
+                                "$ref": "#/components/schemas/script_expr"
+                              },
+                              "key": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "value": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map",
+                              "key_hash",
+                              "key"
+                            ]
+                          },
+                          {
+                            "title": "remove",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "remove"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map"
+                            ]
+                          },
+                          {
+                            "title": "copy",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "copy"
+                                ]
+                              },
+                              "source_big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "destination_big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "source_big_map",
+                              "destination_big_map"
+                            ]
+                          },
+                          {
+                            "title": "alloc",
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "alloc"
+                                ]
+                              },
+                              "big_map": {
+                                "$ref": "#/components/schemas/bignum"
+                              },
+                              "key_type": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "value_type": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/components/schemas/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ]
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/components/schemas/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9]+$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ]
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "big_map",
+                              "key_type",
+                              "value_type"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "lazy_storage_diff": {
+                      "$ref": "#/components/schemas/010-PtGRANAD.lazy_storage_diff"
+                    }
+                  },
+                  "required": [
+                    "storage",
+                    "operations",
+                    "trace"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/scripts/trace_code/normalized": {
+      "post": {
+        "description": "Deprecated alias of the .../helpers/scripts/trace_code RPC",
         "requestBody": {
           "content": {
             "application/json": {
@@ -14441,6 +16335,64 @@
         "title": "64 bit integers",
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
+      },
+      "merkle_tree": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/unistring"
+              },
+              {
+                "oneOf": [
+                  {
+                    "title": "Hash",
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "title": "Data",
+                    "nullable": true,
+                    "oneOf": [
+                      {
+                        "title": "Key",
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9]+$"
+                      },
+                      {
+                        "title": "Dir",
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {
+                          "$ref": "#/components/schemas/raw_context"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Continue",
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/merkle_tree"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
       },
       "micheline.010-PtGRANAD.michelson_v1.expression": {
         "oneOf": [
