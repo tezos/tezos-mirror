@@ -410,7 +410,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         let* at_tn = uniform_atomic_type_name in
         return (type_of_atomic_type_name at_tn)
       else if size = 2 then
-        bind (uniform [|`TOption; `TList; `TSet; `TContract|]) @@ function
+        bind (uniform [|`TOption; `TList; `TSet; `TTicket; `TContract|])
+        @@ function
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:1 in
             match option_t (-1) t ~annot:None with
@@ -424,6 +425,11 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | `TSet -> (
             let* (Ex_comparable_ty t) = m_comparable_type ~size:1 in
             match set_t (-1) t ~annot:None with
+            | Error _ -> assert false
+            | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TTicket -> (
+            let* (Ex_comparable_ty contents) = m_comparable_type ~size:1 in
+            match ticket_t (-1) contents ~annot:None with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
@@ -487,7 +493,12 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             match ticket_t (-1) contents ~annot:None with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
-        | `TContract | `TBig_map ->
+        | `TContract -> (
+            let* (Ex_ty t) = m_type ~size:(size - 1) in
+            match contract_t (-1) t ~annot:None with
+            | Error _ -> assert false
+            | Ok res_ty -> return @@ Ex_ty res_ty)
+        | `TBig_map ->
             (* Don't know what to do with theses. Redraw. *)
             m_type ~size
 
