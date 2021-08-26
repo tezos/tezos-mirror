@@ -48,9 +48,6 @@ cp -f _build/default/"$test_parameters" \
    src/proto_"${version_number}_${short_hash}"/parameters/test-parameters.json
 "$script_dir"/update_integration_test.sh
 
-echo "update_opam_test.sh"
-$script_dir/update_opam_test.sh
-
 echo "link_protocol.sh src/proto_${version_number}_${short_hash}"
 $script_dir/link_protocol.sh src/proto_${version_number}_${short_hash}
 

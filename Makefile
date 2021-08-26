@@ -189,7 +189,6 @@ test-coverage:
 .PHONY: lint-opam-dune
 lint-opam-dune:
 	@dune build @runtest_dune_template
-	@./scripts/check_opam_test.sh
 
 .PHONY: test
 test: lint-opam-dune test-code

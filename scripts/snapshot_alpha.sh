@@ -257,5 +257,4 @@ if [ -z "$SILENCE_REMINDER" ]; then
   echo ""
   echo "  dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version} ${short_hash}"
   echo "  ./scripts/update_integration_test.sh"
-  echo "  ./scripts/update_opam_test.sh"
 fi
