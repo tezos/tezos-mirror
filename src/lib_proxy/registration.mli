@@ -72,6 +72,9 @@ end
 
 type proxy_environment = (module Proxy_sig)
 
+(** [register_proxy_context env] adds a proxy environment to the list
+    of known environments. Raise {!Invalid_argument} if an environment
+    for the given protocol exists already. *)
 val register_proxy_context : proxy_environment -> unit
 
 (** Returns a proxy environment for the given protocol (or the
