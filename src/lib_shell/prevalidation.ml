@@ -365,6 +365,8 @@ let preapply chain_store ~user_activated_upgrades
           Proto.environment_version
           NewProto.environment_version
         >>?= fun () ->
+        NewProto.set_log_message_consumer
+          (Protocol_logging.make_log_message_consumer ()) ;
         NewProto.init context shell_header >>=? fun {context; message; _} ->
         let context = Shell_context.unwrap_disk_context context in
         return (context, message))

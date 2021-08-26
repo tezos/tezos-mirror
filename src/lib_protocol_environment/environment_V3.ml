@@ -138,6 +138,33 @@ struct
 
   include Stdlib
   module Pervasives = Stdlib
+
+  module Logging = struct
+    type level = Internal_event.level =
+      | Debug
+      | Info
+      | Notice
+      | Warning
+      | Error
+      | Fatal
+
+    let logging_function = ref None
+
+    let name_colon_space = Param.name ^ ": "
+
+    let null_formatter = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
+
+    let log (level : Internal_event.level) =
+      match !logging_function with
+      | None -> Format.ikfprintf ignore null_formatter
+      | Some f -> Format.kasprintf (fun s -> f level (name_colon_space ^ s))
+
+    let log_string (level : Internal_event.level) s =
+      match !logging_function with
+      | None -> ()
+      | Some f -> f level (name_colon_space ^ s)
+  end
+
   module Compare = Compare
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
@@ -1105,6 +1132,8 @@ struct
       finalize_block c shell_header >|= wrap_tzresult
 
     let init c bh = init c bh >|= wrap_tzresult
+
+    let set_log_message_consumer f = Logging.logging_function := Some f
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

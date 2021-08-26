@@ -365,6 +365,8 @@ module Make (Proto : Registered_protocol.T) = struct
             Proto.environment_version
             NewProto.environment_version
           >>?= fun () ->
+          NewProto.set_log_message_consumer
+            (Protocol_logging.make_log_message_consumer ()) ;
           NewProto.init validation_result.context block_header.shell
           >|=? fun validation_result ->
           (validation_result, NewProto.environment_version))

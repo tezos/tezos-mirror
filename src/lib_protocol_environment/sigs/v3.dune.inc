@@ -11,6 +11,8 @@
    v3/int64.mli
    v3/format.mli
 
+   v3/logging.mli
+
    ;; Part of external libraries
    v3/hex.mli           ; 1.4.0
    v3/z.mli             ; 1.10

@@ -16,6 +16,9 @@ The main novelties in the Alpha protocol are:
   directories like `/12/af/83/3d/` are removed from the context.  (MR :gl:`!2771`)
 - Gas calculation fix based on the new flattend context layout (MR :gl:`!2771`)
 - Caching of smart contracts loading and typechecking (MR :gl:`!3234`)
+||||||| parent of cb8aabade3 (Doc: document protocol logging)
+- Reimplemented `Logging`.  It now has Lwt-less APIs and the messages are handled
+  by the shell. (MR :gl:`!3225`)
 
 .. contents:: Here is the complete list of changes:
 

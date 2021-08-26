@@ -131,8 +131,8 @@ could log the point at which migration takes place by editing the file
 the match expression of the function ``prepare_first_block`` in the said file to
 include the following lines::
 
-  | Carthage_006 ->
-      Logging.log_notice "\nSTITCHING!\n" ;
+  | Granada_010 ->
+      Logging.(log Notice "STITCHING!") ;
 
 After making sure that our ``master`` branch contains all the migration
 code that we want to test, we need to commit the changes locally::

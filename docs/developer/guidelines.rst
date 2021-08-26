@@ -155,7 +155,10 @@ the template, and address any gap if needed.
 Logging Levels
 --------------
 
-The Tezos libraries use an internal logging library with 5 different verbosity `levels`.
+The Tezos libraries use an logging library with 5 different verbosity `levels`
+defined in ``src/lib_event_logging/internal_event.mli`` for shell and
+``src/lib_protocol_environment/sigs/v3/logging.mli`` for protocol code.
+
 It is important to choose the appropriate level for each event in the code to
 avoid flooding the node administrator with too much information.
 
@@ -178,6 +181,17 @@ administrator of possible problems and errors:
   the node.
 - ``Error`` level are all those events that require an intervention of the node
   administrator or that signal some exceptional circumstance.
+
+There is another level ``Fatal`` with the highest priority but it is rarely
+relevant. Specifically, ``Fatal`` should be reserved for errors that can
+absolutely not be recovered. All logging at the ``Fatal`` level should be
+immediately followed by a call to ``Lwt_exit.exit_and_raise``.
+
+Note that a library is never able to decide whether a certain condition is fatal
+or not. Indeed, the application that calls into the library may not consider the
+function call as essential to the continuation of the application's main
+purpose. Consequently, ``Fatal`` should never be used within libraries.
+
 
 Code formatting
 ---------------

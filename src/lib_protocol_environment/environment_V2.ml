@@ -957,6 +957,8 @@ struct
     include LiftV2 (P)
 
     include IgnoreCaches (struct
+      let set_log_message_consumer _ = ()
+
       let environment_version = Protocol.V2
 
       include Environment_protocol_T.V0toV3 (LiftV2 (P))

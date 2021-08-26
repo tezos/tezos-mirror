@@ -11,6 +11,8 @@
    v4/int64.mli
    v4/format.mli
 
+   v4/logging.mli
+
    ;; Part of external libraries
    v4/hex.mli           ; 1.4.0
    v4/z.mli             ; 1.10

@@ -780,6 +780,8 @@ struct
     include Environment_protocol_T.IgnoreCaches (struct
       let environment_version = Protocol.V0
 
+      let set_log_message_consumer _ = ()
+
       include Environment_protocol_T.V0toV3 (LiftV0 (P))
     end)
   end
