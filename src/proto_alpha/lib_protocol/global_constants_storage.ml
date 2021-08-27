@@ -171,6 +171,8 @@ let get context hash =
 
 let expr_to_address_in_context context expr =
   let lexpr = Script_repr.lazy_expr expr in
+  Raw_context.consume_gas context @@ Script_repr.force_bytes_cost lexpr
+  >>? fun context ->
   Script_repr.force_bytes lexpr >>? fun b ->
   Raw_context.consume_gas context @@ Gas_model.expr_to_address_in_context_cost b
   >|? fun context -> (context, Script_expr_hash.hash_bytes [b])
