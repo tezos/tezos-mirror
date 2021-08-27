@@ -4,8 +4,11 @@ set -eu
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
+#shellcheck disable=SC1090
 . "$script_dir"opam-pin.sh
-export PACKAGES=$(echo $packages | tr '\n' ' ')
+
+#shellcheck disable=SC2154
+PACKAGES=$(echo "$packages" | tr '\n' ' ')
 
 TZ_OPAM_FILES_MODIFIED="${TZ_OPAM_FILES_MODIFIED:-false}"
 TZ_PIPELINE_KIND="${TZ_PIPELINE_KIND:-NOT_SCHEDULE}"
