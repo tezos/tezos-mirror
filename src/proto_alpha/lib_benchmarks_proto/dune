@@ -12,6 +12,7 @@
   tezos-micheline
   tezos-alpha-test-helpers
   tezos-sapling
+  tezos-client-alpha
 )
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_stdlib
@@ -26,4 +27,5 @@
                    -open Tezos_client_alpha
                    -open Tezos_crypto
                    -open Tezos_micheline
-                   -open Tezos_alpha_test_helpers)))
+                   -open Tezos_alpha_test_helpers
+                   -open Tezos_client_alpha)))

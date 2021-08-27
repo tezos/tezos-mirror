@@ -18,6 +18,7 @@ depends: [
   "tezos-micheline"
   "tezos-alpha-test-helpers"
   "tezos-sapling"
+  "tezos-client-alpha"
 
 ]
 build: [
