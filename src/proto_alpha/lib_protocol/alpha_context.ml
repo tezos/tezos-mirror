@@ -461,9 +461,9 @@ module Cache = struct
   module type INTERFACE = sig
     type cached_value
 
-    val update : t -> identifier -> (cached_value * int) option -> t
+    val update : t -> identifier -> (cached_value * int) option -> t tzresult
 
-    val find : t -> identifier -> cached_value option Lwt.t
+    val find : t -> identifier -> cached_value option tzresult Lwt.t
 
     val list_identifiers : t -> (identifier * int) list
 
@@ -495,18 +495,32 @@ module Cache = struct
         value_of_key_handlers :=
           NamespaceMap.add C.namespace voi !value_of_key_handlers
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
-         Make sure that this operation is correctly carbonated. *)
+      let size ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size ctxt ~cache_index:C.cache_index
+
+      let size_limit ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
+
       let update ctxt id v =
+        let cache_size_in_bytes = size ctxt in
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_update ~cache_size_in_bytes)
+        >|? fun ctxt ->
         let v = Option.map (fun (v, size) -> (K v, size)) v in
         Admin.update ctxt (mk ~id) v
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
-         Make sure that this operation is correctly carbonated. *)
       let find ctxt id =
+        let cache_size_in_bytes = size ctxt in
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_update ~cache_size_in_bytes)
+        >>?= fun ctxt ->
         Admin.find ctxt (mk ~id) >>= function
-        | None -> Lwt.return None
-        | Some (K v) -> Lwt.return (Some v)
+        | None -> return None
+        | Some (K v) -> return (Some v)
         | _ ->
             (* This execution path is impossible because all the keys of
                C's namespace (which is unique to C) are constructed with
@@ -530,13 +544,5 @@ module Cache = struct
               list
 
       let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
-
-      let size ctxt =
-        Option.value ~default:max_int
-        @@ Admin.cache_size ctxt ~cache_index:C.cache_index
-
-      let size_limit ctxt =
-        Option.value ~default:max_int
-        @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
     end)
 end

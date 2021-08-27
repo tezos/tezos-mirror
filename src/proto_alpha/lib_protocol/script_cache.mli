@@ -60,7 +60,7 @@ val find :
 (** [update ctxt identifier unparsed_script ir_script size] refreshes the
    cached contract identified by [identifier] with a new [unparsed_script],
    a new [ir_script], and a new size. *)
-val update : context -> identifier -> cached_contract -> int -> context
+val update : context -> identifier -> cached_contract -> int -> context tzresult
 
 (** [entries ctxt] returns the contracts in the cache as well as their
    respective size. The list is sorted by date of last modification:

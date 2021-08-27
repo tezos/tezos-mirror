@@ -117,7 +117,7 @@ let prepare_context rng_state cache_cardinal =
     if Compare.Int.(i = cache_cardinal) then ctxt
     else
       let key = identifier_of_int i in
-      loop (i + 1) (Cache.update ctxt key dummy_script 1)
+      loop (i + 1) (Cache.update ctxt key dummy_script 1 |> assert_ok)
   in
   (loop 0 ctxt, some_key_in_domain)
 

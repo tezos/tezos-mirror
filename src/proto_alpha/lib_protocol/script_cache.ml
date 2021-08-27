@@ -74,16 +74,18 @@ module Cache = (val Cache.register_exn (module Client))
 
 let find ctxt addr =
   let identifier = identifier_of_contract addr in
-  Cache.find ctxt identifier >>= function
+  Cache.find ctxt identifier >>=? function
   | Some (unparsed_script, ex_script) ->
       return (ctxt, identifier, Some (unparsed_script, ex_script))
   | None -> (
-      load_and_elaborate ctxt addr >|=? function
-      | (ctxt, None) -> (ctxt, identifier, None)
+      load_and_elaborate ctxt addr >>=? function
+      | (ctxt, None) -> return (ctxt, identifier, None)
       | (ctxt, Some (unparsed_script, script_ir, size)) ->
           let cached_value = (unparsed_script, script_ir) in
-          let ctxt = Cache.update ctxt identifier (Some (cached_value, size)) in
-          (ctxt, identifier, Some (unparsed_script, script_ir)))
+          Lwt.return
+            ( Cache.update ctxt identifier (Some (cached_value, size))
+            >>? fun ctxt ->
+              ok (ctxt, identifier, Some (unparsed_script, script_ir)) ))
 
 let update ctxt identifier updated_script approx_size =
   Cache.update ctxt identifier (Some (updated_script, approx_size))

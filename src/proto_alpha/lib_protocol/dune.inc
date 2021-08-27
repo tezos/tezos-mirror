@@ -95,6 +95,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
@@ -197,6 +198,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
@@ -299,6 +301,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
@@ -423,6 +426,7 @@ include Tezos_raw_protocol_alpha.Main
    Init_storage
    Sapling_validator
    Global_constants_storage
+   Cache_costs
    Alpha_context
    Script_tc_errors
    Script_typed_ir
@@ -564,6 +568,7 @@ include Tezos_raw_protocol_alpha.Main
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
