@@ -15,9 +15,11 @@ trace
     [ "a"  	@parameter.right ]
   - location: 17 (remaining gas: 1039994.998 units remaining)
     [ (Left "a")  	 ]
-  - location: 19 (remaining gas: 1039994.983 units remaining)
+  - location: 12 (remaining gas: 1039994.983 units remaining)
+    [ (Left "a")  	 ]
+  - location: 19 (remaining gas: 1039994.968 units remaining)
     [ {}  	
       (Left "a")  	 ]
-  - location: 21 (remaining gas: 1039994.968 units remaining)
+  - location: 21 (remaining gas: 1039994.953 units remaining)
     [ (Pair {} (Left "a"))  	 ]
 

@@ -43,47 +43,51 @@ trace
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@defpacked ]
   - location: 26 (remaining gas: 1039950.533 units remaining)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@defpacked ]
-  - location: 32 (remaining gas: 1039950.518 units remaining)
+  - location: 26 (remaining gas: 1039950.518 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@defpacked ]
+  - location: 32 (remaining gas: 1039950.503 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@defpacked ]
-  - location: 33 (remaining gas: 1039939.207 units remaining)
+  - location: 33 (remaining gas: 1039939.192 units remaining)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@selfpacked
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600  	@defpacked ]
-  - location: 36 (remaining gas: 1039939.172 units remaining)
+  - location: 36 (remaining gas: 1039939.157 units remaining)
     [ 0  	 ]
-  - location: 37 (remaining gas: 1039939.157 units remaining)
+  - location: 37 (remaining gas: 1039939.142 units remaining)
     [ True  	 ]
-  - location: 38 (remaining gas: 1039939.147 units remaining)
+  - location: 38 (remaining gas: 1039939.132 units remaining)
     [  ]
-  - location: 44 (remaining gas: 1039939.132 units remaining)
+  - location: 38 (remaining gas: 1039939.117 units remaining)
+    [  ]
+  - location: 44 (remaining gas: 1039939.102 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A"  	@self ]
-  - location: 48 (remaining gas: 1039939.122 units remaining)
+  - location: 48 (remaining gas: 1039939.092 units remaining)
     [  ]
-  - location: 49 (remaining gas: 1039939.107 units remaining)
+  - location: 49 (remaining gas: 1039939.077 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%B"  	@self ]
-  - location: 53 (remaining gas: 1039939.097 units remaining)
+  - location: 53 (remaining gas: 1039939.067 units remaining)
     [  ]
-  - location: 54 (remaining gas: 1039939.082 units remaining)
+  - location: 54 (remaining gas: 1039939.052 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%maybe_C"  	@self ]
-  - location: 60 (remaining gas: 1039939.072 units remaining)
+  - location: 60 (remaining gas: 1039939.042 units remaining)
     [  ]
-  - location: 61 (remaining gas: 1039939.057 units remaining)
+  - location: 61 (remaining gas: 1039939.027 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%Z"  	@self ]
-  - location: 65 (remaining gas: 1039939.047 units remaining)
+  - location: 65 (remaining gas: 1039939.017 units remaining)
     [  ]
-  - location: 66 (remaining gas: 1039939.032 units remaining)
+  - location: 66 (remaining gas: 1039939.002 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
-  - location: 76 (remaining gas: 1039939.022 units remaining)
+  - location: 76 (remaining gas: 1039938.992 units remaining)
     [  ]
-  - location: 77 (remaining gas: 1039939.007 units remaining)
+  - location: 77 (remaining gas: 1039938.977 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
-  - location: 87 (remaining gas: 1039938.997 units remaining)
+  - location: 87 (remaining gas: 1039938.967 units remaining)
     [  ]
-  - location: 88 (remaining gas: 1039938.987 units remaining)
+  - location: 88 (remaining gas: 1039938.957 units remaining)
     [ Unit  	 ]
-  - location: 89 (remaining gas: 1039938.972 units remaining)
+  - location: 89 (remaining gas: 1039938.942 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 91 (remaining gas: 1039938.957 units remaining)
+  - location: 91 (remaining gas: 1039938.927 units remaining)
     [ (Pair {} Unit)  	 ]
 

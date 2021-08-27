@@ -27,9 +27,11 @@ trace
       0xaabbcc  	@storage.some ]
   - location: 21 (remaining gas: 1039993.048 units remaining)
     [ (Some 0x)  	 ]
-  - location: 22 (remaining gas: 1039993.033 units remaining)
+  - location: 13 (remaining gas: 1039993.033 units remaining)
+    [ (Some 0x)  	 ]
+  - location: 22 (remaining gas: 1039993.018 units remaining)
     [ {}  	
       (Some 0x)  	 ]
-  - location: 24 (remaining gas: 1039993.018 units remaining)
+  - location: 24 (remaining gas: 1039993.003 units remaining)
     [ (Pair {} (Some 0x))  	 ]
 

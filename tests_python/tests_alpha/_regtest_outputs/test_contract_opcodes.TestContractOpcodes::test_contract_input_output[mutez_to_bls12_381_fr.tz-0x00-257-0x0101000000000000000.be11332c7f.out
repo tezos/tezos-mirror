@@ -21,16 +21,18 @@ trace
     [ (Some (Pair 257 0))  	 ]
   - location: 14 (remaining gas: 1039991.869 units remaining)
     [ (Pair 257 0)  	@some ]
-  - location: 20 (remaining gas: 1039991.859 units remaining)
+  - location: 14 (remaining gas: 1039991.854 units remaining)
+    [ (Pair 257 0)  	@some ]
+  - location: 20 (remaining gas: 1039991.844 units remaining)
     [ 257  	 ]
-  - location: 21 (remaining gas: 1039991.849 units remaining)
+  - location: 21 (remaining gas: 1039991.834 units remaining)
     [ 0x0100000000000000000000000000000000000000000000000000000000000000  	
       257  	 ]
-  - location: 24 (remaining gas: 1039991.577 units remaining)
+  - location: 24 (remaining gas: 1039991.562 units remaining)
     [ 0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 25 (remaining gas: 1039991.562 units remaining)
+  - location: 25 (remaining gas: 1039991.547 units remaining)
     [ {}  	
       0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 27 (remaining gas: 1039991.547 units remaining)
+  - location: 27 (remaining gas: 1039991.532 units remaining)
     [ (Pair {} 0x0101000000000000000000000000000000000000000000000000000000000000)  	 ]
 

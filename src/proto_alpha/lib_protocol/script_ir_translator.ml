@@ -3275,7 +3275,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       parse_var_type_annot loc annot >>?= fun (annot, ty_name) ->
-      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, t, k))} in
+      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, k))} in
       option_t loc t ~annot:ty_name >>?= fun ty ->
       let stack_ty = Item_t (ty, stack, annot) in
       typed ctxt loc cons_none stack_ty
@@ -3295,11 +3295,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
+                let hinfo = kinfo_of_kinstr k in
                 let btinfo = kinfo_of_descr ibt
                 and bfinfo = kinfo_of_descr ibf in
-                let branch_if_none = ibt.instr.apply btinfo k
-                and branch_if_some = ibf.instr.apply bfinfo k in
-                IIf_none {kinfo; branch_if_none; branch_if_some});
+                let branch_if_none = ibt.instr.apply btinfo (IHalt hinfo)
+                and branch_if_some = ibf.instr.apply bfinfo (IHalt hinfo) in
+                IIf_none {kinfo; branch_if_none; branch_if_some; k});
           }
         in
         {loc; instr = ifnone; bef; aft = ibt.aft}
@@ -3559,9 +3560,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_left = ibt.instr.apply infobt k
-                and branch_if_right = ibf.instr.apply infobf k in
-                IIf_left {kinfo; branch_if_left; branch_if_right});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_left = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_right = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf_left {kinfo; branch_if_left; branch_if_right; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -3605,9 +3607,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_cons = ibt.instr.apply infobt k
-                and branch_if_nil = ibf.instr.apply infobf k in
-                IIf_cons {kinfo; branch_if_nil; branch_if_cons});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_cons = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_nil = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf_cons {kinfo; branch_if_nil; branch_if_cons; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -3774,7 +3777,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
       parse_var_type_annot loc annot >>?= fun (annot, ty_name) ->
-      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, tv, k))} in
+      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, k))} in
       map_t loc tk tv ~annot:ty_name >>?= fun ty ->
       typed ctxt loc instr (Item_t (ty, stack, annot))
   | ( Prim (loc, I_MAP, [body], annot),
@@ -4069,9 +4072,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_true = ibt.instr.apply infobt k
-                and branch_if_false = ibf.instr.apply infobf k in
-                IIf {kinfo; branch_if_true; branch_if_false});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_true = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_false = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf {kinfo; branch_if_true; branch_if_false; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -4311,7 +4315,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( error_unexpected_annot loc annot >>? fun () ->
           (if legacy then ok_unit else check_packable ~legacy:false loc v)
           >>? fun () ->
-          let instr = {apply = (fun kinfo k -> IFailwith (kinfo, loc, v, k))} in
+          let instr = {apply = (fun kinfo _k -> IFailwith (kinfo, loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
           log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
         )
@@ -5686,7 +5690,7 @@ let parse_code :
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  let code_size = Script_repr.(node_size (Micheline.root code)) in
+  let code_size = Script_typed_ir_size.node_size (Micheline.root code) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in

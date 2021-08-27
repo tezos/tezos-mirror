@@ -343,15 +343,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 's) kinfo * ('v option, 's, 'r, 'f) kinstr
       -> ('v, 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * 'b ty * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
-      branch_if_none : ('b, 's, 'r, 'f) kinstr;
-      branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
+      branch_if_none : ('b, 's, 'c, 't) kinstr;
+      branch_if_some : ('a, 'b * 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
   (*
@@ -366,9 +364,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_left : ('a, 's, 'r, 'f) kinstr;
-      branch_if_right : ('b, 's, 'r, 'f) kinstr;
+      branch_if_left : ('a, 's, 'c, 't) kinstr;
+      branch_if_right : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   (*
@@ -383,9 +381,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
-      branch_if_nil : ('b, 's, 'r, 'f) kinstr;
+      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'c, 't) kinstr;
+      branch_if_nil : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
   | IList_map :
@@ -427,10 +425,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo
-      * 'b comparable_ty
-      * 'c ty
-      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
@@ -670,9 +665,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       kinfo : (bool, 'a * 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_true : ('a, 's, 'r, 'f) kinstr;
-      branch_if_false : ('a, 's, 'r, 'f) kinstr;
+      branch_if_true : ('a, 's, 'b, 'u) kinstr;
+      branch_if_false : ('a, 's, 'b, 'u) kinstr;
+      k : ('b, 'u, 'r, 'f) kinstr;
     }
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop :
@@ -704,7 +699,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo * Script.location * 'a ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison

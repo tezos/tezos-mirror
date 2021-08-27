@@ -316,12 +316,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 's) kinfo * ('v option, 's, 'r, 'f) kinstr
       -> ('v, 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * 'b ty * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
-      branch_if_none : ('b, 's, 'r, 'f) kinstr;
-      branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
+      branch_if_none : ('b, 's, 'c, 't) kinstr;
+      branch_if_some : ('a, 'b * 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
   (*
@@ -336,8 +337,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
-      branch_if_left : ('a, 's, 'r, 'f) kinstr;
-      branch_if_right : ('b, 's, 'r, 'f) kinstr;
+      branch_if_left : ('a, 's, 'c, 't) kinstr;
+      branch_if_right : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   (*
@@ -352,8 +354,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
-      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
-      branch_if_nil : ('b, 's, 'r, 'f) kinstr;
+      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'c, 't) kinstr;
+      branch_if_nil : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
   | IList_map :
@@ -395,10 +398,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo
-      * 'b comparable_ty
-      * 'c ty
-      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
@@ -638,8 +638,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       kinfo : (bool, 'a * 's) kinfo;
-      branch_if_true : ('a, 's, 'r, 'f) kinstr;
-      branch_if_false : ('a, 's, 'r, 'f) kinstr;
+      branch_if_true : ('a, 's, 'b, 'u) kinstr;
+      branch_if_false : ('a, 's, 'b, 'u) kinstr;
+      k : ('b, 'u, 'r, 'f) kinstr;
     }
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop :
@@ -671,7 +672,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo * Script.location * 'a ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -1169,7 +1170,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ICdr (kinfo, _) -> kinfo
   | IUnpair (kinfo, _) -> kinfo
   | ICons_some (kinfo, _) -> kinfo
-  | ICons_none (kinfo, _, _) -> kinfo
+  | ICons_none (kinfo, _) -> kinfo
   | IIf_none {kinfo; _} -> kinfo
   | ICons_left (kinfo, _) -> kinfo
   | ICons_right (kinfo, _) -> kinfo
@@ -1185,7 +1186,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ISet_mem (kinfo, _) -> kinfo
   | ISet_update (kinfo, _) -> kinfo
   | ISet_size (kinfo, _) -> kinfo
-  | IEmpty_map (kinfo, _, _, _) -> kinfo
+  | IEmpty_map (kinfo, _, _) -> kinfo
   | IMap_map (kinfo, _, _) -> kinfo
   | IMap_iter (kinfo, _, _) -> kinfo
   | IMap_mem (kinfo, _) -> kinfo
@@ -1253,7 +1254,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IExec (kinfo, _) -> kinfo
   | IApply (kinfo, _, _) -> kinfo
   | ILambda (kinfo, _, _) -> kinfo
-  | IFailwith (kinfo, _, _, _) -> kinfo
+  | IFailwith (kinfo, _, _) -> kinfo
   | ICompare (kinfo, _, _) -> kinfo
   | IEq (kinfo, _) -> kinfo
   | INeq (kinfo, _) -> kinfo
@@ -1339,23 +1340,35 @@ let kinstr_rewritek :
   | ICdr (kinfo, k) -> ICdr (kinfo, f.apply k)
   | IUnpair (kinfo, k) -> IUnpair (kinfo, f.apply k)
   | ICons_some (kinfo, k) -> ICons_some (kinfo, f.apply k)
-  | ICons_none (kinfo, ty, k) -> ICons_none (kinfo, ty, f.apply k)
-  | IIf_none {kinfo; branch_if_none; branch_if_some} ->
-      let branch_if_none = f.apply branch_if_none
-      and branch_if_some = f.apply branch_if_some in
-      IIf_none {kinfo; branch_if_none; branch_if_some}
+  | ICons_none (kinfo, k) -> ICons_none (kinfo, f.apply k)
+  | IIf_none {kinfo; branch_if_none; branch_if_some; k} ->
+      IIf_none
+        {
+          kinfo;
+          branch_if_none = f.apply branch_if_none;
+          branch_if_some = f.apply branch_if_some;
+          k = f.apply k;
+        }
   | ICons_left (kinfo, k) -> ICons_left (kinfo, f.apply k)
   | ICons_right (kinfo, k) -> ICons_right (kinfo, f.apply k)
-  | IIf_left {kinfo; branch_if_left; branch_if_right} ->
-      let branch_if_left = f.apply branch_if_left
-      and branch_if_right = f.apply branch_if_right in
-      IIf_left {kinfo; branch_if_left; branch_if_right}
+  | IIf_left {kinfo; branch_if_left; branch_if_right; k} ->
+      IIf_left
+        {
+          kinfo;
+          branch_if_left = f.apply branch_if_left;
+          branch_if_right = f.apply branch_if_right;
+          k = f.apply k;
+        }
   | ICons_list (kinfo, k) -> ICons_list (kinfo, f.apply k)
   | INil (kinfo, k) -> INil (kinfo, f.apply k)
-  | IIf_cons {kinfo; branch_if_cons; branch_if_nil} ->
-      let branch_if_nil = f.apply branch_if_nil
-      and branch_if_cons = f.apply branch_if_cons in
-      IIf_cons {kinfo; branch_if_cons; branch_if_nil}
+  | IIf_cons {kinfo; branch_if_cons; branch_if_nil; k} ->
+      IIf_cons
+        {
+          kinfo;
+          branch_if_cons = f.apply branch_if_cons;
+          branch_if_nil = f.apply branch_if_nil;
+          k = f.apply k;
+        }
   | IList_map (kinfo, body, k) -> IList_map (kinfo, f.apply body, f.apply k)
   | IList_iter (kinfo, body, k) -> IList_iter (kinfo, f.apply body, f.apply k)
   | IList_size (kinfo, k) -> IList_size (kinfo, f.apply k)
@@ -1364,7 +1377,7 @@ let kinstr_rewritek :
   | ISet_mem (kinfo, k) -> ISet_mem (kinfo, f.apply k)
   | ISet_update (kinfo, k) -> ISet_update (kinfo, f.apply k)
   | ISet_size (kinfo, k) -> ISet_size (kinfo, f.apply k)
-  | IEmpty_map (kinfo, cty, ty, k) -> IEmpty_map (kinfo, cty, ty, f.apply k)
+  | IEmpty_map (kinfo, cty, k) -> IEmpty_map (kinfo, cty, f.apply k)
   | IMap_map (kinfo, body, k) -> IMap_map (kinfo, f.apply body, f.apply k)
   | IMap_iter (kinfo, body, k) -> IMap_iter (kinfo, f.apply body, f.apply k)
   | IMap_mem (kinfo, k) -> IMap_mem (kinfo, f.apply k)
@@ -1430,17 +1443,21 @@ let kinstr_rewritek :
   | IXor_nat (kinfo, k) -> IXor_nat (kinfo, f.apply k)
   | INot_nat (kinfo, k) -> INot_nat (kinfo, f.apply k)
   | INot_int (kinfo, k) -> INot_int (kinfo, f.apply k)
-  | IIf {kinfo; branch_if_true; branch_if_false} ->
-      let branch_if_true = f.apply branch_if_true
-      and branch_if_false = f.apply branch_if_false in
-      IIf {kinfo; branch_if_true; branch_if_false}
+  | IIf {kinfo; branch_if_true; branch_if_false; k} ->
+      IIf
+        {
+          kinfo;
+          branch_if_true = f.apply branch_if_true;
+          branch_if_false = f.apply branch_if_false;
+          k = f.apply k;
+        }
   | ILoop (kinfo, kbody, k) -> ILoop (kinfo, f.apply kbody, f.apply k)
   | ILoop_left (kinfo, kl, kr) -> ILoop_left (kinfo, f.apply kl, f.apply kr)
   | IDip (kinfo, body, k) -> IDip (kinfo, f.apply body, f.apply k)
   | IExec (kinfo, k) -> IExec (kinfo, f.apply k)
   | IApply (kinfo, ty, k) -> IApply (kinfo, ty, f.apply k)
   | ILambda (kinfo, l, k) -> ILambda (kinfo, l, f.apply k)
-  | IFailwith (kinfo, i, ty, k) -> IFailwith (kinfo, i, ty, f.apply k)
+  | IFailwith (kinfo, i, ty) -> IFailwith (kinfo, i, ty)
   | ICompare (kinfo, ty, k) -> ICompare (kinfo, ty, f.apply k)
   | IEq (kinfo, k) -> IEq (kinfo, f.apply k)
   | INeq (kinfo, k) -> INeq (kinfo, f.apply k)

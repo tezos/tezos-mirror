@@ -13,9 +13,11 @@ trace
     [ (Some "hello")  	@parameter ]
   - location: 10 (remaining gas: 1039995.433 units remaining)
     [ "hello"  	 ]
-  - location: 16 (remaining gas: 1039995.418 units remaining)
+  - location: 10 (remaining gas: 1039995.418 units remaining)
+    [ "hello"  	 ]
+  - location: 16 (remaining gas: 1039995.403 units remaining)
     [ {}  	
       "hello"  	 ]
-  - location: 18 (remaining gas: 1039995.403 units remaining)
+  - location: 18 (remaining gas: 1039995.388 units remaining)
     [ (Pair {} "hello")  	 ]
 

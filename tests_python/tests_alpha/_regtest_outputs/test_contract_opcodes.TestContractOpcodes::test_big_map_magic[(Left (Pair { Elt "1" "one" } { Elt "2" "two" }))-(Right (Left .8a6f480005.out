@@ -23,9 +23,13 @@ trace
       (Right Unit)  	@parameter.right.reset ]
   - location: 63 (remaining gas: 1039953.441 units remaining)
     [ (Right Unit)  	 ]
-  - location: 151 (remaining gas: 1039953.426 units remaining)
+  - location: 60 (remaining gas: 1039953.426 units remaining)
+    [ (Right Unit)  	 ]
+  - location: 44 (remaining gas: 1039953.411 units remaining)
+    [ (Right Unit)  	 ]
+  - location: 151 (remaining gas: 1039953.396 units remaining)
     [ {}  	
       (Right Unit)  	 ]
-  - location: 153 (remaining gas: 1039953.411 units remaining)
+  - location: 153 (remaining gas: 1039953.381 units remaining)
     [ (Pair {} (Right Unit))  	 ]
 

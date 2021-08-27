@@ -27,9 +27,11 @@ trace
     [ (Some (Pair 3 1))  	 ]
   - location: 34 (remaining gas: 1039990.296 units remaining)
     [ (Right (Some (Pair 3 1)))  	 ]
-  - location: 39 (remaining gas: 1039990.281 units remaining)
+  - location: 22 (remaining gas: 1039990.281 units remaining)
+    [ (Right (Some (Pair 3 1)))  	 ]
+  - location: 39 (remaining gas: 1039990.266 units remaining)
     [ {}  	
       (Right (Some (Pair 3 1)))  	 ]
-  - location: 41 (remaining gas: 1039990.266 units remaining)
+  - location: 41 (remaining gas: 1039990.251 units remaining)
     [ (Pair {} (Right (Some (Pair 3 1))))  	 ]
 

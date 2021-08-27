@@ -27,9 +27,13 @@ trace
       (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset ]
   - location: 63 (remaining gas: 1039949.755 units remaining)
     [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
-  - location: 151 (remaining gas: 1039949.740 units remaining)
+  - location: 60 (remaining gas: 1039949.740 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 44 (remaining gas: 1039949.725 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 151 (remaining gas: 1039949.710 units remaining)
     [ {}  	
       (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
-  - location: 153 (remaining gas: 1039949.725 units remaining)
+  - location: 153 (remaining gas: 1039949.695 units remaining)
     [ (Pair {} (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))  	 ]
 
