@@ -170,17 +170,16 @@ class TestMultisig:
             )
             utils.bake(client)
             expected_hash = (
-                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4\n'
+                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4'
             )
             assert expected_hash in client.run(
                 ['show', 'supported', 'multisig', 'hashes']
             )
             assert client.get_script_hash(msig['handle']) == expected_hash
             assert client.get_script_hash('dummy_msig') == expected_hash
-            assert (
-                client.hash_script(client.run(['show', 'multisig', 'script']))
-                == expected_hash
-            )
+            assert client.hash_script(
+                [client.run(['show', 'multisig', 'script'])]
+            ) == [(expected_hash, None)]
             assert client.get_balance('dummy_msig') == 100
 
     def test_transfer(self, msig, client: Client, session: dict):

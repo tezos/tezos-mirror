@@ -16,6 +16,14 @@ from .contract_paths import (
 )
 
 
+ID_SCRIPT_LITERAL = '''
+parameter unit; storage unit; code {CAR; NIL operation; PAIR}
+'''.strip()
+ID_SCRIPT_HASH = '''
+exprtpyospPfMqcARmu5FGukprC7kbbe4jb4zxFd4Gxrp2vcCPjRNa
+'''.strip()
+
+
 @pytest.mark.contract
 @pytest.mark.incremental
 class TestManager:
@@ -1357,13 +1365,24 @@ class TestSelfAddressTransfer:
 @pytest.mark.contract
 @pytest.mark.regression
 class TestScriptHashRegression:
-    @pytest.mark.parametrize("contract", all_contracts())
-    def test_contract_hash(self, client_regtest: Client, contract):
-        client = client_regtest
-        assert contract.endswith(
-            '.tz'
-        ), "test contract should have .tz extension"
-        client.hash_script(os.path.join(CONTRACT_PATH, contract))
+    @pytest.mark.parametrize(
+        "client_regtest_custom_scrubber",
+        [[(re.escape(CONTRACT_PATH), '[CONTRACT_PATH]')]],
+        indirect=True,
+    )
+    def test_contract_hash(self, client_regtest_custom_scrubber: Client):
+        client = client_regtest_custom_scrubber
+        contracts = all_contracts()
+        contracts.sort()
+        for contract in contracts:
+            assert contract.endswith(
+                '.tz'
+            ), "test contract should have .tz extension"
+
+        client.hash_script(
+            [os.path.join(CONTRACT_PATH, contract) for contract in contracts],
+            display_names=True,
+        )
 
 
 @pytest.mark.contract
@@ -1371,7 +1390,7 @@ class TestScriptHashOrigination:
     def test_contract_hash_with_origination(
         self, client: Client, session: dict
     ):
-        script = 'parameter unit; storage unit; code {CAR; NIL operation; PAIR}'
+        script = ID_SCRIPT_LITERAL
         originate(
             client,
             session,
@@ -1380,9 +1399,88 @@ class TestScriptHashOrigination:
             amount=1000,
             contract_name='dummy_contract',
         )
-        hash1 = client.hash_script(script)
+        [(hash1, _)] = client.hash_script([script])
         hash2 = client.get_script_hash('dummy_contract')
         assert hash1 == hash2
+
+
+@pytest.mark.contract
+class TestScriptHashMultiple:
+    """Test tezos-client hash script with diffent number and type of
+    arguments"""
+
+    def test_contract_hashes_empty(self, client: Client):
+        assert client.hash_script([]) == []
+
+    def test_contract_hashes_single(self, client: Client):
+        assert client.hash_script([ID_SCRIPT_LITERAL]) == [
+            (ID_SCRIPT_HASH, None)
+        ]
+
+    def test_contract_hashes_single_display_names(self, client: Client):
+        assert client.hash_script([ID_SCRIPT_LITERAL], display_names=True,) == [
+            (
+                ID_SCRIPT_HASH,
+                'Literal script 1',
+            )
+        ]
+
+    def test_contract_hashes_mixed(self, client: Client):
+        contract_path = os.path.join(CONTRACT_PATH, 'attic', 'empty.tz')
+        script_empty_hash = '''
+expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
+        '''.strip()
+        with open(contract_path, 'r') as contract_file:
+            script = contract_file.read()
+
+            hashes = client.hash_script([contract_path, script])
+
+            assert hashes == [
+                (
+                    script_empty_hash,
+                    None,
+                ),
+                (
+                    script_empty_hash,
+                    None,
+                ),
+            ]
+
+            hashes = client.hash_script(
+                [contract_path, script], display_names=True
+            )
+
+            assert hashes == [
+                (
+                    script_empty_hash,
+                    contract_path,
+                ),
+                (
+                    script_empty_hash,
+                    'Literal script 2',
+                ),
+            ]
+
+    @pytest.mark.parametrize(
+        "for_script, display_names, results",
+        [
+            ('csv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
+            ('csv', False, (ID_SCRIPT_HASH, None)),
+            ('tsv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
+            ('tsv', False, (ID_SCRIPT_HASH, None)),
+        ],
+    )
+    def test_contract_hashes_for_script(
+        self, client: Client, for_script, display_names, results
+    ):
+        assert (
+            client.hash_script(
+                [ID_SCRIPT_LITERAL],
+                display_names=display_names,
+                for_script=for_script,
+            )
+            == [results]
+        )
 
 
 @pytest.mark.contract
@@ -1468,14 +1566,16 @@ class TestBadIndentation:
 
     BADLY_INDENTED = os.path.join(ILLTYPED_CONTRACT_PATH, 'badly_indented.tz')
 
-    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL\n"
+    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
 
     def test_bad_indentation_ill_typed(self, client):
         with utils.assert_run_failure('syntax error in program'):
             client.typecheck(self.BADLY_INDENTED)
 
     def test_bad_indentation_hash(self, client):
-        assert client.hash_script(self.BADLY_INDENTED) == self.SCRIPT_HASH
+        assert client.hash_script([self.BADLY_INDENTED]) == [
+            (self.SCRIPT_HASH, None)
+        ]
 
     def test_formatting(self, client, session):
         session['formatted_script'] = client.convert_script(
@@ -1483,9 +1583,9 @@ class TestBadIndentation:
         )
 
     def test_formatted_hash(self, client, session):
-        assert (
-            client.hash_script(session['formatted_script']) == self.SCRIPT_HASH
-        )
+        assert client.hash_script([session['formatted_script']]) == [
+            (self.SCRIPT_HASH, None)
+        ]
 
     def test_formatted_typechecks(self, client, session):
         client.typecheck(session['formatted_script'], file=False)

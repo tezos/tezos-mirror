@@ -500,6 +500,12 @@ let enforce_indentation_flag =
        well-indented."
     ()
 
+let display_names_flag =
+  switch
+    ~long:"display-names"
+    ~doc:"Print names of scripts passed to this command"
+    ()
+
 module Daemon = struct
   let baking_switch =
     switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()

@@ -157,8 +157,8 @@ let commands () =
       ~desc:"literal or a path to a file"
       (parameter (fun cctxt s ->
            cctxt#read_file s >>= function
-           | Ok v -> return v
-           | Error _ -> return s))
+           | Ok v -> return (Some s, v)
+           | Error _ -> return (None, s)))
   in
   [
     command
@@ -427,20 +427,57 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to hash a Michelson script with `BLAKE2B`."
-      (args1 enforce_indentation_flag)
-      (prefixes ["hash"; "script"] @@ file_or_literal_param () @@ stop)
-      (fun check expr_string (cctxt : Protocol_client_context.full) ->
-        let program = Michelson_v1_parser.parse_toplevel ~check expr_string in
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        let code = program.expanded in
-        let bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Alpha_context.Script.expr_encoding
-            code
-        in
-        let hash = Script_expr_hash.hash_bytes [bytes] in
-        cctxt#answer "%a" Script_expr_hash.pp hash >|= ok);
+      (args3
+         enforce_indentation_flag
+         display_names_flag
+         (Tezos_clic_unix.Scriptable.clic_arg ()))
+      (prefixes ["hash"; "script"] @@ seq_of_param @@ file_or_literal_param ())
+      (fun (check, display_names, scriptable)
+           expr_strings
+           (cctxt : Protocol_client_context.full) ->
+        if List.length expr_strings == 0 then
+          cctxt#warning "No scripts were specified on the command line" >|= ok
+        else
+          List.mapi_ep
+            (fun i (src, expr_string) ->
+              let program =
+                Michelson_v1_parser.parse_toplevel ~check expr_string
+              in
+              Micheline_parser.no_parsing_error program >>?= fun program ->
+              let code = program.expanded in
+              let bytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Alpha_context.Script.expr_encoding
+                  code
+              in
+              let hash =
+                Format.asprintf
+                  "%a"
+                  Script_expr_hash.pp
+                  (Script_expr_hash.hash_bytes [bytes])
+              in
+              let name =
+                Option.value
+                  src
+                  ~default:("Literal script " ^ string_of_int (i + 1))
+              in
+              return (hash, name))
+            expr_strings
+          >>=? fun hash_name_rows ->
+          Tezos_clic_unix.Scriptable.output
+            scriptable
+            ~for_human:(fun () ->
+              List.iter_s
+                (fun (hash, name) ->
+                  if display_names then cctxt#answer "%s\t%s" hash name
+                  else cctxt#answer "%s" hash)
+                hash_name_rows
+              >|= ok)
+            ~for_script:(fun () ->
+              List.map
+                (fun (hash, name) ->
+                  if display_names then [hash; name] else [hash])
+                hash_name_rows));
     command
       ~group
       ~desc:
@@ -742,7 +779,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           expr_string
+           (_, expr_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
@@ -820,7 +857,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, data_ty)
-           data_string
+           (_, data_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
