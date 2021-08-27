@@ -100,6 +100,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -203,6 +204,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -306,6 +308,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -431,6 +434,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_tc_errors
    Script_typed_ir
    Script_typed_ir_size
+   Script_typed_ir_size_costs
    Michelson_v1_gas
    Script_ir_annot
    Script_list
@@ -573,6 +577,7 @@ include Tezos_raw_protocol_alpha.Main
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
