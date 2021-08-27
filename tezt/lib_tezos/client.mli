@@ -523,12 +523,12 @@ val spawn_normalize_data :
   t ->
   Process.t
 
-(** Run [tezos-client list mockup protocols]. *)
-val list_mockup_protocols : t -> string list Lwt.t
+(** Run [tezos-client list mode protocols]. *)
+val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
 
-(** Same as [list_mockup_protocols], but do not wait for the process to exit
+(** Same as [list_protocols], but do not wait for the process to exit
     and do not process stdout. *)
-val spawn_list_mockup_protocols : t -> Process.t
+val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
 (** Run [tezos-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t

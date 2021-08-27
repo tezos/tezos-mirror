@@ -75,6 +75,7 @@ let () =
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   Light.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
+  Proxy.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;

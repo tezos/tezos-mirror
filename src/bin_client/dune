@@ -20,6 +20,7 @@
             tezos-client-base
             tezos-client-commands
             tezos-mockup-commands
+            tezos-proxy
 
             (select void_for_linking-genesis from
               (tezos-client-genesis -> void_for_linking-genesis.empty)

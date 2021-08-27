@@ -672,14 +672,20 @@ let normalize_data ?mode ?legacy ~data ~typ client =
   spawn_normalize_data ?mode ?legacy ~data ~typ client
   |> Process.check_and_read_stdout
 
-let spawn_list_mockup_protocols client =
-  spawn_command client (mode_arg client @ ["list"; "mockup"; "protocols"])
+let spawn_list_protocols mode client =
+  let mode_str =
+    match mode with
+    | `Mockup -> "mockup"
+    | `Light -> "light"
+    | `Proxy -> "proxy"
+  in
+  spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
 
-let list_mockup_protocols client =
-  let process = spawn_list_mockup_protocols client in
+let list_protocols mode client =
+  let process = spawn_list_protocols mode client in
   let* () = Process.check process
   and* output = Lwt_io.read (Process.stdout process) in
-  return (String.split_on_char '\n' output)
+  return (String.split_on_char '\n' output |> List.filter (fun s -> s <> ""))
 
 let spawn_migrate_mockup ~next_protocol client =
   spawn_command

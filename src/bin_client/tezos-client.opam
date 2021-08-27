@@ -46,6 +46,7 @@ depends: [
 
   "tezos-client-base-unix"
   "tezos-mockup-commands"
+  "tezos-proxy"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }

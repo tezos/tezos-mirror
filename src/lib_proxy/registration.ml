@@ -98,6 +98,8 @@ let register_proxy_context m =
             INCOMING_P.protocol_hash)
   else registered := m :: !registered
 
+let get_all_registered () : proxy_environment list = !registered
+
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
     ?(chain = `Main) ?(block = `Head 0)

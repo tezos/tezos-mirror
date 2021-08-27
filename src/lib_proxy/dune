@@ -5,6 +5,7 @@
  (libraries
   ringo-lwt
   tezos-base
+  tezos-clic
   tezos-client-base
   tezos-mockup-proxy
   tezos-protocol-environment
