@@ -205,6 +205,7 @@ let make_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
     ?salt:string ->
+    ?more_tags:string list ->
     name:Interpreter_workload.instruction_name ->
     kinstr_and_stack_sampler:
       (Default_config.config -> Random.State.t -> unit -> ex_stack_and_kinstr) ->
@@ -213,12 +214,15 @@ let make_benchmark :
  fun ?amplification
      ?(intercept = false)
      ?salt
+     ?(more_tags = [])
      ~name
      ~kinstr_and_stack_sampler
      () ->
   let module B : Benchmark.S = struct
     include Default_config
     include Default_boilerplate
+
+    let tags = tags @ more_tags
 
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
@@ -258,11 +262,12 @@ let make_simple_benchmark :
     type bef_top bef res_top res.
     ?amplification:int ->
     ?intercept:bool ->
+    ?more_tags:string list ->
     name:Interpreter_workload.instruction_name ->
     kinstr:(bef_top, bef, res_top, res) Script_typed_ir.kinstr ->
     unit ->
     Benchmark.t =
- fun ?amplification ?intercept ~name ~kinstr () ->
+ fun ?amplification ?intercept ?more_tags ~name ~kinstr () ->
   let kinfo = Script_typed_ir.kinfo_of_kinstr kinstr in
   let stack_ty = kinfo.kstack_ty in
   let kinstr_and_stack_sampler config rng_state =
@@ -273,40 +278,61 @@ let make_simple_benchmark :
       Ex_stack_and_kinstr
         {stack = Samplers.Random_value.stack stack_ty rng_state; kinstr}
   in
-  make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+  make_benchmark
+    ?amplification
+    ?intercept
+    ?more_tags
+    ~name
+    ~kinstr_and_stack_sampler
+    ()
 
-let benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler () =
+let benchmark ?amplification ?intercept ?more_tags ~name
+    ~kinstr_and_stack_sampler () =
   let bench =
-    make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+    make_benchmark
+      ?amplification
+      ?intercept
+      ?more_tags
+      ~name
+      ~kinstr_and_stack_sampler
+      ()
   in
   Registration_helpers.register bench
 
-let benchmark_with_stack_sampler ?amplification ?intercept ~name ~kinstr
-    ~stack_sampler () =
+let benchmark_with_stack_sampler ?amplification ?intercept ?more_tags ~name
+    ~kinstr ~stack_sampler () =
   let kinstr_and_stack_sampler config rng_state =
     let stack_sampler = stack_sampler config rng_state in
     fun () -> Ex_stack_and_kinstr {stack = stack_sampler (); kinstr}
   in
   let bench =
-    make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+    make_benchmark
+      ?amplification
+      ?intercept
+      ?more_tags
+      ~name
+      ~kinstr_and_stack_sampler
+      ()
   in
   Registration_helpers.register bench
 
-let benchmark_with_fixed_stack ?amplification ?intercept ~name ~stack ~kinstr ()
-    =
+let benchmark_with_fixed_stack ?amplification ?intercept ?more_tags ~name ~stack
+    ~kinstr () =
   benchmark_with_stack_sampler
     ?amplification
     ?intercept
+    ?more_tags
     ~name
     ~kinstr
     ~stack_sampler:(fun _cfg _rng_state () -> stack)
     ()
 
-let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ~name
-    ~kinstr ~stack_sampler () =
+let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack
+    ?more_tags ~name ~kinstr ~stack_sampler () =
   benchmark_with_stack_sampler
     ?amplification
     ~intercept:false
+    ?more_tags
     ~name
     ~kinstr
     ~stack_sampler
@@ -316,15 +342,23 @@ let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ~name
       benchmark_with_fixed_stack
         ?amplification
         ~intercept:true
+        ?more_tags
         ~name
         ~stack
         ~kinstr
         ())
     intercept_stack
 
-let simple_benchmark ?amplification ?intercept_stack ~name ~kinstr () =
+let simple_benchmark ?amplification ?intercept_stack ?more_tags ~name ~kinstr ()
+    =
   let bench =
-    make_simple_benchmark ?amplification ~intercept:false ~name ~kinstr ()
+    make_simple_benchmark
+      ?amplification
+      ~intercept:false
+      ?more_tags
+      ~name
+      ~kinstr
+      ()
   in
   Registration_helpers.register bench ;
   Option.iter
@@ -332,6 +366,7 @@ let simple_benchmark ?amplification ?intercept_stack ~name ~kinstr () =
       benchmark_with_fixed_stack
         ?amplification
         ~intercept:true
+        ?more_tags
         ~name
         ~stack
         ~kinstr
@@ -412,6 +447,7 @@ let make_continuation_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
     ?salt:string ->
+    ?more_tags:string list ->
     name:Interpreter_workload.continuation_name ->
     cont_and_stack_sampler:
       (Default_config.config ->
@@ -420,10 +456,18 @@ let make_continuation_benchmark :
       ex_stack_and_continuation) ->
     unit ->
     Benchmark.t =
- fun ?amplification ?(intercept = false) ?salt ~name ~cont_and_stack_sampler () ->
+ fun ?amplification
+     ?(intercept = false)
+     ?salt
+     ?(more_tags = [])
+     ~name
+     ~cont_and_stack_sampler
+     () ->
   let module B : Benchmark.S = struct
     include Default_config
     include Default_boilerplate
+
+    let tags = tags @ more_tags
 
     let models =
       Interpreter_model.make_model
@@ -453,13 +497,14 @@ let make_continuation_benchmark :
   end in
   (module B : Benchmark.S)
 
-let continuation_benchmark ?amplification ?intercept ?salt ~name
+let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ~name
     ~cont_and_stack_sampler () =
   let bench =
     make_continuation_benchmark
       ?amplification
       ?intercept
       ?salt
+      ?more_tags
       ~name
       ~cont_and_stack_sampler
       ()
