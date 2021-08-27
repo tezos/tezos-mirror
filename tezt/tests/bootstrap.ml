@@ -63,9 +63,12 @@ let bootstrapped_event =
   fun resolver Node.{name; value} ->
     let filter json =
       let json = JSON.(json |=> 1 |-> "event") in
-      (* We check is_null first otherwise as_object_opt may aslo returns `Some []` for this case *)
+      (* We check is_null first otherwise as_object_opt may also return `Some []` for this case *)
       if JSON.is_null json then false
-      else match JSON.as_object_opt json with Some [] -> true | _ -> false
+      else
+        match JSON.as_object_opt json with
+        | Some [("bootstrapped", _)] -> true
+        | _ -> false
     in
     if name = "node_chain_validator.v0" && filter value then
       if not !fulfilled then (

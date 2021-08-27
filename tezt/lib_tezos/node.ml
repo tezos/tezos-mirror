@@ -283,7 +283,11 @@ let handle_event node {name; value} =
   | "node_chain_validator.v0" -> (
       match JSON.as_list_opt value with
       | Some [_timestamp; details] -> (
-          match JSON.(details |-> "event" |-> "level" |> as_int_opt) with
+          match
+            JSON.(
+              details |-> "event" |-> "processed_block" |-> "level"
+              |> as_int_opt)
+          with
           | None ->
               (* There are several kinds of [node_chain_validator.v0] events
                  and maybe this one is not the one with the level: ignore it. *)
