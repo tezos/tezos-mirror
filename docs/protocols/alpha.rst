@@ -60,7 +60,7 @@ Minor changes
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
   :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266` :gl:`!3270`
-  :gl:`!3285` :gl:`!3375`)
+  :gl:`!3285` :gl:`!3375` :gl:`!3247`)
 
 - Check order in the validation of endorsements has changed to not
   compute all endorsement slots of a level if the endorsement is
