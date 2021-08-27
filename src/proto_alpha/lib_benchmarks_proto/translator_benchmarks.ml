@@ -36,7 +36,7 @@ module Config = struct
 
   let default_config =
     {
-      generator_config = Michelson_generation.default;
+      generator_config = Michelson_generation.default_generator_config;
       michelson_terms_file = None;
     }
 
@@ -239,7 +239,7 @@ module Typechecking_data : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.filter_map
           (function
             | Michelson_generation.Data {term; typ} ->
@@ -321,7 +321,7 @@ module Unparsing_data : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.filter_map
           (function
             | Michelson_generation.Data {term; typ} ->
@@ -399,7 +399,7 @@ module Typechecking_code : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.filter_map
           (function
             | Michelson_generation.Code {term; bef} ->
@@ -481,7 +481,7 @@ module Unparsing_code : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.filter_map
           (function
             | Michelson_generation.Code {term; bef} ->

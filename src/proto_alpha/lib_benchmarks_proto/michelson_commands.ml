@@ -33,8 +33,8 @@ let group =
 
 module Michelson_concat_cmd = struct
   let handler () file1 file2 file3 () =
-    let trace1 = Michelson_generation.load_file file1 in
-    let trace2 = Michelson_generation.load_file file2 in
+    let trace1 = Michelson_generation.load ~filename:file1 in
+    let trace2 = Michelson_generation.load ~filename:file2 in
     let terms = trace1 @ trace2 in
     let l1 = List.length trace1 in
     let l2 = List.length trace2 in
@@ -75,20 +75,11 @@ module Michelson_gen_cmd = struct
 
   let handler (min_size, max_size, burn_in, seed) terms_count terms_kind
       filename () =
-    let min =
-      Option.value
-        ~default:Michelson_generation.default.target_size.min
-        min_size
-    in
-    let max =
-      Option.value
-        ~default:Michelson_generation.default.target_size.max
-        max_size
-    in
+    let default = Michelson_generation.default_generator_config in
+    let min = Option.value ~default:default.target_size.min min_size in
+    let max = Option.value ~default:default.target_size.max max_size in
     let burn_in_multiplier =
-      Option.value
-        ~default:Michelson_generation.default.burn_in_multiplier
-        burn_in
+      Option.value ~default:default.burn_in_multiplier burn_in
     in
     let rng_state =
       match seed with

@@ -30,12 +30,8 @@ type generator_config = {
   burn_in_multiplier : int;
 }
 
-let default =
+let default_generator_config =
   {target_size = {Base_samplers.min = 100; max = 1000}; burn_in_multiplier = 5}
-
-type michelson_data =
-  | Code of {term : Script_repr.expr; bef : Script_repr.expr list}
-  | Data of {term : Script_repr.expr; typ : Script_repr.expr}
 
 let generator_config_encoding =
   let open Data_encoding in
@@ -48,7 +44,11 @@ let generator_config_encoding =
 
 (* ----------------------------------------------------------------------- *)
 
-let michelson_data_encoding =
+type michelson_data =
+  | Code of {term : Script_repr.expr; bef : Script_repr.expr list}
+  | Data of {term : Script_repr.expr; typ : Script_repr.expr}
+
+let michelson_data_list_encoding =
   let open Data_encoding in
   let e = Script_repr.expr_encoding in
   list
@@ -70,7 +70,7 @@ let michelson_data_encoding =
 
 let save ~filename ~terms =
   let bytes =
-    match Data_encoding.Binary.to_bytes michelson_data_encoding terms with
+    match Data_encoding.Binary.to_bytes michelson_data_list_encoding terms with
     | Error err ->
         Format.eprintf
           "Michelson_generation.save: encoding failed (%a); exiting"
@@ -85,12 +85,14 @@ let save ~filename ~terms =
          filename
          (Bytes.unsafe_to_string bytes))
 
-let load_file filename =
+let load ~filename =
   Lwt_main.run
   @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
        Format.eprintf "Michelson_generation.load: loaded %s@." filename ;
        let bytes = Bytes.unsafe_of_string str in
-       match Data_encoding.Binary.of_bytes michelson_data_encoding bytes with
+       match
+         Data_encoding.Binary.of_bytes michelson_data_list_encoding bytes
+       with
        | Ok result -> Lwt.return result
        | Error err ->
            Format.eprintf
@@ -148,7 +150,7 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
   | Ok t -> t
   | Error errs ->
       Format.eprintf "%a@." Error_monad.pp_print_error errs ;
-      raise (Failure "Michelson_generation.michelson_type_to_ex_ty: error")
+      Stdlib.failwith "Michelson_generation.michelson_type_to_ex_ty: error"
 
 let base_type_to_ex_ty ty =
   michelson_type_to_ex_ty (base_type_to_michelson_type ty)
