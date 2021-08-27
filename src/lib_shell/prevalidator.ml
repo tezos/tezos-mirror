@@ -482,14 +482,8 @@ module Make
             config
             op.Filter.Proto.protocol_data
         with
-        | `Branch_delayed errors ->
-            handle pv (`Parsed parsed_op) (`Branch_delayed errors) ;
-            false
-        | `Branch_refused errors ->
-            handle pv (`Parsed parsed_op) (`Branch_refused errors) ;
-            false
-        | `Refused errors ->
-            handle pv (`Parsed parsed_op) (`Refused errors) ;
+        | (`Branch_delayed _ | `Branch_refused _ | `Refused _) as errs ->
+            handle pv (`Parsed parsed_op) errs ;
             false
         | `Undecided -> true)
 
