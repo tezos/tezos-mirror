@@ -156,15 +156,15 @@ module Node_size_benchmark : Benchmark.S = struct
   let models = [("size_translator_model", size_based_model)]
 
   let micheline_nodes_benchmark node =
-    let node = Micheline.root node in
-    let nodes = micheline_nodes node in
+    let open Cache_memory_helpers in
+    let nodes = Nodes.to_int @@ fst @@ node_size node in
     let workload = {micheline_nodes = nodes} in
     let closure () = ignore (Script_typed_ir_size.node_size node) in
     Generator.Plain {workload; closure}
 
   let make_bench rng_state _cfg () =
     let term = Sampler.sample rng_state in
-    micheline_nodes_benchmark (Micheline.strip_locations term)
+    micheline_nodes_benchmark term
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
