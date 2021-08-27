@@ -643,7 +643,7 @@ let rec dummy_comparable_type_generator depth =
 module Parse_type_shared = struct
   type config = {max_size : int}
 
-  let default_config = {max_size = 1024}
+  let default_config = {max_size = Constants_repr.michelson_maximum_type_size}
 
   let config_encoding =
     let open Data_encoding in
