@@ -13,11 +13,13 @@ if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
   git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
   FILES=$(git diff-tree --no-commit-id --name-only -r HEAD..origin/"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME")
 
-  echo Files changed: "$FILES"
+  echo Files changed:
+  echo "$FILES"
 
   MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune\.inc|.*\.opam|scripts/version\.sh|\.gitlab-ci\.yml" | cat)
 
-  echo Matches found: "$MATCHES"
+  echo Matches found:
+  echo "$MATCHES"
 
   if [ -n "$MATCHES" ]; then
     export TZ_OPAM_FILES_MODIFIED=true
