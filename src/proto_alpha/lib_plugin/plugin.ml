@@ -1481,8 +1481,8 @@ module RPC = struct
                 storage;
               }
           in
-          let (size, _cost) = Script_ir_translator.script_size script in
-          return @@ size) ;
+          let (size, cost) = Script_ir_translator.script_size script in
+          Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;
 
       Registration.register0
         ~chunked:false

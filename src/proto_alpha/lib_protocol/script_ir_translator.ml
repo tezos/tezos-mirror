@@ -5744,19 +5744,26 @@ let parse_code :
        (arg_type_full, None)
        ret_type_full
        code_field)
-  >|=? fun (code, ctxt) ->
-  let open Script_typed_ir_size in
-  let view_size view =
-    node_size view.view_code ++ node_size view.input_ty
-    ++ node_size view.output_ty
-  in
-  let views_size = SMap.fold (fun _ v s -> view_size v ++ s) views zero in
-  (* The size of the storage_type and the arg_type is counted by
-     [lambda_size]. *)
-  let ir_size = lambda_size code in
-  (* FIXME: will be used in an upcoming commit *)
-  let (_unused_for_now, code_size) = views_size ++ ir_size in
-  (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
+  >>=? fun (code, ctxt) ->
+  Lwt.return
+    (let open Script_typed_ir_size in
+    let view_size view =
+      node_size view.view_code ++ node_size view.input_ty
+      ++ node_size view.output_ty
+    in
+    let views_size = SMap.fold (fun _ v s -> view_size v ++ s) views zero in
+    (* The size of the storage_type and the arg_type is counted by
+       [lambda_size]. *)
+    let ir_size = lambda_size code in
+    let (nodes, code_size) = views_size ++ ir_size in
+    (* We consume gas after the fact in order to not have to instrument
+       [node_size] (for efficiency).
+       This is safe, as we already pay gas proportional to [views_size]
+       and [ir_size] during their typechecking. *)
+    Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes)
+    >>? fun ctxt ->
+    ok
+      (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
 
 let parse_storage :
     ?type_logger:type_logger ->

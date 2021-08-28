@@ -41,8 +41,12 @@ let load_and_elaborate ctxt addr =
       Script_ir_translator.(
         parse_script ctxt script ~legacy:true ~allow_forged_in_storage:true
         >>=? fun (ex_script, ctxt) ->
-        (* this cost will be used in a subsequent commit *)
-        let (size, _cost) = script_size ex_script in
+        (* We consume gas after the fact in order to not have to instrument
+           [script_size] (for efficiency).
+           This is safe, as we already pay gas proportional to storage size
+           in [parse_script] beforehand. *)
+        let (size, cost) = script_size ex_script in
+        Gas.consume ctxt cost >>?= fun ctxt ->
         return (ctxt, Some (script, ex_script, size)))
 
 module Client = struct

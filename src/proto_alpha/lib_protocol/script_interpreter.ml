@@ -1746,23 +1746,30 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
         ( Gas.consume ctxt (Script.strip_locations_cost unparsed_storage)
         >>? fun ctxt -> ok (Micheline.strip_locations unparsed_storage, ctxt) )
     )
-  >|=? fun (unparsed_storage, ctxt) ->
-  let (ops, op_diffs) = List.split ops.elements in
-  let lazy_storage_diff =
-    match
-      List.flatten
-        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
-    with
-    | [] -> None
-    | diff -> Some diff
-  in
-  let script =
-    Ex_script
-      {code_size; code; arg_type; storage; storage_type; root_name; views}
-  in
-  (* the cost below will be used in a subsequent commit *)
-  let (code_size, _cost) = Script_ir_translator.script_size script in
-  (unparsed_storage, ops, ctxt, lazy_storage_diff, script, code_size)
+  >>=? fun (unparsed_storage, ctxt) ->
+  Lwt.return
+    (let (ops, op_diffs) = List.split ops.elements in
+     let lazy_storage_diff =
+       match
+         List.flatten
+           (List.map
+              (Option.value ~default:[])
+              (op_diffs @ [lazy_storage_diff]))
+       with
+       | [] -> None
+       | diff -> Some diff
+     in
+     let script =
+       Ex_script
+         {code_size; code; arg_type; storage; storage_type; root_name; views}
+     in
+     (* We consume gas after the fact in order to not have to instrument
+        [script_size] (for efficiency).
+        This is safe, as we already pay gas proportional to storage size
+        in [unparse_data]. *)
+     let (size, cost) = Script_ir_translator.script_size script in
+     Gas.consume ctxt cost >>? fun ctxt ->
+     ok (unparsed_storage, ops, ctxt, lazy_storage_diff, script, size))
 
 type execution_result = {
   ctxt : context;
