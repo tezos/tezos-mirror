@@ -2141,6 +2141,7 @@ module Registration_section = struct
                storage_type = unit;
                arg_type = unit;
                lambda;
+               views = SMap.empty;
                root_name = None;
                k = halt (operation @$ address @$ bot);
              })

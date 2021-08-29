@@ -643,7 +643,10 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
    [credit] (taken to contract being executed), and an initial storage
    [init] of type [storage_ty]. The type of the new contract argument
    is [param_ty]. *)
-let create_contract (ctxt, sc) gas storage_type param_type code root_name
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
+   Refactor the sharing part of unparse_script and create_contract *)
+let create_contract (ctxt, sc) gas storage_type param_type code views root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
   unparse_ty ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
@@ -651,15 +654,31 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
     Script_ir_translator.add_field_annot root_name None unparsed_param_type
   in
   unparse_ty ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
+  let open Micheline in
+  let view name {input_ty; output_ty; view_code} views =
+    Prim
+      ( 0,
+        K_view,
+        [
+          String (0, Script_string.to_string name);
+          input_ty;
+          output_ty;
+          view_code;
+        ],
+        [] )
+    :: views
+  in
+  let views = SMap.fold view views [] |> List.rev in
   let code =
-    Micheline.strip_locations
+    strip_locations
       (Seq
          ( 0,
            [
              Prim (0, K_parameter, [unparsed_param_type], []);
              Prim (0, K_storage, [unparsed_storage_type], []);
              Prim (0, K_code, [code], []);
-           ] ))
+           ]
+           @ views ))
   in
   collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
@@ -674,7 +693,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
   >>=? fun (init, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let storage = Micheline.strip_locations storage in
+  let storage = strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
   let operation =
     Origination

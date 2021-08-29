@@ -732,6 +732,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       storage_type : 'a ty;
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
+      views : view SMap.t;
       root_name : field_annot option;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
@@ -1452,9 +1453,11 @@ let kinstr_rewritek :
   | ITransfer_tokens (kinfo, k) -> ITransfer_tokens (kinfo, f.apply k)
   | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
   | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
-  | ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k} ->
+  | ICreate_contract
+      {kinfo; storage_type; arg_type; lambda; views; root_name; k} ->
       let k = f.apply k in
-      ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k}
+      ICreate_contract
+        {kinfo; storage_type; arg_type; lambda; views; root_name; k}
   | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
   | INow (kinfo, k) -> INow (kinfo, f.apply k)
   | IBalance (kinfo, k) -> IBalance (kinfo, f.apply k)

@@ -1077,7 +1077,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                 (input, storage)
                                 (EmptyCell, EmptyCell))))))
       | ICreate_contract
-          {storage_type; arg_type; lambda = Lam (_, code); root_name; k; _} ->
+          {
+            storage_type;
+            arg_type;
+            lambda = Lam (_, code);
+            views;
+            root_name;
+            k;
+            _;
+          } ->
           (* Removed the instruction's arguments manager, spendable and delegatable *)
           let delegate = accu in
           let (credit, (init, stack)) = stack in
@@ -1087,6 +1095,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             storage_type
             arg_type
             code
+            views
             root_name
             delegate
             credit
