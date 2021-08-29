@@ -700,6 +700,48 @@ class TestView:
         client.bake('bootstrap2', ["--minimal-timestamp"])
         assert client.get_storage(contract) == expected
 
+    def test_create_contract(
+        self,
+        client,
+        session,
+    ):
+        contract = 'create_contract_with_view'
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        originate(client, session, path, 'None', 0)
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                "--arg",
+                "Unit",
+                "--burn-cap",
+                "0.1",
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+
+        addr = client.get_storage(contract).split()[1]
+        contract = 'view_op_constant'
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        originate(client, session, path, '2', 0)
+        expected = "10"
+
+        client.transfer(
+            0,
+            "bootstrap1",
+            contract,
+            [
+                "--arg",
+                f"(Pair {expected} {addr})",
+                "--burn-cap",
+                "0.1",
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+
+        assert client.get_storage(contract) == expected
+
     def test_step_constants(self, client, session):
         contract = 'view_op_test_step_contants'
         path = f'{CONTRACT_PATH}/opcodes/' + contract + '.tz'
