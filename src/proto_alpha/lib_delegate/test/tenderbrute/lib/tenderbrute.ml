@@ -126,7 +126,7 @@ let rnd_bytes32 () =
 let mk_selection_map cycle_eras selection =
   List.fold_left
     (fun acc (level, round_delegates) ->
-      let level = Level_repr.from_raw ~cycle_eras level in
+      let level = Level_repr.level_from_raw ~cycle_eras level in
       List.fold_left
         (fun acc (round, delegate) ->
           if LevelRoundMap.mem (level, round) acc then
