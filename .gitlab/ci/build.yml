@@ -4,7 +4,6 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
   stage: build
   before_script:
     - . ./scripts/version.sh
@@ -61,5 +60,6 @@ build_arm64:
 build_x86_64:
   extends:
     - .build
+    - .rules_template__development
   variables:
     ARCH: "x86_64"
