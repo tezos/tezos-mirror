@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,28 @@
 (*****************************************************************************)
 
 open Alpha_context
+
+type error += Balance_rpc_non_delegate of public_key_hash
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"delegate_service.balance_rpc_on_non_delegate"
+    ~title:"Balance request for an unregistered delegate"
+    ~description:"The account whose balance was requested is not a delegate."
+    ~pp:(fun ppf pkh ->
+      Format.fprintf
+        ppf
+        "The implicit account (%a) whose balance was requested is not a \
+         registered delegate. To get the balance of this account you can use \
+         the ../context/contracts/%a/balance RPC."
+        Signature.Public_key_hash.pp
+        pkh
+        Signature.Public_key_hash.pp
+        pkh)
+    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    (function Balance_rpc_non_delegate pkh -> Some pkh | _ -> None)
+    (fun pkh -> Balance_rpc_non_delegate pkh)
 
 type info = {
   balance : Tez.t;
@@ -221,6 +244,7 @@ let delegate_register () =
           List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
       | _ -> return delegates) ;
   register1 ~chunked:false S.info (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.full_balance ctxt pkh >>=? fun balance ->
       Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
       Delegate.frozen_balance_by_cycle ctxt pkh
@@ -243,22 +267,31 @@ let delegate_register () =
         voting_power;
       }) ;
   register1 ~chunked:false S.balance (fun ctxt pkh () () ->
-      Delegate.full_balance ctxt pkh) ;
+      trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
+      >>=? fun () -> Delegate.full_balance ctxt pkh) ;
   register1 ~chunked:false S.frozen_balance (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.frozen_balance ctxt pkh) ;
   register1 ~chunked:true S.frozen_balance_by_cycle (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.frozen_balance_by_cycle ctxt pkh >|= ok) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegated_balance ctxt pkh) ;
   register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.deactivated ctxt pkh) ;
   register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.grace_period ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
       Vote.get_voting_power_free ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =

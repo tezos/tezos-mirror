@@ -48,6 +48,11 @@ RPC changes
   powerful and equally costly in terms of computation for the
   node. (MR :gl:`!3395`)
 
+- The RPCs ``GET ../context/delegates/[PUBLIC_KEY_HASH]/..`` now fail
+  gracefully with a specific error ``delegate.not_registered`` when
+  ``PUBLIC_KEY_HASH`` is not a delegate instead of the generic
+  ``context.storage_error``. (MR :gl:`!3258`, issues :gl:`#450`, :gl:`#451`, and :gl:`#1276`))
+
 Minor changes
 -------------
 
