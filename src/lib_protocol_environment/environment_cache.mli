@@ -217,10 +217,6 @@ val update : 'value t -> key -> ('value * size) option -> 'value t
     associate [key] to the [value] with some [meta]data. *)
 val update_cache_key : 'value t -> key -> 'value -> value_metadata -> 'value t
 
-(** [insert_entry cache key (v, m)] returns a new version of [cache]
-    where [key] is mapped to a new delayed value [v] and metadata [m]. *)
-val insert_entry : 'value t -> key -> 'value * value_metadata -> 'value t
-
 (** [future_cache_expectation cache ~time_in_blocks] returns a
    predicted cache that tries to anticipate the state of [cache]
    in [time_in_blocks]. This function is using an heuristic. *)

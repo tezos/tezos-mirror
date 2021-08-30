@@ -199,12 +199,6 @@ let insert_cache_entry cache key ((_, {size; birth; _}) as entry) =
     removed_entries = KeySet.remove key cache.removed_entries;
   }
 
-let insert_entry t key (value, entry) =
-  with_caches t (fun caches ->
-      let cache = FunctionalArray.get caches key.cache_index in
-      let cache = insert_cache_entry cache key (value, entry) in
-      update_cache_with t key.cache_index cache)
-
 let insert_cache cache key value size cache_nonce =
   (* Conforming to entry size invariant: we need this size to be
      strictly positive. *)

@@ -401,7 +401,8 @@ module Context = struct
           | None -> value_of_key key entry cache
           | Some (value, entry') ->
               if Bytes.equal entry.cache_nonce entry'.cache_nonce then
-                return (Environment_cache.insert_entry cache key (value, entry))
+                return
+                @@ Environment_cache.update_cache_key cache key value entry
               else value_of_key key entry cache)
 
     let load_now ctxt cache builder =
