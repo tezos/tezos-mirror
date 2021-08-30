@@ -70,6 +70,8 @@ Minor changes
   performance will become easier now that they are decoupled from the
   protocol development cycle. (MR :gl:`!3368`)
 
+- Gives a nominal increase to the liquidity baking sunset level. Without this, the subsidy would halt during the lifespan of this protocol. With this change the subsidy can continue until the protocol after this one is activated, even accounting for some delays in proposal injection and/or a restarted voting process, while still making sure it won't extend to two protocols after this one without a more significant increase. This follows the spirit of the liquidity baking TZIP in that it is still roughly six months from Granada activation and requires a referendum on the subsidy in the protocol after this one. (MR :gl:`!3425`)
+
 New Features
 ------------
 

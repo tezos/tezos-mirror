@@ -767,7 +767,11 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             initial_endorsers = c.initial_endorsers;
             delay_per_missing_endorsement = c.delay_per_missing_endorsement;
             liquidity_baking_subsidy = c.liquidity_baking_subsidy;
-            liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
+            liquidity_baking_sunset_level =
+              (* preserve a lower level for testnets *)
+              (if Compare.Int32.(c.liquidity_baking_sunset_level = 2_032_928l)
+              then 2_203_649l
+              else c.liquidity_baking_sunset_level);
             liquidity_baking_escape_ema_threshold =
               c.liquidity_baking_escape_ema_threshold;
           }
