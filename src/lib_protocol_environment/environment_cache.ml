@@ -377,7 +377,7 @@ let sync t ~cache_nonce =
     caches
     []
     empty_cache
-  |> fun (domains, caches) -> (Some caches, List.rev domains)
+  |> fun (rev_domains, caches) -> (Some caches, List.rev rev_domains)
 
 let update_cache_key t key value meta =
   with_caches t @@ fun caches ->
