@@ -920,9 +920,7 @@ class TestGasBound:
         name = 'first_explosion_bigtype.tz'
         contract = session[name]
 
-        # We could not be bothered with finding how to escape parentheses
-        # so we put dots
-        expected_error = "type exceeded maximum type size .1000."
+        expected_error = "type exceeded maximum type size"
         with utils.assert_run_failure(expected_error):
             client.typecheck(contract)
 
