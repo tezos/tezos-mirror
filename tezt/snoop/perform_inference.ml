@@ -52,6 +52,7 @@ let main () =
       "size_translator_model";
       "micheline";
       "micheline_bytes";
+      "encoding";
       "Set_add";
       "Set_elements";
       "Script_expr_hash_of_b58check_opt";
