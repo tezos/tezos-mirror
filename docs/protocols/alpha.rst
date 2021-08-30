@@ -71,7 +71,7 @@ There are two added Michelson primitives: ``VIEW`` (instruction) and
 ``view`` (top-level keyword).
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/169>`__
-- MR: :gl:`!2359`
+- MRs :gl:`!2359` and :gl:`!3431`
 
 Global Constants
 ----------------
