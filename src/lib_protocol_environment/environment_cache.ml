@@ -316,7 +316,12 @@ let rec enforce_size_limit cache =
 
 let record_entries_removals cache =
   let entries_removals =
-    if List.length cache.entries_removals >= entries_removals_window_width then
+    if
+      List.compare_length_with
+        cache.entries_removals
+        entries_removals_window_width
+      >= 0
+    then
       match cache.entries_removals with
       | [] -> assert false
       | _ :: entries_removals -> entries_removals
