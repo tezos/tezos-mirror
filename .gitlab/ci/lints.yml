@@ -14,6 +14,8 @@ misc_checks:
     # Ensure that all unit tests are restricted to their opam package
     # (change 'tezos-test-helpers' to one the most elementary packages of
     # the repo if you add "internal" dependencies to tezos-test-helpers)
+    # check that the hack-module patch applies cleanly
+    - git apply devtools/protocol-print/add-hack-module.patch
     - dune runtest -p tezos-test-helpers ||
       echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
 
