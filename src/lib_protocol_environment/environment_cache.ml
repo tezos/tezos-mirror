@@ -265,7 +265,11 @@ let find t key = lookup_value (cache_of_key t key) key
 
 let compatible_layout t layout =
   with_caches t (fun caches ->
-      List.length layout = FunctionalArray.length caches)
+      List.length layout = FunctionalArray.length caches
+      && List.fold_left_i
+           (fun idx r len -> r && (FunctionalArray.get caches idx).limit = len)
+           true
+           layout)
 
 let from_layout layout = Some (make_caches layout)
 
