@@ -6,10 +6,11 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
-  "re"
-  "lwt"
-  "ezjsonm"
+  "dune" {>= "2.5"}
+  "ocaml" {>= "4.08"}
+  "re" {>= "1.9.0"}
+  "lwt" {>= "5.4.1"}
+  "ezjsonm" {>= "1.2.0"}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
