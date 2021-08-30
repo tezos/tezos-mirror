@@ -251,6 +251,10 @@ Node
    is not explicitly specified, the default value is used. The default
    number of additional cycles to keep is set to 5.
 
+-  Updated the RPC ``chains/main/checkpoint`` by renaming the
+   `save_point` field into `savepoint` to be consistent to the
+   `v0.0.5` store naming.
+
 -  Improved the shutdown procedure for external validator process.
 
 -  Added command ``replay`` which takes a list of block levels, hashes
