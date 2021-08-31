@@ -297,18 +297,6 @@ let future_cache_expectation t ~time_in_blocks =
 let clear t =
   Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
-let list_keys t ~cache_index =
-  let cache = cache_of_index t cache_index in
-  let xs =
-    KeyMap.fold
-      (fun k (_, {size; birth; _}) acc -> (k, size, birth) :: acc)
-      cache.map
-      []
-  in
-  xs
-  |> List.sort (fun (_, _, b1) (_, _, b2) -> Int64.compare b1 b2)
-  |> List.map (fun (k, s, _) -> (k, s))
-
 let rec enforce_size_limit cache =
   if cache.size > cache.limit then
     remove_dean cache
@@ -390,6 +378,18 @@ let update_cache_key t key value meta =
   update_cache_with t key.cache_index cache
 
 let number_of_caches t = with_caches t FunctionalArray.length
+
+let list_keys t ~cache_index =
+  on_cache t cache_index @@ fun cache ->
+  let xs =
+    KeyMap.fold
+      (fun k (_, {size; birth; _}) acc -> (k, size, birth) :: acc)
+      cache.map
+      []
+  in
+  xs
+  |> List.sort (fun (_, _, b1) (_, _, b2) -> Int64.compare b1 b2)
+  |> List.map (fun (k, s, _) -> (k, s))
 
 let key_rank ctxt key =
   let cache = cache_of_key ctxt key in

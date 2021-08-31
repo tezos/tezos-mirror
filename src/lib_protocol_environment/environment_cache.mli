@@ -267,7 +267,7 @@ val number_of_caches : 'value t -> int
 
 (** [list_keys cache ~cache_index] returns the list of keys along with
    their age recorded into the subcache with index [cache_index]. *)
-val list_keys : 'value t -> cache_index:index -> (key * int) list
+val list_keys : 'value t -> cache_index:index -> (key * int) list option
 
 (** [key_rank cache key] returns the rank of the value associated to
    the given [key]. The rank is defined as the number of values older
