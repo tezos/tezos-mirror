@@ -48,7 +48,13 @@ let max_allowed_global_constant_depth = 10_000
    not too exceed 100 000 000 bytes. *)
 let cache_layout = [100_000_000]
 
-let michelson_maximum_type_size = 1000
+(* In previous versions of the protocol, this
+   [michelson_maximum_type_size] limit was set to 1000 but
+   the contract input types (pair <parameter_type> <storage_type>)
+   were not checked. Both components, <parameter_type> and
+   <storage_type> where however checked hence it was possible to build
+   types as big as 2001. *)
+let michelson_maximum_type_size = 2001
 
 type fixed = {
   proof_of_work_nonce_size : int;

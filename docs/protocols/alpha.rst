@@ -162,3 +162,5 @@ Minor Changes
 
 - Reimplemented ``Logging``.  It now has Lwt-less APIs and the messages are handled
   by the shell. (MR :gl:`!3225`)
+
+- The size limit on Michelson types has been roughly doubled (from 1000 to 2001). (MR :gl:`!3434`)
