@@ -142,7 +142,7 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 009 Florence doc:
+   :caption: 010 Granada Protocol doc:
 
    active/michelson
    active/proof_of_stake
@@ -152,20 +152,7 @@ in the :ref:`introduction <howtoget>`.
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 010 Granada Protocol doc:
-
-   010/michelson
-   010/proof_of_stake
-   010/consensus
-   010/sapling
-   010/voting
-   010/glossary
-   010/cli-commands
-   010/rpc
-   010/liquidity_baking
+   active/liquidity_baking
 
 .. toctree::
    :maxdepth: 2

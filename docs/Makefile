@@ -11,13 +11,11 @@ DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 GRANADA_LONG = PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-ACTIVE_LONG = $(FLORENCE_LONG)
+ACTIVE_LONG = $(GRANADA_LONG)
 
 ALPHA_SHORT    = alpha
 GRANADA_SHORT = 010-PtGRANAD
-FLORENCE_SHORT = 009-PsFLoren
-ACTIVE_SHORT = $(FLORENCE_SHORT)
+ACTIVE_SHORT = $(GRANADA_SHORT)
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -38,7 +36,7 @@ manuals: main
 	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker.html
 	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser.html
 	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser.html
-    # active (Florence) protocol
+    # active (granada) protocol
 	@../tezos-client -protocol $(ACTIVE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-client.html
 	@../tezos-baker-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-baker.html
 	@../tezos-endorser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-endorser.html
@@ -69,9 +67,11 @@ linkcheck:
 redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
 
+# xrefs should be checked:
+# - on the active protocol using its numeric name (not the "active" symlink)
+# - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) active
-	$(CHECKXREFS) -l 010
+	$(CHECKXREFS) 010
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -101,7 +101,6 @@ $(DOCGENDIR)/rpc_doc.exe:
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index 010 > 010/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json

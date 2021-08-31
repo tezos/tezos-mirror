@@ -7,7 +7,6 @@
             tezos-rpc-http-server
             tezos-protocol-updater
             ; TODO nomadic-labs/tezos#462: adapt next line(s)
-            tezos-embedded-protocol-009-PsFLoren
             tezos-embedded-protocol-010-PtGRANAD
             tezos-embedded-protocol-alpha
             data-encoding

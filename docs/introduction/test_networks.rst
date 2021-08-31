@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Florence for FLorencenet), the protocol
+network is activated (such as Granada for granadanet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -47,22 +47,6 @@ On Granadanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
-Florencenet
-===========
-
-- Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
-
-  * Available in version 9.0
-
-- Run Docker image: ``wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Florencenet is a test network running the ``PsFLoren`` protocol.
-Florencenet will run until Florence is replaced by another protocol on Mainnet.
-
-On Florencenet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
-
 Future Networks
 ===============
 
@@ -75,6 +59,13 @@ P is activated, the previous test network will end and P-net will continue on it
 
 Old Networks
 ============
+
+Florencenet
+-----------
+
+Florencenet was a test network running the Florence protocol.
+Following the activation of the Granada protocol replacing Florence on Mainnet,
+Florencenet stopped being maintained on August 6, 2021.
 
 Edo2net
 -------

@@ -305,12 +305,12 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Florencenet, to know if you baked, just run::
+Assuming you run on Granadanet, to know if you baked, just run::
 
-    ./florencenet.sh baker log
-    ./florencenet.sh endorser log
+    ./granadanet.sh baker log
+    ./granadanet.sh endorser log
 
-(replace ``florencenet.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``granadanet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

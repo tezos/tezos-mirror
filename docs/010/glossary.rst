@@ -128,6 +128,7 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+.. _glossary_michelson:
 .. _glossary_michelson_010:
 
 Michelson

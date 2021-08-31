@@ -303,7 +303,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
-.. _michelson_type_system:
+.. _michelson_type_system_alpha:
 
 Introduction to the type system and notations
 ---------------------------------------------

@@ -6,8 +6,8 @@ cd
 apt-get update
 apt-get install -y docker.io docker-compose kmod wget
 dockerd &
-# [get florencenet]
-wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-chmod +x florencenet.sh
-# [start florencenet]
-./florencenet.sh start
+# [get granadanet]
+wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
+chmod +x granadanet.sh
+# [start granadanet]
+./granadanet.sh start
