@@ -11,7 +11,9 @@ set -e
 
 if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
   git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-  FILES=$(git diff-tree --no-commit-id --name-only -r origin/"$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"..HEAD)
+  git fetch origin --depth 50 "$CI_MERGE_REQUEST_REF_PATH"
+
+  FILES=$(git diff-tree --no-commit-id --name-only -r "$CI_MERGE_REQUEST_DIFF_BASE_SHA"..HEAD)
 
   echo Files changed:
   echo "$FILES"
