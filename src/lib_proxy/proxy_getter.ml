@@ -30,13 +30,18 @@ module Events = struct
 
   let section = ["proxy_getter"]
 
+  let pp_key =
+    let pp_sep fmt () = Format.fprintf fmt "/" in
+    Format.pp_print_list ~pp_sep Format.pp_print_string
+
   let cache_hit =
     declare_1
       ~section
       ~name:"cache_hit"
       ~msg:"Cache hit: ({key})"
       ~level:Debug
-      ("key", Data_encoding.string)
+      ~pp1:pp_key
+      ("key", Data_encoding.(list string))
 
   let cache_miss =
     declare_1
@@ -44,7 +49,8 @@ module Events = struct
       ~name:"cache_miss"
       ~msg:"Cache miss: ({key})"
       ~level:Debug
-      ("key", Data_encoding.string)
+      ~pp1:pp_key
+      ("key", Data_encoding.(list string))
 
   let split_key_triggers =
     declare_2
@@ -52,8 +58,10 @@ module Events = struct
       ~level:Debug
       ~name:"split_key_triggers"
       ~msg:"split_key heuristic triggers, getting {parent} instead of {leaf}"
-      ("parent", Data_encoding.string)
-      ("leaf", Data_encoding.string)
+      ~pp1:pp_key
+      ~pp2:pp_key
+      ("parent", Data_encoding.(list string))
+      ("leaf", Data_encoding.(list string))
 end
 
 let rec raw_context_size = function
@@ -177,8 +185,6 @@ end
 module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let requests = ref RequestsTree.empty
 
-  let pp_key k = String.concat ";" k
-
   let is_all k =
     match RequestsTree.find_opt !requests k with Some All -> true | _ -> false
 
@@ -215,8 +221,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
     if split && is_all key_to_get then return_unit
     else
       (if split then
-       Events.(
-         emit split_key_triggers (pp_key key_to_get, pp_key requested_key))
+       Events.(emit split_key_triggers (key_to_get, requested_key))
       else Lwt.return_unit)
       >>= fun () ->
       C.do_rpc pgi key_to_get >>= function
@@ -239,18 +244,17 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.key ->
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
-    let pped_key = pp_key key in
     (if is_all key then
      (* This exact request was done already.
         So data was obtained already. Note that this does not imply
         that this function will return [Some] (maybe the node doesn't
         map this key). *)
-     Events.(emit cache_hit pped_key) >>= fun () -> return_unit
+     Events.(emit cache_hit key) >>= fun () -> return_unit
     else
       (* This exact request was NOT done already (either a longer request
          was done or no related request was done at all).
          An RPC MUST be done. *)
-      Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key)
+      Events.(emit cache_miss key) >>= fun () -> do_rpc pgi kind key)
     >>=? fun () -> C.get key >>= return
 
   let proxy_get pgi key = generic_call Get pgi key
