@@ -293,7 +293,7 @@ Note that these parameters are part of the larger set of :ref:`protocol constant
      - 40 seconds
    * - :math:`de`
      - ``DELAY_PER_MISSING_ENDORSEMENT``
-     - 8 seconds
+     - 4 seconds
    * - :math:`ie`
      - ``INITIAL_ENDORSERS``
      - 192
