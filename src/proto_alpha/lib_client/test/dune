@@ -1,12 +1,13 @@
 (tests
- (names test_michelson_v1_macros test_client_proto_contracts test_client_proto_context)
+ (names test_michelson_v1_macros test_client_proto_contracts test_client_proto_context test_proxy)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-alpha
             tezos-client-alpha
             tezos-base-test-helpers
             tezos-test-helpers
-            alcotest-lwt)
+            alcotest-lwt
+            qcheck-alcotest)
  (package tezos-client-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
