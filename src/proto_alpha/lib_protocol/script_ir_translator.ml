@@ -4916,7 +4916,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           apply =
             (fun kinfo k ->
               ICreate_contract
-                {kinfo; storage_type; arg_type; lambda; root_name; k});
+                {kinfo; storage_type; arg_type; lambda; views; root_name; k});
         }
       in
       let stack =
@@ -6179,6 +6179,8 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
+   Refactor the sharing part of unparse_script and create_contract *)
 let unparse_script ctxt mode
     {code; arg_type; storage; storage_type; root_name; views; _} =
   let (Lam (_, original_code)) = code in

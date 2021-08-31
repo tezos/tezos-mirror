@@ -765,6 +765,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       storage_type : 'a ty;
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
+      views : view SMap.t;
       root_name : field_annot option;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
