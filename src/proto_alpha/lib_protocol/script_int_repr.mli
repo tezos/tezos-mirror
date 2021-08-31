@@ -40,6 +40,15 @@ type z = Integer_tag
 (** Natural zero. *)
 val zero_n : n num
 
+(** Natural one. *)
+val one_n : n num
+
+(** Natural successor.
+
+    [succ_n x] is the same as [add_n one_n].
+ *)
+val succ_n : n num -> n num
+
 (** Relative zero. *)
 val zero : z num
 

@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -21,11 +20,25 @@
 (* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
 (* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
 (* DEALINGS IN THE SOFTWARE.                                                 *)
-(*                                                                           *)
-(*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
+(** Update a big map. See [Script_typed_ir.big_map_get_and_update] for details. *)
+val update :
+  'key ->
+  'value option ->
+  ('key, 'value) Protocol.Script_typed_ir.big_map ->
+  Protocol.Alpha_context.t ->
+  (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
+  Protocol.Environment.Error_monad.tzresult
+  Lwt.t
 
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+(** Convert a list to a [Script_big_map]. If the list contains duplicate keys,
+    the first occurence is used.
+  *)
+val of_list :
+  'key Protocol.Script_typed_ir.comparable_ty ->
+  'value Protocol.Script_typed_ir.ty ->
+  ('key * 'value) list ->
+  Protocol.Alpha_context.t ->
+  (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
+  Protocol.Environment.Error_monad.tzresult
+  Lwt.t

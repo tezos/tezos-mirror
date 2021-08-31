@@ -35,6 +35,8 @@ let zero = Z.zero
 
 let zero_n = Z.zero
 
+let one_n = Z.one
+
 let to_string x = Z.to_string x
 
 let of_string s = Option.catch (fun () -> Z.of_string s)
@@ -62,6 +64,8 @@ let mul x y = Z.mul x y
 let ediv x y = Option.catch (fun () -> Z.ediv_rem x y)
 
 let add_n = add
+
+let succ_n = Z.succ
 
 let mul_n = mul
 

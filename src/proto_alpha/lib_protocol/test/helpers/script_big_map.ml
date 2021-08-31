@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -21,11 +20,11 @@
 (* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
 (* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
 (* DEALINGS IN THE SOFTWARE.                                                 *)
-(*                                                                           *)
-(*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
+let update k v m ctxt = Protocol.Script_ir_translator.big_map_update ctxt k v m
 
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+let of_list key_ty ty xs ctxt =
+  List.fold_left_es
+    (fun (bm, ctxt) (k, v) -> update k (Some v) bm ctxt)
+    (Protocol.Script_ir_translator.empty_big_map key_ty ty, ctxt)
+    xs

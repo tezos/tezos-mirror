@@ -24,8 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
-
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+let of_list ty1 xs =
+  List.fold_left
+    (fun rs k -> Protocol.Script_set.update k true rs)
+    (Protocol.Script_set.empty ty1)
+    xs

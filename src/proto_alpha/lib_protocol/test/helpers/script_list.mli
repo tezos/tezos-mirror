@@ -24,8 +24,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
-
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+(** Convert a standard list to a Script IR list. *)
+val of_list : 'a list -> 'a Protocol.Script_typed_ir.boxed_list

@@ -24,8 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
-
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+(** Convert a list to a Script IR set. If the list contains duplicates,
+    the last occurence is used. *)
+val of_list :
+  'a Protocol.Script_typed_ir.comparable_ty ->
+  'a list ->
+  'a Protocol.Script_typed_ir.set

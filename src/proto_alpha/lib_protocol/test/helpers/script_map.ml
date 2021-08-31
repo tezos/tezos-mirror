@@ -24,8 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
-
-(** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+let of_list :
+    type k v.
+    k Protocol.Script_typed_ir.comparable_ty ->
+    (k * v) list ->
+    (k, v) Protocol.Script_typed_ir.map =
+ fun ty1 xs ->
+  List.fold_left
+    (fun rs (k, v) -> Protocol.Script_map.update k (Some v) rs)
+    (Protocol.Script_map.empty ty1)
+    xs
