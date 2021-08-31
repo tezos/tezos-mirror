@@ -95,3 +95,7 @@ let entries ctxt =
 
 let contract_rank ctxt addr =
   Cache.identifier_rank ctxt (identifier_of_contract addr)
+
+let size = Cache.size
+
+let size_limit = Cache.size_limit

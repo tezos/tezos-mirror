@@ -308,6 +308,24 @@ let commands network () =
         | Some rank -> cctxt#message "%d" rank >>= fun () -> return_unit);
     command
       ~group
+      ~desc:"Get cache contract size."
+      no_options
+      (prefixes ["get"; "cache"; "contract"; "size"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        contract_cache_size cctxt ~chain:cctxt#chain ~block:cctxt#block
+        >>=? fun t ->
+        cctxt#message "%d" t >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get cache contract size limit."
+      no_options
+      (prefixes ["get"; "cache"; "contract"; "size"; "limit"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        contract_cache_size_limit cctxt ~chain:cctxt#chain ~block:cctxt#block
+        >>=? fun t ->
+        cctxt#message "%d" t >>= fun () -> return_unit);
+    command
+      ~group
       ~desc:"Get the balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]

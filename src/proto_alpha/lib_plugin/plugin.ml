@@ -1461,7 +1461,7 @@ module RPC = struct
                          root_name;
                          code_size;
                        },
-                     _ ) ->
+                     ctxt ) ->
           Script_ir_translator.parse_data
             ~legacy
             ~allow_forged:true

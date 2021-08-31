@@ -984,6 +984,12 @@ module Cache = struct
 
   let key_rank c key = Context.Cache.key_rank (context c) key
 
+  let cache_size_limit c ~cache_index =
+    Context.Cache.cache_size_limit (context c) ~cache_index
+
+  let cache_size c ~cache_index =
+    Context.Cache.cache_size (context c) ~cache_index
+
   let future_cache_expectation c ~time_in_blocks =
     Context.Cache.future_cache_expectation (context c) ~time_in_blocks
     |> update_context c

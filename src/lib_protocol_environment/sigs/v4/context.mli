@@ -297,6 +297,16 @@ module type CACHE = sig
       multipled by `n_blocks` to determine the entries that are
       likely to be removed in `n_blocks`. *)
   val future_cache_expectation : t -> time_in_blocks:int -> t
+
+  (** [cache_size ctxt ~cache_index] returns an overapproximation of
+      the size of the cache. Returns [None] if [cache_index] is not a
+      valid cache index. *)
+  val cache_size : t -> cache_index:index -> size option
+
+  (** [cache_size_limit ctxt ~cache_index] returns the maximal size of
+      the cache indexed by [cache_index]. Returns [None] if
+      [cache_index] is not a valid cache index. *)
+  val cache_size_limit : t -> cache_index:index -> size option
 end
 
 module Cache :

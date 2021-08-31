@@ -468,6 +468,10 @@ module Cache = struct
     val list_identifiers : t -> (identifier * int) list
 
     val identifier_rank : t -> identifier -> int option
+
+    val size : context -> size
+
+    val size_limit : context -> size
   end
 
   let register_exn (type cvalue)
@@ -526,5 +530,13 @@ module Cache = struct
               list
 
       let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
+
+      let size ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size ctxt ~cache_index:C.cache_index
+
+      let size_limit ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
     end)
 end

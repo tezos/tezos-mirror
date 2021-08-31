@@ -341,11 +341,23 @@ val cached_contracts :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  (Contract.t * int) trace Environment.Error_monad.shell_tzresult Lwt.t
+  (Contract.t * int) list tzresult Lwt.t
 
 val contract_rank :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  int option Environment.Error_monad.shell_tzresult Lwt.t
+  int option tzresult Lwt.t
+
+val contract_cache_size :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  int tzresult Lwt.t
+
+val contract_cache_size_limit :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  int tzresult Lwt.t

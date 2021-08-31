@@ -453,6 +453,12 @@ module Context = struct
       else Lwt.return (Environment_cache.from_layout layout)
 
     let key_rank (Context ctxt) key = Environment_cache.key_rank ctxt.cache key
+
+    let cache_size (Context ctxt) ~cache_index =
+      Environment_cache.cache_size ctxt.cache ~cache_index
+
+    let cache_size_limit (Context ctxt) ~cache_index =
+      Environment_cache.cache_size_limit ctxt.cache ~cache_index
   end
 
   let load_cache (Context ctxt) mode builder =

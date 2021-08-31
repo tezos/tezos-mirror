@@ -261,6 +261,16 @@ val sync : 'value t -> cache_nonce:Bytes.t -> 'value t * domain
    cache. *)
 val number_of_caches : 'value t -> int
 
+(** [cache_size cache ~cache_index] returns an overapproximation of
+    the size of the cache. Returns [None] if [cache_index] is
+    an invalid index. *)
+val cache_size : 'value t -> cache_index:int -> size option
+
+(** [cache_size_limit cache ~cache_index] returns the maximal size of
+    the cache indexed by [cache_index]. Returns [None] if
+    [cache_index] is an invalid index. *)
+val cache_size_limit : 'value t -> cache_index:int -> size option
+
 (** [list_keys cache ~cache_index] returns the list of keys along with
    their age recorded into the subcache with index [cache_index]. *)
 val list_keys : 'value t -> cache_index:index -> (key * int) list option

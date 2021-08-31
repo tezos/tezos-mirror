@@ -373,6 +373,17 @@ let update_cache_key t key value meta =
 
 let number_of_caches t = with_caches t FunctionalArray.length
 
+let on_cache t cache_index f =
+  if cache_index < number_of_caches t && cache_index >= 0 then
+    Some (f (cache_of_index t cache_index))
+  else None
+
+let cache_size t ~cache_index =
+  on_cache t cache_index @@ fun cache -> cache.size
+
+let cache_size_limit t ~cache_index =
+  on_cache t cache_index @@ fun cache -> cache.limit
+
 let list_keys t ~cache_index =
   on_cache t cache_index @@ fun cache ->
   let xs =
