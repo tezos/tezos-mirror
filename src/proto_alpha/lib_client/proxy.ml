@@ -49,39 +49,18 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
   let split_server key =
     match key with
     (* matches paths like:
-       big_maps/index/05/37/bc/fb/1e/39/i/contents/tail *)
-    | "big_maps"
-      :: "index"
-         :: hash0
-            :: hash1
-               :: hash2 :: hash3 :: hash4 :: hash5 :: i :: "contents" :: tail ->
-        Some
-          ( [
-              "big_maps";
-              "index";
-              hash0;
-              hash1;
-              hash2;
-              hash3;
-              hash4;
-              hash5;
-              i;
-              "contents";
-            ],
-            tail )
+       big_maps/index/i/contents/tail *)
+    | "big_maps" :: "index" :: i :: "contents" :: tail ->
+        Some (["big_maps"; "index"; i; "contents"], tail)
     | _ -> None
 
   (** Split that is always done, no matter the mode *)
   let split_always key =
     match key with
     (* matches paths like:
-       contracts/index/05/37/bc/fb/1e/39/000002298c03ed7d454a101eb7022bc95f7e5f41ac78/tail *)
-    | "contracts"
-      :: index
-         :: hash0 :: hash1 :: hash2 :: hash3 :: hash4 :: hash5 :: id :: tail ->
-        Some
-          ( ["contracts"; index; hash0; hash1; hash2; hash3; hash4; hash5; id],
-            tail )
+       contracts/index/000002298c03ed7d454a101eb7022bc95f7e5f41ac78/tail *)
+    | "contracts" :: "index" :: i :: tail ->
+        Some (["contracts"; "index"; i], tail)
     | "cycle" :: i :: tail -> Some (["cycle"; i], tail)
     (* matches paths like:
        rolls/owner/snapshot/19/1/tail *)
