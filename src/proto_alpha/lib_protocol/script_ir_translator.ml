@@ -1912,7 +1912,7 @@ type ('arg, 'storage) code = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
 }
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
@@ -4351,8 +4351,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t
-        ( Timestamp_t {annot = tn1; _},
-          Item_t (Timestamp_t {annot = tn2; _}, rest, _),
+        ( Timestamp_t {annot = tn1; size = _},
+          Item_t (Timestamp_t {annot = tn2; size = _}, rest, _),
           _ ) ) ->
       parse_var_annot loc annot >>?= fun annot ->
       merge_type_annot ~legacy tn1 tn2 >>?= fun tname ->
@@ -5690,7 +5690,6 @@ let parse_code :
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  let code_size = Script_typed_ir_size.node_size (Micheline.root code) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in
@@ -5746,14 +5745,21 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  let view_size view =
-    Script_repr.(
-      node_size view.view_code + node_size view.input_ty
-      + node_size view.output_ty)
-  in
-  let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
-  let code_size = code_size + views_size in
-  (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
+  Saturation_repr.(
+    let view_size view =
+      Script_typed_ir_size.(
+        add
+          (add (node_size view.view_code) (node_size view.input_ty))
+          (node_size view.output_ty))
+    in
+    let views_size =
+      SMap.fold (fun _ v s -> add (view_size v) s) views (safe_int 0)
+    in
+    (* The size of the storage_type and the arg_type is counted by
+       [lambda_size]. *)
+    let ir_size = Script_typed_ir_size.lambda_size code in
+    let code_size = add views_size ir_size in
+    (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -6740,3 +6746,44 @@ let[@coq_axiom_with_reason "gadt"] get_single_sapling_state ctxt ty x =
   match id with
   | Fold_lazy_storage.Ok (Some id) -> ok (Some id, ctxt)
   | Fold_lazy_storage.Ok None | Fold_lazy_storage.Error -> ok (None, ctxt)
+
+(*
+
+   {!Script_cache} needs a measure of the script size in memory.
+   Determining this size is not easy in OCaml because of sharing.
+
+   Indeed, many values present in the script share the same memory
+   area. This is especially true for types and stack types: they are
+   heavily shared in every typed IR internal representation. As a
+   consequence, computing the size of the typed IR without taking
+   sharing into account leads to a size which is sometimes two order
+   of magnitude bigger than the actual size.
+
+   We could track down this sharing. Unfortunately, sharing is not
+   part of OCaml semantics: for this reason, a compiler can optimize
+   memory representation by adding more sharing.  If two nodes use
+   different optimization flags or compilers, such a precise
+   computation of the memory footprint of scripts would lead to two
+   distinct sizes. As these sizes occur in the blockchain context,
+   this situation would lead to a fork.
+
+   For this reason, we introduce a *size model* for the script size.
+   This model provides an overapproximation of the actual size in
+   memory. The risk is to be too far from the actual size: the cache
+   would then be wrongly marked as full. This situation would make the
+   cache less useful but should present no security risk .
+
+*)
+let script_size
+    (Ex_script
+      {
+        code_size;
+        code = _;
+        arg_type = _;
+        storage;
+        storage_type;
+        root_name = _;
+        views = _;
+      }) =
+  let storage_size = Script_typed_ir_size.value_size storage_type storage in
+  Saturation_repr.(add code_size storage_size |> to_int)

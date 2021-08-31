@@ -1,9 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining 'a   *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
 (* to deal in the Software without restriction, including without limitation *)
 (* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
@@ -23,49 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**
-  See [Lazy_storage_kind] for an introduction on lazy storage.
+(** This module provides overapproximation of memory footprint for
+   Michelson-related values.
 
-  This module defines operations on lazy storage types and diffs.
+   These overapproximations are used by the cache to evaluate its own
+   memory footprint and enforce declared limit over its size.
+
 *)
 
-type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
+(** [value_size ty v] returns an overapproximation of the size of the
+   in-memory representation of [v] of type [ty]. *)
+val value_size : 'a Script_typed_ir.ty -> 'a -> Cache_memory_helpers.sint
 
-type ('id, 'alloc, 'updates) diff =
-  | Remove
-  | Update of {init : ('id, 'alloc) init; updates : 'updates}
+(** [ty_size ty] returns an overapproximation of the size of the
+   in-memory representation of type [ty]. *)
+val ty_size : 'a Script_typed_ir.ty -> Cache_memory_helpers.sint
 
-(* Exposing this type is needed only for legacy big map diff. *)
-type diffs_item = private
-  | Item :
-      ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff
-      -> diffs_item
+(** [comparable_ty_size cty] returns an overapproximation of the size
+   of the in-memory representation of comparable type [cty]. *)
+val comparable_ty_size :
+  'a Script_typed_ir.comparable_ty -> Cache_memory_helpers.sint
 
-val make :
-  ('i, 'a, 'u) Lazy_storage_kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
+(** [lambda_size l] returns an overapproximation of the size of the
+    internal IR for the Michelson lambda abstraction [l]. *)
+val lambda_size : ('a, 'b) Script_typed_ir.lambda -> Cache_memory_helpers.sint
 
-type diffs = diffs_item list
+(** [kinstr_size i] returns an overapproximation of the size of the
+    internal IR [i]. *)
+val kinstr_size :
+  ('a, 's, 'r, 'f) Script_typed_ir.kinstr -> Cache_memory_helpers.sint
 
-val diffs_in_memory_size : diffs -> Cache_memory_helpers.sint
-
-val encoding : diffs Data_encoding.t
-
-(**
-  The returned [Z.t] is the size added by the application of the diffs.
-*)
-val apply : Raw_context.t -> diffs -> (Raw_context.t * Z.t) tzresult Lwt.t
-
-val fresh :
-  ('id, _, _) Lazy_storage_kind.t ->
-  temporary:bool ->
-  Raw_context.t ->
-  (Raw_context.t * 'id) tzresult Lwt.t
-
-(**
-  Initializes the storage for all lazy storage kind. 
-  This is useful for genesis only.
-  Protocol updates need to initialize new lazy storage kinds.
-*)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-val cleanup_temporaries : Raw_context.t -> Raw_context.t Lwt.t
+(** [node_size root] returns the size of the in-memory representation
+   of [root] in bytes. This is an over-approximation of the memory
+   actually consumed by [root] since no sharing is taken into
+   account. *)
+val node_size : Script_repr.node -> Cache_memory_helpers.sint

@@ -57,7 +57,7 @@ type ('arg, 'storage) code = {
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
   root_name : Script_typed_ir.field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
          code. This includes the code of the contract as well as the code
@@ -104,6 +104,9 @@ type ('a, 's) judgement =
       descr : 'b 'u. ('b, 'u) Script_typed_ir.stack_ty -> ('a, 's, 'b, 'u) descr;
     }
       -> ('a, 's) judgement
+
+val close_descr :
+  ('a, 'b, 'c, 'd) descr -> ('a, 'b, 'c, 'd) Script_typed_ir.kdescr
 
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
@@ -469,3 +472,7 @@ val get_single_sapling_state :
   'a Script_typed_ir.ty ->
   'a ->
   (Sapling.Id.t option * context) tzresult
+
+(** [script_size script] returns an overapproximation of the size of
+    the in-memory representation of [script]. *)
+val script_size : ex_script -> int

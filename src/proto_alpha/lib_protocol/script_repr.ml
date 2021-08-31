@@ -295,26 +295,10 @@ and[@coq_mutual_as_notation] [@coq_struct "subterms"] micheline_fold_nodes
       micheline_fold_nodes nodes f acc @@ fun acc ->
       micheline_fold_aux node f acc k
 
-let micheline_fold node init f = micheline_fold_aux node f init (fun x -> x)
+let fold node init f = micheline_fold_aux node f init (fun x -> x)
 
-let micheline_nodes node = micheline_fold node 0 @@ fun n _ -> n + 1
+let micheline_nodes node = fold node 0 @@ fun n _ -> n + 1
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in
   cost_micheline_strip_locations nodes
-
-let node_size =
-  let open Micheline in
-  let location_size = 8
-  and word_size = 8
-  and prim_size = 8
-  and annotation_size a = List.fold_left (fun n s -> n + String.length s) 0 a in
-  let internal_node_size = function
-    | Int (_, z) -> location_size + (Z.size z * word_size)
-    | String (_, s) -> String.length s
-    | Bytes (_, s) -> Bytes.length s
-    | Prim (_, _, _, a) -> location_size + prim_size + annotation_size a
-    | Seq (_, _) -> location_size
-  in
-  fun node ->
-    micheline_fold node 0 @@ fun size node -> size + internal_node_size node

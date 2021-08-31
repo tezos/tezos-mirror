@@ -54,6 +54,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
+   cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -97,6 +98,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_typed_ir_size.mli script_typed_ir_size.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -154,6 +156,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
+   cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -197,6 +200,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_typed_ir_size.mli script_typed_ir_size.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -254,6 +258,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
+   cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -297,6 +302,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_typed_ir_size.mli script_typed_ir_size.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -376,6 +382,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_timestamp_repr
    Michelson_v1_primitives
    Script_repr
+   Cache_memory_helpers
    Contract_repr
    Roll_repr
    Vote_repr
@@ -419,6 +426,7 @@ include Tezos_raw_protocol_alpha.Main
    Alpha_context
    Script_tc_errors
    Script_typed_ir
+   Script_typed_ir_size
    Michelson_v1_gas
    Script_ir_annot
    Script_list
@@ -515,6 +523,7 @@ include Tezos_raw_protocol_alpha.Main
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
+   cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -558,6 +567,7 @@ include Tezos_raw_protocol_alpha.Main
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_typed_ir_size.mli script_typed_ir_size.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml

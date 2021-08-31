@@ -29,11 +29,11 @@ open Script_int
 
 (* Preliminary definitions. *)
 
-type var_annot = Var_annot of string
+type var_annot = Var_annot of string [@@ocaml.unboxed]
 
-type type_annot = Type_annot of string
+type type_annot = Type_annot of string [@@ocaml.unboxed]
 
-type field_annot = Field_annot of string
+type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 type never = |
 
@@ -232,7 +232,7 @@ type ('arg, 'storage) script = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
 }
 
 (* ---- Instructions --------------------------------------------------------*)
@@ -1526,3 +1526,54 @@ val ticket_t :
 val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
 
 val chest_t : annot:type_annot option -> Timelock.chest ty
+
+(**
+
+   The following functions named `X_traverse` for X in { kinstr, ty,
+   comparable_ty, value } provide tail recursive top down traversals
+   over the values of these types.
+
+   The traversal goes through a value and rewrites an accumulator
+   along the way starting from some [init]ial value for the
+   accumulator.
+
+   All these traversals follow the same recursion scheme: the
+   user-provided function is first called on the toplevel value, then
+   the traversal recurses on the direct subvalues of the same type.
+
+   Hence, the user-provided function must only compute the
+   contribution of the value on the accumulator minus the contribution
+   of its subvalues of the same type.
+
+*)
+type 'a kinstr_traverse = {
+  apply : 'b 'u 'r 'f. 'a -> ('b, 'u, 'r, 'f) kinstr -> 'a;
+}
+
+val kinstr_traverse :
+  ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
+
+type 'a ty_traverse = {
+  apply : 't. 'a -> 't ty -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
+}
+
+val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
+
+val ty_traverse : 'a ty -> 'r -> 'r ty_traverse -> 'r
+
+type 'accu stack_ty_traverse = {
+  apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;
+}
+
+val stack_ty_traverse : ('a, 's) stack_ty -> 'r -> 'r stack_ty_traverse -> 'r
+
+type 'a value_traverse = {
+  apply : 't. 'a -> 't ty -> 't -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
+}
+
+val value_traverse :
+  ('t ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
+
+val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty

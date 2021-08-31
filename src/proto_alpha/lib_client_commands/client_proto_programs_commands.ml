@@ -160,6 +160,30 @@ let commands () =
            | Ok v -> return (Some s, v)
            | Error _ -> return (None, s)))
   in
+  let handle_parsing_error label (cctxt : Protocol_client_context.full)
+      (emacs_mode, no_print_source) program body =
+    match program with
+    | (program, []) -> body program
+    | res_with_errors when emacs_mode ->
+        cctxt#message
+          "(@[<v 0>(%s . ())@ (errors . %a)@])"
+          label
+          Michelson_v1_emacs.report_errors
+          res_with_errors
+        >>= fun () -> return_unit
+    | (parsed, errors) ->
+        cctxt#message
+          "%a"
+          (fun ppf () ->
+            Michelson_v1_error_reporter.report_errors
+              ~details:(not no_print_source)
+              ~parsed
+              ~show_source:(not no_print_source)
+              ppf
+              errors)
+          ()
+        >>= fun () -> cctxt#error "syntax error in program"
+  in
   [
     command
       ~group
@@ -268,6 +292,37 @@ let commands () =
           >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
+      ~desc:"Ask the node to compute the size of a script."
+      (args4
+         emacs_mode_switch
+         no_print_source_flag
+         run_gas_limit_arg
+         legacy_switch)
+      (prefixes ["compute"; "size"; "for"; "script"]
+      @@ Program.source_param
+      @@ prefixes ["on"; "storage"]
+      @@ param ~name:"storage" ~desc:"the storage data" data_parameter
+      @@ stop)
+      (fun (emacs_mode, no_print_source, original_gas, legacy)
+           program
+           storage
+           cctxt ->
+        let setup = (emacs_mode, no_print_source) in
+        resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
+        handle_parsing_error "size" cctxt setup program @@ fun program ->
+        script_size
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~gas:original_gas
+          ~legacy
+          ~program
+          ~storage
+          ()
+        >>=? fun code_size ->
+        cctxt#message "%d" code_size >>= fun _ -> return ());
+    command
+      ~group
       ~desc:"Ask the node to typecheck a script."
       (args5
          show_types_switch
@@ -279,43 +334,24 @@ let commands () =
       (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
            program
            cctxt ->
-        match program with
-        | (program, []) ->
-            resolve_max_gas cctxt cctxt#block original_gas
-            >>=? fun original_gas ->
-            typecheck_program
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~gas:original_gas
-              ~legacy
-              program
-            >>= fun res ->
-            print_typecheck_result
-              ~emacs:emacs_mode
-              ~show_types
-              ~print_source_on_error:(not no_print_source)
-              program
-              res
-              cctxt
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(types . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
+        let setup = (emacs_mode, no_print_source) in
+        handle_parsing_error "types" cctxt setup program @@ fun program ->
+        resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
+        typecheck_program
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~gas:original_gas
+          ~legacy
+          program
+        >>= fun res ->
+        print_typecheck_result
+          ~emacs:emacs_mode
+          ~show_types
+          ~print_source_on_error:(not no_print_source)
+          program
+          res
+          cctxt);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -645,76 +681,38 @@ let commands () =
       @@ string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
       @@ Program.source_param @@ stop)
-      (fun (emacs_mode, no_print_source) entrypoint program cctxt ->
-        match program with
-        | (program, []) ->
-            entrypoint_type
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
-              ~entrypoint
-            >>= fun entrypoint_type ->
-            print_entrypoint_type
-              ~emacs:emacs_mode
-              ~show_source:(not no_print_source)
-              ~parsed:program
-              ~entrypoint
-              cctxt
-              entrypoint_type
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(entrypoint . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
+      (fun ((emacs_mode, no_print_source) as setup) entrypoint program cctxt ->
+        handle_parsing_error "entrypoint" cctxt setup program @@ fun program ->
+        entrypoint_type
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          program
+          ~entrypoint
+        >>= fun entrypoint_type ->
+        print_entrypoint_type
+          ~emacs:emacs_mode
+          ~show_source:(not no_print_source)
+          ~parsed:program
+          ~entrypoint
+          cctxt
+          entrypoint_type);
     command
       ~group
       ~desc:"Ask the node to list the entrypoints of a script."
       (args2 emacs_mode_switch no_print_source_flag)
       (prefixes ["get"; "script"; "entrypoints"; "for"]
       @@ Program.source_param @@ stop)
-      (fun (emacs_mode, no_print_source) program cctxt ->
-        match program with
-        | (program, []) ->
-            list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
-            >>= fun entrypoints ->
-            print_entrypoints_list
-              ~emacs:emacs_mode
-              ~show_source:(not no_print_source)
-              ~parsed:program
-              cctxt
-              entrypoints
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(entrypoints . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
+      (fun ((emacs_mode, no_print_source) as setup) program cctxt ->
+        handle_parsing_error "entrypoints" cctxt setup program @@ fun program ->
+        list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
+        >>= fun entrypoints ->
+        print_entrypoints_list
+          ~emacs:emacs_mode
+          ~show_source:(not no_print_source)
+          ~parsed:program
+          cctxt
+          entrypoints);
     command
       ~group
       ~desc:
@@ -723,39 +721,16 @@ let commands () =
       (args2 emacs_mode_switch no_print_source_flag)
       (prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
       @@ Program.source_param @@ stop)
-      (fun (emacs_mode, no_print_source) program cctxt ->
-        match program with
-        | (program, []) ->
-            list_unreachables
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
-            >>= fun entrypoints ->
-            print_unreachables
-              ~emacs:emacs_mode
-              ~show_source:(not no_print_source)
-              ~parsed:program
-              cctxt
-              entrypoints
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(entrypoints . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
+      (fun ((emacs_mode, no_print_source) as setup) program cctxt ->
+        handle_parsing_error "entrypoints" cctxt setup program @@ fun program ->
+        list_unreachables cctxt ~chain:cctxt#chain ~block:cctxt#block program
+        >>= fun entrypoints ->
+        print_unreachables
+          ~emacs:emacs_mode
+          ~show_source:(not no_print_source)
+          ~parsed:program
+          cctxt
+          entrypoints);
     command
       ~group
       ~desc:"Ask the node to expand the Michelson macros in a script."

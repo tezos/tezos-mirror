@@ -712,6 +712,19 @@ module RPC = struct
                (req "gas" Gas.encoding))
           RPC_path.(path / "typecheck_code")
 
+      let script_size =
+        RPC_service.post_service
+          ~description:"Compute the size of a script in the current context"
+          ~query:RPC_query.empty
+          ~input:
+            (obj4
+               (req "program" Script.expr_encoding)
+               (req "storage" Script.expr_encoding)
+               (opt "gas" Gas.Arith.z_integral_encoding)
+               (opt "legacy" bool))
+          ~output:(obj1 (req "script_size" int31))
+          RPC_path.(path / "script_size")
+
       let typecheck_data =
         RPC_service.post_service
           ~description:
@@ -1429,6 +1442,49 @@ module RPC = struct
           >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
       Registration.register0
         ~chunked:false
+        S.script_size
+        (fun ctxt () (expr, storage, maybe_gas, legacy) ->
+          let legacy = Option.value ~default:false legacy in
+          let ctxt =
+            match maybe_gas with
+            | None -> Gas.set_unlimited ctxt
+            | Some gas -> Gas.set_limit ctxt gas
+          in
+          let code = Script.lazy_expr expr in
+          Script_ir_translator.parse_code ~legacy ctxt ~code
+          >>=? fun ( Ex_code
+                       {
+                         code;
+                         arg_type;
+                         storage_type;
+                         views;
+                         root_name;
+                         code_size;
+                       },
+                     _ ) ->
+          Script_ir_translator.parse_data
+            ~legacy
+            ~allow_forged:true
+            ctxt
+            storage_type
+            (Micheline.root storage)
+          >>=? fun (storage, _) ->
+          let script =
+            Script_ir_translator.Ex_script
+              {
+                code;
+                arg_type;
+                storage_type;
+                views;
+                root_name;
+                code_size;
+                storage;
+              }
+          in
+          return @@ Script_ir_translator.script_size script) ;
+
+      Registration.register0
+        ~chunked:false
         S.typecheck_data
         (fun ctxt () (data, ty, maybe_gas, legacy) ->
           let legacy = Option.value ~default:false legacy in
@@ -1584,6 +1640,14 @@ module RPC = struct
 
     let typecheck_code ?gas ?legacy ~script ctxt block =
       RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)
+
+    let script_size ?gas ?legacy ~script ~storage ctxt block =
+      RPC_context.make_call0
+        S.script_size
+        ctxt
+        block
+        ()
+        (script, storage, gas, legacy)
 
     let typecheck_data ?gas ?legacy ~data ~ty ctxt block =
       RPC_context.make_call0

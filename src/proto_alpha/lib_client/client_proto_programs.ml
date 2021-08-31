@@ -195,6 +195,17 @@ let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ?legacy
     ~script:program.expanded
 
+let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
+    ~(program : Michelson_v1_parser.parsed)
+    ~(storage : Michelson_v1_parser.parsed) () =
+  Plugin.RPC.Scripts.script_size
+    cctxt
+    (chain, block)
+    ?gas
+    ?legacy
+    ~script:program.expanded
+    ~storage:storage.expanded
+
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
     (cctxt : #Client_context.printer) =
   if emacs then

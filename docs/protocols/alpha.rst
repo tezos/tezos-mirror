@@ -106,6 +106,9 @@ Cache
 - The new RPC ``context/cache/contract_rank`` gives the number of contracts
   older than the one provided as argument.
 
+- The new RPC ``scripts/script_size`` gives the size of the script
+  and its storage when storage in the cache.
+
 - MR: :gl:`!3234`
 
 Context Storage Flattening

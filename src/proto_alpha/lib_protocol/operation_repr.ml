@@ -900,3 +900,53 @@ let equal : type a b. a operation -> b operation -> (a, b) eq option =
     equal_contents_kind_list
       op1.protocol_data.contents
       op2.protocol_data.contents
+
+open Cache_memory_helpers
+
+let script_lazy_expr_size (expr : Script_repr.lazy_expr) =
+  let fun_value expr = word_size +! expr_size expr in
+  let fun_bytes bytes = word_size +! bytes_size bytes in
+  let fun_combine expr_size bytes_size = expr_size +! bytes_size in
+  header_size
+  +! Data_encoding.apply_lazy ~fun_value ~fun_bytes ~fun_combine expr
+
+let script_repr_size ({code; storage} : Script_repr.t) =
+  header_size +! (word_size *? 2) +! script_lazy_expr_size code
+  +! script_lazy_expr_size storage
+
+let internal_manager_operation_size (type a) (op : a manager_operation) =
+  match op with
+  | Transaction {amount = _; parameters; entrypoint; destination} ->
+      header_size +! (word_size *? 4) +! int64_size
+      +! script_lazy_expr_size parameters
+      +! string_size_gen (String.length entrypoint)
+      +! Contract_repr.in_memory_size destination
+  | Origination {delegate; script; credit = _; preorigination} ->
+      header_size +! (word_size *? 4)
+      +! option_size
+           (fun _ -> Contract_repr.public_key_hash_in_memory_size)
+           delegate
+      +! script_repr_size script +! int64_size
+      +! option_size Contract_repr.in_memory_size preorigination
+  | Delegation pkh_opt ->
+      header_size +! word_size
+      +! option_size
+           (fun _ -> Contract_repr.public_key_hash_in_memory_size)
+           pkh_opt
+  | Reveal _ ->
+      (* Reveals can't occur as internal operations *)
+      assert false
+  | Register_global_constant _ ->
+      (* Global constant registrations can't occur as internal operations *)
+      assert false
+
+let packed_internal_operation_in_memory_size :
+    packed_internal_operation -> Saturation_repr.may_saturate Saturation_repr.t
+    = function
+  | Internal_operation iop ->
+      let {source; operation; nonce = _} = iop in
+      let source_size = Contract_repr.in_memory_size source in
+      let nonce_size = word_size in
+      let operation_size = internal_manager_operation_size operation in
+      header_size +! (word_size *? 2) +! source_size +! operation_size
+      +! nonce_size

@@ -55,6 +55,10 @@ module type OPS = sig
 
   val updates_encoding : updates Data_encoding.t
 
+  val alloc_in_memory_size : alloc -> Cache_memory_helpers.sint
+
+  val updates_in_memory_size : updates -> Cache_memory_helpers.sint
+
   val bytes_size_for_empty : Z.t
 
   val alloc : Raw_context.t -> id:Id.t -> alloc -> Raw_context.t tzresult Lwt.t
@@ -76,6 +80,19 @@ end
 
 module Big_map = struct
   include Lazy_storage_kind.Big_map
+
+  let alloc_in_memory_size {key_type; value_type} =
+    let open Cache_memory_helpers in
+    header_size +! (word_size *? 2) +! expr_size key_type
+    +! expr_size value_type
+
+  let updates_in_memory_size updates =
+    let open Cache_memory_helpers in
+    let update_size {key; key_hash = _; value} =
+      header_size +! (word_size *? 3) +! expr_size key +? Script_expr_hash.size
+      +! option_size expr_size value
+    in
+    list_fold_size update_size updates
 
   let bytes_size_for_big_map_key = 65
 
@@ -140,6 +157,12 @@ type ('id, 'alloc, 'updates) ops =
 
 module Sapling_state = struct
   include Lazy_storage_kind.Sapling_state
+
+  let alloc_in_memory_size {memo_size = (_ : int)} =
+    let open Cache_memory_helpers in
+    header_size +! word_size
+
+  let updates_in_memory_size = Sapling_repr.diff_in_memory_size
 
   let bytes_size_for_empty = Z.of_int 33
 
@@ -213,6 +236,28 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
           | _ -> None)
         (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates});
     ]
+
+let init_size :
+    type i a u. (i, a, u) ops -> (i, a) init -> Cache_memory_helpers.sint =
+ fun (module OPS) init ->
+  let open Cache_memory_helpers in
+  match init with
+  | Existing -> zero
+  | Copy {src = _id_is_a_Z_fitting_in_an_int_for_a_long_time} ->
+      header_size +! word_size
+  | Alloc alloc -> header_size +! word_size +! OPS.alloc_in_memory_size alloc
+
+let updates_size : type i a u. (i, a, u) ops -> u -> Cache_memory_helpers.sint =
+ fun (module OPS) updates -> OPS.updates_in_memory_size updates
+
+let diff_in_memory_size kind diff =
+  let open Cache_memory_helpers in
+  match diff with
+  | Remove -> zero
+  | Update {init; updates} ->
+      let ops = get_ops kind in
+      header_size +! (word_size *? 2) +! init_size ops init
+      +! updates_size ops updates
 
 (**
   [apply_updates ctxt ops ~id init] applies the updates [updates] on lazy
@@ -323,7 +368,19 @@ let item_encoding =
        Lazy_storage_kind.all
   [@@coq_axiom_with_reason "gadt"]
 
+let item_in_memory_size
+    (Item
+      ( kind
+      (* kinds are constant tags *),
+        _id_is_a_Z_fitting_in_an_int_for_a_long_time,
+        diff )) =
+  let open Cache_memory_helpers in
+  header_size +! (word_size *? 3) +! diff_in_memory_size kind diff
+
 type diffs = diffs_item list
+
+let diffs_in_memory_size diffs =
+  Cache_memory_helpers.list_fold_size item_in_memory_size diffs
 
 let encoding =
   let open Data_encoding in
