@@ -215,27 +215,28 @@ let test_context_suffix_no_rpc ?query_string path =
   assert (List.length context_queries >= 2) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
+let paths =
+  [
+    (["helpers"; "baking_rights"], []);
+    (["helpers"; "baking_rights"], [("all", "true")]);
+    (["context"; "contracts"], []);
+    (["context"; "delegates"], []);
+    (["context"; "nonces"; "3"], []);
+    (["helpers"; "endorsing_rights"], []);
+    (["votes"; "current_period"], []);
+    (["votes"; "successor_period"], []);
+    (["votes"; "total_voting_power"], []);
+    (["votes"; "ballot_list"], []);
+    (["votes"; "ballots"], []);
+    (["votes"; "current_proposal"], []);
+    (["votes"; "current_quorum"], []);
+    (["votes"; "listings"], []);
+    (["votes"; "proposals"], []);
+  ]
+
 let test_context_suffix_no_rpc ~protocols =
   let iter l f = List.iter f l in
   iter protocols @@ fun protocol ->
-  let paths =
-    [
-      (["helpers"; "baking_rights"], []);
-      (["helpers"; "baking_rights"], [("all", "true")]);
-      (["context"; "delegates"], []);
-      (["context"; "nonces"; "3"], []);
-      (["helpers"; "endorsing_rights"], []);
-      (["votes"; "current_period"], []);
-      (["votes"; "successor_period"], []);
-      (["votes"; "total_voting_power"], []);
-      (["votes"; "ballot_list"], []);
-      (["votes"; "ballots"], []);
-      (["votes"; "current_proposal"], []);
-      (["votes"; "current_quorum"], []);
-      (["votes"; "listings"], []);
-      (["votes"; "proposals"], []);
-    ]
-  in
   iter paths @@ fun (sub_path, query_string) ->
   test_context_suffix_no_rpc
     ~query_string
@@ -673,6 +674,51 @@ let register_protocol_independent () =
   test_supported_protocols_like_mockup `Proxy ;
   test_support_four_protocols `Proxy
 
+let normalize = function
+  | "big_maps" :: "index" :: i :: "contents" :: _ ->
+      ["big_maps"; "index"; i; "contents"]
+  | "contracts" :: "index" :: i :: _ -> ["contracts"; "index"; i]
+  | "cycle" :: i :: _ -> ["cycle"; i]
+  | "rolls" :: "owner" :: "snapshot" :: i :: j :: _ ->
+      ["rolls"; "owner"; "snapshot"; i; j]
+  | "v1" :: _ -> ["v1"]
+  | x -> x
+
+let test_split_key_heuristic =
+  let rpc_path_regexp = rex {|.*proxy_getter: Cache miss \(get\): \((.*)\)|} in
+  let env = String_map.singleton "TEZOS_LOG" "proxy_getter->debug" in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Proxy) split_key heuristic"
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
+  let* (_, client) = init ~protocol () in
+  let test_one (path, query_string) =
+    let full_path = "chains" :: "main" :: "blocks" :: "head" :: path in
+    let* stderr =
+      Client.spawn_rpc ~env ~query_string Client.GET full_path client
+      |> Process.check_and_read_stderr
+    in
+    let lines = String.split_on_char '\n' stderr in
+    let context_queries =
+      List.filter_map (fun line -> line =~* rpc_path_regexp) lines
+    in
+    let seens = ref String_set.empty in
+    let check_query path =
+      let segments = String.split_on_char '/' path in
+      let normalized = normalize segments |> String.concat "/" in
+      if String_set.mem normalized !seens then
+        Test.fail
+          "Request of the form %s/... done twice. Last request is %s"
+          normalized
+          path
+      else seens := String_set.add normalized !seens
+    in
+    List.iter check_query context_queries ;
+    unit
+  in
+  Lwt_list.iter_s test_one paths
+
 let register ~protocols =
   test_bake ~protocols ;
   test_transfer ~protocols ;
@@ -680,4 +726,5 @@ let register ~protocols =
   test_context_suffix_no_rpc ~protocols ;
   test_cache_at_most_once ~protocols ;
   Location.test_locations_proxy ~protocols ;
-  Location.test_compare_proxy ~protocols
+  Location.test_compare_proxy ~protocols ;
+  test_split_key_heuristic ~protocols
