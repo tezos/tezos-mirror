@@ -1779,25 +1779,6 @@ let chest_key_t ~annot = Chest_key_t {annot; size = Type_size.one}
 
 let chest_t ~annot = Chest_t {annot; size = Type_size.one}
 
-(**
-
-   The following functions named `X_traverse` for X in { kinstr, ty,
-   comparable_ty, value } provide tail recursive top down traversals
-   over the values of these types.
-
-   The traversal goes through a value and rewrites an accumulator
-   along the way starting from some [init]ial value for the
-   accumulator.
-
-   All these traversals follow the same recursion scheme: the
-   user-provided function is first called on the toplevel value, then
-   the traversal recurses on the direct subvalues of the same type.
-
-   Hence, the user-provided function must only compute the
-   contribution of the value on the accumulator minus the contribution
-   of its subvalues of the same type.
-
-*)
 type 'a kinstr_traverse = {
   apply : 'b 'u 'r 'f. 'a -> ('b, 'u, 'r, 'f) kinstr -> 'a;
 }

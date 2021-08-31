@@ -947,7 +947,7 @@ module Cache : sig
 
     (** [list_identifiers ctxt] returns the list of the
        identifiers of the cached values along with their respective
-       age. The returned list is sorted in terms of their age in the
+       size. The returned list is sorted in terms of their age in the
        cache, the oldest coming first. *)
     val list_identifiers : context -> (string * int) list
 

@@ -93,7 +93,7 @@ type 'a cache = {
      synchronization. *)
   removed_entries : KeySet.t;
   (* [entries_removals] maintains the last numbers of entries removal
-     per block. This list can be longer than
+     per block. This list cannot be longer than
      [entries_removals_window_width]. *)
   entries_removals : int list;
 }
@@ -163,7 +163,7 @@ let make_caches (layout : size list) =
 
 (*
 
-   When a entry is fresh, it is assigned a [fresh_entry_nonce].
+   When an entry is fresh, it is assigned a [fresh_entry_nonce].
 
    The actual nonce for this entry will be known only when its block
    is finalized: it is only in function [sync] that
@@ -329,8 +329,8 @@ let update_entry entry nonce =
   in
   {entry with cache_nonce = element_nonce}
 
-(* [finalize_cache ctxt cache nonce] saves the domain of [cache] in
-   the storage. This function returns the cache for the next block. *)
+(* [finalize_cache ctxt cache nonce] sets the cache nonce for the new
+   entries. This function returns the cache for the next block. *)
 let finalize_cache ({map; _} as cache) nonce =
   let map = KeyMap.map (fun (e, entry) -> (e, update_entry entry nonce)) map in
   let metamap = KeyMap.map snd map in

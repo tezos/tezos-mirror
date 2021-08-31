@@ -104,6 +104,6 @@ end
    micheline expression held from [root]. *)
 val micheline_nodes : node -> int
 
-(** [micheline_fold node i f] traverses [node] applying [f] on a
+(** [fold node i f] traverses [node] applying [f] on an
     accumulator initialized by [i]. *)
 val fold : node -> 'c -> ('c -> node -> 'c) -> 'c

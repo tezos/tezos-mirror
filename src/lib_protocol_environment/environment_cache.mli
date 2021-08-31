@@ -109,8 +109,8 @@ type 'value t
 (** Size of sub-caches or values. *)
 type size = int
 
-(** Index of the sub-cache in the cache. Values of this type should
-    stay between 0 and 16387. *)
+(** Index of the subcache in the cache. Values of this type should
+    stay between [0] and [16383]. *)
 type index = int
 
 (** [uninitialised] is a special value which identify cache without a
@@ -174,21 +174,23 @@ type value_metadata = {
           reasons: The value of the nonce is stored onto the context and
           consequently influences the context hash of the very same
           block. Such nonce cannot be determined by the shell and its
-          computation is delegated to the economic protocol.  *)
+          computation is delegated to the economic protocol.
+
+          [cache_nonce]s are used by the shell to properly relate
+          the cached entries with the current block and its
+          predecessors. In particular in case of reorganizations,
+          that is a context which is not on the same branch as the
+          current branch, [cache_nonce]s are used to filter out
+          entries that do not exist in the target branch. *)
 }
 
 (** {3 Cache Getters/Setters} *)
 
 (** [find cache key] is [Some v] if [key] has an associated cached
-   value [v] in [cache], or [None] otherwise.
-
-    If the computation of the value has been delayed, this operation
-    can take time significantly larger than a mere lookup in a table.
-    Besides, [find] is in the [Lwt] monad because this computation
-    can rely on some I/Os. *)
+   value [v] in [cache], or [None] otherwise. *)
 val find : 'value t -> key -> 'value option
 
-(** [lookup cache key] is [Some (v, m)] where [v] is the delayed value
+(** [lookup cache key] is [Some (v, m)] where [v] is the value
    associated to [key] and [m] is the corresponding metadata. This
    function returns [None] if [key] is not in the cache domain. *)
 val lookup : 'value t -> key -> ('value * value_metadata) option
@@ -272,13 +274,13 @@ val cache_size : 'value t -> cache_index:int -> size option
 val cache_size_limit : 'value t -> cache_index:int -> size option
 
 (** [list_keys cache ~cache_index] returns the list of keys along with
-   their age recorded into the subcache with index [cache_index]. *)
-val list_keys : 'value t -> cache_index:index -> (key * int) list option
+   their size recorded into the subcache with index [cache_index]. *)
+val list_keys : 'value t -> cache_index:index -> (key * size) list option
 
 (** [key_rank cache key] returns the rank of the value associated to
    the given [key]. The rank is defined as the number of values older
-   than the current one. Returns [None] if the cache does not contain
-   the value of if the [key] is not in the cache. *)
+   than the current one. Returns [None] if the [key] is not in the
+   cache. *)
 val key_rank : 'value t -> key -> int option
 
 (** [pp fmt cache] is a pretty printter for a [cache]. *)

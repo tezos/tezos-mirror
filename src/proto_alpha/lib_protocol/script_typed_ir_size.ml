@@ -358,7 +358,7 @@ and big_map_size :
         (fun _key_hash (key, value) accu ->
           let accu = accu +? script_expr_hash_size in
           (* The following recursive call cannot introduce a stack
-             overflow between this would require a key of type
+             overflow because this would require a key of type
              big_map while big_map is not comparable. *)
           let accu = value_size ~count_lambda_nodes accu (R cty) key in
           match value with
@@ -698,7 +698,7 @@ let lambda_size lam =
   (*
 
       The following formula has been obtained through a regression
-      over the corpus of mainnet contract in Granada.
+      over the corpus of mainnet contracts in Granada.
 
   *)
   (lambda_size ~count_lambda_nodes:true zero lam *? 157 /? 100)
