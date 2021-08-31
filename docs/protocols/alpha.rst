@@ -4,46 +4,32 @@ Protocol Alpha
 This page contains all the relevant information for protocol Alpha, a
 development version of the Tezos protocol.
 
-The code can be found in the ``src/proto_alpha`` directory of the
+The code can be found in the :src:`src/proto_alpha` directory of the
 ``master`` branch of Tezos.
 
 This page documents the changes brought by protocol Alpha with respect
 to Granada.
 
-The main novelties in the Alpha protocol are:
-
-- Context storage flattening for better context access performance.  Hex-nested
-  directories like `/12/af/83/3d/` are removed from the context.  (MR :gl:`!2771`)
-- Gas calculation fix based on the new flattend context layout (MR :gl:`!2771`)
-- Caching of smart contracts loading and typechecking (MR :gl:`!3234`)
-- Reimplemented `Logging`.  It now has Lwt-less APIs and the messages are handled
-  by the shell. (MR :gl:`!3225`)
-
-.. contents:: Here is the complete list of changes:
+.. contents::
 
 New Environment Version (V3)
 ----------------------------
 
 This protocol requires a different protocol environment than Granada.
 It requires protocol environment V3, compared to V2 for Granada.
+(MR :gl:`!3040`)
 
-Receipts, Balance updates
+Receipts, Balance Updates
 -------------------------
 
-- /!\\ Breaking change: Rewards balance updates for nonce revelations
+- **Breaking change:** Rewards balance updates for nonce revelations
   or endorsements now mention the cycle at which the rewards were
   granted instead of the cycle of the level carried by the operation.
   Likewise for deposits balance updates related to endorsement
   operations, they now mention the cycle at which the funds have been
-  deposited.
+  deposited. (MR :gl:`!3270`)
 
-Bug fixes
----------
-
-- A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
-- Fix balance updates that indicate inaccurate burned amounts in some scenarios (MR :gl:`!3407`)
-
-RPC changes
+RPC Changes
 -----------
 
 - Deprecated RPC ``POST ../endorsing_power`` has been removed. Clients
@@ -54,76 +40,54 @@ RPC changes
 - The RPCs ``GET ../context/delegates/[PUBLIC_KEY_HASH]/..`` now fail
   gracefully with a specific error ``delegate.not_registered`` when
   ``PUBLIC_KEY_HASH`` is not a delegate instead of the generic
-  ``context.storage_error``. (MR :gl:`!3258`, issues :gl:`#450`, :gl:`#451`, and :gl:`#1276`))
-
-Minor changes
--------------
-
-- Gas improvements for typechecking instruction ``CONTRACT`` (MR :gl:`!3241`)
-
-- Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
-  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266` :gl:`!3270`
-  :gl:`!3285` :gl:`!3375` :gl:`!3247`)
-
-- Set the predecessor version of the protocol to Granada (MR :gl:`!3347`)
-
-- Check order in the validation of endorsements has changed to not
-  compute all endorsement slots of a level if the endorsement is
-  invalid. (MR :gl: `!3395`)
-
-- Fix handling of potential negative integer in ``Raw_level_repr``
-  encoding. (MR :gl:`!3273`)
-
-- RPCs ``GET ../helpers/endorsing_rights`` and ``GET ../helpers/baking_rewards``
-  have been moved into the RPC plugin. Nothing has changed from the
-  end-user perspective for now but further improvements to their
-  performance will become easier now that they are decoupled from the
-  protocol development cycle. (MR :gl:`!3368`)
-
-- Gives a nominal increase to the liquidity baking sunset level. Without this, the subsidy would halt during the lifespan of this protocol. With this change the subsidy can continue until the protocol after this one is activated, even accounting for some delays in proposal injection and/or a restarted voting process, while still making sure it won't extend to two protocols after this one without a more significant increase. This follows the spirit of the liquidity baking TZIP in that it is still roughly six months from Granada activation and requires a referendum on the subsidy in the protocol after this one. (MR :gl:`!3425`)
-
-New Features
-------------
+  ``context.storage_error``. (MR :gl:`!3258`, issues :gl:`#450`,
+  :gl:`#451`, and :gl:`#1276`)
 
 Timelock
 --------
 
-- Expose timelock primitive to the Michelson interpreter.
-  (MRs :gl:`!3160` :gl:`!2940` :gl:`!2950` :gl:`!3304` :gl:`!3384`) adds to Michelson timelock
-  related types and opcode. It allows a smart contract to include a
-  countermeasure against Block Producer Extractable Value.  More info
-  in :doc:`Timelock <timelock>`.
+- Added timelock-related types and opcodes to Michelson.
+  They allow a smart contract to include a countermeasure against
+  Block Producer Extractable Value.
+  More info in :doc:`Timelock <../alpha/timelock>`.
+  (MRs :gl:`!3160` :gl:`!2940` :gl:`!2950` :gl:`!3304` :gl:`!3384`)
 
-Michelson onchain views
------------------------
+Michelson On-Chain Views
+------------------------
 
-:ref:`Views <MichelsonViews_alpha>` are a new mechanism for contracts calls that:
+:ref:`Views <MichelsonViews_alpha>` are a new mechanism for contract calls that:
 
+- are read-only: they may depend on the contract storage but cannot
+  modify it nor emit operations (but they can call other views);
 
-- are read-only: they may depend on the contract storage but cannot modify it nor emit operations (but they can call other views),
-- take arguments as input in addition to the contract storage,
-- return results as output,
-- are synchronous: the result is immediately available on the stack of the caller contract.
+- take arguments as input in addition to the contract storage;
 
-There are two added Michelson primitives: ``VIEW`` (instruction) and ``view`` (top-level keyword).
+- return results as output;
+
+- are synchronous: the result is immediately available on the stack of
+  the caller contract.
+
+There are two added Michelson primitives: ``VIEW`` (instruction) and
+``view`` (top-level keyword).
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/169>`__
-- `MR <https://gitlab.com/tezos/tezos/-/merge_requests/2359>`__
+- MR: :gl:`!2359`
 
-Global constants
+Global Constants
 ----------------
 
 - A new manager operation and corresponding CLI command have been added
   allowing users to register Micheline expressions in a global table of
   constants, returning an index to the expression. A new primitive
-  `constant <string>` has been added that allows contracts to reference
+  ``constant <string>`` has been added that allows contracts to reference
   these constants by their index. When a contract is called, any
   constants are expanded into their registered values. The result is
   that users can use constants to originate larger contracts, as well as
   share code between contracts.
 
-- `TZIP: <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
-- `MR: <https://gitlab.com/tezos/tezos/-/merge_requests/2962>`__
+- `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
+
+- MR: :gl:`!2962`
 
 Cache
 -----
@@ -141,3 +105,60 @@ Cache
 
 - The new RPC ``context/cache/contract_rank`` gives the number of contracts
   older than the one provided as argument.
+
+- MR: :gl:`!3234`
+
+Context Storage Flattening
+--------------------------
+
+Hex-nested directories like ``/12/af/83/3d/`` are removed from the
+context. This results in better context access performance. (MR :gl:`!2771`)
+
+Gas computation has been adapted to this new flattened context layout. (MR :gl:`!2771`)
+
+Bug Fixes
+---------
+
+- A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
+
+- Fix balance updates that indicate inaccurate burned amounts in some
+  scenarios (MR :gl:`!3407`)
+
+Minor Changes
+-------------
+
+- Gas improvements for typechecking instruction ``CONTRACT`` (MR :gl:`!3241`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
+  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266` :gl:`!3270`
+  :gl:`!3285` :gl:`!3375` :gl:`!3247`)
+
+- Set the predecessor version of the protocol to Granada (MR :gl:`!3347`)
+
+- Check order in the validation of endorsements has changed to not
+  compute all endorsement slots of a level if the endorsement is
+  invalid. (MR :gl:`!3395`)
+
+- Fix handling of potential negative integer in ``Raw_level_repr``
+  encoding. (MR :gl:`!3273`)
+
+- RPCs ``GET ../helpers/endorsing_rights`` and ``GET ../helpers/baking_rewards``
+  have been moved into the RPC plugin. Nothing has changed from the
+  end-user perspective for now but further improvements to their
+  performance will become easier now that they are decoupled from the
+  protocol development cycle. (MR :gl:`!3368`)
+
+- Gives a nominal increase to the liquidity baking sunset
+  level. Without this, the subsidy would halt during the lifespan of
+  this protocol. With this change the subsidy can continue until the
+  protocol after this one is activated, even accounting for some
+  delays in proposal injection and/or a restarted voting process,
+  while still making sure it won't extend to two protocols after this
+  one without a more significant increase. This follows the spirit of
+  `the liquidity baking TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_
+  in that it is still roughly six months
+  from Granada activation and requires a referendum on the subsidy in
+  the protocol after this one. (MR :gl:`!3425`)
+
+- Reimplemented ``Logging``.  It now has Lwt-less APIs and the messages are handled
+  by the shell. (MR :gl:`!3225`)
