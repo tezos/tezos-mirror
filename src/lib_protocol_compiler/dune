@@ -1,5 +1,7 @@
 ; build static executable with --profile static
-(env (static (flags (:standard -ccopt -static))))
+(env
+ (static (flags (:standard -ccopt -static)))
+ (release (ocamlopt_flags (:standard -O3))))
 
 (library
  (name tezos_protocol_registerer)
