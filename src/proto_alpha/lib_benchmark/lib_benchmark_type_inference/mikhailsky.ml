@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_alpha.Protocol
+open Protocol
 
 exception Term_contains_holes
 
@@ -377,13 +377,11 @@ module Data = struct
   let map elts = prim A_Map [seq elts] []
 
   let timestamp ts =
-    let z =
-      Tezos_protocol_alpha.Protocol.Alpha_context.Script_timestamp.to_zint ts
-    in
+    let z = Protocol.Alpha_context.Script_timestamp.to_zint ts in
     prim A_Timestamp [int z] []
 
-  let mutez (tz : Tezos_protocol_alpha.Protocol.Alpha_context.Tez.tez) =
-    let i = Tezos_protocol_alpha.Protocol.Alpha_context.Tez.to_mutez tz in
+  let mutez (tz : Protocol.Alpha_context.Tez.tez) =
+    let i = Protocol.Alpha_context.Tez.to_mutez tz in
     prim A_Mutez [int (Z.of_int64 i)] []
 
   let key_hash kh =

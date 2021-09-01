@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 (* open Tezos_rewriting *)
-open Tezos_benchmark_type_inference_alpha
 open Mikhailsky
 
 let unopt x = match x with Some x -> x | None -> assert false

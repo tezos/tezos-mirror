@@ -137,7 +137,7 @@ let data_typechecker_workload ctxt t_kind micheline_node ex_ty =
               in
               Lwt.return (Some trace)
           | Error errors ->
-              Tezos_client_alpha.Michelson_v1_error_reporter.report_errors
+              Michelson_v1_error_reporter.report_errors
                 ~details:true
                 ~show_source:true
                 Format.err_formatter
@@ -177,7 +177,7 @@ let code_typechecker_workload (ctxt : Protocol.Alpha_context.context)
           in
           Lwt.return (Some trace)
       | Error errs ->
-          Tezos_client_alpha.Michelson_v1_error_reporter.report_errors
+          Michelson_v1_error_reporter.report_errors
             ~details:true
             ~show_source:true
             Format.err_formatter

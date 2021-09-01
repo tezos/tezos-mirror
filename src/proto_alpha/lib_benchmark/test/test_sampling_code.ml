@@ -88,7 +88,7 @@ let _ =
     Test_helpers.typecheck_by_tezos bef michelson ;
     let printable =
       Micheline_printer.printable
-        Tezos_protocol_alpha.Protocol.Michelson_v1_primitives.string_of_prim
+        Protocol.Michelson_v1_primitives.string_of_prim
         michelson
     in
     if verbose then (

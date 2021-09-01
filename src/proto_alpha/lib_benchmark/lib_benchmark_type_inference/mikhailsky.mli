@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_alpha.Protocol
+open Protocol
 
 (** Mikhailsky: Michelson in Micheline form, with typed holes and annotations.
     Mikhailsky terms are hash-consed. *)

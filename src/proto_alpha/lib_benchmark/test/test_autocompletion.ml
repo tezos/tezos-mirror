@@ -53,8 +53,7 @@ let () = Format.eprintf "===============================@.%!"
 
 let () = Format.eprintf "Testing dummy program generator@.%!"
 
-let run x =
-  x rng_state (Tezos_benchmark_type_inference_alpha.Inference.M.empty ())
+let run x = x rng_state (Inference.M.empty ())
 
 let invent_term bef aft =
   let (term, _state) = run (Autocomp.invent_term bef aft) in
@@ -77,7 +76,7 @@ let invent_term bef aft =
     aft' ;
   Format.eprintf "%a@." Mikhailsky.pp term
 
-module T = Tezos_benchmark_type_inference_alpha.Type
+module T = Type
 
 let bef = T.(item unit (item unit (item unit empty)))
 

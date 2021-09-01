@@ -14,6 +14,7 @@
 ;; (ocamlopt_flags (:standard -p -ccopt -no-pie))
  (flags (:standard
          -open Tezos_micheline
+         -open Tezos_protocol_alpha
          -open Tezos_benchmark_type_inference_alpha
          -open Tezos_benchmark_alpha)))
 

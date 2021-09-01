@@ -98,7 +98,7 @@ let pp_phase fmtr (phase : phase) =
   | Global -> Format.fprintf fmtr "global"
 
 let report_michelson_errors fmtr errs =
-  Tezos_client_alpha.Michelson_v1_error_reporter.report_errors
+  Michelson_v1_error_reporter.report_errors
     ~details:true
     ~show_source:true
     fmtr
@@ -263,7 +263,7 @@ module Unparsing_data : Benchmark.S = struct
   let info = "Benchmarking unparsing of data"
 
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
-      (michelson_type : Tezos_protocol_alpha.Protocol.Script_repr.expr) =
+      (michelson_type : Protocol.Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let (ex_ty, ctxt) =
@@ -335,11 +335,7 @@ let () = Registration_helpers.register (module Unparsing_data)
 
 (* The new elaborator expects one more element at the bottom of the stack. *)
 let cushion_stack_type type_list =
-  type_list
-  @ [
-      Michelson_generation.base_type_to_michelson_type
-        Tezos_benchmark_type_inference_alpha.Type.unit;
-    ]
+  type_list @ [Michelson_generation.base_type_to_michelson_type Type.unit]
 
 module Typechecking_code : Benchmark.S = struct
   include Config
