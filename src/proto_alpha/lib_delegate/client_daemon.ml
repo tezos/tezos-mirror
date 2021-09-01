@@ -85,7 +85,13 @@ module Baker = struct
           ~user_activated_upgrades
           ()
       in
-      cctxt#message "Baker started." >>= fun () ->
+      cctxt#message
+        "Baker v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -114,7 +120,13 @@ module Accuser = struct
         ~chains:[chain]
         ()
       >>=? fun valid_blocks_stream ->
-      cctxt#message "Accuser started." >>= fun () ->
+      cctxt#message
+        "Accuser v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
