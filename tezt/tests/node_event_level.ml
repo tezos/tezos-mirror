@@ -32,6 +32,11 @@
                  that retrieve operations.
 *)
 
+let get_request_level = function
+  | "debug" -> "request_completed_debug.v0"
+  | "notice" -> "request_completed_notice.v0"
+  | level -> Test.fail "Incorrect %s level for request_completed event" level
+
 (* Wait for a request event of the specified kind.
    Example of request of kind "inject":
 
@@ -51,13 +56,13 @@
      },
      "level": "notice"
 *)
-let wait_for_request_kind (request_kind : string) node =
+let wait_for_request_kind ?(level = "notice") (request_kind : string) node =
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
     | Some s when String.equal s request_kind -> Some ()
     | Some _ | None -> None
   in
-  Node.wait_for node "request_completed.v0" filter
+  Node.wait_for node (get_request_level level) filter
 
 (* Wait for the request signaling the injection of a new operation in
    the mempool. This event has level "notice".
@@ -74,7 +79,7 @@ let wait_for_flush = wait_for_request_kind "flush"
    Note: this event has level "debug", so the node needs to have event
    level set to "debug" for such an event to exist.
 *)
-let wait_for_arrival = wait_for_request_kind "arrived"
+let wait_for_arrival = wait_for_request_kind ~level:"debug" "arrived"
 
 (* Inject a transfer operation from [client] and wait for an injection
    event on [node] (which should be the node associated to [client]).
@@ -132,14 +137,14 @@ let check_json_is_empty_list ?(fail_msg = "") json =
       Test.fail "%s" msg
 
 (* Test.
-   
+
    Aim: check that a node launched with "debug" event level performs
    various functions correctly: operation injection, baking, and a
    couple RPCs:
    - get /chains/main/mempool/pending_operations
      (RPC.get_mempool_pending_operations)
    - get /chains/main/blocks/head/operations (RPC.get_operations)
-     
+
    Scenario:
    - Step 1: Start a node with event_level:debug, activate the protocol.
    - Step 2: Inject a transfer operation, test RPCs.

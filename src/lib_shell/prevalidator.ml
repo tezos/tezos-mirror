@@ -1195,7 +1195,11 @@ module Make
       match r with Request.(View (Inject _)) -> ok_unit | _ -> Error errs
 
     let on_completion _w r _ st =
-      Event.(emit request_completed) (Request.view r, st)
+      match Request.view r with
+      | Request.View (Flush _) | View (Inject _) | View (Ban _) ->
+          Event.(emit request_completed_notice) (Request.view r, st)
+      | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
+          Event.(emit request_completed_debug) (Request.view r, st)
 
     let on_no_request _ = return_unit
   end

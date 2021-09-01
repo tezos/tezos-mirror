@@ -105,7 +105,7 @@ let wait_for_injection node =
     | Some s when s = "inject" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed.v0" filter in
+  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
   return ()
 
 (** Matches events which contain an flush request.
@@ -133,7 +133,7 @@ let wait_for_flush node =
     | Some s when s = "flush" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed.v0" filter in
+  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
   return ()
 
 let operation_json ~fee ~gas_limit ~source ~destination ~counter =
@@ -1503,7 +1503,7 @@ let wait_for_arrival_of_ophash ophash node =
         Some ()
     | _ -> None
   in
-  Node.wait_for node "request_completed.v0" filter
+  Node.wait_for node "request_completed_debug.v0" filter
 
 (** Test.
 

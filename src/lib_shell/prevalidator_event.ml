@@ -25,7 +25,7 @@
 
 module Request = Prevalidator_worker_state.Request
 
-let section = ["mempool"]
+let section = ["prevalidator"]
 
 include Internal_event.Simple
 
@@ -93,12 +93,30 @@ let operations_not_flushed =
     ~level:Debug
     ("count", Data_encoding.int31)
 
-let request_completed =
+let request_completed_notice =
   declare_2
     ~section
-    ~name:"request_completed"
-    ~msg:"request {view} completed ({worker_status})"
+    ~name:"request_completed_notice"
+    ~msg:"{view} {worker_status}"
     ~level:Notice
+    ("view", Request.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
+    ~pp1:Request.pp
+    ~pp2:Worker_types.pp_status
+
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/1266
+
+   The level duplication is an intermediate solution. Those events are
+   "worker" related and should be handled properly by the worker.
+
+   To do so, the level should be associated directly with the request
+   view instead. *)
+let request_completed_debug =
+  declare_2
+    ~section
+    ~name:"request_completed_debug"
+    ~msg:"{view} {worker_status}"
+    ~level:Debug
     ("view", Request.encoding)
     ("worker_status", Worker_types.request_status_encoding)
     ~pp1:Request.pp

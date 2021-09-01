@@ -59,7 +59,7 @@ let wait_for_denunciation_injection node client oph_promise =
     | Some s when s = "inject" -> Some s
     | Some _ | None -> None
   in
-  let* _ = Node.wait_for node "request_completed.v0" filter in
+  let* _ = Node.wait_for node "request_completed_notice.v0" filter in
   let* oph = oph_promise in
   let* mempool = RPC.get_mempool_pending_operations client in
   if is_operation_in_applied_mempool mempool oph then some oph else none
