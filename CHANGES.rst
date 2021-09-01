@@ -100,6 +100,11 @@ Docker Images
 Miscellaneous
 -------------
 
+Version 10.2
+============
+
+- Fixed a critical issue in the chain storage layer.
+
 Version 10.1
 ============
 
