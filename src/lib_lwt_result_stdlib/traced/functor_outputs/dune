@@ -1,5 +1,5 @@
 (library
  (name traced_functor_outputs)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib.traced.functor-outputs)
+ (instrumentation (backend bisect_ppx))
  (libraries lwt tezos-lwt-result-stdlib.bare.sigs))
