@@ -60,6 +60,17 @@ type fixed = unit
 
 let fixed_encoding =
   let open Data_encoding in
+  let uint62 =
+    let max_int_int64 = Int64.of_int max_int in
+    conv_with_guard
+      (fun int -> Int64.of_int int)
+      (fun int64 ->
+        if Compare.Int64.(int64 < 0L) then Error "Negative integer"
+        else if Compare.Int64.(int64 > max_int_int64) then
+          Error "Integer does not fit in 62 bits"
+        else ok @@ Int64.to_int int64)
+      int64
+  in
   conv
     (fun () ->
       ( proof_of_work_nonce_size,
@@ -69,7 +80,9 @@ let fixed_encoding =
         max_proposals_per_delegate,
         max_micheline_node_count,
         max_micheline_bytes_limit,
-        max_allowed_global_constant_depth ))
+        max_allowed_global_constant_depth,
+        cache_layout,
+        michelson_maximum_type_size ))
     (fun ( _proof_of_work_nonce_size,
            _nonce_length,
            _max_anon_ops_per_block,
@@ -77,8 +90,10 @@ let fixed_encoding =
            _max_proposals_per_delegate,
            _max_micheline_node_count,
            _max_micheline_bytes_limit,
-           _max_allowed_global_constant_depth ) -> ())
-    (obj8
+           _max_allowed_global_constant_depth,
+           _cache_layout,
+           _michelson_maximum_type_size ) -> ())
+    (obj10
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
        (req "max_anon_ops_per_block" uint8)
@@ -86,7 +101,9 @@ let fixed_encoding =
        (req "max_proposals_per_delegate" uint8)
        (req "max_micheline_node_count" int31)
        (req "max_micheline_bytes_limit" int31)
-       (req "max_allowed_global_constants_depth" int31))
+       (req "max_allowed_global_constants_depth" int31)
+       (req "cache_layout" (list uint62))
+       (req "michelson_maximum_type_size" uint16))
 
 let fixed = ()
 
