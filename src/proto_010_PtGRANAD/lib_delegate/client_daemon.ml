@@ -75,7 +75,13 @@ module Endorser = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Endorser started." >>= fun () ->
+      cctxt#message
+        "Endorser v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream
     in
     Client_confirmations.wait_for_bootstrapped
@@ -97,7 +103,13 @@ module Baker = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Baker started." >>= fun () ->
+      cctxt#message
+        "Baker v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_forge.create
         cctxt
         ~user_activated_upgrades
@@ -128,7 +140,13 @@ module Accuser = struct
         ~chains:[chain]
         ()
       >>=? fun valid_blocks_stream ->
-      cctxt#message "Accuser started." >>= fun () ->
+      cctxt#message
+        "Accuser v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_denunciation.create
         cctxt
         ~preserved_levels
