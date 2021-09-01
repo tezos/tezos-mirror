@@ -255,7 +255,6 @@ find . -name '*.old' -exec rm {} \;
 if [ -z "$SILENCE_REMINDER" ]; then
   echo "Generated src/proto_${version}_${short_hash}. Don't forget to:"
   echo ""
-  echo "  ./scripts/update_unit_test.sh"
   echo "  ./scripts/update_integration_test.sh"
   echo "  ./scripts/update_opam_test.sh"
 fi
