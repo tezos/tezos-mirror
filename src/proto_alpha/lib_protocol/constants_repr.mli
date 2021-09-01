@@ -72,20 +72,9 @@ val cache_layout : int list
 
 val michelson_maximum_type_size : int
 
-type fixed = {
-  proof_of_work_nonce_size : int;
-  nonce_length : int;
-  max_anon_ops_per_block : int;
-  max_operation_data_length : int;
-  max_proposals_per_delegate : int;
-  max_micheline_node_count : int;
-  max_micheline_bytes_limit : int;
-  max_allowed_global_constant_depth : int;
-}
+type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding
-
-val fixed : fixed
 
 type parametric = {
   preserved_cycles : int;
@@ -121,7 +110,9 @@ type parametric = {
 
 val parametric_encoding : parametric Data_encoding.encoding
 
-type t = {fixed : fixed; parametric : parametric}
+type t = private {fixed : fixed; parametric : parametric}
+
+val all : parametric -> t
 
 val encoding : t Data_encoding.encoding
 

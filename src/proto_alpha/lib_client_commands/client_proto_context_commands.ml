@@ -1517,11 +1517,11 @@ let commands network () =
                   Format.kasprintf (fun s -> errors := s :: !errors) ppf
                 in
                 if n = 0 then error "Empty proposal list." ;
-                if n > Constants.fixed.max_proposals_per_delegate then
+                if n > Constants.max_proposals_per_delegate then
                   error
                     "Too many proposals: %d > %d."
                     n
-                    Constants.fixed.max_proposals_per_delegate ;
+                    Constants.max_proposals_per_delegate ;
                 (match
                    Base.List.find_all_dups
                      ~compare:Protocol_hash.compare

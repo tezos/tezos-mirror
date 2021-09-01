@@ -287,6 +287,8 @@ let parametric_encoding =
 
 type t = {fixed : fixed; parametric : parametric}
 
+let all parametric = {fixed; parametric}
+
 let encoding =
   let open Data_encoding in
   conv
