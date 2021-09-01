@@ -63,8 +63,8 @@ let additional_info_encoding =
         (fun () -> Release);
     ]
 
-(* Locally defined encoding for Version.t *)
-let current_version_encoding =
+(* The encoding is defined here to keep [Version] "Data_encoding free"*)
+let version_encoding =
   let open Data_encoding in
   conv
     (fun ({major; minor; additional_info} : Version.t) ->
@@ -83,6 +83,6 @@ let encoding =
     (fun (version, network_version, commit_info) ->
       {version; network_version; commit_info})
     (obj3
-       (req "version" current_version_encoding)
+       (req "version" version_encoding)
        (req "network_version" Network_version.encoding)
        (req "commit_info" (option commit_info_encoding)))
