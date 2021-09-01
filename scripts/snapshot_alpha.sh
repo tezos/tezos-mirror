@@ -9,15 +9,27 @@ Packs the current proto_alpha directory in a new
 proto_<version_number>_<hash> directory with all the necessary
 renamings.
 
-<name> should be in lower case
-<version_number> should be three digits"
+<name> should be in lower case, e.g. 'stockholm'
+<version_number> should be three digits, e.g. 022",
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$script_dir"/..
 
+# e.g. stockholm_022
 current=$1
+# e.g. stockholm
 label=$(echo $current | cut -d'_' -f1)
+# e.g. 022
 version=$(echo $current | cut -d'_' -f2)
+# e.g. Stockholm
+capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
+# e.g. STOCKHOLM
+upcased_label=$(tr '[:lower:]' '[:upper:]' <<< "${label}")
+# e.g. Pt8PY9P47nYw7WgPqpr49JZX5iU511ZJ9UPrBKu1CuYtBsLy7q7 (set below)
+long_hash=
+# e.g. Pt8PY9P4 (set below)
+short_hash=
+
 
 if ! ( [[ "$label" =~ ^[a-z]+$ ]] && [[ "$version" =~ ^[0-9][0-9][0-9]$ ]] ); then
     echo "Wrong protocol version."
@@ -99,7 +111,6 @@ sed -e s/_alpha:/_${version}_${label}:/g \
 # add entries in the doc index
 # copy from alpha rather from previous protocol because there may be newly added items
 echo "Add entries in the doc index"
-capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
 alpha_line='Alpha Development Protocol'
 doc_index="docs/index.rst"
 (
