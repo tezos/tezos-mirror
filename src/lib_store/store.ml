@@ -773,8 +773,10 @@ module Chain = struct
             Block.all_operation_hashes block
             |> List.flatten |> Operation_hash.Set.of_list
           in
-          let live_blocks = Block_hash.Set.add most_recent_block live_blocks in
-          let live_ops =
+          let new_live_blocks =
+            Block_hash.Set.add most_recent_block live_blocks
+          in
+          let new_live_operations =
             Operation_hash.Set.union most_recent_ops live_operations
           in
           match
@@ -782,13 +784,15 @@ module Chain = struct
               live_data_cache
               (most_recent_block, most_recent_ops)
           with
-          | None -> Lwt.return (live_blocks, live_ops)
+          | None -> Lwt.return (new_live_blocks, new_live_operations)
           | Some (last_block, last_ops) ->
-              let live_blocks = Block_hash.Set.remove last_block live_blocks in
-              let live_operations =
-                Operation_hash.Set.diff live_operations last_ops
+              let diffed_new_live_blocks =
+                Block_hash.Set.remove last_block new_live_blocks
               in
-              Lwt.return (live_blocks, live_operations))
+              let diffed_new_live_operations =
+                Operation_hash.Set.diff new_live_operations last_ops
+              in
+              Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
       | _ when update_cache ->
           let new_cache = Ringo.Ring.create expected_capacity in
           Chain_traversal.live_blocks_with_ring
