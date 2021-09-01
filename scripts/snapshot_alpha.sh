@@ -153,7 +153,39 @@ sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g
 echo "Fixing python regtests ouputs"
 cd _regtest_outputs
 sed -i.old -e "s/_alpha\b/_${version}/g" *.out
-cd ../../..
+cd ../..
+
+echo "Fixing python protocol constants"
+
+# update tests_python/tools/constants.py
+crt_line='TEZOS_CRT = """'
+constants_file='tools/constants.py'
+(
+    grep -B9999 -F "$crt_line" "$constants_file" \
+      | head -n-1
+
+    cat <<EOF
+${upcased_label} = "$long_hash"
+${upcased_label}_DAEMON = "${version}-${short_hash}"
+${upcased_label}_FOLDER = "proto_${version}_${short_hash}"
+${upcased_label}_PARAMETERS = get_parameters(${upcased_label}_FOLDER)
+
+EOF
+    grep -A9999 -F "$crt_line" "$constants_file" \
+) > "${constants_file}.tmp"
+mv "${constants_file}.tmp" $constants_file
+
+# update pytests/tests_${current - 1}/protocol.py
+
+prev_upcased_label=$(grep '^PREV_HASH = constants.*' "tests_alpha/protocol.py" | cut -d. -f2)
+if [ -z "$prev_upcased_label" ]; then
+    echo "Error: Could not read the label of the predecessor protocol in tests_alpha/protocol.py"
+    exit 1
+fi
+
+sed -i.old -e "s/constants\.ALPHA/constants\.${upcased_label}/" "tests_${version}/protocol.py"
+sed -i.old -e "s/constants\.${prev_upcased_label}/constants\.${upcased_label}/" "tests_alpha/protocol.py"
+cd ../
 
 # move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
