@@ -588,7 +588,7 @@ let () =
 
 (** [Global_constants_storage.substitute] traverses a Micheline node,
     searching for constants and replacing them with their values
-    retrieved from stroage. 
+    retrieved from storage.
 
     There are three branches in the iterations of [Global_constants_storage.substitute]
     can take, each with different costs:

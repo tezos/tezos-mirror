@@ -108,8 +108,8 @@ val numbits : 'a t -> int
 val shift_right : 'a t -> int -> 'a t
 
 (** [shift_left x y] behaves like a logical shift of [x] by [y] bits
-    to the left. [y] must be between 0 and 63. In that cases where [x lsr y]
-    is overflowing, [shift_left x y] is [satured]. *)
+    to the left. [y] must be between 0 and 63. In cases where [x lsl y]
+    is overflowing, [shift_left x y] is [saturated]. *)
 val shift_left : 'a t -> int -> 'a t
 
 (** [mul x y] behaves like multiplication between native integers as

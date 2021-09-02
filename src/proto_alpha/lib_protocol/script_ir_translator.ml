@@ -754,7 +754,7 @@ let rec check_dupable_ty :
       (*
         Lambda are dupable as long as:
           - they don't contain non-dupable values, e.g. in `PUSH`
-            (mosty non-dupable values should probably be considered forged)
+            (mostly non-dupable values should probably be considered forged)
           - they are not the result of a partial application on a non-dupable
             value. `APPLY` rejects non-packable types (because of `PUSH`).
             Hence non-dupable should imply non-packable.
@@ -852,7 +852,7 @@ let merge_type_metadata :
   Type_size.merge size_a size_b >>? fun size ->
   merge_type_annot ~legacy annot_a annot_b >|? fun annot -> {annot; size}
 
-(* Takes two compable types and simultaneously merge their annotations and
+(* Takes two comparable types and simultaneously merge their annotations and
    check that they represent the same type.
 
    The result contains:
@@ -6030,7 +6030,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       in
       let items =
         (* Sort the items in Michelson comparison order and not in key
-           hash order. This code path is only exercized for tracing,
+           hash order. This code path is only exercised for tracing,
            so we don't bother carbonating this sort operation
            precisely. Also, the sort uses a reverse compare because
            [unparse_items] will reverse the result. *)

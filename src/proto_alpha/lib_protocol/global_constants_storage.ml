@@ -268,7 +268,7 @@ let register context value =
   (* To calculate the total depth, we first expand all constants
      in the expression. This may fail with [Expression_too_large]. *)
   substitute_node context (root value) >>=? fun (context, node) ->
-  (* We do not need to carbonate [depth]. [substitute_node] and
+  (* We do not need to carbonate [check_depth]. [substitute_node] and
      [Storage.Global_constants.Map.init] are already carbonated
      and the computation cost of [depth] is small compared to these. *)
   check_depth node >>?= fun _ ->

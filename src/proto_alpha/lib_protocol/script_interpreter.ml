@@ -1441,7 +1441,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let (chest, (time_z, stack)) = stack in
           (* If the time is not an integer we then consider the proof as
              incorrect. Indeed the verification asks for an integer for practical reasons.
-             Therfore no proof can be correct.*)
+             Therefore no proof can be correct.*)
           let accu =
             match Alpha_context.Script_int.to_int time_z with
             | None -> R false

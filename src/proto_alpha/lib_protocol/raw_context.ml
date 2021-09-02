@@ -27,7 +27,7 @@ module Int_set = Set.Make (Compare.Int)
 
 (*
 
-   Gas levels maintainance
+   Gas levels maintenance
    =======================
 
    The context maintains two levels of gas, one corresponds to the gas
@@ -713,7 +713,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    onto the context via the function `add_constants` or
    `patch_constants`.
 
-   This migration can be achieved also implicitely by modifying the
+   This migration can be achieved also implicitly by modifying the
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
