@@ -198,5 +198,3 @@ download. These include:
 * `XTZ-Shots <https://mainnet.xtz-shots.io/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
 
-If you know of any other snapshots providers or if you are about to
-become one, please feel free to update this list by opening a merge
