@@ -38,8 +38,8 @@ if [ -z "$short_hash" ]; then
   exit 1
 fi
 
-echo "update_unit_test.sh"
-$script_dir/update_unit_test.sh
+echo "dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version_number} ${short_hash}"
+dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version_number} ${short_hash}
 
 echo "update_integration_test.sh"
 $script_dir/update_integration_test.sh
