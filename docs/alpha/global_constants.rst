@@ -1,0 +1,122 @@
+Global Constants
+================
+
+The size limit for Michelson contracts is quite small, limited to 60
+kilobytes as of Granada protocol. Global constants are a feature added
+in Hangzhou protocol that adds “macros” to Michelson scripts, allowing
+for larger and more complex contracts on the chain. It works in the
+following way:
+
+-  Fragments of Michelson code (written in the Micheline format) are
+   registered on the chain via a new operation
+   ``register_global_constant``. An example expression might be the
+   integer ``999`` or the lambda expression ``{ PUSH int 999; ADD }``
+-  Included in the receipt of the operation is a hash of the expression
+   registered. For example the hash ``999`` is
+   ``expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8``.
+-  Constants can be referenced inside a Michelson script with the new
+   primitive ``constant``. For example, we could write a lambda
+   equivalent to the one above like so:
+   ``{ PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");       ADD }``
+
+Global Constant Registration
+----------------------------
+
+The new ``register_global_constant`` operation includes an object with a
+single key ``"value"``, the value of which is the Micheline expression
+to be registered.
+
+You can submit this operation conveniently through a new cli command.
+For example, the command:
+
+.. code:: sh
+
+    client register global constant "999" from bootstrap1 --burn-cap 0.017
+
+would result in the output:
+
+::
+
+   Node is bootstrapped.
+   Estimated gas: 1440 units (will add 100 for safety)
+   Estimated storage: 68 bytes added (will add 20 for safety)
+   Operation successfully injected in the node.
+   Operation hash is 'onsFknW5iWa6eiTYqAghY4peQZ7JYQUJg5fR8MwAQkMKjXfNqGf'
+   NOT waiting for the operation to be included.
+   Use command
+     tezos-client wait for onsFknW5iWa6eiTYqAghY4peQZ7JYQUJg5fR8MwAQkMKjXfNqGf to be included --confirmations 5 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+   and/or an external block explorer to make sure that it has been included.
+   This sequence of operations was run:
+     Manager signed operations:
+       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+       Fee to the baker: ꜩ0.000385
+       Expected counter: 1
+       Gas limit: 1540
+       Storage limit: 88 bytes
+       Balance updates:
+         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ................ -ꜩ0.000385
+         fees(the baker who will include this operation,0) ... +ꜩ0.000385
+       Register Global:
+         Value: 999
+         This global constant registration was successfully applied
+         Balance updates:
+           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.017
+         Consumed gas: 1440
+         Storage size: 68 bytes
+         Global address: expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8
+
+As you can see, the address of the constant is returned in the operation
+receipt. This address is a B58 hash of the bytes of the expression
+registered (similar to other hashes in Tezos). This means constants are
+content-addressable - given a particular Micheline expression, you can
+always calculate it’s address on the chain and check if it’s registered.
+
+A few points about registering global constants: - Global constants may
+contain references to other constants; however, any referenced constants
+must already be registered on the chain. As a corollary, you cannot have
+cyclic references. - Global constants are not type-checked before
+registration - any valid Micheline expression may be registered. That
+said, attempting originate a contract that uses a constant in an
+ill-typed way will fail. - The total depth of the expression registered
+as a constant (after expanding all constant references) may not exceed
+10,000. - The total number of nodes in the Micheline expression being
+registered (after expanding all constant references) may not exceed the
+``max_micheline_node_count`` protocol constant. As of Hangzhou this is
+50,000. - The total number of bytes in the Micheline expression being
+registered (after expanding all constant references) may not exceed the
+``max_micheline_bytes_limit`` protocol constant. As of Hangzhou this is
+50,000.
+
+Originating a Contract that uses Global Constants
+-------------------------------------------------
+
+A global constant can be referenced in Michelson script via the
+primitive ``constant``, which accepts a single string argument, being
+the hash of the expression to be referenced at runtime. This primitive
+can be used to replace any Micheline node in the bodies of the
+``parameter``, ``storage``, or ``code`` keys of a Michelson script. For
+example, we replace every instance of the type ``lambda unit unit`` and
+value 999 with their respective hashes:
+
+::
+
+     parameter (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL");
+     storage (big_map (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); code {
+       PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");
+       <rest of code>
+     }
+
+During origination, all constants are expanded recursively. The
+operation will fail if the resulting contract is ill-typed. Global
+constant expansion consumes gas; thus, the operation may also fail due
+to gas exhaustion.
+
+Global Constants at Runtime
+---------------------------
+
+Contracts that use global constants are semantically equivalent to the
+contract with all constants expanded.
+
+Note that using the ``UNPACK`` operation to construct a lambda or
+``CREATE_CONTRACT`` instruction that contains a constant reference is
+not supported.
