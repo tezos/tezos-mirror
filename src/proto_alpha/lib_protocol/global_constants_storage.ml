@@ -233,6 +233,9 @@ let substitute_node context node =
           k (context, map, did_substitution) node)
   >>=? fun (context, node, did_substitution) ->
   if did_substitution then
+    (* Gas charged during expansion is at least proportional to the size of the
+       resulting node so the execution time of [node_too_large] is already
+       covered. *)
     if node_too_large node then fail Expression_too_large
     else return (context, node)
   else return (context, node)
@@ -266,12 +269,16 @@ let check_depth node =
 
 let register context value =
   (* To calculate the total depth, we first expand all constants
-     in the expression. This may fail with [Expression_too_large]. *)
+     in the expression. This may fail with [Expression_too_large].
+
+     Though the stored expression is the unexpanded version.
+  *)
   substitute_node context (root value) >>=? fun (context, node) ->
   (* We do not need to carbonate [check_depth]. [substitute_node] and
      [Storage.Global_constants.Map.init] are already carbonated
-     and the computation cost of [depth] is small compared to these. *)
-  check_depth node >>?= fun _ ->
+     with gas at least proportional to the size of the expanded node
+     and the computation cost of [check_depth] is of the same order. *)
+  check_depth node >>?= fun (_depth : int) ->
   expr_to_address_in_context context value >>?= fun (context, key) ->
   Storage.Global_constants.Map.mem context key
   >>=? fun (context, already_exists) ->

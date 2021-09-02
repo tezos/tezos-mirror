@@ -767,7 +767,7 @@ let apply_manager_operation_content :
       ( Script.force_decode_in_context ctxt value >|? fun (value_expr, ctxt) ->
         (ctxt, value_expr) )
       >>?= fun (ctxt, expr) ->
-      (* Set the key to the type and value in storage. *)
+      (* Set the key to the value in storage. *)
       Global_constants_storage.register ctxt expr
       >>=? fun (ctxt, address, size) ->
       (* The burn and the reporting of the burn are calculated differently.

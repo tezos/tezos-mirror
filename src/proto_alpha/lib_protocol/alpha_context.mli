@@ -703,7 +703,10 @@ module Global_constants_storage : sig
     returning the hash and storage bytes consumed.
 
     Does not type-check the Micheline code being registered, allow potentially
-    ill-typed Michelson values (see note at top of module).
+    ill-typed Michelson values (see note at top of module in global_constants_storage.mli).
+
+    The constant is stored unexpanded, but it is temporarily expanded at registration
+    time only to check the expanded version respects the following limits.
 
     Fails with [Expression_too_deep] if, after fully, expanding all constants,
     the expression would contain too many nested levels, that is more than
@@ -721,6 +724,10 @@ module Global_constants_storage : sig
 
   (** [substitute context expr] Replaces every constant in the
     given Michelson expression with its value stored in the global table.
+
+    The expansion is applied recursively so that the returned expression
+    contains no constant.
+
     Fails with [Badly_formed_constant_expression] if constants are not
     well-formed (see declaration of [Badly_formed_constant_expression]) or
     with [Nonexistent_global] if a referenced constant does not exist in

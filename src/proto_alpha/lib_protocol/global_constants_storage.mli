@@ -65,6 +65,10 @@ val get :
     Does not type-check the Micheline code being registered, allow potentially
     ill-typed Michelson values to be stored in the table (see note at top of module).
 
+    The constant is stored unexpanded, but it is temporarily expanded at registration
+    time only to check the expanded version respects the following limits.
+    This also ensures there are no cyclic dependencies between constants.
+
     Fails with [Expression_too_deep] if, after fully expanding all constants,
     the expression would have a depth greater than [Constant_repr.max_allowed_global_constant_depth].
 
@@ -82,6 +86,10 @@ val register :
 
 (** [substitute context expr] replaces every constant in the
     given Michelson expression with its value stored in the global table.
+
+    The expansion is applied recursively so that the returned expression
+    contains no constant.
+
     Fails with [Badly_formed_constant_expression] if constants are not
     well-formed (see declaration of [Badly_formed_constant_expression]) or
     with [Nonexistent_global] if a referenced constant does not exist in
