@@ -131,6 +131,27 @@ let build hash =
 
           let complete_b58prefix = Env.Context.complete
         end : T)
+  | Some (V4 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.MakeV4 (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+          module Block_services = Block_services.Make (P) (P)
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
 
 module VersionTable = Protocol_hash.Table
 
