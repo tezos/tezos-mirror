@@ -1278,16 +1278,6 @@ let notify_operations (t : t) peer mempool =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
 
-let operations (t : t) =
-  let module Prevalidator : T = (val t) in
-  let w = Lazy.force Prevalidator.worker in
-  let pv = Prevalidator.Worker.state w in
-  ( {
-      (Classification.validation_result pv.shell.classification) with
-      applied = List.rev pv.shell.classification.applied_rev;
-    },
-    pv.shell.pending )
-
 let pending (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in

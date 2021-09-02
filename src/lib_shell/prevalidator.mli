@@ -92,9 +92,6 @@ val timestamp : t -> Time.System.t
 (** Returns the fitness of the current prevalidation context *)
 val fitness : t -> Fitness.t Lwt.t
 
-(** Returns the list of valid operations known to this prevalidation worker *)
-val operations : t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
-
 (** Returns the list of pending operations known to this prevalidation worker *)
 val pending : t -> Operation.t Operation_hash.Map.t Lwt.t
 
