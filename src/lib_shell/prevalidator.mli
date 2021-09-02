@@ -85,18 +85,8 @@ val flush :
   Operation_hash.Set.t ->
   unit tzresult Lwt.t
 
-(** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
-    reset of the prevalidation context *)
-val timestamp : t -> Time.System.t
-
 (** Returns the fitness of the current prevalidation context *)
 val fitness : t -> Fitness.t Lwt.t
-
-(** Returns the list of valid operations known to this prevalidation worker *)
-val operations : t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
-
-(** Returns the list of pending operations known to this prevalidation worker *)
-val pending : t -> Operation.t Operation_hash.Map.t Lwt.t
 
 (** Returns the list of prevalidation contexts running and their associated chain *)
 val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
