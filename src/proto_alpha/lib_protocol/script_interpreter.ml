@@ -1361,15 +1361,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IPairing_check_bls12_381 (_, k) ->
           let pairs = accu in
-          let check =
-            match pairs.elements with
-            | [] -> true
-            | pairs ->
-                Bls12_381.(
-                  miller_loop pairs |> final_exponentiation_opt
-                  |> Option.map Gt.(eq one))
-                |> Option.value ~default:false
-          in
+          let check = Bls12_381.pairing_check pairs.elements in
           (step [@ocaml.tailcall]) g gas k ks check stack
       | IComb (_, _, witness, k) ->
           let rec aux :
