@@ -2,7 +2,8 @@
  (name tezos_protocol_environment)
  (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment)
- (libraries tezos-base
+ (libraries bls12-381
+            tezos-base
             tezos-sapling
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs

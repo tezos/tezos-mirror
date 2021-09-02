@@ -1,6 +1,7 @@
 (tests
  (names test test_mem_context_array_theory)
- (libraries tezos-base.unix
+ (libraries bls12-381-unix
+            tezos-base.unix
             tezos-protocol-environment
             alcotest-lwt
             tezos-test-helpers

@@ -8,6 +8,8 @@ license: "MIT"
 depends: [
   "zarith" { < "1.12"} # the signature of the [Z] module has changed in 1.12
   "dune" { >= "2.0" }
+  "bls12-381-legacy" # for env{1,2,3}
+  "bls12-381" { >= "1.0.0" & < "1.1.0" } # for env4
   "tezos-sapling"
   "tezos-base"
   "tezos-context"

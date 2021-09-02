@@ -25,10 +25,8 @@
 
 module Fr : S.PRIME_FIELD
 
-module Fq12 : S.FIELD
+module G1 : S.CURVE with type Scalar.t = Fr.t
 
-include
-  S.PAIRING
-    with type Gt.t = Fq12.t
-     and type G1.Scalar.t = Fr.t
-     and type G2.Scalar.t = Fr.t
+module G2 : S.CURVE with type Scalar.t = Fr.t
+
+val pairing_check : (G1.t * G2.t) list -> bool

@@ -242,7 +242,13 @@ struct
   end
 
   module Time = Time.Protocol
-  module Bls12_381 = BLS12_381
+
+  module Bls12_381 = struct
+    include Bls12_381
+
+    let pairing_check = Bls12_381.Pairing.pairing_check
+  end
+
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
@@ -515,20 +521,6 @@ struct
 
       (** Multiply an element by a scalar *)
       val mul : t -> Scalar.t -> t
-    end
-
-    module type PAIRING = sig
-      module Gt : FIELD
-
-      module G1 : CURVE
-
-      module G2 : CURVE
-
-      val miller_loop : (G1.t * G2.t) list -> Gt.t
-
-      val final_exponentiation_opt : Gt.t -> Gt.t option
-
-      val pairing : G1.t -> G2.t -> Gt.t
     end
 
     module type PVSS_ELEMENT = sig

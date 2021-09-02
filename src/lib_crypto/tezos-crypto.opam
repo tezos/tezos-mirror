@@ -14,13 +14,11 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "bls12-381" { < "0.5" }
   "tezos-hacl-glue"
   "tezos-hacl-glue-unix" {with-test}
   "zarith"
   "secp256k1-internal"
   "ringo" { = "0.5" }
-  "bls12-381-unix" { with-test }
   "qcheck-alcotest" { with-test }
   "tezos-test-helpers" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }

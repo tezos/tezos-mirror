@@ -744,18 +744,14 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
     and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
      fun rng_state ->
-      let b =
-        Bls12_381.G1.Uncompressed.(to_bytes (random ~state:rng_state ()))
-      in
+      let b = Bls12_381.G1.(to_bytes (random ~state:rng_state ())) in
       match Environment.Bls12_381.G1.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
     and generate_bls12_381_g2 : Environment.Bls12_381.G2.t sampler =
      fun rng_state ->
-      let b =
-        Bls12_381.G2.Uncompressed.(to_bytes (random ~state:rng_state ()))
-      in
+      let b = Bls12_381.G2.(to_bytes (random ~state:rng_state ())) in
       match Environment.Bls12_381.G2.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
