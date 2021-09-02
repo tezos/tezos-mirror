@@ -177,7 +177,6 @@
             test_signature
             test_timelock
             test_context_hash
-            bls12-381-unix
             tezos-hacl-glue-unix
             data-encoding
             alcotest-glue-unix

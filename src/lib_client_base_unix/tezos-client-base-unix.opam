@@ -9,9 +9,6 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-base"
   "tezos-client-base"
-  # Dependency of tezos-crypto. Adding here to avoid adding in packages
-  # depending on tezos-client-base-unix
-  "bls12-381-unix"
   "tezos-stdlib-unix"
   "tezos-rpc-http-client"
   "tezos-signer-backends"
