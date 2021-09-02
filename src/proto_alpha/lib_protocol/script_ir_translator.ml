@@ -5685,7 +5685,7 @@ let parse_code :
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
-  Global_constants_storage.substitute ctxt code >>=? fun (ctxt, code) ->
+  Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   let code_size = Script_repr.(node_size (Micheline.root code)) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->

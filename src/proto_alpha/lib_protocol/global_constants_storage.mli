@@ -29,7 +29,7 @@
     reference this value by its hash. 
     
     Note: the table does not typecheck the values stored in it.
-    Instead, any place that uses constants must first call [substitute]
+    Instead, any place that uses constants must first call [expand]
     before typechecking the code. This decision was made to make it as
     easy as possible for users to register values to the table, and also
     to allow maximum flexibility in the use of constants for different
@@ -84,7 +84,7 @@ val register :
   Script_repr.expr ->
   (Raw_context.t * Script_expr_hash.t * Z.t) tzresult Lwt.t
 
-(** [substitute context expr] replaces every constant in the
+(** [expand context expr] replaces every constant in the
     given Michelson expression with its value stored in the global table.
 
     The expansion is applied recursively so that the returned expression
@@ -94,7 +94,7 @@ val register :
     well-formed (see declaration of [Badly_formed_constant_expression]) or
     with [Nonexistent_global] if a referenced constant does not exist in
     the table. *)
-val substitute :
+val expand :
   Raw_context.t ->
   Script_repr.expr ->
   (Raw_context.t * Script_repr.expr) tzresult Lwt.t
@@ -120,7 +120,7 @@ module Internal_for_tests : sig
    Notice that a common source of bug is to forget to properly call the
    continuation in `f`.
    
-   See [Global_constants_storage.substitute] for an example.
+   See [Global_constants_storage.expand] for an example.
 
    TODO: https://gitlab.com/tezos/tezos/-/issues/1609
    Move function to lib_micheline.

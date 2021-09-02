@@ -23,16 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module includes benchmarks for [Global_constants_storage.substitute]
+(* This module includes benchmarks for [Global_constants_storage.expand]
    and [Global_constants_storage.Internal_for_tests.expr_to_address_in_context].
    The other main function exported by [Global_constants_storage] is [register];
-   however, [register] calls [substitute] and does little else, and thus does
+   however, [register] calls [expand] and does little else, and thus does
    not need to be further carbonated.
    
    In the process of creating these benchmarks, we benchmarked several OCaml
    stdlib functions and [Script_expr_hash.of_b58check_opt]. While these cost
    models are not used in the protocol, they are kept here to ensure the
-   assumptions underlying [register] and [substitute] don't change out
+   assumptions underlying [register] and [expand] don't change out
    from under us.*)
 
 open Tezos_benchmark
@@ -586,11 +586,11 @@ let () =
             "Global_constants_storage_expr_to_address_in_context"
             Global_constants_storage_expr_to_address_in_context.models))
 
-(** [Global_constants_storage.substitute] traverses a Micheline node,
+(** [Global_constants_storage.expand] traverses a Micheline node,
     searching for constants and replacing them with their values
     retrieved from storage.
 
-    There are three branches in the iterations of [Global_constants_storage.substitute]
+    There are three branches in the iterations of [Global_constants_storage.expand]
     can take, each with different costs:
     - Branch 1: The first time a particular constant is found, the hash is parsed with
       [Script_expr_hash.of_b58check_opt], and its value is retrieved
@@ -613,13 +613,12 @@ let () =
 
     Below are models for Branch 2 and 3 respectively.
     *)
-module Global_constants_storage_substitute_models = struct
-  module Global_constants_storage_substitute_constant_branch : Benchmark.S =
-  struct
-    let name = "Global_constants_storage_substitute_constant_branch"
+module Global_constants_storage_expand_models = struct
+  module Global_constants_storage_expand_constant_branch : Benchmark.S = struct
+    let name = "Global_constants_storage_expand_constant_branch"
 
     let info =
-      "Benchmark for the constant branch Global_constants_storage.substitute \
+      "Benchmark for the constant branch Global_constants_storage.expand \
        function"
 
     let tags = ["global_constants"]
@@ -644,7 +643,7 @@ module Global_constants_storage_substitute_models = struct
         dominates the cost of each iteration. *)
     let models =
       [
-        ( "Global_constants_storage_substitute_constant_branch",
+        ( "Global_constants_storage_expand_constant_branch",
           Model.(
             make
               ~conv:(fun size -> (size, ()))
@@ -673,7 +672,7 @@ module Global_constants_storage_substitute_models = struct
       let closure () =
         ignore
           (Lwt_main.run
-          @@ Alpha_context.Global_constants_storage.substitute
+          @@ Alpha_context.Global_constants_storage.expand
                context
                (strip_locations node))
       in
@@ -685,23 +684,23 @@ module Global_constants_storage_substitute_models = struct
 
   let () =
     Registration.register
-      (module Global_constants_storage_substitute_constant_branch) ;
+      (module Global_constants_storage_expand_constant_branch) ;
     Registration.register_for_codegen
-      "Global_constants_storage_substitute_constant_branch"
+      "Global_constants_storage_expand_constant_branch"
       (Model.For_codegen
          (WithExceptions.Option.get ~loc:__LOC__
          @@ List.assoc
               ~equal:String.equal
-              "Global_constants_storage_substitute_constant_branch"
-              Global_constants_storage_substitute_constant_branch.models))
+              "Global_constants_storage_expand_constant_branch"
+              Global_constants_storage_expand_constant_branch.models))
 
-  module Global_constants_storage_substitute_no_constant_branch : Benchmark.S =
+  module Global_constants_storage_expand_no_constant_branch : Benchmark.S =
   struct
-    let name = "Global_constants_storage_substitute_no_constant_branch"
+    let name = "Global_constants_storage_expand_no_constant_branch"
 
     let info =
-      "Benchmark for the Global_constants_storage.substitute function on the \
-       case without constants"
+      "Benchmark for the Global_constants_storage.expand function on the case \
+       without constants"
 
     let tags = ["global_constants"]
 
@@ -732,7 +731,7 @@ module Global_constants_storage_substitute_models = struct
        model is sufficient. *)
     let models =
       [
-        ( "Global_constants_storage_substitute_no_constant_branch",
+        ( "Global_constants_storage_expand_no_constant_branch",
           Model.(
             make
               ~conv:(fun size -> (size, ()))
@@ -741,7 +740,7 @@ module Global_constants_storage_substitute_models = struct
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants
-        and calling [substitute] on it. This causes the function to spend all its time in
+        and calling [expand] on it. This causes the function to spend all its time in
         Branch 3. *)
     let create_benchmark rng_state _config () =
       let open Micheline in
@@ -752,7 +751,7 @@ module Global_constants_storage_substitute_models = struct
       let closure () =
         ignore
           (Lwt_main.run
-          @@ Alpha_context.Global_constants_storage.substitute context expr)
+          @@ Alpha_context.Global_constants_storage.expand context expr)
       in
       Generator.Plain {workload = size; closure}
 
@@ -762,13 +761,13 @@ module Global_constants_storage_substitute_models = struct
 
   let () =
     Registration.register
-      (module Global_constants_storage_substitute_no_constant_branch) ;
+      (module Global_constants_storage_expand_no_constant_branch) ;
     Registration.register_for_codegen
-      "Global_constants_storage_substitute_no_constant_branch"
+      "Global_constants_storage_expand_no_constant_branch"
       (Model.For_codegen
          (WithExceptions.Option.get ~loc:__LOC__
          @@ List.assoc
               ~equal:String.equal
-              "Global_constants_storage_substitute_no_constant_branch"
-              Global_constants_storage_substitute_no_constant_branch.models))
+              "Global_constants_storage_expand_no_constant_branch"
+              Global_constants_storage_expand_no_constant_branch.models))
 end

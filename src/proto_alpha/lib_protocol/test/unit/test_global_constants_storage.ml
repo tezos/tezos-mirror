@@ -119,36 +119,35 @@ let test_register_fails_if_too_deep =
       >|= Environment.wrap_tzresult
       >>= assert_error_id __LOC__ "proto.alpha.Expression_too_deep")
 
-(** [substitute] on an expression containing a nonexistent global
+(** [expand] on an expression containing a nonexistent global
     constant returns an error. *)
-let test_substitute_nonexistent_fails =
+let test_expand_nonexistent_fails =
   tztest_qcheck
     ~name:
-      "substitute on an expression containing a nonexistent global constant \
-       fails"
+      "expand on an expression containing a nonexistent global constant fails"
     (pair
        Generators.context_arbitrary
        Generators.canonical_with_constant_arbitrary)
   @@ fun (context, (_, expr, _)) ->
   assume_expr_not_too_large expr ;
-  Global_constants_storage.substitute context expr
+  Global_constants_storage.expand context expr
   >|= Environment.wrap_tzresult
   >>= assert_error_id __LOC__ "proto.alpha.Nonexistent_global"
 
-(** Substituting an expression without constants should yield the same expression. *)
-let test_substitute_no_constants =
-  tztest "substitute: no constants case" `Quick (fun () ->
+(** Expanding an expression without constants should yield the same expression. *)
+let test_expand_no_constants =
+  tztest "expand: no constants case" `Quick (fun () ->
       create_context () >>=? fun context ->
       let expected = Expr.from_string "Pair 1 (Pair 2 3)" in
-      Global_constants_storage.substitute context expected
+      Global_constants_storage.expand context expected
       >|= Environment.wrap_tzresult
       >>=? fun (_, result_expr) ->
       assert_expr_equal __LOC__ expected result_expr)
 
-(** Similar to [test_substitute_no_constants], but random. *)
-let test_register_and_substitute_orthogonal =
+(** Similar to [test_expand_no_constants], but random. *)
+let test_register_and_expand_orthogonal =
   tztest_qcheck
-    ~name:"register and substitute are orthogonal"
+    ~name:"register and expand are orthogonal"
     (triple
        Generators.context_arbitrary
        Generators.canonical_without_constant_arbitrary
@@ -160,15 +159,15 @@ let test_register_and_substitute_orthogonal =
       Global_constants_storage.register context expr1
       >|= Environment.wrap_tzresult
       >>=? fun (context, _hash, _cost) ->
-      Global_constants_storage.substitute context expr2
+      Global_constants_storage.expand context expr2
       >|= Environment.wrap_tzresult
       >|=? fun (_, expr2_result) -> qcheck_eq ~pp:print_expr expr2 expr2_result)
 
-(** Substitution should expand constants in the given
+(** Expanding should expand constants in the given
     expression, then expand any new constants, etc.
     recursively until no constants remain.  *)
-let test_substitute_deep_constants =
-  tztest "substitute: deep constants" `Quick (fun () ->
+let test_expand_deep_constants =
+  tztest "expand: deep constants" `Quick (fun () ->
       (* Should hold for any n, but this test is very slow,
          hence we don't do QCheck. *)
       let n = 1000 in
@@ -200,7 +199,7 @@ let test_substitute_deep_constants =
              "{constant \"%s\"; CDR; NIL operation; PAIR}"
              (Script_expr_hash.to_b58check hash)
       in
-      Global_constants_storage.substitute context deep_expr
+      Global_constants_storage.expand context deep_expr
       >|= Environment.wrap_tzresult
       >>=? fun (_, result) ->
       let seq_n_deep n =
@@ -220,12 +219,12 @@ let test_substitute_deep_constants =
 (** The [constant] prim is permitted only to have a
     single string argument, representing a valid
     Script_repr.expr hash. *)
-let test_substitute_reject_ill_formed =
-  tztest "substitute: ill formed constants are rejected" `Quick (fun () ->
+let test_expand_reject_ill_formed =
+  tztest "expand: ill formed constants are rejected" `Quick (fun () ->
       let test expr =
         create_context () >>=? fun context ->
         let expected = Expr.from_string expr in
-        Global_constants_storage.substitute context expected
+        Global_constants_storage.expand context expected
         >|= Environment.wrap_tzresult
         >>= assert_error_id
               __LOC__
@@ -238,11 +237,11 @@ let test_substitute_reject_ill_formed =
       (* constant with bad hash fails *)
       >>=? fun _ -> test "constant \"foobar\"")
 
-(** [test_substitute] accepts an expression [stored] to be
+(** [test_expand] accepts an expression [stored] to be
     registered in the store, an expression [expr] that includes a template slot for
     the hash of [stored], and an [expected] expression, and generates a test that
-    asserts the value of [expr] after substitution matches [expected]. *)
-let make_substitute_test ~stored ~expr ~expected () =
+    asserts the value of [expr] after expansion matches [expected]. *)
+let make_expand_test ~stored ~expr ~expected () =
   create_context () >>=? fun context ->
   let stored_expr = Expr.from_string stored in
   Global_constants_storage.register context stored_expr
@@ -252,45 +251,45 @@ let make_substitute_test ~stored ~expr ~expected () =
   let expr_with_constant =
     Format.sprintf expr (Script_expr_hash.to_b58check hash) |> Expr.from_string
   in
-  Global_constants_storage.substitute context expr_with_constant
+  Global_constants_storage.expand context expr_with_constant
   >|= Environment.wrap_tzresult
   >>=? fun (_, result_expr) -> assert_expr_equal __LOC__ expected result_expr
 
-let test_substitute_data_example =
+let test_expand_data_example =
   tztest
-    "substitute: data"
+    "expand: data"
     `Quick
-    (make_substitute_test
+    (make_expand_test
        ~stored:"3"
        ~expr:"Pair 1 (Pair 2 (constant \"%s\"))"
        ~expected:"Pair 1 (Pair 2 3)")
 
-let test_substitute_types_example =
+let test_expand_types_example =
   tztest
-    "substitute: types"
+    "expand: types"
     `Quick
-    (make_substitute_test
+    (make_expand_test
        ~stored:"big_map string string"
        ~expr:"PUSH (constant \"%s\") {}"
        ~expected:"PUSH (big_map string string) {}")
 
-let test_substitute_instr_example =
+let test_expand_instr_example =
   tztest
-    "substitute: instr"
+    "expand: instr"
     `Quick
-    (make_substitute_test
+    (make_expand_test
        ~stored:"PUSH int 3"
        ~expr:"{ DROP; constant \"%s\"; DROP }"
        ~expected:"{ DROP; PUSH int 3 ; DROP }")
 
 (** For any expression [e], when replacing any subexpression
     [e'] with a constant hash and registering [e'], calling
-    [substitute] on the new expression yields the
+    [expand] on the new expression yields the
     original expression [e]*)
-let test_substitute_pbt =
+let test_expand_pbt =
   let open Michelson_v1_printer in
   tztest_qcheck
-    ~name:"substitute: random"
+    ~name:"expand: random"
     (pair
        Generators.context_arbitrary
        Generators.canonical_with_constant_arbitrary)
@@ -301,14 +300,14 @@ let test_substitute_pbt =
       Global_constants_storage.register context sub_expr
       >|= Environment.wrap_tzresult
       >>=? fun (context, _, _) ->
-      Global_constants_storage.substitute context expr_with_constant
+      Global_constants_storage.expand context expr_with_constant
       >|= Environment.wrap_tzresult
       >|=? fun (_, result_expr) ->
       qcheck_eq ~pp:print_expr full_expr result_expr)
 
-let test_substitute_is_idempotent =
+let test_expand_is_idempotent =
   tztest_qcheck
-    ~name:"substitute is idempotent"
+    ~name:"expand is idempotent"
     (pair
        Generators.context_arbitrary
        Generators.canonical_with_constant_arbitrary)
@@ -317,10 +316,10 @@ let test_substitute_is_idempotent =
       Global_constants_storage.register context sub_expr
       >|= Environment.wrap_tzresult
       >>=? fun (context, _, _) ->
-      Global_constants_storage.substitute context expr_with_constant
+      Global_constants_storage.expand context expr_with_constant
       >|= Environment.wrap_tzresult
       >>=? fun (context, result1) ->
-      Global_constants_storage.substitute context full_expr
+      Global_constants_storage.expand context full_expr
       >|= Environment.wrap_tzresult
       >|=? fun (_, result2) -> qcheck_eq ~pp:print_expr result1 result2)
 
@@ -343,15 +342,15 @@ let tests =
     test_register_fails_with_unregistered_references;
     test_register_fails_with_unregistered_references_pbt;
     test_register_fails_if_too_deep;
-    test_substitute_nonexistent_fails;
-    test_substitute_no_constants;
-    test_register_and_substitute_orthogonal;
-    test_substitute_deep_constants;
-    test_substitute_reject_ill_formed;
-    test_substitute_data_example;
-    test_substitute_types_example;
-    test_substitute_instr_example;
-    test_substitute_pbt;
-    test_substitute_is_idempotent;
+    test_expand_nonexistent_fails;
+    test_expand_no_constants;
+    test_register_and_expand_orthogonal;
+    test_expand_deep_constants;
+    test_expand_reject_ill_formed;
+    test_expand_data_example;
+    test_expand_types_example;
+    test_expand_instr_example;
+    test_expand_pbt;
+    test_expand_is_idempotent;
     test_fold_does_not_stack_overflow;
   ]
