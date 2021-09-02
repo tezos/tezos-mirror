@@ -217,7 +217,12 @@ let substitute_node context node =
               | None -> fail Badly_formed_constant_expression
               | Some hash -> (
                   match Expr_hash_map.find hash map with
-                  | Some node -> k (context, map, true) node
+                  | Some node ->
+                      (* Charge traversing the newly retrieved node *)
+                      Raw_context.consume_gas
+                        context
+                        (Gas_model.substitute_no_constants_branch_cost node)
+                      >>?= fun context -> k (context, map, true) node
                   | None ->
                       get context hash >>=? fun (context, expr) ->
                       (* Charge traversing the newly retrieved node *)
