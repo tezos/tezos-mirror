@@ -16,6 +16,7 @@
    v0/context_hash.ml
    v0/error_monad_traversors.ml
    v0/data_encoding.ml
+   v1/bls12_381.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

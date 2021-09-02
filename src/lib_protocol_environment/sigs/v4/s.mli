@@ -341,20 +341,6 @@ module type CURVE = sig
   val mul : t -> Scalar.t -> t
 end
 
-module type PAIRING = sig
-  module Gt : FIELD
-
-  module G1 : CURVE
-
-  module G2 : CURVE
-
-  val miller_loop : (G1.t * G2.t) list -> Gt.t
-
-  val final_exponentiation_opt : Gt.t -> Gt.t option
-
-  val pairing : G1.t -> G2.t -> Gt.t
-end
-
 module type PVSS_ELEMENT = sig
    type t
 

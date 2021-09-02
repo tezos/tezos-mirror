@@ -137,6 +137,7 @@ struct
         Stdlib.exit 1
 
   include Stdlib
+  open Tezos_protocol_environment_structs.V3.M
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -242,7 +243,7 @@ struct
   end
 
   module Time = Time.Protocol
-  module Bls12_381 = BLS12_381
+  module Bls12_381 = Bls12_381
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
