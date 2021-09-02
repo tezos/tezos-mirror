@@ -124,7 +124,6 @@ module type T = sig
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
-    Worker_types.limits ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
@@ -192,9 +191,6 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
-
-  (** Access the event backlog. *)
-  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list

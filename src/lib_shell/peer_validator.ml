@@ -62,7 +62,6 @@ type limits = {
   block_header_timeout : Time.System.Span.t;
   block_operations_timeout : Time.System.Span.t;
   protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
 }
 
 module Types = struct
@@ -433,7 +432,6 @@ let create ?(notify_new_block = fun _ -> ()) ?(notify_termination = fun _ -> ())
   Worker.launch
     table
     ~timeout:limits.new_head_request_timeout
-    limits.worker_limits
     name
     parameters
     (module Handlers)
@@ -465,8 +463,6 @@ let information = Worker.information
 let running_workers () = Worker.list table
 
 let current_request t = Worker.current_request t
-
-let last_events = Worker.last_events
 
 let pipeline_length w =
   let state = Worker.state w in

@@ -25,14 +25,6 @@
 
 open Error_monad
 
-(** Some memory and time limits. *)
-type limits = {
-  backlog_size : int;
-      (** Number of event stored in the backlog for each debug level. *)
-  backlog_level : Internal_event.level;
-      (** Stores events at least as important as this value. *)
-}
-
 (** The running status of an individual worker. *)
 type worker_status =
   | Launching of Time.System.t
@@ -64,18 +56,16 @@ type request_status = {
 val request_status_encoding : request_status Data_encoding.t
 
 (** The full status of an individual worker. *)
-type ('req, 'evt) full_status = {
+type 'req full_status = {
   status : worker_status;
   pending_requests : (Time.System.t * 'req) list;
-  backlog : (Internal_event.level * 'evt list) list;
   current_request : (Time.System.t * Time.System.t * 'req) option;
 }
 
 (** Full worker status serializer for RPCs. *)
 val full_status_encoding :
   'req Data_encoding.t ->
-  'evt Data_encoding.t ->
   error list Data_encoding.t ->
-  ('req, 'evt) full_status Data_encoding.t
+  'req full_status Data_encoding.t
 
 val pp_status : Format.formatter -> request_status -> unit

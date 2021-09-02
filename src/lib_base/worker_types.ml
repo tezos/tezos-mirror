@@ -25,8 +25,6 @@
 
 open Error_monad
 
-type limits = {backlog_size : int; backlog_level : Internal_event.level}
-
 type worker_status =
   | Launching of Time.System.t
   | Running of Time.System.t
@@ -118,26 +116,19 @@ let request_status_encoding =
        (req "treated" Time.System.Span.encoding)
        (req "completed" Time.System.Span.encoding))
 
-type ('req, 'evt) full_status = {
+type 'req full_status = {
   status : worker_status;
   pending_requests : (Time.System.t * 'req) list;
-  backlog : (Internal_event.level * 'evt list) list;
   current_request : (Time.System.t * Time.System.t * 'req) option;
 }
 
-let full_status_encoding req_encoding evt_encoding error_encoding =
+let full_status_encoding req_encoding error_encoding =
   let open Data_encoding in
   let requests_encoding =
     list
       (obj2
          (req "pushed" Time.System.encoding)
          (req "request" (dynamic_size req_encoding)))
-  in
-  let events_encoding =
-    list
-      (obj2
-         (req "level" Internal_event.Level.encoding)
-         (req "events" (dynamic_size (list (dynamic_size evt_encoding)))))
   in
   let current_request_encoding =
     obj3
@@ -146,14 +137,13 @@ let full_status_encoding req_encoding evt_encoding error_encoding =
       (req "request" req_encoding)
   in
   conv
-    (fun {status; pending_requests; backlog; current_request} ->
-      (status, pending_requests, backlog, current_request))
-    (fun (status, pending_requests, backlog, current_request) ->
-      {status; pending_requests; backlog; current_request})
-    (obj4
+    (fun {status; pending_requests; current_request} ->
+      (status, pending_requests, current_request))
+    (fun (status, pending_requests, current_request) ->
+      {status; pending_requests; current_request})
+    (obj3
        (req "status" (worker_status_encoding error_encoding))
        (req "pending_requests" requests_encoding)
-       (req "backlog" events_encoding)
        (opt "current_request" current_request_encoding))
 
 let pp_status ppf {pushed; treated; completed} =
