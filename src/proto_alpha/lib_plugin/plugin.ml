@@ -1481,7 +1481,8 @@ module RPC = struct
                 storage;
               }
           in
-          return @@ Script_ir_translator.script_size script) ;
+          let (size, _cost) = Script_ir_translator.script_size script in
+          return @@ size) ;
 
       Registration.register0
         ~chunked:false

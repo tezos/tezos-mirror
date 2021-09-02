@@ -6782,8 +6782,8 @@ let script_size
         root_name = _;
         views = _;
       }) =
-  (* FIXME: will be used in an upcoming commit *)
-  let (_unused_for_now, storage_size) =
+  let (nodes, storage_size) =
     Script_typed_ir_size.value_size storage_type storage
   in
-  Saturation_repr.(add code_size storage_size |> to_int)
+  let cost = Script_typed_ir_size_costs.nodes_cost ~nodes in
+  (Saturation_repr.(add code_size storage_size |> to_int), cost)

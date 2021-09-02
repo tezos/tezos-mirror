@@ -1760,7 +1760,8 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     Ex_script
       {code_size; code; arg_type; storage; storage_type; root_name; views}
   in
-  let code_size = Script_ir_translator.script_size script in
+  (* the cost below will be used in a subsequent commit *)
+  let (code_size, _cost) = Script_ir_translator.script_size script in
   (unparsed_storage, ops, ctxt, lazy_storage_diff, script, code_size)
 
 type execution_result = {
