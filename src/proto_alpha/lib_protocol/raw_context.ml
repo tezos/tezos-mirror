@@ -770,7 +770,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             liquidity_baking_sunset_level =
               (* preserve a lower level for testnets *)
               (if Compare.Int32.(c.liquidity_baking_sunset_level = 2_032_928l)
-              then 2_203_649l
+              then 2_244_609l
               else c.liquidity_baking_sunset_level);
             liquidity_baking_escape_ema_threshold =
               c.liquidity_baking_escape_ema_threshold;

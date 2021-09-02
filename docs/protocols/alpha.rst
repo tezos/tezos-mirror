@@ -148,10 +148,10 @@ Minor Changes
   performance will become easier now that they are decoupled from the
   protocol development cycle. (MR :gl:`!3368`)
 
-- Gives a nominal increase to the liquidity baking sunset level of
-  170,721 blocks, or four voting voting periods plus 6,881 blocks to
+- Gives an increase to the liquidity baking sunset level of
+  211,681 blocks, or five voting periods plus 6,881 blocks to
   sync with the following voting period, roughly an additional two
-  months. Without this, the subsidy would halt during the lifespan of
+  months and a half. Without this, the subsidy would halt during the lifespan of
   this protocol. With this change the subsidy can continue until the
   protocol after this one is activated, even accounting for some
   delays in proposal injection and/or a restarted voting process,
@@ -159,7 +159,7 @@ Minor Changes
   one without a more significant increase. This follows the spirit of
   `the liquidity baking TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_ in that it is still roughly six months
   from Granada activation and requires a referendum on the subsidy in
-  the protocol after this one. (MR :gl:`!3425`)
+  the protocol after this one. (MR :gl:`!3425` :gl:`!3464`)
 
 - Reimplemented ``Logging``.  It now has Lwt-less APIs and the messages are handled
   by the shell. (MR :gl:`!3225`)
