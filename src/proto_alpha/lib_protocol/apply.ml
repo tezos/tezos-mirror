@@ -764,9 +764,7 @@ let apply_manager_operation_content :
         [] )
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
-      ( Script.force_decode_in_context ctxt value >|? fun (value_expr, ctxt) ->
-        (ctxt, value_expr) )
-      >>?= fun (ctxt, expr) ->
+      Script.force_decode_in_context ctxt value >>?= fun (expr, ctxt) ->
       (* Set the key to the value in storage. *)
       Global_constants_storage.register ctxt expr
       >>=? fun (ctxt, address, size) ->

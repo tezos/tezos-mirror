@@ -280,12 +280,9 @@ let register context value =
      and the computation cost of [check_depth] is of the same order. *)
   check_depth node >>?= fun (_depth : int) ->
   expr_to_address_in_context context value >>?= fun (context, key) ->
-  Storage.Global_constants.Map.mem context key
-  >>=? fun (context, already_exists) ->
-  if already_exists then fail Expression_already_registered
-  else
-    Storage.Global_constants.Map.init context key value
-    >|=? fun (context, size) -> (context, key, Z.of_int size)
+  trace Expression_already_registered
+  @@ Storage.Global_constants.Map.init context key value
+  >|=? fun (context, size) -> (context, key, Z.of_int size)
 
 module Internal_for_tests = struct
   let node_too_large = node_too_large
