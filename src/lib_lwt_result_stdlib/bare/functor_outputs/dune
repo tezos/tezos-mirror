@@ -1,5 +1,5 @@
 (library
  (name bare_functor_outputs)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib.bare.functor-outputs)
+ (instrumentation (backend bisect_ppx))
  (libraries lwt))

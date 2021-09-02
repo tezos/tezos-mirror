@@ -1,21 +1,23 @@
 (tests
- (names test_bits
-        test_tzList
-        test_bounded_heap
-        test_tzString
-        test_arrays
-        test_fallbackArray
-        test_functionalArray
-        test_lwt_pipe
-        test_circular_buffer
-        test_circular_buffer_fuzzy)
- (libraries tezos-stdlib
-            alcotest
-            alcotest-lwt
-            lwt_log
-            bigstring
-            lwt.unix
-            tezos-test-helpers
-            qcheck-alcotest)
+ (names
+  test_bits
+  test_tzList
+  test_bounded_heap
+  test_tzString
+  test_arrays
+  test_fallbackArray
+  test_functionalArray
+  test_lwt_pipe
+  test_circular_buffer
+  test_circular_buffer_fuzzy)
  (package tezos-stdlib)
+ (libraries
+  tezos-stdlib
+  alcotest
+  alcotest-lwt
+  lwt_log
+  bigstring
+  lwt.unix
+  tezos-test-helpers
+  qcheck-alcotest)
  (flags (:standard -open Tezos_stdlib)))

@@ -8,15 +8,13 @@
   test_fuzzing_list
   test_fuzzing_set
   test_fuzzing_seq_tiered
-  test_fuzzing_option
- )
- (libraries
-            tezos-lwt-result-stdlib
-            tezos-lwt-result-stdlib.examples.traces
-            lwt.unix
-            alcotest-lwt
-            qcheck-alcotest
-            tezos-test-helpers)
- (flags (:standard -open Tezos_lwt_result_stdlib))
+  test_fuzzing_option)
  (package tezos-lwt-result-stdlib)
-)
+ (libraries
+  tezos-lwt-result-stdlib
+  tezos-lwt-result-stdlib.examples.traces
+  lwt.unix
+  alcotest-lwt
+  qcheck-alcotest
+  tezos-test-helpers)
+ (flags (:standard -open Tezos_lwt_result_stdlib)))

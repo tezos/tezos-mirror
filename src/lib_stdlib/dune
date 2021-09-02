@@ -1,9 +1,7 @@
 (library
  (name tezos_stdlib)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-stdlib)
- (libraries hex
-            zarith
-            lwt)
+ (instrumentation (backend bisect_ppx))
+ (libraries hex zarith lwt)
  (inline_tests)
  (preprocess (pps ppx_inline_test)))

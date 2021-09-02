@@ -1,9 +1,8 @@
 (library
  (name traced_structs)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib.traced.structs)
+ (instrumentation (backend bisect_ppx))
  (libraries
-   lwt
-   tezos-lwt-result-stdlib.traced.sigs
-   tezos-lwt-result-stdlib.bare.structs
- ))
+  lwt
+  tezos-lwt-result-stdlib.traced.sigs
+  tezos-lwt-result-stdlib.bare.structs))
