@@ -77,6 +77,21 @@ let parse_block s =
         (String.split delim s, delim)
     | _ -> raise Exit
   in
+  (* Converts a string representing a block level into a Int32. Fails
+     if the resulting integer is negative. *)
+  let to_valid_level_id s =
+    let l = Int32.of_string s in
+    if Compare.Int32.(l < 0l) then raise Exit else l
+  in
+  (* Converts an Int32 into a level identifier. If [?offset] is given,
+     returns the level identifier minus that offset. *)
+  let to_level ?offset l =
+    if Compare.Int32.(l = 0l) then Ok `Genesis
+    else
+      match offset with
+      | Some ofs -> Ok (`Level Int32.(sub l ofs))
+      | None -> Ok (`Level l)
+  in
   try
     match split_on_delim (count_delims s) with
     | (["genesis"], _) -> Ok `Genesis
@@ -98,15 +113,19 @@ let parse_block s =
     | ([hol], _) -> (
         match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, 0))
+        | None -> to_level (to_valid_level_id s))
+    | ([hol; n], '~') | ([hol; n], '-') -> (
+        match Block_hash.of_b58check_opt hol with
+        | Some h -> Ok (`Hash (h, int_of_string n))
         | None ->
-            let l = Int32.of_string s in
-            if Compare.Int32.(l < 0l) then raise Exit
-            else if Compare.Int32.(l = 0l) then Ok `Genesis
-            else Ok (`Level (Int32.of_string s)))
-    | ([h; n], '~') | ([h; n], '-') ->
-        Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
-    | ([h; n], '+') ->
-        Ok (`Hash (Block_hash.of_b58check_exn h, -int_of_string n))
+            let offset = to_valid_level_id n in
+            to_level ~offset (to_valid_level_id hol))
+    | ([hol; n], '+') -> (
+        match Block_hash.of_b58check_opt hol with
+        | Some h -> Ok (`Hash (h, -int_of_string n))
+        | None ->
+            let offset = Int32.neg (to_valid_level_id n) in
+            to_level ~offset (to_valid_level_id hol))
     | _ -> raise Exit
   with _ -> Error ("Cannot parse block identifier: " ^ s)
 

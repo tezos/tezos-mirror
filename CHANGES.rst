@@ -49,6 +49,17 @@ Node
 
 - Change chain validator event encoding. RPC GET  ``/workers/chain_validators/<chain_id>`` is modified.
 
+-  Added the possibility to use the ``~``, ``-`` and ``+`` operators
+   when querying blocks by their level using the
+   ``/chains/.../blocks/`` RPC. For instance,
+   ``/chains/main/blocks/41+1`` requests the block at level 42. Before
+   this change, these notations were only available with aliases (such
+   as ``head-1``).
+
+-  Added the possibility to use the ``+`` operator when specifying the
+   block to export, using the ``--block`` argument of the snapshot
+   export command. Before, only ``~`` and ``-`` were allowed.
+
 Client
 ------
 
