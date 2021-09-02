@@ -47,6 +47,7 @@ module Configuration : sig
       URI in the configuration. *)
   val apply : t -> unit tzresult Lwt.t
 
+  (** Close all the sinks except ["lwt-log://"] and call {!apply}. *)
   val reapply : t -> unit tzresult Lwt.t
 end
 

@@ -351,7 +351,8 @@ let build_rpc_directory node =
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
-       ~mainchain_validator:node.mainchain_validator store) ;
+       ~mainchain_validator:node.mainchain_validator
+       node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;

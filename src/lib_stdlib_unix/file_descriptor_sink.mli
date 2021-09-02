@@ -44,7 +44,7 @@
       acceptable values are ["one-per-line"] (the default),
       ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
       Netstring format}) (both to separate JSON records), {i or} ["pp"] to
-      output the events pretty-printed.
+      output the events pretty-printed as text using the [syslog] format.
 
     Options available only for ["file-descriptor-path://"]:
 
