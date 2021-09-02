@@ -57,7 +57,7 @@ let () =
       ~title:"Primitive namespace"
       ~description:
         "One of the five possible namespaces of primitive (data constructor, \
-         type name, instruction or keyword)."
+         type name, instruction, keyword, or constant hash)."
     @@ string_enum
          [
            ("type", Michelson_v1_primitives.Type_namespace);

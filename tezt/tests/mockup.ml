@@ -145,7 +145,10 @@ let test_calling_contract_with_global_constant_failure ~protocols =
   let storage = "0" in
   let input = "Unit" in
   let process = Client.spawn_run_script ~src:script ~storage ~input client in
-  Process.check_error ~exit_code:1 ~msg:(rex "No global was found") process
+  Process.check_error
+    ~exit_code:1
+    ~msg:(rex "No registered global was found")
+    process
 
 let test_register_global_constant_success ~protocols =
   Protocol.register_test

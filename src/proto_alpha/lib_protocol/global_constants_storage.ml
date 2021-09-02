@@ -113,8 +113,8 @@ let () =
     (function Expression_too_deep -> Some () | _ -> None)
     (fun () -> Expression_too_deep) ;
   let description =
-    "Attempted to register an expression as global constant has already been \
-     registered."
+    "Attempted to register an expression as global constant that has already \
+     been registered."
   in
   register_error_kind
     `Branch
@@ -140,8 +140,7 @@ let () =
     (function Badly_formed_constant_expression -> Some () | _ -> None)
     (fun () -> Badly_formed_constant_expression) ;
   let description =
-    "No global was found at the given hash in storage. Are you sure the value \
-     is registered and you have the correct hash?"
+    "No registered global was found at the given hash in storage."
   in
   register_error_kind
     `Branch
