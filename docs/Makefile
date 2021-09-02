@@ -77,8 +77,8 @@ xrefscheck:
 scriptsindoccheck:
 	introduction/test_howtoget.sh install-bin-bionic
 	introduction/test_howtoget.sh install-bin-focal
-	introduction/test_howtoget.sh install-bin-fedora31
-	introduction/test_howtoget.sh install-bin-fedora32
+	introduction/test_howtoget.sh install-bin-fedora33
+	introduction/test_howtoget.sh install-bin-fedora34
 	introduction/test_howtoget.sh install-opam-scratch
 	introduction/test_howtoget.sh install-opam-bionic
 	introduction/test_howtoget.sh install-opam-focal
