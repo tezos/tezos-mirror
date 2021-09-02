@@ -9,15 +9,27 @@ Packs the current proto_alpha directory in a new
 proto_<version_number>_<hash> directory with all the necessary
 renamings.
 
-<name> should be in lower case
-<version_number> should be three digits"
+<name> should be in lower case, e.g. 'stockholm'
+<version_number> should be three digits, e.g. 022",
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$script_dir"/..
 
+# e.g. stockholm_022
 current=$1
+# e.g. stockholm
 label=$(echo $current | cut -d'_' -f1)
+# e.g. 022
 version=$(echo $current | cut -d'_' -f2)
+# e.g. Stockholm
+capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
+# e.g. STOCKHOLM
+upcased_label=$(tr '[:lower:]' '[:upper:]' <<< "${label}")
+# e.g. Pt8PY9P47nYw7WgPqpr49JZX5iU511ZJ9UPrBKu1CuYtBsLy7q7 (set below)
+long_hash=
+# e.g. Pt8PY9P4 (set below)
+short_hash=
+
 
 if ! ( [[ "$label" =~ ^[a-z]+$ ]] && [[ "$version" =~ ^[0-9][0-9][0-9]$ ]] ); then
     echo "Wrong protocol version."
@@ -99,7 +111,6 @@ sed -e s/_alpha:/_${version}_${label}:/g \
 # add entries in the doc index
 # copy from alpha rather from previous protocol because there may be newly added items
 echo "Add entries in the doc index"
-capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
 alpha_line='Alpha Development Protocol'
 doc_index="docs/index.rst"
 (
@@ -142,7 +153,39 @@ sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g
 echo "Fixing python regtests ouputs"
 cd _regtest_outputs
 sed -i.old -e "s/_alpha\b/_${version}/g" *.out
-cd ../../..
+cd ../..
+
+echo "Fixing python protocol constants"
+
+# update tests_python/tools/constants.py
+crt_line='TEZOS_CRT = """'
+constants_file='tools/constants.py'
+(
+    grep -B9999 -F "$crt_line" "$constants_file" \
+      | head -n-1
+
+    cat <<EOF
+${upcased_label} = "$long_hash"
+${upcased_label}_DAEMON = "${version}-${short_hash}"
+${upcased_label}_FOLDER = "proto_${version}_${short_hash}"
+${upcased_label}_PARAMETERS = get_parameters(${upcased_label}_FOLDER)
+
+EOF
+    grep -A9999 -F "$crt_line" "$constants_file" \
+) > "${constants_file}.tmp"
+mv "${constants_file}.tmp" $constants_file
+
+# update pytests/tests_${current - 1}/protocol.py
+
+prev_upcased_label=$(grep '^PREV_HASH = constants.*' "tests_alpha/protocol.py" | cut -d. -f2)
+if [ -z "$prev_upcased_label" ]; then
+    echo "Error: Could not read the label of the predecessor protocol in tests_alpha/protocol.py"
+    exit 1
+fi
+
+sed -i.old -e "s/constants\.ALPHA/constants\.${upcased_label}/" "tests_${version}/protocol.py"
+sed -i.old -e "s/constants\.${prev_upcased_label}/constants\.${upcased_label}/" "tests_alpha/protocol.py"
+cd ../
 
 # move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
