@@ -124,4 +124,4 @@ contract with all constants expanded.
 
 Note that using the ``UNPACK`` operation to construct a lambda or
 ``CREATE_CONTRACT`` instruction that contains a constant reference is
-not supported.
+not supported. Referencing constants from views is likewise unsupported.
