@@ -66,10 +66,10 @@ would result in the output:
          Global address: expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8
 
 As you can see, the address of the constant is returned in the operation
-receipt in the field ``Global address``. This address is a B58 hash of the bytes of the expression
-registered (similar to other hashes in Tezos). This means constants are
-content-addressable - given a particular Micheline expression, you can
-always calculate its on-chain address and check if it’s registered.
+receipt in the field ``Global address``. This address is the Base58-encode Blake2b
+hash of the binary serialization of the registered Micheline expression.
+This means constants are content-addressable - given a particular Micheline
+expression, you can always calculate its on-chain address and check if it’s registered.
 
 A few points about registering global constants:
 
