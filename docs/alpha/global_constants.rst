@@ -69,7 +69,7 @@ As you can see, the address of the constant is returned in the operation
 receipt. This address is a B58 hash of the bytes of the expression
 registered (similar to other hashes in Tezos). This means constants are
 content-addressable - given a particular Micheline expression, you can
-always calculate it’s address on the chain and check if it’s registered.
+always calculate its on-chain address and check if it’s registered.
 
 A few points about registering global constants: - Global constants may
 contain references to other constants; however, any referenced constants
