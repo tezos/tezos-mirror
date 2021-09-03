@@ -3598,7 +3598,6 @@ Full grammar
       | { <data> ; ... }
       | { Elt <data> <data> ; ... }
       | instruction
-      | constant <string constant>
     <natural number constant> ::=
       | [0-9]+
     <int constant> ::=
