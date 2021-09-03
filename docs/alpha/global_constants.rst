@@ -1,13 +1,13 @@
 Global Constants
 ================
 
-The size limit for Michelson contracts is quite small, limited to 60
+The size limit for :doc:`Michelson <michelson>` contracts is quite small, limited to 60
 kilobytes as of Granada protocol. Global constants are a feature added
-in Hangzhou protocol that adds “macros” to Michelson scripts, allowing
+in Hangzhou protocol that enables the re-use of user-defined Micheline chunks in Michelson scripts, allowing
 for larger and more complex contracts on the chain. It works in the
 following way:
 
--  Fragments of Michelson code (written in the Micheline format) are
+-  Fragments of Michelson code (written in the :doc:`Micheline format <../shell/micheline>`) are
    registered on the chain via a new operation
    ``register_global_constant``. An example expression might be the
    integer ``999`` or the lambda expression ``{ PUSH int 999; ADD }``
@@ -17,7 +17,7 @@ following way:
 -  Constants can be referenced inside a Michelson script with the new
    primitive ``constant``. For example, we could write a lambda
    equivalent to the one above like so:
-   ``{ PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");       ADD }``
+   ``{ PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8"); ADD }``
 
 Global Constant Registration
 ----------------------------
@@ -31,7 +31,7 @@ For example, the command:
 
 .. code:: sh
 
-    client register global constant "999" from bootstrap1 --burn-cap 0.017
+    tezos-client register global constant "999" from bootstrap1 --burn-cap 0.017
 
 would result in the output:
 
@@ -66,7 +66,7 @@ would result in the output:
          Global address: expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8
 
 As you can see, the address of the constant is returned in the operation
-receipt. This address is a B58 hash of the bytes of the expression
+receipt in the field ``Global address``. This address is a B58 hash of the bytes of the expression
 registered (similar to other hashes in Tezos). This means constants are
 content-addressable - given a particular Micheline expression, you can
 always calculate its on-chain address and check if it’s registered.
@@ -94,17 +94,18 @@ A global constant can be referenced in Michelson script via the
 primitive ``constant``, which accepts a single string argument, being
 the hash of the expression to be referenced at runtime. This primitive
 can be used to replace any Micheline node in the bodies of the
-``parameter``, ``storage``, or ``code`` keys of a Michelson script. For
+``parameter``, ``storage``, or ``code`` fields of a Michelson script. For
 example, we replace every instance of the type ``lambda unit unit`` and
 value 999 with their respective hashes:
 
 ::
 
      parameter (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL");
-     storage (big_map (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); code {
+     storage (big_map (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); 
+     code {
        PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");
        <rest of code>
-     }
+     };
 
 During origination, all constants are expanded recursively. The
 operation will fail if the resulting contract is ill-typed. Global
