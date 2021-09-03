@@ -114,6 +114,18 @@ val add :
     - [refused] is empty *)
 val validation_result : t -> error Preapply_result.t
 
+(** [map applied branch_delayed branch_refused refused t]
+    returns the pairs [(operation_hash, operation)] contained in [t].
+    Fields of [t] are included according to the value of the corresponding
+    named argument. By default all fields are included. *)
+val to_map :
+  applied:bool ->
+  branch_delayed:bool ->
+  branch_refused:bool ->
+  refused:bool ->
+  t ->
+  Operation.t Operation_hash.Map.t
+
 (**/**)
 
 module Internal_for_tests : sig

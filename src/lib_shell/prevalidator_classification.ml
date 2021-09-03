@@ -160,6 +160,16 @@ let validation_result classes =
     refused = Operation_hash.Map.empty;
   }
 
+let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
+  let module Map = Operation_hash.Map in
+  let ( +> ) accum to_add =
+    Map.fold (fun h (op, _err) acc -> Map.add h op acc) to_add accum
+  in
+  (if applied then Map.of_seq @@ List.to_seq classes.applied_rev else Map.empty)
+  +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
+  +> (if branch_refused then classes.branch_refused.map else Map.empty)
+  +> if refused then classes.refused.map else Map.empty
+
 module Internal_for_tests = struct
   let bounded_map_pp ppf bounded_map =
     bounded_map.map |> Operation_hash.Map.bindings
