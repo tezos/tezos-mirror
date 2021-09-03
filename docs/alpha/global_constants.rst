@@ -26,7 +26,7 @@ The new ``register_global_constant`` operation includes an object with a
 single key ``"value"``, the value of which is the Micheline expression
 to be registered.
 
-You can submit this operation conveniently through a new cli command.
+You can submit this operation conveniently through a new :doc:`tezos-client <cli-commands>` command.
 For example, the command:
 
 .. code:: sh
@@ -71,21 +71,25 @@ registered (similar to other hashes in Tezos). This means constants are
 content-addressable - given a particular Micheline expression, you can
 always calculate its on-chain address and check if it’s registered.
 
-A few points about registering global constants: - Global constants may
-contain references to other constants; however, any referenced constants
-must already be registered on the chain. As a corollary, you cannot have
-cyclic references. - Global constants are not type-checked before
-registration - any valid Micheline expression may be registered. That
-said, attempting originate a contract that uses a constant in an
-ill-typed way will fail. - The total depth of the expression registered
-as a constant (after expanding all constant references) may not exceed
-10,000. - The total number of nodes in the Micheline expression being
-registered (after expanding all constant references) may not exceed the
-``max_micheline_node_count`` protocol constant. As of Hangzhou this is
-50,000. - The total number of bytes in the Micheline expression being
-registered (after expanding all constant references) may not exceed the
-``max_micheline_bytes_limit`` protocol constant. As of Hangzhou this is
-50,000.
+A few points about registering global constants:
+
+- Global constants may contain references to other constants; however,
+  any referenced constants must already be registered on the chain. As a
+  corollary, you cannot have cyclic references.
+- Global constants are not type-checked before registration - any
+  valid Micheline expression may be registered. That said, attempting
+  to originate a contract that uses a constant in an ill-typed way will
+  fail.
+- The total depth of the expression registered as a constant (after
+  expanding all constant references) may not exceed 10,000.
+- The total number of nodes in the Micheline expression being
+  registered (after expanding all constant references) may not exceed
+  the ``max_micheline_node_count`` protocol constant. As of Hangzhou
+  this is 50,000.
+- The total number of bytes in the Micheline expression being
+  registered (after expanding all constant references) may not exceed
+  the ``max_micheline_bytes_limit`` protocol constant. As of Hangzhou
+  this is 50,000.
 
 Originating a Contract that uses Global Constants
 -------------------------------------------------
@@ -98,7 +102,7 @@ can be used to replace any Micheline node in the bodies of the
 example, we replace every instance of the type ``lambda unit unit`` and
 value 999 with their respective hashes:
 
-::
+.. code-block:: michelson
 
      parameter (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL");
      storage (big_map (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); 
