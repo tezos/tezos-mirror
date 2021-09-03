@@ -1726,10 +1726,10 @@ Domain specific data types
 
 -  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
 
--  ``chest ``: a timelocked chest containing bytes and information to open it.
+-  ``chest``: a timelocked chest containing bytes and information to open it.
    see :doc:`Timelock <timelock>` .
 
--  ``chest_key ``: used to open a chest, also contains a proof
+-  ``chest_key``: used to open a chest, also contains a proof
    to check the correctness of the opening. see :doc:`Timelock <timelock>` .
 
 
@@ -2303,7 +2303,7 @@ Operations on timelock
 
 - ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The results can be bytes
   if the opening is correct, or a boolean indicating whether the chest was incorrect,
-  or its opening was. See :doc:`Timelock <timelock>`for more information.
+  or its opening was. See :doc:`Timelock <timelock>` for more information.
 
 ::
 
