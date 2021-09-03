@@ -105,19 +105,10 @@ val add :
   t ->
   unit
 
-(** [validation_result t] returns an instance of [Preapply_result.t] whose
-    fields are as follows:
-
-    - [applied] is [t.applied_rev] reversed
-    - [branch_delayed] is [t.branch_delayed]'s map
-    - [branch_refused] is [t.branch_refused]'s map
-    - [refused] is empty *)
-val validation_result : t -> error Preapply_result.t
-
 (** [map applied branch_delayed branch_refused refused t]
     returns the pairs [(operation_hash, operation)] contained in [t].
     Fields of [t] are included according to the value of the corresponding
-    named argument. By default all fields are included. *)
+    named argument. *)
 val to_map :
   applied:bool ->
   branch_delayed:bool ->

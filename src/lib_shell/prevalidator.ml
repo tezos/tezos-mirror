@@ -1011,9 +1011,12 @@ module Make
         ~live_blocks:new_live_blocks
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
-           (Preapply_result.operations
-              ~handle_branch_refused
-              (Classification.validation_result pv.shell.classification))
+           (Classification.to_map
+              ~applied:true
+              ~branch_delayed:true
+              ~branch_refused:handle_branch_refused
+              ~refused:false
+              pv.shell.classification)
            pv.shell.pending)
       >>= fun pending ->
       Classification.clear pv.shell.classification ~handle_branch_refused ;

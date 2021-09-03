@@ -222,45 +222,6 @@ let test_is_applied =
   qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
   true
 
-let test_validation_result =
-  let open QCheck in
-  Test.make ~name:"[validation_result] is well-behaved" (make Generators.t_gen)
-  @@ fun t ->
-  let Preapply_result.{applied; refused; branch_refused; branch_delayed} =
-    Prevalidator_classification.validation_result t
-  in
-  let _ =
-    qcheck_eq'
-      ~eq:
-        (List.equal (fun (oph1, op1) (oph2, op2) ->
-             Operation_hash.equal oph1 oph2 && Operation.equal op1 op2))
-      ~expected:(List.rev t.applied_rev)
-      ~actual:applied
-      ()
-  in
-  let qcheck_eq_operation_hash_map ~expected ~actual =
-    let _ =
-      qcheck_eq'
-        ~eq:
-          (Operation_hash.Map.equal (fun (op1, _errors1) (op2, _errors2) ->
-               Operation.equal op1 op2))
-        ~expected
-        ~actual
-        ()
-    in
-    ()
-  in
-  qcheck_eq_operation_hash_map
-    ~expected:Operation_hash.Map.empty
-    ~actual:refused ;
-  qcheck_eq_operation_hash_map
-    ~expected:(Prevalidator_classification.map t.branch_refused)
-    ~actual:branch_refused ;
-  qcheck_eq_operation_hash_map
-    ~expected:(Prevalidator_classification.map t.branch_delayed)
-    ~actual:branch_delayed ;
-  true
-
 module Bounded = struct
   type binding = Operation_hash.t * Operation.t
 
@@ -426,40 +387,6 @@ module Bounded = struct
     true
 end
 
-let test_to_map_equivalence =
-  QCheck.Test.make
-    ~name:
-      "Preapply_result.operations ~handle_branch_refused \
-       (Classification.validation_result classes) = Classification.to_map \
-       ~branch_refused:handle_branch_refused ~refused:false classes, modulo \
-       the order"
-    (QCheck.make QCheck.Gen.(pair bool Generators.t_gen))
-  @@ fun (handle_branch_refused, classes) ->
-  let actual =
-    Preapply_result.operations
-      ~handle_branch_refused
-      (Prevalidator_classification.validation_result classes)
-  in
-  let expected =
-    Prevalidator_classification.to_map
-      ~applied:true
-      ~branch_delayed:true
-      ~branch_refused:handle_branch_refused
-      ~refused:false
-      classes
-  in
-  let map_to_list m = Operation_hash.Map.to_seq m |> List.of_seq in
-  let pp_pair fmt (oph, op) =
-    Format.fprintf fmt "%a" Operation_hash.pp oph ;
-    Format.fprintf fmt ":" ;
-    Format.fprintf fmt "%a" Operation.pp op
-  in
-  let pp fmt x =
-    Format.fprintf fmt "%a" (Format.pp_print_list pp_pair) (map_to_list x)
-  in
-  let eq = Operation_hash.Map.equal Operation.equal in
-  qcheck_eq' ~eq ~pp ~expected ~actual ()
-
 let () =
   Alcotest.run
     "Prevalidator_classification"
@@ -471,8 +398,6 @@ let () =
             test_clear_empties_all_except_branch_refused;
             test_is_in_mempool_remove;
             test_is_applied;
-            test_validation_result;
             Bounded.test_bounded;
-            test_to_map_equivalence;
           ] );
     ]
