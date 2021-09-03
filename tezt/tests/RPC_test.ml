@@ -686,6 +686,25 @@ let test_blacklist address () =
   let* _success_resp = Client.rpc GET ["network"; "connections"] client in
   unit
 
+let test_no_service_at_valid_prefix address () =
+  let node = Node.create ~rpc_host:address [] in
+  let endpoint = Client.(Node node) in
+  let* () = Node.config_init node [] in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  let* client = Client.init ~endpoint () in
+  let* () =
+    Client.spawn_rpc GET ["chains"; "main"] client
+    |> Process.check_error
+         ~exit_code:1
+         ~msg:
+           (rex
+              "Fatal error:\n\
+              \  No service found at this URL (but this is a valid prefix)*\n\
+               *")
+  in
+  unit
+
 let register () =
   let register_alpha test_mode_tag =
     check_rpc
@@ -750,5 +769,10 @@ let register () =
         ~__FILE__
         ~title:(mk_title "blacklist" addr)
         ~tags:["rpc"; "acl"]
-        (test_blacklist addr))
+        (test_blacklist addr) ;
+      Test.register
+        ~__FILE__
+        ~title:(mk_title "no_service_at_valid_prefix" addr)
+        ~tags:["rpc"]
+        (test_no_service_at_valid_prefix addr))
     addresses
