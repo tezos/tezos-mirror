@@ -426,6 +426,40 @@ module Bounded = struct
     true
 end
 
+let test_to_map_equivalence =
+  QCheck.Test.make
+    ~name:
+      "Preapply_result.operations ~handle_branch_refused \
+       (Classification.validation_result classes) = Classification.to_map \
+       ~branch_refused:handle_branch_refused ~refused:false classes, modulo \
+       the order"
+    (QCheck.make QCheck.Gen.(pair bool Generators.t_gen))
+  @@ fun (handle_branch_refused, classes) ->
+  let actual =
+    Preapply_result.operations
+      ~handle_branch_refused
+      (Prevalidator_classification.validation_result classes)
+  in
+  let expected =
+    Prevalidator_classification.to_map
+      ~applied:true
+      ~branch_delayed:true
+      ~branch_refused:handle_branch_refused
+      ~refused:false
+      classes
+  in
+  let map_to_list m = Operation_hash.Map.to_seq m |> List.of_seq in
+  let pp_pair fmt (oph, op) =
+    Format.fprintf fmt "%a" Operation_hash.pp oph ;
+    Format.fprintf fmt ":" ;
+    Format.fprintf fmt "%a" Operation.pp op
+  in
+  let pp fmt x =
+    Format.fprintf fmt "%a" (Format.pp_print_list pp_pair) (map_to_list x)
+  in
+  let eq = Operation_hash.Map.equal Operation.equal in
+  qcheck_eq' ~eq ~pp ~expected ~actual ()
+
 let () =
   Alcotest.run
     "Prevalidator_classification"
@@ -439,5 +473,6 @@ let () =
             test_is_applied;
             test_validation_result;
             Bounded.test_bounded;
+            test_to_map_equivalence;
           ] );
     ]
