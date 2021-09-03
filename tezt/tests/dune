@@ -1,6 +1,7 @@
 (executable
  (name main)
- (libraries tezt-tezos
+ (libraries str
+            tezt-tezos
             data-encoding
             tezos-base
             tezos-base.unix

@@ -1042,11 +1042,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (fun t -> t#branch_delayed)
         |> seal
 
+      (* We extend the object so that the fields of 'next_operation'
+         stay toplevel, for backward compatibility. *)
+      let processed_operation_encoding =
+        merge_objs
+          (merge_objs
+             (obj1 (req "hash" Operation_hash.encoding))
+             next_operation_encoding)
+          (obj1 (dft "error" RPC_error.encoding []))
+
       let monitor_operations path =
         RPC_service.get_service
           ~description:"Monitor the mempool operations."
           ~query:mempool_query
-          ~output:(list next_operation_encoding)
+          ~output:(list processed_operation_encoding)
           RPC_path.(path / "monitor_operations")
 
       let get_filter path =

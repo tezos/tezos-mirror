@@ -23,6 +23,11 @@ be documented here either.
 Node
 ----
 
+- GET ``/chains/<chain_id>/mempool/monitor_operation``: Output is
+  extended to include operation hashes (field name is ``hash``) and
+  errors (field name is ``error``) when the operation was classified
+  as ``Branch_delayed``, ``Branch_refused`` or ``Refused``.
+
 -  Better handling of mempool cache in the `distributed_db` which
    should make the `distributed_db` RAM consumption strongly
    correlated to the one of the mempool.

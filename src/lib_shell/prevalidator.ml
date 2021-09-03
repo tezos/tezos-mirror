@@ -101,6 +101,7 @@ module type T = sig
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       (Classification.classification
+      * Operation_hash.t
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -309,6 +310,7 @@ module Make
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       (Classification.classification
+      * Operation_hash.t
       * Operation.shell_header
       * Proto.operation_data)
       Lwt_watcher.input;
@@ -434,8 +436,10 @@ module Make
   let handle pv op kind =
     let notify () =
       match op with
-      | `Parsed ({raw; protocol_data; _} : Proto.operation_data operation) ->
-          Lwt_watcher.notify pv.operation_stream (kind, raw.shell, protocol_data)
+      | `Parsed ({raw; protocol_data; hash} : Proto.operation_data operation) ->
+          Lwt_watcher.notify
+            pv.operation_stream
+            (kind, hash, raw.shell, protocol_data)
       | _ -> ()
     in
     match op with
@@ -773,20 +777,22 @@ module Make
              let (op_stream, stopper) =
                Lwt_watcher.create_stream operation_stream
              in
+
              (* Convert ops *)
-             let map_op op =
+             let map_op error (hash, op) =
                match Prevalidation.parse_unsafe op.Operation.proto with
                | Error _ -> None
                | Ok protocol_data ->
-                   Some Proto.{shell = op.shell; protocol_data}
+                   Some (hash, Proto.{shell = op.shell; protocol_data}, error)
              in
-             let fold_op _k (op, _error) acc =
-               match map_op op with Some op -> op :: acc | None -> acc
+             let fold_op hash (op, error) acc =
+               match map_op error (hash, op) with
+               | Some op -> op :: acc
+               | None -> acc
              in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
-               if params#applied then
-                 List.filter_map map_op (List.map snd applied_rev)
+               if params#applied then List.filter_map (map_op []) applied_rev
                else []
              in
              let refused =
@@ -812,6 +818,7 @@ module Make
              in
              let current_mempool =
                List.concat [applied; refused; branch_refused; branch_delayed]
+               |> List.map (fun (hash, op, errors) -> ((hash, op), errors))
              in
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
@@ -827,9 +834,18 @@ module Make
                    Lwt.return_some mempool
                | None -> (
                    Lwt_stream.get op_stream >>= function
-                   | Some (kind, shell, protocol_data) when filter_result kind
-                     ->
-                       Lwt.return_some [{Proto.shell; protocol_data}]
+                   | Some (kind, hash, shell, protocol_data)
+                     when filter_result kind ->
+                       let errors =
+                         match kind with
+                         | `Applied -> []
+                         | `Branch_delayed errors
+                         | `Branch_refused errors
+                         | `Refused errors ->
+                             errors
+                       in
+                       Lwt.return_some
+                         [((hash, {Proto.shell; protocol_data}), errors)]
                    | Some _ -> next ()
                    | None -> Lwt.return_none)
              in

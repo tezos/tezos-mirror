@@ -421,7 +421,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_refused:bool ->
       ?refused:bool ->
       unit ->
-      (Next_proto.operation list Lwt_stream.t * stopper) tzresult Lwt.t
+      (((Operation_hash.t * Next_proto.operation) * error list) list
+       Lwt_stream.t
+      * stopper)
+      tzresult
+      Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
@@ -655,7 +659,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_refused : bool
           ; refused : bool >,
           unit,
-          Next_proto.operation list )
+          ((Operation_hash.t * Next_proto.operation) * error list) list )
         RPC_service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)
