@@ -84,7 +84,7 @@ Global Constants
   constants are expanded into their registered values. The result is
   that users can use constants to originate larger contracts, as well as
   share code between contracts. You can read more about global constants
-  at the :doc:`documentation page </global_constants>`.
+  at the :doc:`documentation page <../alpha/global_constants>`.
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
 
