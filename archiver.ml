@@ -317,13 +317,6 @@ let dump_received path ?unaccurate level items =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      Lwt_io.printl
-        (Format.asprintf
-           "Locked %s from [%a]"
-           filename
-           (Format.pp_print_seq (fun f (x, _) -> Format.pp_print_string f x))
-           (StringMap.to_seq !files_in_use))
-      >>= fun () ->
       load filename encoding empty >>=? fun infos ->
       let (updated_known, unknown) =
         List.fold_left
@@ -365,7 +358,6 @@ let dump_received path ?unaccurate level items =
       extract_anomalies path level out_infos)
   >>= fun out ->
   let () = drop_file_mutex filename in
-  Lwt_io.printlf "Droped %s" filename >>= fun () ->
   match out with
   | Ok () -> Lwt.return_unit
   | Error err ->

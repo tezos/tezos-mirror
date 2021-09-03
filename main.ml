@@ -26,8 +26,12 @@
 module Block_services = Protocol_client_context.Alpha_block_services
 open Tezos_protocol_010_PtGRANAD
 
-let dump_my_current_endorsements cctxt ?unaccurate ~full block level ops
-    =
+let print_failures f =
+  f >|= function
+  | Ok () -> ()
+  | Error e -> Error_monad.pp_print_error Format.err_formatter e
+
+let dump_my_current_endorsements cctxt ~full block level ops =
   Protocol.Delegate_services.Endorsing_rights.get
     cctxt
     (cctxt#chain, `Hash (block, 0))
@@ -55,23 +59,11 @@ let dump_my_current_endorsements cctxt ?unaccurate ~full block level ops
         missing
     else items
   in
+  let unaccurate = if full then Some false else None in
   let () = Archiver.add_received ?unaccurate level endorsements in
   return_unit
 
-let rec check_level_in_endorsements ref_level = function
-  | Block_services.
-      { protocol_data =
-          Protocol.Alpha_context.Operation_data
-            { contents = Single (Endorsement { level }); _ };
-        _
-      }
-    :: tail ->
-      Int32.equal ref_level (Protocol.Alpha_context.Raw_level.to_int32 level)
-      && check_level_in_endorsements ref_level tail
-  | _ :: tail -> check_level_in_endorsements ref_level tail
-  | [] -> true
-
-let extract_endorsement infos
+let extract_endorsement
     (operation_content : Protocol.Alpha_context.packed_operation) =
   match operation_content with
   | { Protocol.Main.protocol_data =
@@ -92,74 +84,14 @@ let extract_endorsement infos
           };
       shell = { branch }
     } ->
-      let () =
-        assert (
-          match infos with
-          | None -> true
-          | Some (b', l') ->
-              Block_hash.equal branch b'
-              && Protocol.Alpha_context.Raw_level.equal level l' )
-      in
-      (Some (branch, level), Some slot)
-  | _ -> (infos, None)
+      Some ((branch, level), slot)
+  | _ ->  None
 
-let rec valid_endorsements_loop cctxt unaccurate =
+let rec endorsements_recorder cctxt current_level =
   Block_services.Mempool.monitor_operations
     cctxt
     ~chain:cctxt#chain
     ~applied:true
-    ~refused:false
-    ~branch_delayed:false
-    ~branch_refused:false
-    ()
-  >>=? fun (ops_stream, _stopper) ->
-  let op_stream = Lwt_stream.flatten ops_stream in
-  Lwt_stream.fold
-    (fun op (infos, l) ->
-      let delay = Systime_os.now () in
-      let (vv, news) = extract_endorsement infos op in
-      (vv, Option.fold ~some:(fun x -> ([],delay, x) :: l) ~none:l news))
-    op_stream
-    (None, [])
-  >>= fun out ->
-  let next = valid_endorsements_loop cctxt false in
-  match out with
-  | (None, _) -> next
-  | (Some (block, level), timed_ops) ->
-      let level = Protocol.Alpha_context.Raw_level.to_int32 level in
-      dump_my_current_endorsements
-        cctxt
-        ~unaccurate
-        ~full:true
-        block
-        level
-        timed_ops
-      >>=? fun () -> next
-
-let errors_of_operation cctxt op_hash =
-  Block_services.Mempool.pending_operations cctxt ~chain:cctxt#chain ()
-  >|=? fun { refused; branch_refused; branch_delayed; _ } ->
-  match Operation_hash.Map.find op_hash branch_delayed with
-  | Some (_, err) -> err
-  | None -> (
-      match Operation_hash.Map.find op_hash branch_refused with
-      | Some (_, err) -> err
-      | None -> (
-          match Operation_hash.Map.find op_hash refused with
-          | Some (_, err) -> err
-          | None -> [] ) )
-
-module EndorsementLRU =
-  (val Ringo.set_maker ~replacement:Ringo.FIFO ~overflow:Ringo.Weak ~accounting:Ringo.Sloppy)
-  (Operation_hash)
-
-let known_problems = EndorsementLRU.create 25000
-
-let rec invalid_endorsements_loop cctxt =
-  Block_services.Mempool.monitor_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~applied:false
     ~refused:true
     ~branch_delayed:true
     ~branch_refused:true
@@ -167,39 +99,26 @@ let rec invalid_endorsements_loop cctxt =
   >>=? fun (ops_stream, _stopper) ->
   let op_stream = Lwt_stream.flatten ops_stream in
   Lwt_stream.fold_s
-    (fun op acc ->
+    (fun ((_hash,op),errors) acc ->
       let delay = Systime_os.now () in
-      match extract_endorsement None op with
-      | (_, None) -> Lwt.return acc
-      | (None, Some _) -> assert false
-      | (Some (block, level), Some news) ->
-         let op_hash = Protocol.Alpha_context.Operation.hash_packed op in
-         if EndorsementLRU.mem known_problems op_hash then
-           Lwt.return acc
-         else
-           let () = EndorsementLRU.add known_problems op_hash in
-           errors_of_operation cctxt op_hash >>=? fun errors ->
-          Lwt.return
-            (acc >|? fun m ->
-                     Block_hash.Map.update block (function
-                         | Some (_,l) -> Some (level, (errors, delay, news) :: l)
-                         | None -> Some(level, [errors, delay, news]))
-                       m))
+      match extract_endorsement op with
+      | None -> Lwt.return acc
+      | (Some ((block, level), news)) ->
+         Lwt.return
+           (acc >|? fun m ->
+                    Block_hash.Map.update block (function
+                        | Some (_,l) -> Some (level, (errors, delay, news) :: l)
+                        | None -> Some(level, [errors, delay, news]))
+                      m))
     op_stream
     (ok Block_hash.Map.empty)
   >>=? fun out ->
-  let next = invalid_endorsements_loop cctxt in
   Block_hash.Map.iter_ep
     (fun block (level, endorsements) ->
       let level = Protocol.Alpha_context.Raw_level.to_int32 level in
-      dump_my_current_endorsements
-        cctxt
-        ~full:false
-        block
-        level
-        endorsements)
+      let full = Compare.Int32.(current_level = level) in
+      dump_my_current_endorsements cctxt ~full block level endorsements)
     out
-  >>=? fun () -> next
 
 let blocks_loop cctxt =
   Shell_services.Monitor.valid_blocks cctxt ~chains:[cctxt#chain] ()
@@ -207,73 +126,62 @@ let blocks_loop cctxt =
   Lwt_stream.fold_s
     (fun ((chain_id, hash), header) _acc ->
       let reception_time = Systime_os.now () in
+      let block_level = header.Block_header.shell.Block_header.level in
+      let () =
+        Lwt.ignore_result
+          (print_failures (endorsements_recorder cctxt block_level)) in
       Block_services.Operations.operations_in_pass
         cctxt
         ~chain:(`Hash chain_id)
         ~block:(`Hash (hash, 0))
         0
-      >>=? fun ops ->
-      let block_level = header.Block_header.shell.Block_header.level in
-      let timestamp = header.Block_header.shell.Block_header.timestamp in
-      let _seed_nonce_hash =
-        match
-          Data_encoding.Binary.of_bytes
-            Protocol.block_header_data_encoding
-            header.Block_header.protocol_data
-        with
-        | Ok { contents = { seed_nonce_hash; _ }; signature = _ } ->
-            seed_nonce_hash
-        | Error err ->
-            let () =
-              Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
-            in
-            None
-      in
-      (*_assert
-          (check_level_in_endorsements (Int32.pred block_level) ops)
-          __LOC__
-          "Endorsement with the wrong level in "
-        >>=? fun () ->*)
-      let pks =
-        List.filter_map
-          (fun Block_services.{ receipt; _ } ->
-            match receipt with
-            | Some
-                (Protocol.Apply_results.Operation_metadata
-                  { contents =
-                      Single_result
-                        (Protocol.Apply_results.Endorsement_with_slot_result
-                          (Tezos_raw_protocol_010_PtGRANAD.Apply_results
-                           .Endorsement_result { delegate; _ }))
-                  }) ->
-                Some delegate
-            | _ -> None)
-          ops
-      in
-      let () =
-        Archiver.add_block block_level hash timestamp reception_time pks
-      in
-      return_unit)
+      >|= function
+      | Error e -> Error_monad.pp_print_error Format.err_formatter e
+      | Ok ops ->
+         let timestamp = header.Block_header.shell.Block_header.timestamp in
+         let _seed_nonce_hash =
+           match
+             Data_encoding.Binary.of_bytes
+               Protocol.block_header_data_encoding
+               header.Block_header.protocol_data
+           with
+           | Ok { contents = { seed_nonce_hash; _ }; signature = _ } ->
+              seed_nonce_hash
+           | Error err ->
+              let () =
+                Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
+              in
+              None
+         in
+         let pks =
+           List.filter_map
+             (fun Block_services.{ receipt; _ } ->
+               match receipt with
+               | Some
+                 (Protocol.Apply_results.Operation_metadata
+                    { contents =
+                        Single_result
+                          (Protocol.Apply_results.Endorsement_with_slot_result
+                             (Tezos_raw_protocol_010_PtGRANAD.Apply_results
+                                .Endorsement_result { delegate; _ }))
+                 }) ->
+                  Some delegate
+               | _ -> None)
+             ops
+         in
+         Archiver.add_block block_level hash timestamp reception_time pks)
     block_stream
-    (ok ())
-
-let print_failures f =
-  f >|= function
-  | Ok () -> ()
-  | Error e -> Error_monad.pp_print_error Format.err_formatter e
+    () >>= return
 
 let main cctxt prefix =
   let dumper = Archiver.launch prefix in
   let main =
-    Lwt.join
-      [ print_failures (valid_endorsements_loop cctxt true);
-        print_failures (invalid_endorsements_loop cctxt);
-        print_failures (blocks_loop cctxt) ]
+    print_failures (blocks_loop cctxt)
     >>= fun () ->
     let () = Archiver.stop () in
-    return_unit
+    Lwt.return_unit
   in
-  dumper >>= fun () -> main
+  Lwt.join [dumper; main] >>= return
 
 let group =
   { Clic.name = "teztale"; Clic.title = "A delegate operation monitor" }
