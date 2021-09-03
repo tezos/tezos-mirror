@@ -105,10 +105,21 @@ value 999 with their respective hashes:
 .. code-block:: michelson
 
      parameter (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL");
-     storage (big_map (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); 
+     storage (big_map int (constant "exprtYirrFwYKm6yKLzJNtYRbq49zedYq16BonRvMzHiwSbUekB9YL")); 
      code {
        PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");
-       <rest of code>
+       # <rest of code>
+     };
+
+The full expansion of this contract would be:
+
+.. code-block:: michelson
+
+     parameter (lambda unit unit);
+     storage (big_map int (lambda unit unit)); 
+     code {
+       PUSH int 999;
+       # <rest of code>
      };
 
 During origination, all constants are expanded recursively. The
