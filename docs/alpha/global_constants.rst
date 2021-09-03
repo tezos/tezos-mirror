@@ -98,7 +98,7 @@ A global constant can be referenced in Michelson script via the
 primitive ``constant``, which accepts a single string argument, being
 the hash of the expression to be referenced at runtime. This primitive
 can be used to replace any Micheline node in the bodies of the
-``parameter``, ``storage``, or ``code`` fields of a Michelson script. For
+``parameter``, ``storage``, ``code``, or ``view`` fields of a Michelson script. For
 example, we replace every instance of the type ``lambda unit unit`` and
 value 999 with their respective hashes:
 
@@ -135,4 +135,4 @@ contract with all constants expanded.
 
 Note that using the ``UNPACK`` operation to construct a lambda or
 ``CREATE_CONTRACT`` instruction that contains a constant reference is
-not supported. Referencing constants from views is likewise unsupported.
+not supported.
