@@ -5803,6 +5803,8 @@ let typecheck_code :
     legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
     =
  fun ~legacy ctxt code ->
+  (* Constants need to be expanded or [parse_toplevel] may fail. *)
+  Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let type_map = ref [] in
@@ -6693,7 +6695,10 @@ let parse_instr :
 
 let unparse_data = unparse_data ~stack_depth:0
 
-let unparse_code = unparse_code ~stack_depth:0
+let unparse_code ctxt mode code =
+  (* Constants need to be expanded or [unparse_code] may fail. *)
+  Global_constants_storage.expand ctxt (strip_locations code)
+  >>=? fun (ctxt, code) -> unparse_code ~stack_depth:0 ctxt mode (root code)
 
 let parse_contract ~legacy context loc arg_ty contract ~entrypoint =
   parse_contract ~stack_depth:0 ~legacy context loc arg_ty contract ~entrypoint
