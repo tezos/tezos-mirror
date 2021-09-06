@@ -18,7 +18,7 @@ if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
   echo Files changed:
   echo "$FILES"
 
-  MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune\.inc|.*\.opam|scripts/version\.sh|\.gitlab-ci\.yml" | cat)
+  MATCHES=$(echo "$FILES" | tr ' ' '\n' | grep -E ".*dune|.*dune\.inc|.*\.opam|scripts/version\.sh|\.gitlab-ci\.yml" || true)
 
   echo Matches found:
   echo "$MATCHES"
