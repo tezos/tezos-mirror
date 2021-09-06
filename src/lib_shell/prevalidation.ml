@@ -160,9 +160,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       ?protocol_data
       ~cache:`Lazy
       ()
-    >>=? fun state ->
-    (* FIXME arbitrary value, to be customisable *)
-    return {state; applied = []; live_blocks; live_operations}
+    >>=? fun state -> return {state; applied = []; live_blocks; live_operations}
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
