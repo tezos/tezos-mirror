@@ -387,6 +387,137 @@ module Bounded = struct
     true
 end
 
+(** Tests of [Prevalidator_classification.to_map] *)
+module To_map = struct
+  module Classification = Prevalidator_classification
+
+  let map_pp fmt x =
+    let map_to_list m = Operation_hash.Map.to_seq m |> List.of_seq in
+    let pp_pair fmt (oph, op) =
+      Format.fprintf fmt "%a:%a" Operation_hash.pp oph Operation.pp op
+    in
+    Format.fprintf fmt "%a" (Format.pp_print_list pp_pair) (map_to_list x)
+
+  let map_eq = Operation_hash.Map.equal Operation.equal
+
+  (** [remove_all m1 m2] returns the subset of [m1] thas is not within [m2].
+      Said differently, [remove_all m1 m2] removes from [m1] all keys
+      that are in [m2]. *)
+  let remove_all m1 m2 =
+    let keys2 =
+      Operation_hash.Map.bindings m2
+      |> List.map fst |> Operation_hash.Set.of_list
+    in
+    Operation_hash.Map.filter
+      (fun key _val -> not (Operation_hash.Set.mem key keys2))
+      m1
+
+  (** [m -=~ n] holds if [m] if of size [n - 1] or of size [n]. The [-]
+      symbol is chosen to hint at the fact that the size is the given
+      number or the number minus one. *)
+  let ( -=~ ) m size =
+    let actual_size = Operation_hash.Map.cardinal m in
+    size - 1 <= actual_size && actual_size <= size
+
+  (** [to_map_all] calls [Classification.to_map] with all named
+      arguments set to [true] *)
+  let to_map_all =
+    Classification.to_map
+      ~applied:true
+      ~branch_delayed:true
+      ~branch_refused:true
+      ~refused:true
+
+  (** Tests the relationship between [Classification.add]
+      and [Classification.to_map] *)
+  let test_add =
+    QCheck.Test.make
+      ~name:"[add] extends the size of [to_map] by 0 or 1"
+      (QCheck.make
+         (QCheck.Gen.quad
+            Generators.t_gen
+            Generators.classification_gen
+            Generators.operation_hash_gen
+            Generators.operation_gen))
+    @@ fun (t, classification, oph, op) ->
+    let initial = to_map_all t in
+    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    let diff = remove_all (to_map_all t) initial in
+    qcheck_eq' ~expected:true ~actual:(diff -=~ 1) ()
+
+  (** Tests the relationship between [Classification.remove]
+      and [Classification.to_map] *)
+  let test_remove =
+    QCheck.Test.make
+      ~name:"[remove] reduces the size of [to_map] by 0 or 1"
+      (QCheck.make
+         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
+    @@ fun (t, oph) ->
+    let initial = to_map_all t in
+    Classification.remove oph t ;
+    let diff = remove_all initial (to_map_all t) in
+    qcheck_eq' ~expected:true ~actual:(diff -=~ 1) ()
+
+  (** Tests the relationship between [Classification.clear]
+      and [Classification.to_map] *)
+  let test_clear =
+    QCheck.Test.make
+      ~name:"[clear] can be emulated by [to_map ~refused:true ..]"
+      (QCheck.make (QCheck.Gen.pair Generators.t_gen QCheck.Gen.bool))
+    @@ fun (t, handle_branch_refused) ->
+    let initial =
+      Classification.to_map
+        ~applied:false
+        ~branch_delayed:false
+        ~branch_refused:(not handle_branch_refused)
+        ~refused:true
+        t
+    in
+    Classification.clear ~handle_branch_refused t ;
+    let cleared = to_map_all t in
+    qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:cleared ()
+
+  (** Tests the relationship between [Classification.is_applied]
+      and [Classification.to_map] *)
+  let test_is_applied =
+    QCheck.Test.make
+      ~name:"[is_applied] can be emulated by [to_map ~applied:true]"
+      (QCheck.make
+         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
+    @@ fun (t, oph) ->
+    let is_applied = Classification.is_applied oph t in
+    let map =
+      Classification.to_map
+        ~applied:true
+        ~branch_delayed:false
+        ~branch_refused:false
+        ~refused:false
+        t
+      |> Operation_hash.Map.filter (fun oph' _val -> oph' = oph)
+    in
+    qcheck_eq'
+      ~expected:is_applied
+      ~actual:(Operation_hash.Map.cardinal map = 1)
+      ()
+
+  (** Tests the relationship between [Classification.is_in_mempool]
+      and [Classification.to_map] *)
+  let test_is_in_mempool =
+    QCheck.Test.make
+      ~name:"[is_in_mempool] can be emulated by [to_map]"
+      (QCheck.make
+         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
+    @@ fun (t, oph) ->
+    let is_in_mempool = Classification.is_in_mempool oph t in
+    let map =
+      to_map_all t |> Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
+    in
+    qcheck_eq'
+      ~expected:is_in_mempool
+      ~actual:(Operation_hash.Map.cardinal map = 1)
+      ()
+end
+
 let () =
   Alcotest.run
     "Prevalidator_classification"
@@ -399,5 +530,9 @@ let () =
             test_is_in_mempool_remove;
             test_is_applied;
             Bounded.test_bounded;
+            To_map.test_add;
+            To_map.test_remove;
+            To_map.test_clear;
+            To_map.test_is_in_mempool;
           ] );
     ]
