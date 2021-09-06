@@ -412,12 +412,21 @@ module To_map = struct
       (fun key _val -> not (Operation_hash.Set.mem key keys2))
       m1
 
-  (** [m -=~ n] holds if [m] if of size [n - 1] or of size [n]. The [-]
-      symbol is chosen to hint at the fact that the size is the given
-      number or the number minus one. *)
-  let ( -=~ ) m size =
-    let actual_size = Operation_hash.Map.cardinal m in
-    size - 1 <= actual_size && actual_size <= size
+  (** [eq_mod_binding m1 (k, v_opt) m2] holds iff:
+
+      - [m1] equals [m2], or
+      - [v_opt] is [Some v] and the union of [m1] and [(k,v)] equals [m2], or
+      - [v_opt] is [None] and the union of [m1] and [(k,v)] equals [m2],
+        for some unknown value [v]. *)
+  let eq_mod_binding m1 (k, v_opt) m2 =
+    let diff = remove_all m2 m1 in
+    match (Operation_hash.Map.bindings diff, v_opt) with
+    | ([], _) -> true
+    | ([(kdiff, vdiff)], Some v)
+      when Operation_hash.equal kdiff k && Operation.equal v vdiff ->
+        true
+    | ([(kdiff, _)], None) when Operation_hash.equal kdiff k -> true
+    | _ -> false
 
   (** [to_map_all] calls [Classification.to_map] with all named
       arguments set to [true] *)
@@ -442,8 +451,13 @@ module To_map = struct
     @@ fun (t, classification, oph, op) ->
     let initial = to_map_all t in
     Classification.add ~notify:(Fun.const ()) classification oph op t ;
-    let diff = remove_all (to_map_all t) initial in
-    qcheck_eq' ~expected:true ~actual:(diff -=~ 1) ()
+    (* We need to use [eq_mod_binding] because it covers the two possible cases:
+       if [oph] is not in [initial], we have [initial @@ [(oph, op)] = to_map_all t]
+       if [oph] is in [initial] already, we have [initial = to_map_all t] *)
+    qcheck_eq'
+      ~expected:true
+      ~actual:(eq_mod_binding initial (oph, Some op) (to_map_all t))
+      ()
 
   (** Tests the relationship between [Classification.remove]
       and [Classification.to_map] *)
@@ -455,8 +469,13 @@ module To_map = struct
     @@ fun (t, oph) ->
     let initial = to_map_all t in
     Classification.remove oph t ;
-    let diff = remove_all initial (to_map_all t) in
-    qcheck_eq' ~expected:true ~actual:(diff -=~ 1) ()
+    (* We need to use [eq_mod_binding] because it covers the two possible cases:
+       if [oph] is not in [initial], we have [initial = to_map_all t]
+       if [oph] is in [initial], we have [initial = to_map_all t @@ [(oph, op)] ] *)
+    qcheck_eq'
+      ~expected:true
+      ~actual:(eq_mod_binding (to_map_all t) (oph, None) initial)
+      ()
 
   (** Tests the relationship between [Classification.clear]
       and [Classification.to_map] *)
