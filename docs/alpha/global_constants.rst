@@ -94,7 +94,7 @@ A few points about registering global constants:
 Originating a Contract that uses Global Constants
 -------------------------------------------------
 
-A global constant can be referenced in Michelson script via the
+A global constant can be referenced in Michelson scripts via the
 primitive ``constant``, which accepts a single string argument, being
 the hash of the expression to be referenced at runtime. This primitive
 can be used to replace any Micheline node in the bodies of the
