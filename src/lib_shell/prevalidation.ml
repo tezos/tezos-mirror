@@ -233,7 +233,7 @@ let preapply chain_store ~user_activated_upgrades
   Context.get_protocol predecessor_context >>= fun protocol ->
   (match Registered_protocol.get protocol with
   | None ->
-      (* FIXME. *)
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1718 *)
       (* This should not happen: it should be handled in the validator. *)
       failwith
         "Prevalidation: missing protocol '%a' for the current block."
