@@ -45,17 +45,6 @@
  (modules Embedded_cmis Packer Compiler))
 
 (library
- (name tezos_protocol_compiler_byte)
- (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-compiler.byte)
- (libraries tezos-base
-            tezos-protocol-compiler
-            compiler-libs.bytecomp)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_compiler))
- (modules Byte))
-
-(library
  (name tezos_protocol_compiler_native)
  (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.native)
@@ -65,15 +54,6 @@
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_compiler))
  (modules Native))
-
-(executable
- (name main_byte)
- (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-compiler-byte)
- (modes native)
- (libraries tezos_protocol_compiler_byte)
- (flags (:standard -linkall))
- (modules Main_byte))
 
 (executable
  (name main_native)
