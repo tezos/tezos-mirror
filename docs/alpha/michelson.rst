@@ -2680,7 +2680,7 @@ This simple five cases notation is called :doc:`../shell/micheline`.
 
 In the Tezos protocol, the primitive ``constant`` with a single
 character string applied has special meaning. See
-:doc:`../alpha/global_constants`.
+:doc:`global_constants`.
 
 Constants
 ~~~~~~~~~
