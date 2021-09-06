@@ -911,7 +911,10 @@ module Make
     let on_inject (pv : state) op =
       let oph = Operation.hash op in
       already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
-      if already_handled then return_unit (* FIXME : is this an error ? *)
+      if already_handled then
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
+           Is this an error? *)
+        return_unit
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
