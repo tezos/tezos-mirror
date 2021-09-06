@@ -388,8 +388,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
+    type t_with_version
+
+    val pending_operations_version_dispatcher :
+      version:int -> t -> t_with_version option
+
     (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
-    val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
+    val pending_operations :
+      #simple -> ?chain:chain -> ?version:int -> unit -> t tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
     val ban_operation :
@@ -632,7 +638,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) RPC_path.t ->
-        ([`GET], 'a, 'b, unit, unit, Mempool.t) RPC_service.t
+        ( [`GET],
+          'a,
+          'b,
+          < version : int >,
+          unit,
+          Mempool.t_with_version )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
       val ban_operation :

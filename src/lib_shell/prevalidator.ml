@@ -717,7 +717,7 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
-           (fun pv () () ->
+           (fun pv params () ->
              let map_op op =
                match Prevalidation.parse_unsafe op.Operation.proto with
                | Ok protocol_data ->
@@ -765,14 +765,22 @@ module Make
                  pv.shell.pending
                  Operation_hash.Map.empty
              in
-             return
+             let pending_operations =
                {
                  Proto_services.Mempool.applied;
                  refused;
                  branch_refused;
                  branch_delayed;
                  unprocessed;
-               }) ;
+               }
+             in
+             match
+               Proto_services.Mempool.pending_operations_version_dispatcher
+                 ~version:params#version
+                 pending_operations
+             with
+             | None -> raise Not_found
+             | Some t -> return t) ;
        dir :=
          RPC_directory.register
            !dir
@@ -1387,15 +1395,23 @@ let empty_rpc_directory : unit RPC_directory.t =
   RPC_directory.register
     RPC_directory.empty
     (Block_services.Empty.S.Mempool.pending_operations RPC_path.open_root)
-    (fun _pv () () ->
-      return
+    (fun _pv params () ->
+      let pending_operations =
         {
           Block_services.Empty.Mempool.applied = [];
           refused = Operation_hash.Map.empty;
           branch_refused = Operation_hash.Map.empty;
           branch_delayed = Operation_hash.Map.empty;
           unprocessed = Operation_hash.Map.empty;
-        })
+        }
+      in
+      match
+        Block_services.Empty.Mempool.pending_operations_version_dispatcher
+          ~version:params#version
+          pending_operations
+      with
+      | None -> raise Not_found
+      | Some t -> return t)
 
 let rpc_directory : t option RPC_directory.t =
   RPC_directory.register_dynamic_directory

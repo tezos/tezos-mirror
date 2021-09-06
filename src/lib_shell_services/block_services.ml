@@ -922,7 +922,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         unprocessed : Next_proto.operation Operation_hash.Map.t;
       }
 
-      let encoding =
+      let version_0_encoding =
         conv
           (fun {applied; refused; branch_refused; branch_delayed; unprocessed} ->
             (applied, refused, branch_refused, branch_delayed, unprocessed))
@@ -965,12 +965,105 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                 (Operation_hash.Map.encoding
                    (dynamic_size next_operation_encoding))))
 
+      let version_1_encoding =
+        let operations_with_error_encoding kind =
+          req
+            kind
+            (conv
+               (fun map -> Operation_hash.Map.bindings map)
+               (fun list -> list |> List.to_seq |> Operation_hash.Map.of_seq)
+               (list
+                  (merge_objs
+                     (obj1 (req "hash" Operation_hash.encoding))
+                     (merge_objs
+                        next_operation_encoding
+                        (obj1 (req "error" RPC_error.encoding))))))
+        in
+        conv
+          (fun {applied; refused; branch_refused; branch_delayed; unprocessed} ->
+            (applied, refused, branch_refused, branch_delayed, unprocessed))
+          (fun (applied, refused, branch_refused, branch_delayed, unprocessed) ->
+            {applied; refused; branch_refused; branch_delayed; unprocessed})
+          (obj5
+             (req
+                "applied"
+                (list
+                   (conv
+                      (fun (hash, (op : Next_proto.operation)) ->
+                        ((hash, op.shell), op.protocol_data))
+                      (fun ((hash, shell), protocol_data) ->
+                        (hash, {shell; protocol_data}))
+                      (merge_objs
+                         (merge_objs
+                            (obj1 (req "hash" Operation_hash.encoding))
+                            Operation.shell_header_encoding)
+                         (dynamic_size Next_proto.operation_data_encoding)))))
+             (operations_with_error_encoding "refused")
+             (operations_with_error_encoding "branch_refused")
+             (operations_with_error_encoding "branch_delayed")
+             (req
+                "unprocessed"
+                (conv
+                   (fun map -> Operation_hash.Map.bindings map)
+                   (fun list ->
+                     list |> List.to_seq |> Operation_hash.Map.of_seq)
+                   (list
+                      (merge_objs
+                         (obj1 (req "hash" Operation_hash.encoding))
+                         next_operation_encoding)))))
+
+      (* This encoding should be always the one by default. *)
+      let encoding = version_0_encoding
+
+      (* If you change this value, also change [encoding]. *)
+      let default_pending_operations_version = 0
+
+      let pending_query =
+        let open RPC_query in
+        query (fun version ->
+            object
+              method version = version
+            end)
+        |+ field
+             "version"
+             RPC_arg.int
+             default_pending_operations_version
+             (fun t -> t#version)
+        |> seal
+
+      type t_with_version = Version_0 of t | Version_1 of t
+
+      let pending_operations_encoding =
+        union
+          [
+            case
+              ~title:"new_encoding_pending_operations"
+              Json_only
+              version_1_encoding
+              (function
+                | Version_1 pending_operations -> Some pending_operations
+                | Version_0 _ -> None)
+              (fun pending_operations -> Version_1 pending_operations);
+            case
+              ~title:"old_encoding_pending_operations"
+              Json_only
+              version_0_encoding
+              (function
+                | Version_0 pending_operations -> Some pending_operations
+                | Version_1 _ -> None)
+              (fun pending_operations -> Version_0 pending_operations);
+          ]
+
+      let pending_operations_version_dispatcher ~version pending_operations =
+        if version = 0 then Some (Version_0 pending_operations)
+        else if version = 1 then Some (Version_1 pending_operations)
+        else None
+
       let pending_operations path =
-        (* TODO: branch_delayed/... *)
         RPC_service.get_service
           ~description:"List the prevalidated operations."
-          ~query:RPC_query.empty
-          ~output:encoding
+          ~query:pending_query
+          ~output:pending_operations_encoding
           RPC_path.(path / "pending_operations")
 
       let ban_operation path =
@@ -1285,9 +1378,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    let pending_operations ctxt ?(chain = `Main) () =
-      let s = S.Mempool.pending_operations (mempool_path chain_path) in
-      RPC_context.make_call1 s ctxt chain () ()
+    type t_with_version = S.Mempool.t_with_version =
+      | Version_0 of t
+      | Version_1 of t
+
+    let pending_operations_version_dispatcher =
+      S.Mempool.pending_operations_version_dispatcher
+
+    let pending_operations ctxt ?(chain = `Main)
+        ?(version = S.Mempool.default_pending_operations_version) () =
+      RPC_context.make_call1
+        (S.Mempool.pending_operations (mempool_path chain_path))
+        ctxt
+        chain
+        (object
+           method version = version
+        end)
+        ()
+      >>=? function
+      | Version_1 pending_operations | Version_0 pending_operations ->
+          return pending_operations
 
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
