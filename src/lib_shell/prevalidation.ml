@@ -281,7 +281,7 @@ let preapply chain_store ~user_activated_upgrades
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
           | Error _ ->
-              (* FIXME *)
+              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1721  *)
               Lwt.return (acc_validation_result, acc_validation_state)
           | Ok op ->
               apply_operation_with_preapply_result
