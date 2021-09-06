@@ -87,32 +87,30 @@ let extract_endorsement
       Some ((branch, level), slot)
   | _ ->  None
 
-let rec endorsements_recorder cctxt current_level =
+let endorsements_recorder cctxt current_level =
   Block_services.Mempool.monitor_operations
     cctxt
     ~chain:cctxt#chain
     ~applied:true
-    ~refused:true
+    ~refused:false
     ~branch_delayed:true
     ~branch_refused:true
     ()
   >>=? fun (ops_stream, _stopper) ->
   let op_stream = Lwt_stream.flatten ops_stream in
-  Lwt_stream.fold_s
+  Lwt_stream.fold
     (fun ((_hash,op),errors) acc ->
       let delay = Systime_os.now () in
       match extract_endorsement op with
-      | None -> Lwt.return acc
+      | None -> acc
       | (Some ((block, level), news)) ->
-         Lwt.return
-           (acc >|? fun m ->
-                    Block_hash.Map.update block (function
-                        | Some (_,l) -> Some (level, (errors, delay, news) :: l)
-                        | None -> Some(level, [errors, delay, news]))
-                      m))
+         Block_hash.Map.update block (function
+             | Some (_,l) -> Some (level, (errors, delay, news) :: l)
+             | None -> Some(level, [errors, delay, news]))
+           acc)
     op_stream
-    (ok Block_hash.Map.empty)
-  >>=? fun out ->
+    Block_hash.Map.empty
+  >>= fun out ->
   Block_hash.Map.iter_ep
     (fun block (level, endorsements) ->
       let level = Protocol.Alpha_context.Raw_level.to_int32 level in
@@ -122,62 +120,74 @@ let rec endorsements_recorder cctxt current_level =
 
 let blocks_loop cctxt =
   Shell_services.Monitor.valid_blocks cctxt ~chains:[cctxt#chain] ()
-  >>=? fun (block_stream, _stopper) ->
-  Lwt_stream.fold_s
-    (fun ((chain_id, hash), header) _acc ->
-      let reception_time = Systime_os.now () in
-      let block_level = header.Block_header.shell.Block_header.level in
-      let () =
-        Lwt.ignore_result
-          (print_failures (endorsements_recorder cctxt block_level)) in
-      Block_services.Operations.operations_in_pass
-        cctxt
-        ~chain:(`Hash chain_id)
-        ~block:(`Hash (hash, 0))
-        0
-      >|= function
-      | Error e -> Error_monad.pp_print_error Format.err_formatter e
-      | Ok ops ->
-         let timestamp = header.Block_header.shell.Block_header.timestamp in
-         let _seed_nonce_hash =
-           match
-             Data_encoding.Binary.of_bytes
-               Protocol.block_header_data_encoding
-               header.Block_header.protocol_data
-           with
-           | Ok { contents = { seed_nonce_hash; _ }; signature = _ } ->
-              seed_nonce_hash
-           | Error err ->
-              let () =
-                Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
-              in
-              None
-         in
-         let pks =
-           List.filter_map
-             (fun Block_services.{ receipt; _ } ->
-               match receipt with
-               | Some
-                 (Protocol.Apply_results.Operation_metadata
-                    { contents =
-                        Single_result
-                          (Protocol.Apply_results.Endorsement_with_slot_result
-                             (Tezos_raw_protocol_010_PtGRANAD.Apply_results
-                                .Endorsement_result { delegate; _ }))
-                 }) ->
-                  Some delegate
-               | _ -> None)
-             ops
-         in
-         Archiver.add_block block_level hash timestamp reception_time pks)
-    block_stream
-    () >>= return
+  >>= function
+  | Error e ->
+     let () = Error_monad.pp_print_error Format.err_formatter e in
+     Lwt.return_unit
+  | Ok (block_stream, _stopper) ->
+     Lwt_stream.iter_p
+       (fun ((chain_id, hash), header) ->
+         let reception_time = Systime_os.now () in
+         let block_level = header.Block_header.shell.Block_header.level in
+         Block_services.Operations.operations_in_pass
+           cctxt
+           ~chain:(`Hash chain_id)
+           ~block:(`Hash (hash, 0))
+           0
+         >|= function
+         | Error e -> Error_monad.pp_print_error Format.err_formatter e
+         | Ok ops ->
+            let timestamp = header.Block_header.shell.Block_header.timestamp in
+            let _seed_nonce_hash =
+              match
+                Data_encoding.Binary.of_bytes
+                  Protocol.block_header_data_encoding
+                  header.Block_header.protocol_data
+              with
+              | Ok { contents = { seed_nonce_hash; _ }; signature = _ } ->
+                 seed_nonce_hash
+              | Error err ->
+                 let () =
+                   Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
+                 in
+                 None
+            in
+            let pks =
+              List.filter_map
+                (fun Block_services.{ receipt; _ } ->
+                  match receipt with
+                  | Some
+                    (Protocol.Apply_results.Operation_metadata
+                       { contents =
+                           Single_result
+                             (Protocol.Apply_results.Endorsement_with_slot_result
+                                (Tezos_raw_protocol_010_PtGRANAD.Apply_results
+                                   .Endorsement_result { delegate; _ }))
+                    }) ->
+                     Some delegate
+                  | _ -> None)
+                ops
+            in
+            Archiver.add_block block_level hash timestamp reception_time pks)
+       block_stream
+
+let endorsements_loop cctxt =
+  Shell_services.Monitor.heads cctxt cctxt#chain
+  >>= function
+  | Error e ->
+     let () = Error_monad.pp_print_error Format.err_formatter e in
+     Lwt.return_unit
+  | Ok (head_stream, _stopper) ->
+     Lwt_stream.iter_p
+       (fun (_hash, header) ->
+         let block_level = header.Block_header.shell.Block_header.level in
+         print_failures (endorsements_recorder cctxt block_level))
+       head_stream
 
 let main cctxt prefix =
   let dumper = Archiver.launch prefix in
   let main =
-    print_failures (blocks_loop cctxt)
-    >>= fun () ->
+    Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) >>= fun () ->
     let () = Archiver.stop () in
     Lwt.return_unit
   in
