@@ -46,7 +46,11 @@ val encoding : json Encoding.t
 
 val schema_encoding : schema Encoding.t
 
-val construct : 't Encoding.t -> 't -> json
+val construct :
+  ?include_default_fields:[`Always | `Auto | `Never] ->
+  't Encoding.t ->
+  't ->
+  json
 
 val destruct : 't Encoding.t -> json -> 't
 

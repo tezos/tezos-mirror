@@ -835,7 +835,11 @@ module Json : sig
   val schema : ?definitions_path:string -> 'a Encoding.t -> schema
 
   (** Construct a JSON object from an encoding. *)
-  val construct : 't Encoding.t -> 't -> json
+  val construct :
+    ?include_default_fields:[`Always | `Auto | `Never] ->
+    't Encoding.t ->
+    't ->
+    json
 
   type jsonm_lexeme =
     [ `Null
