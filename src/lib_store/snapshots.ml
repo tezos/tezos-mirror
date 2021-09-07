@@ -2337,6 +2337,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     ensure_valid_export_chain_dir store_dir chain_id >>=? fun () ->
     init snapshot_path >>=? fun snapshot_exporter ->
+    (* Register a clean up callback to prevent export cancelation not
+       to be correctly cleaned. *)
+    let cleaner_id =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          Exporter.cleaner snapshot_exporter >>= fun () -> Lwt.return_unit)
+    in
     protect
       ~on_error:(fun errors ->
         Exporter.cleaner snapshot_exporter >>= fun () ->
@@ -2408,6 +2414,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     Exporter.finalize snapshot_exporter metadata
     >>=? fun exported_snapshot_filename ->
     Event.(emit export_success exported_snapshot_filename) >>= fun () ->
+    Lwt_exit.unregister_clean_up_callback cleaner_id ;
     return_unit
 end
 
