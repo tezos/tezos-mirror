@@ -123,6 +123,44 @@ html: Makefile api/errors.rst rpc p2p install-dependencies
 	cp ../CHANGES.rst .
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
+# pylint does not support pyproject.toml configuration for now
+# It is configured by ./.pylint.rc
+# In pylint, we ignore the following additional errors:
+# - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
+PYLINT=poetry run pylint --disable C0330
+
+# pycodestyle does not support pyproject.toml configuration for now
+# https://github.com/PyCQA/pydocstyle/issues/447
+#
+# In pycodestyle we ignore the following additional errors w.r.t to defaults
+# (i.e. E121,E123,E126,E226,E24,E704,W503)
+# - E203 :: pycodestyle is wrong (https://github.com/psf/black/issues/315)
+#           and black takes care of it
+# - E231 :: same as E203
+#
+# Other error codes are detailed at https://www.flake8rules.com/
+PYCODESTYLE=poetry run pycodestyle
+PYCODESTYLE_OPTIONS=\
+	--ignore=E121,E123,E126,E226,E24,E704,W503,E203,E231 \
+	--max-line-length=80
+
+PYTHON_SRCS?=conf.py _extensions/*.py scripts/*.py
+
+pylint:
+	@echo "Linting with pylint, version:"
+	@poetry run pylint --version | sed 's/^/  /'
+	$(PYLINT) $(PYTHON_SRCS)
+
+lint_black:
+	@echo "Running black formatter as style checker"
+	poetry run black --check $(PYTHON_SRCS)
+
+pycodestyle:
+	@echo "Linting with pycodestyle version `poetry run pycodestyle --version` (`poetry run which pycodestyle`)"
+	$(PYCODESTYLE) $(PYCODESTYLE_OPTIONS) $(PYTHON_SRCS)
+
+lint: pylint pycodestyle lint_black
+
 clean:
 	@-rm -Rf "$(BUILDDIR)"
 	@-rm -Rf api/errors.rst active/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst

@@ -1,5 +1,6 @@
 from pygments.lexer import RegexLexer
-from pygments.token import *
+from pygments.token import Whitespace, Literal, Punctuation, Keyword, Comment
+
 
 class MichelsonLexer(RegexLexer):
     name = 'Michelson'
@@ -28,17 +29,16 @@ class MichelsonLexer(RegexLexer):
             # types
             (r'[a-z][a-z_]*', Keyword.Type),
             # annotations
-            (r'[@:%](@|%|%%|[_a-zA-Z][_0-9a-zA-Z\.]*)?', Keyword.Name)
+            (r'[@:%](@|%|%%|[_a-zA-Z][_0-9a-zA-Z\.]*)?', Keyword.Name),
         ],
         'comment': [
             (r'[^*/]', Comment.Multiline),
             (r'/\*', Comment.Multiline, '#push'),
             (r'\*/', Comment.Multiline, '#pop'),
-            (r'[*/]', Comment.Multiline)
-        ]
+            (r'[*/]', Comment.Multiline),
+        ],
     }
 
 
 def setup(sphinx):
     sphinx.add_lexer("michelson", MichelsonLexer)
-    
