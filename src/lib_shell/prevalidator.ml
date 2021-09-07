@@ -1223,7 +1223,7 @@ module Make
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/merge_requests/2668
+  (* FIXME: https://gitlab.com/tezos/tezos/-/merge_requests/2668
 
      If the interface of worker would not use tzresult we would
      see that this is not necessary since the function
