@@ -4,8 +4,7 @@ set -e
 
 snapshot_protocol () {
     f_proto_name="$1"
-    f_proto_version="$2"
-    f_proto_dir="$3"
+    f_proto_dir="$2"
 
     # snapshot protocol alpha into new directory
     echo "
@@ -15,6 +14,9 @@ Calling: ./scripts/snapshot_alpha $f_proto_name."
     # link new protocol for the shell and client
     echo "
 Calling: ./scripts/link_protocol.sh $f_proto_dir."
+
+    # $f_proto_dir might contain a wildcard
+    # shellcheck disable=SC2086
     ./scripts/link_protocol.sh $f_proto_dir
 }
 
@@ -31,7 +33,7 @@ import_snapshot () {
     f_snapshot_path="$1"
     f_blockhash="$2"
 
-    ! [ -z "$f_blockhash" ] && f_blockhash_opt="--block $f_blockhash"
+    [ -n "$f_blockhash" ] && f_blockhash_opt="--block $f_blockhash"
 
     # The command ${snapshot%.(rolling|full|archive} did not worked for no
     # found reason
@@ -50,6 +52,8 @@ The context in ${context_dir} will be used for the test."
     else
         echo "
 Importing context from $f_snapshot_path into $context_dir."
+        # $f_snapshot_path might be empty
+        # shellcheck disable=SC2086
         ./tezos-node snapshot import "$f_snapshot_path" --data-dir "$context_dir" $f_blockhash_opt
     fi
 }
@@ -84,10 +88,10 @@ Creating a yes-wallet in directory ${yes_wallet}."
 }
 
 #setting tmp dir
-if ! [[ -z "$TMP" ]]
+if [[ -n "$TMP" ]]
 then
     tmp_dir="$TMP"
-elif ! [[ -z "$TMPDIR" ]]
+elif [[ -n "$TMPDIR" ]]
 then
     tmp_dir="$TMPDIR"
 else
@@ -162,10 +166,9 @@ in the imported chain is <block_hash>.
 
 # manual or auto mode
 #
-if ! ( [[ $1 == "manual" ]] || [[ $1 == "auto" ]] ) || [ $# -lt 2 ]
+if ! { [[ $1 == "manual" ]] || [[ $1 == "auto" ]] ;}  || [ $# -lt 2 ]
 then
     echo "$usage"
-    echo "$manual"
     exit 1
 else
     mode="$1"
@@ -182,17 +185,15 @@ then
     pred_proto_version=$(printf "%03d" $((10#$proto_version -1)))
 else
     pred_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
-    pred_proto_version=$(echo $pred_proto_name | cut -d'_' -f2)
-
-    proto_version=($pred_proto_version +1)
+    pred_proto_version=$(echo "$pred_proto_name" | cut -d'_' -f2)
 
     proto_dir="src/proto_alpha/"
 fi
 
 # now calls correct scripts and renaming
-if ! [ -z "$proto_name" ]
+if [ -n "$proto_name" ]
 then
-    snapshot_protocol "$proto_name" "$proto_version" "$proto_dir"
+    snapshot_protocol "$proto_name" $proto_dir
 fi
 
 echo "
@@ -200,7 +201,7 @@ Setting environment for $mode test"
 if [[ $mode == "auto" ]]
 then
     #set \$path
-    if ! [ -z "$proto_name" ]
+    if [ -n "$proto_name" ]
     then
         snapshot_path="$3"
         blockhash="$4"
@@ -220,10 +221,10 @@ then
 
     make
 
-    if ! [ -z "$proto_name" ]
+    if [ -n "$proto_name" ]
     then
         full_hash=$(jq .hash < ${proto_dir}/lib_protocol/TEZOS_PROTOCOL)
-        sed -i.old -e 's/^let protocol = .*/let protocol = '$full_hash'/' ./tezt/manual_tests/migration.ml
+        sed -i.old -e 's/^let protocol = .*/let protocol = '"$full_hash"'/' ./tezt/manual_tests/migration.ml
     fi
 
     import_snapshot "$snapshot_path" "$blockhash"
@@ -256,7 +257,7 @@ needs."
 elif [[ "$mode" == "manual" ]]
 then
     #set \$level \$path
-    if ! [ -z $proto_name ]
+    if [ -n "$proto_name" ]
     then
         mig_level=$3
         snapshot_path=$4
@@ -268,19 +269,19 @@ then
     fi
 
     # check if \$level is set
-    if [ -z $mig_level ]
+    if [ -z "$mig_level" ]
     then
-        echo $usage
+        echo "$usage"
         exit 1
     fi
 
-    user_activated_upgrade $proto_dir $mig_level
+    user_activated_upgrade $proto_dir "$mig_level"
 
-    pred_full_hash=$(jq -r .hash < src/proto_${pred_proto_version}_*/lib_protocol/TEZOS_PROTOCOL)
-    pred_short_hash=$(echo $pred_full_hash | head -c 8)
+    pred_full_hash=$(jq -r .hash < src/proto_"${pred_proto_version}"_*/lib_protocol/TEZOS_PROTOCOL)
+    pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
 
     # now calls correct scripts and renaming
-    if (( $mig_level <= 28082 ))
+    if (( "$mig_level" <= 28082 ))
     then
         # Env test use a fresh context and no yes-node/wallet
         echo "
@@ -294,7 +295,7 @@ $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
 $ eval \`./src/bin_client/tezos-init-sandboxed-client.sh 1\`
 $ tezos-activate-${pred_proto_version}-${pred_short_hash}
 
-Then bake blocks until the chain reaches level $level with:
+Then bake blocks until the chain reaches level $mig_level with:
 $ tezos-client bake for bootstrap1 --minimal-timestamp
 
 In order to re-run the migration test, kill the sandboxed node and run the
@@ -308,7 +309,7 @@ commands above (the script needs not to be run again)."
 
         make
 
-        if ! [ -z "$snapshot_path" ] && [ -f "$snapshot_path" ]
+        if [ -n "$snapshot_path" ] && [ -f "$snapshot_path" ]
         then
             import_snapshot "$snapshot_path" "$blockhash"
             ! [ -f "$context_dir/identity.json" ] && generate_identities "$context_dir"
@@ -328,7 +329,7 @@ Use the following commands to start the node with the imported context:
 $ test_directory=\$(mktemp -d -t \"${context_dir##*/}-XXXX\") && cp -r \"$context_dir/.\" \"\$test_directory\"
 $ ./tezos-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
 
-Then bake blocks until the chain reaches level $level with:
+Then bake blocks until the chain reaches level $mig_level with:
 $ ./tezos-client -d $yes_wallet bake for foundation1 --minimal-timestamp
 
 In order to re-run the migration test, kill the node and delete spurious fil
