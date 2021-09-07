@@ -218,11 +218,25 @@ let test_expand_deep_constants =
 
 (** The [constant] prim is permitted only to have a
     single string argument, representing a valid
-    Script_repr.expr hash. *)
+    Script_repr.expr hash, with no annotations *)
 let test_expand_reject_ill_formed =
   tztest "expand: ill formed constants are rejected" `Quick (fun () ->
+      (* first, create a context, register a constant and check
+         that its expansion works well. *)
+      create_context () >>=? fun context ->
+      let some_expr = Expr.from_string "0" in
+      Global_constants_storage.register context some_expr
+      >|= Environment.wrap_tzresult
+      >>=? fun (context, hash, _) ->
+      let hash = Script_expr_hash.to_b58check hash in
+      (* check that expansion of the registered constant works *)
+      Global_constants_storage.expand
+        context
+        (Expr.from_string @@ Format.sprintf "constant \"%s\"" hash)
+      >|= Environment.wrap_tzresult
+      >>=? fun (context, result) ->
+      assert_expr_equal __LOC__ some_expr result >>=? fun () ->
       let test expr =
-        create_context () >>=? fun context ->
         let expected = Expr.from_string expr in
         Global_constants_storage.expand context expected
         >|= Environment.wrap_tzresult
@@ -231,11 +245,17 @@ let test_expand_reject_ill_formed =
               "proto.alpha.Badly_formed_constant_expression"
       in
       (* constant with an argument other than String fails *)
-      test "constant 9" >>=? fun _ ->
+      test "constant 9" >>=? fun () ->
       (* same as above but nested *)
-      test "Pair 1 (constant (Pair 2 3))"
+      test "Pair 1 (constant (Pair 2 3))" >>=? fun () ->
       (* constant with bad hash fails *)
-      >>=? fun _ -> test "constant \"foobar\"")
+      test "constant \"foobar\"" >>=? fun () ->
+      (* constant with type annot *)
+      test @@ Format.sprintf "(constant :a \"%s\")" hash >>=? fun () ->
+      (* constant with var annot *)
+      test @@ Format.sprintf "(constant @a \"%s\")" hash >>=? fun () ->
+      (* constant with field annot *)
+      test @@ Format.sprintf "(constant %%a \"%s\")" hash)
 
 (** [test_expand] accepts an expression [stored] to be
     registered in the store, an expression [expr] that includes a template slot for
