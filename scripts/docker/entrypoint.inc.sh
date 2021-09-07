@@ -106,12 +106,14 @@ launch_node() {
         "$node" config init \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
+                --allow-all-rpc ":$NODE_RPC_PORT" \
                 $config_args
     else
         echo "Updating the node configuration..."
         "$node" config update \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
+                --allow-all-rpc ":$NODE_RPC_PORT" \
                 $config_args
     fi
 
