@@ -34,12 +34,12 @@ install_bin_focal:
   script:
     - bash ./docs/introduction/install-bin-fedora.sh
 
-install_bin_fedora_32:
-  image: fedora:32
-  extends: .install_bin_fedora_template
-
 install_bin_fedora_33:
   image: fedora:33
+  extends: .install_bin_fedora_template
+
+install_bin_fedora_34:
+  image: fedora:34
   extends: .install_bin_fedora_template
 
 .install_opam_ubuntu_template:

@@ -33,14 +33,10 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
-    ( "010",
+    ( "",
       "010 Granada",
       Some "/include/rpc_introduction.rst.inc",
       "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV" );
-    ( "",
-      "009 Florence",
-      Some "/include/rpc_introduction.rst.inc",
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
   ]
 
 let pp_name ppf = function

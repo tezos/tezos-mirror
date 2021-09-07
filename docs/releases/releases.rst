@@ -81,8 +81,7 @@ The packaged forms are updated from the source form as follows:
 
    -  at each stable release
    -  The process is currently performed manually by
-      `Serokell <https://serokell.io>`_ when the OPAM packages
-      above are generated.
+      `Serokell <https://serokell.io>`_.
 
 For installing Tezos from these different forms of releases, see
 :doc:`../introduction/howtoget`.

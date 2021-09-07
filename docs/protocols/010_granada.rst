@@ -67,7 +67,7 @@ At any time bakers can vote to shut off the liquidity baking subsidy by setting 
 - MRs: :gl:`!2765` :gl:`!2897` :gl:`!2920` :gl:`!2929` :gl:`!2946`
 - Issue: :gl:`#1238`
 
-More detailed docs for liquidity baking can be found :doc:`here<../010/liquidity_baking>`.
+More detailed docs for liquidity baking can be found :doc:`here<../active/liquidity_baking>`.
 
 Gas improvements
 ----------------
