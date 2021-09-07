@@ -74,6 +74,12 @@ let create parameters =
     applied_rev = [];
   }
 
+let set_of_bounded_map bounded_map =
+  Operation_hash.Map.fold
+    (fun oph _ acc -> Operation_hash.Set.add oph acc)
+    bounded_map.map
+    Operation_hash.Set.empty
+
 let flush (classes : t) ~handle_branch_refused =
   if handle_branch_refused then (
     Ringo.Ring.clear classes.branch_refused.ring ;
@@ -81,7 +87,10 @@ let flush (classes : t) ~handle_branch_refused =
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
   classes.applied_rev <- [] ;
-  classes.in_mempool <- Operation_hash.Set.empty
+  classes.in_mempool <-
+    Operation_hash.Set.union
+      (set_of_bounded_map classes.refused)
+      (set_of_bounded_map classes.branch_refused)
 
 let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 
