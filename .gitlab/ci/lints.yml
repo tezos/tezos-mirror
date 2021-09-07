@@ -19,6 +19,16 @@ misc_checks:
     - dune runtest -p tezos-test-helpers ||
       echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
 
+check_docs_python:
+  extends: .build_template
+  stage: test
+  needs: []
+  before_script:
+    - cd docs
+    - poetry install
+  script:
+    - make lint
+
 check_precommit_hook:
   extends: .build_template
   stage: test
