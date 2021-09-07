@@ -1099,7 +1099,8 @@ module Make
       (match request with
       | Request.Flush (hash, event, live_blocks, live_operations) ->
           on_advertise pv.shell ;
-          (* TODO: rebase the advertisement instead *)
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
+             Rebase the advertisement instead. *)
           let chain_store =
             Distributed_db.chain_store pv.shell.parameters.chain_db
           in
