@@ -78,6 +78,22 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     default_bootstrap_peers;
   }
 
+(* The script in scripts/user_activated_upgrade.sh patches the following lines
+   when it needs to set the user activated upgrade levels for Mainnet. *)
+(* BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)
+let mainnet_user_activated_upgrades =
+  [
+    (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
+    (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP");
+  ]
+
+(* END_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)
+(* it patches the following lines when it needs to set the user activated
+   upgrade levels for a sandbox. *)
+(* BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)
+let sandbox_user_activated_upgrades = []
+(* END_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)
+
 let blockchain_network_mainnet =
   let giganode_1 = "116.202.172.21" in
   let giganode_2 = "95.216.45.62" in
@@ -96,11 +112,7 @@ let blockchain_network_mainnet =
     ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
-    ~user_activated_upgrades:
-      [
-        (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
-        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP");
-      ]
+    ~user_activated_upgrades:mainnet_user_activated_upgrades
     ~user_activated_protocol_overrides:
       [
         ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
@@ -241,6 +253,7 @@ let blockchain_network_sandbox =
       }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:sandbox_user_activated_upgrades
 
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in

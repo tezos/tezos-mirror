@@ -92,8 +92,7 @@ type ex_comparable_data_3 =
 
 (* We use the Michelson samplers from lib_benchmark and turn them into QCheck
    generators *)
-module Parameters : Tezos_benchmark_alpha.Michelson_samplers_parameters.S =
-struct
+module Parameters : Michelson_samplers_parameters.S = struct
   let atom_size_range : Tezos_benchmark.Base_samplers.range =
     {min = 0; max = 10}
 
@@ -101,7 +100,7 @@ struct
 
   let other_size : Tezos_benchmark.Base_samplers.range = {min = 0; max = 100}
 
-  let parameters : Tezos_benchmark_alpha.Michelson_samplers_parameters.t =
+  let parameters : Michelson_samplers_parameters.t =
     {
       int_size = atom_size_range;
       string_size = atom_size_range;
@@ -118,8 +117,7 @@ struct
   let algo = `Default
 end
 
-module Samplers : Tezos_benchmark_alpha.Michelson_samplers.S =
-  Tezos_benchmark_alpha.Michelson_samplers.Make (Parameters)
+module Samplers : Michelson_samplers.S = Michelson_samplers.Make (Parameters)
 
 let ex_comparable_data_sampler :
     ex_comparable_data Tezos_benchmark.Base_samplers.sampler =

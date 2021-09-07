@@ -37,7 +37,7 @@
 
 open Tezos_benchmark
 open Tezos_micheline
-open Tezos_protocol_alpha.Protocol
+open Protocol
 
 let assert_ok_lwt x =
   match Lwt_main.run x with
@@ -86,7 +86,7 @@ module Micheline_sampler = struct
   let all_kinds = [|Int_node; String_node; Bytes_node; Seq_node; Prim_node|]
 
   let prims =
-    let open Tezos_protocol_alpha.Protocol.Michelson_v1_primitives in
+    let open Protocol.Michelson_v1_primitives in
     [|
       K_parameter;
       K_storage;
@@ -521,8 +521,6 @@ let () =
 
 module Global_constants_storage_expr_to_address_in_context : Benchmark.S =
 struct
-  open Tezos_raw_protocol_alpha
-
   let name = "Global_constants_storage_expr_to_address_in_context"
 
   let info =
@@ -618,8 +616,6 @@ let () =
 module Global_constants_storage_substitute_models = struct
   module Global_constants_storage_substitute_constant_branch : Benchmark.S =
   struct
-    open Tezos_raw_protocol_alpha
-
     let name = "Global_constants_storage_substitute_constant_branch"
 
     let info =
@@ -701,8 +697,6 @@ module Global_constants_storage_substitute_models = struct
 
   module Global_constants_storage_substitute_no_constant_branch : Benchmark.S =
   struct
-    open Tezos_raw_protocol_alpha
-
     let name = "Global_constants_storage_substitute_no_constant_branch"
 
     let info =

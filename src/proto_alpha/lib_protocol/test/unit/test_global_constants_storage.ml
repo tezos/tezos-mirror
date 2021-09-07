@@ -40,7 +40,7 @@ open QCheck
 open Lib_test.Qcheck_helpers
 open Michelson_v1_primitives
 open Michelson_v1_printer
-open Tezos_alpha_test_helpers.Test_global_constants
+open Test_global_constants
 
 (** [get] on a nonexistent global constant
     returns an error. *)

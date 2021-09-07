@@ -58,10 +58,11 @@ if (( $level > 28082 )); then
     # replace existing upgrades
     awk -v level=$level -v full_hash=$full_hash '
 BEGIN{found=0}{
-if (!found && $0 ~ "~user_activated_upgrades")
-  {found=1; printf "    ~user_activated_upgrades:\n      [ (%dl, \"%s\") ]\n", level, full_hash}
+if (!found && $0 ~ "BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES")
+  {found=1; printf "(* BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)\n";
+   printf "let mainnet_user_activated_upgrades = [ (%dl, \"%s\") ]\n", level, full_hash}
 else {
-  if (found && $0 ~ "~user_activated_protocol_overrides")
+  if (found && ($0 ~ "END_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES"))
     {found=0; print }
   else
     { if (!found){print}}
@@ -71,12 +72,19 @@ else {
     echo "The sandbox will now switch to $full_hash at level $level."
 else # we are in sandbox
 
-    # add upgrade to the sandbox
+    # add upgrade to the sandbox (same awk script as for mainnet but with
+    # "SANDBOX" instead of "MAINNET")
     awk -v level=$level -v full_hash=$full_hash '
-{ print
-  if ($0 ~ "~alias:\"sandbox\"")
-  { printf "    ~user_activated_upgrades:\n      [ (%dl, \"%s\") ]\n", level, full_hash }
-}' src/bin_node/node_config_file.ml > tmp_file
+BEGIN{found=0}{
+if (!found && $0 ~ "BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES")
+  {found=1; printf "(* BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)\n";
+   printf "let sandbox_user_activated_upgrades = [ (%dl, \"%s\") ]\n", level, full_hash}
+else {
+  if (found && ($0 ~ "END_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES"))
+    {found=0; print }
+  else
+    { if (!found){print}}
+}}' src/bin_node/node_config_file.ml > tmp_file
     mv tmp_file src/bin_node/node_config_file.ml
 
     sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/tezos-init-sandboxed-client.sh

@@ -79,10 +79,7 @@ let rec michelson_type_list_to_ex_stack_ty
           match ex_stack_ty with
           | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
 
-module Alpha_test_helpers = Tezos_alpha_test_helpers
-
 let typecheck_by_tezos =
-  let open Alpha_test_helpers in
   let context_init_memory ~rng_state =
     Context.init
       ~rng_state

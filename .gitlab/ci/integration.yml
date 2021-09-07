@@ -43,6 +43,7 @@ script:snapshot_alpha_and_link:
     - make
   script:
     - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
+    - make
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##

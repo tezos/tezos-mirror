@@ -359,7 +359,7 @@ adding to the yes-wallet the existing accounts of large bakers in Mainnet,
 e.g. ``foundation1`` to ``foundation8``, we would have enough rights to bake
 blocks at will. We can do so by running::
 
-  $ dune exec scripts/yes-wallet/yes_wallet.exe /tmp/yes-wallet
+  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in /tmp/yes-wallet
 
 This command creates a yes-wallet and places the yes-wallet folder in the
 system's temp directory (in our example, ``/tmp``) as given by the path argument
@@ -693,7 +693,7 @@ invoking the following eight commands)::
   $ ./scripts/link_protocol.sh src/proto_007_*
   $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1617344 
   $ patch -p1 < scripts/yes-node.patch
-  $ dune exec scripts/yes-wallet/yes_wallet.exe /tmp/yes-wallet
+  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in /tmp/yes-wallet
   $ make
   $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/mainnet
   $ ./tezos-node identity generate --data-dir /tmp/mainnet
