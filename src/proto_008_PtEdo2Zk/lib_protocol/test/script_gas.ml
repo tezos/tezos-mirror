@@ -103,7 +103,7 @@ module Tested_terms () = struct
         (TzTrace.make
            (Exn (Failure "min costs and full costs have different lengths")))
       (fun min full ->
-        if Z.leq min full then ok_unit
+        if Z.leq min full then Result.return_unit
         else
           generic_error
             "Script_repr: inconsistent costs %a vs %a@."

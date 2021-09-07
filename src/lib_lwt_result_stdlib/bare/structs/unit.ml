@@ -27,11 +27,11 @@ include Stdlib.Unit
 
 let unit = ()
 
-let unit_s = Monad.unit_s
+let unit_s = Monad.Lwt.return_unit
 
-let unit_e = Monad.unit_e
+let unit_e = Monad.Result.return_unit
 
-let unit_es = Monad.unit_es
+let unit_es = Monad.LwtResult.return_unit
 
 let catch ?(catch_only = fun _ -> true) f =
   match f () with

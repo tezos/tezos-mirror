@@ -80,7 +80,7 @@ let test_free_neutral since =
     Gas.Arith.(
       Gas.consumed ~since:ctxt ~until:branch1
       = Gas.consumed ~since:ctxt ~until:branch2)
-  then ok_none
+  then Result.return_none
   else Ok (Some (cost, Gas.free))
 
 (** Consuming [cost1] then [cost2] is equivalent to consuming
@@ -97,12 +97,12 @@ let test_consume_commutes since =
     Gas.Arith.(
       Gas.consumed ~since:ctxt ~until:branch1
       = Gas.consumed ~since:ctxt ~until:branch2)
-  then ok_none
+  then Result.return_none
   else Ok (Some (cost1, cost2))
 
 let rec loop_check check n ctxt =
   let open Environment.Error_monad in
-  if n = 0 then ok_none
+  if n = 0 then Result.return_none
   else
     check ctxt >>? function
     | None -> loop_check check (n - 1) ctxt

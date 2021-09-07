@@ -35,10 +35,10 @@ let is_unknown = Option.is_none
 
 let join (type a) ~where eq (l1 : a t) (l2 : a t) =
   match (l1, l2) with
-  | (None, None) -> ok_none
-  | (Some x, None) | (None, Some x) -> ok (Some x)
+  | (None, None) -> Result.return_none
+  | (Some x, None) | (None, Some x) -> Result.return_some x
   | (Some x, Some y) ->
-      if eq x y then ok (Some x)
+      if eq x y then Result.return_some x
       else generic_error "Limit.join: error (%s)" where
 
 let%test "join" =

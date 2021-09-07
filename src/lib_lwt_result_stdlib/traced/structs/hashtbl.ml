@@ -73,8 +73,10 @@ struct
              let promise =
                Lwt.try_bind
                  (fun () -> p)
-                 (function Error _ -> Monad.unit_es | Ok v -> f k v)
-                 (fun _ -> Monad.unit_es)
+                 (function
+                   | Error _ -> Monad.LwtTracedResult.return_unit
+                   | Ok v -> f k v)
+                 (fun _ -> Monad.LwtTracedResult.return_unit)
              in
              promise :: acc)
            t

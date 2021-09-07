@@ -56,9 +56,9 @@ module TieredSeq : TIER with type t = int Seq.t = struct
 
   let iter f s =
     iter f s ;
-    unit_es
+    LwtResult.return_unit
 
-  let iter_s f s = iter_s f s >>= fun () -> unit_es
+  let iter_s f s = iter_s f s >>= fun () -> LwtResult.return_unit
 
   let iter_e f s = Lwt.return @@ iter_e f s
 
@@ -134,9 +134,9 @@ module TieredSeq_s : TIER with type t = int Seq_s.t = struct
 
   open Monad
 
-  let iter f s = iter f s >>= fun () -> unit_es
+  let iter f s = iter f s >>= fun () -> LwtResult.return_unit
 
-  let iter_s f s = iter_s f s >>= fun () -> unit_es
+  let iter_s f s = iter_s f s >>= fun () -> LwtResult.return_unit
 end
 
 module TestedSeq_s = TestIter (TieredSeq_s)

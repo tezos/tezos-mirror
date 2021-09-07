@@ -90,41 +90,41 @@ let fold_left_es f acc seq =
 
 let rec iter f seq =
   seq () >>? function
-  | Nil -> unit_e
+  | Nil -> Result.return_unit
   | Cons (item, seq) ->
       f item ;
       iter f seq
 
 let rec iter_e f seq =
   seq () >>? function
-  | Nil -> unit_e
+  | Nil -> Result.return_unit
   | Cons (item, seq) -> f item >>? fun () -> iter_e f seq
 
 let rec iter_s f seq =
   seq () >>?= function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq =
   seq () >>?= function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> Lwt.apply f item >>= fun () -> iter_s f seq
 
 let rec iter_es f seq =
   seq () >>?= function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq =
   seq () >>?= function
-  | Nil -> unit_es
+  | Nil -> LwtResult.return_unit
   | Cons (item, seq) -> Lwt.apply f item >>=? fun () -> iter_es f seq
 
 let iter_p f seq =
   let rec iter_p acc f seq =
     match seq () with
     | Error _ as e -> join_p acc >>= fun () -> Lwt.return e
-    | Ok Nil -> join_p acc >>= fun () -> Monad.unit_es
+    | Ok Nil -> join_p acc >>= fun () -> LwtResult.return_unit
     | Ok (Cons (item, seq)) -> iter_p (Lwt.apply f item :: acc) f seq
   in
   iter_p [] f seq

@@ -31,10 +31,25 @@ module Make (Error : sig
   include Sig.EXT with type error := error
 end)
 (Trace : Sig.TRACE)
-(Monad : Sig.MONAD with type 'error trace := 'error Trace.trace) :
+(Monad : Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
+           with type 'error trace := 'error Trace.trace) :
   Sig.MONAD_EXT
     with type error := Error.error
      and type 'error trace := 'error Trace.trace = struct
+  open Monad
+
+  (* we default to combined monad everywhere. Note that we include [LwtResult]
+     rather than [LwtTracedResult] because [return] and [return_*] functions are
+     more generic. The [fail] function is re-shadowed below for more specific
+     [fail] default. *)
+  include LwtResult
+
+  (* we default to failing within the traced monad *)
+  let fail = fail_trace
+
+  let error = error_trace
+
+  (* default (traced-everywhere) helper types *)
   type tztrace = Error.error Trace.trace
 
   type 'a tzresult = ('a, tztrace) result
@@ -71,4 +86,48 @@ end)
       (fun c e -> Sig.combine_category c (Error.classify_error e))
       `Temporary
       trace
+
+  let record_trace err result =
+    match result with
+    | Ok _ as res -> res
+    | Error trace -> Error (Trace.cons err trace)
+
+  let trace err f =
+    f >>= function
+    | Error trace -> Lwt.return_error (Trace.cons err trace)
+    | ok -> Lwt.return ok
+
+  let record_trace_eval mk_err = function
+    | Error trace -> mk_err () >>? fun err -> Error (Trace.cons err trace)
+    | ok -> ok
+
+  let trace_eval mk_err f =
+    f >>= function
+    | Error trace ->
+        mk_err () >>=? fun err -> Lwt.return_error (Trace.cons err trace)
+    | ok -> Lwt.return ok
+
+  let error_unless cond exn = if cond then Result.return_unit else error exn
+
+  let error_when cond exn = if cond then error exn else Result.return_unit
+
+  let fail_unless cond exn =
+    if cond then LwtTracedResult.return_unit else fail exn
+
+  let fail_when cond exn =
+    if cond then fail exn else LwtTracedResult.return_unit
+
+  let unless cond f = if cond then LwtResult.return_unit else f ()
+
+  let when_ cond f = if cond then f () else LwtResult.return_unit
+
+  let dont_wait f err_handler exc_handler =
+    Lwt.dont_wait
+      (fun () ->
+        f () >>= function
+        | Ok () -> Lwt.return_unit
+        | Error trace ->
+            err_handler trace ;
+            Lwt.return_unit)
+      exc_handler
 end

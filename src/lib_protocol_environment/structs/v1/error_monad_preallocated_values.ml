@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,5 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Trace : Sig.TRACE) :
-  Sig.MONAD with type 'err trace := 'err Trace.trace
+(* In the MR https://gitlab.com/tezos/tezos/-/merge_requests/3346, some of the
+   pre-allocated values for the error monad are removed. The intent is to avoid
+   giving two names to the same value where a single one gives more focus and
+   clarity to the code.
+
+   This module exports the old names (available in some legacy protocol
+   environments) for backwards compatibility purpose. *)
+
+let ok_unit = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_unit
+
+let ok_none = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_none
+
+let ok_some = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_some
+
+let ok_nil = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_nil
+
+let ok_true = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_true
+
+let ok_false = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_false

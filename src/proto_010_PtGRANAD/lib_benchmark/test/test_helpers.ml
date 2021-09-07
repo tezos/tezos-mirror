@@ -109,7 +109,7 @@ let typecheck_by_tezos =
          Tezos_crypto.Operation_hash.zero
   in
   fun bef node ->
-    Result.get_ok
+    Stdlib.Result.get_ok
       (Lwt_main.run
          ( context_init_memory ~rng_state >>=? fun ctxt ->
            let stack = stack_type_to_michelson_type_list bef in

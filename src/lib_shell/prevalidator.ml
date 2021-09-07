@@ -1192,7 +1192,9 @@ module Make
 
     let on_error _w r st errs =
       Event.(emit request_failed) (r, st, errs) >|= fun () ->
-      match r with Request.(View (Inject _)) -> ok_unit | _ -> Error errs
+      match r with
+      | Request.(View (Inject _)) -> Result.return_unit
+      | _ -> Error errs
 
     let on_completion _w r _ st =
       match Request.view r with

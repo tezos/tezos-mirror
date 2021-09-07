@@ -26,11 +26,17 @@
 
 (** Tezos Protocol Implementation - Error Monad *)
 
-(** Categories of error *)
+(** {1 Categories of error}
+
+    Note: this is only meaningful within the protocol. It may be removed from
+    the error monad and pushed to the protocol environment in the future.
+    See https://gitlab.com/tezos/tezos/-/issues/1576 *)
 type error_category =
   [ `Branch  (** Errors that may not happen in another context *)
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
+
+(** {1 Assembling the different components of the error monad.} *)
 
 type error = TzCore.error = ..
 
@@ -44,19 +50,48 @@ module TzTrace : Sig.TRACE with type 'error trace = 'error list
 
 type 'error trace = 'error TzTrace.trace
 
-include Sig.MONAD with type 'error trace := 'error TzTrace.trace
+include
+  Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
+    with type 'error trace := 'error TzTrace.trace
 
 include
   Sig.MONAD_EXT
     with type error := error
      and type 'error trace := 'error TzTrace.trace
 
-(** Erroneous result (shortcut for generic errors) *)
+(** {1 Exception-Error bridge} *)
+
+(** [generic_error] is for generic failure within the [Result] monad. You
+    should use this function rarely: only when there isn't a more specific
+    error.
+
+    The traced error carried in the returned value is unspecified. It is not
+    meant to be recovered from. The error message includes the one passed as
+    argument. Tracking the origin of these errors is generally more difficult
+    than tracking a more specialised error.
+
+    Note: this is somewhat equivalent to [Stdlib.failwith] in that it is a
+    generic failure mechanism with a simple error message that should be
+    replaced by a specific exception in most cases. *)
 val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
 
-(** Erroneous return (shortcut for generic errors) *)
+(** [failwith] is like {!generic_error} but for the LwtResult-monad. The same
+    usage notes apply. *)
 val failwith : ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 -> 'a
 
+(** [error_exn exc] wraps the exception [exc] within an (unspecified) error
+    within a trace within a result. It is meant as a way to switch from
+    exception-based error management to tzresult-based error management, e.g.,
+    when calling external libraries that use exceptions.
+
+{[
+   try Ok (parse_input s) with Lex_error | Parse_error as exc -> error_exn exc
+]}
+
+    [error_exn] is named after {!error} which is the function that fails within
+    the TracedResult monad. If you need a lower-level function that constructs
+    the error trace but doesn't wrap it in a [result], you can use
+    {!error_of_exn}. *)
 val error_exn : exn -> 'a tzresult
 
 (** [error_of_exn e] is a trace that carries the exception [e]. This function is
@@ -69,7 +104,11 @@ try
 with
   | (Not_found | Failure _) as e ->
         Error (error_of_exn e)
-]} *)
+]}
+
+    [error_of_exn] converts (by wrapping) an exception into a traced error. If
+    you intend to place this value in an [Error] construct, you can use
+    {!error_exn} instead. *)
 val error_of_exn : exn -> error trace
 
 (** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
@@ -82,10 +121,19 @@ Lwt_result.catch p >|= tzresult_of_exn_result
 ]} *)
 val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
 
+(** {2 Exception traces}
+
+    The following functions allow you to enrich existing traces with wrapped
+    exceptions. *)
+
+(** [record_trace_exn exc r] is [record_trace (error_of_exn exc) r] *)
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 
+(** [trace_exn exc r] is [trace (error_of_exn exc) r] *)
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 
+(** [generic_trace … r] is [r] where the trace (if any) is enriched with
+  [generic_error …]. *)
 val generic_trace :
   ( 'a,
     Format.formatter,
@@ -96,6 +144,8 @@ val generic_trace :
 
 val pp_exn : Format.formatter -> exn -> unit
 
+(** [failure …] is like [generic_error …] but the error isn't wrapped in a trace
+    in a result. *)
 val failure : ('a, Format.formatter, unit, error) format4 -> 'a
 
 (** Wrapped OCaml/Lwt exception *)

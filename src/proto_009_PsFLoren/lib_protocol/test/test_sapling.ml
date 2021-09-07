@@ -801,7 +801,7 @@ module Interpreter_tests = struct
                   true
               | _ -> false)
             errs) ;
-        ok_unit
+        Result.return_unit
 
   (* In this test we do two transactions in one block and same two in two block.
      We check that the sate is the same expect for roots.

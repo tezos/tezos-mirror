@@ -474,7 +474,7 @@ let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   wrap_error_lwt
     ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
-      if equal actual expected then return ctxt
+      if equal actual expected then Environment.Error_monad.return ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
@@ -495,7 +495,7 @@ let test_parse_data_fails loc ctxt ty node =
          if
            Astring.String.is_infix ~affix:expect_id trace_string
            && Astring.String.is_infix ~affix:expect_descrfiption trace_string
-         then return_unit
+         then Environment.Error_monad.return_unit
          else
            Alcotest.failf
              "Unexpected error (%s) at %s"

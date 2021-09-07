@@ -56,7 +56,7 @@ type result = {
 }
 
 let check_proto_environment_version_increasing block_hash before after =
-  if Protocol.compare_version before after <= 0 then ok_unit
+  if Protocol.compare_version before after <= 0 then Result.return_unit
   else
     error
       (invalid_block

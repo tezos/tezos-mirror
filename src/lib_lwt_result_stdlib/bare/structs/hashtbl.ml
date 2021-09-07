@@ -166,8 +166,8 @@ struct
       (fun (k, p) ->
         Lwt.try_bind
           (fun () -> p)
-          (function Error _ -> unit_es | Ok v -> f k v)
-          (fun _ -> unit_es))
+          (function Error _ -> LwtResult.return_unit | Ok v -> f k v)
+          (fun _ -> LwtResult.return_unit))
       (T.to_seq t)
 
   let fold_with_waiting_es f t init =
@@ -200,8 +200,8 @@ struct
            let promise =
              Lwt.try_bind
                (fun () -> p)
-               (function Error _ -> Monad.unit_es | Ok v -> f k v)
-               (fun _ -> Monad.unit_es)
+               (function Error _ -> LwtResult.return_unit | Ok v -> f k v)
+               (fun _ -> LwtResult.return_unit)
            in
            promise :: acc)
          t
