@@ -651,15 +651,17 @@ let mempool_hooks =
     on_log = (fun output -> replace_variable output |> hooks.on_log);
   }
 
-let get_client_path client =
-  match Client.get_mode client with
-  | Client (Some (Node n)) | Proxy (Node n) -> Node.rpc_port n
-  | Client (Some (Proxy_server p)) | Proxy (Proxy_server p) ->
-      Proxy_server.rpc_port p
-  | Mockup | Light _ | Client None ->
+let get_client_port client =
+  match
+    Client.get_mode client |> Client.mode_to_endpoint
+    |> Option.map Client.rpc_port
+  with
+  | Some port -> port
+  | None ->
       Test.fail
         "Client for mempool rpc tests should be initialized with a node or a \
-         proxy server only"
+         proxy server only. Both have an endpoint and hence a RPC port so this \
+         should not happen."
 
 (* Test the mempool RPCs *)
 (* In this test, we create an applied operation and three operations that fails
@@ -684,7 +686,7 @@ let test_mempool ?endpoint client =
        not support streaming RPCs yet. *)
     sf
       "http://localhost:%d/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true"
-      (get_client_path client)
+      (get_client_port client)
   in
   let proc_monitor =
     (* monitor_operation rpc must be lanched before adding operations in order
