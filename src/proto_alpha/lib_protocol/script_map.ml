@@ -44,7 +44,11 @@ let empty : type a b. a comparable_ty -> (a, b) map =
 
     let key_ty = ty
 
-    module OPS = OPS
+    module OPS = struct
+      type value = b
+
+      include OPS
+    end
 
     let boxed = (OPS.empty, 0)
   end)

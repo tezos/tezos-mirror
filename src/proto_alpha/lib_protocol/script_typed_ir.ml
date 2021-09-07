@@ -209,24 +209,28 @@ let option_key loc t ~annot =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
   Option_key (t, {annot; size})
 
+module type Boxed_set_OPS = sig
+  type t
+
+  type elt
+
+  val empty : t
+
+  val add : elt -> t -> t
+
+  val mem : elt -> t -> bool
+
+  val remove : elt -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+end
+
 module type Boxed_set = sig
   type elt
 
   val elt_ty : elt comparable_ty
 
-  module OPS : sig
-    type t
-
-    val empty : t
-
-    val add : elt -> t -> t
-
-    val mem : elt -> t -> bool
-
-    val remove : elt -> t -> t
-
-    val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
-  end
+  module OPS : Boxed_set_OPS with type elt = elt
 
   val boxed : OPS.t
 
@@ -235,6 +239,24 @@ end
 
 type 'elt set = (module Boxed_set with type elt = 'elt)
 
+module type Boxed_map_OPS = sig
+  type key
+
+  type value
+
+  type 'a t
+
+  val empty : value t
+
+  val add : key -> value -> value t -> value t
+
+  val remove : key -> value t -> value t
+
+  val find : key -> value t -> value option
+
+  val fold : (key -> value -> 'a -> 'a) -> value t -> 'a -> 'a
+end
+
 module type Boxed_map = sig
   type key
 
@@ -242,19 +264,7 @@ module type Boxed_map = sig
 
   val key_ty : key comparable_ty
 
-  module OPS : sig
-    type 'a t
-
-    val empty : value t
-
-    val add : key -> value -> value t -> value t
-
-    val remove : key -> value t -> value t
-
-    val find : key -> value t -> value option
-
-    val fold : (key -> value -> 'a -> 'a) -> value t -> 'a -> 'a
-  end
+  module OPS : Boxed_map_OPS with type key = key and type value = value
 
   val boxed : value OPS.t * int
 end
