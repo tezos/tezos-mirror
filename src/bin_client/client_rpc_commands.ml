@@ -42,6 +42,10 @@ type input = {
   display : string -> unit Lwt.t;
 }
 
+let no_service_at_valid_prefix (cctxt : #Client_context.full) =
+  cctxt#error "No service found at this URL (but this is a valid prefix)\n"
+  >>= fun () -> return_unit
+
 (* generic JSON generation from a schema with callback for random or
    interactive filling *)
 let fill_in ?(show_optionals = true) input schema =
@@ -319,10 +323,7 @@ let schema meth url (cctxt : #Client_context.full) =
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
-      | None ->
-          cctxt#message
-            "No service found at this URL (but this is a valid prefix)\n%!"
-          >>= fun () -> return_unit
+      | None -> no_service_at_valid_prefix cctxt
       | Some {input = Some input; output; _} ->
           let json =
             `O
@@ -339,10 +340,7 @@ let schema meth url (cctxt : #Client_context.full) =
           in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return_unit)
-  | _ ->
-      cctxt#message
-        "No service found at this URL (but this is a valid prefix)\n%!"
-      >>= fun () -> return_unit
+  | _ -> no_service_at_valid_prefix cctxt
 
 let format binary meth url (cctxt : #Client_context.io_rpcs) =
   let args = String.split '/' url in
@@ -355,10 +353,7 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
-      | None ->
-          cctxt#message
-            "No service found at this URL (but this is a valid prefix)\n%!"
-          >>= fun () -> return_unit
+      | None -> no_service_at_valid_prefix cctxt
       | Some {input = Some input; output; _} ->
           cctxt#message
             "@[<v 0>@[<v 2>Input format:@,%a@]@,@[<v 2>Output format:@,%a@]@,@]"
@@ -373,10 +368,7 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
             pp
             (Lazy.force output)
           >>= fun () -> return_unit)
-  | _ ->
-      cctxt#message
-        "No service found at this URL (but this is a valid prefix)\n%!"
-      >>= fun () -> return_unit
+  | _ -> no_service_at_valid_prefix cctxt
 
 let fill_in ?(show_optionals = true) schema =
   let open Json_schema in
@@ -386,7 +378,7 @@ let fill_in ?(show_optionals = true) schema =
   | _ -> editor_fill_in ~show_optionals schema
 
 let display_answer (cctxt : #Client_context.full) = function
-  | `Ok json -> cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json
+  | `Ok json -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
   | `Not_found _ -> cctxt#error "No service found at this URL\n%!"
   | `Gone _ ->
       cctxt#error
@@ -411,18 +403,13 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
-      | None ->
-          cctxt#message
-            "No service found at this URL with this method (but this is a \
-             valid prefix)\n\
-             %!"
-          >>= fun () -> return_unit
+      | None -> no_service_at_valid_prefix cctxt
       | Some {input = None; _} ->
-          Option.iter_s
-            (fun _ ->
+          (match body with
+          | None -> Lwt.return_unit
+          | Some _ ->
               cctxt#warning
                 "This URL did not expect a JSON input but one was provided\n%!")
-            body
           >>= fun () ->
           cctxt#generic_json_call meth ?body uri >>=? fun answer ->
           display_answer cctxt answer >|= ok

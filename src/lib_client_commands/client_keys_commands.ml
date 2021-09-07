@@ -461,8 +461,7 @@ let commands network : Client_context.full Clic.command list =
           alias_keys cctxt name >>=? fun key_info ->
           match key_info with
           | None ->
-              cctxt#message "No keys found for address" >>= fun () ->
-              return_unit
+              cctxt#error "No keys found for address" >>= fun () -> return_unit
           | Some (pkh, pk, skloc) -> (
               cctxt#message "Hash: %a" Signature.Public_key_hash.pp pkh
               >>= fun () ->
