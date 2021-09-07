@@ -53,6 +53,27 @@ module Operation_map = struct
         Operation.equal o1 o2 && t1 = t2)
 end
 
+let add_if_not_present classification oph op t =
+  Prevalidator_classification.(
+    if not (is_in_mempool oph t) then
+      add ~notify:(fun () -> ()) classification oph op t)
+
+type classification_event =
+  | Add_if_not_present of
+      Prevalidator_classification.classification
+      * Operation_hash.t
+      * Operation.t
+  | Remove of Operation_hash.t
+  | Flush of bool
+
+let play_event event t =
+  let open Prevalidator_classification in
+  match event with
+  | Add_if_not_present (classification, oph, op) ->
+      add_if_not_present classification oph op t
+  | Remove oph -> remove oph t
+  | Flush handle_branch_refused -> flush ~handle_branch_refused t
+
 module Generators = struct
   open Prevalidator_classification
 
@@ -103,12 +124,7 @@ module Generators = struct
     let t = Prevalidator_classification.create parameters in
     List.iter
       (fun (classification, operation_hash, operation) ->
-        Prevalidator_classification.add
-          ~notify:(fun () -> ())
-          classification
-          operation_hash
-          operation
-          t)
+        add_if_not_present classification operation_hash operation t)
       inputs ;
     t
 
@@ -154,6 +170,54 @@ module Generators = struct
       =
     let open QCheck.Gen in
     t_gen >>= fun t -> pair (return t) (with_t_operation_gen t)
+
+  (** Generates an [event].
+      The operation hash for [Remove] events is generated using
+      [with_t_operation_gen] with the given [t].
+      The classification, hash and operation for [Add_if_not_present]
+      events are generated independently from [t]. *)
+  let event_gen t =
+    let open QCheck.Gen in
+    let add_gen =
+      let+ (classification, oph, op) =
+        triple classification_gen operation_hash_gen operation_gen
+      in
+      Add_if_not_present (classification, oph, op)
+    in
+    let remove_gen =
+      let+ (oph, _op) = with_t_operation_gen t in
+      Remove oph
+    in
+    let flush_gen =
+      let+ b = bool in
+      Flush b
+    in
+    (* the weights are chosen so that the total number of classified
+       operations may grow before the next flush *)
+    frequency [(20, add_gen); (10, remove_gen); (1, flush_gen)]
+
+  (** Generates a record [t_initial] and a sequence of [events].
+      The [t] given to each [event_gen] (used to generate the
+      operation hash in the case of a [Remove] event) is the [t]
+      obtained by having applied all previous events to [t_initial]. *)
+  let t_with_event_sequence_gen =
+    let open QCheck.Gen in
+    t_gen >>= fun t ->
+    let t_initial = Internal_for_tests.copy t in
+    let rec loop acc_gen n =
+      if n <= 0 then acc_gen
+      else
+        let acc =
+          let+ event =
+            let+ event = event_gen t in
+            play_event event t ;
+            event
+          and+ tl = acc_gen in
+          event :: tl
+        in
+        loop acc (n - 1)
+    in
+    pair (return t_initial) (loop (return []) 100)
 end
 
 let qcheck_eq_true ~actual =
@@ -171,6 +235,95 @@ let qcheck_bounded_map_is_empty bounded_map =
   in
   qcheck_eq_true ~actual
 
+(** Computes the set of operation hashes present in fields [refused;
+    branch_refused; branch_delayed; applied_rev] of [t]. Also checks
+    that these fields are disjoint. *)
+let disjoint_union_classified_fields ?fail_msg
+    (t : Prevalidator_classification.t) =
+  let ( +> ) acc next_set =
+    if not (Operation_hash.Set.disjoint acc next_set) then
+      QCheck.Test.fail_reportf
+        "Invariant 'The fields: [refused; branch_refused; branch_delayed; \
+         applied] are disjoint' broken by t =@.%a@.%s"
+        Prevalidator_classification.Internal_for_tests.pp
+        t
+        (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
+    Operation_hash.Set.union acc next_set
+  in
+  let to_set =
+    Prevalidator_classification.Internal_for_tests.set_of_bounded_map
+  in
+  to_set t.refused +> to_set t.branch_refused +> to_set t.branch_delayed
+  +> (Operation_hash.Set.of_list @@ List.rev_map fst t.applied_rev)
+
+(** Checks both invariants of type [Prevalidator_classification.t]:
+    - The field [in_mempool] is the set of all operation hashes present
+      in fields: [refused; branch_refused; branch_delayed; applied].
+    - The fields: [refused; branch_refused; branch_delayed; applied]
+      are disjoint.
+    These invariants are enforced by [Prevalidator_classification]
+    **as long as the caller does not [add] an operation which is already
+    present in [t]**. We use [check_invariants] in tests where we know
+    this does not happen.
+    Ensuring that the caller behaves correctly would require unit testing
+    the [prevalidator] module, which we cannot do at the moment (September
+    2021). Instead, we run scenarios which might carry particular risks
+    of breaking this using [Tezt]. *)
+let check_invariants ?fail_msg (t : Prevalidator_classification.t) =
+  let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
+  if not (Operation_hash.Set.equal expected_in_mempool t.in_mempool) then
+    let set_pp ppf set =
+      set |> Operation_hash.Set.elements
+      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    in
+    let set1 = Operation_hash.Set.diff expected_in_mempool t.in_mempool in
+    let set2 = Operation_hash.Set.diff t.in_mempool expected_in_mempool in
+    let sets_report =
+      Format.asprintf
+        "In individual fields but not in [in_mempool]:\n\
+         %a@.In [in_mempool] but not individual fields:\n\
+         %a@."
+        set_pp
+        set1
+        set_pp
+        set2
+    in
+    QCheck.Test.fail_reportf
+      "Invariant 'The field [in_mempool] is the set of all operation hashes \
+       present in fields: [refused; branch_refused; branch_delayed; applied]' \
+       broken by t =@.%a\n\
+       @.%s@.%a@.%s"
+      Prevalidator_classification.Internal_for_tests.pp
+      t
+      sets_report
+      Prevalidator_classification.Internal_for_tests.pp_t_sizes
+      t
+      (match fail_msg with
+      | None -> ""
+      | Some msg -> Format.sprintf "\n%s@." msg)
+
+let classification_pp pp classification =
+  Format.fprintf
+    pp
+    (match classification with
+    | `Applied -> "Applied"
+    | `Branch_delayed _ -> "Branch_delayed"
+    | `Branch_refused _ -> "Branch_refused"
+    | `Refused _ -> "Refused")
+
+let event_pp pp = function
+  | Add_if_not_present (classification, oph, _op) ->
+      Format.fprintf
+        pp
+        "Add_if_not_present %a %a"
+        classification_pp
+        classification
+        Operation_hash.pp
+        oph
+  | Remove oph -> Format.fprintf pp "Remove %a" Operation_hash.pp oph
+  | Flush handle_branch_refused ->
+      Format.fprintf pp "Flush ~handle_branch_refused:%b" handle_branch_refused
+
 let test_flush_empties_all_except_refused =
   let open QCheck in
   Test.make
@@ -184,7 +337,6 @@ let test_flush_empties_all_except_refused =
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
-  qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
   qcheck_eq'
     ~pp:Operation_map.pp
     ~eq:Operation_map.eq
@@ -219,7 +371,6 @@ let test_flush_empties_all_except_refused_and_branch_refused =
   in
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
-  qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
   qcheck_eq'
     ~pp:Operation_map.pp
     ~eq:Operation_map.eq
@@ -257,6 +408,27 @@ let test_is_applied =
   Prevalidator_classification.remove oph t ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_applied oph t) ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
+  true
+
+let test_invariants =
+  QCheck.Test.make
+    ~name:
+      "invariants are preserved through any sequence of events (provided we do \
+       not [add] already present operations)"
+    (QCheck.make Generators.t_with_event_sequence_gen)
+  @@ fun (t, events) ->
+  let _ =
+    List.fold_left
+      (fun (fail_msg, cnt) event ->
+        play_event event t ;
+        let fail_msg =
+          Format.asprintf "%s\n%3d - %a" fail_msg cnt event_pp event
+        in
+        check_invariants ~fail_msg t ;
+        (fail_msg, cnt + 1))
+      ("Sequence of events played:", 0)
+      events
+  in
   true
 
 module Bounded = struct
@@ -649,6 +821,7 @@ let () =
             test_flush_empties_all_except_refused_and_branch_refused;
             test_is_in_mempool_remove;
             test_is_applied;
+            test_invariants;
             Bounded.test_bounded;
             To_map.test_create;
             To_map.test_add;

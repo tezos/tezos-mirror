@@ -247,4 +247,25 @@ module Internal_for_tests = struct
       applied_rev
       in_mempool_pp
       in_mempool
+
+  let set_of_bounded_map = set_of_bounded_map
+
+  let pp_t_sizes pp t =
+    let show_bounded_map name bounded_map =
+      Format.sprintf
+        "%s map: %d, %s ring: %d"
+        name
+        (Operation_hash.Map.cardinal bounded_map.map)
+        name
+        (List.length (Ringo.Ring.elements bounded_map.ring))
+    in
+    Format.fprintf
+      pp
+      "map_size_limit: %d\n%s\n%s\n%s\napplied_rev: %d\nin_mempool: %d"
+      t.parameters.map_size_limit
+      (show_bounded_map "refused" t.refused)
+      (show_bounded_map "branch_refused" t.branch_refused)
+      (show_bounded_map "branch_delayed" t.branch_delayed)
+      (List.length t.applied_rev)
+      (Operation_hash.Set.cardinal t.in_mempool)
 end

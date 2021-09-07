@@ -127,4 +127,12 @@ module Internal_for_tests : sig
   (** Returns a deep copy of the input [t], so that mutating the one
       doesn't affect the other. *)
   val copy : t -> t
+
+  (** [set_of_bounded_map m] returns all the operation hashes in [m]. *)
+  val set_of_bounded_map : bounded_map -> Operation_hash.Set.t
+
+  (** [pp_t_sizes t] prints the [map_size_limit] parameter of [t]
+      and the sizes of its fields (number of elements in the map and
+      in the ring of [bounded_map] / length of list / cardinal of set). *)
+  val pp_t_sizes : Format.formatter -> t -> unit
 end
