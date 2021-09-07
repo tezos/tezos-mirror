@@ -24,6 +24,8 @@ stages:
 opam:placeholder_job:
   stage: "packaging"
   script: "echo This is placeholder job to make sure that the child pipeline is not empty"
+  rules:
+    - when: always
 EOF
 } > opam-ci.yml
 
