@@ -23,6 +23,13 @@ be documented here either.
 Node
 ----
 
+- GET ``/workers/prevalidators``: The field ``backlog`` always returns
+  an empty list. The events in this backlog can be obtained in a
+  different way: either via stdout, or by configuring a new sink for
+  events via the environment variable ``TEZOS_EVENTS_CONFIG`` (should
+  be set before launching the node)
+
+
 - GET ``/chains/<chain_id>/mempool/monitor_operation``: Output is
   extended to include operation hashes (field name is ``hash``) and
   errors (field name is ``error``) when the operation was classified

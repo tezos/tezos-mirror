@@ -113,6 +113,10 @@ val current_request :
   (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view)
   option
 
+(** [DEPRECATED] This function is legacy and should be removed. Currently, it
+   always answers `[]`.
+
+    See https://gitlab.com/tezos/tezos/-/issues/1714 *)
 val last_events :
   t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 

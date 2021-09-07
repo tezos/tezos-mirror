@@ -74,18 +74,12 @@ module Operation_encountered : sig
   val pp : Format.formatter -> t -> unit
 end
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
+
+   This module should be removed once backlogs will be removed from
+   the RPC /worker/prevalidators. *)
 module Event : sig
-  type t =
-    | Request of
-        (Request.view * Worker_types.request_status * error list option)
-    | Invalid_mempool_filter_configuration
-    | Unparsable_operation of Operation_hash.t
-    | Processing_n_operations of int
-    | Fetching_operation of Operation_hash.t
-    | Operation_included of Operation_hash.t
-    | Operations_not_flushed of int
-    | Operation_not_fetched of Operation_hash.t
-    | Banned_operation_encountered of Operation_encountered.t
+  type t = unit
 
   type view = t
 

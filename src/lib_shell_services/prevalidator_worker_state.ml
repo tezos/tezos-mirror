@@ -209,152 +209,20 @@ module Operation_encountered = struct
       oph
 end
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
+
+   This module should be removed once backlogs will be removed from
+   the RPC /worker/prevalidators *)
 module Event = struct
-  type t =
-    | Request of
-        (Request.view * Worker_types.request_status * error list option)
-    | Invalid_mempool_filter_configuration
-    | Unparsable_operation of Operation_hash.t
-    | Processing_n_operations of int
-    | Fetching_operation of Operation_hash.t
-    | Operation_included of Operation_hash.t
-    | Operations_not_flushed of int
-    | Operation_not_fetched of Operation_hash.t
-    | Banned_operation_encountered of Operation_encountered.t
+  type t = unit
 
   type view = t
 
   let view t = t
 
-  let level req =
-    let open Request in
-    match req with
-    | Request (View (Flush _), _, _) -> Internal_event.Notice
-    | Request (View (Notify _), _, _) -> Internal_event.Debug
-    | Request (View Leftover, _, _) -> Internal_event.Debug
-    | Request (View (Inject _), _, _) -> Internal_event.Notice
-    | Request (View (Arrived _), _, _) -> Internal_event.Debug
-    | Request (View Advertise, _, _) -> Internal_event.Debug
-    | Request (View (Ban _), _, _) -> Internal_event.Notice
-    | Invalid_mempool_filter_configuration | Unparsable_operation _
-    | Processing_n_operations _ | Fetching_operation _ | Operation_included _
-    | Operations_not_flushed _ | Operation_not_fetched _ ->
-        Internal_event.Debug
-    | Banned_operation_encountered _ -> Internal_event.Notice
+  let level _req = Internal_event.Debug
 
-  let encoding =
-    let open Data_encoding in
-    union
-      ~tag_size:`Uint8
-      [
-        case
-          (Tag 0)
-          ~title:"Request"
-          (obj2
-             (req "request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding))
-          (function Request (req, t, None) -> Some (req, t) | _ -> None)
-          (fun (req, t) -> Request (req, t, None));
-        case
-          (Tag 1)
-          ~title:"Failed request"
-          (obj3
-             (req "error" RPC_error.encoding)
-             (req "failed_request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding))
-          (function
-            | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-          (fun (errs, req, t) -> Request (req, t, Some errs));
-        case
-          (Tag 2)
-          ~title:"invalid_mempool_configuration"
-          empty
-          (function
-            | Invalid_mempool_filter_configuration -> Some () | _ -> None)
-          (fun () -> Invalid_mempool_filter_configuration);
-        case
-          (Tag 3)
-          ~title:"unparsable_operation"
-          Operation_hash.encoding
-          (function Unparsable_operation oph -> Some oph | _ -> None)
-          (fun oph -> Unparsable_operation oph);
-        case
-          (Tag 4)
-          ~title:"processing_n_operations"
-          int31
-          (function Processing_n_operations n -> Some n | _ -> None)
-          (fun n -> Processing_n_operations n);
-        case
-          (Tag 5)
-          ~title:"fetching_operation"
-          (obj1 (req "fetching_operation" Operation_hash.encoding))
-          (function Fetching_operation oph -> Some oph | _ -> None)
-          (fun oph -> Fetching_operation oph);
-        case
-          (Tag 6)
-          ~title:"operation_included"
-          Operation_hash.encoding
-          (function Operation_included oph -> Some oph | _ -> None)
-          (fun oph -> Operation_included oph);
-        case
-          (Tag 7)
-          ~title:"operations_not_flushed"
-          (obj1 (req "operations_not_flushed" int31))
-          (function Operations_not_flushed n -> Some n | _ -> None)
-          (fun n -> Operations_not_flushed n);
-        case
-          (Tag 8)
-          ~title:"operation_not_fetched"
-          (obj1 (req "operation_not_fetched" Operation_hash.encoding))
-          (function Operation_not_fetched oph -> Some oph | _ -> None)
-          (fun oph -> Operation_not_fetched oph);
-        case
-          (Tag 9)
-          ~title:"banned_operation_encountered"
-          (obj1
-             (req "banned_operation_encountered" Operation_encountered.encoding))
-          (function
-            | Banned_operation_encountered op_enc -> Some op_enc | _ -> None)
-          (fun op_enc -> Banned_operation_encountered op_enc);
-      ]
+  let encoding = Data_encoding.unit
 
-  let pp ppf = function
-    | Invalid_mempool_filter_configuration ->
-        Format.fprintf ppf "invalid mempool filter configuration"
-    | Unparsable_operation oph ->
-        Format.fprintf ppf "unparsable operation %a" Operation_hash.pp oph
-    | Processing_n_operations n ->
-        Format.fprintf ppf "processing %d operations" n
-    | Fetching_operation oph ->
-        Format.fprintf ppf "fetching operation %a" Operation_hash.pp oph
-    | Operation_included oph ->
-        Format.fprintf
-          ppf
-          "operation %a included before being prevalidated"
-          Operation_hash.pp
-          oph
-    | Operations_not_flushed n ->
-        Format.fprintf ppf "%d operations were not washed by the flush" n
-    | Banned_operation_encountered op_enc ->
-        Format.fprintf ppf "banned %a" Operation_encountered.pp op_enc
-    | Request (view, {pushed; treated; completed}, None) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>%a@, %a@]"
-          Request.pp
-          view
-          Worker_types.pp_status
-          {pushed; treated; completed}
-    | Request (view, {pushed; treated; completed}, Some errors) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>%a@, %a, %a@]"
-          Request.pp
-          view
-          Worker_types.pp_status
-          {pushed; treated; completed}
-          (Format.pp_print_list Error_monad.pp)
-          errors
-    | Operation_not_fetched oph ->
-        Format.fprintf ppf "operation %a was not fetched" Operation_hash.pp oph
+  let pp = Format.pp_print_newline
 end
