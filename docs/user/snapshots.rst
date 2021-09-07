@@ -186,3 +186,15 @@ can be exported from a given history mode node.
 +---------+---------------+-----------------+
 | Rolling | No            | Yes             |
 +---------+---------------+-----------------+
+
+Snapshot providers
+~~~~~~~~~~~~~~~~~~
+
+There is a number of services that provide node snapshots. They create snapshots
+of their nodes on a regular basis (usually daily) and make them available for
+download. These include:
+
+* `Giga Node <https://snapshots-tezos.giganode.io/>`_
+* `XTZ-Shots <https://mainnet.xtz-shots.io/>`_
+* `Lambs on acid <https://lambsonacid.nl/>`_
+

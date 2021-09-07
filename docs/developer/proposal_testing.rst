@@ -176,22 +176,23 @@ the chain progress.
 When on a context imported from Mainnet, we will use a `snapshot file` (do not
 mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
 which results in a snapshot file like in here) that contains the real status of
-a Mainnet's node at a particular moment in time (see :doc:`../user/snapshots`). Such a
-snapshot file can be downloaded from several sites on the internet. For
-instance, the site `TulipTools <https://snapshots.tulip.tools/>`_ stores daily
-snapshot files from both Mainnet and Testnet, in both ``full`` and ``rolling``
-mode (see :doc:`../user/history_modes`). For the purposes of testing the migration, a
-snapshot file in ``rolling`` mode is enough. It is important to use a snapshot
-file that is recent enough as to contain the predecessor of the Alpha
-protocol. It is also important to note down the level at which the snapshot file
-was taken, which determines at which level we want to trigger the migration. The
-site `TulipTools <https://snapshots.tulip.tools/>`_ conveniently indicates the
-date and the level (the `block`) at which each snapshot file was taken.
+a Mainnet's node at a particular moment in time. Such a snapshot file can be
+downloaded from several sites on the internet (see :doc:`../user/snapshots`).
+For instance, the site `Giganode <https://snapshots-tezos.giganode.io/>`_ stores
+daily snapshot files from both Mainnet and Testnet, in both ``full`` and
+``rolling`` mode (see :doc:`../user/history_modes`). For the purposes of testing
+the migration, a snapshot file in ``rolling`` mode is enough. It is important to
+use a snapshot file that is recent enough as to contain the predecessor of the
+Alpha protocol. It is also important to note down the level at which the
+snapshot file was taken, which determines at which level we want to trigger the
+migration. The `Giganode snapshots page <https://snapshots-tezos.giganode.io/>`_
+conveniently indicates the date and the level (the `block`) at which each
+snapshot file was taken.
 
 In our example we will use a snapshot file
-``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
-`TulipTools <https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
-which was taken at level ``1039318``.
+``~/snapshot-mainnet.rolling``
+that was downloaded from `Giganode <https://snapshots-tezos.giganode.io/>`_
+and which was taken at level ``1617344``.
 
 The next subsections explain each of the individual steps 1--7.
 
@@ -299,7 +300,7 @@ If we had opted for not snapshotting the Alpha protocol, we could pass the path
 Now we consider the case when testing the migration on a context imported from
 the snapshot file. In that case, we should recall the level at which the
 snapshot file was taken from the beginning of Section `Prepare the
-migration`_. In our example, this level is ``1039318``. The user-activated
+migration`_. In our example, this level is ``1617344``. The user-activated
 upgrade allows us to start the node imported from Mainnet, which would have the
 predecessor of the Alpha protocol already active if the snapshot is recent
 enough, and then have the migration triggered automatically at the desired
@@ -308,10 +309,10 @@ was taken.
 
 In our example, where we the Alpha protocol was snapshot into
 ``src/proto_007_<short_hash>``, we can set the user-activated upgrade such that
-the migration is triggered three levels after the level ``1039321`` at which the
+the migration is triggered three levels after the level ``1617344`` at which the
 snapshot was taken by invoking::
 
-  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1617347
 
 As before, if we had opted for not snapshotting the Alpha protocol, we could pass
 the path ``src/proto_alpha`` as the parameter of the command above.
@@ -383,9 +384,9 @@ project under the ``src`` folder by invoking::
 If we wish to test the migration in a realistic scenario, we need to import a
 context from a Mainnet's snapshot file. As explained in the beginning of Section
 `Prepare the migration`_, in our example we will use a snapshot file
-``~/mainnet_2020-07-14_12 00.rolling`` that was downloaded from
-`TulipTools <https://snapshots.tulip.tools/>`_ on July the 14th of 2020, and
-which was taken at level ``1039318``.
+``~/snapshot-mainnet.rolling``
+that was downloaded from `Giganode <https://snapshots-tezos.giganode.io/>`_
+and which was taken at level ``1617344``.
 
 We also need to generate a node identity, which we will keep in the folder that
 contains the history of the node. Since importing a node from a snapshot file is
@@ -394,19 +395,20 @@ will keep the original folder unchanged, and we will copy its contents to a
 fresh test folder every time we want to perform the migration.
 
 For instance, the following commands import a context from the snapshot file
-``~/mainnet_2020-07-14_12 00.rolling`` into the folder ``/tmp/mainnet_2020-07-14_12 00``,
+``~/snapshot-mainnet.rolling``
+into the folder ``/tmp/mainnet``,
 and generate an identity in the same folder::
 
-  $ ./tezos-node snapshot import ~/mainnet_2020-07-14_12\ 00.rolling --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
-  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet_2020-07-14_12\ 00
+  $ ./tezos-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
 
 The ``./tezos-node snapshot import`` command accepts an option
 ``--block <block_hash>`` that instructs the command to check that the hash of
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
-the current main chain of the Tezos network. The web
-`TulipTools <https://snapshots.tulip.tools/>`_ provides the first ten characters
-of the hash of the last block in a given snapshot file. Although we will not be
+the current main chain of the Tezos network. The
+`Giganode <https://snapshots-tezos.giganode.io/>`_ provides 
+the hash of the last block in a given snapshot file. Although we will not be
 using the ``--block`` option in this tutorial, the developer is encouraged to
 check that this prefix corresponds to the hash of a real block in Mainnet.
 
@@ -439,23 +441,25 @@ migration on the sandbox and want to trigger it at level three, we can use::
   $ ./scripts/prepare_migration_test.sh manual d_007 3
 
 If on the contrary we have imported a realistic context from the snapshot file
-``~/mainnet_2020-07-14_12\ 00.rolling`` taken at level ``1039318``, and we want
+``~/snapshot-mainnet.rolling``
+taken at level ``1617344``, and we want
 to trigger the migration three levels after the level at which the snapshot file
 was taken, we can use::
 
-  $ ./scripts/prepare_migration_test.sh manual d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh manual d_007 1617347 \
+    ~/snapshot-mainnet.rolling
 
 In the latter case both the context and the yes-wallet folder will be placed in
 the system's temp directory. In our example the temp directory is ``/tmp``, and
 the context and yes-wallet would be placed in paths
-``/tmp/tezos-node-mainnet_2020-07-14_12\ 00`` and ``/tmp/yes-wallet``
+``/tmp/tezos-node-mainnet`` and ``/tmp/yes-wallet``
 respectively.
 
 If the script detects that the yes-wallet folder already exists int ``/tmp``,
 then it will clean it by removing spurious files ``/tmp/yes-wallet/blocks`` and
 ``/tmp/yes-wallet/wallet_locks``, and it will not create a new yes-wallet
 folder. If the script detects that the folder
-``/tmp/tezos-node-mainnet_2020-07-14_12 00`` already exists, or if the developer
+``/tmp/tezos-node-mainnet`` already exists, or if the developer
 passes the path of a folder instead of the path of a snapshot file, then the
 script will use the corresponding folder as the original folder, and will not
 import a new context.
@@ -527,10 +531,10 @@ unchanged, and every time we want to run the test, we will copy its contents to
 a fresh test folder. In our example, we can do this by taking advantage of an
 environment variable ``test-directory`` and the tool ``mktemp`` as follows::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
 
 This command creates a fresh test folder in the system's temp directory (in our
-example ``/tmp``) whose name is ``tezos-node-mainnet_2020-07-14_12 00-XXXX``,
+example ``/tmp``) whose name is ``tezos-node-mainnet-XXXX``,
 where the ``XXXX`` are four random alphanumerical characters, and sets the
 environment variable ``test-directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
@@ -570,7 +574,7 @@ can do this with the following command::
 Then we repeat the commands above in order to create a fresh test folder, and to
 copy the context of the original folder into the test folder. In our example::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
 
 Now we run the node in the test folder by invoking::
 
@@ -680,23 +684,23 @@ setting user-activated upgrades, importing a context from Mainnet into the
 original context folder, generating an identity in the same folder, and
 compiling the project::
 
-  $ ./scripts/prepare_migration_test.sh manual d_007 1039321 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh manual d_007 1617344 ~/mainnet.rolling
 
 (Alternatively, each of these steps could be performed individually by
 invoking the following eight commands)::
 
   $ ./scripts/snapshot_alpha.sh d_007
   $ ./scripts/link_protocol.sh src/proto_007_*
-  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
+  $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1617344 
   $ patch -p1 < scripts/yes-node.patch
   $ dune exec scripts/yes-wallet/yes_wallet.exe /tmp/yes-wallet
   $ make
-  $ ./tezos-node snapshot import ~/mainnet_2020-07-14_12\ 00.rolling --data-dir /tmp/mainnet_2020-07-14_12\ 00
-  $ ./tezos-node identity generate --data-dir /tmp/mainnet_2020-07-14_12\ 00
+  $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/mainnet
+  $ ./tezos-node identity generate --data-dir /tmp/mainnet
 
 Copy original folder into test folder::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
 
 Run the node`::
 
@@ -721,7 +725,7 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 ``/tmp/yes-wallet/blocks``::
 
   $ rm -rf "$test_directory" && rm -f /tmp/yes-wallet/{blocks,wallet_lock};
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
 
 Run the node::
 
@@ -788,13 +792,13 @@ and uses it as the original folder for the migration.
 In our example, we can prepare the automatic migration with the following
 command::
 
-  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet.rolling
 
 This command snapshots the Alpha protocol into ``src/proto_007_<short_hash>``
 and links it in the build system, and then patches the shell in order to obtain
-a yes-node. If the folder ``/tmp/mainnet_2020-07-14_12 00`` does not exist
+a yes-node. If the folder ``/tmp/mainnet`` does not exist
 already, then it creates that folder and imports the context from the snapshot
-file ``~/mainnet_2020-07-14_12 00.rolling`` into it. As explained in Section
+file ``~/mainnet.rolling`` into it. As explained in Section
 `Batch steps 1--7 above`_, the script ``scripts/prepare_migration_test.sh`` may
 receive an optional ``<block_hash>`` parameter as the last argument which, if
 present, will be used for the option ``--block <block_hash>`` of the command
@@ -876,7 +880,7 @@ Prepare migration by snapshotting the Alpha protocol, linking it in the build
 system, patching the shell in order to obtain a yes-node and compiling the
 project::
 
-  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet_2020-07-14_12\ 00.rolling
+  $ ./scripts/prepare_migration_test.sh auto d_007 ~/mainnet.rolling
 
 Run the migration test::
 
