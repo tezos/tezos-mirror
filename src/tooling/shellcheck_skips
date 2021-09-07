@@ -13,8 +13,6 @@ scripts/ci/docker_registry.inc.sh
 scripts/ci/docker_registry_read.sh
 scripts/ci/docker_registry_tag.sh
 scripts/create_docker_image.sh
-scripts/docker/entrypoint.inc.sh
-scripts/docker/entrypoint.sh
 scripts/install_build_deps.raw.sh
 scripts/install_build_deps.rust.sh
 scripts/install_build_deps.sh
