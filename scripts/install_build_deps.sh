@@ -2,15 +2,20 @@
 
 set -e
 
+script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+src_dir="$(dirname "$script_dir")"
+
+#shellcheck source=scripts/version.sh
+. "$script_dir"/version.sh
+
+# make sure that this variable is declared
+ocaml_version=${ocaml_version:?}
+opam_repository=${opam_repository:?}
+
 create_opam_switch() {
     [ -n "$1" ] || { echo "create_opam_switch expects a non-empty argument"; return 1; }
     opam switch create "$1" --repositories=tezos "ocaml-base-compiler.$ocaml_version"
 }
-
-script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-src_dir="$(dirname "$script_dir")"
-
-. "$script_dir"/version.sh
 
 if [ "$1" = "--dev" ]; then
     dev=yes
@@ -39,7 +44,7 @@ if [ -n "$OPAMSWITCH" ]; then
     else
         echo "$OPAMSWITCH already exists. Installing dependencies."
     fi
-    eval $(opam env --switch="$OPAMSWITCH" --set-switch)
+    eval "$(opam env --switch="$OPAMSWITCH" --set-switch)"
 else
     if [ ! -d "$src_dir/_opam" ] ; then
         create_opam_switch "$src_dir"
@@ -51,7 +56,7 @@ else
     fi
 fi
 
-eval $(opam env --shell=sh)
+eval "$(opam env --shell=sh)"
 
 # Check if the default opam repo was set in this switch
 default_switch=

@@ -13,16 +13,11 @@ scripts/ci/docker_registry.inc.sh
 scripts/ci/docker_registry_read.sh
 scripts/ci/docker_registry_tag.sh
 scripts/create_docker_image.sh
-scripts/install_build_deps.raw.sh
-scripts/install_build_deps.rust.sh
-scripts/install_build_deps.sh
 scripts/install_sapling_parameters.sh
 scripts/link_protocol.sh
 scripts/opam-check.sh
-scripts/opam-pin.sh
 scripts/opam-remove.sh
 scripts/opam-test-all.sh
-scripts/opam-unpin.sh
 scripts/opam-upgrade.sh
 scripts/prepare_migration_test.sh
 scripts/release/binaries.sh
