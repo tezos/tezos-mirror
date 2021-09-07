@@ -477,6 +477,62 @@ module To_map = struct
       ~actual:(eq_mod_binding (to_map_all t) (oph, None) initial)
       ()
 
+  let test_map_remove_add =
+    (* Property checked:
+
+       - \forall t oph class, C.to_map (C.remove t oph) + oph =
+       C.to_map (C.add t oph class)
+
+       where (+)/(-) are add/remove over maps. *)
+    QCheck.Test.make
+      ~name:"Check property between map, remove and add (1)"
+      (QCheck.make
+         (QCheck.Gen.quad
+            Generators.t_gen
+            Generators.classification_gen
+            Generators.operation_hash_gen
+            Generators.operation_gen))
+    @@ fun (t, classification, oph, op) ->
+    let t' = Obj.obj (Obj.dup (Obj.repr t)) in
+    Classification.remove oph t ;
+    let initial = to_map_all t in
+    let left = Operation_hash.Map.add oph op initial in
+    Classification.add ~notify:(Fun.const ()) classification oph op t' ;
+    let right = to_map_all t' in
+    qcheck_eq'
+      ~expected:left
+      ~actual:right
+      ~eq:(Operation_hash.Map.equal Operation.equal)
+      ()
+
+  let test_map_add_remove =
+    (* Property checked:
+
+       - \forall t oph class, C.to_map (C.add t oph class) - oph =
+       C.to_map (C.remove t oph)
+
+       where (+)/(-) are add/remove over maps. *)
+    QCheck.Test.make
+      ~name:"Check property between map, remove and add (2)"
+      (QCheck.make
+         (QCheck.Gen.quad
+            Generators.t_gen
+            Generators.classification_gen
+            Generators.operation_hash_gen
+            Generators.operation_gen))
+    @@ fun (t, classification, oph, op) ->
+    let t' = Obj.obj (Obj.dup (Obj.repr t)) in
+    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    let initial = to_map_all t in
+    let left = Operation_hash.Map.remove oph initial in
+    Classification.remove oph t' ;
+    let right = to_map_all t' in
+    qcheck_eq'
+      ~expected:left
+      ~actual:right
+      ~eq:(Operation_hash.Map.equal Operation.equal)
+      ()
+
   (** Tests the relationship between [Classification.clear]
       and [Classification.to_map] *)
   let test_clear =
@@ -551,6 +607,8 @@ let () =
             Bounded.test_bounded;
             To_map.test_add;
             To_map.test_remove;
+            To_map.test_map_remove_add;
+            To_map.test_map_add_remove;
             To_map.test_clear;
             To_map.test_is_in_mempool;
           ] );
