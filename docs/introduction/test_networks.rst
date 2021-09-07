@@ -72,14 +72,16 @@ Edo2net
 
 Edo2net was a test network running the Edo protocol.
 Following the activation of the Florence protocol replacing Edo on Mainnet,
-Edo2net stopped being maintained on May 11th, 2021.
+Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker will
+no longer be producing blocks).
 
 Delphinet
 ---------
 
 Delphinet was a test network running the Delphi protocol.
 Following the activation of the Edo protocol replacing Delphi on Mainnet,
-Delphinet stopped being maintained on Febuary 28th, 2021.
+Delphinet stopped being maintained on Febuary 28th, 2021 (the bootstrap baker
+will no longer be producing blocks).
 
 Dalphanet
 ---------
@@ -94,7 +96,8 @@ Carthagenet
 
 Carthagenet was a test network running the Carthage protocol.
 Following the activation of the Delphi protocol replacing Carthage on Mainnet,
-Carthagenet stopped being maintained on December 12th, 2020.
+Carthagenet stopped being maintained on December 12th, 2020 (the bootstrap
+baker will no longer be producing blocks).
 
 Babylonnet
 ----------
