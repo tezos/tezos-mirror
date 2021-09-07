@@ -155,7 +155,21 @@ let add ~notify classification oph op classes =
 let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
   let module Map = Operation_hash.Map in
   let ( +> ) accum to_add =
-    Map.fold (fun h (op, _err) acc -> Map.add h op acc) to_add accum
+    let merge_fun _k accum_v_opt to_add_v_opt =
+      match (accum_v_opt, to_add_v_opt) with
+      | (Some accum_v, None) -> Some accum_v
+      | (None, Some (to_add_v, _err)) -> Some to_add_v
+      | (Some _accum_v, Some (to_add_v, _err)) ->
+          (* This case should not happen, because the different classes
+             should be disjoint. However, if this invariant is broken,
+             it is not critical, hence we do not raise an error.
+             Because such part of the code is quite technical and
+             the invariant is not critical,
+             we don't advertise the node administrator either (no log). *)
+          Some to_add_v
+      | (None, None) -> None
+    in
+    Map.merge merge_fun accum to_add
   in
   (if applied then Map.of_seq @@ List.to_seq classes.applied_rev else Map.empty)
   +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
