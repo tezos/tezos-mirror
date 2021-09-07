@@ -164,6 +164,13 @@ let qcheck_eq_false ~actual =
   let _ = qcheck_eq' ~pp:Format.pp_print_bool ~expected:false ~actual () in
   ()
 
+let qcheck_bounded_map_is_empty bounded_map =
+  let actual =
+    bounded_map |> Prevalidator_classification.map
+    |> Operation_hash.Map.is_empty
+  in
+  qcheck_eq_true ~actual
+
 let test_flush_empties_all_except_refused =
   let open QCheck in
   Test.make
@@ -174,12 +181,8 @@ let test_flush_empties_all_except_refused =
   let refused_before = t.refused |> Prevalidator_classification.map in
   Prevalidator_classification.flush ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Prevalidator_classification.map in
-  let bounded_map_is_empty bounded_map =
-    bounded_map |> Prevalidator_classification.map
-    |> Operation_hash.Map.is_empty
-  in
-  qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_refused) ;
-  qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_delayed) ;
+  qcheck_bounded_map_is_empty t.branch_refused ;
+  qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
   qcheck_eq'
@@ -206,10 +209,6 @@ let test_flush_empties_all_except_refused_and_branch_refused =
   let branch_refused_after =
     t.branch_refused |> Prevalidator_classification.map
   in
-  let bounded_map_is_empty bounded_map =
-    bounded_map |> Prevalidator_classification.map
-    |> Operation_hash.Map.is_empty
-  in
   let _ =
     qcheck_eq'
       ~pp:Operation_map.pp
@@ -218,7 +217,7 @@ let test_flush_empties_all_except_refused_and_branch_refused =
       ~actual:branch_refused_after
       ()
   in
-  qcheck_eq_true ~actual:(bounded_map_is_empty t.branch_delayed) ;
+  qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq_true ~actual:(Operation_hash.Set.is_empty t.in_mempool) ;
   qcheck_eq'
