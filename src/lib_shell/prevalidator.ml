@@ -1177,7 +1177,9 @@ module Make
           pending = Operation_hash.Map.empty;
           advertisement = `None;
           filter_config =
-            Protocol_hash.Map.empty (* TODO: initialize from config file *);
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
+               initialize from config file *)
+            Protocol_hash.Map.empty;
           banned_operations = Operation_hash.Set.empty;
         }
       in
