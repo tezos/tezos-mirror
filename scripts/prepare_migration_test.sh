@@ -82,7 +82,7 @@ after deleting spurious files ${yes_wallet}/{blocks,wallet_locks}."
     else
         echo "
 Creating a yes-wallet in directory ${yes_wallet}."
-        dune exec scripts/yes-wallet/yes_wallet.exe "$yes_wallet"
+        dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in "$yes_wallet"
     fi
     echo "You can now bake for foundation{1..8}."
 }
