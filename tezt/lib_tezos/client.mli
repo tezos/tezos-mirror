@@ -30,12 +30,20 @@ type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Proxy_server of Proxy_server.t  (** A proxy server *)
 
+(** [rpc_port endpoint] returns the port on which to reach [endpoint]
+    when doing RPC calls. *)
+val rpc_port : endpoint -> int
+
 (** Mode of the client *)
 type mode =
   | Client of endpoint option
   | Mockup
   | Light of float * endpoint list
   | Proxy of endpoint
+
+(** [mode_to_endpoint mode] returns the {!endpoint} within a {!mode}
+    (if any) *)
+val mode_to_endpoint : mode -> endpoint option
 
 (** The synchronization mode of the client.
 

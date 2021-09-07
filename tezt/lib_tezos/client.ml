@@ -96,8 +96,6 @@ let sources_file client =
   | Mockup | Client _ | Proxy _ -> assert false
   | Light _ -> client.base_dir // "sources.json"
 
-(** [mode_to_endpoint mode] returns the {!endpoint} within a {!mode}
-  *  (if any) *)
 let mode_to_endpoint = function
   | Client None | Mockup | Light (_, []) -> None
   | Client (Some endpoint) | Light (_, endpoint :: _) | Proxy endpoint ->

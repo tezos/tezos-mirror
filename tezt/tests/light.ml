@@ -97,7 +97,7 @@ let test_endpoint_not_in_sources () =
     ~tags:["client"; "light"; "cli"]
   @@ fun () ->
   let min_agreement = 1.0 in
-  let mk_node_endpoint rpc_port = Client.(Node (Node.create ~rpc_port [])) in
+  let mk_node_endpoint rpc_port = Client.Node (Node.create ~rpc_port []) in
   (* The mismatch is that the port of [endpoint] is not in [sources].
    * We use the port to disambiguate, because disambiguating
    * with the host is complicated, because of Client.address
