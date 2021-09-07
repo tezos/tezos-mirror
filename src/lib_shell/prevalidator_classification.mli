@@ -39,6 +39,17 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
+(** Invariants ensured by this module **provided that the caller does
+    not {!add} an operation which is already present in [t]**:
+    - The field [in_mempool] is the set of all operation hashes present
+      in fields: [refused; branch_refused; branch_delayed; applied].
+    - An operation cannot be at the same time in two of the following
+      fields: [refused; branch_refused; branch_delayed; applied].
+
+    Note: We could always enforce these invariants by checking in {!add}
+    whether the operation is already present. However, this would make
+    the behavior of {!add} less predictable, so we do not think this to
+    be an improvement from the point of view of the caller. *)
 type t = private {
   parameters : parameters;
   refused : bounded_map;
@@ -57,10 +68,13 @@ type t = private {
     *)
 val create : parameters -> t
 
-(** [flush classes ~handle_branch_refused] resets fields of [classes]; except for
-    the [refused] field which is never reset, to avoid revalidating
-    operations that will never be valid. Also, the [branch_refused] field is
-    reset iff [handle_branch_refused] is [true]. *)
+(** [flush classes ~handle_branch_refused] partially resets [classes]:
+    - fields [applied_rev] and [branch_delayed] are emptied;
+    - field [branch_refused] is emptied iff [handle_branch_refused] is [true];
+    - field [refused] is left unchanged, to avoid revalidating operations that
+      will never be valid.
+    Also updates field [in_mempool] to maintain the corresponding invariant
+    of {!t}. *)
 val flush : t -> handle_branch_refused:bool -> unit
 
 (** [is_in_mempool oph classes] indicates whether [oph] is present

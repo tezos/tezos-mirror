@@ -54,7 +54,10 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
-(** Note that [applied] and [in_mempool] are intentionally unbounded. *)
+(** Note that [applied] and [in_mempool] are intentionally unbounded.
+    See the mli for detailed documentation.
+    All operations must maintain the invariant about [in_mempool]
+    described in the mli. *)
 type t = {
   parameters : parameters;
   refused : bounded_map;
