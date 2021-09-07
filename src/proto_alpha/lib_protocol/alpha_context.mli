@@ -1257,7 +1257,7 @@ module Lazy_storage : sig
 
   val encoding : diffs Data_encoding.t
 
-  val diffs_in_memory_size : diffs -> Cache_memory_helpers.sint
+  val diffs_in_memory_size : diffs -> Cache_memory_helpers.nodes_and_size
 
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
 
@@ -1859,7 +1859,7 @@ module Operation : sig
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
   val packed_internal_operation_in_memory_size :
-    packed_internal_operation -> Cache_memory_helpers.sint
+    packed_internal_operation -> Cache_memory_helpers.nodes_and_size
 
   val pack : 'kind operation -> packed_operation
 

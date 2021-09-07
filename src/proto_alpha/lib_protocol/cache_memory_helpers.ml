@@ -23,7 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The [Nodes] module is used to count the number of computation steps
+    performed when evaluating the size of the in-memory graph corresponding
+    to an OCaml value.
+
+    In first approximation, the value of type [Nodes.t] threaded through
+    {!expr_size} below and through the module {!Script_typed_ir_size}
+    is meant to match the number of recursive calls in the [traverse]
+    functions of {!Script_typed_ir} and in that of {!node_size}.
+
+    The assumption is that there's a bounded amount of work performed between
+    two such recursive calls, hence that the total work is bounded above
+    by something proportional to the [Nodes.t] accumulator.
+
+    Computations on values of type [Nodes.t] do not overflow, as they
+    are bounded above by the number of nodes traversed when computing
+    an OCaml value.
+ *)
+module Nodes : sig
+  type t = private int
+
+  val zero : t
+
+  val one : t [@@ocaml.warning "-32"]
+
+  val succ : t -> t
+
+  val add : t -> t -> t
+
+  val to_int : t -> int
+end = struct
+  type t = int
+
+  let zero = 0
+
+  let one = 1
+
+  let succ x = x + 1
+
+  let add x y = x + y
+
+  let to_int x = x
+end
+
+(** {2 Helpers to deal with computing the in-memory size of values} *)
+
 type sint = Saturation_repr.may_saturate Saturation_repr.t
+
+type nodes_and_size = Nodes.t * sint
 
 let ( !! ) = Saturation_repr.safe_int
 
@@ -35,7 +82,9 @@ let ( *? ) s x = Saturation_repr.mul s !!x
 
 let ( /? ) s x = Saturation_repr.ediv s !!x
 
-let zero = !!0
+let ( ++ ) (n1, s1) (n2, s2) = (Nodes.add n1 n2, s1 +! s2)
+
+let zero = (Nodes.zero, !!0)
 
 let word_size = !!8
 
@@ -45,7 +94,7 @@ let int64_size = header_size +! (word_size *? 2)
 
 let z_size z =
   let numbits = Z.numbits z in
-  if Compare.Int.(numbits <= 62) then zero else (word_size *? Z.size z) +? 32
+  if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 32
 
 let string_size_gen len = header_size +? len +? (8 - (len mod 8))
 
@@ -53,8 +102,18 @@ let bytes_size b = string_size_gen (Bytes.length b)
 
 let string_size s = string_size_gen (String.length s)
 
+let ret_adding (nodes, size) added = (nodes, size +! added)
+
+let ret_succ_adding (nodes, size) added = (Nodes.succ nodes, size +! added)
+
+let ret_succ (nodes, size) = (Nodes.succ nodes, size)
+
 let option_size some x =
   let some x = header_size +! word_size +! some x in
+  Option.fold ~none:!!0 ~some x
+
+let option_size_vec some x =
+  let some x = ret_adding (some x) (header_size +! word_size) in
   Option.fold ~none:zero ~some x
 
 let list_cell_size elt_size =
@@ -64,7 +123,9 @@ let list_cell_size elt_size =
 let list_fold_size elt_size list =
   List.fold_left
     (fun accu elt ->
-      accu +! header_size +! word_size +! word_size +! elt_size elt)
+      ret_succ_adding
+        (accu ++ elt_size elt)
+        (header_size +! word_size +! word_size))
     zero
     list
 
@@ -74,16 +135,25 @@ let boxed_tup2 x y =
 
 let node_size =
   let open Micheline in
-  let annotation_size a = list_fold_size string_size a in
+  let annotation_size a =
+    List.fold_left
+      (fun accu s ->
+        ret_succ_adding accu (header_size +! (word_size *? 2) +! string_size s))
+      zero
+      a
+  in
   let internal_node_size = function
-    | Int (_, z) -> header_size +! (word_size *? 2) +! z_size z
-    | String (_, s) -> header_size +! (word_size *? 2) +! string_size s
-    | Bytes (_, s) -> header_size +! (word_size *? 2) +! bytes_size s
-    | Prim (_, _, _, a) -> header_size +! (word_size *? 4) +! annotation_size a
-    | Seq (_, _) -> header_size +! (word_size *? 2)
+    | Int (_, z) -> (Nodes.one, header_size +! (word_size *? 2) +! z_size z)
+    | String (_, s) ->
+        (Nodes.one, header_size +! (word_size *? 2) +! string_size s)
+    | Bytes (_, s) ->
+        (Nodes.one, header_size +! (word_size *? 2) +! bytes_size s)
+    | Prim (_, _, _, a) ->
+        ret_succ_adding (annotation_size a) (header_size +! (word_size *? 4))
+    | Seq (_, _) -> (Nodes.one, header_size +! (word_size *? 2))
   in
   fun node ->
-    Script_repr.fold node zero @@ fun size node ->
-    size +! internal_node_size node
+    Script_repr.fold node zero @@ fun accu node ->
+    accu ++ internal_node_size node
 
 let expr_size expr = node_size (Micheline.root expr)

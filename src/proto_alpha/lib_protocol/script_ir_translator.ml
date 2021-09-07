@@ -5745,21 +5745,18 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  Saturation_repr.(
-    let view_size view =
-      Script_typed_ir_size.(
-        add
-          (add (node_size view.view_code) (node_size view.input_ty))
-          (node_size view.output_ty))
-    in
-    let views_size =
-      SMap.fold (fun _ v s -> add (view_size v) s) views (safe_int 0)
-    in
-    (* The size of the storage_type and the arg_type is counted by
-       [lambda_size]. *)
-    let ir_size = Script_typed_ir_size.lambda_size code in
-    let code_size = add views_size ir_size in
-    (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
+  let open Script_typed_ir_size in
+  let view_size view =
+    node_size view.view_code ++ node_size view.input_ty
+    ++ node_size view.output_ty
+  in
+  let views_size = SMap.fold (fun _ v s -> view_size v ++ s) views zero in
+  (* The size of the storage_type and the arg_type is counted by
+     [lambda_size]. *)
+  let ir_size = lambda_size code in
+  (* FIXME: will be used in an upcoming commit *)
+  let (_unused_for_now, code_size) = views_size ++ ir_size in
+  (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -6785,5 +6782,8 @@ let script_size
         root_name = _;
         views = _;
       }) =
-  let storage_size = Script_typed_ir_size.value_size storage_type storage in
+  (* FIXME: will be used in an upcoming commit *)
+  let (_unused_for_now, storage_size) =
+    Script_typed_ir_size.value_size storage_type storage
+  in
   Saturation_repr.(add code_size storage_size |> to_int)
