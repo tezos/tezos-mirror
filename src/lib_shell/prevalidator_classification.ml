@@ -152,13 +152,29 @@ let add ~notify classification oph op classes =
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->
       handle_error oph op classification classes
 
-let validation_result classes =
-  {
-    Preapply_result.applied = List.rev classes.applied_rev;
-    branch_delayed = classes.branch_delayed.map;
-    branch_refused = classes.branch_refused.map;
-    refused = Operation_hash.Map.empty;
-  }
+let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
+  let module Map = Operation_hash.Map in
+  let ( +> ) accum to_add =
+    let merge_fun _k accum_v_opt to_add_v_opt =
+      match (accum_v_opt, to_add_v_opt) with
+      | (Some accum_v, None) -> Some accum_v
+      | (None, Some (to_add_v, _err)) -> Some to_add_v
+      | (Some _accum_v, Some (to_add_v, _err)) ->
+          (* This case should not happen, because the different classes
+             should be disjoint. However, if this invariant is broken,
+             it is not critical, hence we do not raise an error.
+             Because such part of the code is quite technical and
+             the invariant is not critical,
+             we don't advertise the node administrator either (no log). *)
+          Some to_add_v
+      | (None, None) -> None
+    in
+    Map.merge merge_fun accum to_add
+  in
+  (if applied then Map.of_seq @@ List.to_seq classes.applied_rev else Map.empty)
+  +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
+  +> (if branch_refused then classes.branch_refused.map else Map.empty)
+  +> if refused then classes.refused.map else Map.empty
 
 module Internal_for_tests = struct
   let bounded_map_pp ppf bounded_map =
