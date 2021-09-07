@@ -164,15 +164,15 @@ let qcheck_eq_false ~actual =
   let _ = qcheck_eq' ~pp:Format.pp_print_bool ~expected:false ~actual () in
   ()
 
-let test_clear_empties_all =
+let test_flush_empties_all_except_refused =
   let open QCheck in
   Test.make
     ~name:
-      "[clear ~handle_branch_refused:true] empties everything except [refused]"
+      "[flush ~handle_branch_refused:true] empties everything except [refused]"
     (make Generators.t_gen)
   @@ fun t ->
   let refused_before = t.refused |> Prevalidator_classification.map in
-  Prevalidator_classification.clear ~handle_branch_refused:true t ;
+  Prevalidator_classification.flush ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Prevalidator_classification.map in
   let bounded_map_is_empty bounded_map =
     bounded_map |> Prevalidator_classification.map
@@ -189,11 +189,11 @@ let test_clear_empties_all =
     ~actual:refused_after
     ()
 
-let test_clear_empties_all_except_branch_refused =
+let test_flush_empties_all_except_refused_and_branch_refused =
   let open QCheck in
   Test.make
     ~name:
-      "[clear ~handle_branch_refused:false] empties everything except \
+      "[flush ~handle_branch_refused:false] empties everything except \
        [refused] and [branch_refused]"
     (make Generators.t_gen)
   @@ fun t ->
@@ -201,7 +201,7 @@ let test_clear_empties_all_except_branch_refused =
   let branch_refused_before =
     t.branch_refused |> Prevalidator_classification.map
   in
-  Prevalidator_classification.clear ~handle_branch_refused:false t ;
+  Prevalidator_classification.flush ~handle_branch_refused:false t ;
   let refused_after = t.refused |> Prevalidator_classification.map in
   let branch_refused_after =
     t.branch_refused |> Prevalidator_classification.map
@@ -581,11 +581,11 @@ module To_map = struct
       ~pp:map_pp
       ()
 
-  (** Tests the relationship between [Classification.clear]
+  (** Tests the relationship between [Classification.flush]
       and [Classification.to_map] *)
-  let test_clear =
+  let test_flush =
     QCheck.Test.make
-      ~name:"[clear] can be emulated by [to_map ~refused:true ..]"
+      ~name:"[flush] can be emulated by [to_map ~refused:true ..]"
       (QCheck.make (QCheck.Gen.pair Generators.t_gen QCheck.Gen.bool))
     @@ fun (t, handle_branch_refused) ->
     let initial =
@@ -596,9 +596,9 @@ module To_map = struct
         ~refused:true
         t
     in
-    Classification.clear ~handle_branch_refused t ;
-    let cleared = to_map_all t in
-    qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:cleared ()
+    Classification.flush ~handle_branch_refused t ;
+    let flushed = to_map_all t in
+    qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:flushed ()
 
   (** Tests the relationship between [Classification.is_applied]
       and [Classification.to_map] *)
@@ -646,8 +646,8 @@ let () =
       ( "",
         qcheck_wrap
           [
-            test_clear_empties_all;
-            test_clear_empties_all_except_branch_refused;
+            test_flush_empties_all_except_refused;
+            test_flush_empties_all_except_refused_and_branch_refused;
             test_is_in_mempool_remove;
             test_is_applied;
             Bounded.test_bounded;
@@ -656,7 +656,7 @@ let () =
             To_map.test_remove;
             To_map.test_map_remove_add;
             To_map.test_map_add_remove;
-            To_map.test_clear;
+            To_map.test_flush;
             To_map.test_is_in_mempool;
           ] );
     ]

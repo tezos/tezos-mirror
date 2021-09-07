@@ -1029,7 +1029,7 @@ module Make
               pv.shell.classification)
            pv.shell.pending)
       >>= fun pending ->
-      Classification.clear pv.shell.classification ~handle_branch_refused ;
+      Classification.flush pv.shell.classification ~handle_branch_refused ;
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       Operation_hash.Map.fold_s

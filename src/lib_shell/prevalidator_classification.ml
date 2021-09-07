@@ -74,7 +74,7 @@ let create parameters =
     applied_rev = [];
   }
 
-let clear (classes : t) ~handle_branch_refused =
+let flush (classes : t) ~handle_branch_refused =
   if handle_branch_refused then (
     Ringo.Ring.clear classes.branch_refused.ring ;
     classes.branch_refused.map <- Operation_hash.Map.empty) ;

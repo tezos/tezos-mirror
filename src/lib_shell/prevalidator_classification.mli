@@ -57,11 +57,11 @@ type t = private {
     *)
 val create : parameters -> t
 
-(** [clear classes ~handle_branch_refused] resets fields of [classes]; except for
+(** [flush classes ~handle_branch_refused] resets fields of [classes]; except for
     the [refused] field which is never reset, to avoid revalidating
     operations that will never be valid. Also, the [branch_refused] field is
     reset iff [handle_branch_refused] is [true]. *)
-val clear : t -> handle_branch_refused:bool -> unit
+val flush : t -> handle_branch_refused:bool -> unit
 
 (** [is_in_mempool oph classes] indicates whether [oph] is present
     in field [in_mempool] of [classes]. *)
