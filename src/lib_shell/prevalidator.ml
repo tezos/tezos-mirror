@@ -903,7 +903,8 @@ module Make
                     oph ;
                   return_unit)
             else (
-              (* TODO: should this have an influence on the peer's score ? *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
+                 Should this have an influence on the peer's score ? *)
               pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
               return_unit)
         | false -> return_unit
