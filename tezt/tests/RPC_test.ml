@@ -665,12 +665,16 @@ let get_client_port client =
 
 (* Test the mempool RPCs *)
 (* In this test, we create an applied operation and three operations that fails
-   to be applied. Each one of this failed operation have a different
+   to be applied. Each one of this failed operation has a different
    classification to test every possibilities of the monitor_operations and
    pending_operations RPCs. The errors classification are the following :
    - Branch_refused (Branch error classification in protocol)
    - Branch_delayed (Temporary)
-   - Refused (Permanent) *)
+   - Refused (Permanent)
+
+   The main goal is to have a record of the encoding of the different
+   operations returned by the RPC calls. This allows
+   us to detect undesired changes. *)
 let test_mempool ?endpoint client =
   let open Lwt in
   let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
