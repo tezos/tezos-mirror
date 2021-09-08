@@ -108,16 +108,8 @@ val remove : Operation_hash.t -> t -> unit
 
     - [Applied] is never discarded
     - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time (if the corresponding bounded_map is full)
-    - [Refused] is discarded 1 or 2 times (if the corresponding bounded_map is full)
-
-    [notify] is called at the very beginning of [add]. Its goal is to remind call sites that classifying an operation should send a notification somewhere. Its presence in this API is arguable, and may change/move in the future. *)
-val add :
-  notify:(unit -> unit) ->
-  classification ->
-  Operation_hash.t ->
-  Operation.t ->
-  t ->
-  unit
+    - [Refused] is discarded 1 or 2 times (if the corresponding bounded_map is full) *)
+val add : classification -> Operation_hash.t -> Operation.t -> t -> unit
 
 (** [map applied branch_delayed branch_refused refused t]
     returns the pairs [(operation_hash, operation)] contained in [t].

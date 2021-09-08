@@ -157,8 +157,7 @@ let handle_error oph op classification classes =
   bounded_map.map <- Operation_hash.Map.add oph (op, tztrace) bounded_map.map ;
   classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 
-let add ~notify classification oph op classes =
-  notify () ;
+let add classification oph op classes =
   match classification with
   | `Applied -> handle_applied oph op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->

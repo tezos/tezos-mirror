@@ -455,17 +455,16 @@ module Make
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
   let handle pv op kind =
-    let notify () =
-      match op with
-      | `Parsed ({raw; protocol_data; hash} : Proto.operation_data operation) ->
-          Lwt_watcher.notify
-            pv.operation_stream
-            (kind, hash, raw.shell, protocol_data)
-      | _ -> ()
-    in
+    (match op with
+    | `Parsed ({hash; raw; _} : Proto.operation_data operation)
+    | `Unparsed (hash, raw) ->
+        Classification.add kind hash raw pv.shell.classification) ;
     match op with
-    | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
-        Classification.add ~notify kind hash raw pv.shell.classification
+    | `Parsed ({raw; protocol_data; hash} : Proto.operation_data operation) ->
+        Lwt_watcher.notify
+          pv.operation_stream
+          (kind, hash, raw.shell, protocol_data)
+    | _ -> ()
 
   let pre_filter pv oph raw =
     match Prevalidation.parse raw with

@@ -63,8 +63,7 @@ end
 
 let add_if_not_present classification oph op t =
   Prevalidator_classification.(
-    if not (is_in_mempool oph t) then
-      add ~notify:(fun () -> ()) classification oph op t)
+    if not (is_in_mempool oph t) then add classification oph op t)
 
 type classification_event =
   | Add_if_not_present of
@@ -395,12 +394,7 @@ let test_is_in_mempool_remove =
     @@ Generators.(
          Gen.pair (t_with_operation_gen ()) unrefused_classification_gen))
   @@ fun ((t, (oph, op)), unrefused_classification) ->
-  Prevalidator_classification.add
-    ~notify:(fun () -> ())
-    unrefused_classification
-    oph
-    op
-    t ;
+  Prevalidator_classification.add unrefused_classification oph op t ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
   Prevalidator_classification.remove oph t ;
   qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
@@ -412,7 +406,7 @@ let test_is_applied =
     ~name:"[is_applied] is well-behaved"
     (make @@ Generators.(Gen.triple (t_gen ()) operation_hash_gen operation_gen))
   @@ fun (t, oph, op) ->
-  Prevalidator_classification.add ~notify:(fun () -> ()) `Applied oph op t ;
+  Prevalidator_classification.add `Applied oph op t ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_applied oph t) ;
   qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
   Prevalidator_classification.remove oph t ;
@@ -495,7 +489,6 @@ module Bounded = struct
     List.iter
       (fun (classification, operation_hash, operation) ->
         Prevalidator_classification.add
-          ~notify:(fun () -> ())
           classification
           operation_hash
           operation
@@ -514,13 +507,7 @@ module Bounded = struct
 
   let add_bindings bindings classification t =
     List.iter
-      (fun (oph, op) ->
-        Prevalidator_classification.add
-          ~notify:(fun () -> ())
-          classification
-          oph
-          op
-          t)
+      (fun (oph, op) -> Prevalidator_classification.add classification oph op t)
       bindings
 
   let check_discarded_contains_bindings ~discarded_hashes ~bindings =
@@ -682,7 +669,7 @@ module To_map = struct
             Generators.classification_gen))
     @@ fun ((t, (oph, op)), classification) ->
     let initial = to_map_all t in
-    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    Classification.add classification oph op t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
        if [oph] is not in [initial], we have [initial @@ [(oph, op)] = to_map_all t]
        if [oph] is in [initial] already, we have [initial = to_map_all t] *)
@@ -739,7 +726,7 @@ module To_map = struct
     Classification.remove oph t ;
     let initial = to_map_all t in
     let left = Operation_hash.Map.add oph op initial in
-    Classification.add ~notify:(Fun.const ()) classification oph op t' ;
+    Classification.add classification oph op t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
@@ -775,7 +762,7 @@ module To_map = struct
             Generators.classification_gen))
     @@ fun ((t, (oph, op)), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
-    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    Classification.add classification oph op t ;
     let initial = to_map_all t in
     let left = Operation_hash.Map.remove oph initial in
     Classification.remove oph t' ;
