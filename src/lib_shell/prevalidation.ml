@@ -160,9 +160,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       ?protocol_data
       ~cache:`Lazy
       ()
-    >>=? fun state ->
-    (* FIXME arbitrary value, to be customisable *)
-    return {state; applied = []; live_blocks; live_operations}
+    >>=? fun state -> return {state; applied = []; live_blocks; live_operations}
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
@@ -233,7 +231,7 @@ let preapply chain_store ~user_activated_upgrades
   Context.get_protocol predecessor_context >>= fun protocol ->
   (match Registered_protocol.get protocol with
   | None ->
-      (* FIXME. *)
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1718 *)
       (* This should not happen: it should be handled in the validator. *)
       failwith
         "Prevalidation: missing protocol '%a' for the current block."
@@ -283,7 +281,7 @@ let preapply chain_store ~user_activated_upgrades
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
           | Error _ ->
-              (* FIXME *)
+              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1721  *)
               Lwt.return (acc_validation_result, acc_validation_state)
           | Ok op ->
               apply_operation_with_preapply_result

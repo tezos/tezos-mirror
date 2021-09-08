@@ -903,7 +903,8 @@ module Make
                     oph ;
                   return_unit)
             else (
-              (* TODO: should this have an influence on the peer's score ? *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
+                 Should this have an influence on the peer's score ? *)
               pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
               return_unit)
         | false -> return_unit
@@ -911,7 +912,10 @@ module Make
     let on_inject (pv : state) op =
       let oph = Operation.hash op in
       already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
-      if already_handled then return_unit (* FIXME : is this an error ? *)
+      if already_handled then
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
+           Is this an error? *)
+        return_unit
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
@@ -1095,7 +1099,8 @@ module Make
       (match request with
       | Request.Flush (hash, event, live_blocks, live_operations) ->
           on_advertise pv.shell ;
-          (* TODO: rebase the advertisement instead *)
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
+             Rebase the advertisement instead. *)
           let chain_store =
             Distributed_db.chain_store pv.shell.parameters.chain_db
           in
@@ -1173,7 +1178,9 @@ module Make
           pending = Operation_hash.Map.empty;
           advertisement = `None;
           filter_config =
-            Protocol_hash.Map.empty (* TODO: initialize from config file *);
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
+               initialize from config file *)
+            Protocol_hash.Map.empty;
           banned_operations = Operation_hash.Set.empty;
         }
       in
@@ -1220,7 +1227,7 @@ module Make
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/merge_requests/2668
+  (* FIXME: https://gitlab.com/tezos/tezos/-/merge_requests/2668
 
      If the interface of worker would not use tzresult we would
      see that this is not necessary since the function
