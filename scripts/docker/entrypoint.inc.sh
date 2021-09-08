@@ -1,14 +1,26 @@
 #!/bin/sh
 
+# make sure all these variables are defined in the parent script
+node=${node:?}
+client=${client:?}
+admin_client=${admin_client:?}
+baker=${baker:?}
+endorser=${endorser:?}
+accuser=${accuser:?}
+signer=${signer:?}
+client_dir=${client_dir:?}
+node_dir=${node_dir:?}
+node_data_dir=${node_data_dir:?}
+
 configure_client() {
 
-    local client_config="$HOME/.tezos-client/config"
+    _client_config="$HOME/.tezos-client/config"
     mkdir -p "$client_dir" "$HOME/.tezos-client"
 
-    if [ ! -f "$client_config" ]; then
+    if [ ! -f "$_client_config" ]; then
         "$client" --base-dir "$client_dir" \
                   --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
-                  config init --output "$client_config" >/dev/null 2>&1
+                  config init --output "$_client_config" >/dev/null 2>&1
     else
         "$client" --base-dir "$client_dir" \
                   --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
@@ -18,14 +30,14 @@ configure_client() {
 }
 
 wait_for_the_node_to_be_ready() {
-    local count=0
+    _count=0
     if "$client" rpc get /chains/main/blocks/head/hash >/dev/null 2>&1; then return; fi
     printf "Waiting for the node to initialize..."
     sleep 1
     while ! "$client" rpc get /chains/main/blocks/head/hash >/dev/null 2>&1
     do
-        count=$((count+1))
-        if [ "$count" -ge 30 ]; then
+        _count=$((_count+1))
+        if [ "$_count" -ge 30 ]; then
             echo " timeout."
             exit 2
         fi
@@ -49,14 +61,14 @@ check_image_version() {
     # run has a incompatible version with the blockchain we have stored
     # locally on disk
 
-    local image_version="$(cat "/usr/local/share/tezos/alphanet_version")"
-    echo "Current public chain: $image_version."
-    local local_data_version=""
+    _image_version="$(cat "/usr/local/share/tezos/alphanet_version")"
+    echo "Current public chain: $_image_version."
+    _local_data_version=""
     if [ -f "$node_dir/alphanet_version" ]; then
-        local_data_version="$(cat "$node_dir/alphanet_version")"
-        echo "Local chain data: $local_data_version."
+        _local_data_version="$(cat "$node_dir/alphanet_version")"
+        echo "Local chain data: $_local_data_version."
     fi
-    if [ "$local_data_version" != "$image_version" ]; then
+    if [ "$_local_data_version" != "$_image_version" ]; then
         echo "Removing outdated chain data..."
         if [ -f "$node_data_dir/identity.json" ]; then \
             mv "$node_data_dir/identity.json" /tmp
@@ -86,12 +98,14 @@ launch_node() {
         "$node" config init \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
+                --allow-all-rpc ":$NODE_RPC_PORT" \
                 "$@"
     else
         echo "Updating the node configuration..."
         "$node" config update \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
+                --allow-all-rpc ":$NODE_RPC_PORT" \
                 "$@"
     fi
 
