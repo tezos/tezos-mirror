@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Edo, gets the RPC descriptions
+# This script launches a sandbox node, activates Granada, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-protocol_parameters=src/proto_009_PsFLoren/parameters/sandbox-parameters.json
-protocol_name=florence
+protocol_hash=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+protocol_parameters=src/proto_010_PtGRANAD/parameters/sandbox-parameters.json
+protocol_name=granada
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
