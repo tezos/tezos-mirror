@@ -48,7 +48,8 @@ $tezos_node config init --data-dir $data_dir \
     --network sandbox \
     --expected-pow 0 \
     --rpc-addr localhost:$rpc_port \
-    --no-bootstrap-peer
+    --no-bootstrap-peer \
+    --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
 $tezos_node run --data-dir $data_dir &
 node_pid="$!"
