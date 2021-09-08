@@ -36,14 +36,8 @@ test-script-gen-genesis:
     expire_in: 1 day
     when: always
 
-unit:008_PtEdo2Zk:
-  extends: .unit_test_template
-  script:
-    - >
-      make
-      src/proto_008_PtEdo2Zk/lib_client.test_proto
-      src/proto_008_PtEdo2Zk/lib_protocol.test_proto
-
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
 unit:009_PsFLoren:
   extends: .unit_test_template
   script:
