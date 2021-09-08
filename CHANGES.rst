@@ -72,6 +72,10 @@ Node
    block to export, using the ``--block`` argument of the snapshot
    export command. Before, only ``~`` and ``-`` were allowed.
 
+-  Fixed a bug where the mempool forgot about ``refused`` operations
+   on flush, leading to these operations being potentially reevaluated
+   in the future (e.g. if they are advertised again by a peer).
+
 Client
 ------
 
