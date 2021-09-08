@@ -475,6 +475,21 @@ module To_map = struct
       ~branch_refused:true
       ~refused:true
 
+  (** Tests the relationship between [Classification.create]
+      and [Classification.to_map] *)
+  let test_create =
+    QCheck.Test.make
+      ~name:"[to_map_all (create params)] is empty"
+      (QCheck.make Generators.parameters_gen)
+    @@ fun parameters ->
+    let t = Classification.create parameters in
+    qcheck_eq'
+      ~pp:map_pp
+      ~eq:map_eq
+      ~expected:Operation_hash.Map.empty
+      ~actual:(to_map_all t)
+      ()
+
   (** Tests the relationship between [Classification.add]
       and [Classification.to_map] *)
   let test_add =
@@ -636,6 +651,7 @@ let () =
             test_is_in_mempool_remove;
             test_is_applied;
             Bounded.test_bounded;
+            To_map.test_create;
             To_map.test_add;
             To_map.test_remove;
             To_map.test_map_remove_add;
