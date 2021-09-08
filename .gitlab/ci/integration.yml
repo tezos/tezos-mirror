@@ -242,12 +242,6 @@ integration:009_rpc:
     - poetry run pytest "tests_009/test_rpc.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/009_rpc.xml" 2>&1 | tee "tmp/009_rpc.out" | tail
   stage: test
 
-integration:009_voting_full:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_009/test_voting_full.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/009_voting_full.xml" 2>&1 | tee "tmp/009_voting_full.out" | tail
-  stage: test
-
 integration:010_batch:
   extends: .integration_python_template
   script:

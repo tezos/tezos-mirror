@@ -5,10 +5,6 @@ DAEMON = constants.FLORENCE_DAEMON
 PARAMETERS = constants.FLORENCE_PARAMETERS
 FOLDER = constants.FLORENCE_FOLDER
 
-PREV_HASH = constants.EDO
-PREV_DAEMON = constants.EDO_DAEMON
-PREV_PARAMETERS = constants.EDO_PARAMETERS
-
 
 def activate(
     client,
