@@ -209,6 +209,18 @@ let option_key loc t ~annot =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
   Option_key (t, {annot; size})
 
+(*
+
+   This signature contains the exact set of functions used in the
+   protocol. We do not include all [Set.S] because this would
+   increase the size of the first class modules used to represent
+   [boxed_set].
+
+   Warning: for any change in this signature, there must be a
+   change in [Script_typed_ir_size.value_size] which updates
+   [boxing_space] in the case for sets.
+
+*)
 module type Boxed_set_OPS = sig
   type t
 
@@ -239,6 +251,11 @@ end
 
 type 'elt set = (module Boxed_set with type elt = 'elt)
 
+(*
+
+   Same remark as for [Boxed_set_OPS]. (See below.)
+
+*)
 module type Boxed_map_OPS = sig
   type key
 
