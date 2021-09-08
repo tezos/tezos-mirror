@@ -267,7 +267,7 @@ def _call_tezt(files: List[str], staged_or_modified: bool) -> int:
             continue
         if not file_.endswith(".ml"):
             continue
-        with open(file_, 'r') as handle:
+        with open(file_, mode="r", encoding="utf-8") as handle:
             pattern = re.escape("let register () =")
             match = re.search(pattern, handle.read())
             if match is None:

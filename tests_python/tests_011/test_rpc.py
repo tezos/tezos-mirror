@@ -17,7 +17,7 @@ OPERATION_OFFSET = "0"
 
 @pytest.fixture(scope="class")
 def session():
-    session = dict()
+    session = {}
     session["implicit_accounts"] = [
         "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",

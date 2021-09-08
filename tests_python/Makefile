@@ -4,7 +4,7 @@ TYPECHECK=poetry run mypy
 # It is configured by ./.pylint.rc
 # In pylint, we ignore the following additional errors:
 # - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
-PYLINT=poetry run pylint --disable C0330
+PYLINT=poetry run pylint --disable C0330 --disable W1514 --disable R1732 --disable C0206
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447

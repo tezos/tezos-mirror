@@ -26,8 +26,8 @@
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
-    - diff tests_python/poetry.lock /home/tezos/poetry.lock
-    - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
+    - diff poetry.lock /home/tezos/poetry.lock
+    - diff pyproject.toml /home/tezos/pyproject.toml
     - dune build @runtest_dune_template
     # 2. Actually build
     - make all build-test
