@@ -1027,7 +1027,7 @@ let wait_for_banned_operation_injection node oph =
   Node.wait_for node "banned_operation_encountered.v0" filter
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
-let bake_empty_mempool client =
+let bake_empty_mempool ?endpoint client =
   let mempool_str =
     {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
   in
@@ -1036,7 +1036,7 @@ let bake_empty_mempool client =
     Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
         Lwt_io.write oc mempool_str)
   in
-  let* () = Client.bake_for ~mempool client in
+  let* () = Client.bake_for ?endpoint ~mempool client in
   unit
 
 (** This test bans an operation and tests the ban.
