@@ -493,7 +493,7 @@ module To_map = struct
             Generators.operation_hash_gen
             Generators.operation_gen))
     @@ fun (t, classification, oph, op) ->
-    let t' = Obj.obj (Obj.dup (Obj.repr t)) in
+    let t' = Classification.Internal_for_tests.copy t in
     Classification.remove oph t ;
     let initial = to_map_all t in
     let left = Operation_hash.Map.add oph op initial in
@@ -521,7 +521,7 @@ module To_map = struct
             Generators.operation_hash_gen
             Generators.operation_gen))
     @@ fun (t, classification, oph, op) ->
-    let t' = Obj.obj (Obj.dup (Obj.repr t)) in
+    let t' = Classification.Internal_for_tests.copy t in
     Classification.add ~notify:(Fun.const ()) classification oph op t ;
     let initial = to_map_all t in
     let left = Operation_hash.Map.remove oph initial in

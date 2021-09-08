@@ -123,4 +123,8 @@ module Internal_for_tests : sig
   val pp : Format.formatter -> t -> unit
 
   val bounded_map_pp : Format.formatter -> bounded_map -> unit
+
+  (** Returns a deep copy of the input [t], so that mutating the one
+      doesn't affect the other. *)
+  val copy : t -> t
 end

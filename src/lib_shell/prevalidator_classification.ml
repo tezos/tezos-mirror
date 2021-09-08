@@ -177,6 +177,28 @@ let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
   +> if refused then classes.refused.map else Map.empty
 
 module Internal_for_tests = struct
+  (** [copy_bounded_map bm] returns a deep copy of [bm] *)
+  let copy_bounded_map (bm : bounded_map) : bounded_map =
+    let copy_ring (ring : Operation_hash.t Ringo.Ring.t) =
+      let result = Ringo.Ring.capacity ring |> Ringo.Ring.create in
+      List.iter (Ringo.Ring.add result) (Ringo.Ring.elements ring) ;
+      result
+    in
+    {map = bm.map; ring = copy_ring bm.ring}
+
+  let copy (t : t) : t =
+    (* Code could be shorter by doing a functional update thanks to
+       the 'with' keyword. We rather list all the fields, so that
+       the compiler emits a warning when a field is added. *)
+    {
+      parameters = t.parameters;
+      refused = copy_bounded_map t.refused;
+      branch_refused = copy_bounded_map t.branch_refused;
+      branch_delayed = copy_bounded_map t.branch_delayed;
+      applied_rev = t.applied_rev;
+      in_mempool = t.in_mempool;
+    }
+
   let bounded_map_pp ppf bounded_map =
     bounded_map.map |> Operation_hash.Map.bindings
     |> List.map (fun (key, _value) -> key)
