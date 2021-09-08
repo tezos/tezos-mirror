@@ -709,13 +709,6 @@ case $(basename "$0") in
         default_port=9732
         network=florencenet
         ;;
-    edo2net.sh)
-        docker_base_dir="$HOME/.tezos-edo2net"
-        docker_image=tezos/tezos:master
-        docker_compose_base_name=edo2net
-        default_port=9732
-        network=edo2net
-        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
         docker_image=tezos/tezos:master
