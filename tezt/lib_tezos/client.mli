@@ -531,6 +531,36 @@ val spawn_normalize_data :
   t ->
   Process.t
 
+(** Run [tezos-client normalize script ..]*)
+val normalize_script :
+  ?mode:normalize_mode -> script:string -> t -> string Lwt.t
+
+(** Same as [normalize_script], but do not wait for the process to exit. *)
+val spawn_normalize_script :
+  ?mode:normalize_mode -> script:string -> t -> Process.t
+
+(** Run [tezos-client typecheck script ..]*)
+val typecheck_script :
+  script:string ->
+  ?details:bool ->
+  ?emacs:bool ->
+  ?no_print_source:bool ->
+  ?gas:int ->
+  ?legacy:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as [typecheck_script], but do not wait for the process to exit. *)
+val spawn_typecheck_script :
+  script:string ->
+  ?details:bool ->
+  ?emacs:bool ->
+  ?no_print_source:bool ->
+  ?gas:int ->
+  ?legacy:bool ->
+  t ->
+  Process.t
+
 (** Run [tezos-client list mode protocols]. *)
 val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
 

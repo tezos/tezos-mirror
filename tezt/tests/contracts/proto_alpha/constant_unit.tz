@@ -1,0 +1,8 @@
+parameter (constant "exprvKFFbc7SnPjkPZgyhaHewQhmrouNjNae3DpsQ8KuADn9i2WuJ8");
+storage (constant "exprvKFFbc7SnPjkPZgyhaHewQhmrouNjNae3DpsQ8KuADn9i2WuJ8");
+code {
+       DROP;
+       PUSH unit (constant "expruJpGVgueH6vjZDZQRjgXUuHBi4Y6UQ3cbz6swP2FMVybvnDjm5");
+       NIL operation;
+       PAIR;
+     }

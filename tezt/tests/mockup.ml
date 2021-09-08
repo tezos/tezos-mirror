@@ -209,6 +209,27 @@ let test_originate_contract_with_global_constant_success ~protocols =
   Log.info "result %s" result ;
   return ()
 
+let test_typechecking_and_normalization_work_with_constants ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Typechecking and normalization work with constants"
+    ~tags:["mockup"; "client"; "global_constant"]
+    ~protocols
+  @@ fun protocol ->
+  let (src, _, _) = transfer_data in
+  let* client = Client.init_mockup ~protocol () in
+  (* Register the type *)
+  let value = "unit" in
+  let burn_cap = Some (Tez.of_int 1) in
+  let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
+  (* Register the value *)
+  let value = "Unit" in
+  let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
+  let script = "file:./tezt/tests/contracts/proto_alpha/constant_unit.tz" in
+  let* _ = Client.normalize_script ~script client in
+  let* _ = Client.typecheck_script ~script client in
+  return ()
+
 let test_simple_baking_event =
   Protocol.register_test
     ~__FILE__
@@ -512,7 +533,8 @@ let register_global_constants ~protocols =
   test_register_global_constant_failure ~protocols ;
   test_calling_contract_with_global_constant_success ~protocols ;
   test_calling_contract_with_global_constant_failure ~protocols ;
-  test_originate_contract_with_global_constant_success ~protocols
+  test_originate_contract_with_global_constant_success ~protocols ;
+  test_typechecking_and_normalization_work_with_constants ~protocols
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
