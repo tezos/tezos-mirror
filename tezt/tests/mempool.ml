@@ -1036,8 +1036,18 @@ let bake_empty_mempool ?endpoint client =
     Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
         Lwt_io.write oc mempool_str)
   in
-  let* () = Client.bake_for ?endpoint ~mempool client in
-  unit
+  Client.bake_for ?endpoint ~mempool client
+
+(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
+    with an empty mempool, then waits for a [flush] event on [node] (which
+    will usually be the node corresponding to [client], but could be any
+    node with a connection path to it). *)
+let bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
+  let waiter = wait_for_flush node in
+  let* () = bake_empty_mempool client in
+  if log then
+    Log.info "Baked for %s with an empty mempool." (Client.name client) ;
+  waiter
 
 (** This test bans an operation and tests the ban.
 
@@ -1146,9 +1156,7 @@ let ban_operation =
     "Step 6: Bake on Node 2 with an empty mempool to force synchronisation \
      with Node 3. Check that the banned operation is not in the mempool of \
      Node 3." ;
-  let dummy_baking = wait_for_flush node_2 in
-  let* () = bake_empty_mempool client_2 in
-  let* () = dummy_baking in
+  let* () = bake_empty_mempool_and_wait_for_flush client_2 node_2 in
   let* _ = check_op_removed client_3 oph_to_ban in
   Log.info "Check that banned op is not in node_3" ;
   Log.info
@@ -1499,7 +1507,7 @@ let wait_for_arrival_of_ophash ophash node =
         json |-> "view" |-> "operation_hash" |> as_string_opt )
     with
     | (Some "arrived", Some s) when String.equal s ophash ->
-        Log.info "Witnessed arrival of operation %s" ophash ;
+        Log.info "Witnessed arrival of operation %s." ophash ;
         Some ()
     | _ -> None
   in
@@ -1798,6 +1806,251 @@ let recycling_branch_refused =
   if pending <> 2 then Test.fail "the two operations should be reclassified" ;
   unit
 
+(** Calls RPC POST /chains/main/mempool/filter from [client], with [data]
+    formatted from string [config_str]. *)
+let set_filter config_str client =
+  let* _ =
+    RPC.post_mempool_filter ~data:(Ezjsonm.from_string config_str) client
+  in
+  unit
+
+(** [set_filter_no_fee_requirement client] sets all fields [minimal_*]
+    to 0 in the filter configuration of [client]'s mempool. *)
+let set_filter_no_fee_requirement =
+  set_filter
+    {|{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
+
+(** Checks that arguments [applied] and [refused] are the number of operations
+    in the mempool of [client] with the corresponding classification,
+    that both sets of operations are disjoint, and that there is no 
+    [branch_delayed], [branch_refused], or [unprocessed] operation.
+    If [log] is [true], also logs the hash and fee of all applied
+    and refused operations. *)
+let check_mempool_ops ?(log = false) client ~applied ~refused =
+  let name = Client.name client in
+  let log_op =
+    if log then fun classification hash fee ->
+      Log.info
+        ~color:Log.Color.FG.yellow
+        ~prefix:(name ^ ", " ^ classification)
+        "%s (fee: %d)"
+        hash
+        fee
+    else fun _ _ _ -> ()
+  in
+  let* ops = RPC.get_mempool_pending_operations client in
+  let open JSON in
+  (* get (and log) applied operations *)
+  let applied_ophs =
+    let classification = "applied" in
+    List.map
+      (fun op ->
+        let oph = get_hash op in
+        log_op classification oph (op |-> "contents" |=> 0 |-> "fee" |> as_int) ;
+        oph)
+      (ops |-> classification |> as_list)
+  in
+  (* get (and log) refused operations *)
+  let refused_ophs =
+    let classification = "refused" in
+    List.map
+      (fun op ->
+        match op |> as_list with
+        | [oph; descr] ->
+            let oph = as_string oph in
+            log_op
+              classification
+              oph
+              (descr |-> "contents" |=> 0 |-> "fee" |> as_int) ;
+            oph
+        | _ ->
+            Test.fail
+              "Unexpected JSON structure for refused operation in %s's mempool."
+              name)
+      (ops |-> classification |> as_list)
+  in
+  (* various checks about applied and refused operations *)
+  Check.(
+    (List.length applied_ophs = applied)
+      int
+      ~error_msg:(name ^ ": found %L applied operation(s), expected %R.")) ;
+  Check.(
+    (List.length refused_ophs = refused)
+      int
+      ~error_msg:(name ^ ": found %L refused operation(s), expected %R.")) ;
+  List.iter
+    (fun oph ->
+      if List.mem oph refused_ophs then
+        Test.fail "%s: operation %s is both applied and refused" name oph)
+    applied_ophs ;
+  (* check that other classifications are empty *)
+  List.iter
+    (fun classification ->
+      match ops |-> classification |> as_list with
+      | [] -> ()
+      | _ ->
+          Test.fail
+            "%s: unexpectedly found %s operation(s): %s"
+            name
+            classification
+            (ops |-> classification |> encode))
+    ["branch_refused"; "branch_delayed"; "unprocessed"] ;
+  unit
+
+(** Waits for [node] to receive a notification from a peer of a mempool
+    containing exactly [n_ops] valid operations. *)
+let wait_for_notify_n_valid_ops node n_ops =
+  Node.wait_for node "node_prevalidator.v0" (fun event ->
+      let open JSON in
+      let view = event |=> 1 |-> "request_view" in
+      match view |-> "request" |> as_string_opt with
+      | Some "notify" ->
+          let valid_ophs = view |-> "mempool" |-> "known_valid" |> as_list in
+          if Int.equal (List.length valid_ophs) n_ops then Some () else None
+      | _ -> None)
+
+(** Checks that the last block of [client] contains exactly
+    [n_manager_ops] manager operations (which includes the transfer
+    operations). *)
+let check_n_manager_ops_in_block ?(log = false) client n_manager_ops =
+  let* baked_ops = RPC.get_operations client in
+  let baked_manager_ops = JSON.(baked_ops |=> 3 |> as_list) in
+  Check.(
+    (List.length baked_manager_ops = n_manager_ops)
+      int
+      ~error_msg:
+        "The baked block contains %L manager operation(s), expected %R.") ;
+  if log then
+    Log.info "The baked block contains %d manager operation(s)." n_manager_ops ;
+  unit
+
+let iter2_p f l1 l2 = Lwt.join (List.map2 f l1 l2)
+
+(** Test.
+
+    Aim: test that a refused operation is not reclassified even though
+    it would now be valid.
+
+    Scenario:
+    - Step 1: Start two nodes, connect them, and activate the protocol.
+    - Step 2: In [node2]'s mempool filter configuration, set all fields
+      [minimal_*] to 0, so that [node2] accepts operations with any fee.
+    - Step 3: Inject two operations (transfers) in [node2] with respective
+      fees 1000 and 10 mutez. Check that both operations are [applied] in
+      [node2]'s mempool.
+    - Step 4: Bake with an empty mempool for [node1] to force synchronization
+      with [node2]. Check that the mempool of [node1] has one applied and one
+      refused operation. Indeed, [node1] has the default filter config with
+      [minimal_fees] at 100 mutez.
+    - Step 5: In [node1]'s mempool filter configuration, set all fields
+      [minimal_*] to 0. Inject a new operation with fee 5 in [node2], then
+      bake with an empty mempool. Check that [node1] contains two applied
+      operations (the ones with fee 1000 and 5) and one refused operation.
+      Indeed, the operation with fee 10 would now be valid, but it has already
+      been refused so it must not be revalidated.
+    - Step 6: Bake for [node1] (normally, i.e. without enforcing a given
+      mempool). Check that the baked block contains exactly one manager
+      operation (the category containing transfer operations). Indeed, the
+      filter used to determine which operations are included in the block does
+      not share its configuration with the mempool's filter, so only the
+      operation of fee 1000 is included. Check that [node1] contains one
+      applied operation (fee 5) and one refused operation (fee 10), and that
+      [node2] contains two applied operations. *)
+let test_do_not_reclassify =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"mempool do not reclassify"
+    ~tags:["mempool"; "node"; "filter"; "refused"; "applied"]
+  @@ fun protocol ->
+  let step_color = Log.Color.BG.blue in
+  Log.info
+    ~color:step_color
+    "Step 1: Start two nodes, connect them, and activate the protocol." ;
+  let* node1 =
+    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Connections 1]
+  and* node2 = Node.init [Synchronisation_threshold 0; Connections 1] in
+  let* client1 = Client.init ~endpoint:Client.(Node node1) ()
+  and* client2 = Client.init ~endpoint:Client.(Node node2) () in
+  let* () = Client.Admin.connect_address client1 ~peer:node2
+  and* () = Client.activate_protocol ~protocol client1 in
+  let proto_activation_level = 1 in
+  let* _ = Node.wait_for_level node1 proto_activation_level
+  and* _ = Node.wait_for_level node2 proto_activation_level in
+  Log.info "Both nodes are at level %d." proto_activation_level ;
+  Log.info
+    ~color:step_color
+    "Step 2: In [node2]'s mempool filter configuration, set all fields \
+     [minimal_*] to 0, so that [node2] accepts operations with any fee." ;
+  let* () = set_filter_no_fee_requirement client2 in
+  Log.info "Node2 filter config: all [minimal_*] set to 0." ;
+  Log.info
+    ~color:step_color
+    "Step 3: Inject two operations (transfers) in [node2] with respective fees \
+     1000 and 10 mutez. Check that both operations are [applied] in [node2]'s \
+     mempool." ;
+  let waiter_arrival_node1 = wait_for_arrival node1 in
+  let inject_transfer from_key ~fee =
+    let waiter = wait_for_injection node2 in
+    let _ =
+      Client.transfer
+        ~wait:"0"
+        ~amount:(Tez.of_int 1)
+        ~giver:from_key.Constant.alias
+        ~receiver:Constant.bootstrap5.alias
+        ~fee:(Tez.of_mutez_int fee)
+        client2
+    in
+    waiter
+  in
+  let bootstraps = Constant.[bootstrap1; bootstrap2] in
+  let fees = [1000; 10] in
+  let* () = iter2_p (fun key fee -> inject_transfer key ~fee) bootstraps fees in
+  Log.info
+    "Injected transfers in node2 with fees: %s."
+    (String.concat "; " (List.map Int.to_string fees)) ;
+  let* () = check_mempool_ops ~log:true client2 ~applied:2 ~refused:0 in
+  Log.info
+    ~color:step_color
+    "Step 4: Bake with an empty mempool for [node1] to force synchronization \
+     with [node2]. Check that the mempool of [node1] has one applied and one \
+     refused operation. Indeed, [node1] has the default filter config with \
+     [minimal_fees] at 100 mutez." ;
+  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () = waiter_arrival_node1 in
+  let* () = check_mempool_ops ~log:true client1 ~applied:1 ~refused:1 in
+  Log.info
+    ~color:step_color
+    "Step 5: In [node1]'s mempool filter configuration, set all fields \
+     [minimal_*] to 0. Inject a new operation with fee 5 in [node2], then bake \
+     with an empty mempool. Check that [node1] contains two applied operations \
+     (the ones with fee 1000 and 5) and one refused operation. Indeed, the \
+     operation with fee 10 would now be valid, but it has already been refused \
+     so it must not be revalidated." ;
+  let* () = set_filter_no_fee_requirement client1 in
+  let* () = inject_transfer Constant.bootstrap3 ~fee:5 in
+  let waiter_notify_3_valid_ops = wait_for_notify_n_valid_ops node1 3 in
+  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  (* Wait for [node1] to receive a mempool containing 3 operations (the
+     number of [applied] operations in [node2]), among which will figure
+     the operation with fee 10 that has already been [refused] in [node1]. *)
+  let* () = waiter_notify_3_valid_ops in
+  let* () = check_mempool_ops ~log:true client1 ~applied:2 ~refused:1 in
+  Log.info
+    ~color:step_color
+    "Step 6: Bake for [node1] (normally, i.e. without enforcing a given \
+     mempool). Check that the baked block contains exactly one manager \
+     operation (the category containing transfer operations). Indeed, the \
+     filter used to determine which operations are included in the block does \
+     not share its configuration with the mempool's filter, so only the \
+     operation of fee 1000 is included. Check that [node1] contains one \
+     applied operation (fee 5) and one refused operation (fee 10), and that \
+     [node2] contains 2 applied operations." ;
+  let* () = bake_wait_log node1 client1 in
+  let* () = check_n_manager_ops_in_block ~log:true client1 1 in
+  let* () = check_mempool_ops ~log:true client1 ~applied:1 ~refused:1 in
+  let* () = check_mempool_ops ~log:true client2 ~applied:2 ~refused:0 in
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
@@ -1808,4 +2061,5 @@ let register ~protocols =
   unban_operation_and_reinject ~protocols ;
   unban_all_operations ~protocols ;
   ban_operation_branch_refused_reevaluated ~protocols ;
-  recycling_branch_refused ~protocols
+  recycling_branch_refused ~protocols ;
+  test_do_not_reclassify ~protocols

@@ -48,6 +48,8 @@ type t = {
   mutable mode : mode;
 }
 
+let name t = t.name
+
 let base_dir t = t.base_dir
 
 let get_mode t = t.mode

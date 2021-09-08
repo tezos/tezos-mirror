@@ -57,6 +57,9 @@ type normalize_mode = Readable | Optimized | Optimized_legacy
 (** Tezos client states. *)
 type t
 
+(** Get the name of a client (e.g. ["client1"]). *)
+val name : t -> string
+
 (** Get the base directory of a client.
 
     The base directory is the location where clients store their
