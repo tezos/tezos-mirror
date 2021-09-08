@@ -6537,13 +6537,14 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         let reversed = {length = l.length; elements = List.rev l.elements} in
         (ctxt, reversed, ids_to_copy, acc)
     | (Map_f has_lazy_storage, Map_t (_, ty, _), (module M)) ->
+        let bindings m = M.OPS.fold (fun k v bs -> (k, v) :: bs) m [] in
         List.fold_left_es
           (fun (ctxt, m, ids_to_copy, acc) (k, x) ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
             (ctxt, M.OPS.add k x m, ids_to_copy, acc))
           (ctxt, M.OPS.empty, ids_to_copy, acc)
-          (M.OPS.bindings (fst M.boxed))
+          (bindings (fst M.boxed))
         >|=? fun (ctxt, m, ids_to_copy, acc) ->
         let module M = struct
           module OPS = M.OPS

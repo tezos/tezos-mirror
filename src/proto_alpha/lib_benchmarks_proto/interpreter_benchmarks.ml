@@ -1130,8 +1130,12 @@ module Registration_section = struct
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
+        |> WithExceptions.Option.get ~loc:__LOC__
       in
       (key, map)
 
@@ -1304,8 +1308,12 @@ module Registration_section = struct
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
+        |> WithExceptions.Option.get ~loc:__LOC__
       in
       let big_map =
         raise_if_error

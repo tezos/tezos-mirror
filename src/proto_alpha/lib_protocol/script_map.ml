@@ -65,14 +65,17 @@ let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
 
     let boxed =
       let (map, size) = Box.boxed in
-      let contains = Box.OPS.mem k map in
+      let contains =
+        match Box.OPS.find k map with None -> false | _ -> true
+      in
       match v with
       | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
       | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
   end)
 
 let mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) -> Box.OPS.mem k (fst Box.boxed)
+ fun k (module Box) ->
+  match Box.OPS.find k (fst Box.boxed) with None -> false | _ -> true
 
 let fold :
     type key value acc.
