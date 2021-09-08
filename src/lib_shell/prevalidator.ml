@@ -373,7 +373,11 @@ module Make
           operations
         >>= fun mempool ->
         Store.Block.read_predecessor_opt chain_store block >>= function
-        | None -> assert false
+        | None ->
+            (* Can this happen? If yes, there's nothing more to pop anyway,
+               so returning the accumulator. It's not the mempool that
+               should crash, should this case happen. *)
+            Lwt.return mempool
         | Some predecessor -> pop_blocks ancestor predecessor mempool
     in
     let push_block mempool block =
