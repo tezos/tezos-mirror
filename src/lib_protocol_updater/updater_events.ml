@@ -70,6 +70,17 @@ let dynlink_error =
     ("plugin", Data_encoding.string)
     ("reason", Data_encoding.string)
 
+let dynlink_error_static =
+  declare_2
+    ~section
+    ~level
+    ~name:"dynlink_error_static"
+    ~msg:
+      "can't load plugin either because the binary is statically linked or \
+       because there was an error in its compilation: {plugin} ({reason})"
+    ("plugin", Data_encoding.string)
+    ("reason", Data_encoding.string)
+
 let internal_error =
   declare_1
     ~section

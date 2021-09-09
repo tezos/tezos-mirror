@@ -1,3 +1,8 @@
+
+; build static executable with --profile static
+(env
+ (static (flags (:standard -ccopt -static ))))
+
 (executables
  (names main_snoop)
  (instrumentation (backend bisect_ppx))
