@@ -125,3 +125,10 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     - when: never
+
+# Rules for jobs that should run only during merge requests.
+.rules_template__merge_requests:
+  rules:
+    - if: '$CI_MERGE_REQUEST_PROJECT_ID'
+      when: always
+    - when: never # default
