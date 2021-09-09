@@ -1045,9 +1045,9 @@ module Make
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
         (fun oph op pending ->
-          pre_filter pv oph op >>= function
-          | true -> Lwt.return (Operation_hash.Map.add oph op pending)
-          | false -> Lwt.return pending)
+          pre_filter pv oph op >|= function
+          | true -> Operation_hash.Map.add oph op pending
+          | false -> pending)
         pending
         Operation_hash.Map.empty
       >>= fun pending ->
