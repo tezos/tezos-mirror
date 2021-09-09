@@ -464,17 +464,28 @@ module Make
 
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
-  let handle pv op kind =
+  let handle
+      ~(notifier :
+         Classification.classification ->
+         Operation_hash.t ->
+         Operation.shell_header ->
+         Proto.operation_data ->
+         unit) shell op kind =
     (match op with
     | `Parsed ({hash; raw; _} : Proto.operation_data operation)
     | `Unparsed (hash, raw) ->
-        Classification.add kind hash raw pv.shell.classification) ;
+        Classification.add kind hash raw shell.classification) ;
     match op with
     | `Parsed ({raw; protocol_data; hash} : Proto.operation_data operation) ->
-        Lwt_watcher.notify
-          pv.operation_stream
-          (kind, hash, raw.shell, protocol_data)
+        notifier kind hash raw.shell protocol_data
     | _ -> ()
+
+  let mk_notifier operation_stream classification hash shell_header op_data =
+    (* This callback is safe encapsulation-wise, because it depends
+       on an "harmless" field of [types_state_shell]: [operation_stream] *)
+    Lwt_watcher.notify
+      operation_stream
+      (classification, hash, shell_header, op_data)
 
   let pre_filter pv oph raw =
     match Prevalidation.parse raw with
@@ -504,7 +515,11 @@ module Make
             op.Filter.Proto.protocol_data
         with
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _) as errs ->
-            handle pv (`Parsed parsed_op) errs ;
+            handle
+              ~notifier:(mk_notifier pv.operation_stream)
+              pv.shell
+              (`Parsed parsed_op)
+              errs ;
             false
         | `Undecided -> true)
 
@@ -525,16 +540,16 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let classify_operation pv validation_state mempool op oph =
+  let classify_operation ~notifier shell validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle pv (`Unparsed (oph, op)) (`Refused errors) ;
+        handle ~notifier shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
         | Applied (new_validation_state, receipt) ->
             post_filter
-              pv.shell
+              shell
               ~validation_state_before:
                 (Prevalidation.validation_state validation_state)
               ~validation_state_after:
@@ -543,7 +558,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle pv (`Parsed op) `Applied ;
+              handle ~notifier shell (`Parsed op) `Applied ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -551,21 +566,21 @@ module Make
               Lwt.return (new_validation_state, new_mempool))
             else (
               Distributed_db.Operation.clear_or_cancel
-                pv.shell.parameters.chain_db
+                shell.parameters.chain_db
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            handle pv (`Parsed op) (`Branch_delayed errors) ;
+            handle ~notifier shell (`Parsed op) (`Branch_delayed errors) ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            handle pv (`Parsed op) (`Branch_refused errors) ;
+            handle ~notifier shell (`Parsed op) (`Branch_refused errors) ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            handle pv (`Parsed op) (`Refused errors) ;
+            handle ~notifier shell (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
-              pv.shell.parameters.chain_db
+              shell.parameters.chain_db
               oph ;
             Lwt.return (validation_state, mempool))
 
@@ -589,19 +604,26 @@ module Make
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
 
-  let classify_pending_operations w (pv : state) state =
+  let classify_pending_operations ~notifier w (shell : types_state_shell) state
+      =
     Operation_hash.Map.fold_es
       (fun oph op (acc_validation_state, acc_mempool, limit) ->
         if limit <= 0 then
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
-          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-          classify_operation pv acc_validation_state acc_mempool op oph
+          shell.pending <- Operation_hash.Map.remove oph shell.pending ;
+          classify_operation
+            ~notifier
+            shell
+            acc_validation_state
+            acc_mempool
+            op
+            oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
-      pv.shell.pending
-      (state, Mempool.empty, pv.shell.parameters.limits.operations_batch_size)
+      shell.pending
+      (state, Mempool.empty, shell.parameters.limits.operations_batch_size)
     >>= function
     | Error (state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
@@ -610,12 +632,18 @@ module Make
     | Ok (state, advertised_mempool, _) -> Lwt.return (state, advertised_mempool)
 
   let handle_unprocessed w pv =
+    let notifier = mk_notifier pv.operation_stream in
     match pv.validation_state with
     | Error err ->
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
-          (fun oph op -> handle pv (`Unparsed (oph, op)) (`Branch_delayed err))
+          (fun oph op ->
+            handle
+              ~notifier
+              pv.shell
+              (`Unparsed (oph, op))
+              (`Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -624,7 +652,7 @@ module Make
         | 0 -> Lwt.return_unit
         | n ->
             Event.(emit processing_n_operations) n >>= fun () ->
-            classify_pending_operations w pv state
+            classify_pending_operations ~notifier w pv.shell state
             >>= fun (state, advertised_mempool) ->
             let remaining_pendings =
               Operation_hash.Map.fold
@@ -914,7 +942,8 @@ module Make
               >>= function
               | Some op ->
                   let error = [Exn (Failure "Unknown branch operation")] in
-                  handle pv (`Parsed op) (`Branch_refused error) ;
+                  let notifier = mk_notifier pv.operation_stream in
+                  handle ~notifier pv.shell (`Parsed op) (`Branch_refused error) ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
