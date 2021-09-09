@@ -357,9 +357,16 @@ module Make
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  let list_pendings chain_db ~from_block ~to_block ~live_blocks old_mempool =
+  (** [handle_live_operations chain_db from_branch to_branch live_blocks old_mempool]
+      gathers the operations from [from_branch] that are NOT in [to_branch],
+      so that they are considered pending afterwards. Obtained operations
+      are eligible to be propagated. On the other hand, all newly included operations
+      are cleared and won't be propagated. Please note that, when
+      we solely increment the head, there are only operations in [to_branch]. *)
+  let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
+      old_mempool =
     let chain_store = Distributed_db.chain_store chain_db in
-    let rec pop_blocks ancestor block mempool =
+    let rec pop_block ancestor block mempool =
       let hash = Store.Block.hash block in
       if Block_hash.equal hash ancestor then Lwt.return mempool
       else
@@ -378,7 +385,7 @@ module Make
                so returning the accumulator. It's not the mempool that
                should crash, should this case happen. *)
             Lwt.return mempool
-        | Some predecessor -> pop_blocks ancestor predecessor mempool
+        | Some predecessor -> pop_block ancestor predecessor mempool
     in
     let push_block mempool block =
       let operations = Store.Block.all_operation_hashes block in
@@ -390,9 +397,12 @@ module Make
         mempool
         operations
     in
-    Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
+    Store.Chain_traversal.new_blocks
+      chain_store
+      ~from_block:from_branch
+      ~to_block:to_branch
     >>= fun (ancestor, path) ->
-    pop_blocks (Store.Block.hash ancestor) from_block old_mempool
+    pop_block (Store.Block.hash ancestor) from_branch old_mempool
     >>= fun mempool ->
     let new_mempool = List.fold_left push_block mempool path in
     let (new_mempool, outdated) =
@@ -1025,10 +1035,10 @@ module Make
         ()
       >>= fun validation_state ->
       pv.validation_state <- validation_state ;
-      list_pendings
+      handle_live_operations
         pv.shell.parameters.chain_db
-        ~from_block:old_predecessor
-        ~to_block:new_predecessor
+        ~from_branch:old_predecessor
+        ~to_branch:new_predecessor
         ~live_blocks:new_live_blocks
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
