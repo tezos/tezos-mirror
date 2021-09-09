@@ -50,7 +50,7 @@ match the reduced block times, as follows: ``blocks_per_cycle =
 
 The constant ``time_between_blocks`` is left unchanged at ``[60; 40]`` but the new constant ``minimal_block_delay = 30`` is added.
 
-- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`__
+- `TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`__
 - MRs: :gl:`!2386` :gl:`!2531` :gl:`!2881`
 - Issue: :gl:`#1027`
 
@@ -63,7 +63,7 @@ The liquidity baking subsidy shuts off automatically at a fixed level if not ren
 
 At any time bakers can vote to shut off the liquidity baking subsidy by setting a boolean flag in protocol_data. An exponential moving average (ema) of this escape flag is calculated with a window size of 2000 blocks and the subsidy permanently shuts off if the ema is ever over a threshold included in constants (half the window size with precision of 1000 added for integer computation).
 
-- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`__
+- `TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`__
 - MRs: :gl:`!2765` :gl:`!2897` :gl:`!2920` :gl:`!2929` :gl:`!2946`
 - Issue: :gl:`#1238`
 
@@ -88,7 +88,7 @@ RPC changes
 - Replace ``deposit`` by ``deposits`` in ``frozen_balance`` RPC. (MR :gl:`!2751`)
 
 - All the protocol-specific RPCs under the ``helpers`` path have been
-  moved from the protocol to the `recently introduced <tezos!2446>`__ RPC
+  moved from the protocol to the :gl:`recently introduced <tezos!2446>` RPC
   plugin. This change should not be visible for end-users but improves
   the maintainability of these RPCs. (MR :gl:`!2811`)
 

@@ -31,7 +31,7 @@ Note that the Michelson mode will be chosen automatically by Emacs for
 files with a ``.tz`` or ``.tez`` extension.
 
 We can now open our favourite contract
-:src:`./tests_python/contracts_alpha/attic/id.tz` in Emacs
+:src:`tests_python/contracts_alpha/attic/id.tz` in Emacs
 and, when moving the cursor on
 a Michelson instruction, in the bottom of the windows Emacs should
 display the state of the stack before (left) and after (right) the

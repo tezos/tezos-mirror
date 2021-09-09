@@ -168,7 +168,7 @@ happened successfully, a blog post goes out to Agora and then company
 blogs (see the process for “At The Time Of Release, above”) and then a
 news release is sent out by the TF’s PR people.
 
-On the main `tezos/tezos <https://www.gitlab.com/tezos/tezos>`__
+On the main `tezos/tezos <https://gitlab.com/tezos/tezos>`__
 repository, on the master branch, the proto_alpha directory is reset to
 the newly activated protocol and its associated daemons, with the
 exception of vanity nonce and migration that should be reverted.

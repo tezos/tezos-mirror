@@ -5,7 +5,7 @@ This has been adapted from a blog post on *michelson-lang.com*.
 
 If you’re not familiar with monads, go take a few minutes and read a
 tutorial. I personally got a lot out of this
-`paper <http://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf>`__
+`paper <https://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf>`__
 by Philip Wadler, but there are a ton of others available online. Find
 one that works for you. The error monad isn’t terribly scary as Monads
 go, so once you feel like you understand the gist, come on back and see

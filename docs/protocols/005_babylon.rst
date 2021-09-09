@@ -112,7 +112,7 @@ vote period, if there is less than 5% of the stake supporting them,
 the protocol goes back to a proposal period.
 
 `Cryptium's blog post (proposal quorum).
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-v-3e0ddfd98177>`_
+<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-v-3e0ddfd98177>`_
 
 `(MR71)
 <https://gitlab.com/nomadic-labs/tezos/-/merge_requests/71>`_
@@ -136,7 +136,7 @@ Additionally the formula to update the quorum uses an exponential
 moving average of the participation.
 
 `Cryptium's blog post (quorum caps).
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-ii-607227fc6d65>`_
+<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-ii-607227fc6d65>`_
 
 `MR52. <https://gitlab.com/nomadic-labs/tezos/-/merge_requests/52>`_
 
@@ -159,8 +159,8 @@ The only solution for now is to move the funds to a newly created tz
 account and delegate from there.
 
 Cryptium's blog posts
-1. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
-2. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
+1. `<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
+2. `<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
 
 Merge Request : `MR61. <https://gitlab.com/nomadic-labs/tezos/-/merge_requests/61>`_
 
@@ -182,8 +182,8 @@ Detailed instructions for migrating such applications will be provided
 in the coming days.
 
 Cryptium's blog posts
-1. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
-2. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
+1. `<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
+2. `<https://medium.com/metastatedev/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
 
 `manager.tz script
 <https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts/manager.tz>`_
@@ -592,7 +592,7 @@ Changelog
 ---------
 
 You can see the full git history on the branch `proto-005
-<https://gitlab.com/nomadic-labs/tezos/commits/proto-005>`_.
+<https://gitlab.com/nomadic-labs/tezos/-/commits/proto-005>`_.
 In order to regenerate a protocol with the same hash as Babylon you
 can run from this branch::
 

@@ -6,7 +6,7 @@ FA1.2 asset smart contracts
 Financial application 1.2, or `FA1.2` for short, is a standard that
 describes the interface of smart contracts that implement ledger with
 balances that is described by `tzip-007
-<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_.
+<https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_.
 On the following page, we will refer to FA1.2 assets as their commonly
 used terminology: tokens.
 
@@ -24,7 +24,7 @@ supply. The Michelson interface is then described by the following entrypoints:
 
 Multiple implementations of such a standard exist within the ecosystem. For
 example, one is provided with the `TZIP-007 specification
-<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/ManagedLedger.tz>`_.
+<https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-7/ManagedLedger.tz>`_.
 `Edukera <https://docs.archetype-lang.org/contract-library/tokens/fa-1.2>`_ and
 `camlCase <https://gitlab.com/camlcase-dev/fa1.2>`_ both provide a contract that
 implements the standard, and both have been verified using the `Mi-Cho-Coq
@@ -34,7 +34,7 @@ request <nomadic-labs/mi-cho-coq!97>`).
 The ``tezos-client`` supports this standard with specific commands that allow
 the user to avoid calling FA1.2 contracts using entrypoints and forging
 Michelson arguments. Moreover, it supports calling `views
-<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_
+<https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_
 (the ``get*`` entrypoints) offchain, without doing an explicit transaction that
 returns a value on a given contract.
 
@@ -111,7 +111,7 @@ An FA1.2 contract implements three entrypoints that allow a user to check any
 account's balance, or allowance between an account and an operator, and get the
 total supply of tokens of the contract. These entrypoints are implemented as
 `views
-<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_:
+<https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`_:
 they give back the requested information as a transaction on a given contract,
 assuming its parameter is compatible.
 
