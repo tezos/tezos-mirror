@@ -87,7 +87,7 @@ Global Constants
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
 
-- MR: :gl:`!2962`
+- MRs: :gl:`!2962`, :gl:`!3467`
 
 Cache
 -----

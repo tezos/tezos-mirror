@@ -703,7 +703,10 @@ module Global_constants_storage : sig
     returning the hash and storage bytes consumed.
 
     Does not type-check the Micheline code being registered, allow potentially
-    ill-typed Michelson values (see note at top of module).
+    ill-typed Michelson values (see note at top of module in global_constants_storage.mli).
+
+    The constant is stored unexpanded, but it is temporarily expanded at registration
+    time only to check the expanded version respects the following limits.
 
     Fails with [Expression_too_deep] if, after fully, expanding all constants,
     the expression would contain too many nested levels, that is more than
@@ -719,13 +722,17 @@ module Global_constants_storage : sig
   val register :
     t -> Script.expr -> (t * Script_expr_hash.t * Z.t) tzresult Lwt.t
 
-  (** [substitute context expr] Replaces every constant in the
+  (** [expand context expr] Replaces every constant in the
     given Michelson expression with its value stored in the global table.
+
+    The expansion is applied recursively so that the returned expression
+    contains no constant.
+
     Fails with [Badly_formed_constant_expression] if constants are not
     well-formed (see declaration of [Badly_formed_constant_expression]) or
     with [Nonexistent_global] if a referenced constant does not exist in
     the table. *)
-  val substitute : t -> Script.expr -> (t * Script.expr) tzresult Lwt.t
+  val expand : t -> Script.expr -> (t * Script.expr) tzresult Lwt.t
 
   module Internal_for_tests : sig
     (** [node_too_large node] returns true if:

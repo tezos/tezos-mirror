@@ -199,7 +199,7 @@ type namespace =
   (* The Constant Hash namespace is a singleton reserved
      for the constant keyword. Unlike other primitives,
      constants have no representation in the typed IR,
-     being fully substituted away before typechecking. *)
+     being fully expanded away before typechecking. *)
   | (* prefix "H" *) Constant_hash_namespace
 
 val namespace : prim -> namespace

@@ -40,7 +40,7 @@ let test_constants_consistency () =
 
 let test_max_operations_ttl () =
   let open Protocol in
-  (* max_operatios_ttl is hard-coded for mainnet to avoid any
+  (* max_operations_ttl is hard-coded for mainnet to avoid any
      recomputation and is not reconfigured for other networks. *)
   let minimal_block_delay =
     Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet

@@ -148,11 +148,17 @@ let shift_left () =
     in
     List.iter_es
       (must_saturate true)
-      [(saturated, 1); (shift_right saturated 1, 2); (ok_int 1, 63)]
+      [(saturated, 1); (shift_right saturated 1, 2); (ok_int 1, 62)]
     >>=? fun () ->
     List.iter_es
       (must_saturate false)
-      [(ok_int 1, 0); (ok_int 1, 31); (ok_int 1, 61)])
+      [
+        (ok_int 1, 0);
+        (ok_int 1, 31);
+        (ok_int 1, 61);
+        (ok_int 0, 99);
+        (ok_int ((1 lsl 62) - 2), 0);
+      ])
 
 let of_z_opt () =
   fail_unless

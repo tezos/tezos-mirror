@@ -39,7 +39,7 @@ val max_proposals_per_delegate : int
 val max_operation_data_length : int
 
 (** A global size limit on the size of Micheline expressions
-    after substitution.
+    after expansion.
 
     We want to prevent constants from being
     used to create huge values that could potentially do damage
@@ -53,7 +53,7 @@ val max_operation_data_length : int
 val max_micheline_node_count : int
 
 (** Same as [max_micheline_node_count] but for limiting the combined
-    bytes of the strings, ints and bytes in a substituted Micheline
+    bytes of the strings, ints and bytes in a expanded Micheline
     expression.  *)
 val max_micheline_bytes_limit : int
 

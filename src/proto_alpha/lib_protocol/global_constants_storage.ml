@@ -27,7 +27,7 @@ open Michelson_v1_primitives
 
 (*
 
-   See [substitute] for an example.
+   See [expand] for an example.
 
    TODO: https://gitlab.com/tezos/tezos/-/issues/1609
    Move function to lib_micheline.
@@ -76,11 +76,11 @@ module Gas_model = struct
     @@ ((v0 lsl 4) + (v0 lsl 3) + (v0 lsl 2) + (v0 lsl 1) + v0 + (v0 lsr 1))
 
   (* Approximating 4156.4530516 *)
-  let substitute_constants_branch_cost =
+  let expand_constants_branch_cost =
     Gas_limit_repr.atomic_step_cost @@ safe_int 4156
 
   (* Approximating 24.534511699 * number of nodes *)
-  let substitute_no_constants_branch_cost node =
+  let expand_no_constants_branch_cost node =
     let size = Script_repr.micheline_nodes node |> safe_int in
     Gas_limit_repr.atomic_step_cost
     @@ (shift_left size 4 + shift_left size 3 + shift_right size 1)
@@ -113,8 +113,8 @@ let () =
     (function Expression_too_deep -> Some () | _ -> None)
     (fun () -> Expression_too_deep) ;
   let description =
-    "Attempted to register an expression as global constant has already been \
-     registered."
+    "Attempted to register an expression as global constant that has already \
+     been registered."
   in
   register_error_kind
     `Branch
@@ -140,8 +140,7 @@ let () =
     (function Badly_formed_constant_expression -> Some () | _ -> None)
     (fun () -> Badly_formed_constant_expression) ;
   let description =
-    "No global was found at the given hash in storage. Are you sure the value \
-     is registered and you have the correct hash?"
+    "No registered global was found at the given hash in storage."
   in
   register_error_kind
     `Branch
@@ -187,58 +186,64 @@ let node_too_large node =
     nodes > Constants_repr.max_micheline_node_count
     || string_bytes + z_bytes > Constants_repr.max_micheline_bytes_limit)
 
-let substitute_node context node =
+let expand_node context node =
   (* We charge for traversing the top-level node at the beginning.
      Inside the loop, we charge for traversing each new constant
      that gets expanded. *)
   Raw_context.consume_gas
     context
-    (Gas_model.substitute_no_constants_branch_cost node)
+    (Gas_model.expand_no_constants_branch_cost node)
   >>?= fun context ->
   bottom_up_fold_cps
     (* We carry a Boolean representing whether we
-       had to do any substitutions or not. *)
+       had to do any expansions or not. *)
     (context, Expr_hash_map.empty, false)
     node
-    (fun (context, _, did_substitution) node ->
-      return (context, node, did_substitution))
-    (fun k (context, map, did_substitution) node ->
+    (fun (context, _, did_expansion) node ->
+      return (context, node, did_expansion))
+    (fun k (context, map, did_expansion) node ->
       match node with
-      | Prim (_, H_constant, args, _) -> (
+      | Prim (_, H_constant, args, annot) -> (
           (* Charge for validating the b58check hash. *)
-          Raw_context.consume_gas
-            context
-            Gas_model.substitute_constants_branch_cost
+          Raw_context.consume_gas context Gas_model.expand_constants_branch_cost
           >>?= fun context ->
-          match args with
+          match (args, annot) with
           (* A constant Prim should always have a single String argument,
               being a properly formatted hash. *)
-          | [String (_, address)] -> (
+          | ([String (_, address)], []) -> (
               match Script_expr_hash.of_b58check_opt address with
               | None -> fail Badly_formed_constant_expression
               | Some hash -> (
                   match Expr_hash_map.find hash map with
-                  | Some node -> k (context, map, true) node
+                  | Some node ->
+                      (* Charge traversing the newly retrieved node *)
+                      Raw_context.consume_gas
+                        context
+                        (Gas_model.expand_no_constants_branch_cost node)
+                      >>?= fun context -> k (context, map, true) node
                   | None ->
                       get context hash >>=? fun (context, expr) ->
                       (* Charge traversing the newly retrieved node *)
                       let node = root expr in
                       Raw_context.consume_gas
                         context
-                        (Gas_model.substitute_no_constants_branch_cost node)
+                        (Gas_model.expand_no_constants_branch_cost node)
                       >>?= fun context ->
                       k (context, Expr_hash_map.add hash node map, true) node))
           | _ -> fail Badly_formed_constant_expression)
       | Int _ | String _ | Bytes _ | Prim _ | Seq _ ->
-          k (context, map, did_substitution) node)
-  >>=? fun (context, node, did_substitution) ->
-  if did_substitution then
+          k (context, map, did_expansion) node)
+  >>=? fun (context, node, did_expansion) ->
+  if did_expansion then
+    (* Gas charged during expansion is at least proportional to the size of the
+       resulting node so the execution time of [node_too_large] is already
+       covered. *)
     if node_too_large node then fail Expression_too_large
     else return (context, node)
   else return (context, node)
 
-let substitute context expr =
-  substitute_node context (root expr) >|=? fun (context, node) ->
+let expand context expr =
+  expand_node context (root expr) >|=? fun (context, node) ->
   (context, strip_locations node)
 
 (** Computes the maximum depth of a Micheline node. Fails
@@ -251,34 +256,35 @@ let check_depth node =
     else
       match node with
       | Int _ | String _ | Bytes _ | Prim (_, _, [], _) | Seq (_, []) ->
-          k (depth + 1)
+          (k [@tailcall]) (depth + 1)
       | Prim (_, _, hd :: tl, _) | Seq (_, hd :: tl) ->
-          advance hd (depth + 1) (fun dhd ->
-              advance
+          (advance [@tailcall]) hd (depth + 1) (fun dhd ->
+              (advance [@tailcall])
                 (* Because [depth] doesn't care about the content
                    of the expression, we can safely throw away information
                    about primitives and replace them with the [Seq] constructor.*)
                 (Seq (-1, tl))
                 depth
-                (fun dtl -> k (Compare.Int.max dhd dtl)))
+                (fun dtl -> (k [@tailcall]) (Compare.Int.max dhd dtl)))
   in
   advance node 0 (fun x -> Ok x)
 
 let register context value =
   (* To calculate the total depth, we first expand all constants
-     in the expression. This may fail with [Expression_too_large]. *)
-  substitute_node context (root value) >>=? fun (context, node) ->
-  (* We do not need to carbonate [depth]. [substitute_node] and
+     in the expression. This may fail with [Expression_too_large].
+
+     Though the stored expression is the unexpanded version.
+  *)
+  expand_node context (root value) >>=? fun (context, node) ->
+  (* We do not need to carbonate [check_depth]. [expand_node] and
      [Storage.Global_constants.Map.init] are already carbonated
-     and the computation cost of [depth] is small compared to these. *)
-  check_depth node >>?= fun _ ->
+     with gas at least proportional to the size of the expanded node
+     and the computation cost of [check_depth] is of the same order. *)
+  check_depth node >>?= fun (_depth : int) ->
   expr_to_address_in_context context value >>?= fun (context, key) ->
-  Storage.Global_constants.Map.mem context key
-  >>=? fun (context, already_exists) ->
-  if already_exists then fail Expression_already_registered
-  else
-    Storage.Global_constants.Map.init context key value
-    >|=? fun (context, size) -> (context, key, Z.of_int size)
+  trace Expression_already_registered
+  @@ Storage.Global_constants.Map.init context key value
+  >|=? fun (context, size) -> (context, key, Z.of_int size)
 
 module Internal_for_tests = struct
   let node_too_large = node_too_large
