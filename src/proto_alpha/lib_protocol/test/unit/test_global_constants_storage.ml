@@ -257,6 +257,44 @@ let test_expand_reject_ill_formed =
       (* constant with field annot *)
       test @@ Format.sprintf "(constant %%a \"%s\")" hash)
 
+(** The [constant] prim is not permitted to have a
+    [constant] child argument. 
+
+    The idea is to have expansion like this:
+
+    constant (constant <hash of hash>) -> constant hash -> value
+        
+    But we want to forbid this as a badly formed constant.
+    Asserting that every constant must be a *static* string 
+    makes it easier to see which constants are used where, because
+    you can just traverse the AST (no expansion necessary). *)
+let test_reject_use_of_inner_constant =
+  tztest
+    "expand: use of 'constant (constant ...)' is rejected"
+    `Quick
+    (fun () ->
+      (* First, create a context, register a constant and check
+         that its expansion works well. *)
+      create_context () >>=? fun context ->
+      let some_expr = Expr.from_string "0" in
+      Global_constants_storage.register context some_expr
+      >|= Environment.wrap_tzresult
+      >>=? fun (context, hash, _) ->
+      let hash = Script_expr_hash.to_b58check hash in
+      (* Next, register the hash itself as a constant. *)
+      Global_constants_storage.register
+        context
+        (strip_locations (Micheline.String (-1, hash)))
+      >|= Environment.wrap_tzresult
+      >>=? fun (context, hash, _) ->
+      let hash = Script_expr_hash.to_b58check hash in
+      Global_constants_storage.expand
+        context
+        (Expr.from_string
+        @@ Format.sprintf "{ constant (constant \"%s\") } " hash)
+      >|= Environment.wrap_tzresult
+      >>= assert_error_id __LOC__ "proto.alpha.Badly_formed_constant_expression")
+
 (** [test_expand] accepts an expression [stored] to be
     registered in the store, an expression [expr] that includes a template slot for
     the hash of [stored], and an [expected] expression, and generates a test that
@@ -367,6 +405,7 @@ let tests =
     test_register_and_expand_orthogonal;
     test_expand_deep_constants;
     test_expand_reject_ill_formed;
+    test_reject_use_of_inner_constant;
     test_expand_data_example;
     test_expand_types_example;
     test_expand_instr_example;

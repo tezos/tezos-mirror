@@ -58,7 +58,10 @@ let bottom_up_fold_cps initial_accumulator node initial_k f =
           accu
           node
   in
-  traverse_node initial_accumulator node initial_k
+  f
+    (fun accu node -> traverse_node accu node initial_k)
+    initial_accumulator
+    node
 
 module Gas_model = struct
   open Saturation_repr
