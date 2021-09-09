@@ -111,6 +111,49 @@ module Generators = struct
           t)
       inputs ;
     t
+
+  (* With probability 1/2, we take an operation hash already present in the
+     classification. This operation is taken uniformly among the
+     different classes. *)
+  let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t
+      =
+    let module Classification = Prevalidator_classification in
+    let open QCheck.Gen in
+    fun t ->
+      let to_ops map =
+        Operation_hash.Map.bindings map
+        |> List.map (fun (oph, (op, _)) -> (oph, op))
+      in
+      (* If map is empty, it cannot be used as a generator *)
+      let freq_of_map map = if Operation_hash.Map.is_empty map then 0 else 1 in
+      (* If list is empty, it cannot be used as a generator *)
+      let freq_of_list = function [] -> 0 | _ -> 1 in
+      (* If map is not empty, take one of its elements *)
+      let freq_and_gen_of_map map = (freq_of_map map, oneofl (to_ops map)) in
+      (* If list is not empty, take one of its elements *)
+      let freq_and_gen_of_list list = (freq_of_list list, oneofl list) in
+      (* We use max to ensure the ponderation is strictly greater than 0. *)
+      let freq_fresh t =
+        max
+          1
+          (freq_of_list t.applied_rev
+          + freq_of_map (Classification.map t.branch_refused)
+          + freq_of_map (Classification.map t.branch_delayed)
+          + freq_of_map (Classification.map t.refused))
+      in
+      frequency
+        [
+          freq_and_gen_of_list t.applied_rev;
+          freq_and_gen_of_map (Classification.map t.branch_refused);
+          freq_and_gen_of_map (Classification.map t.branch_delayed);
+          freq_and_gen_of_map (Classification.map t.refused);
+          (freq_fresh t, pair operation_hash_gen operation_gen);
+        ]
+
+  let t_with_operation_gen : (t * (Operation_hash.t * Operation.t)) QCheck.Gen.t
+      =
+    let open QCheck.Gen in
+    t_gen >>= fun t -> pair (return t) (with_t_operation_gen t)
 end
 
 let qcheck_eq_true ~actual =
