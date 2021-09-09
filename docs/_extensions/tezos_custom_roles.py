@@ -119,6 +119,9 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     project_url = os.environ.get(
         'CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'
     )
-    url = project_url + "/tree/" + branch + "/" + src
+    if Path(TEZOS_HOME, file).is_file():
+        url = project_url + "/-/blob/" + branch + "/" + src
+    else:  # most likely a directory
+        url = project_url + "/-/tree/" + branch + "/" + src
     node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], msg
