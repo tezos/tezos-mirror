@@ -97,7 +97,7 @@ delegate.
 Hence a delegate must have enough funds to be able to pay security
 deposits for all the blocks it can potentially bake/endorse during
 ``preserved_cycles``.
-The current deposits are *512ꜩ* for baked block and *64ꜩ* for
+The current deposits are *640ꜩ* for baked block and *2.5ꜩ* for
 endorsement.
 Note that delegating coins doesn't mean that a delegate can spend
 them, they only add up to its rolls count while all the deposits must
