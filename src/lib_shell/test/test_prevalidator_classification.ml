@@ -233,13 +233,8 @@ let test_is_in_mempool_remove =
   Test.make
     ~name:"[is_in_mempool] and [remove_*] are well-behaved"
     (make
-    @@ Generators.(
-         Gen.quad
-           t_gen
-           unrefused_classification_gen
-           operation_hash_gen
-           operation_gen))
-  @@ fun (t, unrefused_classification, oph, op) ->
+    @@ Generators.(Gen.pair t_with_operation_gen unrefused_classification_gen))
+  @@ fun ((t, (oph, op)), unrefused_classification) ->
   Prevalidator_classification.add
     ~notify:(fun () -> ())
     unrefused_classification
@@ -486,12 +481,10 @@ module To_map = struct
     QCheck.Test.make
       ~name:"[add] extends the size of [to_map] by 0 or 1"
       (QCheck.make
-         (QCheck.Gen.quad
-            Generators.t_gen
-            Generators.classification_gen
-            Generators.operation_hash_gen
-            Generators.operation_gen))
-    @@ fun (t, classification, oph, op) ->
+         (QCheck.Gen.pair
+            Generators.t_with_operation_gen
+            Generators.classification_gen))
+    @@ fun ((t, (oph, op)), classification) ->
     let initial = to_map_all t in
     Classification.add ~notify:(Fun.const ()) classification oph op t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
@@ -507,9 +500,8 @@ module To_map = struct
   let test_remove =
     QCheck.Test.make
       ~name:"[remove] reduces the size of [to_map] by 0 or 1"
-      (QCheck.make
-         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
-    @@ fun (t, oph) ->
+      (QCheck.make Generators.t_with_operation_gen)
+    @@ fun (t, (oph, _)) ->
     let initial = to_map_all t in
     Classification.remove oph t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
@@ -530,12 +522,10 @@ module To_map = struct
     QCheck.Test.make
       ~name:"Check property between map, remove and add (1)"
       (QCheck.make
-         (QCheck.Gen.quad
-            Generators.t_gen
-            Generators.classification_gen
-            Generators.operation_hash_gen
-            Generators.operation_gen))
-    @@ fun (t, classification, oph, op) ->
+         (QCheck.Gen.pair
+            Generators.t_with_operation_gen
+            Generators.classification_gen))
+    @@ fun ((t, (oph, op)), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
     Classification.remove oph t ;
     let initial = to_map_all t in
@@ -546,6 +536,7 @@ module To_map = struct
       ~expected:left
       ~actual:right
       ~eq:(Operation_hash.Map.equal Operation.equal)
+      ~pp:map_pp
       ()
 
   let test_map_add_remove =
@@ -558,12 +549,10 @@ module To_map = struct
     QCheck.Test.make
       ~name:"Check property between map, remove and add (2)"
       (QCheck.make
-         (QCheck.Gen.quad
-            Generators.t_gen
-            Generators.classification_gen
-            Generators.operation_hash_gen
-            Generators.operation_gen))
-    @@ fun (t, classification, oph, op) ->
+         (QCheck.Gen.pair
+            Generators.t_with_operation_gen
+            Generators.classification_gen))
+    @@ fun ((t, (oph, op)), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
     Classification.add ~notify:(Fun.const ()) classification oph op t ;
     let initial = to_map_all t in
@@ -574,6 +563,7 @@ module To_map = struct
       ~expected:left
       ~actual:right
       ~eq:(Operation_hash.Map.equal Operation.equal)
+      ~pp:map_pp
       ()
 
   (** Tests the relationship between [Classification.clear]
@@ -600,9 +590,8 @@ module To_map = struct
   let test_is_applied =
     QCheck.Test.make
       ~name:"[is_applied] can be emulated by [to_map ~applied:true]"
-      (QCheck.make
-         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
-    @@ fun (t, oph) ->
+      (QCheck.make Generators.t_with_operation_gen)
+    @@ fun (t, (oph, _)) ->
     let is_applied = Classification.is_applied oph t in
     let map =
       Classification.to_map
@@ -623,9 +612,8 @@ module To_map = struct
   let test_is_in_mempool =
     QCheck.Test.make
       ~name:"[is_in_mempool] can be emulated by [to_map]"
-      (QCheck.make
-         (QCheck.Gen.pair Generators.t_gen Generators.operation_hash_gen))
-    @@ fun (t, oph) ->
+      (QCheck.make Generators.t_with_operation_gen)
+    @@ fun (t, (oph, _)) ->
     let is_in_mempool = Classification.is_in_mempool oph t in
     let map =
       to_map_all t |> Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
