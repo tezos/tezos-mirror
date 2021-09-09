@@ -1,8 +1,7 @@
 Protocol Granada
 ================
 
-This page contains all the relevant information for protocol Granada, a
-development version of the Tezos protocol.
+This page contains all the relevant information for protocol Granada.
 
 The code can be found in the ``src/proto_010_PtGRANAD`` directory of the
 ``master`` branch of Tezos.

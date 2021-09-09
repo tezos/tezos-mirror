@@ -1,8 +1,8 @@
 Protocol Alpha
 ==============
 
-This page contains all the relevant information for protocol Alpha, a
-development version of the Tezos protocol.
+This page contains all the relevant information for protocol Alpha
+(see :ref:`naming_convention`).
 
 The code can be found in the :src:`src/proto_alpha` directory of the
 ``master`` branch of Tezos.

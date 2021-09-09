@@ -32,6 +32,8 @@ sequence:
 * 006 Carthage
 * 007 Delphi
 * 008 Edo
+* 009 Florence
+* 010 Granada
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
