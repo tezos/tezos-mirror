@@ -1,0 +1,17 @@
+language: c
+sudo: required
+install: test -e .travis.opam.sh || wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-opam.sh
+script:
+- bash -ex .travis-opam.sh
+env:
+  global:
+    - PINS="ledgerwallet.dev:."
+
+  matrix:
+    - OCAML_VERSION="4.09" PACKAGE="ledgerwallet"
+    - OCAML_VERSION="4.09" PACKAGE="ledgerwallet-tezos"
+    - OCAML_VERSION="4.09" PACKAGE="ledgerwallet-btc"
+    - OCAML_VERSION="4.09" PACKAGE="ledgerwallet-zil"
+    - OCAML_VERSION="4.09" PACKAGE="ledgerwallet-ssh-agent"
+os:
+- linux

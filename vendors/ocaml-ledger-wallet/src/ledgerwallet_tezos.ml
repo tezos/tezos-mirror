@@ -140,6 +140,21 @@ let () = Transport.Status.register_string_f begin function
     | _ -> None
   end
 
+let () = Transport.Status.register_help_suggestor_f begin function
+    | Transport.Status.Conditions_of_use_not_satisfied ->
+        Some "Either you rejected the operation or you waited long enough \
+              to respond that the device rejected it for you."
+    | Transport.Status.Incorrect_class ->
+        Some "A Tezos application wasn't found on the device. Is the Tezos \
+              Wallet or Tezos Baking application open on the device? Is the \
+              device busy talking to another process?"
+    | Transport.Status.Security_status_unsatisfied ->
+        Some "The operation was automatically rejected for security reasons. \
+              If baking, you may need to setup the device or reset the \
+              high-water mark."
+    | _ -> None
+  end
+
 let wrap_ins cmd =
   Apdu.create_cmd ~cmd ~cla_of_cmd:(fun _ -> 0x80) ~ins_of_cmd:int_of_ins
 
