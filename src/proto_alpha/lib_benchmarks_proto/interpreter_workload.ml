@@ -52,6 +52,7 @@ type instruction_name =
   | N_ICons_some
   | N_ICons_none
   | N_IIf_none
+  | N_IOpt_map
   (* unions *)
   | N_ILeft
   | N_IRight
@@ -224,6 +225,7 @@ type continuation_name =
   | N_KCons
   | N_KReturn
   | N_KView_exit
+  | N_KMap_head
   | N_KUndip
   | N_KLoop_in
   | N_KLoop_in_left
@@ -254,6 +256,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICons_some -> "N_ICons_some"
   | N_ICons_none -> "N_ICons_none"
   | N_IIf_none -> "N_IIf_none"
+  | N_IOpt_map -> "N_IOpt_map"
   | N_ILeft -> "N_ILeft"
   | N_IRight -> "N_IRight"
   | N_IIf_left -> "N_IIf_left"
@@ -408,6 +411,7 @@ let string_of_continuation_name : continuation_name -> string =
   | N_KCons -> "N_KCons"
   | N_KReturn -> "N_KReturn"
   | N_KView_exit -> "N_KView_exit"
+  | N_KMap_head -> "N_KMap_head"
   | N_KUndip -> "N_KUndip"
   | N_KLoop_in -> "N_KLoop_in"
   | N_KLoop_in_left -> "N_KLoop_in_left"
@@ -471,6 +475,7 @@ let all_instructions =
     N_ICons_some;
     N_ICons_none;
     N_IIf_none;
+    N_IOpt_map;
     N_ILeft;
     N_IRight;
     N_IIf_left;
@@ -624,6 +629,7 @@ let all_continuations =
     N_KCons;
     N_KReturn;
     N_KView_exit;
+    N_KMap_head;
     N_KUndip;
     N_KLoop_in;
     N_KLoop_in_left;
@@ -715,7 +721,7 @@ module Instructions = struct
 
   let if_none = ir_sized_step N_IIf_none nullary
 
-  let opt_map = ir_sized_step N_IIf_none nullary
+  let opt_map = ir_sized_step N_IOpt_map nullary
 
   let left = ir_sized_step N_ILeft nullary
 
@@ -1089,8 +1095,7 @@ module Control = struct
 
   let view_exit = cont_sized_step N_KView_exit nullary
 
-  (* TODO: Benchmark this! *)
-  let map_head = cont_sized_step N_KReturn nullary
+  let map_head = cont_sized_step N_KMap_head nullary
 
   let undip = cont_sized_step N_KUndip nullary
 

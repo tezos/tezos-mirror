@@ -336,7 +336,8 @@ module Cost_of = struct
     (* model N_IIf_none *)
     let cost_N_IIf_none = S.safe_int 10
 
-    (* TODO benchmarking required *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/1899
+       Benchmarking required *)
     let cost_opt_map = S.safe_int 10
 
     (* model N_IImplicit_account *)
@@ -711,8 +712,9 @@ module Cost_of = struct
     (* model N_KView_exit *)
     let cost_N_KView_exit = S.safe_int 15
 
-    (* TODO: Benchmark and update the cost *)
-    let const_N_KMap_head = S.safe_int 1
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/1899
+       Benchmark and update the cost *)
+    let const_N_KMap_head = S.safe_int 15
 
     (* model N_KUndip *)
     let cost_N_KUndip = S.safe_int 15
@@ -953,7 +955,6 @@ module Cost_of = struct
 
     let if_none = atomic_step_cost cost_N_IIf_none
 
-    (* TODO Benchmark this! *)
     let opt_map = atomic_step_cost cost_opt_map
 
     let cons_pair = atomic_step_cost cost_N_ICons_pair
