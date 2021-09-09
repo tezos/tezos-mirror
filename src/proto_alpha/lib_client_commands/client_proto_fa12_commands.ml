@@ -129,8 +129,7 @@ let get_contract_caller_keys cctxt caller =
       Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
       return (source, caller_pk, caller_sk)
 
-let commands () : #Protocol_client_context.full Clic.command list =
-  let open Client_proto_args in
+let commands_ro () : #Protocol_client_context.full Clic.command list =
   Clic.
     [
       command
@@ -154,155 +153,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
             Contract.pp
             contract ;
           return_unit);
-      command
-        ~group
-        ~desc:"Transfer tokens between two given accounts"
-        (Clic.args15
-           as_arg
-           tez_amount_arg
-           fee_arg
-           Client_proto_context_commands.dry_run_switch
-           Client_proto_context_commands.verbose_signing_switch
-           gas_limit_arg
-           storage_limit_arg
-           counter_arg
-           no_print_source_flag
-           minimal_fees_arg
-           minimal_nanotez_per_byte_arg
-           minimal_nanotez_per_gas_unit_arg
-           force_low_fee_arg
-           fee_cap_arg
-           burn_cap_arg)
-        (prefixes ["from"; "fa1.2"; "contract"]
-        @@ token_contract_param () @@ prefix "transfer" @@ amount_param ()
-        @@ prefix "from" @@ from_param () @@ prefix "to" @@ to_param () @@ stop
-        )
-        (fun ( as_address,
-               tez_amount,
-               fee,
-               dry_run,
-               verbose_signing,
-               gas_limit,
-               storage_limit,
-               counter,
-               no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
-             (_, contract)
-             amount
-             src
-             (_, dst)
-             (cctxt : #Protocol_client_context.full) ->
-          let (_, caller) = Option.value ~default:src as_address in
-          get_contract_caller_keys cctxt caller
-          >>=? fun (source, caller_pk, caller_sk) ->
-          let action = Client_proto_fa12.Transfer (snd src, dst, amount) in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk:caller_pk
-            ~src_sk:caller_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
-      command
-        ~group
-        ~desc:"Allow account to transfer an amount of token"
-        contract_call_options
-        (prefixes ["from"; "fa1.2"; "contract"]
-        @@ token_contract_param () @@ prefix "as"
-        @@ alias_param ~name:"as" ~desc:"name or address of the sender"
-        @@ prefix "approve" @@ amount_param () @@ prefix "from"
-        @@ alias_param
-             ~name:"from"
-             ~desc:"name or address to approve withdrawal"
-        @@ stop)
-        (fun ( tez_amount,
-               fee,
-               dry_run,
-               verbose_signing,
-               gas_limit,
-               storage_limit,
-               counter,
-               no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
-             (_, contract)
-             (_, source)
-             amount
-             (_, dst)
-             (cctxt : #Protocol_client_context.full) ->
-          get_contract_caller_keys cctxt source
-          >>=? fun (source, src_pk, src_sk) ->
-          let action = Client_proto_fa12.Approve (dst, amount) in
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk
-            ~src_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
       command
         ~group
         ~desc:"Ask for an address's balance offchain"
@@ -627,6 +477,161 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 ~msg:"transfer simulation failed"
                 cctxt
           >>= fun _ -> return_unit);
+    ]
+
+let commands_rw () : #Protocol_client_context.full Clic.command list =
+  let open Client_proto_args in
+  Clic.
+    [
+      command
+        ~group
+        ~desc:"Transfer tokens between two given accounts"
+        (Clic.args15
+           as_arg
+           tez_amount_arg
+           fee_arg
+           Client_proto_context_commands.dry_run_switch
+           Client_proto_context_commands.verbose_signing_switch
+           gas_limit_arg
+           storage_limit_arg
+           counter_arg
+           no_print_source_flag
+           minimal_fees_arg
+           minimal_nanotez_per_byte_arg
+           minimal_nanotez_per_gas_unit_arg
+           force_low_fee_arg
+           fee_cap_arg
+           burn_cap_arg)
+        (prefixes ["from"; "fa1.2"; "contract"]
+        @@ token_contract_param () @@ prefix "transfer" @@ amount_param ()
+        @@ prefix "from" @@ from_param () @@ prefix "to" @@ to_param () @@ stop
+        )
+        (fun ( as_address,
+               tez_amount,
+               fee,
+               dry_run,
+               verbose_signing,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             (_, contract)
+             amount
+             src
+             (_, dst)
+             (cctxt : #Protocol_client_context.full) ->
+          let (_, caller) = Option.value ~default:src as_address in
+          get_contract_caller_keys cctxt caller
+          >>=? fun (source, caller_pk, caller_sk) ->
+          let action = Client_proto_fa12.Transfer (snd src, dst, amount) in
+          let fee_parameter =
+            {
+              Injection.minimal_fees;
+              minimal_nanotez_per_byte;
+              minimal_nanotez_per_gas_unit;
+              force_low_fee;
+              fee_cap;
+              burn_cap;
+            }
+          in
+          Client_proto_fa12.call_contract
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~contract
+            ~action
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ~source
+            ~src_pk:caller_pk
+            ~src_sk:caller_sk
+            ~tez_amount
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ~fee_parameter
+            ()
+          >>= Client_proto_context_commands.report_michelson_errors
+                ~no_print_source
+                ~msg:"transfer simulation failed"
+                cctxt
+          >>= fun _ -> return_unit);
+      command
+        ~group
+        ~desc:"Allow account to transfer an amount of token"
+        contract_call_options
+        (prefixes ["from"; "fa1.2"; "contract"]
+        @@ token_contract_param () @@ prefix "as"
+        @@ alias_param ~name:"as" ~desc:"name or address of the sender"
+        @@ prefix "approve" @@ amount_param () @@ prefix "from"
+        @@ alias_param
+             ~name:"from"
+             ~desc:"name or address to approve withdrawal"
+        @@ stop)
+        (fun ( tez_amount,
+               fee,
+               dry_run,
+               verbose_signing,
+               gas_limit,
+               storage_limit,
+               counter,
+               no_print_source,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             (_, contract)
+             (_, source)
+             amount
+             (_, dst)
+             (cctxt : #Protocol_client_context.full) ->
+          get_contract_caller_keys cctxt source
+          >>=? fun (source, src_pk, src_sk) ->
+          let action = Client_proto_fa12.Approve (dst, amount) in
+          let fee_parameter =
+            {
+              Injection.minimal_fees;
+              minimal_nanotez_per_byte;
+              minimal_nanotez_per_gas_unit;
+              force_low_fee;
+              fee_cap;
+              burn_cap;
+            }
+          in
+          Client_proto_fa12.call_contract
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~contract
+            ~action
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ~source
+            ~src_pk
+            ~src_sk
+            ~tez_amount
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ~fee_parameter
+            ()
+          >>= Client_proto_context_commands.report_michelson_errors
+                ~no_print_source
+                ~msg:"transfer simulation failed"
+                cctxt
+          >>= fun _ -> return_unit);
       command
         ~group
         ~desc:
@@ -755,3 +760,5 @@ let commands () : #Protocol_client_context.full Clic.command list =
                     Data_encoding.Json.pp
                     operations_json));
     ]
+
+let commands () = commands_ro () @ commands_rw ()
