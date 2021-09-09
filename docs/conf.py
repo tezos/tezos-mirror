@@ -205,10 +205,12 @@ texinfo_documents = [
 
 linkcheck_anchors = False
 linkcheck_ignore = [
-    r'https://www.reddit.com.*/',
-    'https://www.michelson-lang.com/',
-    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*',
+    # links which may fail for lack of access rights:
+    'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/',
     r'http(s)?://localhost:\d+/?',
+    # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
+    # (interpreted by linkcheck as external links, generating false positives)
+    r'^\.\./',
 ]
 
 # Python module index generation is broken, deactivate it.
