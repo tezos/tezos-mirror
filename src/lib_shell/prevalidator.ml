@@ -1041,6 +1041,35 @@ module Make
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
+    (* The presence of [pv] is tempoary, to make changes easier to reread *)
+    let recyle_operations pv ~from_branch ~to_branch ~live_blocks
+        ~classification ~pending ~chain_db ~handle_branch_refused =
+      handle_live_operations
+        chain_db
+        ~from_branch
+        ~to_branch
+        ~live_blocks
+        (Operation_hash.Map.union
+           (fun _key v _ -> Some v)
+           (Classification.to_map
+              ~applied:true
+              ~branch_delayed:true
+              ~branch_refused:handle_branch_refused
+              ~refused:false
+              classification)
+           pending)
+      >>= fun pending ->
+      Classification.flush classification ~handle_branch_refused ;
+      (* Could be implemented as Operation_hash.Map.filter_s which
+         does not exist for the moment. *)
+      Operation_hash.Map.fold_s
+        (fun oph op pending ->
+          pre_filter pv oph op >|= function
+          | true -> Operation_hash.Map.add oph op pending
+          | false -> pending)
+        pending
+        Operation_hash.Map.empty
+
     let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
       let old_predecessor = pv.shell.predecessor in
@@ -1064,35 +1093,20 @@ module Make
         ()
       >>= fun validation_state ->
       pv.validation_state <- validation_state ;
-      handle_live_operations
-        pv.shell.parameters.chain_db
+      recyle_operations
+        pv
         ~from_branch:old_predecessor
         ~to_branch:new_predecessor
         ~live_blocks:new_live_blocks
-        (Operation_hash.Map.union
-           (fun _key v _ -> Some v)
-           (Classification.to_map
-              ~applied:true
-              ~branch_delayed:true
-              ~branch_refused:handle_branch_refused
-              ~refused:false
-              pv.shell.classification)
-           pv.shell.pending)
-      >>= fun pending ->
-      Classification.flush pv.shell.classification ~handle_branch_refused ;
-      (* Could be implemented as Operation_hash.Map.filter_s which
-         does not exist for the moment. *)
-      Operation_hash.Map.fold_s
-        (fun oph op pending ->
-          pre_filter pv oph op >|= function
-          | true -> Operation_hash.Map.add oph op pending
-          | false -> pending)
-        pending
-        Operation_hash.Map.empty
-      >>= fun pending ->
-      Event.(emit operations_not_flushed) (Operation_hash.Map.cardinal pending)
+        ~classification:pv.shell.classification
+        ~pending:pv.shell.pending
+        ~chain_db:pv.shell.parameters.chain_db
+        ~handle_branch_refused
+      >>= fun new_pending_operations ->
+      Event.(emit operations_not_flushed)
+        (Operation_hash.Map.cardinal new_pending_operations)
       >>= fun () ->
-      pv.shell.pending <- pending ;
+      pv.shell.pending <- new_pending_operations ;
       set_mempool pv.shell Mempool.empty
 
     let on_advertise pv =
