@@ -23,24 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Node_connection_lost
-
 val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
-val wait_for_first_event :
-  name:string -> 'event tzresult Lwt_stream.t -> 'event Lwt.t
-
-val main :
-  name:string ->
-  cctxt:(#Protocol_client_context.full as 'a) ->
-  stream:'event tzresult Lwt_stream.t ->
-  state_maker:('event -> 'state tzresult Lwt.t) ->
-  pre_loop:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
-  compute_timeout:('state -> 'timesup Lwt.t) ->
-  timeout_k:('a -> 'state -> 'timesup -> unit tzresult Lwt.t) ->
-  event_k:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
-  finalizer:('state -> unit Lwt.t) ->
-  unit tzresult Lwt.t
+(* val wait_for_first_event :
+ *   name:string -> 'event tzresult Lwt_stream.t -> 'event Lwt.t
+ *
+ * val main :
+ *   name:string ->
+ *   cctxt:(#Protocol_client_context.full as 'a) ->
+ *   stream:'event tzresult Lwt_stream.t ->
+ *   state_maker:('event -> 'state tzresult Lwt.t) ->
+ *   pre_loop:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
+ *   compute_timeout:('state -> 'timesup Lwt.t) ->
+ *   timeout_k:('a -> 'state -> 'timesup -> unit tzresult Lwt.t) ->
+ *   event_k:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
+ *   finalizer:('state -> unit Lwt.t) ->
+ *   unit tzresult Lwt.t *)
 
 (** [main ~name ~cctxt ~stream ~state_maker ~pre_loop ~timeout_maker ~timeout_k
     ~event_k] is an infinitely running loop that

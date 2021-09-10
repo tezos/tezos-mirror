@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol
+open Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type unsigned_block = {
+  unsigned_block_header : Block_header.t;
+  operations : Tezos_base.Operation.t list list;
+}
+
+type simulation_kind =
+  | Filter of Operation_pool.pool
+  | Apply of {
+      ordered_pool : Operation_pool.ordered_pool;
+      payload_hash : Block_payload_hash.t;
+    }
+
+type simulation_mode = Local of Context.index | Node
+
+val forge_faked_protocol_data :
+  ?payload_hash:Block_payload_hash.t ->
+  payload_round:Round.t ->
+  seed_nonce_hash:Nonce_hash.t option ->
+  liquidity_baking_escape_vote:bool ->
+  unit ->
+  block_header_data
+
+val forge :
+  #Protocol_client_context.full ->
+  chain_id:Chain_id.t ->
+  pred_info:Baking_state.block_info ->
+  timestamp:Time.Protocol.t ->
+  liquidity_baking_escape_vote:bool ->
+  Baking_configuration.fees_config ->
+  seed_nonce_hash:Nonce_hash.t option ->
+  payload_round:Round.t ->
+  Baking_state.validation_mode ->
+  simulation_kind ->
+  Constants.parametric ->
+  unsigned_block tzresult Lwt.t

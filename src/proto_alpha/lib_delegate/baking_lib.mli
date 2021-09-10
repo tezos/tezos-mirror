@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol.Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+(** {1 API} *)
+
+val bake :
+  Protocol_client_context.full ->
+  ?minimal_fees:Tez.t ->
+  ?minimal_nanotez_per_gas_unit:Q.t ->
+  ?minimal_nanotez_per_byte:Q.t ->
+  ?force:bool ->
+  ?minimal_timestamp:bool ->
+  ?mempool:Baking_configuration.Mempool.t ->
+  ?monitor_node_mempool:bool ->
+  ?context_path:string ->
+  Baking_state.delegate list ->
+  unit tzresult Lwt.t
+
+val preendorse :
+  Protocol_client_context.full ->
+  ?force:bool ->
+  Baking_state.delegate list ->
+  unit tzresult Lwt.t
+
+val endorse :
+  Protocol_client_context.full ->
+  ?force:bool ->
+  Baking_state.delegate list ->
+  unit tzresult Lwt.t
+
+val propose :
+  Protocol_client_context.full ->
+  ?minimal_fees:Tez.t ->
+  ?minimal_nanotez_per_gas_unit:Q.t ->
+  ?minimal_nanotez_per_byte:Q.t ->
+  ?force:bool ->
+  ?minimal_timestamp:bool ->
+  ?mempool:Baking_configuration.Mempool.t ->
+  ?context_path:string ->
+  Baking_state.delegate list ->
+  unit tzresult Lwt.t

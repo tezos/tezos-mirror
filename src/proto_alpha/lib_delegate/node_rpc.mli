@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol
+open Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+(** Inject a block.
+
+    @param force defaults to [false]
+    @return block hash of the newly injected block
+*)
+val inject_block :
+  #Protocol_client_context.full ->
+  ?force:bool ->
+  chain:Shell_services.chain ->
+  Block_header.t ->
+  Tezos_base.Operation.t list list ->
+  Block_hash.t tzresult Lwt.t
+
+(** Preapply a block using the node validation mechanism.*)
+val preapply_block :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  head:Block_hash.t ->
+  timestamp:Time.Protocol.t ->
+  protocol_data:Protocol.block_header_data ->
+  packed_operation list list ->
+  (Tezos_base.Block_header.shell_header * error Preapply_result.t list) tzresult
+  Lwt.t
+
+(** Fetch a proposal from the node.
+
+    @param cache is unset by default 
+*)
+val proposal :
+  #RPC_context.simple ->
+  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
+  chain:Shell_services.chain ->
+  Block_hash.t ->
+  Baking_state.proposal tzresult Lwt.t
+
+(** Monitor proposals from the node.*)
+val monitor_proposals :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  unit ->
+  (Baking_state.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+
+(** Await the current protocol to be activated. *)
+val await_protocol_activation :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  unit ->
+  unit tzresult Lwt.t

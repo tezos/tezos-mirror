@@ -37,9 +37,6 @@ type block_info = {
   proto_level : int;
   level : Raw_level.t;
   context : Context_hash.t;
-  predecessor_block_metadata_hash : Block_metadata_hash.t option;
-  predecessor_operations_metadata_hash :
-    Operation_metadata_list_list_hash.t option;
 }
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
@@ -47,17 +44,6 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Shell_services.Blocks.protocols cctxt ~chain ~block ()
   >>=? fun {current_protocol = protocol; next_protocol} ->
-  (Shell_services.Blocks.metadata_hash cctxt ~chain ~block () >>= function
-   | Ok predecessor_block_metadata_hash ->
-       return_some predecessor_block_metadata_hash
-   | Error _ -> return_none)
-  >>=? fun predecessor_block_metadata_hash ->
-  (Shell_services.Blocks.Operation_metadata_hashes.root cctxt ~chain ~block ()
-   >>= function
-   | Ok predecessor_operations_metadata_hash ->
-       return_some predecessor_operations_metadata_hash
-   | Error _ -> return_none)
-  >>=? fun predecessor_operations_metadata_hash ->
   let {
     Tezos_base.Block_header.predecessor;
     fitness;
@@ -83,8 +69,6 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
           proto_level;
           level;
           context;
-          predecessor_block_metadata_hash;
-          predecessor_operations_metadata_hash;
         }
   | Error _ -> failwith "Cannot convert level into int32"
 
@@ -190,15 +174,15 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
   | Error (RPC_context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
-  | Ok (first, last) -> (
+  | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
       Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-      >>=? function
-      | [] -> return_nil
-      | hd :: _ ->
-          let blocks =
-            List.remove (length - Int32.to_int (Raw_level.diff last first)) hd
-          in
-          if Int32.equal level (Raw_level.to_int32 last) then
-            return (hash :: blocks)
-          else return blocks)
+      >>=? fun blocks ->
+      (* TODO-TB change this *)
+      let head = match blocks with hd :: _ -> hd | _ -> assert false in
+      let blocks =
+        List.remove (length - Int32.to_int (Raw_level.diff last first)) head
+      in
+      if Int32.equal level (Raw_level.to_int32 last) then
+        return (hash :: blocks)
+      else return blocks

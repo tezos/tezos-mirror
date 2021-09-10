@@ -144,6 +144,25 @@ module Denunciator = struct
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
+  let double_preendorsement_detected =
+    declare_2
+      ~section
+      ~level
+      ~name:"double_preendorsement_detected"
+      ~msg:"double preendorsement detected"
+      ("existing_preendorsement", Operation_hash.encoding)
+      ("new_preendorsement", Operation_hash.encoding)
+
+  let double_preendorsement_denounced =
+    declare_2
+      ~section
+      ~level
+      ~name:"double_preendorsement_denounced"
+      ~msg:"double preendorsement evidence injected: {hash}"
+      ("hash", Operation_hash.encoding)
+      ~pp2:pp_ignore
+      ("bytes", Data_encoding.bytes)
+
   let inconsistent_endorsement =
     declare_1
       ~section

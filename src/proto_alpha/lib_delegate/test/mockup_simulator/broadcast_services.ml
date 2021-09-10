@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+module S = struct
+  open Data_encoding
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+  let path = RPC_path.(root / "broadcast")
+
+  let dests_query =
+    let open RPC_query in
+    query (fun dests ->
+        object
+          method dests = dests
+        end)
+    |+ multi_field "dests" RPC_arg.int (fun t -> t#dests)
+    |> seal
+
+  (* copied from lib_shell_services/injection_services.ml *)
+  let block_param =
+    obj2
+      (req "block" (dynamic_size Block_header.encoding))
+      (req
+         "operations"
+         (list (dynamic_size (list (dynamic_size Operation.encoding)))))
+
+  let block =
+    RPC_service.post_service
+      ~description:"Broadcast a block."
+      ~query:dests_query
+      ~input:block_param
+      ~output:unit
+      RPC_path.(path / "block")
+
+  let operation =
+    RPC_service.post_service
+      ~description:"Broadcast an operation."
+      ~query:dests_query
+      ~input:Tezos_raw_protocol_alpha.Alpha_context.Operation.encoding
+      ~output:unit
+      RPC_path.(path / "operation")
+end
+
+open RPC_context
+
+let block ctxt ?(dests = []) raw operations =
+  make_call
+    S.block
+    ctxt
+    ()
+    (object
+       method dests = dests
+    end)
+    (raw, operations)
+
+let operation ctxt ?(dests = []) operation =
+  make_call
+    S.operation
+    ctxt
+    ()
+    (object
+       method dests = dests
+    end)
+    operation

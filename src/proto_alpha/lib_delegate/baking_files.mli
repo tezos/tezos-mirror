@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+type _ location
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+val resolve_location :
+  chain_id:Chain_id.t ->
+  ([< `Highwatermarks | `Nonce | `State] as 'kind) ->
+  'kind location
+
+val filename : [< `Highwatermarks | `Nonce | `State] location -> string

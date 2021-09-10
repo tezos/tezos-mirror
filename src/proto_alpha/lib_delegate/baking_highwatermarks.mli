@@ -23,11 +23,69 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol.Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type highwatermark = {round : Round.t; level : int32}
+
+type error += Block_previously_baked of highwatermark
+
+type error += Block_previously_preendorsed of highwatermark
+
+type error += Block_previously_endorsed of highwatermark
+
+type t
+
+val encoding : t Data_encoding.t
+
+val load :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  t tzresult Lwt.t
+
+val may_sign_block :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  bool tzresult Lwt.t
+
+val may_sign_preendorsement :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  bool tzresult Lwt.t
+
+val may_sign_endorsement :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  bool tzresult Lwt.t
+
+val record_block :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  unit tzresult Lwt.t
+
+val record_preendorsement :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  unit tzresult Lwt.t
+
+val record_endorsement :
+  #Protocol_client_context.full ->
+  [`Highwatermarks] Baking_files.location ->
+  delegate:Signature.public_key_hash ->
+  level:int32 ->
+  round:Round.t ->
+  unit tzresult Lwt.t

@@ -23,33 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** Daemons directly supported by lib_delegate *)
 
-module Endorser : sig
-  val run :
-    #Protocol_client_context.full ->
-    chain:Chain_services.chain ->
-    delay:int ->
-    keep_alive:bool ->
-    public_key_hash list ->
-    unit tzresult Lwt.t
-end
-
+(** {1 Baker daemon} *)
 module Baker : sig
   val run :
-    #Protocol_client_context.full ->
-    ?minimal_fees:Tez.t ->
+    Protocol_client_context.full ->
+    ?minimal_fees:Protocol.Alpha_context.Tez.t ->
     ?minimal_nanotez_per_gas_unit:Q.t ->
     ?minimal_nanotez_per_byte:Q.t ->
-    ?max_priority:int ->
+    ?liquidity_baking_escape_vote:bool ->
     ?per_block_vote_file:string ->
-    chain:Chain_services.chain ->
+    chain:Shell_services.chain ->
     context_path:string ->
     keep_alive:bool ->
-    public_key_hash list ->
+    Baking_state.delegate list ->
     unit tzresult Lwt.t
 end
+
+(** {1 Accuser daemon} *)
 
 module Accuser : sig
   val run :

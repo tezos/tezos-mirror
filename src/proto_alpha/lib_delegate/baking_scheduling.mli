@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Baking_state
+open Protocol.Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type loop_state
+
+val create_loop_state :
+  proposal Lwt_stream.t -> Operation_worker.t -> loop_state
+
+val sleep_until : Time.Protocol.t -> unit Lwt.t option
+
+(** An event monitor using the streams in [loop_state] (to create
+    promises) and a timeout promise [timeout]. The function reacts to a
+    promise being fulfilled by firing an event [Baking_state.event]. *)
+val wait_next_event :
+  timeout:timeout_kind Lwt.t ->
+  loop_state ->
+  (event option, error trace) result Lwt.t
+
+val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
+
+val first_potential_round_at_next_level :
+  state -> earliest_round:Round.t -> (Round.t * delegate) option
+
+val compute_next_potential_baking_time :
+  state -> (Time.Protocol.t * Round.t) option Lwt.t
+
+val compute_next_timeout : state -> timeout_kind Lwt.t tzresult Lwt.t
+
+val create_initial_state :
+  Protocol_client_context.full ->
+  ?synchronize:bool ->
+  chain:Chain_services.chain ->
+  Baking_configuration.t ->
+  Operation_worker.t ->
+  current_proposal:proposal ->
+  delegate trace ->
+  state tzresult Lwt.t
+
+val compute_bootstrap_event : state -> event tzresult
+
+val automaton_loop :
+  ?stop_on_event:(event -> bool) ->
+  config:Baking_configuration.t ->
+  on_error:(tztrace -> (unit, tztrace) result Lwt.t) ->
+  loop_state ->
+  state ->
+  event ->
+  event option tzresult Lwt.t
+
+val run :
+  Protocol_client_context.full ->
+  ?canceler:Lwt_canceler.t ->
+  ?stop_on_event:(event -> bool) ->
+  ?on_error:(tztrace -> unit tzresult Lwt.t) ->
+  chain:Chain_services.chain ->
+  Baking_configuration.t ->
+  delegate trace ->
+  unit tzresult Lwt.t

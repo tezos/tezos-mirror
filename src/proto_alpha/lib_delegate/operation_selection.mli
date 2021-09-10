@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol
+open Alpha_context
+open Environment_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type simulation_result = {
+  validation_result : validation_result;
+  block_header_metadata : Apply_results.block_metadata;
+  operations : packed_operation list list;
+  operations_hash : Operation_list_list_hash.t;
+}
+
+val filter_operations_with_simulation :
+  Baking_simulator.incremental ->
+  Baking_configuration.fees_config ->
+  hard_gas_limit_per_block:Gas.Arith.integral ->
+  Operation_pool.pool ->
+  simulation_result tzresult Lwt.t
+
+val filter_operations_without_simulation :
+  Baking_configuration.fees_config ->
+  hard_gas_limit_per_block:Gas.Arith.integral ->
+  Operation_pool.pool ->
+  packed_operation list list

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+type error += Cannot_open_context_index of {context_path : string}
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type error += Node_connection_lost
+
+type error += Cannot_load_local_file of string
+
+let make_id id = String.concat "." [Protocol.name; id]
+
+let () =
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:(make_id "cannot_open_context_index")
+    ~title:"Cannot open context index"
+    ~description:"Failed to open the context index at the given location"
+    ~pp:(fun fmt path ->
+      Format.fprintf fmt "Cannot open context index at %s" path)
+    Data_encoding.(obj1 (req "cannot_open_context_index" Data_encoding.string))
+    (function
+      | Cannot_open_context_index {context_path} -> Some context_path
+      | _ -> None)
+    (fun context_path -> Cannot_open_context_index {context_path}) ;
+  register_error_kind
+    `Temporary
+    ~id:(make_id "baking_scheduling.node_connection_lost")
+    ~title:"Node connection lost"
+    ~description:"The connection with the node was lost."
+    ~pp:(fun fmt () -> Format.fprintf fmt "Lost connection with the node")
+    Data_encoding.empty
+    (function Node_connection_lost -> Some () | _ -> None)
+    (fun () -> Node_connection_lost) ;
+  register_error_kind
+    `Temporary
+    ~id:(make_id "baking_scheduling.cannot_load_local_file")
+    ~title:"Cannot load local file"
+    ~description:"Cannot load local file."
+    ~pp:(fun fmt filename ->
+      Format.fprintf fmt "Cannot load the local file %s" filename)
+    Data_encoding.(obj1 (req "file" string))
+    (function Cannot_load_local_file s -> Some s | _ -> None)
+    (fun s -> Cannot_load_local_file s)

@@ -23,11 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Delegate_events.Baking_scheduling
+open Protocol
+open Alpha_context
 
-let sleep_until time =
-  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
-  let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
-  if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
-  else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
+type incremental = {
+  predecessor : Baking_state.block_info;
+  context : Tezos_protocol_environment.Context.t;
+  state : validation_state;
+  rev_operations : Operation.packed list;
+  header : Tezos_base.Block_header.shell_header;
+}
+
+val load_context :
+  context_path:string -> Abstract_context_index.t tzresult Lwt.t
+
+(** Make sure that the given context is consistent by trying to read in it *)
+val check_context_consistency :
+  Abstract_context_index.t -> Context_hash.t -> unit tzresult Lwt.t
+
+val begin_construction :
+  timestamp:Time.Protocol.t ->
+  ?protocol_data:block_header_data ->
+  Abstract_context_index.t ->
+  Baking_state.block_info ->
+  Chain_id.t ->
+  incremental tzresult Lwt.t
+
+val add_operation :
+  incremental ->
+  Operation.packed ->
+  (incremental * operation_receipt) tzresult Lwt.t
+
+val finalize_construction :
+  incremental ->
+  (Tezos_protocol_environment.validation_result * block_header_metadata)
+  tzresult
+  Lwt.t

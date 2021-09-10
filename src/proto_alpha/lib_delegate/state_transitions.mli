@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,59 +25,66 @@
 
 open Protocol
 open Alpha_context
+open Baking_state
+open Baking_actions
 
-val timestamp_tag : Time.System.t Tag.def
+val do_nothing : state -> (state * action) Lwt.t
 
-val valid_ops : int Tag.def
+type proposal_acceptance = Invalid | Outdated_proposal | Valid_proposal
 
-val op_count : int Tag.def
+val is_acceptable_proposal_for_current_level :
+  state -> proposal -> proposal_acceptance Lwt.t
 
-val refused_ops : int Tag.def
+val make_consensus_list :
+  state -> proposal -> (delegate * consensus_content) list
 
-val bake_priority_tag : int Tag.def
+val make_preendorse_action : state -> proposal -> action
 
-val fitness_tag : Fitness.t Tag.def
+val may_update_proposal : state -> proposal -> state Lwt.t
 
-val current_slots_tag : int Tag.def
+val preendorse : state -> proposal -> (state * action) Lwt.t
 
-val future_slots_tag : int Tag.def
+val extract_pqc :
+  state -> proposal -> (Kind.preendorsement operation list * Round.t) option
 
-val timespan_tag : Time.System.Span.t Tag.def
+val handle_new_proposal : state -> proposal -> (state * action) Lwt.t
 
-val filename_tag : string Tag.def
+val round_proposer :
+  state ->
+  (delegate * endorsing_slot) SlotMap.t ->
+  Round.t ->
+  (delegate * endorsing_slot) option
 
-val signed_header_tag : Bytes.t Tag.def
+val propose_fresh_block_action :
+  endorsements:Kind.endorsement Operation.t list ->
+  ?last_proposal:block_info ->
+  predecessor:block_info ->
+  state ->
+  delegate ->
+  Round.t ->
+  action Lwt.t
 
-val signed_operation_tag : Bytes.t Tag.def
+val repropose_block_action :
+  state -> delegate -> Round.t -> proposal -> action Lwt.t
 
-val operations_tag : Tezos_base.Operation.t list list Tag.def
+val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
-val raw_operations_tag : Operation.raw list Tag.def
+val time_to_bake : state -> Round.t -> (state * action) Lwt.t
 
-val bake_op_count_tag : int Tag.def
+val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 
-val endorsement_slot_tag : int Tag.def
+val make_endorse_action : state -> proposal -> action
 
-val endorsement_slots_tag : int list Tag.def
+val prequorum_reached_when_awaiting_preendorsements :
+  state ->
+  Operation_worker.candidate ->
+  Kind.preendorsement operation list ->
+  (state * action) Lwt.t
 
-val denounced_endorsements_slots_tag : int list Tag.def
+val quorum_reached_when_waiting_endorsements :
+  state ->
+  Operation_worker.candidate ->
+  Kind.endorsement operation list ->
+  (state * action) Lwt.t
 
-val denouncement_source_tag : string Tag.def
-
-val level_tag : Raw_level.t Tag.def
-
-val nonce_tag : Nonce.t Tag.def
-
-val chain_tag : Block_services.chain Tag.def
-
-val block_tag : Block_services.block Tag.def
-
-val worker_tag : string Tag.def
-
-val block_header_tag : Block_header.t Tag.def
-
-val conflicting_endorsements_tag :
-  (Kind.endorsement operation * Kind.endorsement operation) Tag.def
-
-val conflicting_preendorsements_tag :
-  (Kind.preendorsement operation * Kind.preendorsement operation) Tag.def
+val step : state -> event -> (state * action) Lwt.t
