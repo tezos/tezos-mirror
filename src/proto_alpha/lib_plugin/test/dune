@@ -1,0 +1,24 @@
+(executables
+ (names test_consensus_filter)
+ (libraries tezos-base
+            alcotest-lwt
+            tezos-test-helpers
+            qcheck-alcotest
+            tezos-stdlib-unix
+            tezos-protocol-alpha-parameters
+            tezos-protocol-plugin-alpha)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
+                   -open Tezos_protocol_environment_alpha)))
+
+(rule
+ (alias buildtest)
+ (deps test_consensus_filter.exe)
+ (action (progn)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-alpha)
+ (action (run %{exe:test_consensus_filter.exe} -q -e)))
