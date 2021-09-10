@@ -193,6 +193,20 @@ val post_run_operation :
 
 (** {2 Protocol RPCs} *)
 
+type ctxt_type = Bytes | Json
+
+(** Call RPC /chain/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+*)
+val get_context_value :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?ctxt_type:ctxt_type ->
+  value_path:string list ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
 val get_constants :
   ?endpoint:Client.endpoint ->
