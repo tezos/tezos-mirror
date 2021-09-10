@@ -28,7 +28,8 @@ let make_simple blocks =
     if n <= 0 then return pred
     else Block.bake pred >>=? fun block -> loop block (n - 1)
   in
-  Context.init 5 >>=? fun (genesis, _) -> loop genesis blocks
+  Context.init ~consensus_threshold:0 5 >>=? fun (genesis, _) ->
+  loop genesis blocks
 
 type args = {blocks : int; accounts : int}
 
