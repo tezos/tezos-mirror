@@ -50,84 +50,86 @@ let (comparable_ty_size, ty_size) =
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
-    let self_size =
-      match cty with
-      | Unit_key a -> base a
-      | Int_key a -> base a
-      | Nat_key a -> base a
-      | Signature_key a -> base a
-      | String_key a -> base a
-      | Bytes_key a -> base a
-      | Mutez_key a -> base a
-      | Key_hash_key a -> base a
-      | Key_key a -> base a
-      | Timestamp_key a -> base a
-      | Address_key a -> base a
-      | Bool_key a -> base a
-      | Chain_id_key a -> base a
-      | Never_key a -> base a
-      | Pair_key ((_ty1, fa1), (_ty2, fa2), a) ->
-          base a
-          +! ((word_size *? 6) +! (header_size *? 2))
-          +! option_size field_annot_size fa1
-          +! option_size field_annot_size fa2
-      | Union_key ((_ty1, fa1), (_ty2, fa2), a) ->
-          base a
-          +! ((word_size *? 6) +! (header_size *? 2))
-          +! option_size field_annot_size fa1
-          +! option_size field_annot_size fa2
-      | Option_key (_ty, a) -> base a +! word_size
-    in
-    ret_succ_adding accu self_size
+    match cty with
+    | Unit_key a -> ret_succ_adding accu (base a)
+    | Int_key a -> ret_succ_adding accu (base a)
+    | Nat_key a -> ret_succ_adding accu (base a)
+    | Signature_key a -> ret_succ_adding accu (base a)
+    | String_key a -> ret_succ_adding accu (base a)
+    | Bytes_key a -> ret_succ_adding accu (base a)
+    | Mutez_key a -> ret_succ_adding accu (base a)
+    | Key_hash_key a -> ret_succ_adding accu (base a)
+    | Key_key a -> ret_succ_adding accu (base a)
+    | Timestamp_key a -> ret_succ_adding accu (base a)
+    | Address_key a -> ret_succ_adding accu (base a)
+    | Bool_key a -> ret_succ_adding accu (base a)
+    | Chain_id_key a -> ret_succ_adding accu (base a)
+    | Never_key a -> ret_succ_adding accu (base a)
+    | Pair_key ((_ty1, fa1), (_ty2, fa2), a) ->
+        ret_succ_adding accu
+        @@ base a
+           +! ((word_size *? 6) +! (header_size *? 2))
+           +! option_size field_annot_size fa1
+           +! option_size field_annot_size fa2
+    | Union_key ((_ty1, fa1), (_ty2, fa2), a) ->
+        ret_succ_adding accu
+        @@ base a
+           +! ((word_size *? 6) +! (header_size *? 2))
+           +! option_size field_annot_size fa1
+           +! option_size field_annot_size fa2
+    | Option_key (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
   and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
    fun accu ty ->
-    let self_size =
-      match ty with
-      | Unit_t a -> base a
-      | Int_t a -> base a
-      | Nat_t a -> base a
-      | Signature_t a -> base a
-      | String_t a -> base a
-      | Bytes_t a -> base a
-      | Mutez_t a -> base a
-      | Key_hash_t a -> base a
-      | Key_t a -> base a
-      | Timestamp_t a -> base a
-      | Address_t a -> base a
-      | Bool_t a -> base a
-      | Operation_t a -> base a
-      | Chain_id_t a -> base a
-      | Never_t a -> base a
-      | Bls12_381_g1_t a -> base a
-      | Bls12_381_g2_t a -> base a
-      | Bls12_381_fr_t a -> base a
-      | Chest_key_t a -> base a
-      | Chest_t a -> base a
-      | Pair_t ((_ty1, fa1, va1), (_ty2, fa2, va2), a) ->
-          base a
-          +! ((word_size *? 8) +! (header_size *? 2))
-          +! option_size field_annot_size fa1
-          +! option_size var_annot_size va1
-          +! option_size field_annot_size fa2
-          +! option_size var_annot_size va2
-      | Union_t ((_ty1, fa1), (_ty2, fa2), a) ->
-          base a
-          +! ((word_size *? 6) +! (header_size *? 2))
-          +! option_size field_annot_size fa1
-          +! option_size field_annot_size fa2
-      | Lambda_t (_ty1, _ty2, a) -> base a +! (word_size *? 2)
-      | Option_t (_ty, a) -> base a +! word_size
-      | List_t (_ty, a) -> base a +! word_size
-      | Set_t (_cty, a) -> base a +! word_size
-      | Map_t (_cty, _ty, a) -> base a +! (word_size *? 2)
-      | Big_map_t (_cty, _ty, a) -> base a +! (word_size *? 2)
-      | Contract_t (_ty, a) -> base a +! word_size
-      | Sapling_transaction_t (_m, a) ->
-          base a +! sapling_memo_size_size +! word_size
-      | Sapling_state_t (_m, a) -> base a +! sapling_memo_size_size +! word_size
-      | Ticket_t (_cty, a) -> base a +! word_size
-    in
-    ret_succ_adding accu self_size
+    match ty with
+    | Unit_t a -> ret_succ_adding accu @@ base a
+    | Int_t a -> ret_succ_adding accu @@ base a
+    | Nat_t a -> ret_succ_adding accu @@ base a
+    | Signature_t a -> ret_succ_adding accu @@ base a
+    | String_t a -> ret_succ_adding accu @@ base a
+    | Bytes_t a -> ret_succ_adding accu @@ base a
+    | Mutez_t a -> ret_succ_adding accu @@ base a
+    | Key_hash_t a -> ret_succ_adding accu @@ base a
+    | Key_t a -> ret_succ_adding accu @@ base a
+    | Timestamp_t a -> ret_succ_adding accu @@ base a
+    | Address_t a -> ret_succ_adding accu @@ base a
+    | Bool_t a -> ret_succ_adding accu @@ base a
+    | Operation_t a -> ret_succ_adding accu @@ base a
+    | Chain_id_t a -> ret_succ_adding accu @@ base a
+    | Never_t a -> ret_succ_adding accu @@ base a
+    | Bls12_381_g1_t a -> ret_succ_adding accu @@ base a
+    | Bls12_381_g2_t a -> ret_succ_adding accu @@ base a
+    | Bls12_381_fr_t a -> ret_succ_adding accu @@ base a
+    | Chest_key_t a -> ret_succ_adding accu @@ base a
+    | Chest_t a -> ret_succ_adding accu @@ base a
+    | Pair_t ((_ty1, fa1, va1), (_ty2, fa2, va2), a) ->
+        ret_succ_adding accu
+        @@ base a
+           +! ((word_size *? 8) +! (header_size *? 2))
+           +! option_size field_annot_size fa1
+           +! option_size var_annot_size va1
+           +! option_size field_annot_size fa2
+           +! option_size var_annot_size va2
+    | Union_t ((_ty1, fa1), (_ty2, fa2), a) ->
+        ret_succ_adding accu
+        @@ base a
+           +! ((word_size *? 6) +! (header_size *? 2))
+           +! option_size field_annot_size fa1
+           +! option_size field_annot_size fa2
+    | Lambda_t (_ty1, _ty2, a) ->
+        ret_succ_adding accu @@ (base a +! (word_size *? 2))
+    | Option_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+    | List_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+    | Set_t (_cty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+    | Map_t (_cty, _ty, a) ->
+        ret_succ_adding accu @@ (base a +! (word_size *? 2))
+    | Big_map_t (_cty, _ty, a) ->
+        ret_succ_adding accu @@ (base a +! (word_size *? 2))
+    | Contract_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
+    | Sapling_transaction_t (_m, a) ->
+        ret_succ_adding accu @@ (base a +! sapling_memo_size_size +! word_size)
+    | Sapling_state_t (_m, a) ->
+        ret_succ_adding accu @@ (base a +! sapling_memo_size_size +! word_size)
+    | Ticket_t (_cty, a) -> ret_succ_adding accu @@ (base a +! word_size)
   in
   let f = ({apply; apply_comparable} : nodes_and_size ty_traverse) in
   ( (fun cty -> comparable_ty_traverse cty zero f),
@@ -136,15 +138,12 @@ let (comparable_ty_size, ty_size) =
 let stack_ty_size s =
   let apply : type a s. nodes_and_size -> (a, s) stack_ty -> nodes_and_size =
    fun accu s ->
-    let self_size =
-      match s with
-      | Bot_t -> zero
-      | Item_t (ty, _, annot) ->
-          ret_succ_adding
-            (ty_size ty)
-            (header_size +! (word_size *? 3) +! option_size var_annot_size annot)
-    in
-    ret_succ (accu ++ self_size)
+    match s with
+    | Bot_t -> ret_succ accu
+    | Item_t (ty, _, annot) ->
+        ret_succ_adding
+          (accu ++ ty_size ty)
+          (header_size +! (word_size *? 3) +! option_size var_annot_size annot)
   in
   stack_ty_traverse s zero {apply}
 
