@@ -159,16 +159,6 @@ activation step works on the protocol itself. Consequently, if a protocol hash
 is voted in and the protocol it identifies is invalid, the activation step
 fails.
 
-A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
-valid source code), if its code uses functions not present in the
-:ref:`protocol environment <protocol_environment>`, or if it downgrades the
-:ref:`protocol environment <protocol_environment>` version.
-
-If an invalid protocol is voted in, then the activation fails for all the nodes,
-and then the chain becomes stuck. This is why it is important to vote for hashes
-that designate valid protocols: ones with sources that are available and that
-can be compiled.
-
 .. sidebar:: Checking a hash is of a valid protocol
 
    When a hash is proposed by a delegate, it is usually accompanied by some
@@ -187,6 +177,15 @@ can be compiled.
 
    If your node becomes stuck, you should start a fresh up-to-date node.
 
+A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
+valid source code), if its code uses functions not present in the
+:ref:`protocol environment <protocol_environment>`, or if it downgrades the
+:ref:`protocol environment <protocol_environment>` version.
+
+If an invalid protocol is voted in, then the activation fails for all the nodes,
+and then the chain becomes stuck. This is why it is important to vote for hashes
+that designate valid protocols: ones with sources that are available and that
+can be compiled.
 
 Operations
 ----------
