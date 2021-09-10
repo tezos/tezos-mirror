@@ -532,7 +532,8 @@ let test_rolling () =
    block must be outside the max_op_ttl of the next checkpoint. *)
 let test_drag_after_import () =
   let constants =
-    Default_parameters.{constants_test with blocks_per_cycle = 256l}
+    Default_parameters.
+      {constants_test with blocks_per_cycle = 256l; consensus_threshold = 0}
   in
   let patch_context ctxt =
     let test_parameters =
@@ -661,7 +662,8 @@ let tests speed =
       make_tests
         speed
         Tezos_protocol_alpha_parameters.Default_parameters.(
-          parameters_of_constants constants_sandbox)
+          parameters_of_constants
+            {constants_sandbox with consensus_threshold = 0})
     in
     test_rolling () :: test_drag_after_import () :: generated_tests
   in
