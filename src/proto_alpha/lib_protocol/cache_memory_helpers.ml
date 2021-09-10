@@ -92,11 +92,19 @@ let header_size = word_size
 
 let int64_size = header_size +! (word_size *? 2)
 
+let h1w = header_size +! word_size
+
+let h2w = header_size +! (word_size *? 2)
+
+let h3w = header_size +! (word_size *? 3)
+
+let h4w = header_size +! (word_size *? 4)
+
 let z_size z =
   let numbits = Z.numbits z in
   if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 32
 
-let string_size_gen len = header_size +? len +? (8 - (len mod 8))
+let string_size_gen len = header_size +? (len + (8 - (len mod 8)))
 
 let bytes_size b = string_size_gen (Bytes.length b)
 
@@ -137,20 +145,16 @@ let node_size =
   let open Micheline in
   let annotation_size a =
     List.fold_left
-      (fun accu s ->
-        ret_succ_adding accu (header_size +! (word_size *? 2) +! string_size s))
+      (fun accu s -> ret_succ_adding accu (h2w +! string_size s))
       zero
       a
   in
   let internal_node_size = function
-    | Int (_, z) -> (Nodes.one, header_size +! (word_size *? 2) +! z_size z)
-    | String (_, s) ->
-        (Nodes.one, header_size +! (word_size *? 2) +! string_size s)
-    | Bytes (_, s) ->
-        (Nodes.one, header_size +! (word_size *? 2) +! bytes_size s)
-    | Prim (_, _, _, a) ->
-        ret_succ_adding (annotation_size a) (header_size +! (word_size *? 4))
-    | Seq (_, _) -> (Nodes.one, header_size +! (word_size *? 2))
+    | Int (_, z) -> (Nodes.one, h2w +! z_size z)
+    | String (_, s) -> (Nodes.one, h2w +! string_size s)
+    | Bytes (_, s) -> (Nodes.one, h2w +! bytes_size s)
+    | Prim (_, _, _, a) -> ret_succ_adding (annotation_size a) h4w
+    | Seq (_, _) -> (Nodes.one, h2w)
   in
   fun node ->
     Script_repr.fold node zero @@ fun accu node ->

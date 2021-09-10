@@ -46,7 +46,7 @@ let metadata_size {annot; size = _} =
   (word_size *? 2) +! header_size +! option_size type_annot_size annot
 
 let (comparable_ty_size, ty_size) =
-  let base metadata = header_size +! word_size +! metadata_size metadata in
+  let base metadata = h1w +! metadata_size metadata in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
@@ -143,7 +143,7 @@ let stack_ty_size s =
     | Item_t (ty, _, annot) ->
         ret_succ_adding
           (accu ++ ty_size ty)
-          (header_size +! (word_size *? 3) +! option_size var_annot_size annot)
+          (h3w +! option_size var_annot_size annot)
   in
   stack_ty_traverse s zero {apply}
 
@@ -151,10 +151,10 @@ let script_nat_size n = Script_int.to_zint n |> z_size
 
 let script_int_size n = Script_int.to_zint n |> z_size
 
-let signature_size = header_size +! (word_size *? 3) +? Signature.size
+let signature_size = h3w +? Signature.size
 
 let key_hash_size (x : Signature.public_key_hash) =
-  header_size +! word_size
+  h1w
   +? Signature.(
        match x with
        | Ed25519 _ -> Ed25519.Public_key_hash.size
@@ -163,29 +163,28 @@ let key_hash_size (x : Signature.public_key_hash) =
 
 let public_key_size (x : public_key) =
   let ks = Signature.Public_key.size x in
-  header_size +! word_size +? ks
+  h1w +? ks
 
-let mutez_size = header_size +! (word_size *? 2)
+let mutez_size = h2w
 
 let timestamp_size x = Script_timestamp.to_zint x |> z_size
 
 let contract_size = Contract.in_memory_size
 
-let address_size ((c, s) : address) =
-  header_size +! (word_size *? 2) +! contract_size c +! string_size s
+let address_size ((c, s) : address) = h2w +! contract_size c +! string_size s
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding
     (ty_size input_ty ++ ty_size output_ty)
-    (header_size +! (word_size *? 3) +! script_string_size name)
+    (h3w +! script_string_size name)
 
 let script_expr_hash_size = Script_expr_hash.size
 
-let peano_shape_proof k = (header_size +! (header_size +! word_size)) *? k
+let peano_shape_proof k = (header_size +! h1w) *? k
 
 let stack_prefix_preservation_witness_size k =
-  let kinfo_size = header_size +! (word_size *? 2) in
-  (header_size +! (header_size +! (word_size *? 2) +! kinfo_size)) *? k
+  let kinfo_size = h2w in
+  (header_size +! (h2w +! kinfo_size)) *? k
 
 let comb_gadt_witness_size = peano_shape_proof
 
@@ -198,12 +197,10 @@ let comb_set_gadt_witness_size = peano_shape_proof
 let dup_n_gadt_witness_size = peano_shape_proof
 
 let contract_size (arg_ty, address) =
-  ret_adding
-    (ty_size arg_ty)
-    (header_size +! (word_size *? 2) +! address_size address)
+  ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
 let sapling_state_size {Sapling.id; diff; memo_size = _} =
-  header_size +! (word_size *? 3)
+  h3w
   +! option_size (fun x -> z_size (Sapling.Id.unparse_to_z x)) id
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
@@ -215,14 +212,13 @@ let operation_size
   ret_adding
     (Operation.packed_internal_operation_in_memory_size poi
     ++ option_size_vec Lazy_storage.diffs_in_memory_size diffs)
-    (header_size +! (word_size *? 2))
+    h2w
 
-let chain_id_size = header_size +! word_size +? Chain_id.size
+let chain_id_size = h1w +? Chain_id.size
 
 (* [contents] is handle by the recursion scheme in [value_size] *)
 let ticket_size {ticketer; contents = _; amount} =
-  header_size +! (word_size *? 3) +! address_size ticketer
-  +! script_nat_size amount
+  h3w +! address_size ticketer +! script_nat_size amount
 
 let chest_size chest =
   (*
@@ -235,8 +231,7 @@ let chest_size chest =
   let locked_value_size = 256 in
   let rsa_public_size = 256 in
   let ciphertext_size = Timelock.get_plaintext_size chest in
-  header_size +! (word_size *? 3) +? locked_value_size +? rsa_public_size
-  +? ciphertext_size
+  h3w +? (locked_value_size + rsa_public_size + ciphertext_size)
 
 let chest_key_size _ =
   (*
@@ -247,23 +242,21 @@ let chest_key_size _ =
   *)
   let unlocked_value_size = 256 in
   let proof_size = 256 in
-  header_size +! (word_size *? 2) +? unlocked_value_size +? proof_size
+  h2w +? (unlocked_value_size + proof_size)
 
 let view_size {input_ty; output_ty; view_code} =
   ret_adding
     (node_size input_ty ++ node_size output_ty ++ node_size view_code)
-    (header_size +! (word_size *? 3))
+    h3w
 
 let views_size views =
   SMap.fold
     (fun k view accu ->
-      ret_adding
-        (accu ++ view_size view)
-        (script_string_size k +! (header_size +! (word_size *? 4))))
+      ret_adding (accu ++ view_size view) (script_string_size k +! h4w))
     views
     zero
 
-let kinfo_size {iloc = _; kstack_ty = _} = header_size +! (word_size *? 2)
+let kinfo_size {iloc = _; kstack_ty = _} = h2w
 
 (* The following mutually recursive functions are mostly
    tail-recursive and the only recursive call that is not a tailcall
@@ -292,22 +285,16 @@ let rec value_size :
     | Timestamp_t _ -> ret_succ_adding accu (timestamp_size x)
     | Address_t _ -> ret_succ_adding accu (address_size x)
     | Bool_t _ -> ret_succ accu
-    | Pair_t (_, _, _) -> ret_succ_adding accu (header_size +! (word_size *? 2))
-    | Union_t (_, _, _) -> ret_succ_adding accu (header_size +! word_size)
+    | Pair_t (_, _, _) -> ret_succ_adding accu h2w
+    | Union_t (_, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
     | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
-    | List_t (_, _) ->
-        ret_succ_adding
-          accu
-          (header_size +! (word_size *? 2)
-          +! ((header_size +! (word_size *? 2)) *? x.length))
+    | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
         let module M = (val x) in
         let boxing_space = !!300 in
-        ret_succ_adding
-          accu
-          (boxing_space +! ((header_size +! (word_size *? 4)) *? M.size))
+        ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
         let module M = (val x) in
         let size = snd M.boxed in
@@ -352,9 +339,8 @@ let rec value_size :
     | Timestamp_key _ -> ret_succ_adding accu (timestamp_size x)
     | Address_key _ -> ret_succ_adding accu (address_size x)
     | Bool_key _ -> ret_succ accu
-    | Pair_key (_, _, _) ->
-        ret_succ_adding accu (header_size +! (word_size *? 2))
-    | Union_key (_, _, _) -> ret_succ_adding accu (header_size +! word_size)
+    | Pair_key (_, _, _) -> ret_succ_adding accu h2w
+    | Union_key (_, _, _) -> ret_succ_adding accu h1w
     | Option_key (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | Chain_id_key _ -> ret_succ_adding accu chain_id_size
     | Never_key _ -> ( match x with _ -> .)
@@ -394,13 +380,13 @@ and big_map_size :
         accu
     in
 
-    ret_adding map_size (header_size +! (word_size *? 2))
+    ret_adding map_size h2w
   in
   let big_map_id_size s = z_size (Big_map.Id.unparse_to_z s) in
   let id_size = option_size big_map_id_size id in
   ret_adding
     (comparable_ty_size key_type ++ ty_size value_type ++ diff_size)
-    (header_size +! (word_size *? 4) +! id_size)
+    (h4w +! id_size)
 
 and lambda_size :
     type i o.
@@ -410,9 +396,7 @@ and lambda_size :
   (* We assume that the nodes' size have already been counted if the
      lambda is not a toplevel lambda. *)
   let accu =
-    ret_adding
-      (accu ++ if count_lambda_nodes then node_size node else zero)
-      (header_size +! (word_size *? 2))
+    ret_adding (accu ++ if count_lambda_nodes then node_size node else zero) h2w
   in
   (kdescr_size [@ocaml.tailcall]) ~count_lambda_nodes:false accu kdescr
 
@@ -424,9 +408,7 @@ and kdescr_size :
     nodes_and_size =
  fun ~count_lambda_nodes accu {kloc = _; kbef; kaft; kinstr} ->
   let accu =
-    ret_adding
-      (accu ++ stack_ty_size kbef ++ stack_ty_size kaft)
-      (header_size +! (word_size *? 4))
+    ret_adding (accu ++ stack_ty_size kbef ++ stack_ty_size kaft) h4w
   in
   (kinstr_size [@ocaml.tailcall]) ~count_lambda_nodes accu kinstr
 
@@ -437,7 +419,7 @@ and kinstr_size :
     (a, s, r, f) kinstr ->
     nodes_and_size =
  fun ~count_lambda_nodes accu t ->
-  let base kinfo = header_size +! (word_size *? 2) +! kinfo_size kinfo in
+  let base kinfo = h2w +! kinfo_size kinfo in
   let apply :
       type a s r f. nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
    fun accu t ->
@@ -675,8 +657,7 @@ and kinstr_size :
           (accu ++ comparable_ty_size cty)
           (base kinfo +! word_size)
     | IOpen_chest (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IHalt kinfo ->
-        ret_succ_adding accu (header_size +! word_size +! kinfo_size kinfo)
+    | IHalt kinfo -> ret_succ_adding accu (h1w +! kinfo_size kinfo)
     | ILog (_, _, _, _) ->
         (* This instruction is ignored because it is only used for testing. *)
         accu
