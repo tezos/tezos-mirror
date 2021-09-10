@@ -38,8 +38,9 @@ open Michelson_v1_primitives
 *)
 let bottom_up_fold_cps initial_accumulator node initial_k f =
   let rec traverse_node accu node k =
+    f accu node @@ fun accu node ->
     match node with
-    | String _ | Int _ | Bytes _ -> f accu node k
+    | String _ | Int _ | Bytes _ -> k accu node
     | Prim (loc, prim, args, annot) ->
         (traverse_nodes [@ocaml.tailcall]) accu args @@ fun accu args ->
         f accu (Prim (loc, prim, args, annot)) k
@@ -50,13 +51,11 @@ let bottom_up_fold_cps initial_accumulator node initial_k f =
     match nodes with
     | [] -> k accu []
     | node :: nodes ->
-        f accu node @@ fun accu node ->
         (traverse_node [@ocaml.tailcall]) accu node @@ fun accu node ->
         (traverse_nodes [@ocaml.tailcall]) accu nodes @@ fun accu nodes ->
         k accu (node :: nodes)
   in
-  f initial_accumulator node @@ fun accu node ->
-  traverse_node accu node initial_k
+  traverse_node initial_accumulator node initial_k
 
 module Gas_model = struct
   open Saturation_repr
