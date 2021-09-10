@@ -670,6 +670,51 @@ let normalize_data ?mode ?legacy ~data ~typ client =
   spawn_normalize_data ?mode ?legacy ~data ~typ client
   |> Process.check_and_read_stdout
 
+let spawn_normalize_script ?mode ~script client =
+  let mode_to_string = function
+    | Readable -> "Readable"
+    | Optimized -> "Optimized"
+    | Optimized_legacy -> "Optimized_legacy"
+  in
+  let mode_cmd =
+    Option.map mode_to_string mode
+    |> Option.map (fun s -> ["--unparsing-mode"; s])
+  in
+  let cmd =
+    ["normalize"; "script"; script] @ Option.value ~default:[] mode_cmd
+  in
+  spawn_command client cmd
+
+let normalize_script ?mode ~script client =
+  spawn_normalize_script ?mode ~script client |> Process.check_and_read_stdout
+
+let spawn_typecheck_script ~script ?(details = false) ?(emacs = false)
+    ?(no_print_source = false) ?gas ?(legacy = false) client =
+  let gas_cmd =
+    Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
+  in
+  let cmd =
+    ["typecheck"; "script"; script]
+    @ Option.value ~default:[] gas_cmd
+    @ (if details then ["--details"] else [])
+    @ (if emacs then ["--emacs"] else [])
+    @ (if no_print_source then ["--no-print-source"] else [])
+    @ if legacy then ["--legacy"] else []
+  in
+  spawn_command client cmd
+
+let typecheck_script ~script ?(details = false) ?(emacs = false)
+    ?(no_print_source = false) ?gas ?(legacy = false) client =
+  spawn_typecheck_script
+    ~script
+    ~details
+    ~emacs
+    ~no_print_source
+    ?gas
+    ~legacy
+    client
+  |> Process.check_and_read_stdout
+
 let spawn_list_protocols mode client =
   let mode_str =
     match mode with
