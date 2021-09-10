@@ -42,8 +42,9 @@ let var_annot_size (Var_annot _) = !!0
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0
 
-let metadata_size {annot; size = _} =
-  (word_size *? 2) +! header_size +! option_size type_annot_size annot
+let metadata_size {annot; size = _} = h2w +! option_size type_annot_size annot
+
+let hh6w = (word_size *? 6) +! (header_size *? 2)
 
 let (comparable_ty_size, ty_size) =
   let base metadata = h1w +! metadata_size metadata in
@@ -67,14 +68,12 @@ let (comparable_ty_size, ty_size) =
     | Never_key a -> ret_succ_adding accu (base a)
     | Pair_key ((_ty1, fa1), (_ty2, fa2), a) ->
         ret_succ_adding accu
-        @@ base a
-           +! ((word_size *? 6) +! (header_size *? 2))
+        @@ base a +! hh6w
            +! option_size field_annot_size fa1
            +! option_size field_annot_size fa2
     | Union_key ((_ty1, fa1), (_ty2, fa2), a) ->
         ret_succ_adding accu
-        @@ base a
-           +! ((word_size *? 6) +! (header_size *? 2))
+        @@ base a +! hh6w
            +! option_size field_annot_size fa1
            +! option_size field_annot_size fa2
     | Option_key (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
