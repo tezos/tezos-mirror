@@ -94,16 +94,16 @@ In the proxy server's terminal, you should see this output (tree sizes may vary)
 
     Apr 21 11:10:07.474 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
     Apr 21 11:10:07.474 - alpha.proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:10:07.476 - proxy_getter: Cache miss: (v1;constants)
-    Apr 21 11:10:07.476 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1;constants
+    Apr 21 11:10:07.476 - proxy_getter: Cache miss: (v1/constants)
+    Apr 21 11:10:07.476 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
     Apr 21 11:10:07.476 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
     Apr 21 11:10:07.477 - alpha.proxy_rpc: received tree of size 2
-    Apr 21 11:10:07.477 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:10:07.477 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_balance_updates)
     Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_operation_results)
     Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
-    Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts;index)
+    Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts/index)
     Apr 21 11:10:07.478 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
     Apr 21 11:10:07.479 - alpha.proxy_rpc: received tree of size 115
 
@@ -137,23 +137,23 @@ In the meantime, in the proxy server's terminal, you should see:
 
     Apr 21 11:14:04.262 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
     Apr 21 11:14:04.263 - alpha.proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1;constants)
-    Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1;constants
+    Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1/constants)
+    Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
     Apr 21 11:14:04.266 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
     Apr 21 11:14:04.266 - alpha.proxy_rpc: received tree of size 2
-    Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_balance_updates)
     Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_operation_results)
     Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
-    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts;index)
+    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts/index)
     Apr 21 11:14:04.268 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
     Apr 21 11:14:04.269 - alpha.proxy_rpc: received tree of size 115
-    Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1;constants)
-    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1/constants)
+    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_balance_updates)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_operation_results)
-    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts;index)
+    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts/index)
 
 The last four lines show that the proxy server is answering the request
 without delegating anything to the node: there is no ``alpha.proxy_rpc`` line.

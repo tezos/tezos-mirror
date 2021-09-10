@@ -31,18 +31,6 @@ open Lib_test.Qcheck_helpers
 let check_irmin_tree_eq t1 t2 =
   qcheck_eq ~pp:Store.Tree.pp ~eq:Store.Tree.equal t1 t2
 
-(** [filter_map_values f map] returns a subset of [map]. Every mapping
-    [(k, v'])] in the returned map is such that [k] is a key of [map]
-    mapped to [v], and [f v = Some v']. *)
-let filter_map f map =
-  TzString.Map.fold
-    (fun key value acc ->
-      match f value with
-      | None -> acc
-      | Some value' -> TzString.Map.add key value' acc)
-    map
-    TzString.Map.empty
-
 (** [raw_context_rm_empty rc] returns [None] if [rc] is empty, otherwise
     a variant of [rc] where empty subtrees have been removed. *)
 let rec raw_context_rm_empty =
@@ -50,7 +38,7 @@ let rec raw_context_rm_empty =
   function
   | Key _ as rc -> Some rc
   | Dir dir ->
-      let dir' = filter_map raw_context_rm_empty dir in
+      let dir' = TzString.Map.filter_map (fun _ -> raw_context_rm_empty) dir in
       if TzString.Map.is_empty dir' then None else Some (Dir dir')
   | Cut -> None
 
@@ -66,7 +54,7 @@ let rec merkle_node_rm_empty =
 (** [merkle_tree_rm_empty mtree] returns [None] if [mtree] is empty, otherwise
     a variant of [mtree] where empty subtrees have been removed. *)
 and merkle_tree_rm_empty mtree =
-  let mtree' = filter_map merkle_node_rm_empty mtree in
+  let mtree' = TzString.Map.filter_map (fun _ -> merkle_node_rm_empty) mtree in
   if TzString.Map.is_empty mtree' then None else Some mtree'
 
 (** [merkle_tree_rm_empty mtree] returns a variant of [mtree] where

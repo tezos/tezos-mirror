@@ -23,39 +23,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A proxy server instance *)
-type t
+(** Testing
+    -------
+    Component:    Client
+    Invocation:   dune build @src/proto_alpha/lib_client/runtest
+    Subject:      Test of --mode proxy and tezos-proxy-server heuristic
+*)
 
-(** Get the RPC port of a proxy server. It's the port to
-    do request to. *)
-val rpc_port : t -> int
+let proxy_mode_arb =
+  QCheck.make (QCheck.Gen.oneofl Tezos_proxy.Proxy.[Client; Server])
 
-(** Get the runner associated to a proxy server.
+let key_gen : string list QCheck.Gen.t =
+  (* Segments taken from the implementation of split_key in src/proto_alpha/lib_client/proxy.ml *)
+  let keys =
+    QCheck.Gen.oneofl
+      [
+        "big_maps";
+        "index";
+        "contents";
+        "contracts";
+        "cycle";
+        "cycle";
+        "rolls";
+        "owner";
+        "snapshot";
+        "v1";
+      ]
+    |> QCheck.Gen.list
+  in
+  QCheck.Gen.frequency QCheck.Gen.[(9, keys); (1, list string)]
 
-    Return [None] if the proxy server runs on the local machine. *)
-val runner : t -> Runner.t option
+(** Whether [t1] is a prefix of [t2] *)
+let rec is_prefix t1 t2 =
+  match (t1, t2) with
+  | ([], _) -> true
+  | (_, []) -> false
+  | (x1 :: rest1, x2 :: rest2) when x1 = x2 -> is_prefix rest1 rest2
+  | _ -> false
 
-(** [init ?runner ?name ?rpc_port node] creates and starts a proxy server
-    that serves the given port and delegates its queries to [node].
+let test_split_key =
+  let fmt =
+    let pp_sep fmt () = Format.fprintf fmt "/" in
+    Format.pp_print_list ~pp_sep Format.pp_print_string
+  in
+  QCheck.Test.make
+    ~name:"[fst (split_key s)] is a prefix of [s]"
+    QCheck.(pair proxy_mode_arb (QCheck.make key_gen))
+  @@ fun (mode, key) ->
+  match Proxy.ProtoRpc.split_key mode key with
+  | None -> true
+  | Some (shorter, _) ->
+      if is_prefix shorter key then true
+      else
+        QCheck.Test.fail_reportf
+          "Expected result of split_key to be a prefix of the input key. But \
+           %a is not a prefix of %a."
+          fmt
+          shorter
+          fmt
+          key
 
-    [event_level] specifies the verbosity of the file descriptor sink.
-    Possible values are: ["debug"], ["info"], ["notice"], ["warning"], ["error"],
-    and ["fatal"]. *)
-val init :
-  ?runner:Runner.t ->
-  ?name:string ->
-  ?rpc_port:int ->
-  ?event_level:string ->
-  Node.t ->
-  t Lwt.t
-
-(** Raw events. *)
-type event = {name : string; value : JSON.t}
-
-(** Add a callback to be called whenever the proxy_server emits an event.
-
-    This callback is never removed.
-
-    You can have multiple [on_event] handlers, although
-    the order in which they trigger is unspecified. *)
-val on_event : t -> (event -> unit) -> unit
+let () =
+  Alcotest.run
+    "tezos-lib-client-proxy"
+    [("proxy", Lib_test.Qcheck_helpers.qcheck_wrap [test_split_key])]

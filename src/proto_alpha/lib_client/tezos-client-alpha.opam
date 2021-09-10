@@ -21,6 +21,8 @@ depends: [
   "tezos-test-helpers" { with-test }
   "tezos-base-test-helpers" { with-test }
   "ppx_inline_test"
+  "qcheck-alcotest" { with-test }
+  "tezos-test-helpers" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
