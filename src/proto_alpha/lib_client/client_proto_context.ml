@@ -77,6 +77,9 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
          ok hash)
        script_opt
 
+let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
+  Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
@@ -273,6 +276,39 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?fee
     ~fee_parameter
     (Some source)
+
+let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk
+    ~fee_parameter limit_opt =
+  let operation = Set_deposits_limit limit_opt in
+  let operation =
+    Injection.prepare_manager_operation
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      operation
+  in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~source:contract
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
+    ~src_pk
+    ~src_sk:manager_sk
+    ~fee_parameter
+    operation
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->

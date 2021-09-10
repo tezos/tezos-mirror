@@ -858,7 +858,7 @@ let mem_init :
     parameters:Protocol_parameters.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
+    Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
@@ -940,14 +940,19 @@ let mem_init :
     }
   >>=? fun context ->
   return
-    ( chain_id,
-      Tezos_protocol_environment.
-        {block_hash = hash; block_header = shell_header; context} )
+    Tezos_mockup_registration.Registration_intf.
+      {
+        chain = chain_id;
+        rpc_context =
+          Tezos_protocol_environment.
+            {block_hash = hash; block_header = shell_header; context};
+        protocol_data = Bytes.empty;
+      }
 
 let migrate :
-    Chain_id.t * Tezos_protocol_environment.rpc_context ->
-    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
- fun (chain_id, rpc_context) ->
+    Tezos_mockup_registration.Registration.mockup_context ->
+    Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
+ fun {chain; rpc_context; protocol_data} ->
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
@@ -956,7 +961,9 @@ let migrate :
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}
   in
-  return (chain_id, rpc_context)
+  return
+    Tezos_mockup_registration.Registration_intf.
+      {chain; rpc_context; protocol_data}
 
 (* ------------------------------------------------------------------------- *)
 (* Register mockup *)

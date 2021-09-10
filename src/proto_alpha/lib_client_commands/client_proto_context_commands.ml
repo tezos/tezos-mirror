@@ -511,6 +511,32 @@ let commands_ro () =
           (Data_encoding.Binary.describe
              Alpha_context.Operation.unsigned_encoding)
         >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get the frozen deposits limit of a delegate."
+      no_options
+      (prefixes ["get"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
+      @@ stop)
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts."
+              Contract.pp
+              contract
+        | Some delegate -> (
+            get_frozen_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              delegate
+            >>=? function
+            | None -> cctxt#answer "unlimited" >>= return
+            | Some limit ->
+                cctxt#answer "%a %s" Tez.pp limit Client_proto_args.tez_sym
+                >>= return));
   ]
 
 (* ----------------------------------------------------------------------------*)
@@ -1790,6 +1816,139 @@ let commands_rw () =
               proposal
               ballot
             >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Set the deposits limit of a registered delegate."
+      (args10
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["set"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ prefix "to"
+      @@ tez_param
+           ~name:"deposits limit"
+           ~desc:"the maximum amount of frozen deposits"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, contract)
+           limit
+           (cctxt : Protocol_client_context.full) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts or unregistered delegate \
+               contracts."
+              Contract.pp
+              contract
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            set_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~simulation
+              ~fee_parameter
+              ?fee
+              mgr
+              ~src_pk
+              ~manager_sk
+              (Some limit)
+            >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Remove the deposits limit of a registered delegate."
+      (args10
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["unset"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, contract)
+           (cctxt : Protocol_client_context.full) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts or unregistered delegate \
+               contracts."
+              Contract.pp
+              contract
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            set_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~simulation
+              ~fee_parameter
+              ?fee
+              mgr
+              ~src_pk
+              ~manager_sk
+              None
+            >>=? fun _ -> return_unit);
   ]
 
 let commands network () =

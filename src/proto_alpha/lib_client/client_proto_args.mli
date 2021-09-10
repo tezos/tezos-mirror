@@ -80,11 +80,13 @@ val await_endorsements_arg : (bool, full) Clic.arg
 
 val force_switch : (bool, full) Clic.arg
 
+val no_endorse_switch : (bool, full) Clic.arg
+
 val minimal_timestamp_switch : (bool, full) Clic.arg
 
 val endorsement_delay_arg : (int, full) Clic.arg
 
-val preserved_levels_arg : (int, full) Clic.arg
+val preserved_levels_arg : (int option, full) Clic.arg
 
 val no_print_source_flag : (bool, full) Clic.arg
 
@@ -116,6 +118,8 @@ module Daemon : sig
 end
 
 val int_parameter : (int, full) Clic.parameter
+
+val uri_parameter : (Uri.t, full) Clic.parameter
 
 val string_parameter : (string, full) Clic.parameter
 

@@ -152,7 +152,9 @@ let commands () =
         Client_keys.get_key cctxt delegate >>=? fun (_, _, sk) ->
         Client_keys.sign
           cctxt
-          ~watermark:(Block_header chain_id)
+          ~watermark:
+            (Protocol.Alpha_context.Block_header.to_watermark
+               (Block_header chain_id))
           sk
           unsigned_header
         >>=? fun s -> cctxt#message "%a" Hex.pp (Signature.to_hex s) >>= return);
