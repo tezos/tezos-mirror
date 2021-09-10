@@ -151,7 +151,7 @@ References:
 Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Tezos project uses `pytest <http://pytest.org/>`_, a Python testing
+The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
 framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
 ``tezos-node`` and ``tezos-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
@@ -597,4 +597,4 @@ follow this convention:
 3. Each file name must be prefixed by ``test_`` to preserve a uniform
    directory structure.
 
-4. OCaml comments must be valid ``ocamldoc`` `special comments <https://caml.inria.fr/pub/docs/manual-ocaml/ocamldoc.html#s:ocamldoc-comments>`_.
+4. OCaml comments must be valid ``ocamldoc`` `special comments <https://ocaml.org/manual/ocamldoc.html#s:ocamldoc-comments>`_.

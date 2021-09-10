@@ -24,9 +24,9 @@ effect of slightly more than doubling the maximum size of a smart
 contract.
 
 -  Commit:
-   :gl:`tezos#3ff6bc8d`
+   :gl:`tezos@3ff6bc8d`
 -  TZIP:
-   `increase_operation_size_limit <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-increase_operation_size_limit.md>`__
+   `increase_operation_size_limit <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-increase_operation_size_limit.md>`__
 
 Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entrypoints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,7 +34,7 @@ Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entry
 -  Solves issue:
    :gl:`tezos#643`
 -  Commit:
-   :gl:`tezos#e879b1a7`
+   :gl:`tezos@e879b1a7`
 
 Depth-First Execution Order (⚠️ Attention Smart Contract Developers!)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

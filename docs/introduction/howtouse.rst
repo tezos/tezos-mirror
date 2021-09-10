@@ -461,7 +461,7 @@ Let's originate our first contract and call it *id*::
 
 The initial balance is ꜩ1, generously provided by implicit account
 *alice*. The contract stores a Michelson program ``id.tz``
-(found in file :src:`./tests_python/contracts_alpha/attic/id.tz`), with
+(found in file :src:`tests_python/contracts_alpha/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
 needed to avoid shell expansion). The parameter ``--burn-cap``
 specifies the maximal fee the user is willing to pay for this

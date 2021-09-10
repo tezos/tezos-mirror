@@ -146,4 +146,4 @@ the same type or ``None`` if that's not the case.
 
 .. _Algebraic Data Types: https://ocaml.org/learn/tutorials/data_types_and_matching.html
 .. _Generalized Algebraic Data Types: https://ocaml.org/manual/gadts.html
-.. _A simple expression evaluator: https://mads-hartmann.com/ocaml/2015/01/05/gadt-ocaml.html
+.. _A simple expression evaluator: https://blog.mads-hartmann.com/ocaml/2015/01/05/gadt-ocaml.html

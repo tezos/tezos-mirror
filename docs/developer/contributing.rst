@@ -77,7 +77,7 @@ We mostly use merge requests (aka MRs) for contributing to the master branch,
 meaning that nobody should be pushing into the master branch directly. Once a
 merge request is ready, it is reviewed and approved, then merged with a merge commit.
 
-We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviewing_and_managing_merge_requests.html#semi-linear-history-merge-requests>`_,
+We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviews/index.html#semi-linear-history-merge-requests>`_,
 which means that merge requests are only
 merged if they are direct suffixes of the master branch.
 This means that merge requests are rebased on top of ``master`` before they are merged.

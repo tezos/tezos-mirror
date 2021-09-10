@@ -304,7 +304,6 @@ languages:
   it is incomplete as it does not support annotations.
 
 - An online converter between Micheline files and their JSON encoding
-  (improperly called "Michelson"):
-  https://smart-contracts-micheline-michelson-translator-for-tezos.scalac.io
+  (improperly called "Michelson")
   developed as part of Cryptonomic hackathon and documented here:
-  https://scalac.io/we-hakked-tezos-and-created-a-micheline-michelson-translator/
+  https://scalac.io/blog/we-hakked-tezos-and-created-a-micheline-michelson-translator/

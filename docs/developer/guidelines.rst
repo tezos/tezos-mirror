@@ -366,6 +366,5 @@ Coding conventions
 
 Other than the guidelines above, there are currently no coding
 conventions enforced in the codebase. However, Tezos developers should be aware
-of general `OCaml programming guidelines <http://caml.inria.fr/resources/doc/
-guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
+of general `OCaml programming guidelines <https://caml.inria.fr/resources/doc/guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
 and more.

@@ -253,6 +253,6 @@ The proxy server is a project led by
 `smelc <https://gitlab.com/smelc>`_ and `Sir4ur0n <https://gitlab.com/Sir4ur0n>`_.
 To contact us:
 
-* We are on the `Tezos-dev slack <tezos-dev.slack.com>`_, or
+* We are on the `Tezos-dev slack <https://tezos-dev.slack.com>`_, or
 * create an issue on `Tezos' Gitlab <https://gitlab.com/tezos/tezos/-/issues>`_
   and assign it to us.

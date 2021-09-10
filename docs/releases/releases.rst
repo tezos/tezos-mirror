@@ -75,7 +75,7 @@ The packaged forms are updated from the source form as follows:
 
    -  at each stable release
    -  This is currently a manual process performed by
-      `Nomadic Labs <https://nomadic-labs.com>`_.
+      `Nomadic Labs <https://www.nomadic-labs.com/>`_.
 
 -  APT and DNF binary packages:
 

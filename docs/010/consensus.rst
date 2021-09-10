@@ -363,5 +363,5 @@ of the documentation for a discussion on (over-)delegation.
 Further External Resources
 --------------------------
 
-- Emmy* `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_
+- Emmy* `TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_
 - Emmy* `analysis <https://blog.nomadic-labs.com/faster-finality-with-emmy.html>`_.
