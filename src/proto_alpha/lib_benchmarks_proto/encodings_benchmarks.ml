@@ -387,12 +387,12 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ make_encode_variable_size_to_bytes
          ~name:"ENCODING_Chest"
          ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
-           let ((chest, _), _w) = generator rng_state in
-           chest)
+           let ((chest, _), plaintext_size) = generator rng_state in
+           (chest, {bytes = plaintext_size}))
 
   let () =
     Registration_helpers.register
@@ -406,13 +406,16 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_decode_fixed_size_from_bytes
+    @@ make_decode_variable_size_from_bytes
          ~name:"DECODING_Chest"
          ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
          ~from_bytes:(Data_encoding.Binary.of_bytes_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
-           let ((chest, _), _w) = generator rng_state in
-           chest)
+           let ((chest, _), _) = generator rng_state in
+           let b =
+             Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding chest
+           in
+           (chest, {bytes = Bytes.length b}))
 
   let () =
     Registration_helpers.register

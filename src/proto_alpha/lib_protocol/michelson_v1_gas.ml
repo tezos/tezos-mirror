@@ -843,6 +843,13 @@ module Cost_of = struct
     (* model DECODING_SIGNATURE_secp256k1 *)
     let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 30
 
+    (* model DECODING_Chest_key *)
+    let cost_DECODING_Chest_key = S.safe_int 7000
+
+    (* model DECODING_Chest *)
+    (* TODO gas cost *)
+    let cost_DECODING_Chest ~bytes = S.safe_int bytes
+
     (* model ENCODING_CHAIN_ID *)
     let cost_ENCODING_CHAIN_ID = S.safe_int 50
 
@@ -872,6 +879,13 @@ module Cost_of = struct
 
     (* model ENCODING_SIGNATURE_secp256k1 *)
     let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 40
+
+    (* model ENCODING_Chest_key *)
+    let cost_ENCODING_Chest_key = S.safe_int 12800
+
+    (* model ENCODING_Chest *)
+    (* TODO gas cost *)
+    let cost_ENCODING_Chest ~plaintext_size = S.safe_int plaintext_size
 
     (* model TIMESTAMP_READABLE_DECODING *)
     let cost_TIMESTAMP_READABLE_DECODING = S.safe_int 120
@@ -1681,8 +1695,7 @@ module Cost_of = struct
     (* FIXME *)
     let chest_key = Gas.write_bytes_cost 1
 
-    (* FIXME *)
-    let chest = Gas.write_bytes_cost 1
+    let chest ~bytes = atomic_step_cost (cost_DECODING_Chest ~bytes)
   end
 
   module Unparsing = struct
@@ -1790,7 +1803,7 @@ module Cost_of = struct
     (* FIXME *)
     let chest_key = Gas.write_bytes_cost 1
 
-    (* FIXME *)
-    let chest = Gas.write_bytes_cost 1
+    let chest ~plaintext_size =
+      atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
   end
 end
