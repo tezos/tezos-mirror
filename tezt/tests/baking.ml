@@ -394,8 +394,14 @@ let check_ordering ops =
 
 let assert_block_is_well_baked block =
   match JSON.(as_list (block |-> "operations")) with
-  | [empty1; empty2; empty3; manager_ops] ->
-      List.iter (fun l -> assert (JSON.as_list l = [])) [empty1; empty2; empty3] ;
+  | [endorsement_ops; vote_ops; anonymous_ops; manager_ops] ->
+      (* There very well might be endorsement operations *)
+      Log.debug
+        "%d endorsement operations"
+        (List.length (JSON.as_list endorsement_ops)) ;
+      List.iter
+        (fun l -> assert (JSON.as_list l = []))
+        [vote_ops; anonymous_ops] ;
       let fees_managers_and_counters =
         List.map
           (fun json -> get_fees_manager_and_counter json)
@@ -464,7 +470,7 @@ let bake_and_check state ~mempool =
   return ()
 
 let init ~protocol =
-  let* sandbox_node = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* sandbox_client = Client.init ~endpoint:(Node sandbox_node) () in
   let* () = Client.activate_protocol ~protocol sandbox_client in
   Log.info "Activated protocol." ;

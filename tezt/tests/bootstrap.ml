@@ -98,7 +98,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      before we kill [node_2]. *)
   let bakes_before_kill = 9 in
 
-  let max_operations_ttl = 0 in
+  let max_operations_ttl = 1 in
+
+  (* TODO-TB: update the doc strings below, written for
+     max_operations_ttl = 0. *)
 
   (* Number of calls to [tezos-client bake for] while [node_2] is not
      running. This number is high enough so that it is bigger than the
@@ -315,7 +318,7 @@ let register ~protocols =
   let rolling = Node.Rolling None in
   (* This parameter is used in the special case we run two rolling
      nodes. To ensure two nodes cannot reconnect, we need to bake some
-     amount of block. Putting the number `0` in parameters allows to
+     blocks. Putting the number `0` in parameters allows to
      save 16 blocks. *)
   let rolling_0 = Node.Rolling (Some 0) in
   check_bootstrap_with_history_modes archive archive ~protocols ;

@@ -279,6 +279,7 @@ val bake_for :
   ?key:string ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
+  ?monitor_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
@@ -291,16 +292,99 @@ val spawn_bake_for :
   ?key:string ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
+  ?monitor_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
   Process.t
+
+(** Run [tezos-client bake for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val tenderbake_for :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?keys:string list ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?monitor_node_mempool:bool ->
+  ?force:bool ->
+  ?context_path:string ->
+  t ->
+  unit Lwt.t
+
+(** Run [tezos-client endorse for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val endorse_for :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  unit Lwt.t
+
+(** Same as [endorse_for], but do not wait for the process to exit. *)
+val spawn_endorse_for :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client preendorse for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val preendorse_for :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  unit Lwt.t
+
+(** Same as [preendorse_for], but do not wait for the process to exit. *)
+val spawn_preendorse_for :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client propose for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val spawn_propose_for :
+  ?endpoint:endpoint ->
+  ?minimal_timestamp:bool ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  Process.t
+
+(* TODO refactor this *)
+
+(** [propose_for] *)
+val propose_for :
+  ?endpoint:endpoint ->
+  ?minimal_timestamp:bool ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  unit Lwt.t
 
 (** Run [tezos-client show address]. *)
 val show_address : ?show_secret:bool -> alias:string -> t -> Account.key Lwt.t
 
 (** Same as [show_address], but do not wait for the process to exit. *)
 val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
+
+(** Run [tezos-client gen keys]. *)
+val gen_keys : alias:string -> t -> unit Lwt.t
 
 (** A helper to run [tezos-client gen keys] followed by
     [tezos-client show address] to get the generated key. *)
@@ -309,14 +393,6 @@ val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 (** Same as [gen_and_show_keys] but returns a [Constant.key] instead of an
     [Account.key]. *)
 val gen_and_show_secret_keys : alias:string -> t -> Constant.key Lwt.t
-
-(** Run [tezos-client endorse for].
-
-    Default [key] is {!Constant.bootstrap2.alias}. *)
-val endorse_for : ?endpoint:endpoint -> ?key:string -> t -> unit Lwt.t
-
-(** Same as [endorse_for], but do not wait for the process to exit. *)
-val spawn_endorse_for : ?endpoint:endpoint -> ?key:string -> t -> Process.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
@@ -416,7 +492,7 @@ val spawn_get_balance_for :
 (** Run [tezos-client create mockup]. *)
 val create_mockup :
   ?sync_mode:mockup_sync_mode ->
-  ?constants:Protocol.constants ->
+  ?parameter_file:string ->
   protocol:Protocol.t ->
   t ->
   unit Lwt.t
@@ -424,7 +500,7 @@ val create_mockup :
 (** Same as [create_mockup], but do not wait for the process to exit. *)
 val spawn_create_mockup :
   ?sync_mode:mockup_sync_mode ->
-  ?constants:Protocol.constants ->
+  ?parameter_file:string ->
   protocol:Protocol.t ->
   t ->
   Process.t
@@ -698,6 +774,7 @@ val init_mockup :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?sync_mode:mockup_sync_mode ->
+  ?parameter_file:string ->
   ?constants:Protocol.constants ->
   protocol:Protocol.t ->
   unit ->

@@ -141,12 +141,44 @@ let default_samples =
     "voting_period";
   ]
 
+let alpha_samples =
+  [
+    "block_header";
+    "block_header.raw";
+    "block_header.unsigned";
+    "contract";
+    "contract.big_map_diff";
+    "cycle";
+    "fitness";
+    "gas.cost";
+    "gas";
+    "level";
+    "nonce";
+    "operation.internal";
+    "operation";
+    "operation.raw";
+    "operation.unsigned";
+    "period";
+    "raw_level";
+    "seed";
+    "tez";
+    "timestamp";
+    "vote.ballot";
+    "vote.ballots";
+    "vote.listings";
+    "voting_period.kind";
+    "voting_period";
+  ]
+
 let register ~protocols =
   check_dump_encodings () ;
   List.iter
     (fun protocol ->
+      let samples =
+        if Protocol.(protocol = Alpha) then alpha_samples else default_samples
+      in
       check_samples_encoding
         ~group_name:(Protocol.tag protocol)
         ~protocols:[protocol]
-        ~samples:default_samples)
+        ~samples)
     protocols

@@ -463,6 +463,22 @@ module Delegates = struct
       client =
     get_sub ?endpoint ?hooks ~chain ~block ~pkh "balance" client
 
+  let spawn_get_full_balance ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~pkh client =
+    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
+
+  let get_full_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
+      client =
+    get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
+
+  let spawn_get_frozen_deposits ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~pkh client =
+    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
+
+  let get_frozen_deposits ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~pkh client =
+    get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
+
   let spawn_get_deactivated ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~pkh client =
     spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "deactivated" client

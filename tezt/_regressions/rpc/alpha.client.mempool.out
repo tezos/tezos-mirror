@@ -1,10 +1,10 @@
 tezt/_regressions/rpc/alpha.client.mempool.out
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.alpha.prefilter.outdated_endorsement"}]}]
+[]
 [{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
 [{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement","slot":4,"level":3,"round":4,"block_payload_hash":"[BLOCK_PAYLOAD_HASH]"}],"signature":"[SIGNATURE]"}]
 [{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.alpha.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/pending_operations
@@ -12,11 +12,9 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
     [ { "hash": "[OPERATION_HASH]",
         "branch": "[BRANCH_HASH]",
         "contents":
-          [ { "kind": "transaction",
-              "source": "[PUBLIC_KEY_HASH]", "fee": "402",
-              "counter": "1", "gas_limit": "1520", "storage_limit": "0",
-              "amount": "2000000",
-              "destination": "[PUBLIC_KEY_HASH]" } ],
+          [ { "kind": "endorsement", "slot": 4, "level": 3, "round": 4,
+              "block_payload_hash":
+                "[BLOCK_PAYLOAD_HASH]" } ],
         "signature":
           "[SIGNATURE]" } ],
   "refused":
@@ -34,24 +32,7 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
           "error":
             [ { "kind": "permanent",
                 "id": "proto.alpha.prefilter.fees_too_low" } ] } ] ],
-  "outdated":
-    [ [ "[OPERATION_HASH]",
-        { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
-          "branch": "[BRANCH_HASH]",
-          "contents":
-            [ { "kind": "endorsement_with_slot",
-                "endorsement":
-                  { "branch":
-                      "[BRANCH_HASH]",
-                    "operations": { "kind": "endorsement", "level": 2 },
-                    "signature":
-                      "[SIGNATURE]" },
-                "slot": 10 } ],
-          "signature":
-            "[SIGNATURE]",
-          "error":
-            [ { "kind": "temporary",
-                "id": "proto.alpha.prefilter.outdated_endorsement" } ] } ] ],
+  "outdated": [],
   "branch_refused":
     [ [ "[OPERATION_HASH]",
         { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
@@ -68,29 +49,27 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
             [ { "kind": "branch",
                 "id": "proto.alpha.contract.counter_in_the_past",
                 "contract": "[PUBLIC_KEY_HASH]",
-                "expected": "2", "found": "1" } ] } ] ],
-  "branch_delayed":
-    [ [ "[OPERATION_HASH]",
+                "expected": "2", "found": "1" } ] } ],
+      [ "[OPERATION_HASH]",
         { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
           "branch": "[BRANCH_HASH]",
           "contents":
-            [ { "kind": "endorsement_with_slot",
-                "endorsement":
-                  { "branch":
-                      "[BRANCH_HASH]",
-                    "operations": { "kind": "endorsement", "level": 3 },
-                    "signature":
-                      "[SIGNATURE]" },
-                "slot": 4 } ],
+            [ { "kind": "transaction",
+                "source": "[PUBLIC_KEY_HASH]",
+                "fee": "402", "counter": "1", "gas_limit": "1520",
+                "storage_limit": "0", "amount": "2000000",
+                "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
           "error":
-            [ { "kind": "temporary",
-                "id": "proto.alpha.prefilter.outdated_endorsement" } ] } ] ],
-  "unprocessed": [] }
+            [ { "kind": "branch",
+                "id": "proto.alpha.contract.counter_in_the_past",
+                "contract": "[PUBLIC_KEY_HASH]",
+                "expected": "2", "found": "1" } ] } ] ],
+  "branch_delayed": [], "unprocessed": [] }
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.alpha.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.alpha.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.alpha.prefilter.outdated_endorsement"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement","slot":4,"level":3,"round":4,"block_payload_hash":"[BLOCK_PAYLOAD_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.alpha.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.alpha.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.alpha.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
@@ -641,10 +620,13 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "context": {
                             "$ref": "#/definitions/Context_hash"
                           },
-                          "priority": {
+                          "payload_hash": {
+                            "$ref": "#/definitions/value_hash"
+                          },
+                          "payload_round": {
                             "type": "integer",
-                            "minimum": 0,
-                            "maximum": 65535
+                            "minimum": -2147483648,
+                            "maximum": 2147483647
                           },
                           "proof_of_work_nonce": {
                             "type": "string",
@@ -664,7 +646,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "signature",
                           "liquidity_baking_escape_vote",
                           "proof_of_work_nonce",
-                          "priority",
+                          "payload_round",
+                          "payload_hash",
                           "context",
                           "fitness",
                           "operations_hash",
@@ -734,7 +717,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/block_hash"
                           },
                           "operations": {
-                            "$ref": "#/definitions/alpha.inlined.endorsement.contents"
+                            "$ref": "#/definitions/alpha.inlined.endorsement_mempool.contents"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -746,7 +729,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "alpha.inlined.endorsement.contents": {
+                      "alpha.inlined.endorsement_mempool.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -758,14 +741,92 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "endorsement"
                                 ]
                               },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
                               "level": {
                                 "type": "integer",
                                 "minimum": -2147483648,
                                 "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
                               }
                             },
                             "required": [
+                              "block_payload_hash",
+                              "round",
                               "level",
+                              "slot",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "alpha.inlined.preendorsement": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "branch": {
+                            "$ref": "#/definitions/block_hash"
+                          },
+                          "operations": {
+                            "$ref": "#/definitions/alpha.inlined.preendorsement.contents"
+                          },
+                          "signature": {
+                            "$ref": "#/definitions/Signature"
+                          }
+                        },
+                        "required": [
+                          "operations",
+                          "branch"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "alpha.inlined.preendorsement.contents": {
+                        "oneOf": [
+                          {
+                            "title": "Preendorsement",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "preendorsement"
+                                ]
+                              },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
+                              }
+                            },
+                            "required": [
+                              "block_payload_hash",
+                              "round",
+                              "level",
+                              "slot",
                               "kind"
                             ],
                             "additionalProperties": false
@@ -939,14 +1000,68 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "endorsement"
                                 ]
                               },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
                               "level": {
                                 "type": "integer",
                                 "minimum": -2147483648,
                                 "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
                               }
                             },
                             "required": [
+                              "block_payload_hash",
+                              "round",
                               "level",
+                              "slot",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Preendorsement",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "preendorsement"
+                                ]
+                              },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
+                              }
+                            },
+                            "required": [
+                              "block_payload_hash",
+                              "round",
+                              "level",
+                              "slot",
                               "kind"
                             ],
                             "additionalProperties": false
@@ -979,32 +1094,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Endorsement_with_slot",
-                            "type": "object",
-                            "properties": {
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "endorsement_with_slot"
-                                ]
-                              },
-                              "endorsement": {
-                                "$ref": "#/definitions/alpha.inlined.endorsement"
-                              },
-                              "slot": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 65535
-                              }
-                            },
-                            "required": [
-                              "slot",
-                              "endorsement",
-                              "kind"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
                             "title": "Double_endorsement_evidence",
                             "type": "object",
                             "properties": {
@@ -1019,15 +1108,33 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               },
                               "op2": {
                                 "$ref": "#/definitions/alpha.inlined.endorsement"
-                              },
-                              "slot": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 65535
                               }
                             },
                             "required": [
-                              "slot",
+                              "op2",
+                              "op1",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Double_preendorsement_evidence",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "double_preendorsement_evidence"
+                                ]
+                              },
+                              "op1": {
+                                "$ref": "#/definitions/alpha.inlined.preendorsement"
+                              },
+                              "op2": {
+                                "$ref": "#/definitions/alpha.inlined.preendorsement"
+                              }
+                            },
+                            "required": [
                               "op2",
                               "op1",
                               "kind"
@@ -1402,6 +1509,45 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               },
                               "delegate": {
                                 "$ref": "#/definitions/Signature.Public_key_hash"
+                              }
+                            },
+                            "required": [
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Set_deposits_limit",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "set_deposits_limit"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "limit": {
+                                "$ref": "#/definitions/alpha.mutez"
                               }
                             },
                             "required": [
@@ -1846,6 +1992,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           }
                         ]
+                      },
+                      "value_hash": {
+                        "title": "Hash of a consensus value (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
                       }
                     }
                   },
@@ -2338,6 +2488,127 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
+                          "title": "alpha.inlined.preendorsement.contents"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 43,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 20,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Preendorsement"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.inlined.preendorsement"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "branch",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "operations",
+                              "layout": {
+                                "name": "alpha.inlined.preendorsement.contents",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "size": 43,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "signature",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
                           "title": "public_key_hash"
                         },
                         "encoding": {
@@ -2568,13 +2839,24 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "priority",
+                              "name": "payload_hash",
                               "layout": {
-                                "size": "Uint16",
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "payload_round",
+                              "layout": {
+                                "size": "Int32",
                                 "kind": "Int"
                               },
                               "data_kind": {
-                                "size": 2,
+                                "size": 4,
                                 "kind": "Float"
                               },
                               "kind": "named"
@@ -2632,17 +2914,17 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "alpha.inlined.endorsement.contents"
+                          "title": "alpha.inlined.endorsement_mempool.contents"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
                           "kind": {
-                            "size": 5,
+                            "size": 43,
                             "kind": "Float"
                           },
                           "cases": [
                             {
-                              "tag": 0,
+                              "tag": 21,
                               "fields": [
                                 {
                                   "name": "Tag",
@@ -2657,6 +2939,18 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
                                   "name": "level",
                                   "layout": {
                                     "size": "Int32",
@@ -2664,6 +2958,29 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   },
                                   "data_kind": {
                                     "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
                                     "kind": "Float"
                                   },
                                   "kind": "named"
@@ -2694,11 +3011,11 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "operations",
                               "layout": {
-                                "name": "alpha.inlined.endorsement.contents",
+                                "name": "alpha.inlined.endorsement_mempool.contents",
                                 "kind": "Ref"
                               },
                               "data_kind": {
-                                "size": 5,
+                                "size": 43,
                                 "kind": "Float"
                               },
                               "kind": "named"
@@ -2726,36 +3043,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "kind": "Dynamic"
                           },
                           "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Endorsement"
-                            },
                             {
                               "tag": 1,
                               "fields": [
@@ -2841,18 +3128,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   },
                                   "data_kind": {
                                     "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "slot",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
                                   },
                                   "kind": "named"
                                 }
@@ -3075,7 +3350,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               "name": "Ballot"
                             },
                             {
-                              "tag": 10,
+                              "tag": 7,
                               "fields": [
                                 {
                                   "name": "Tag",
@@ -3095,9 +3370,9 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "size": "Uint30"
                                 },
                                 {
-                                  "name": "endorsement",
+                                  "name": "op1",
                                   "layout": {
-                                    "name": "alpha.inlined.endorsement",
+                                    "name": "alpha.inlined.preendorsement",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -3106,19 +3381,23 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
-                                  "name": "slot",
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "op2",
                                   "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
+                                    "name": "alpha.inlined.preendorsement",
+                                    "kind": "Ref"
                                   },
                                   "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
+                                    "kind": "Variable"
                                   },
                                   "kind": "named"
                                 }
                               ],
-                              "name": "Endorsement_with_slot"
+                              "name": "Double_preendorsement_evidence"
                             },
                             {
                               "tag": 17,
@@ -3152,6 +3431,136 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Failing_noop"
+                            },
+                            {
+                              "tag": 20,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Preendorsement"
+                            },
+                            {
+                              "tag": 21,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Endorsement"
                             },
                             {
                               "tag": 107,
@@ -3640,6 +4049,95 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Register_global_constant"
+                            },
+                            {
+                              "tag": 112,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "option_indicator",
+                                  "name": "limit"
+                                },
+                                {
+                                  "name": "limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Set_deposits_limit"
                             }
                           ]
                         }
@@ -4360,10 +4858,13 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "context": {
                             "$ref": "#/definitions/Context_hash"
                           },
-                          "priority": {
+                          "payload_hash": {
+                            "$ref": "#/definitions/value_hash"
+                          },
+                          "payload_round": {
                             "type": "integer",
-                            "minimum": 0,
-                            "maximum": 65535
+                            "minimum": -2147483648,
+                            "maximum": 2147483647
                           },
                           "proof_of_work_nonce": {
                             "type": "string",
@@ -4383,7 +4884,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "signature",
                           "liquidity_baking_escape_vote",
                           "proof_of_work_nonce",
-                          "priority",
+                          "payload_round",
+                          "payload_hash",
                           "context",
                           "fitness",
                           "operations_hash",
@@ -4453,7 +4955,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/block_hash"
                           },
                           "operations": {
-                            "$ref": "#/definitions/alpha.inlined.endorsement.contents"
+                            "$ref": "#/definitions/alpha.inlined.endorsement_mempool.contents"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -4465,7 +4967,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "alpha.inlined.endorsement.contents": {
+                      "alpha.inlined.endorsement_mempool.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -4477,14 +4979,92 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "endorsement"
                                 ]
                               },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
                               "level": {
                                 "type": "integer",
                                 "minimum": -2147483648,
                                 "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
                               }
                             },
                             "required": [
+                              "block_payload_hash",
+                              "round",
                               "level",
+                              "slot",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "alpha.inlined.preendorsement": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "branch": {
+                            "$ref": "#/definitions/block_hash"
+                          },
+                          "operations": {
+                            "$ref": "#/definitions/alpha.inlined.preendorsement.contents"
+                          },
+                          "signature": {
+                            "$ref": "#/definitions/Signature"
+                          }
+                        },
+                        "required": [
+                          "operations",
+                          "branch"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "alpha.inlined.preendorsement.contents": {
+                        "oneOf": [
+                          {
+                            "title": "Preendorsement",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "preendorsement"
+                                ]
+                              },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
+                              }
+                            },
+                            "required": [
+                              "block_payload_hash",
+                              "round",
+                              "level",
+                              "slot",
                               "kind"
                             ],
                             "additionalProperties": false
@@ -4658,14 +5238,68 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                   "endorsement"
                                 ]
                               },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
                               "level": {
                                 "type": "integer",
                                 "minimum": -2147483648,
                                 "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
                               }
                             },
                             "required": [
+                              "block_payload_hash",
+                              "round",
                               "level",
+                              "slot",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Preendorsement",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "preendorsement"
+                                ]
+                              },
+                              "slot": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "round": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "block_payload_hash": {
+                                "$ref": "#/definitions/value_hash"
+                              }
+                            },
+                            "required": [
+                              "block_payload_hash",
+                              "round",
+                              "level",
+                              "slot",
                               "kind"
                             ],
                             "additionalProperties": false
@@ -4698,32 +5332,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
-                            "title": "Endorsement_with_slot",
-                            "type": "object",
-                            "properties": {
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "endorsement_with_slot"
-                                ]
-                              },
-                              "endorsement": {
-                                "$ref": "#/definitions/alpha.inlined.endorsement"
-                              },
-                              "slot": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 65535
-                              }
-                            },
-                            "required": [
-                              "slot",
-                              "endorsement",
-                              "kind"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
                             "title": "Double_endorsement_evidence",
                             "type": "object",
                             "properties": {
@@ -4738,15 +5346,33 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               },
                               "op2": {
                                 "$ref": "#/definitions/alpha.inlined.endorsement"
-                              },
-                              "slot": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 65535
                               }
                             },
                             "required": [
-                              "slot",
+                              "op2",
+                              "op1",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Double_preendorsement_evidence",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "double_preendorsement_evidence"
+                                ]
+                              },
+                              "op1": {
+                                "$ref": "#/definitions/alpha.inlined.preendorsement"
+                              },
+                              "op2": {
+                                "$ref": "#/definitions/alpha.inlined.preendorsement"
+                              }
+                            },
+                            "required": [
                               "op2",
                               "op1",
                               "kind"
@@ -5121,6 +5747,45 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               },
                               "delegate": {
                                 "$ref": "#/definitions/Signature.Public_key_hash"
+                              }
+                            },
+                            "required": [
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Set_deposits_limit",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "set_deposits_limit"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "limit": {
+                                "$ref": "#/definitions/alpha.mutez"
                               }
                             },
                             "required": [
@@ -5596,6 +6261,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           }
                         ]
+                      },
+                      "value_hash": {
+                        "title": "Hash of a consensus value (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
                       }
                     }
                   },
