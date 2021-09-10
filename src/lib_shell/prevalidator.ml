@@ -98,6 +98,84 @@ type types_state_shell = {
   mutable banned_operations : Operation_hash.Set.t;
 }
 
+(** [handle_live_operations chain_db from_branch to_branch live_blocks old_mempool]
+    gathers the operations from [from_branch] that are NOT in [to_branch],
+    so that they are considered pending afterwards. Obtained operations
+    are eligible to be propagated. On the other hand, all newly included operations
+    are cleared and won't be propagated. Please note that, when
+    we solely increment the head, there are only operations in [to_branch]. *)
+let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
+    old_mempool =
+  let chain_store = Distributed_db.chain_store chain_db in
+  let rec pop_block ancestor block mempool =
+    let hash = Store.Block.hash block in
+    if Block_hash.equal hash ancestor then Lwt.return mempool
+    else
+      let operations = Store.Block.operations block in
+      List.fold_left_s
+        (List.fold_left_s (fun mempool op ->
+             let h = Operation.hash op in
+             Distributed_db.inject_operation chain_db h op >|= fun (_ : bool) ->
+             Operation_hash.Map.add h op mempool))
+        mempool
+        operations
+      >>= fun mempool ->
+      Store.Block.read_predecessor_opt chain_store block >>= function
+      | None ->
+          (* Can this happen? If yes, there's nothing more to pop anyway,
+             so returning the accumulator. It's not the mempool that
+             should crash, should this case happen. *)
+          Lwt.return mempool
+      | Some predecessor -> pop_block ancestor predecessor mempool
+  in
+  let push_block mempool block =
+    let operations = Store.Block.all_operation_hashes block in
+    List.iter
+      (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
+      operations ;
+    List.fold_left
+      (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
+      mempool
+      operations
+  in
+  Store.Chain_traversal.new_blocks
+    chain_store
+    ~from_block:from_branch
+    ~to_block:to_branch
+  >>= fun (ancestor, path) ->
+  pop_block (Store.Block.hash ancestor) from_branch old_mempool
+  >>= fun mempool ->
+  let new_mempool = List.fold_left push_block mempool path in
+  let (new_mempool, outdated) =
+    Operation_hash.Map.partition
+      (fun _oph op -> Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+      new_mempool
+  in
+  Operation_hash.Map.iter
+    (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
+    outdated ;
+  Lwt.return new_mempool
+
+let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
+    ~pending ~chain_db ~handle_branch_refused =
+  handle_live_operations
+    chain_db
+    ~from_branch
+    ~to_branch
+    ~live_blocks
+    (Operation_hash.Map.union
+       (fun _key v _ -> Some v)
+       (Classification.to_map
+          ~applied:true
+          ~branch_delayed:true
+          ~branch_refused:handle_branch_refused
+          ~refused:false
+          classification)
+       pending)
+  >>= fun pending ->
+  Classification.flush classification ~handle_branch_refused ;
+  Lwt.return pending
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -356,65 +434,6 @@ module Make
   open Types
 
   type worker = Worker.infinite Worker.queue Worker.t
-
-  (** [handle_live_operations chain_db from_branch to_branch live_blocks old_mempool]
-      gathers the operations from [from_branch] that are NOT in [to_branch],
-      so that they are considered pending afterwards. Obtained operations
-      are eligible to be propagated. On the other hand, all newly included operations
-      are cleared and won't be propagated. Please note that, when
-      we solely increment the head, there are only operations in [to_branch]. *)
-  let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
-      old_mempool =
-    let chain_store = Distributed_db.chain_store chain_db in
-    let rec pop_block ancestor block mempool =
-      let hash = Store.Block.hash block in
-      if Block_hash.equal hash ancestor then Lwt.return mempool
-      else
-        let operations = Store.Block.operations block in
-        List.fold_left_s
-          (List.fold_left_s (fun mempool op ->
-               let h = Operation.hash op in
-               Distributed_db.inject_operation chain_db h op
-               >|= fun (_ : bool) -> Operation_hash.Map.add h op mempool))
-          mempool
-          operations
-        >>= fun mempool ->
-        Store.Block.read_predecessor_opt chain_store block >>= function
-        | None ->
-            (* Can this happen? If yes, there's nothing more to pop anyway,
-               so returning the accumulator. It's not the mempool that
-               should crash, should this case happen. *)
-            Lwt.return mempool
-        | Some predecessor -> pop_block ancestor predecessor mempool
-    in
-    let push_block mempool block =
-      let operations = Store.Block.all_operation_hashes block in
-      List.iter
-        (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
-        operations ;
-      List.fold_left
-        (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
-        mempool
-        operations
-    in
-    Store.Chain_traversal.new_blocks
-      chain_store
-      ~from_block:from_branch
-      ~to_block:to_branch
-    >>= fun (ancestor, path) ->
-    pop_block (Store.Block.hash ancestor) from_branch old_mempool
-    >>= fun mempool ->
-    let new_mempool = List.fold_left push_block mempool path in
-    let (new_mempool, outdated) =
-      Operation_hash.Map.partition
-        (fun _oph op ->
-          Block_hash.Set.mem op.Operation.shell.branch live_blocks)
-        new_mempool
-    in
-    Operation_hash.Map.iter
-      (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
-      outdated ;
-    Lwt.return new_mempool
 
   (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
@@ -1040,26 +1059,6 @@ module Make
       Seq.iter_s
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
-
-    let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
-        ~pending ~chain_db ~handle_branch_refused =
-      handle_live_operations
-        chain_db
-        ~from_branch
-        ~to_branch
-        ~live_blocks
-        (Operation_hash.Map.union
-           (fun _key v _ -> Some v)
-           (Classification.to_map
-              ~applied:true
-              ~branch_delayed:true
-              ~branch_refused:handle_branch_refused
-              ~refused:false
-              classification)
-           pending)
-      >>= fun pending ->
-      Classification.flush classification ~handle_branch_refused ;
-      Lwt.return pending
 
     let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
