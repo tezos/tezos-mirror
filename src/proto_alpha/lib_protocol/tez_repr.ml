@@ -133,12 +133,15 @@ let mul_exn t m =
   | Ok v -> v
   | Error _ -> invalid_arg "mul_exn"
 
+let div_exn t d =
+  match t /? Int64.(of_int d) with
+  | Ok v -> v
+  | Error _ -> invalid_arg "div_exn"
+
 let of_mutez t = if t < 0L then None else Some t
 
 let of_mutez_exn x =
   match of_mutez x with None -> invalid_arg "Tez.of_mutez" | Some v -> v
-
-let to_int64 t = t
 
 let to_mutez t = t
 

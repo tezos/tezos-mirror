@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Public_key_map = Map.Make (Signature.Public_key)
+
 type 'a lazyt = unit -> 'a
 
 type 'a lazy_list_t = LCons of 'a * 'a lazy_list_t tzresult Lwt.t lazyt

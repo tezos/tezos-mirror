@@ -50,10 +50,10 @@ let () =
     (fun pkh -> Balance_rpc_non_delegate pkh)
 
 type info = {
-  balance : Tez.t;
-  frozen_balance : Tez.t;
-  frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+  full_balance : Tez.t;
+  frozen_deposits : Tez.t;
   staking_balance : Tez.t;
+  frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
   deactivated : bool;
@@ -65,39 +65,39 @@ let info_encoding =
   let open Data_encoding in
   conv
     (fun {
-           balance;
-           frozen_balance;
-           frozen_balance_by_cycle;
+           full_balance;
+           frozen_deposits;
            staking_balance;
+           frozen_deposits_limit;
            delegated_contracts;
            delegated_balance;
            deactivated;
            grace_period;
            voting_power;
          } ->
-      ( balance,
-        frozen_balance,
-        frozen_balance_by_cycle,
+      ( full_balance,
+        frozen_deposits,
         staking_balance,
+        frozen_deposits_limit,
         delegated_contracts,
         delegated_balance,
         deactivated,
         grace_period,
         voting_power ))
-    (fun ( balance,
-           frozen_balance,
-           frozen_balance_by_cycle,
+    (fun ( full_balance,
+           frozen_deposits,
            staking_balance,
+           frozen_deposits_limit,
            delegated_contracts,
            delegated_balance,
            deactivated,
            grace_period,
            voting_power ) ->
       {
-        balance;
-        frozen_balance;
-        frozen_balance_by_cycle;
+        full_balance;
+        frozen_deposits;
         staking_balance;
+        frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
         deactivated;
@@ -105,15 +105,54 @@ let info_encoding =
         voting_power;
       })
     (obj9
-       (req "balance" Tez.encoding)
-       (req "frozen_balance" Tez.encoding)
-       (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
+       (req "full_balance" Tez.encoding)
+       (req "frozen_deposits" Tez.encoding)
        (req "staking_balance" Tez.encoding)
+       (opt "frozen_deposits_limit" Tez.encoding)
        (req "delegated_contracts" (list Contract.encoding))
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding)
        (req "voting_power" int32))
+
+let participation_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           Delegate.expected_cycle_activity;
+           minimal_cycle_activity;
+           missed_slots;
+           remaining_allowed_missed_slots;
+           expected_endorsing_rewards;
+           current_pending_rewards;
+         } ->
+      ( expected_cycle_activity,
+        minimal_cycle_activity,
+        missed_slots,
+        remaining_allowed_missed_slots,
+        expected_endorsing_rewards,
+        current_pending_rewards ))
+    (fun ( expected_cycle_activity,
+           minimal_cycle_activity,
+           missed_slots,
+           remaining_allowed_missed_slots,
+           expected_endorsing_rewards,
+           current_pending_rewards ) ->
+      {
+        expected_cycle_activity;
+        minimal_cycle_activity;
+        missed_slots;
+        remaining_allowed_missed_slots;
+        expected_endorsing_rewards;
+        current_pending_rewards;
+      })
+    (obj6
+       (req "expected_cycle_activity" int31)
+       (req "minimal_cycle_activity" int31)
+       (req "missed_slots" bool)
+       (req "remaining_allowed_missed_slots" int31)
+       (req "expected_endorsing_rewards" Tez.encoding)
+       (req "current_pending_rewards" Tez.encoding))
 
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
@@ -145,44 +184,44 @@ module S = struct
       ~output:info_encoding
       path
 
-  let balance =
+  let full_balance =
     RPC_service.get_service
       ~description:
-        "Returns the full balance of a given delegate, including the frozen \
-         balances."
+        "Returns the full balance (in mutez) of a given delegate, including \
+         the frozen balances."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "balance")
+      RPC_path.(path / "full_balance")
 
-  let frozen_balance =
+  let frozen_deposits =
     RPC_service.get_service
       ~description:
-        "Returns the total frozen balances of a given delegate, this includes \
-         the frozen deposits, rewards and fees."
+        "Returns the amount of frozen deposits (in mutez) for a specific level \
+         or the total sum when no specific level is provided."
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "frozen_balance")
-
-  let frozen_balance_by_cycle =
-    RPC_service.get_service
-      ~description:
-        "Returns the frozen balances of a given delegate, indexed by the cycle \
-         by which it will be unfrozen"
-      ~query:RPC_query.empty
-      ~output:Delegate.frozen_balance_by_cycle_encoding
-      RPC_path.(path / "frozen_balance_by_cycle")
+      RPC_path.(path / "frozen_deposits")
 
   let staking_balance =
     RPC_service.get_service
       ~description:
-        "Returns the total amount of tokens delegated to a given delegate. \
-         This includes the balances of all the contracts that delegate to it, \
-         but also the balance of the delegate itself and its frozen fees and \
-         deposits. The rewards do not count in the delegated balance until \
-         they are unfrozen."
+        "Returns the total amount of tokens (in mutez) delegated to a given \
+         delegate. This includes the balances of all the contracts that \
+         delegate to it, but also the balance of the delegate itself and its \
+         frozen fees and deposits. The rewards do not count in the delegated \
+         balance until they are unfrozen."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
+
+  let frozen_deposits_limit =
+    RPC_service.get_service
+      ~description:
+        "Returns the frozen deposits limit for the given delegate or none if \
+         unbounded."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option Tez.encoding)
+      RPC_path.(path / "frozen_deposits_limit")
 
   let delegated_contracts =
     RPC_service.get_service
@@ -195,9 +234,9 @@ module S = struct
   let delegated_balance =
     RPC_service.get_service
       ~description:
-        "Returns the balances of all the contracts that delegate to a given \
-         delegate. This excludes the delegate's own balance and its frozen \
-         balances."
+        "Returns the balances (in mutez) of all the contracts that delegate to \
+         a given delegate. This excludes the delegate's own balance and its \
+         frozen balances."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")
@@ -229,9 +268,20 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Data_encoding.int32
       RPC_path.(path / "voting_power")
+
+  let participation =
+    RPC_service.get_service
+      ~description:
+        "Returns cycle and level participation information. In particular this \
+         indicates the total number of slots that are required for a delegate \
+         to endorse in the current cycle in order to be awarded its endorsing \
+         rewards."
+      ~query:RPC_query.empty
+      ~output:participation_info_encoding
+      RPC_path.(path / "participation")
 end
 
-let delegate_register () =
+let register () =
   let open Services_registration in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
@@ -245,39 +295,38 @@ let delegate_register () =
       | _ -> return delegates) ;
   register1 ~chunked:false S.info (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.full_balance ctxt pkh >>=? fun balance ->
-      Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
-      Delegate.frozen_balance_by_cycle ctxt pkh
-      >>= fun frozen_balance_by_cycle ->
+      Delegate.full_balance ctxt pkh >>=? fun full_balance ->
+      Delegate.frozen_deposits ctxt pkh >>=? fun frozen_deposits ->
       Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
+      Delegate.frozen_deposits_limit ctxt pkh >>=? fun frozen_deposits_limit ->
       Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
       Delegate.grace_period ctxt pkh >>=? fun grace_period ->
       Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
       {
-        balance;
-        frozen_balance;
-        frozen_balance_by_cycle;
+        full_balance;
+        frozen_deposits;
         staking_balance;
+        frozen_deposits_limit;
         delegated_contracts;
         delegated_balance;
         deactivated;
         grace_period;
         voting_power;
       }) ;
-  register1 ~chunked:false S.balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
       >>=? fun () -> Delegate.full_balance ctxt pkh) ;
-  register1 ~chunked:false S.frozen_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.frozen_balance ctxt pkh) ;
-  register1 ~chunked:true S.frozen_balance_by_cycle (fun ctxt pkh () () ->
-      Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.frozen_balance_by_cycle ctxt pkh >|= ok) ;
+      Delegate.frozen_deposits ctxt pkh) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
+  register1 ~chunked:false S.frozen_deposits_limit (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Delegate.frozen_deposits_limit ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
@@ -292,24 +341,27 @@ let delegate_register () =
       Delegate.grace_period ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Vote.get_voting_power_free ctxt pkh)
+      Vote.get_voting_power_free ctxt pkh) ;
+  register1 ~chunked:false S.participation (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Delegate.delegate_participation_info ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =
   RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
 
 let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 
-let balance ctxt block pkh =
-  RPC_context.make_call1 S.balance ctxt block pkh () ()
+let full_balance ctxt block pkh =
+  RPC_context.make_call1 S.full_balance ctxt block pkh () ()
 
-let frozen_balance ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balance ctxt block pkh () ()
-
-let frozen_balance_by_cycle ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balance_by_cycle ctxt block pkh () ()
+let frozen_deposits ctxt block pkh =
+  RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()
 
 let staking_balance ctxt block pkh =
   RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
+
+let frozen_deposits_limit ctxt block pkh =
+  RPC_context.make_call1 S.frozen_deposits_limit ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
@@ -325,66 +377,3 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
-
-module Minimal_valid_time = struct
-  let minimal_valid_time ctxt ~priority ~endorsing_power ~predecessor_timestamp
-      =
-    Baking.minimal_valid_time
-      (Constants.parametric ctxt)
-      ~priority
-      ~endorsing_power
-      ~predecessor_timestamp
-
-  module S = struct
-    type t = {priority : int; endorsing_power : int}
-
-    let minimal_valid_time_query =
-      let open RPC_query in
-      query (fun priority endorsing_power -> {priority; endorsing_power})
-      |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
-      |+ field "endorsing_power" RPC_arg.int 0 (fun t -> t.endorsing_power)
-      |> seal
-
-    let minimal_valid_time =
-      RPC_service.get_service
-        ~description:
-          "Minimal valid time for a block given a priority and an endorsing \
-           power."
-        ~query:minimal_valid_time_query
-        ~output:Time.encoding
-        RPC_path.(open_root / "minimal_valid_time")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0
-      ~chunked:false
-      S.minimal_valid_time
-      (fun ctxt {priority; endorsing_power} () ->
-        let predecessor_timestamp = Timestamp.predecessor ctxt in
-        Lwt.return
-        @@ minimal_valid_time
-             ctxt
-             ~priority
-             ~endorsing_power
-             ~predecessor_timestamp)
-
-  let get ctxt block priority endorsing_power =
-    RPC_context.make_call0
-      S.minimal_valid_time
-      ctxt
-      block
-      {priority; endorsing_power}
-      ()
-end
-
-let register () =
-  delegate_register () ;
-  Minimal_valid_time.register ()
-
-let minimal_valid_time ctxt priority endorsing_power predecessor_timestamp =
-  Minimal_valid_time.minimal_valid_time
-    ctxt
-    ~priority
-    ~endorsing_power
-    ~predecessor_timestamp

@@ -55,6 +55,9 @@ val take : sequence -> bytes * sequence
 (** Generates the next random value as a bounded [int32] *)
 val take_int32 : sequence -> int32 -> int32 * sequence
 
+(** Generates the next random value as a bounded [int64] *)
+val take_int64 : sequence -> int64 -> int64 * sequence
+
 (** {2 Predefined seeds} *)
 
 val empty : seed

@@ -30,10 +30,9 @@ val init :
     Script_repr.t ->
     ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t) tzresult
     Lwt.t) ->
-  ?ramp_up_cycles:int ->
   ?no_reward_cycles:int ->
   Parameters_repr.bootstrap_account list ->
   Parameters_repr.bootstrap_contract list ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t

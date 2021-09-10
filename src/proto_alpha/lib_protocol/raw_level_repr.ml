@@ -47,6 +47,15 @@ let root = 0l
 
 let succ = Int32.succ
 
+let add l i =
+  assert (Compare.Int.(i >= 0)) ;
+  Int32.add l (Int32.of_int i)
+
+let sub l i =
+  assert (Compare.Int.(i >= 0)) ;
+  let res = Int32.sub l (Int32.of_int i) in
+  if Compare.Int32.(res >= 0l) then Some res else None
+
 let pred l = if l = 0l then None else Some (Int32.pred l)
 
 let diff = Int32.sub

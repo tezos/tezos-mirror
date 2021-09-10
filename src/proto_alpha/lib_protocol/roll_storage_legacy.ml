@@ -24,12 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc
-
 type error +=
   | (* `Permanent *) Consume_roll_change
   | (* `Permanent *) No_roll_for_delegate
-  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
+  | (* `Permanent *) No_stake_snapshot_for_cycle of Cycle_repr.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
 let () =
@@ -58,7 +56,7 @@ let () =
   (* No roll snapshot for cycle *)
   register_error_kind
     `Permanent
-    ~id:"contract.manager.no_roll_snapshot_for_cycle"
+    ~id:"contract.manager.no_stake_snapshot_for_cycle"
     ~title:"No roll snapshot for cycle"
     ~description:
       "A snapshot of the rolls distribution does not exist for this cycle."
@@ -69,12 +67,12 @@ let () =
         Cycle_repr.pp
         c)
     (obj1 (req "cycle" Cycle_repr.encoding))
-    (function No_roll_snapshot_for_cycle c -> Some c | _ -> None)
-    (fun c -> No_roll_snapshot_for_cycle c) ;
+    (function No_stake_snapshot_for_cycle c -> Some c | _ -> None)
+    (fun c -> No_stake_snapshot_for_cycle c) ;
   (* Unregistered delegate *)
   register_error_kind
     `Permanent
-    ~id:"contract.manager.unregistered_delegate"
+    ~id:"contract.manager.unregistered_delegate_legacy"
     ~title:"Unregistered delegate"
     ~description:"A contract cannot be delegated to an unregistered delegate"
     ~pp:(fun ppf k ->
@@ -97,130 +95,48 @@ let delegate_pubkey ctxt delegate =
   | None | Some (Manager_repr.Hash _) -> fail (Unregistered_delegate delegate)
   | Some (Manager_repr.Public_key pk) -> return pk
 
-let clear_cycle ctxt cycle =
-  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun index ->
-  Storage.Roll.Snapshot_for_cycle.remove_existing ctxt cycle >>=? fun ctxt ->
-  Storage.Roll.Last_for_snapshot.remove_existing (ctxt, cycle) index
-  >>=? fun ctxt -> Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >|= ok
-
 let fold ctxt ~f init =
-  Storage.Roll.Next.get ctxt >>=? fun last ->
+  Storage.Roll_legacy.Next.get ctxt >>=? fun last ->
   let[@coq_struct "roll"] rec loop ctxt roll acc =
-    if Roll_repr.(roll = last) then return acc
+    if Roll_repr_legacy.(roll = last) then return acc
     else
-      Storage.Roll.Owner.find ctxt roll >>=? function
-      | None -> loop ctxt (Roll_repr.succ roll) acc
+      Storage.Roll_legacy.Owner.find ctxt roll >>=? function
+      | None -> loop ctxt (Roll_repr_legacy.succ roll) acc
       | Some delegate ->
           f roll delegate acc >>=? fun acc ->
-          loop ctxt (Roll_repr.succ roll) acc
+          loop ctxt (Roll_repr_legacy.succ roll) acc
   in
-  loop ctxt Roll_repr.first init
-
-let snapshot_rolls_for_cycle ctxt cycle =
-  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun index ->
-  Storage.Roll.Snapshot_for_cycle.update ctxt cycle (index + 1) >>=? fun ctxt ->
-  Storage.Roll.Owner.snapshot ctxt (cycle, index) >>=? fun ctxt ->
-  Storage.Roll.Next.get ctxt >>=? fun last ->
-  Storage.Roll.Last_for_snapshot.init (ctxt, cycle) index last
-
-(* NOTE: Deletes all snapshots for a given cycle that are not randomly selected. *)
-let freeze_rolls_for_cycle ctxt cycle =
-  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun max_index ->
-  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
-  let rd = Seed_repr.initialize_new seed [Bytes.of_string "roll_snapshot"] in
-  let seq = Seed_repr.sequence rd 0l in
-  let selected_index =
-    Seed_repr.take_int32 seq (Int32.of_int max_index) |> fst |> Int32.to_int
-  in
-  Storage.Roll.Snapshot_for_cycle.update ctxt cycle selected_index
-  >>=? fun ctxt ->
-  List.fold_left_es
-    (fun ctxt index ->
-      if Compare.Int.(index = selected_index) then return ctxt
-      else
-        Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >>= fun ctxt ->
-        Storage.Roll.Last_for_snapshot.remove_existing (ctxt, cycle) index)
-    ctxt
-    (0 --> (max_index - 1))
-
-(* Roll selection *)
-module Random = struct
-  let int32_to_bytes i =
-    let b = Bytes.make 4 '0' in
-    TzEndian.set_int32 b 0 i ;
-    b
-
-  let level_random seed use (level : Level_repr.t) =
-    let position = level.Level_repr.cycle_position in
-    Seed_repr.initialize_new
-      seed
-      [Bytes.of_string ("level " ^ use ^ ":"); int32_to_bytes position]
-
-  let owner c kind (level : Level_repr.t) offset =
-    let cycle = level.Level_repr.cycle in
-    Seed_storage.for_cycle c cycle >>=? fun random_seed ->
-    let rd = level_random random_seed kind level in
-    let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
-    Storage.Roll.Snapshot_for_cycle.get c cycle >>=? fun index ->
-    Storage.Roll.Last_for_snapshot.get (c, cycle) index >>=? fun bound ->
-    let rec loop sequence =
-      let (roll, sequence) = Roll_repr.random sequence ~bound in
-      Storage.Roll.Owner.Snapshot.find c ((cycle, index), roll) >>=? function
-      | None -> loop sequence
-      | Some delegate -> return delegate
-    in
-    Storage.Roll.Owner.snapshot_exists c (cycle, index)
-    >>= fun snapshot_exists ->
-    error_unless snapshot_exists (No_roll_snapshot_for_cycle cycle)
-    >>?= fun () -> loop sequence
-end
-
-let baking_rights_owner c level ~priority =
-  Random.owner c "baking" level priority
-
-let endorsement_rights_owner c level ~slot =
-  Random.owner c "endorsement" level slot
-
-let count_rolls ctxt delegate =
-  Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? function
-  | None -> return 0
-  | Some head_roll ->
-      let[@coq_struct "roll"] rec loop acc roll =
-        Storage.Roll.Successor.find ctxt roll >>=? function
-        | None -> return acc
-        | Some next -> loop (succ acc) next
-      in
-      loop 1 head_roll
+  loop ctxt Roll_repr_legacy.first init
 
 let get_change ctxt delegate =
-  Storage.Roll.Delegate_change.find ctxt delegate
+  Storage.Roll_legacy.Delegate_change.find ctxt delegate
   >|=? Option.value ~default:Tez_repr.zero
 
 module Delegate = struct
   let fresh_roll ctxt =
-    Storage.Roll.Next.get ctxt >>=? fun roll ->
-    Storage.Roll.Next.update ctxt (Roll_repr.succ roll) >|=? fun ctxt ->
-    (roll, ctxt)
+    Storage.Roll_legacy.Next.get ctxt >>=? fun roll ->
+    Storage.Roll_legacy.Next.update ctxt (Roll_repr_legacy.succ roll)
+    >|=? fun ctxt -> (roll, ctxt)
 
   let get_limbo_roll ctxt =
-    Storage.Roll.Limbo.find ctxt >>=? function
+    Storage.Roll_legacy.Limbo.find ctxt >>=? function
     | None ->
         fresh_roll ctxt >>=? fun (roll, ctxt) ->
-        Storage.Roll.Limbo.init ctxt roll >|=? fun ctxt -> (roll, ctxt)
+        Storage.Roll_legacy.Limbo.init ctxt roll >|=? fun ctxt -> (roll, ctxt)
     | Some roll -> return (roll, ctxt)
 
   let consume_roll_change ctxt delegate =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
     record_trace Consume_roll_change Tez_repr.(change -? tokens_per_roll)
     >>?= fun new_change ->
-    Storage.Roll.Delegate_change.update ctxt delegate new_change
+    Storage.Roll_legacy.Delegate_change.update ctxt delegate new_change
 
   let recover_roll_change ctxt delegate =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
     Tez_repr.(change +? tokens_per_roll) >>?= fun new_change ->
-    Storage.Roll.Delegate_change.update ctxt delegate new_change
+    Storage.Roll_legacy.Delegate_change.update ctxt delegate new_change
 
   let pop_roll_from_delegate ctxt delegate =
     recover_roll_change ctxt delegate >>=? fun ctxt ->
@@ -228,13 +144,13 @@ module Delegate = struct
        delegate : roll -> successor_roll -> ...
        limbo : limbo_head -> ...
     *)
-    Storage.Roll.Limbo.find ctxt >>=? fun limbo_head ->
-    Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? function
+    Storage.Roll_legacy.Limbo.find ctxt >>=? fun limbo_head ->
+    Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate >>=? function
     | None -> fail No_roll_for_delegate
     | Some roll ->
-        Storage.Roll.Owner.remove_existing ctxt roll >>=? fun ctxt ->
-        Storage.Roll.Successor.find ctxt roll >>=? fun successor_roll ->
-        Storage.Roll.Delegate_roll_list.add_or_remove
+        Storage.Roll_legacy.Owner.remove_existing ctxt roll >>=? fun ctxt ->
+        Storage.Roll_legacy.Successor.find ctxt roll >>=? fun successor_roll ->
+        Storage.Roll_legacy.Delegate_roll_list.add_or_remove
           ctxt
           delegate
           successor_roll
@@ -242,12 +158,12 @@ module Delegate = struct
         (* delegate : successor_roll -> ...
            roll ------^
            limbo : limbo_head -> ... *)
-        Storage.Roll.Successor.add_or_remove ctxt roll limbo_head
+        Storage.Roll_legacy.Successor.add_or_remove ctxt roll limbo_head
         >>= fun ctxt ->
         (* delegate : successor_roll -> ...
            roll ------v
            limbo : limbo_head -> ... *)
-        Storage.Roll.Limbo.add ctxt roll >|= fun ctxt ->
+        Storage.Roll_legacy.Limbo.add ctxt roll >|= fun ctxt ->
         (* delegate : successor_roll -> ...
            limbo : roll -> limbo_head -> ... *)
         ok (roll, ctxt)
@@ -258,27 +174,30 @@ module Delegate = struct
        delegate : delegate_head -> ...
        limbo : roll -> limbo_successor -> ...
     *)
-    Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? fun delegate_head ->
+    Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate
+    >>=? fun delegate_head ->
     get_limbo_roll ctxt >>=? fun (roll, ctxt) ->
-    Storage.Roll.Owner.init ctxt roll delegate_pk >>=? fun ctxt ->
-    Storage.Roll.Successor.find ctxt roll >>=? fun limbo_successor ->
-    Storage.Roll.Limbo.add_or_remove ctxt limbo_successor >>= fun ctxt ->
+    Storage.Roll_legacy.Owner.init ctxt roll delegate_pk >>=? fun ctxt ->
+    Storage.Roll_legacy.Successor.find ctxt roll >>=? fun limbo_successor ->
+    Storage.Roll_legacy.Limbo.add_or_remove ctxt limbo_successor >>= fun ctxt ->
     (* delegate : delegate_head -> ...
        roll ------v
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Successor.add_or_remove ctxt roll delegate_head >>= fun ctxt ->
+    Storage.Roll_legacy.Successor.add_or_remove ctxt roll delegate_head
+    >>= fun ctxt ->
     (* delegate : delegate_head -> ...
        roll ------^
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Delegate_roll_list.add ctxt delegate roll
+    Storage.Roll_legacy.Delegate_roll_list.add ctxt delegate roll
     (* delegate : roll -> delegate_head -> ...
        limbo : limbo_successor -> ... *)
     >|= ok
 
   let ensure_inited ctxt delegate =
-    Storage.Roll.Delegate_change.mem ctxt delegate >>= function
+    Storage.Roll_legacy.Delegate_change.mem ctxt delegate >>= function
     | true -> return ctxt
-    | false -> Storage.Roll.Delegate_change.init ctxt delegate Tez_repr.zero
+    | false ->
+        Storage.Roll_legacy.Delegate_change.init ctxt delegate Tez_repr.zero
 
   let is_inactive ctxt delegate =
     Storage.Contract.Inactive_delegate.mem
@@ -304,9 +223,10 @@ module Delegate = struct
   let add_amount ctxt delegate amount =
     ensure_inited ctxt delegate >>=? fun ctxt ->
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
     Tez_repr.(amount +? change) >>?= fun change ->
-    Storage.Roll.Delegate_change.update ctxt delegate change >>=? fun ctxt ->
+    Storage.Roll_legacy.Delegate_change.update ctxt delegate change
+    >>=? fun ctxt ->
     delegate_pubkey ctxt delegate >>=? fun delegate_pk ->
     let[@coq_struct "change"] rec loop ctxt change =
       if Tez_repr.(change < tokens_per_roll) then return ctxt
@@ -319,10 +239,12 @@ module Delegate = struct
     if inactive then return ctxt
     else
       loop ctxt change >>=? fun ctxt ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? fun rolls ->
+      Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate
+      >>=? fun rolls ->
       match rolls with
       | None -> return ctxt
-      | Some _ -> Storage.Active_delegates_with_rolls.add ctxt delegate >|= ok
+      | Some _ ->
+          Storage.Legacy_active_delegates_with_rolls.add ctxt delegate >|= ok
 
   let remove_amount ctxt delegate amount =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
@@ -332,32 +254,34 @@ module Delegate = struct
         pop_roll_from_delegate ctxt delegate >>=? fun (_, ctxt) ->
         Tez_repr.(change +? tokens_per_roll) >>?= fun change -> loop ctxt change
     in
-    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
     is_inactive ctxt delegate >>=? fun inactive ->
     (if inactive then return (ctxt, change)
     else
       loop ctxt change >>=? fun (ctxt, change) ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? fun rolls ->
+      Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate
+      >>=? fun rolls ->
       match rolls with
       | None ->
-          Storage.Active_delegates_with_rolls.remove ctxt delegate
+          Storage.Legacy_active_delegates_with_rolls.remove ctxt delegate
           >|= fun ctxt -> ok (ctxt, change)
       | Some _ -> return (ctxt, change))
     >>=? fun (ctxt, change) ->
     Tez_repr.(change -? amount) >>?= fun change ->
-    Storage.Roll.Delegate_change.update ctxt delegate change
+    Storage.Roll_legacy.Delegate_change.update ctxt delegate change
 
   let set_inactive ctxt delegate =
     ensure_inited ctxt delegate >>=? fun ctxt ->
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
     Storage.Contract.Inactive_delegate.add
       ctxt
       (Contract_repr.implicit_contract delegate)
     >>= fun ctxt ->
-    Storage.Active_delegates_with_rolls.remove ctxt delegate >>= fun ctxt ->
+    Storage.Legacy_active_delegates_with_rolls.remove ctxt delegate
+    >>= fun ctxt ->
     let[@coq_struct "change"] rec loop ctxt change =
-      Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? function
+      Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate >>=? function
       | None -> return (ctxt, change)
       | Some _roll ->
           pop_roll_from_delegate ctxt delegate >>=? fun (_, ctxt) ->
@@ -365,7 +289,7 @@ module Delegate = struct
           loop ctxt change
     in
     loop ctxt change >>=? fun (ctxt, change) ->
-    Storage.Roll.Delegate_change.update ctxt delegate change
+    Storage.Roll_legacy.Delegate_change.update ctxt delegate change
 
   let set_active ctxt delegate =
     is_inactive ctxt delegate >>=? fun inactive ->
@@ -400,7 +324,7 @@ module Delegate = struct
     else
       ensure_inited ctxt delegate >>=? fun ctxt ->
       let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-      Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+      Storage.Roll_legacy.Delegate_change.get ctxt delegate >>=? fun change ->
       Storage.Contract.Inactive_delegate.remove
         ctxt
         (Contract_repr.implicit_contract delegate)
@@ -414,10 +338,12 @@ module Delegate = struct
           loop ctxt change
       in
       loop ctxt change >>=? fun ctxt ->
-      Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? fun rolls ->
+      Storage.Roll_legacy.Delegate_roll_list.find ctxt delegate
+      >>=? fun rolls ->
       match rolls with
       | None -> return ctxt
-      | Some _ -> Storage.Active_delegates_with_rolls.add ctxt delegate >|= ok
+      | Some _ ->
+          Storage.Legacy_active_delegates_with_rolls.add ctxt delegate >|= ok
 end
 
 module Contract = struct
@@ -431,61 +357,3 @@ module Contract = struct
     | None -> return c
     | Some delegate -> Delegate.remove_amount c delegate amount
 end
-
-let init ctxt = Storage.Roll.Next.init ctxt Roll_repr.first
-
-let init_first_cycles ctxt =
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  (* Precompute rolls for cycle (0 --> preserved_cycles) *)
-  List.fold_left_es
-    (fun ctxt c ->
-      let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
-      Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
-      snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
-      freeze_rolls_for_cycle ctxt cycle)
-    ctxt
-    (0 --> preserved)
-  >>=? fun ctxt ->
-  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 1)) in
-  (* Precomputed a snapshot for cycle (preserved_cycles + 1) *)
-  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
-  snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
-  (* Prepare storage for storing snapshots for cycle (preserved_cycles+2) *)
-  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 2)) in
-  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0
-
-let snapshot_rolls ctxt =
-  let current_level = Raw_context.current_level ctxt in
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  let cycle = Cycle_repr.add current_level.cycle (preserved + 2) in
-  snapshot_rolls_for_cycle ctxt cycle
-
-let cycle_end ctxt last_cycle =
-  let preserved = Constants_storage.preserved_cycles ctxt in
-  (match Cycle_repr.sub last_cycle preserved with
-  | None -> return ctxt
-  | Some cleared_cycle -> clear_cycle ctxt cleared_cycle)
-  >>=? fun ctxt ->
-  let frozen_roll_cycle = Cycle_repr.add last_cycle (preserved + 1) in
-  freeze_rolls_for_cycle ctxt frozen_roll_cycle >>=? fun ctxt ->
-  Storage.Roll.Snapshot_for_cycle.init
-    ctxt
-    (Cycle_repr.succ (Cycle_repr.succ frozen_roll_cycle))
-    0
-
-let update_tokens_per_roll ctxt new_tokens_per_roll =
-  let constants = Raw_context.constants ctxt in
-  let old_tokens_per_roll = constants.tokens_per_roll in
-  Raw_context.patch_constants ctxt (fun constants ->
-      {constants with Constants_repr.tokens_per_roll = new_tokens_per_roll})
-  >>= fun ctxt ->
-  let decrease = Tez_repr.(new_tokens_per_roll < old_tokens_per_roll) in
-  (if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
-  else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll))
-  >>?= fun abs_diff ->
-  Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:(fun pkh ctxt_opt ->
-      ctxt_opt >>?= fun ctxt ->
-      count_rolls ctxt pkh >>=? fun rolls ->
-      Tez_repr.(abs_diff *? Int64.of_int rolls) >>?= fun amount ->
-      if decrease then Delegate.add_amount ctxt pkh amount
-      else Delegate.remove_amount ctxt pkh amount)

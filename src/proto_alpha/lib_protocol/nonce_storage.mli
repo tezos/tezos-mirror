@@ -38,13 +38,15 @@ val encoding : nonce Data_encoding.t
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash : Nonce_hash.t;
   delegate : Signature.Public_key_hash.t;
-  rewards : Tez_repr.t;
-  fees : Tez_repr.t;
 }
 
 type status = Unrevealed of unrevealed | Revealed of Seed_repr.nonce
 
 val get : Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
+
+type nonce_presence = No_nonce_expected | Nonce_expected of status
+
+val check : Raw_context.t -> Level_repr.t -> nonce_presence tzresult Lwt.t
 
 val record_hash : Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
 

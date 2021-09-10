@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+(* 32 *)
+let prefix = "\001\106\242" (* vh(52) *)
 
-(* Computed by typing the contract
-   "{parameter unit; storage unit; code FAILWITH}"
-   and evaluating
-   [(8 * Obj.reachable_words (Obj.repr typed_script))]
-   where [typed_script] is of type [ex_script] *)
-let minimal_size_of_typed_contract_in_bytes = 688
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "value_hash"
 
-let approximate_cardinal bytes =
-  S.safe_int (bytes / minimal_size_of_typed_contract_in_bytes)
+      let title = "Hash of a consensus value"
 
-let log2 x = S.safe_int (1 + S.numbits x)
+      let b58check_prefix = prefix
 
-let cache_update_constant = S.safe_int 600
+      let size = None
+    end)
 
-let cache_update_coeff = S.safe_int 57
-
-(* Cost of calling [Environment_cache.update]. *)
-let cache_update ~cache_size_in_bytes =
-  let approx_card = approximate_cardinal cache_size_in_bytes in
-  Gas_limit_repr.atomic_step_cost
-    S.(add cache_update_constant (mul cache_update_coeff (log2 approx_card)))
-
-(* Cost of calling [Environment_cache.find].
-   This overapproximates [cache_find] slightly. *)
-let cache_find = cache_update
+let () = Base58.check_encoded_prefix b58check_encoding "vh" 52

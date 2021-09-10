@@ -36,18 +36,23 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
+   block_payload_hash.mli block_payload_hash.ml
+   slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   round_repr.mli round_repr.ml
+   block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.mli constants_repr.ml
-   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
+   fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
@@ -56,7 +61,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
-   roll_repr.mli roll_repr.ml
+   roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
@@ -73,20 +78,26 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
+   cache_repr.mli cache_repr.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
-   roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   roll_storage_legacy.mli roll_storage_legacy.ml
+   contract_manager_storage.mli contract_manager_storage.ml
+   delegate_activation_storage.mli delegate_activation_storage.ml
+   frozen_deposits_storage.mli frozen_deposits_storage.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
+   commitment_storage.mli commitment_storage.ml
+   token.mli token.ml
+   delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
-   commitment_storage.mli commitment_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
@@ -97,7 +108,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
-   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
@@ -143,18 +153,23 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
+   block_payload_hash.mli block_payload_hash.ml
+   slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   round_repr.mli round_repr.ml
+   block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.mli constants_repr.ml
-   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
+   fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
@@ -163,7 +178,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
-   roll_repr.mli roll_repr.ml
+   roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
@@ -180,20 +195,26 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
+   cache_repr.mli cache_repr.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
-   roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   roll_storage_legacy.mli roll_storage_legacy.ml
+   contract_manager_storage.mli contract_manager_storage.ml
+   delegate_activation_storage.mli delegate_activation_storage.ml
+   frozen_deposits_storage.mli frozen_deposits_storage.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
+   commitment_storage.mli commitment_storage.ml
+   token.mli token.ml
+   delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
-   commitment_storage.mli commitment_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
@@ -204,7 +225,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
-   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
@@ -250,18 +270,23 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
+   block_payload_hash.mli block_payload_hash.ml
+   slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   round_repr.mli round_repr.ml
+   block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.mli constants_repr.ml
-   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
+   fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
@@ -270,7 +295,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
-   roll_repr.mli roll_repr.ml
+   roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
@@ -287,20 +312,26 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
+   cache_repr.mli cache_repr.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
-   roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   roll_storage_legacy.mli roll_storage_legacy.ml
+   contract_manager_storage.mli contract_manager_storage.ml
+   delegate_activation_storage.mli delegate_activation_storage.ml
+   frozen_deposits_storage.mli frozen_deposits_storage.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
+   commitment_storage.mli commitment_storage.ml
+   token.mli token.ml
+   delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
-   commitment_storage.mli commitment_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
@@ -311,7 +342,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
-   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
@@ -379,18 +409,23 @@ include Tezos_raw_protocol_alpha.Main
    Script_expr_hash
    Contract_hash
    Blinded_public_key_hash
+   Block_payload_hash
+   Slot_repr
    Tez_repr
    Period_repr
    Time_repr
+   Round_repr
+   Block_payload_repr
    Fixed_point_repr
    Saturation_repr
    Gas_limit_repr
    Constants_repr
-   Fitness_repr
    Raw_level_repr
+   Fitness_repr
    Cycle_repr
    Level_repr
    Seed_repr
+   Sampler
    Voting_period_repr
    Script_string_repr
    Script_int_repr
@@ -399,7 +434,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_repr
    Cache_memory_helpers
    Contract_repr
-   Roll_repr
+   Roll_repr_legacy
    Vote_repr
    Block_header_repr
    Operation_repr
@@ -416,20 +451,26 @@ include Tezos_raw_protocol_alpha.Main
    Storage_sigs
    Storage_functors
    Storage
+   Cache_repr
    Constants_storage
    Level_storage
    Nonce_storage
    Seed_storage
-   Roll_storage
-   Delegate_storage
+   Roll_storage_legacy
+   Contract_manager_storage
+   Delegate_activation_storage
+   Frozen_deposits_storage
+   Stake_storage
+   Contract_delegate_storage
    Sapling_storage
    Lazy_storage_diff
    Contract_storage
+   Commitment_storage
+   Token
+   Delegate_storage
    Bootstrap_storage
-   Fitness_storage
    Voting_period_storage
    Vote_storage
-   Commitment_storage
    Fees_storage
    Ticket_storage
    Liquidity_baking_repr
@@ -440,7 +481,6 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_validator
    Global_constants_costs
    Global_constants_storage
-   Cache_costs
    Alpha_context
    Local_gas_counter
    Script_tc_errors
@@ -525,18 +565,23 @@ include Tezos_raw_protocol_alpha.Main
    script_expr_hash.mli script_expr_hash.ml
    contract_hash.mli contract_hash.ml
    blinded_public_key_hash.mli blinded_public_key_hash.ml
+   block_payload_hash.mli block_payload_hash.ml
+   slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   round_repr.mli round_repr.ml
+   block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
    constants_repr.mli constants_repr.ml
-   fitness_repr.mli fitness_repr.ml
    raw_level_repr.mli raw_level_repr.ml
+   fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    seed_repr.mli seed_repr.ml
+   sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
@@ -545,7 +590,7 @@ include Tezos_raw_protocol_alpha.Main
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
-   roll_repr.mli roll_repr.ml
+   roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    operation_repr.mli operation_repr.ml
@@ -562,20 +607,26 @@ include Tezos_raw_protocol_alpha.Main
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
+   cache_repr.mli cache_repr.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
-   roll_storage.mli roll_storage.ml
-   delegate_storage.mli delegate_storage.ml
+   roll_storage_legacy.mli roll_storage_legacy.ml
+   contract_manager_storage.mli contract_manager_storage.ml
+   delegate_activation_storage.mli delegate_activation_storage.ml
+   frozen_deposits_storage.mli frozen_deposits_storage.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
+   commitment_storage.mli commitment_storage.ml
+   token.mli token.ml
+   delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   fitness_storage.mli fitness_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
-   commitment_storage.mli commitment_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
@@ -586,7 +637,6 @@ include Tezos_raw_protocol_alpha.Main
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
-   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml

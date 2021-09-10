@@ -43,17 +43,37 @@
 type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t;
-      baker : Alpha_context.public_key_hash;
+      fitness : Alpha_context.Fitness.t;
+      payload_producer : Alpha_context.public_key_hash;
+      block_producer : Alpha_context.public_key_hash;
+      predecessor_round : Alpha_context.Round.t;
+      predecessor_level : Alpha_context.Level.t;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t;
-      baker : Alpha_context.public_key_hash;
+      fitness : Alpha_context.Fitness.t;
+      payload_producer : Alpha_context.public_key_hash;
+      block_producer : Alpha_context.public_key_hash;
+      predecessor_level : Alpha_context.Level.t;
+      predecessor_round : Alpha_context.Round.t;
     }
-  | Partial_construction of {predecessor : Block_hash.t}
+  (* Mempool only *)
+  | Partial_construction of {
+      predecessor : Block_hash.t;
+      predecessor_fitness : Fitness.t;
+      predecessor_level : Alpha_context.Level.t;
+      predecessor_round : Alpha_context.Round.t;
+    }
+  (* Baker only *)
   | Full_construction of {
       predecessor : Block_hash.t;
-      protocol_data : Alpha_context.Block_header.contents;
-      baker : Alpha_context.public_key_hash;
+      payload_producer : Alpha_context.public_key_hash;
+      block_producer : Alpha_context.public_key_hash;
+      protocol_data_contents : Alpha_context.Block_header.contents;
+      level : Int32.t;
+      round : Alpha_context.Round.t;
+      predecessor_level : Alpha_context.Level.t;
+      predecessor_round : Alpha_context.Round.t;
     }
 
 type validation_state = {
@@ -74,7 +94,7 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-val init_context : Context.t -> Context.t Lwt.t
+val init_cache : Context.t -> Context.t Lwt.t
 
 include
   Updater.PROTOCOL

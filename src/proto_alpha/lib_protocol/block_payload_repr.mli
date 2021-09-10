@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val current : Raw_context.t -> Int64.t
+(** Value on which validators try to reach a consensus.
 
-val increase : Raw_context.t -> Raw_context.t
+    Consensus at a given level is reached on a sequence of operations.  However,
+   to differentiate between two blocks having the same sequence of operations,
+   assuming that could ever happen (for instance, two empty blocks), we also
+   include the hash of the block that precedes the block where these operations
+   should be included. *)
+
+(** [hash block_hash round oplh] creates a payload hash given a
+    [block_hash], the first [round] at which the payload was proposed
+    and the hash [oplh] of the non-consensus operations. *)
+val hash :
+  predecessor:Block_hash.t ->
+  Round_repr.t ->
+  Operation_list_hash.t ->
+  Block_payload_hash.t

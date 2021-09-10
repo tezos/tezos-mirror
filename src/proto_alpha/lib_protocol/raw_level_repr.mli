@@ -55,4 +55,10 @@ val succ : raw_level -> raw_level
 
 val pred : raw_level -> raw_level option
 
+(** [add l i] i must be positive *)
+val add : raw_level -> int -> raw_level
+
+(** [sub l i] i must be positive *)
+val sub : raw_level -> int -> raw_level option
+
 module Index : Storage_description.INDEX with type t = raw_level

@@ -23,12 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let find = Storage.Commitments.find
+let exists = Storage.Commitments.mem
 
-let remove_existing = Storage.Commitments.remove_existing
+let committed_amount ctxt bpkh =
+  Storage.Commitments.find ctxt bpkh >>=? fun balance ->
+  return (Option.value ~default:Tez_repr.zero balance)
 
-let init ctxt commitments =
-  let init_commitment ctxt Commitment_repr.{blinded_public_key_hash; amount} =
-    Storage.Commitments.init ctxt blinded_public_key_hash amount
-  in
-  List.fold_left_es init_commitment ctxt commitments
+let increase_commitment_only_call_from_token ctxt bpkh amount =
+  if Tez_repr.(amount = zero) then return ctxt
+  else
+    committed_amount ctxt bpkh >>=? fun balance ->
+    Tez_repr.(amount +? balance) >>?= fun new_balance ->
+    Storage.Commitments.add ctxt bpkh new_balance >|= ok
+
+let decrease_commitment_only_call_from_token ctxt bpkh amount =
+  committed_amount ctxt bpkh >>=? fun balance ->
+  Tez_repr.(balance -? amount) >>?= fun new_balance ->
+  if Tez_repr.(new_balance = Tez_repr.zero) then
+    Storage.Commitments.remove ctxt bpkh >|= ok
+  else Storage.Commitments.add ctxt bpkh new_balance >|= ok

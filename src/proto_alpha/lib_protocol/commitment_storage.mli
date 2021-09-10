@@ -23,11 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val init :
-  Raw_context.t -> Commitment_repr.t list -> Raw_context.t tzresult Lwt.t
+(** [exists ctxt bpkh] returns true iff [bpkh] is associated to a non null
+    commitment. *)
+val exists : Raw_context.t -> Blinded_public_key_hash.t -> bool Lwt.t
 
-val find :
-  Raw_context.t -> Blinded_public_key_hash.t -> Tez_repr.t option tzresult Lwt.t
+(** [committed_amount ctxt bpkh] return the commitment associated to [bpkh], or
+    [Tez_repr.zero] if [bpkh] has no associated commitment. *)
+val committed_amount :
+  Raw_context.t -> Blinded_public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-val remove_existing :
-  Raw_context.t -> Blinded_public_key_hash.t -> Raw_context.t tzresult Lwt.t
+val increase_commitment_only_call_from_token :
+  Raw_context.t ->
+  Blinded_public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val decrease_commitment_only_call_from_token :
+  Raw_context.t ->
+  Blinded_public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t

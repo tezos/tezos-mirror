@@ -111,17 +111,42 @@ let test_fa12_init_storage manager =
             [] )))
 
 let originate ctxt address ~balance script =
-  Contract_storage.raw_originate ctxt address ~balance ~script ~delegate:None
+  Contract_storage.raw_originate
+    ctxt
+    ~prepaid_bootstrap_storage:true
+    address
+    ~script
   >>=? fun ctxt ->
-  Fees_storage.record_paid_storage_space_subsidy ctxt address
-  >>=? fun (ctxt, size, paid_storage_size_diff) ->
+  Contract_storage.used_storage_space ctxt address >>=? fun size ->
+  Fees_storage.burn_origination_fees
+    ~origin:Protocol_migration
+    ctxt
+    ~storage_limit:(Z.of_int64 Int64.max_int)
+    ~payer:`Liquidity_baking_subsidies
+  >>=? fun (ctxt, _, origination_updates) ->
+  Fees_storage.burn_storage_fees
+    ~origin:Protocol_migration
+    ctxt
+    ~storage_limit:(Z.of_int64 Int64.max_int)
+    ~payer:`Liquidity_baking_subsidies
+    size
+  >>=? fun (ctxt, _, storage_updates) ->
+  Token.transfer
+    ~origin:Protocol_migration
+    ctxt
+    `Liquidity_baking_subsidies
+    (`Contract address)
+    balance
+  >>=? fun (ctxt, transfer_updates) ->
+  let balance_updates =
+    origination_updates @ storage_updates @ transfer_updates
+  in
   let result : Migration_repr.origination_result =
     {
-      balance_updates =
-        Receipt_repr.[(Contract address, Credited balance, Protocol_migration)];
+      balance_updates;
       originated_contracts = [address];
       storage_size = size;
-      paid_storage_size_diff;
+      paid_storage_size_diff = size;
     }
   in
   return (ctxt, result)

@@ -88,6 +88,23 @@ let take_int32 s bound =
     in
     loop s
 
+let take_int64 s bound =
+  if Compare.Int64.(bound <= 0L) then invalid_arg "Seed_repr.take_int64"
+    (* FIXME *)
+  else
+    let rec loop s =
+      let (bytes, s) = take s in
+      let r = Int64.abs (TzEndian.get_int64 bytes 0) in
+      let drop_if_over =
+        Int64.sub Int64.max_int (Int64.rem Int64.max_int bound)
+      in
+      if Compare.Int64.(r >= drop_if_over) then loop s
+      else
+        let v = Int64.rem r bound in
+        (v, s)
+    in
+    loop s
+
 type error += Unexpected_nonce_length (* `Permanent *)
 
 let () =

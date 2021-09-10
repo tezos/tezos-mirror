@@ -588,6 +588,7 @@ module Make_indexed_data_snapshotable_storage
         let name = snapshot_name
       end)
 
+  module V_encoder = Make_encoder (V)
   include Make_indexed_data_storage (C_data) (I) (V)
   module Snapshot =
     Make_indexed_data_storage (C_snapshot) (Pair (Snapshot_index) (I)) (V)
@@ -603,6 +604,28 @@ module Make_indexed_data_snapshotable_storage
     | None -> Lwt.return (err_missing_key data_name)
     | Some tree ->
         C.add_tree s (snapshot_path id) tree >|= (fun t -> C.project t) >|= ok
+
+  let fold_snapshot s id ~init ~f =
+    C.find_tree s (snapshot_path id) >>= function
+    | None -> Lwt.return (err_missing_key data_name)
+    | Some tree ->
+        C_data.Tree.fold
+          tree
+          ~depth:(`Eq I.path_length)
+          []
+          ~init:(Ok init)
+          ~f:(fun file tree acc ->
+            acc >>?= fun acc ->
+            C.Tree.to_value tree >>= function
+            | Some v -> (
+                match I.of_path file with
+                | None -> assert false
+                | Some path -> (
+                    let key () = C.absolute_key s file in
+                    match V_encoder.of_bytes ~key v with
+                    | Ok v -> f path v acc
+                    | Error _ -> return acc))
+            | None -> return acc)
 
   let delete_snapshot s id =
     C.remove s (snapshot_path id) >|= fun t -> C.project t

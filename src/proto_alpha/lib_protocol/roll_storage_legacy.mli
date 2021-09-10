@@ -35,57 +35,8 @@
 type error +=
   | (* `Permanent *) Consume_roll_change
   | (* `Permanent *) No_roll_for_delegate
-  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
+  | (* `Permanent *) No_stake_snapshot_for_cycle of Cycle_repr.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
-
-(**
-   [init ctxt] returns a new context initialized from [ctxt] where the next
-   roll to be allocated is the first roll, i.e.
-   [(Storage.Roll.Next.get ctxt) = Roll_repr.first].
-   This function returns a [{!Storage_error Existing_key}] error if the context
-   has already been initialized.
-*)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-(**
-   [init_first_cycles ctxt] computes a new context from [ctxt] where the store
-   has been prepared to save roll snapshots for all cycles from [0] to
-   [Constants.preserved_cycles + 2]:
-
-   1. rolls for all cycles in the interval [(0, preserved_cycles)] are frozen
-      (after taking a snapshot),
-   2. a snapshot is taken for rolls of cycle [preserved_cycles + 1],
-   3. rolls for cycle [preserved_cycles + 2] are ready for a snapshot, i.e. the
-      necessary storage has been prepared.
-*)
-val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-(**
-   [cycle_end ctxt last_cycle] returns a new context after applying the
-   end-of-cycle bookkeeping to [ctxt]:
-
-   1. clears cycle [c = (last_cycle - preserved_cycles)] if [last_cycle >=
-      preserved_cycles] (this amounts to deleting the only snapshot left after
-      the freezing of [c]),
-   2. freezes snapshot rolls for the cycle
-      [(last_cycle + preserved_cycles + 1)] (this amounts to removing all
-      snapshots for the cycle, except one randomly selected for computing
-      baking rights),
-   3. makes cycle [(last_cycle + preserved_cycles + 2)] ready for snapshot.
-*)
-val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
-(**
-   [snapshot_rolls ctxt] creates roll snapshots for cycle
-   [c = level + preserved_cycles + 2]. The returned context is such that:
-
-   1. the snapshot index associated to cycle [c] is incremented,
-   2. the rolls' owners are copied and associated to the snapshot id
-      [(c,index)] (where [index] is the current snapshot index of cycle [c]),
-   3. the last roll for cycle [c], and snapshot [index] is set to be the next
-      roll of [ctxt].
-*)
-val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (**
    [fold ctxt f init] folds [f] on the list of all rolls from [Roll_repr.first]
@@ -96,27 +47,9 @@ val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 *)
 val fold :
   Raw_context.t ->
-  f:(Roll_repr.roll -> Signature.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Roll_repr_legacy.roll -> Signature.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
   'a ->
   'a tzresult Lwt.t
-
-(**
-   May return a [No_roll_snapshot_for_cycle] error.
-*)
-val baking_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  priority:int ->
-  Signature.Public_key.t tzresult Lwt.t
-
-(**
-   May return a [No_roll_snapshot_for_cycle] error.
-*)
-val endorsement_rights_owner :
-  Raw_context.t ->
-  Level_repr.t ->
-  slot:int ->
-  Signature.Public_key.t tzresult Lwt.t
 
 module Delegate : sig
   val is_inactive :
@@ -221,13 +154,6 @@ val delegate_pubkey :
   Signature.Public_key.t tzresult Lwt.t
 
 (**
-   [count_rolls ctxt delegate] returns the number of rolls held by
-   [delegate] in context [ctxt].
-*)
-val count_rolls :
-  Raw_context.t -> Signature.Public_key_hash.t -> int tzresult Lwt.t
-
-(**
    [get_change ctxt delegate] returns the amount of change held by
    [delegate] in context [ctxt]. The change is the part of the staking
    balance of a delegate that is not part of a roll, i.e., the amount
@@ -236,19 +162,6 @@ val count_rolls :
 *)
 val get_change :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
-(**
-   [update_tokens_per_roll ctxt am] performs the following actions:
-   
-   1. set the constant [tokens_per_roll] to [am],
-   2. if the constant was increased by [tpram], then add the amount
-      [nr * tpram] to each delegate, where [nr] is the delegate's
-      number of rolls,
-   3. if the constant was instead decreased by [tpram], then remove
-      the amount [nr * tpram] from all delegates.
-*)
-val update_tokens_per_roll :
-  Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
 (**
    [get_contract_delegate ctxt contract] returns the public key hash

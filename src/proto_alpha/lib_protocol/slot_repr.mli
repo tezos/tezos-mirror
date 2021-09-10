@@ -23,10 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Costs function for cache accesses. *)
+type t = int (* TODO-TB remake abstract (required index for storage) *)
 
-(** Cost of calling [Cache.update]. *)
-val cache_update : cache_size_in_bytes:int -> Gas_limit_repr.cost
+val encoding : t Data_encoding.t
 
-(** Cost of calling [Cache.find]. *)
-val cache_find : cache_size_in_bytes:int -> Gas_limit_repr.cost
+val pp : Format.formatter -> t -> unit
+
+val zero : t
+
+val succ : t -> t
+
+val of_int_do_not_use_except_for_parameters : int -> t
+
+val to_int : t -> int
+
+module Map : Map.S with type key = t
+
+module Set : Set.S with type elt = t
+
+include Compare.S with type t := t
+
+module List : sig
+  (* Expected invariant: list of increasing values *)
+  type nonrec t = t list
+
+  val encoding : t Data_encoding.t
+
+  val slot_range : min:int -> count:int -> t tzresult
+end

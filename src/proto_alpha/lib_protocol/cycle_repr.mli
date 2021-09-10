@@ -47,9 +47,14 @@ val succ : cycle -> cycle
 
 val diff : cycle -> cycle -> int32
 
+(** a ---> b = [a; ...; b] *)
+val ( ---> ) : cycle -> cycle -> cycle list
+
 val to_int32 : cycle -> int32
 
 val of_int32_exn : int32 -> cycle
+
+val of_string_exn : string -> cycle
 
 module Map : Map.S with type key = cycle
 
