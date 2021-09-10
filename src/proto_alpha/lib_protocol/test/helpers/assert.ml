@@ -31,8 +31,23 @@ let error ~loc v f =
   | Ok _ -> failwith "Unexpected successful result (%s)" loc
   | Error err -> failwith "@[Unexpected error (%s): %a@]" loc pp_print_trace err
 
+let test_error_encodings e =
+  let module E = Environment.Error_monad in
+  ignore (E.pp Format.str_formatter e) ;
+  let e' = E.json_of_error e |> E.error_of_json in
+  assert (e = e')
+
 let proto_error ~loc v f =
-  error ~loc v (function Environment.Ecoproto_error err -> f err | _ -> false)
+  error ~loc v (function
+      | Environment.Ecoproto_error err ->
+          test_error_encodings err ;
+          f err
+      | _ -> false)
+
+let proto_error_with_info ~loc res error_title =
+  proto_error ~loc res (function err ->
+      error_title
+      = (Error_monad.find_info_of_error (Environment.wrap_tzerror err)).title)
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   if not (cmp a b) then
@@ -62,7 +77,7 @@ let equal_int ~loc (a : int) (b : int) =
 
 (* int32 *)
 let equal_int32 ~loc (a : int32) (b : int32) =
-  equal ~loc Int32.equal "int32s (%a and %a) aren't equal" Int32.pp a b
+  equal ~loc Int32.equal "Int32 aren't equal" Int32.pp a b
 
 let not_equal_int ~loc (a : int) (b : int) =
   not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
@@ -133,8 +148,8 @@ open Context
     [amount].
     Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
     [Rewards] for the others. *)
-let balance_is ~loc b contract ?(kind = Contract.Main) expected =
-  Contract.balance b contract ~kind >>=? fun balance ->
+let balance_is ~loc b contract expected =
+  Contract.balance b contract >>=? fun balance ->
   equal_tez ~loc balance expected
 
 (** [balance_was_operated ~operand b c old_balance amount] checks that the
@@ -142,26 +157,11 @@ let balance_is ~loc b contract ?(kind = Contract.Main) expected =
     returns the current balance.
     Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
     [Rewards] for the others. *)
-let balance_was_operated ~operand ~loc b contract ?(kind = Contract.Main)
-    old_balance amount =
+let balance_was_operated ~operand ~loc b contract old_balance amount =
   operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
-  balance_is ~loc b contract ~kind expected
+  balance_is ~loc b contract expected
 
 let balance_was_credited =
   balance_was_operated ~operand:Alpha_context.Tez.( +? )
 
 let balance_was_debited = balance_was_operated ~operand:Alpha_context.Tez.( -? )
-
-(* debug *)
-
-let print_balances ctxt id =
-  Contract.balance ~kind:Main ctxt id >>=? fun main ->
-  Contract.balance ~kind:Deposit ctxt id >>=? fun deposit ->
-  Contract.balance ~kind:Fees ctxt id >>=? fun fees ->
-  Contract.balance ~kind:Rewards ctxt id >|=? fun rewards ->
-  Format.printf
-    "\nMain: %s\nDeposit: %s\nFees: %s\nRewards: %s\n"
-    (Alpha_context.Tez.to_string main)
-    (Alpha_context.Tez.to_string deposit)
-    (Alpha_context.Tez.to_string fees)
-    (Alpha_context.Tez.to_string rewards)

@@ -128,7 +128,7 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
   let dest = `Collected_commitments Blinded_public_key_hash.zero in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
-  let dest = `Frozen_bonds pkh in
+  let dest = `Frozen_deposits pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest false >>=? fun _ ->
   let dest = `Legacy_deposits (pkh, Cycle.root) in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
@@ -205,7 +205,7 @@ let test_transferring_to_frozen_deposits ctxt =
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
-    (`Frozen_bonds pkh)
+    (`Frozen_deposits pkh)
     amount
     [(Bonds pkh, Credited amount, Block_application)]
 
@@ -376,7 +376,7 @@ let test_transferring_from_frozen_deposits ctxt =
   let amount = random_amount () in
   test_transferring_from_bounded_source
     ctxt
-    (`Frozen_bonds pkh)
+    (`Frozen_deposits pkh)
     amount
     [(Bonds pkh, Debited amount, Block_application)]
 

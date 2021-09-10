@@ -36,51 +36,87 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
   let signature = Some (Signature.sign ~watermark sk unsigned) in
   ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
-  (match delegate with
-  | None -> Context.get_endorser ctxt >|=? fun (delegate, _slots) -> delegate
-  | Some delegate -> return delegate)
-  >>=? fun delegate_pkh ->
-  Account.find delegate_pkh >>=? fun delegate ->
-  Lwt.return
-    ( (match level with
-      | None -> Context.get_level ctxt
-      | Some level -> ok level)
-    >|? fun level ->
-      let op = Single (Endorsement {level}) in
-      sign
-        ~watermark:Signature.(Endorsement Chain_id.zero)
-        delegate.sk
-        signing_context
-        op )
+(** Generates the block payload hash based on the hash [pred_hash] of
+    the predecessor block and the hash of non-consensus operations of
+    the current block [b]. *)
+let mk_block_payload_hash pred_hash payload_round (b : Block.t) =
+  let ops = Block.Forge.classify_operations b.operations in
+  let non_consensus_operations =
+    List.concat (match List.tl ops with None -> [] | Some l -> l)
+  in
+  let hashes = List.map Operation.hash_packed non_consensus_operations in
+  let non_consensus_operations_hash = Operation_list_hash.compute hashes in
+  Block_payload.hash
+    ~predecessor:pred_hash
+    payload_round
+    non_consensus_operations_hash
 
-let endorsement_with_slot ?delegate ?level ctxt ?(signing_context = ctxt) () =
-  (match delegate with None -> Context.get_endorser ctxt | Some v -> return v)
+(* ctxt is used for getting the branch in sign *)
+let endorsement ?delegate ?slot ?level ?round ?block_payload_hash
+    ~endorsed_block ctxt ?(signing_context = ctxt) () =
+  let pred_hash = match ctxt with Context.B b -> b.hash | _ -> assert false in
+  (match delegate with
+  | None -> Context.get_endorser (B endorsed_block)
+  | Some v -> return v)
   >>=? fun (delegate_pkh, slots) ->
-  let slot = WithExceptions.Option.get ~loc:__LOC__ (List.hd slots) in
+  let slot =
+    match slot with None -> Stdlib.List.hd slots | Some slot -> slot
+  in
+  (match level with
+  | None -> Context.get_level (B endorsed_block)
+  | Some level -> ok level)
+  >>?= fun level ->
+  (match round with
+  | None -> Block.get_round endorsed_block
+  | Some round -> ok round)
+  >>?= fun round ->
+  let block_payload_hash =
+    match block_payload_hash with
+    | None -> mk_block_payload_hash pred_hash round endorsed_block
+    | Some block_payload_hash -> block_payload_hash
+  in
+  let consensus_content = {slot; level; round; block_payload_hash} in
+  let op = Single (Endorsement consensus_content) in
   Account.find delegate_pkh >>=? fun delegate ->
-  Lwt.return
-    ( (match level with
-      | None -> Context.get_level ctxt
-      | Some level -> ok level)
-    >|? fun level ->
-      let op = Single (Endorsement {level}) in
-      let endorsement =
-        sign
-          ~watermark:Signature.(Endorsement Chain_id.zero)
-          delegate.sk
-          signing_context
-          op
-      in
-      ({
-         shell = endorsement.shell;
-         protocol_data =
-           {
-             contents = Single (Endorsement_with_slot {endorsement; slot});
-             signature = None;
-           };
-       }
-        : Kind.endorsement_with_slot Operation.t) )
+  return
+    (sign
+       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
+       delegate.sk
+       signing_context
+       op)
+
+let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
+    ~endorsed_block ctxt ?(signing_context = ctxt) () =
+  let pred_hash = match ctxt with Context.B b -> b.hash | _ -> assert false in
+  (match delegate with
+  | None -> Context.get_endorser (B endorsed_block)
+  | Some v -> return v)
+  >>=? fun (delegate_pkh, slots) ->
+  let slot =
+    match slot with None -> Stdlib.List.hd slots | Some slot -> slot
+  in
+  (match level with
+  | None -> Context.get_level (B endorsed_block)
+  | Some level -> ok level)
+  >>?= fun level ->
+  (match round with
+  | None -> Block.get_round endorsed_block
+  | Some round -> ok round)
+  >>?= fun round ->
+  let block_payload_hash =
+    match block_payload_hash with
+    | None -> mk_block_payload_hash pred_hash round endorsed_block
+    | Some block_payload_hash -> block_payload_hash
+  in
+  let consensus_content = {slot; level; round; block_payload_hash} in
+  let op = Single (Preendorsement consensus_content) in
+  Account.find delegate_pkh >>=? fun delegate ->
+  return
+    (sign
+       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
+       delegate.sk
+       signing_context
+       op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
@@ -297,12 +333,12 @@ let register_global_constant ?counter ?public_key ?fee ?gas_limit ?storage_limit
     operation
   >|=? fun sop -> sign account.sk ctxt sop
 
-let miss_signed_endorsement ?level ctxt =
+let miss_signed_endorsement ?level ~endorsed_block ctxt =
   (match level with None -> Context.get_level ctxt | Some level -> ok level)
   >>?= fun level ->
-  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, _slots) ->
+  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:delegate.pkh ~level ctxt ()
+  endorsement ~delegate:(delegate.pkh, slots) ~level ~endorsed_block ctxt ()
 
 let transaction ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
@@ -314,6 +350,18 @@ let transaction ?counter ?fee ?gas_limit ?storage_limit
 
 let delegation ?fee ctxt source dst =
   let top = Delegation dst in
+  manager_operation
+    ?fee
+    ~gas_limit:(Gas.Arith.integral_of_int_exn 1000)
+    ~source
+    ctxt
+    top
+  >>=? fun sop ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt sop
+
+let set_deposits_limit ?fee ctxt source limit =
+  let top = Set_deposits_limit limit in
   manager_operation
     ?fee
     ~gas_limit:(Gas.Arith.integral_of_int_exn 1000)
@@ -341,8 +389,16 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_endorsement ctxt op1 op2 ~slot =
-  let contents = Single (Double_endorsement_evidence {op1; op2; slot}) in
+let double_endorsement ctxt op1 op2 =
+  let contents = Single (Double_endorsement_evidence {op1; op2}) in
+  let branch = Context.branch ctxt in
+  {
+    shell = {branch};
+    protocol_data = Operation_data {contents; signature = None};
+  }
+
+let double_preendorsement ctxt op1 op2 =
+  let contents = Single (Double_preendorsement_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
@@ -414,4 +470,4 @@ let dummy_script =
       storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], [])));
     }
 
-let dummy_script_cost = Test_tez.Tez.of_mutez_exn 9_500L
+let dummy_script_cost = Test_tez.of_mutez_exn 9_500L

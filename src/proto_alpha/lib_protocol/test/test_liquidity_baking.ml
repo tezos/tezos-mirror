@@ -108,13 +108,13 @@ let liquidity_baking_cpmm_address () =
 
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
 let liquidity_baking_subsidies n () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   Block.bake_n n blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  Tez.(liquidity_baking_subsidy *? Int64.(of_int n)) >>?= fun expected_credit ->
+  (liquidity_baking_subsidy *? Int64.(of_int n)) >>?= fun expected_credit ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
@@ -127,7 +127,7 @@ let liquidity_baking_subsidies n () =
    More precisely, after the sunset, the total amount credited to the subsidy is only proportional
    to the sunset level and in particular it does not depend on [n]. *)
 let liquidity_baking_sunset_level n () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -135,7 +135,7 @@ let liquidity_baking_sunset_level n () =
   Block.bake_n (Int32.to_int sunset + n) blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
+  (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
   >>?= fun expected_credit ->
   Assert.balance_was_credited
     ~loc:__LOC__
@@ -149,7 +149,7 @@ let liquidity_baking_sunset_level n () =
 (* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
 let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
     bake_after_escape () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   let rec bake_escaping blk i =
@@ -163,7 +163,7 @@ let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
   Block.bake_n bake_after_escape blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  Tez.(liquidity_baking_subsidy *? Int64.of_int escape_level)
+  liquidity_baking_subsidy *? Int64.of_int escape_level
   >>?= fun expected_balance ->
   Assert.balance_was_credited
     ~loc:__LOC__
@@ -188,7 +188,7 @@ let liquidity_baking_escape_hatch_60 n () =
 (* 50% of blocks have liquidity_baking_escape_vote = true.
    Escape hatch should not be activated. *)
 let liquidity_baking_escape_hatch_50 n () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -203,7 +203,7 @@ let liquidity_baking_escape_hatch_50 n () =
   bake_50_percent_escaping blk 0 >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
+  (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
   >>?= fun expected_balance ->
   Assert.balance_was_credited
     ~loc:__LOC__
@@ -216,7 +216,7 @@ let liquidity_baking_escape_hatch_50 n () =
 (* Test that the escape EMA in block metadata is correct. *)
 let liquidity_baking_escape_ema n_vote_false n_vote_true escape_level
     bake_after_escape expected_escape_ema () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   let rec bake_escaping blk i =
     if i < escape_level then
       Block.bake_n n_vote_false blk >>=? fun blk ->
@@ -240,7 +240,7 @@ let liquidity_baking_escape_ema_threshold () =
   liquidity_baking_escape_ema 0 1 1387 1 1_050_000 ()
 
 let liquidity_baking_storage n () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   let expected_storage =
@@ -251,7 +251,7 @@ let liquidity_baking_storage n () =
          \        100\n\
          \        \"KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN\"\n\
          \        \"KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo\""
-         (100 + (n * Int64.to_int (Tez.to_mutez subsidy))))
+         (100 + (n * Int64.to_int (to_mutez subsidy))))
   in
   Block.bake_n n blk >>=? fun blk ->
   Context.Contract.storage (B blk) liquidity_baking >>=? fun storage ->
@@ -268,7 +268,7 @@ let liquidity_baking_storage n () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_balance_update () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -289,15 +289,15 @@ let liquidity_baking_balance_update () =
   List.fold_left_e
     (fun accum (_, update, _) ->
       match update with
-      | Alpha_context.Receipt.Credited x -> Tez.(accum +? x)
+      | Alpha_context.Receipt.Credited x -> accum +? x
       | Alpha_context.Receipt.Debited _ -> assert false)
-    Tez.(of_int 0)
+    (of_int 0)
     liquidity_baking_updates
   >>?= fun credits ->
   Assert.equal_int
     ~loc:__LOC__
-    (Int64.to_int (Tez.to_mutez credits))
-    ((Int32.to_int sunset - 1) * Int64.to_int (Tez.to_mutez subsidy))
+    (Int64.to_int (to_mutez credits))
+    ((Int32.to_int sunset - 1) * Int64.to_int (to_mutez subsidy))
   >>=? fun () -> return_unit
 
 let get_cpmm_result results =
@@ -315,12 +315,16 @@ let get_address_in_result result =
   | Apply_results.Origination_result {originated_contracts; _} -> (
       match originated_contracts with [c] -> c | _ -> assert false)
 
-let get_balance_update_in_result result =
+let get_balance_updates_in_result result =
   match result with
-  | Apply_results.Origination_result {balance_updates; _} -> (
-      match balance_updates with
-      | [(Contract _, Credited balance, Protocol_migration)] -> balance
-      | _ -> assert false)
+  | Apply_results.Origination_result {balance_updates; _} -> balance_updates
+
+let get_balance_update_in_result result =
+  match get_balance_updates_in_result result with
+  | [(Contract _, Credited balance, Protocol_migration)] -> balance
+  | [_; _; _; _; _; (Contract _, Credited balance, Protocol_migration)] ->
+      balance
+  | _ -> assert false
 
 let liquidity_baking_origination_result_cpmm_address () =
   Context.init 1 >>=? fun (blk, _contracts) ->
@@ -345,7 +349,7 @@ let liquidity_baking_origination_result_cpmm_balance () =
   >>=? fun (_blk, origination_results) ->
   let result = get_cpmm_result origination_results in
   let balance_update = get_balance_update_in_result result in
-  Assert.equal_tez ~loc:__LOC__ balance_update Tez.(of_mutez_exn 100L)
+  Assert.equal_tez ~loc:__LOC__ balance_update (of_mutez_exn 100L)
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_lqt_address () =
@@ -368,9 +372,19 @@ let liquidity_baking_origination_result_lqt_balance () =
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_lqt_result origination_results in
-  let balance_update = get_balance_update_in_result result in
-  Assert.equal_tez ~loc:__LOC__ balance_update Tez.zero >>=? fun () ->
-  return_unit
+  let balance_updates = get_balance_updates_in_result result in
+  match balance_updates with
+  | [
+   (Liquidity_baking_subsidies, Debited am1, Protocol_migration);
+   (Storage_fees, Credited am2, Protocol_migration);
+   (Liquidity_baking_subsidies, Debited am3, Protocol_migration);
+   (Storage_fees, Credited am4, Protocol_migration);
+  ] ->
+      Assert.equal_tez ~loc:__LOC__ am1 am2 >>=? fun () ->
+      Assert.equal_tez ~loc:__LOC__ am3 am4 >>=? fun () ->
+      Assert.equal_tez ~loc:__LOC__ am1 (of_mutez_exn 64_250L) >>=? fun () ->
+      Assert.equal_tez ~loc:__LOC__ am3 (of_mutez_exn 494_500L)
+  | _ -> failwith "Unexpected balance updates (%s)" __LOC__
 
 (* Test that with no contract at the tzBTC address and the level low enough to indicate we're not on mainnet, three contracts are originated in stitching. *)
 let liquidity_baking_origination_test_migration () =
@@ -382,7 +396,8 @@ let liquidity_baking_origination_test_migration () =
 
 (* Test that with no contract at the tzBTC address and the level high enough to indicate we could be on mainnet, no contracts are originated in stitching. *)
 let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
-  Context.init 1 ~level:1_437_862l >>=? fun (blk, _contracts) ->
+  Context.init ~consensus_threshold:0 ~level:1_437_862l 1
+  >>=? fun (blk, _contracts) ->
   (* By baking a bit we also check that the subsidy application with no CPMM present does nothing rather than stopping the chain.*)
   Block.bake_n_with_origination_results 64 blk
   >>=? fun (_blk, origination_results) ->

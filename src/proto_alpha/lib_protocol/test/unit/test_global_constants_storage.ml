@@ -48,8 +48,8 @@ let test_get_on_nonexistent_fails =
   tztest_qcheck
     ~name:"get on a nonexistent global constants fails"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_without_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_without_constant_arbitrary ()))
     (fun (context, expr) ->
       expr_to_hash expr |> Environment.wrap_tzresult >>?= fun hash ->
       Global_constants_storage.get context hash
@@ -62,8 +62,8 @@ let test_get_always_returns_registered_expr =
   tztest_qcheck
     ~name:"get always returned the registered constant"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_without_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_without_constant_arbitrary ()))
     (fun (context, expr) ->
       Global_constants_storage.register context expr
       >|= Environment.wrap_tzresult
@@ -92,8 +92,8 @@ let test_register_fails_with_unregistered_references_pbt =
   tztest_qcheck
     ~name:"register: fails with unregistered references pbt"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_with_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_with_constant_arbitrary ()))
     (fun (context, (_, expr, _)) ->
       assume_expr_not_too_large expr ;
       Global_constants_storage.register context expr
@@ -126,8 +126,8 @@ let test_expand_nonexistent_fails =
     ~name:
       "expand on an expression containing a nonexistent global constant fails"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_with_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_with_constant_arbitrary ()))
   @@ fun (context, (_, expr, _)) ->
   assume_expr_not_too_large expr ;
   Global_constants_storage.expand context expr
@@ -149,9 +149,9 @@ let test_register_and_expand_orthogonal =
   tztest_qcheck
     ~name:"register and expand are orthogonal"
     (triple
-       Generators.context_arbitrary
-       Generators.canonical_without_constant_arbitrary
-       Generators.canonical_without_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_without_constant_arbitrary ())
+       (Generators.canonical_without_constant_arbitrary ()))
     (fun (context, expr1, expr2) ->
       assume_expr_not_too_large expr1 ;
       assume_expr_not_too_large expr2 ;
@@ -347,8 +347,8 @@ let test_expand_pbt =
   tztest_qcheck
     ~name:"expand: random"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_with_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_with_constant_arbitrary ()))
     (fun (context, (full_expr, expr_with_constant, sub_expr)) ->
       assume_expr_not_too_large full_expr ;
       assume_expr_not_too_large expr_with_constant ;
@@ -365,8 +365,8 @@ let test_expand_is_idempotent =
   tztest_qcheck
     ~name:"expand is idempotent"
     (pair
-       Generators.context_arbitrary
-       Generators.canonical_with_constant_arbitrary)
+       (Generators.context_arbitrary ())
+       (Generators.canonical_with_constant_arbitrary ()))
     (fun (context, (full_expr, expr_with_constant, sub_expr)) ->
       assume_expr_not_too_large full_expr ;
       Global_constants_storage.register context sub_expr

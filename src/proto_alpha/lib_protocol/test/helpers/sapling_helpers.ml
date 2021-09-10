@@ -156,7 +156,7 @@ module Alpha_context_helpers = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
+    (* ~fitness:b.header.shell.fitness *)
     >>= wrap
     >|=? fun (ctxt, _, _) -> ctxt
 
@@ -211,7 +211,20 @@ module Alpha_context_helpers = struct
     | None -> return_none
     | Some (_balance, vs) ->
         finalize ctx vs >>=? fun (ctx, id) ->
-        let ectx = (Alpha_context.finalize ctx).context in
+        let fake_fitness =
+          Alpha_context.(
+            let level =
+              match Raw_level.of_int32 0l with
+              | Error _ -> assert false
+              | Ok l -> l
+            in
+            Fitness.create_without_locked_round
+              ~level
+              ~predecessor_round:Round.zero
+              ~round:Round.zero
+            |> Fitness.to_raw)
+        in
+        let ectx = (Alpha_context.finalize ctx fake_fitness).context in
         (* bump the level *)
         Alpha_context.prepare
           ectx
@@ -220,7 +233,6 @@ module Alpha_context_helpers = struct
               Raw_level.to_int32 Level.((succ ctx (current ctx)).level))
           ~predecessor_timestamp:(Time.Protocol.of_seconds Int64.zero)
           ~timestamp:(Time.Protocol.of_seconds Int64.zero)
-          ~fitness:(Fitness_repr.from_int64 Int64.zero)
         >>= wrap
         >|=? fun (ctx, _, _) -> Some (ctx, id)
 
@@ -309,8 +321,10 @@ module Interpreter_helpers = struct
   (* Make a transaction and sync a local client state. [to_exclude] is the list
      of addresses that cannot bake the block*)
   let transac_and_sync ~memo_size block parameters amount src dst baker =
-    Test_tez.Tez.(one_mutez *? Int64.of_int amount) >>?= fun amount_tez ->
-    let fee = Test_tez.Tez.of_int 10 in
+    let amount_tez =
+      Test_tez.(Alpha_context.Tez.one_mutez *! Int64.of_int amount)
+    in
+    let fee = Test_tez.of_int 10 in
     Op.transaction ~fee (B block) src dst amount_tez ~parameters
     >>=? fun operation ->
     Incremental.begin_construction ~policy:Block.(By_account baker) block

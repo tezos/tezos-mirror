@@ -28,7 +28,7 @@ open Protocol
 (** Initializes 2 addresses to do only operations plus one that will be
     used to bake. *)
 let init () =
-  Context.init 3 >|=? fun (b, contracts) ->
+  Context.init ~consensus_threshold:0 3 >|=? fun (b, contracts) ->
   let (src0, src1, src2) =
     match contracts with
     | src0 :: src1 :: src2 :: _ -> (src0, src1, src2)
@@ -65,7 +65,7 @@ let originate_contract file storage src b baker =
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
-  Op.origination (B b) src ~fee:(Test_tez.Tez.of_int 10) ~script
+  Op.origination (B b) src ~fee:(Test_tez.of_int 10) ~script
   >>=? fun (operation, dst) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->

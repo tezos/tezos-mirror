@@ -47,12 +47,12 @@ let succeed x = match x with Ok _ -> true | _ -> false
 let failed x = not (succeed x)
 
 let dummy_context () =
-  Context.init 1 >>=? fun (block, _) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (block, _) ->
   Raw_context.prepare
     ~level:Int32.zero
     ~predecessor_timestamp:Time.Protocol.epoch
     ~timestamp:Time.Protocol.epoch
-    ~fitness:[]
+    (* ~fitness:[] *)
     (block.context : Environment_context.Context.t)
   >|= Environment.wrap_tzresult
 
@@ -255,7 +255,7 @@ let originate_contract block source script =
   Block.bake ~operation block >>=? fun block -> return (block, dst)
 
 let init_block to_originate =
-  Context.init 1 >>=? fun (block, contracts) ->
+  Context.init ~consensus_threshold:0 1 >>=? fun (block, contracts) ->
   let src = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   (*** originate contracts ***)
   let rec full_originate block originated = function

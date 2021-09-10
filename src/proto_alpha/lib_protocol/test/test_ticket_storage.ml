@@ -40,7 +40,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 let make_context () =
   let* (block, _) = Context.init 1 in
   let* incr = Incremental.begin_construction block in
-  return (Fees.start_counting_storage_fees @@ Incremental.alpha_ctxt incr)
+  return (Incremental.alpha_ctxt incr)
 
 let hash_key ctxt ~ticketer ~typ ~contents ~owner =
   let ticketer = Micheline.root @@ Expr.from_string ticketer in
