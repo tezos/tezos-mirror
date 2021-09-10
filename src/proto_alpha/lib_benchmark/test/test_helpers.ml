@@ -67,8 +67,9 @@ let base_type_to_ex_ty ty =
 let rec michelson_type_list_to_ex_stack_ty
     (stack_ty : Protocol.Alpha_context.Script.expr list) ctxt =
   let open Protocol.Script_ir_translator in
+  let open Protocol.Script_typed_ir in
   match stack_ty with
-  | [] -> (Ex_stack_ty Protocol.Script_typed_ir.Bot_t, ctxt)
+  | [] -> (Ex_stack_ty Bot_t, ctxt)
   | hd :: tl -> (
       let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with

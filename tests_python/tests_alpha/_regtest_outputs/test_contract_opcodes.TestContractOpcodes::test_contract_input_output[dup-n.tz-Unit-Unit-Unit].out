@@ -66,14 +66,20 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 38 (remaining gas: 1039968.199 units remaining)
+  - location: 32 (remaining gas: 1039968.206 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 38 (remaining gas: 1039968.184 units remaining)
     [ 2  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 40 (remaining gas: 1039968.189 units remaining)
+  - location: 40 (remaining gas: 1039968.174 units remaining)
     [ 2  	
       2  	
       1  	
@@ -81,34 +87,40 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 45 (remaining gas: 1039968.154 units remaining)
+  - location: 45 (remaining gas: 1039968.139 units remaining)
     [ 0  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 46 (remaining gas: 1039968.139 units remaining)
+  - location: 46 (remaining gas: 1039968.124 units remaining)
     [ True  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 47 (remaining gas: 1039968.129 units remaining)
+  - location: 47 (remaining gas: 1039968.114 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 53 (remaining gas: 1039968.106 units remaining)
+  - location: 47 (remaining gas: 1039968.099 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 53 (remaining gas: 1039968.076 units remaining)
     [ 3  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 55 (remaining gas: 1039968.096 units remaining)
+  - location: 55 (remaining gas: 1039968.066 units remaining)
     [ 3  	
       3  	
       1  	
@@ -116,34 +128,40 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 60 (remaining gas: 1039968.061 units remaining)
+  - location: 60 (remaining gas: 1039968.031 units remaining)
     [ 0  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 61 (remaining gas: 1039968.046 units remaining)
+  - location: 61 (remaining gas: 1039968.016 units remaining)
     [ True  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 62 (remaining gas: 1039968.036 units remaining)
+  - location: 62 (remaining gas: 1039968.006 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 68 (remaining gas: 1039968.012 units remaining)
+  - location: 62 (remaining gas: 1039967.991 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 68 (remaining gas: 1039967.967 units remaining)
     [ 4  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 70 (remaining gas: 1039968.002 units remaining)
+  - location: 70 (remaining gas: 1039967.957 units remaining)
     [ 4  	
       4  	
       1  	
@@ -151,34 +169,40 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 75 (remaining gas: 1039967.967 units remaining)
+  - location: 75 (remaining gas: 1039967.922 units remaining)
     [ 0  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 76 (remaining gas: 1039967.952 units remaining)
+  - location: 76 (remaining gas: 1039967.907 units remaining)
     [ True  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 77 (remaining gas: 1039967.942 units remaining)
+  - location: 77 (remaining gas: 1039967.897 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 83 (remaining gas: 1039967.917 units remaining)
+  - location: 77 (remaining gas: 1039967.882 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 83 (remaining gas: 1039967.857 units remaining)
     [ 5  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 85 (remaining gas: 1039967.907 units remaining)
+  - location: 85 (remaining gas: 1039967.847 units remaining)
     [ 5  	
       5  	
       1  	
@@ -186,33 +210,39 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 90 (remaining gas: 1039967.872 units remaining)
+  - location: 90 (remaining gas: 1039967.812 units remaining)
     [ 0  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 91 (remaining gas: 1039967.857 units remaining)
+  - location: 91 (remaining gas: 1039967.797 units remaining)
     [ True  	
       1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 92 (remaining gas: 1039967.847 units remaining)
+  - location: 92 (remaining gas: 1039967.787 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 98 (remaining gas: 1039967.815 units remaining)
+  - location: 92 (remaining gas: 1039967.772 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 98 (remaining gas: 1039967.740 units remaining)
     [  ]
-  - location: 100 (remaining gas: 1039967.805 units remaining)
+  - location: 100 (remaining gas: 1039967.730 units remaining)
     [ Unit  	 ]
-  - location: 101 (remaining gas: 1039967.790 units remaining)
+  - location: 101 (remaining gas: 1039967.715 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 103 (remaining gas: 1039967.775 units remaining)
+  - location: 103 (remaining gas: 1039967.700 units remaining)
     [ (Pair {} Unit)  	 ]
 

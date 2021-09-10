@@ -401,7 +401,8 @@ module Context = struct
           | None -> value_of_key key entry cache
           | Some (value, entry') ->
               if Bytes.equal entry.cache_nonce entry'.cache_nonce then
-                return (Environment_cache.insert_entry cache key (value, entry))
+                return
+                @@ Environment_cache.update_cache_key cache key value entry
               else value_of_key key entry cache)
 
     let load_now ctxt cache builder =
@@ -452,6 +453,12 @@ module Context = struct
       else Lwt.return (Environment_cache.from_layout layout)
 
     let key_rank (Context ctxt) key = Environment_cache.key_rank ctxt.cache key
+
+    let cache_size (Context ctxt) ~cache_index =
+      Environment_cache.cache_size ctxt.cache ~cache_index
+
+    let cache_size_limit (Context ctxt) ~cache_index =
+      Environment_cache.cache_size_limit ctxt.cache ~cache_index
   end
 
   let load_cache (Context ctxt) mode builder =

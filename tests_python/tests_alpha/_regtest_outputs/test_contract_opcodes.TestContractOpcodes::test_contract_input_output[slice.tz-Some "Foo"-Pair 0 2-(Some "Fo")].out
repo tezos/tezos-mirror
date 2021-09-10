@@ -27,9 +27,11 @@ trace
       "Foo"  	@storage.some ]
   - location: 21 (remaining gas: 1039993.004 units remaining)
     [ (Some "Fo")  	 ]
-  - location: 22 (remaining gas: 1039992.989 units remaining)
+  - location: 13 (remaining gas: 1039992.989 units remaining)
+    [ (Some "Fo")  	 ]
+  - location: 22 (remaining gas: 1039992.974 units remaining)
     [ {}  	
       (Some "Fo")  	 ]
-  - location: 24 (remaining gas: 1039992.974 units remaining)
+  - location: 24 (remaining gas: 1039992.959 units remaining)
     [ (Pair {} (Some "Fo"))  	 ]
 

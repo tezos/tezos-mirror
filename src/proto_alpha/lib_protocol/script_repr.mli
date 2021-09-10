@@ -104,8 +104,6 @@ end
    micheline expression held from [root]. *)
 val micheline_nodes : node -> int
 
-(** [node_size root] returns the size of the in-memory representation
-   of [root] in bytes. This is an over-approximation of the memory
-   actually consumed by [root] since no sharing is taken into
-   account. *)
-val node_size : node -> int
+(** [fold node i f] traverses [node] applying [f] on an
+    accumulator initialized by [i]. *)
+val fold : node -> 'c -> ('c -> node -> 'c) -> 'c

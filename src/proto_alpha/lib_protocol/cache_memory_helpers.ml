@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,67 +23,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-open Script_typed_ir
+type sint = Saturation_repr.may_saturate Saturation_repr.t
 
-let key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (module Box) -> Box.key_ty
+let ( !! ) = Saturation_repr.safe_int
 
-let empty : type a b. a comparable_ty -> (a, b) map =
- fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
+let ( +! ) = Saturation_repr.add
 
-    let compare = Script_comparable.compare_comparable ty
-  end) in
-  (module struct
-    type key = a
+let ( +? ) s x = Saturation_repr.add s !!x
 
-    type value = b
+let ( *? ) s x = Saturation_repr.mul s !!x
 
-    let key_ty = ty
+let ( /? ) s x = Saturation_repr.ediv s !!x
 
-    module OPS = struct
-      type value = b
+let zero = !!0
 
-      include OPS
-    end
+let word_size = !!8
 
-    let boxed = (OPS.empty, 0)
-  end)
+let header_size = word_size
 
-let get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
+let int64_size = header_size +! (word_size *? 2)
 
-let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
-  (module struct
-    type key = a
+let z_size z =
+  let numbits = Z.numbits z in
+  if Compare.Int.(numbits <= 62) then zero else (word_size *? Z.size z) +? 32
 
-    type value = b
+let string_size_gen len = header_size +? len +? (8 - (len mod 8))
 
-    let key_ty = Box.key_ty
+let bytes_size b = string_size_gen (Bytes.length b)
 
-    module OPS = Box.OPS
+let string_size s = string_size_gen (String.length s)
 
-    let boxed =
-      let (map, size) = Box.boxed in
-      let contains =
-        match Box.OPS.find k map with None -> false | _ -> true
-      in
-      match v with
-      | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
-      | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
-  end)
+let option_size some x =
+  let some x = header_size +! word_size +! some x in
+  Option.fold ~none:zero ~some x
 
-let mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) ->
-  match Box.OPS.find k (fst Box.boxed) with None -> false | _ -> true
+let list_cell_size elt_size =
+  header_size +! word_size +! word_size +! elt_size
+  [@@ocaml.inline always]
 
-let fold :
-    type key value acc.
-    (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
+let list_fold_size elt_size list =
+  List.fold_left
+    (fun accu elt ->
+      accu +! header_size +! word_size +! word_size +! elt_size elt)
+    zero
+    list
 
-let size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))
+let boxed_tup2 x y =
+  header_size +! word_size +! word_size +! x +! y
+  [@@ocaml.inline always]
+
+let node_size =
+  let open Micheline in
+  let annotation_size a = list_fold_size string_size a in
+  let internal_node_size = function
+    | Int (_, z) -> header_size +! (word_size *? 2) +! z_size z
+    | String (_, s) -> header_size +! (word_size *? 2) +! string_size s
+    | Bytes (_, s) -> header_size +! (word_size *? 2) +! bytes_size s
+    | Prim (_, _, _, a) -> header_size +! (word_size *? 4) +! annotation_size a
+    | Seq (_, _) -> header_size +! (word_size *? 2)
+  in
+  fun node ->
+    Script_repr.fold node zero @@ fun size node ->
+    size +! internal_node_size node
+
+let expr_size expr = node_size (Micheline.root expr)

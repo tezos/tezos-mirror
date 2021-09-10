@@ -54,6 +54,8 @@ module Make (A : sig
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+
+  val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t
 end) =
 struct
   open A
@@ -130,6 +132,19 @@ struct
         "fold f a init should accumulate all applications of f over all \
          elements of a."
 
+  let check_fold_map (s, _, _) =
+    let a = make s 100 in
+    let (a, _) =
+      Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0)
+    in
+    let (r', a') = fold_map (fun accu x -> (accu + x, x)) a 0 0 in
+    let r = ref 0 in
+    iter (fun x -> r := !r + x) a' ;
+    if not (!r = r') then
+      fail
+        "fold_map f a init should accumulate all applications of f over all \
+         elements of a and produce a fresh array using f."
+
   let tests =
     [
       ("make_fallback", `Quick, on_samples check_make_and_fallback);
@@ -140,5 +155,6 @@ struct
       ("iter", `Quick, on_samples check_iter);
       ("map", `Quick, on_samples check_map);
       ("fold", `Quick, on_samples check_fold);
+      ("fold_map", `Quick, on_samples check_fold_map);
     ]
 end

@@ -93,7 +93,7 @@ type 'a cache = {
      synchronization. *)
   removed_entries : KeySet.t;
   (* [entries_removals] maintains the last numbers of entries removal
-     per block. This list can be longer than
+     per block. This list cannot be longer than
      [entries_removals_window_width]. *)
   entries_removals : int list;
 }
@@ -163,7 +163,7 @@ let make_caches (layout : size list) =
 
 (*
 
-   When a entry is fresh, it is assigned a [fresh_entry_nonce].
+   When an entry is fresh, it is assigned a [fresh_entry_nonce].
 
    The actual nonce for this entry will be known only when its block
    is finalized: it is only in function [sync] that
@@ -198,12 +198,6 @@ let insert_cache_entry cache key ((_, {size; birth; _}) as entry) =
     lru = Int64Map.add birth key cache.lru;
     removed_entries = KeySet.remove key cache.removed_entries;
   }
-
-let insert_entry t key (value, entry) =
-  with_caches t (fun caches ->
-      let cache = FunctionalArray.get caches key.cache_index in
-      let cache = insert_cache_entry cache key (value, entry) in
-      update_cache_with t key.cache_index cache)
 
 let insert_cache cache key value size cache_nonce =
   (* Conforming to entry size invariant: we need this size to be
@@ -265,7 +259,11 @@ let find t key = lookup_value (cache_of_key t key) key
 
 let compatible_layout t layout =
   with_caches t (fun caches ->
-      List.length layout = FunctionalArray.length caches)
+      List.length layout = FunctionalArray.length caches
+      && List.fold_left_i
+           (fun idx r len -> r && (FunctionalArray.get caches idx).limit = len)
+           true
+           layout)
 
 let from_layout layout = Some (make_caches layout)
 
@@ -293,18 +291,6 @@ let future_cache_expectation t ~time_in_blocks =
 let clear t =
   Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
-let list_keys t ~cache_index =
-  let cache = cache_of_index t cache_index in
-  let xs =
-    KeyMap.fold
-      (fun k (_, {size; birth; _}) acc -> (k, size, birth) :: acc)
-      cache.map
-      []
-  in
-  xs
-  |> List.sort (fun (_, _, b1) (_, _, b2) -> Int64.compare b1 b2)
-  |> List.map (fun (k, s, _) -> (k, s))
-
 let rec enforce_size_limit cache =
   if cache.size > cache.limit then
     remove_dean cache
@@ -316,14 +302,19 @@ let rec enforce_size_limit cache =
 
 let record_entries_removals cache =
   let entries_removals =
-    cache.entries_removals @ [KeySet.cardinal cache.removed_entries]
-  in
-  let entries_removals =
-    if List.length entries_removals > entries_removals_window_width then
-      match entries_removals with
+    if
+      List.compare_length_with
+        cache.entries_removals
+        entries_removals_window_width
+      >= 0
+    then
+      match cache.entries_removals with
       | [] -> assert false
       | _ :: entries_removals -> entries_removals
-    else entries_removals
+    else cache.entries_removals
+  in
+  let entries_removals =
+    entries_removals @ [KeySet.cardinal cache.removed_entries]
   in
   {cache with entries_removals; removed_entries = KeySet.empty}
 
@@ -338,28 +329,20 @@ let update_entry entry nonce =
   in
   {entry with cache_nonce = element_nonce}
 
-(* [finalize_cache ctxt cache nonce] saves the domain of [cache] in
-   the storage. This function returns the cache for the next block. *)
+(* [finalize_cache ctxt cache nonce] sets the cache nonce for the new
+   entries. This function returns the cache for the next block. *)
 let finalize_cache ({map; _} as cache) nonce =
-  let (metamap, map) =
-    KeyMap.fold
-      (fun key (e, entry) (meta_map, map) ->
-        let entry = update_entry entry nonce in
-        (KeyMap.add key entry meta_map, KeyMap.add key (e, entry) map))
-      map
-      (KeyMap.empty, KeyMap.empty)
-  in
+  let map = KeyMap.map (fun (e, entry) -> (e, update_entry entry nonce)) map in
+  let metamap = KeyMap.map snd map in
   ({cache with map}, metamap)
 
-let sync_cache :
-    'a cache -> cache_nonce:Bytes.t -> 'a cache * value_metadata KeyMap.t =
- fun cache ~cache_nonce ->
+type domain = value_metadata KeyMap.t list
+
+let sync_cache cache ~cache_nonce =
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
   let (cache, new_entries) = finalize_cache cache cache_nonce in
   (cache, new_entries)
-
-type domain = value_metadata KeyMap.t list
 
 let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
   Data_encoding.(
@@ -371,20 +354,16 @@ let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list (dynamic_size subcache_domain_encoding))
 
-let sync : 'a t -> cache_nonce:Bytes.t -> 'a t * domain =
- fun t ~cache_nonce ->
-  with_caches t (fun caches ->
-      let fresh_caches =
-        FunctionalArray.make (FunctionalArray.length caches) empty_cache
-      in
-      FunctionalArray.fold
-        (fun (i, acc, caches) cache ->
-          let (cache, domain) = sync_cache cache ~cache_nonce in
-          let caches = FunctionalArray.set caches i cache in
-          (i + 1, domain :: acc, caches))
-        caches
-        (0, [], fresh_caches)
-      |> fun (_, domains, caches) -> (Some caches, List.rev domains))
+let sync t ~cache_nonce =
+  with_caches t @@ fun caches ->
+  FunctionalArray.fold_map
+    (fun acc cache ->
+      let (cache, domain) = sync_cache cache ~cache_nonce in
+      (domain :: acc, cache))
+    caches
+    []
+    empty_cache
+  |> fun (rev_domains, caches) -> (Some caches, List.rev rev_domains)
 
 let update_cache_key t key value meta =
   with_caches t @@ fun caches ->
@@ -394,11 +373,35 @@ let update_cache_key t key value meta =
 
 let number_of_caches t = with_caches t FunctionalArray.length
 
+let on_cache t cache_index f =
+  if cache_index < number_of_caches t && cache_index >= 0 then
+    Some (f (cache_of_index t cache_index))
+  else None
+
+let cache_size t ~cache_index =
+  on_cache t cache_index @@ fun cache -> cache.size
+
+let cache_size_limit t ~cache_index =
+  on_cache t cache_index @@ fun cache -> cache.limit
+
+let list_keys t ~cache_index =
+  on_cache t cache_index @@ fun cache ->
+  let xs =
+    KeyMap.fold
+      (fun k (_, {size; birth; _}) acc -> (k, size, birth) :: acc)
+      cache.map
+      []
+  in
+  xs
+  |> List.sort (fun (_, _, b1) (_, _, b2) -> Int64.compare b1 b2)
+  |> List.map (fun (k, s, _) -> (k, s))
+
 let key_rank ctxt key =
   let cache = cache_of_key ctxt key in
   let rec length_until x n = function
     | [] -> Some n
-    | y :: ys -> if x = y then Some n else length_until x (n + 1) ys
+    | y :: ys ->
+        if Key.compare x y = 0 then Some n else length_until x (n + 1) ys
   in
   if not @@ KeyMap.mem key cache.map then None
   else Int64Map.bindings cache.lru |> List.map snd |> length_until key 0

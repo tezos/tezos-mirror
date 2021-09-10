@@ -29,11 +29,11 @@ open Script_int
 
 (* Preliminary definitions. *)
 
-type var_annot = Var_annot of string
+type var_annot = Var_annot of string [@@ocaml.unboxed]
 
-type type_annot = Type_annot of string
+type type_annot = Type_annot of string [@@ocaml.unboxed]
 
-type field_annot = Field_annot of string
+type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 type never = |
 
@@ -145,12 +145,28 @@ val option_key :
   annot:type_annot option ->
   'v option comparable_ty tzresult
 
+module type Boxed_set_OPS = sig
+  type t
+
+  type elt
+
+  val empty : t
+
+  val add : elt -> t -> t
+
+  val mem : elt -> t -> bool
+
+  val remove : elt -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+end
+
 module type Boxed_set = sig
   type elt
 
   val elt_ty : elt comparable_ty
 
-  module OPS : Set.S with type elt = elt
+  module OPS : Boxed_set_OPS with type elt = elt
 
   val boxed : OPS.t
 
@@ -159,6 +175,24 @@ end
 
 type 'elt set = (module Boxed_set with type elt = 'elt)
 
+module type Boxed_map_OPS = sig
+  type key
+
+  type value
+
+  type 'a t
+
+  val empty : value t
+
+  val add : key -> value -> value t -> value t
+
+  val remove : key -> value t -> value t
+
+  val find : key -> value t -> value option
+
+  val fold : (key -> value -> 'a -> 'a) -> value t -> 'a -> 'a
+end
+
 module type Boxed_map = sig
   type key
 
@@ -166,7 +200,7 @@ module type Boxed_map = sig
 
   val key_ty : key comparable_ty
 
-  module OPS : Map.S with type key = key
+  module OPS : Boxed_map_OPS with type key = key and type value = value
 
   val boxed : value OPS.t * int
 end
@@ -198,7 +232,7 @@ type ('arg, 'storage) script = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
 }
 
 (* ---- Instructions --------------------------------------------------------*)
@@ -343,15 +377,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 's) kinfo * ('v option, 's, 'r, 'f) kinstr
       -> ('v, 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * 'b ty * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
-      branch_if_none : ('b, 's, 'r, 'f) kinstr;
-      branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
+      branch_if_none : ('b, 's, 'c, 't) kinstr;
+      branch_if_some : ('a, 'b * 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
   (*
@@ -366,9 +398,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_left : ('a, 's, 'r, 'f) kinstr;
-      branch_if_right : ('b, 's, 'r, 'f) kinstr;
+      branch_if_left : ('a, 's, 'c, 't) kinstr;
+      branch_if_right : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   (*
@@ -383,9 +415,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
-      branch_if_nil : ('b, 's, 'r, 'f) kinstr;
+      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'c, 't) kinstr;
+      branch_if_nil : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
   | IList_map :
@@ -427,10 +459,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo
-      * 'b comparable_ty
-      * 'c ty
-      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
@@ -670,9 +699,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       kinfo : (bool, 'a * 's) kinfo;
-      (* See remark in IIf_none. *)
-      branch_if_true : ('a, 's, 'r, 'f) kinstr;
-      branch_if_false : ('a, 's, 'r, 'f) kinstr;
+      branch_if_true : ('a, 's, 'b, 'u) kinstr;
+      branch_if_false : ('a, 's, 'b, 'u) kinstr;
+      k : ('b, 'u, 'r, 'f) kinstr;
     }
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop :
@@ -704,7 +733,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo * Script.location * 'a ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -1497,3 +1526,54 @@ val ticket_t :
 val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
 
 val chest_t : annot:type_annot option -> Timelock.chest ty
+
+(**
+
+   The following functions named `X_traverse` for X in { kinstr, ty,
+   comparable_ty, value } provide tail recursive top down traversals
+   over the values of these types.
+
+   The traversal goes through a value and rewrites an accumulator
+   along the way starting from some [init]ial value for the
+   accumulator.
+
+   All these traversals follow the same recursion scheme: the
+   user-provided function is first called on the toplevel value, then
+   the traversal recurses on the direct subvalues of the same type.
+
+   Hence, the user-provided function must only compute the
+   contribution of the value on the accumulator minus the contribution
+   of its subvalues of the same type.
+
+*)
+type 'a kinstr_traverse = {
+  apply : 'b 'u 'r 'f. 'a -> ('b, 'u, 'r, 'f) kinstr -> 'a;
+}
+
+val kinstr_traverse :
+  ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
+
+type 'a ty_traverse = {
+  apply : 't. 'a -> 't ty -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
+}
+
+val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
+
+val ty_traverse : 'a ty -> 'r -> 'r ty_traverse -> 'r
+
+type 'accu stack_ty_traverse = {
+  apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;
+}
+
+val stack_ty_traverse : ('a, 's) stack_ty -> 'r -> 'r stack_ty_traverse -> 'r
+
+type 'a value_traverse = {
+  apply : 't. 'a -> 't ty -> 't -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
+}
+
+val value_traverse :
+  ('t ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
+
+val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty

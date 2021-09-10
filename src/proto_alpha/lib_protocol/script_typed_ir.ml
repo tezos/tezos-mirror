@@ -29,11 +29,11 @@ open Script_int
 
 (* Preliminary definitions. *)
 
-type var_annot = Var_annot of string
+type var_annot = Var_annot of string [@@ocaml.unboxed]
 
-type type_annot = Type_annot of string
+type type_annot = Type_annot of string [@@ocaml.unboxed]
 
-type field_annot = Field_annot of string
+type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 type never = |
 
@@ -209,12 +209,40 @@ let option_key loc t ~annot =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
   Option_key (t, {annot; size})
 
+(*
+
+   This signature contains the exact set of functions used in the
+   protocol. We do not include all [Set.S] because this would
+   increase the size of the first class modules used to represent
+   [boxed_set].
+
+   Warning: for any change in this signature, there must be a
+   change in [Script_typed_ir_size.value_size] which updates
+   [boxing_space] in the case for sets.
+
+*)
+module type Boxed_set_OPS = sig
+  type t
+
+  type elt
+
+  val empty : t
+
+  val add : elt -> t -> t
+
+  val mem : elt -> t -> bool
+
+  val remove : elt -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+end
+
 module type Boxed_set = sig
   type elt
 
   val elt_ty : elt comparable_ty
 
-  module OPS : Set.S with type elt = elt
+  module OPS : Boxed_set_OPS with type elt = elt
 
   val boxed : OPS.t
 
@@ -223,6 +251,29 @@ end
 
 type 'elt set = (module Boxed_set with type elt = 'elt)
 
+(*
+
+   Same remark as for [Boxed_set_OPS]. (See below.)
+
+*)
+module type Boxed_map_OPS = sig
+  type key
+
+  type value
+
+  type 'a t
+
+  val empty : value t
+
+  val add : key -> value -> value t -> value t
+
+  val remove : key -> value t -> value t
+
+  val find : key -> value t -> value option
+
+  val fold : (key -> value -> 'a -> 'a) -> value t -> 'a -> 'a
+end
+
 module type Boxed_map = sig
   type key
 
@@ -230,7 +281,7 @@ module type Boxed_map = sig
 
   val key_ty : key comparable_ty
 
-  module OPS : Map.S with type key = key
+  module OPS : Boxed_map_OPS with type key = key and type value = value
 
   val boxed : value OPS.t * int
 end
@@ -266,7 +317,7 @@ type ('arg, 'storage) script = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
       (* This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
          code. This includes the code of the contract as well as the code
@@ -316,12 +367,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 's) kinfo * ('v option, 's, 'r, 'f) kinstr
       -> ('v, 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * 'b ty * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
-      branch_if_none : ('b, 's, 'r, 'f) kinstr;
-      branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
+      branch_if_none : ('b, 's, 'c, 't) kinstr;
+      branch_if_some : ('a, 'b * 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
   (*
@@ -336,8 +388,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
-      branch_if_left : ('a, 's, 'r, 'f) kinstr;
-      branch_if_right : ('b, 's, 'r, 'f) kinstr;
+      branch_if_left : ('a, 's, 'c, 't) kinstr;
+      branch_if_right : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   (*
@@ -352,8 +405,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
-      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
-      branch_if_nil : ('b, 's, 'r, 'f) kinstr;
+      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'c, 't) kinstr;
+      branch_if_nil : ('b, 's, 'c, 't) kinstr;
+      k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
   | IList_map :
@@ -395,10 +449,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo
-      * 'b comparable_ty
-      * 'c ty
-      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
@@ -638,8 +689,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf : {
       kinfo : (bool, 'a * 's) kinfo;
-      branch_if_true : ('a, 's, 'r, 'f) kinstr;
-      branch_if_false : ('a, 's, 'r, 'f) kinstr;
+      branch_if_true : ('a, 's, 'b, 'u) kinstr;
+      branch_if_false : ('a, 's, 'b, 'u) kinstr;
+      k : ('b, 'u, 'r, 'f) kinstr;
     }
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop :
@@ -671,7 +723,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo * Script.location * 'a ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -1169,7 +1221,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ICdr (kinfo, _) -> kinfo
   | IUnpair (kinfo, _) -> kinfo
   | ICons_some (kinfo, _) -> kinfo
-  | ICons_none (kinfo, _, _) -> kinfo
+  | ICons_none (kinfo, _) -> kinfo
   | IIf_none {kinfo; _} -> kinfo
   | ICons_left (kinfo, _) -> kinfo
   | ICons_right (kinfo, _) -> kinfo
@@ -1185,7 +1237,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ISet_mem (kinfo, _) -> kinfo
   | ISet_update (kinfo, _) -> kinfo
   | ISet_size (kinfo, _) -> kinfo
-  | IEmpty_map (kinfo, _, _, _) -> kinfo
+  | IEmpty_map (kinfo, _, _) -> kinfo
   | IMap_map (kinfo, _, _) -> kinfo
   | IMap_iter (kinfo, _, _) -> kinfo
   | IMap_mem (kinfo, _) -> kinfo
@@ -1253,7 +1305,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IExec (kinfo, _) -> kinfo
   | IApply (kinfo, _, _) -> kinfo
   | ILambda (kinfo, _, _) -> kinfo
-  | IFailwith (kinfo, _, _, _) -> kinfo
+  | IFailwith (kinfo, _, _) -> kinfo
   | ICompare (kinfo, _, _) -> kinfo
   | IEq (kinfo, _) -> kinfo
   | INeq (kinfo, _) -> kinfo
@@ -1339,23 +1391,35 @@ let kinstr_rewritek :
   | ICdr (kinfo, k) -> ICdr (kinfo, f.apply k)
   | IUnpair (kinfo, k) -> IUnpair (kinfo, f.apply k)
   | ICons_some (kinfo, k) -> ICons_some (kinfo, f.apply k)
-  | ICons_none (kinfo, ty, k) -> ICons_none (kinfo, ty, f.apply k)
-  | IIf_none {kinfo; branch_if_none; branch_if_some} ->
-      let branch_if_none = f.apply branch_if_none
-      and branch_if_some = f.apply branch_if_some in
-      IIf_none {kinfo; branch_if_none; branch_if_some}
+  | ICons_none (kinfo, k) -> ICons_none (kinfo, f.apply k)
+  | IIf_none {kinfo; branch_if_none; branch_if_some; k} ->
+      IIf_none
+        {
+          kinfo;
+          branch_if_none = f.apply branch_if_none;
+          branch_if_some = f.apply branch_if_some;
+          k = f.apply k;
+        }
   | ICons_left (kinfo, k) -> ICons_left (kinfo, f.apply k)
   | ICons_right (kinfo, k) -> ICons_right (kinfo, f.apply k)
-  | IIf_left {kinfo; branch_if_left; branch_if_right} ->
-      let branch_if_left = f.apply branch_if_left
-      and branch_if_right = f.apply branch_if_right in
-      IIf_left {kinfo; branch_if_left; branch_if_right}
+  | IIf_left {kinfo; branch_if_left; branch_if_right; k} ->
+      IIf_left
+        {
+          kinfo;
+          branch_if_left = f.apply branch_if_left;
+          branch_if_right = f.apply branch_if_right;
+          k = f.apply k;
+        }
   | ICons_list (kinfo, k) -> ICons_list (kinfo, f.apply k)
   | INil (kinfo, k) -> INil (kinfo, f.apply k)
-  | IIf_cons {kinfo; branch_if_cons; branch_if_nil} ->
-      let branch_if_nil = f.apply branch_if_nil
-      and branch_if_cons = f.apply branch_if_cons in
-      IIf_cons {kinfo; branch_if_cons; branch_if_nil}
+  | IIf_cons {kinfo; branch_if_cons; branch_if_nil; k} ->
+      IIf_cons
+        {
+          kinfo;
+          branch_if_cons = f.apply branch_if_cons;
+          branch_if_nil = f.apply branch_if_nil;
+          k = f.apply k;
+        }
   | IList_map (kinfo, body, k) -> IList_map (kinfo, f.apply body, f.apply k)
   | IList_iter (kinfo, body, k) -> IList_iter (kinfo, f.apply body, f.apply k)
   | IList_size (kinfo, k) -> IList_size (kinfo, f.apply k)
@@ -1364,7 +1428,7 @@ let kinstr_rewritek :
   | ISet_mem (kinfo, k) -> ISet_mem (kinfo, f.apply k)
   | ISet_update (kinfo, k) -> ISet_update (kinfo, f.apply k)
   | ISet_size (kinfo, k) -> ISet_size (kinfo, f.apply k)
-  | IEmpty_map (kinfo, cty, ty, k) -> IEmpty_map (kinfo, cty, ty, f.apply k)
+  | IEmpty_map (kinfo, cty, k) -> IEmpty_map (kinfo, cty, f.apply k)
   | IMap_map (kinfo, body, k) -> IMap_map (kinfo, f.apply body, f.apply k)
   | IMap_iter (kinfo, body, k) -> IMap_iter (kinfo, f.apply body, f.apply k)
   | IMap_mem (kinfo, k) -> IMap_mem (kinfo, f.apply k)
@@ -1430,17 +1494,21 @@ let kinstr_rewritek :
   | IXor_nat (kinfo, k) -> IXor_nat (kinfo, f.apply k)
   | INot_nat (kinfo, k) -> INot_nat (kinfo, f.apply k)
   | INot_int (kinfo, k) -> INot_int (kinfo, f.apply k)
-  | IIf {kinfo; branch_if_true; branch_if_false} ->
-      let branch_if_true = f.apply branch_if_true
-      and branch_if_false = f.apply branch_if_false in
-      IIf {kinfo; branch_if_true; branch_if_false}
+  | IIf {kinfo; branch_if_true; branch_if_false; k} ->
+      IIf
+        {
+          kinfo;
+          branch_if_true = f.apply branch_if_true;
+          branch_if_false = f.apply branch_if_false;
+          k = f.apply k;
+        }
   | ILoop (kinfo, kbody, k) -> ILoop (kinfo, f.apply kbody, f.apply k)
   | ILoop_left (kinfo, kl, kr) -> ILoop_left (kinfo, f.apply kl, f.apply kr)
   | IDip (kinfo, body, k) -> IDip (kinfo, f.apply body, f.apply k)
   | IExec (kinfo, k) -> IExec (kinfo, f.apply k)
   | IApply (kinfo, ty, k) -> IApply (kinfo, ty, f.apply k)
   | ILambda (kinfo, l, k) -> ILambda (kinfo, l, f.apply k)
-  | IFailwith (kinfo, i, ty, k) -> IFailwith (kinfo, i, ty, f.apply k)
+  | IFailwith (kinfo, i, ty) -> IFailwith (kinfo, i, ty)
   | ICompare (kinfo, ty, k) -> ICompare (kinfo, ty, f.apply k)
   | IEq (kinfo, k) -> IEq (kinfo, f.apply k)
   | INeq (kinfo, k) -> INeq (kinfo, f.apply k)
@@ -1710,3 +1778,406 @@ let ticket_t loc t ~annot =
 let chest_key_t ~annot = Chest_key_t {annot; size = Type_size.one}
 
 let chest_t ~annot = Chest_t {annot; size = Type_size.one}
+
+type 'a kinstr_traverse = {
+  apply : 'b 'u 'r 'f. 'a -> ('b, 'u, 'r, 'f) kinstr -> 'a;
+}
+
+let kinstr_traverse i init f =
+  let rec aux :
+      type ret a s r f. 'accu -> (a, s, r, f) kinstr -> ('accu -> ret) -> ret =
+   fun accu t continue ->
+    let accu = f.apply accu t in
+    let next k =
+      (aux [@ocaml.tailcall]) accu k @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let next2 k1 k2 =
+      (aux [@ocaml.tailcall]) accu k1 @@ fun accu ->
+      (aux [@ocaml.tailcall]) accu k2 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let next3 k1 k2 k3 =
+      (aux [@ocaml.tailcall]) accu k1 @@ fun accu ->
+      (aux [@ocaml.tailcall]) accu k2 @@ fun accu ->
+      (aux [@ocaml.tailcall]) accu k3 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let return () = (continue [@ocaml.tailcall]) accu in
+    match t with
+    | IDrop (_, k) -> (next [@ocaml.tailcall]) k
+    | IDup (_, k) -> (next [@ocaml.tailcall]) k
+    | ISwap (_, k) -> (next [@ocaml.tailcall]) k
+    | IConst (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ICons_pair (_, k) -> (next [@ocaml.tailcall]) k
+    | ICar (_, k) -> (next [@ocaml.tailcall]) k
+    | ICdr (_, k) -> (next [@ocaml.tailcall]) k
+    | IUnpair (_, k) -> (next [@ocaml.tailcall]) k
+    | ICons_some (_, k) -> (next [@ocaml.tailcall]) k
+    | ICons_none (_, k) -> (next [@ocaml.tailcall]) k
+    | IIf_none {kinfo = _; branch_if_none = k1; branch_if_some = k2; k} ->
+        (next3 [@ocaml.tailcall]) k1 k2 k
+    | ICons_left (_, k) -> (next [@ocaml.tailcall]) k
+    | ICons_right (_, k) -> (next [@ocaml.tailcall]) k
+    | IIf_left {kinfo = _; branch_if_left = k1; branch_if_right = k2; k} ->
+        (next3 [@ocaml.tailcall]) k1 k2 k
+    | ICons_list (_, k) -> (next [@ocaml.tailcall]) k
+    | INil (_, k) -> (next [@ocaml.tailcall]) k
+    | IIf_cons {kinfo = _; branch_if_nil = k1; branch_if_cons = k2; k} ->
+        (next3 [@ocaml.tailcall]) k1 k2 k
+    | IList_map (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IList_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IList_size (_, k) -> (next [@ocaml.tailcall]) k
+    | IEmpty_set (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ISet_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | ISet_mem (_, k) -> (next [@ocaml.tailcall]) k
+    | ISet_update (_, k) -> (next [@ocaml.tailcall]) k
+    | ISet_size (_, k) -> (next [@ocaml.tailcall]) k
+    | IEmpty_map (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IMap_map (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IMap_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IMap_mem (_, k) -> (next [@ocaml.tailcall]) k
+    | IMap_get (_, k) -> (next [@ocaml.tailcall]) k
+    | IMap_update (_, k) -> (next [@ocaml.tailcall]) k
+    | IMap_get_and_update (_, k) -> (next [@ocaml.tailcall]) k
+    | IMap_size (_, k) -> (next [@ocaml.tailcall]) k
+    | IEmpty_big_map (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IBig_map_mem (_, k) -> (next [@ocaml.tailcall]) k
+    | IBig_map_get (_, k) -> (next [@ocaml.tailcall]) k
+    | IBig_map_update (_, k) -> (next [@ocaml.tailcall]) k
+    | IBig_map_get_and_update (_, k) -> (next [@ocaml.tailcall]) k
+    | IConcat_string (_, k) -> (next [@ocaml.tailcall]) k
+    | IConcat_string_pair (_, k) -> (next [@ocaml.tailcall]) k
+    | ISlice_string (_, k) -> (next [@ocaml.tailcall]) k
+    | IString_size (_, k) -> (next [@ocaml.tailcall]) k
+    | IConcat_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IConcat_bytes_pair (_, k) -> (next [@ocaml.tailcall]) k
+    | ISlice_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IBytes_size (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_seconds_to_timestamp (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_timestamp_to_seconds (_, k) -> (next [@ocaml.tailcall]) k
+    | ISub_timestamp_seconds (_, k) -> (next [@ocaml.tailcall]) k
+    | IDiff_timestamps (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_tez (_, k) -> (next [@ocaml.tailcall]) k
+    | ISub_tez (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_teznat (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_nattez (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_teznat (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_tez (_, k) -> (next [@ocaml.tailcall]) k
+    | IOr (_, k) -> (next [@ocaml.tailcall]) k
+    | IAnd (_, k) -> (next [@ocaml.tailcall]) k
+    | IXor (_, k) -> (next [@ocaml.tailcall]) k
+    | INot (_, k) -> (next [@ocaml.tailcall]) k
+    | IIs_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IAbs_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IInt_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_intint (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_intnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_natint (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_natnat (_, k) -> (next [@ocaml.tailcall]) k
+    | ISub_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_intint (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_intnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_natint (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_natnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_intint (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_intnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_natint (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_natnat (_, k) -> (next [@ocaml.tailcall]) k
+    | ILsl_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | ILsr_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IOr_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IAnd_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IAnd_int_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IXor_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | INot_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | INot_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IIf {kinfo = _; branch_if_true = k1; branch_if_false = k2; k} ->
+        (next3 [@ocaml.tailcall]) k1 k2 k
+    | ILoop (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | ILoop_left (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IDip (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IExec (_, k) -> (next [@ocaml.tailcall]) k
+    | IApply (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ILambda (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IFailwith (_, _, _) -> (return [@ocaml.tailcall]) ()
+    | ICompare (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IEq (_, k) -> (next [@ocaml.tailcall]) k
+    | INeq (_, k) -> (next [@ocaml.tailcall]) k
+    | ILt (_, k) -> (next [@ocaml.tailcall]) k
+    | IGt (_, k) -> (next [@ocaml.tailcall]) k
+    | ILe (_, k) -> (next [@ocaml.tailcall]) k
+    | IGe (_, k) -> (next [@ocaml.tailcall]) k
+    | IAddress (_, k) -> (next [@ocaml.tailcall]) k
+    | IContract (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IView (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ITransfer_tokens (_, k) -> (next [@ocaml.tailcall]) k
+    | IImplicit_account (_, k) -> (next [@ocaml.tailcall]) k
+    | ICreate_contract {k; _} -> (next [@ocaml.tailcall]) k
+    | ISet_delegate (_, k) -> (next [@ocaml.tailcall]) k
+    | INow (_, k) -> (next [@ocaml.tailcall]) k
+    | IBalance (_, k) -> (next [@ocaml.tailcall]) k
+    | ILevel (_, k) -> (next [@ocaml.tailcall]) k
+    | ICheck_signature (_, k) -> (next [@ocaml.tailcall]) k
+    | IHash_key (_, k) -> (next [@ocaml.tailcall]) k
+    | IPack (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IUnpack (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IBlake2b (_, k) -> (next [@ocaml.tailcall]) k
+    | ISha256 (_, k) -> (next [@ocaml.tailcall]) k
+    | ISha512 (_, k) -> (next [@ocaml.tailcall]) k
+    | ISource (_, k) -> (next [@ocaml.tailcall]) k
+    | ISender (_, k) -> (next [@ocaml.tailcall]) k
+    | ISelf (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | ISelf_address (_, k) -> (next [@ocaml.tailcall]) k
+    | IAmount (_, k) -> (next [@ocaml.tailcall]) k
+    | ISapling_empty_state (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ISapling_verify_update (_, k) -> (next [@ocaml.tailcall]) k
+    | IDig (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IDug (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IDipn (_, _, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IDropn (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IChainId (_, k) -> (next [@ocaml.tailcall]) k
+    | INever _ -> (return [@ocaml.tailcall]) ()
+    | IVoting_power (_, k) -> (next [@ocaml.tailcall]) k
+    | ITotal_voting_power (_, k) -> (next [@ocaml.tailcall]) k
+    | IKeccak (_, k) -> (next [@ocaml.tailcall]) k
+    | ISha3 (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_bls12_381_g1 (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_bls12_381_g2 (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_bls12_381_fr (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_bls12_381_g1 (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_bls12_381_g2 (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_bls12_381_fr (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_bls12_381_z_fr (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_bls12_381_fr_z (_, k) -> (next [@ocaml.tailcall]) k
+    | IInt_bls12_381_fr (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg_bls12_381_g1 (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg_bls12_381_g2 (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg_bls12_381_fr (_, k) -> (next [@ocaml.tailcall]) k
+    | IPairing_check_bls12_381 (_, k) -> (next [@ocaml.tailcall]) k
+    | IComb (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IUncomb (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IComb_get (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IComb_set (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IDup_n (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | ITicket (_, k) -> (next [@ocaml.tailcall]) k
+    | IRead_ticket (_, k) -> (next [@ocaml.tailcall]) k
+    | ISplit_ticket (_, k) -> (next [@ocaml.tailcall]) k
+    | IJoin_tickets (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IOpen_chest (_, k) -> (next [@ocaml.tailcall]) k
+    | IHalt _ -> (return [@ocaml.tailcall]) ()
+    | ILog (_, _, _, k) -> (next [@ocaml.tailcall]) k
+  in
+  aux init i (fun accu -> accu)
+
+type 'a ty_traverse = {
+  apply : 't. 'a -> 't ty -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
+}
+
+let (ty_traverse, comparable_ty_traverse) =
+  let rec aux :
+      type t ret accu.
+      accu ty_traverse -> accu -> t comparable_ty -> (accu -> ret) -> ret =
+   fun f accu ty continue ->
+    let accu = f.apply_comparable accu ty in
+    let next2 ty1 ty2 =
+      (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+      (aux [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let next ty1 =
+      (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let return () = (continue [@ocaml.tailcall]) accu in
+    match ty with
+    | Unit_key _ | Int_key _ | Nat_key _ | Signature_key _ | String_key _
+    | Bytes_key _ | Mutez_key _ | Key_hash_key _ | Key_key _ | Timestamp_key _
+    | Address_key _ | Bool_key _ | Chain_id_key _ | Never_key _ ->
+        (return [@ocaml.tailcall]) ()
+    | Pair_key ((ty1, _), (ty2, _), _) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Union_key ((ty1, _), (ty2, _), _) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Option_key (ty, _) -> (next [@ocaml.tailcall]) ty
+  and aux' :
+      type ret t accu. accu ty_traverse -> accu -> t ty -> (accu -> ret) -> ret
+      =
+   fun f accu ty continue ->
+    let accu = f.apply accu ty in
+    match (ty : t ty) with
+    | Unit_t _ | Int_t _ | Nat_t _ | Signature_t _ | String_t _ | Bytes_t _
+    | Mutez_t _ | Key_hash_t _ | Key_t _ | Timestamp_t _ | Address_t _
+    | Bool_t _
+    | Sapling_transaction_t (_, _)
+    | Sapling_state_t (_, _)
+    | Operation_t _ | Chain_id_t _ | Never_t _ | Bls12_381_g1_t _
+    | Bls12_381_g2_t _ | Bls12_381_fr_t _ ->
+        (continue [@ocaml.tailcall]) accu
+    | Ticket_t (cty, _) -> aux f accu cty continue
+    | Chest_key_t _ | Chest_t _ -> (continue [@ocaml.tailcall]) accu
+    | Pair_t ((ty1, _, _), (ty2, _, _), _) ->
+        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Union_t ((ty1, _), (ty2, _), _) ->
+        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Lambda_t (ty1, ty2, _) ->
+        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Option_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
+    | List_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
+    | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty @@ continue
+    | Map_t (cty, ty1, _) ->
+        (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
+        (next' [@ocaml.tailcall]) f accu ty1 continue
+    | Big_map_t (cty, ty1, _) ->
+        (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
+        (next' [@ocaml.tailcall]) f accu ty1 continue
+    | Contract_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
+  and next2' :
+      type a b ret accu.
+      accu ty_traverse -> accu -> a ty -> b ty -> (accu -> ret) -> ret =
+   fun f accu ty1 ty2 continue ->
+    (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+    (aux' [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
+    (continue [@ocaml.tailcall]) accu
+  and next' :
+      type a ret accu. accu ty_traverse -> accu -> a ty -> (accu -> ret) -> ret
+      =
+   fun f accu ty1 continue ->
+    (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+    (continue [@ocaml.tailcall]) accu
+  in
+  ( (fun ty init f -> aux' f init ty (fun accu -> accu)),
+    fun cty init f -> aux f init cty (fun accu -> accu) )
+
+type 'accu stack_ty_traverse = {
+  apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;
+}
+
+let stack_ty_traverse (type a t) (sty : (a, t) stack_ty) init f =
+  let rec aux : type b u. 'accu -> (b, u) stack_ty -> 'accu =
+   fun accu sty ->
+    match sty with
+    | Bot_t -> f.apply accu sty
+    | Item_t (_, sty', _) -> aux (f.apply accu sty) sty'
+  in
+  aux init sty
+
+type 'a value_traverse = {
+  apply : 't. 'a -> 't ty -> 't -> 'a;
+  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
+}
+
+let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
+    =
+  let rec aux : type ret t. 'accu -> t ty -> t -> ('accu -> ret) -> ret =
+   fun accu ty x continue ->
+    let accu = f.apply accu ty x in
+    let next2 ty1 ty2 x1 x2 =
+      (aux [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
+      (aux [@ocaml.tailcall]) accu ty2 x2 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let next ty1 x1 =
+      (aux [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let return () = (continue [@ocaml.tailcall]) accu in
+    let rec on_list ty' accu = function
+      | [] -> (continue [@ocaml.tailcall]) accu
+      | x :: xs ->
+          (aux [@ocaml.tailcall]) accu ty' x @@ fun accu ->
+          (on_list [@ocaml.tailcall]) ty' accu xs
+    in
+    match ty with
+    | Unit_t _ | Int_t _ | Nat_t _ | Signature_t _ | String_t _ | Bytes_t _
+    | Mutez_t _ | Key_hash_t _ | Key_t _ | Timestamp_t _ | Address_t _
+    | Bool_t _
+    | Sapling_transaction_t (_, _)
+    | Sapling_state_t (_, _)
+    | Operation_t _ | Chain_id_t _ | Never_t _ | Bls12_381_g1_t _
+    | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Chest_key_t _ | Chest_t _
+    | Lambda_t (_, _, _) ->
+        (return [@ocaml.tailcall]) ()
+    | Pair_t ((ty1, _, _), (ty2, _, _), _) ->
+        (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
+    | Union_t ((ty1, _), (ty2, _), _) -> (
+        match x with
+        | L l -> (next [@ocaml.tailcall]) ty1 l
+        | R r -> (next [@ocaml.tailcall]) ty2 r)
+    | Option_t (ty, _) -> (
+        match x with
+        | None -> return ()
+        | Some v -> (next [@ocaml.tailcall]) ty v)
+    | Ticket_t (cty, _) -> (aux' [@ocaml.tailcall]) accu cty x.contents continue
+    | List_t (ty', _) -> on_list ty' accu x.elements
+    | Map_t (kty, ty', _) ->
+        let module M = (val x) in
+        let bindings =
+          M.OPS.fold (fun k v bs -> (k, v) :: bs) (fst M.boxed) []
+        in
+        on_bindings accu kty ty' continue bindings
+    | Set_t (ty', _) ->
+        let module M = (val x) in
+        let elements = M.OPS.fold (fun x s -> x :: s) M.boxed [] in
+        on_list' accu ty' elements continue
+    | Big_map_t (_, _, _) ->
+        (* For big maps, there is no obvious recursion scheme so we
+           delegate this case to the client. *)
+        (return [@ocaml.tailcall]) ()
+    | Contract_t (_, _) -> (return [@ocaml.tailcall]) ()
+  and on_list' :
+      type ret t. 'accu -> t comparable_ty -> t list -> ('accu -> ret) -> ret =
+   fun accu ty' xs continue ->
+    match xs with
+    | [] -> (continue [@ocaml.tailcall]) accu
+    | x :: xs ->
+        (aux' [@ocaml.tailcall]) accu ty' x @@ fun accu ->
+        (on_list' [@ocaml.tailcall]) accu ty' xs continue
+  and on_bindings :
+      type ret k v.
+      'accu -> k comparable_ty -> v ty -> ('accu -> ret) -> (k * v) list -> ret
+      =
+   fun accu kty ty' continue xs ->
+    match xs with
+    | [] -> (continue [@ocaml.tailcall]) accu
+    | (k, v) :: xs ->
+        (aux' [@ocaml.tailcall]) accu kty k @@ fun accu ->
+        (aux [@ocaml.tailcall]) accu ty' v @@ fun accu ->
+        (on_bindings [@ocaml.tailcall]) accu kty ty' continue xs
+  and aux' : type ret t. 'accu -> t comparable_ty -> t -> ('accu -> ret) -> ret
+      =
+   fun accu ty x continue ->
+    let accu = f.apply_comparable accu ty x in
+    let next2 ty1 ty2 x1 x2 =
+      (aux' [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
+      (aux' [@ocaml.tailcall]) accu ty2 x2 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let next ty1 x1 =
+      (aux' [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
+      (continue [@ocaml.tailcall]) accu
+    in
+    let return () = (continue [@ocaml.tailcall]) accu in
+    match ty with
+    | Unit_key _ | Int_key _ | Nat_key _ | Signature_key _ | String_key _
+    | Bytes_key _ | Mutez_key _ | Key_hash_key _ | Key_key _ | Timestamp_key _
+    | Address_key _ | Bool_key _ | Chain_id_key _ | Never_key _ ->
+        (return [@ocaml.tailcall]) ()
+    | Pair_key ((ty1, _), (ty2, _), _) ->
+        (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
+    | Union_key ((ty1, _), (ty2, _), _) -> (
+        match x with
+        | L l -> (next [@ocaml.tailcall]) ty1 l
+        | R r -> (next [@ocaml.tailcall]) ty2 r)
+    | Option_key (ty, _) -> (
+        match x with
+        | None -> (return [@ocaml.tailcall]) ()
+        | Some v -> (next [@ocaml.tailcall]) ty v)
+  in
+  match ty with
+  | L ty -> aux init ty x (fun accu -> accu)
+  | R cty -> aux' init cty x (fun accu -> accu)
+
+let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty = function
+  | Item_t (ty, _, _) -> ty

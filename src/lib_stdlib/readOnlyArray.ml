@@ -91,3 +91,14 @@ let fold f array init =
     else aux (f accu (Array.unsafe_get array idx)) (idx + 1)
   in
   aux init 0
+
+let fold_map f array init fallback =
+  let output = Array.(make (length array)) fallback in
+  let rec aux accu idx =
+    if idx > length array - 1 then accu
+    else
+      let (accu, y) = f accu (Array.unsafe_get array idx) in
+      Array.unsafe_set output idx y ;
+      aux accu (idx + 1)
+  in
+  (aux init 0, output)

@@ -38,16 +38,10 @@ let load_and_elaborate ctxt addr =
   match script with
   | None -> return (ctxt, None)
   | Some script ->
-      Script_ir_translator.parse_script
-        ctxt
-        script
-        ~legacy:true
-        ~allow_forged_in_storage:true
-      >>=? fun (ex_script, ctxt) ->
-      let (Ex_script {code_size; _}) = ex_script in
-      Script_repr.force_decode script.storage >>?= fun storage ->
-      let storage_size = Script_repr.node_size (Micheline.root storage) in
-      return (ctxt, Some (script, ex_script, code_size + storage_size))
+      Script_ir_translator.(
+        parse_script ctxt script ~legacy:true ~allow_forged_in_storage:true
+        >>=? fun (ex_script, ctxt) ->
+        return (ctxt, Some (script, ex_script, script_size ex_script)))
 
 module Client = struct
   type cached_value = cached_contract
@@ -101,3 +95,7 @@ let entries ctxt =
 
 let contract_rank ctxt addr =
   Cache.identifier_rank ctxt (identifier_of_contract addr)
+
+let size = Cache.size
+
+let size_limit = Cache.size_limit

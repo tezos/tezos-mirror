@@ -65,6 +65,12 @@ module Cache : sig
     'a ->
     (Alpha_context.Contract.t * int) list shell_tzresult Lwt.t
 
+  val contract_cache_size :
+    'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
+
+  val contract_cache_size_limit :
+    'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
+
   val contract_rank :
     'a #RPC_context.simple ->
     'a ->

@@ -168,8 +168,9 @@ let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
 let rec michelson_type_list_to_ex_stack_ty
     (stack_ty : Alpha_context.Script.expr list) ctxt =
   let open Script_ir_translator in
+  let open Script_typed_ir in
   match stack_ty with
-  | [] -> (Ex_stack_ty Script_typed_ir.Bot_t, ctxt)
+  | [] -> (Ex_stack_ty Bot_t, ctxt)
   | hd :: tl -> (
       let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with

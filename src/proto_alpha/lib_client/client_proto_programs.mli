@@ -140,6 +140,17 @@ val print_typecheck_result :
   #Client_context.printer ->
   unit tzresult Lwt.t
 
+val script_size :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?gas:Gas.Arith.integral ->
+  ?legacy:bool ->
+  program:Michelson_v1_parser.parsed ->
+  storage:Michelson_v1_parser.parsed ->
+  unit ->
+  int tzresult Lwt.t
+
 val entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->

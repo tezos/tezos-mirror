@@ -63,9 +63,8 @@ val find :
 val update : context -> identifier -> cached_contract -> int -> context
 
 (** [entries ctxt] returns the contracts in the cache as well as their
-   respective date of last modification in the cache. A small date
-   means that the contract has not been used recently comparing to
-   others. *)
+   respective size. The list is sorted by date of last modification:
+   the least recently updated entry comes first. *)
 val entries : context -> (Contract.t * int) list tzresult
 
 (** [contract_rank ctxt contract] returns the number of contracts
@@ -73,3 +72,10 @@ val entries : context -> (Contract.t * int) list tzresult
     returns [None] if [contract] does not exist in the cache of
     [ctxt]. *)
 val contract_rank : context -> Contract.t -> int option
+
+(** [size ctxt] is an overapproximation of the cache size in
+   memory (in bytes). *)
+val size : context -> int
+
+(** [size_limit ctxt] is the maximal size of the cache (in bytes). *)
+val size_limit : context -> int

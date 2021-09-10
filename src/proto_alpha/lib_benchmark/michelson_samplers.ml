@@ -339,6 +339,10 @@ module type S = sig
   end
 end
 
+exception SamplingError of string
+
+let fail_sampling error = raise (SamplingError error)
+
 module Make (P : Michelson_samplers_parameters.S) : S = struct
   include Michelson_samplers_base.Make_full (P)
 
@@ -628,14 +632,13 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             let ty = comparable_downcast contents_ty in
             generate_ticket ty
         | Sapling_transaction_t _ ->
-            Stdlib.failwith
+            fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_state_t _ ->
-            Stdlib.failwith "Michelson_samplers: sapling state not handled yet"
+            fail_sampling "Michelson_samplers: sapling state not handled yet"
         | Chest_key_t _ ->
-            Stdlib.failwith "Michelson_samplers: chest key not handled yet"
-        | Chest_t _ ->
-            Stdlib.failwith "Michelson_samplers: chest not handled yet"
+            fail_sampling "Michelson_samplers: chest key not handled yet"
+        | Chest_t _ -> fail_sampling "Michelson_samplers: chest not handled yet"
 
     and generate_lambda :
         type arg ret.
@@ -643,8 +646,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         ret Script_typed_ir.ty ->
         (arg, ret) Script_typed_ir.lambda sampler =
      fun _arg_ty _ret_ty _rng_state ->
-      (* TODO: plug michelson sampler *)
-      assert false
+      fail_sampling "Michelson_samplers: lambda not handled yet"
 
     and generate_list :
         type elt.
@@ -720,7 +722,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
               "%a@."
               (Error_monad.TzTrace.pp_print Error_monad.pp)
               e ;
-            Stdlib.failwith "raise_if_error"
+            fail_sampling "raise_if_error"
 
     and generate_contract :
         type arg.
@@ -740,7 +742,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
     and generate_transfer_tokens :
         Alpha_context.packed_internal_operation sampler =
-     fun _rng_state -> Stdlib.failwith "generate_transfer_tokens: unimplemented"
+     fun _rng_state -> fail_sampling "generate_transfer_tokens: unimplemented"
 
     and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
      fun rng_state ->

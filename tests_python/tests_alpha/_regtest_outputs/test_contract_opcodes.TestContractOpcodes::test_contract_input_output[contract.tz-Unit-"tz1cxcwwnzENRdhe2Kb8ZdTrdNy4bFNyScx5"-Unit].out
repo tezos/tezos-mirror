@@ -15,13 +15,15 @@ trace
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")  	@parameter.contract ]
   - location: 11 (remaining gas: 1039939.711 units remaining)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
-  - location: 17 (remaining gas: 1039939.701 units remaining)
+  - location: 11 (remaining gas: 1039939.696 units remaining)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
+  - location: 17 (remaining gas: 1039939.686 units remaining)
     [  ]
-  - location: 18 (remaining gas: 1039939.691 units remaining)
+  - location: 18 (remaining gas: 1039939.676 units remaining)
     [ Unit  	 ]
-  - location: 19 (remaining gas: 1039939.676 units remaining)
+  - location: 19 (remaining gas: 1039939.661 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 21 (remaining gas: 1039939.661 units remaining)
+  - location: 21 (remaining gas: 1039939.646 units remaining)
     [ (Pair {} Unit)  	 ]
 

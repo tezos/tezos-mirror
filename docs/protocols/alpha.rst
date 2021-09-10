@@ -100,13 +100,23 @@ Cache
   cache. This reduces the gas consumption for the most recently used
   contracts.
 
-- The new RPC ``context/cache/contracts`` provides the list of contracts
+- The new RPC ``context/cache/contracts/all`` returns the list of contracts
   in the cache.
 
-- The new RPC ``context/cache/contract_rank`` gives the number of contracts
-  older than the one provided as argument.
+- The new RPC ``context/cache/contracts/size`` returns an overapproximation
+  of the cache size (in bytes).
 
-- MR: :gl:`!3234`
+- The new RPC ``context/cache/contracts/size_limit`` returns the maximal
+  cache size (in bytes). When this size is reached, the cache removes
+  the least recently used entries.
+
+- The new RPC ``context/cache/contract_rank`` gives the number of contracts
+  that are less recently used than the one provided as argument.
+
+- The new RPC ``scripts/script_size`` gives the size of the script
+  and its storage when stored in the cache.
+
+- MRs: :gl:`!3234` :gl:`!3419`
 
 Context Storage Flattening
 --------------------------

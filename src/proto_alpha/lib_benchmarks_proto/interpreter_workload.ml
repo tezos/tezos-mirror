@@ -1216,7 +1216,7 @@ let extract_ir_sized_step :
   | (ICdr (_, _), _) -> Instructions.cdr
   | (IUnpair (_, _), _) -> Instructions.unpair
   | (ICons_some (_, _), _) -> Instructions.cons_some
-  | (ICons_none (_, _, _), _) -> Instructions.cons_none
+  | (ICons_none (_, _), _) -> Instructions.cons_none
   | (IIf_none _, _) -> Instructions.if_none
   | (ICons_left (_, _), _) -> Instructions.left
   | (ICons_right (_, _), _) -> Instructions.right
@@ -1238,7 +1238,7 @@ let extract_ir_sized_step :
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
   | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
-  | (IEmpty_map (_, _, _, _), _) -> Instructions.empty_map
+  | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
   | (IMap_map _, (map, _)) -> Instructions.map_map (Size.map map)
   | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
   | (IMap_mem (_, _), (v, (((module Map) as map), _))) ->
@@ -1369,7 +1369,7 @@ let extract_ir_sized_step :
   | (IExec (_, _), _) -> Instructions.exec
   | (IApply (_, _, _), _) -> Instructions.apply
   | (ILambda (_, _, _), _) -> Instructions.lambda
-  | (IFailwith (_, _, _, _), _) -> Instructions.failwith_
+  | (IFailwith (_, _, _), _) -> Instructions.failwith_
   | (ICompare (_, cmp_ty, _), (a, (b, _))) ->
       extract_compare_sized_step cmp_ty a b
   | (IEq (_, _), _) -> Instructions.eq

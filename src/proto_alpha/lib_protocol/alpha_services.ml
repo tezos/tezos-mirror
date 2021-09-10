@@ -131,7 +131,22 @@ module Cache = struct
         ~query:RPC_query.empty
         ~output:
           Data_encoding.(list @@ tup2 Alpha_context.Contract.encoding int31)
-        RPC_path.(custom_root / "context" / "cache" / "contracts")
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "all")
+
+    let contract_cache_size =
+      RPC_service.get_service
+        ~description:"Return the size of the contract cache"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int31
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "size")
+
+    let contract_cache_size_limit =
+      RPC_service.get_service
+        ~description:"Return the size limit of the contract cache"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int31
+        RPC_path.(
+          custom_root / "context" / "cache" / "contracts" / "size_limit")
 
     let contract_rank =
       RPC_service.post_service
@@ -148,11 +163,21 @@ module Cache = struct
     let open Services_registration in
     register0 ~chunked:true S.cached_contracts (fun ctxt () () ->
         Script_cache.entries ctxt |> Lwt.return) ;
+    register0 ~chunked:false S.contract_cache_size (fun ctxt () () ->
+        Script_cache.size ctxt |> return) ;
+    register0 ~chunked:false S.contract_cache_size_limit (fun ctxt () () ->
+        Script_cache.size_limit ctxt |> return) ;
     register0 ~chunked:false S.contract_rank (fun ctxt () contract ->
         Script_cache.contract_rank ctxt contract |> return)
 
   let cached_contracts ctxt block =
     RPC_context.make_call0 S.cached_contracts ctxt block () ()
+
+  let contract_cache_size ctxt block =
+    RPC_context.make_call0 S.contract_cache_size ctxt block () ()
+
+  let contract_cache_size_limit ctxt block =
+    RPC_context.make_call0 S.contract_cache_size_limit ctxt block () ()
 
   let contract_rank ctxt block contract =
     RPC_context.make_call0 S.contract_rank ctxt block () contract

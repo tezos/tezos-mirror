@@ -197,10 +197,10 @@ type cache_key
 type cache_value = ..
 
 module type CACHE = sig
-  (** Abstract type of a cache. A cache is made of subcaches. Each
-     subcache has its own size limit. The limit of its subcache is
-     called a layout and can be initialized via the [set_cache_layout]
-     function. *)
+  (** Type for context view. A context contains a cache. A cache is
+     made of subcaches. Each subcache has its own size limit. The
+     limit of its subcache is called a layout and can be initialized
+     via the [set_cache_layout] function. *)
   type t
 
   (** Size for subcaches and values of the cache. Units are not
@@ -275,11 +275,12 @@ module type CACHE = sig
 
   (** {3 Cache introspection} *)
 
-  (** [list_keys cache_handle ctxt] returns the list of cached keys in
-     cache numbered [cache_handle] along with their respective
-     [age]. The returned list is sorted in terms of their age in the
-     cache, the oldest coming first. *)
-  val list_keys : t -> cache_index:index -> (key * int) list
+  (** [list_keys ctxt ~cache_index] returns the list of cached keys in
+     cache numbered [cache_index] along with their respective
+     [size]. The returned list is sorted in terms of their age in the
+     cache, the oldest coming first. If [cache_index] is invalid,
+     then this function returns [None]. *)
+  val list_keys : t -> cache_index:index -> (key * size) list option
 
   (** [key_rank index ctxt key] returns the number of cached value older
        than the given [key]; or, [None] if the [key] is not a cache key. *)
@@ -296,6 +297,16 @@ module type CACHE = sig
       multipled by `n_blocks` to determine the entries that are
       likely to be removed in `n_blocks`. *)
   val future_cache_expectation : t -> time_in_blocks:int -> t
+
+  (** [cache_size ctxt ~cache_index] returns an overapproximation of
+      the size of the cache. Returns [None] if [cache_index] is not a
+      valid cache index. *)
+  val cache_size : t -> cache_index:index -> size option
+
+  (** [cache_size_limit ctxt ~cache_index] returns the maximal size of
+      the cache indexed by [cache_index]. Returns [None] if
+      [cache_index] is not a valid cache index. *)
+  val cache_size_limit : t -> cache_index:index -> size option
 end
 
 module Cache :

@@ -554,8 +554,6 @@ module Script : sig
   val unit_parameter : lazy_expr
 
   val strip_locations_cost : node -> Gas.cost
-
-  val node_size : node -> int
 end
 
 module Constants : sig
@@ -865,6 +863,18 @@ module Cache : sig
       likely to be removed in `n_blocks`. *)
     val future_cache_expectation : context -> time_in_blocks:int -> context
 
+    (** [cache_size ctxt ~cache_index] returns an overapproximation of
+       the size of the cache. Returns [None] if [cache_index] is
+       greater than the number of subcaches declared by the cache
+       layout. *)
+    val cache_size : context -> cache_index:int -> size option
+
+    (** [cache_size_limit ctxt ~cache_index] returns the maximal size of
+       the cache indexed by [cache_index]. Returns [None] if
+       [cache_index] is greater than the number of subcaches declared
+       by the cache layout. *)
+    val cache_size_limit : context -> cache_index:int -> size option
+
     (** [value_of_key ctxt k] interprets the functions introduced by
      [register] to construct a cacheable value for a key [k]. *)
     val value_of_key :
@@ -937,7 +947,7 @@ module Cache : sig
 
     (** [list_identifiers ctxt] returns the list of the
        identifiers of the cached values along with their respective
-       age. The returned list is sorted in terms of their age in the
+       size. The returned list is sorted in terms of their age in the
        cache, the oldest coming first. *)
     val list_identifiers : context -> (string * int) list
 
@@ -945,6 +955,14 @@ module Cache : sig
        older than the one of [identifier]; or, [None] if the [identifier] has
        no associated value in the subcache. *)
     val identifier_rank : context -> string -> int option
+
+    (** [size ctxt] returns an overapproximation of the subcache size
+        (in bytes). *)
+    val size : context -> int
+
+    (** [size_limit ctxt] returns the maximal size of the subcache
+        (in bytes). *)
+    val size_limit : context -> int
   end
 
   (** [register_exn client] produces an [Interface] specific to a
@@ -1194,6 +1212,10 @@ module Sapling : sig
   type alloc = {memo_size : Memo_size.t}
 
   type updates = diff
+
+  val transaction_in_memory_size : transaction -> Cache_memory_helpers.sint
+
+  val diff_in_memory_size : diff -> Cache_memory_helpers.sint
 end
 
 module Lazy_storage : sig
@@ -1235,6 +1257,8 @@ module Lazy_storage : sig
 
   val encoding : diffs Data_encoding.t
 
+  val diffs_in_memory_size : diffs -> Cache_memory_helpers.sint
+
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
 
   val cleanup_temporaries : context -> context Lwt.t
@@ -1246,6 +1270,8 @@ module Contract : sig
   include BASIC_DATA
 
   type contract = t
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
 
   val rpc_arg : contract RPC_arg.arg
 
@@ -1831,6 +1857,9 @@ module Operation : sig
   val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
+
+  val packed_internal_operation_in_memory_size :
+    packed_internal_operation -> Cache_memory_helpers.sint
 
   val pack : 'kind operation -> packed_operation
 

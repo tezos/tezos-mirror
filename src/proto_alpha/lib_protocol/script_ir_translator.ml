@@ -1912,7 +1912,7 @@ type ('arg, 'storage) code = {
   storage_type : 'storage ty;
   views : view SMap.t;
   root_name : field_annot option;
-  code_size : int;
+  code_size : Cache_memory_helpers.sint;
 }
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
@@ -3275,7 +3275,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       parse_var_type_annot loc annot >>?= fun (annot, ty_name) ->
-      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, t, k))} in
+      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, k))} in
       option_t loc t ~annot:ty_name >>?= fun ty ->
       let stack_ty = Item_t (ty, stack, annot) in
       typed ctxt loc cons_none stack_ty
@@ -3295,11 +3295,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
+                let hinfo = kinfo_of_kinstr k in
                 let btinfo = kinfo_of_descr ibt
                 and bfinfo = kinfo_of_descr ibf in
-                let branch_if_none = ibt.instr.apply btinfo k
-                and branch_if_some = ibf.instr.apply bfinfo k in
-                IIf_none {kinfo; branch_if_none; branch_if_some});
+                let branch_if_none = ibt.instr.apply btinfo (IHalt hinfo)
+                and branch_if_some = ibf.instr.apply bfinfo (IHalt hinfo) in
+                IIf_none {kinfo; branch_if_none; branch_if_some; k});
           }
         in
         {loc; instr = ifnone; bef; aft = ibt.aft}
@@ -3559,9 +3560,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_left = ibt.instr.apply infobt k
-                and branch_if_right = ibf.instr.apply infobf k in
-                IIf_left {kinfo; branch_if_left; branch_if_right});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_left = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_right = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf_left {kinfo; branch_if_left; branch_if_right; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -3605,9 +3607,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_cons = ibt.instr.apply infobt k
-                and branch_if_nil = ibf.instr.apply infobf k in
-                IIf_cons {kinfo; branch_if_nil; branch_if_cons});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_cons = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_nil = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf_cons {kinfo; branch_if_nil; branch_if_cons; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -3774,7 +3777,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
       parse_var_type_annot loc annot >>?= fun (annot, ty_name) ->
-      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, tv, k))} in
+      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, k))} in
       map_t loc tk tv ~annot:ty_name >>?= fun ty ->
       typed ctxt loc instr (Item_t (ty, stack, annot))
   | ( Prim (loc, I_MAP, [body], annot),
@@ -4069,9 +4072,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           {
             apply =
               (fun kinfo k ->
-                let branch_if_true = ibt.instr.apply infobt k
-                and branch_if_false = ibf.instr.apply infobf k in
-                IIf {kinfo; branch_if_true; branch_if_false});
+                let hinfo = kinfo_of_kinstr k in
+                let branch_if_true = ibt.instr.apply infobt (IHalt hinfo)
+                and branch_if_false = ibf.instr.apply infobf (IHalt hinfo) in
+                IIf {kinfo; branch_if_true; branch_if_false; k});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -4311,7 +4315,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( error_unexpected_annot loc annot >>? fun () ->
           (if legacy then ok_unit else check_packable ~legacy:false loc v)
           >>? fun () ->
-          let instr = {apply = (fun kinfo k -> IFailwith (kinfo, loc, v, k))} in
+          let instr = {apply = (fun kinfo _k -> IFailwith (kinfo, loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
           log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
         )
@@ -4347,8 +4351,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t
-        ( Timestamp_t {annot = tn1; _},
-          Item_t (Timestamp_t {annot = tn2; _}, rest, _),
+        ( Timestamp_t {annot = tn1; size = _},
+          Item_t (Timestamp_t {annot = tn2; size = _}, rest, _),
           _ ) ) ->
       parse_var_annot loc annot >>?= fun annot ->
       merge_type_annot ~legacy tn1 tn2 >>?= fun tname ->
@@ -5686,7 +5690,6 @@ let parse_code :
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  let code_size = Script_repr.(node_size (Micheline.root code)) in
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in
@@ -5742,14 +5745,21 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  let view_size view =
-    Script_repr.(
-      node_size view.view_code + node_size view.input_ty
-      + node_size view.output_ty)
-  in
-  let views_size = SMap.fold (fun _ v s -> view_size v + s) views 0 in
-  let code_size = code_size + views_size in
-  (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt)
+  Saturation_repr.(
+    let view_size view =
+      Script_typed_ir_size.(
+        add
+          (add (node_size view.view_code) (node_size view.input_ty))
+          (node_size view.output_ty))
+    in
+    let views_size =
+      SMap.fold (fun _ v s -> add (view_size v) s) views (safe_int 0)
+    in
+    (* The size of the storage_type and the arg_type is counted by
+       [lambda_size]. *)
+    let ir_size = Script_typed_ir_size.lambda_size code in
+    let code_size = add views_size ir_size in
+    (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -6533,13 +6543,14 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         let reversed = {length = l.length; elements = List.rev l.elements} in
         (ctxt, reversed, ids_to_copy, acc)
     | (Map_f has_lazy_storage, Map_t (_, ty, _), (module M)) ->
+        let bindings m = M.OPS.fold (fun k v bs -> (k, v) :: bs) m [] in
         List.fold_left_es
           (fun (ctxt, m, ids_to_copy, acc) (k, x) ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
             (ctxt, M.OPS.add k x m, ids_to_copy, acc))
           (ctxt, M.OPS.empty, ids_to_copy, acc)
-          (M.OPS.bindings (fst M.boxed))
+          (bindings (fst M.boxed))
         >|=? fun (ctxt, m, ids_to_copy, acc) ->
         let module M = struct
           module OPS = M.OPS
@@ -6735,3 +6746,44 @@ let[@coq_axiom_with_reason "gadt"] get_single_sapling_state ctxt ty x =
   match id with
   | Fold_lazy_storage.Ok (Some id) -> ok (Some id, ctxt)
   | Fold_lazy_storage.Ok None | Fold_lazy_storage.Error -> ok (None, ctxt)
+
+(*
+
+   {!Script_cache} needs a measure of the script size in memory.
+   Determining this size is not easy in OCaml because of sharing.
+
+   Indeed, many values present in the script share the same memory
+   area. This is especially true for types and stack types: they are
+   heavily shared in every typed IR internal representation. As a
+   consequence, computing the size of the typed IR without taking
+   sharing into account leads to a size which is sometimes two order
+   of magnitude bigger than the actual size.
+
+   We could track down this sharing. Unfortunately, sharing is not
+   part of OCaml semantics: for this reason, a compiler can optimize
+   memory representation by adding more sharing.  If two nodes use
+   different optimization flags or compilers, such a precise
+   computation of the memory footprint of scripts would lead to two
+   distinct sizes. As these sizes occur in the blockchain context,
+   this situation would lead to a fork.
+
+   For this reason, we introduce a *size model* for the script size.
+   This model provides an overapproximation of the actual size in
+   memory. The risk is to be too far from the actual size: the cache
+   would then be wrongly marked as full. This situation would make the
+   cache less useful but should present no security risk .
+
+*)
+let script_size
+    (Ex_script
+      {
+        code_size;
+        code = _;
+        arg_type = _;
+        storage;
+        storage_type;
+        root_name = _;
+        views = _;
+      }) =
+  let storage_size = Script_typed_ir_size.value_size storage_type storage in
+  Saturation_repr.(add code_size storage_size |> to_int)

@@ -890,8 +890,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICons_none
-        ~kinstr:
-          (ICons_none (kinfo_unit, unit, halt (option unit @$ unit @$ bot)))
+        ~kinstr:(ICons_none (kinfo_unit, halt (option unit @$ unit @$ bot)))
         ()
 
     let () =
@@ -903,6 +902,7 @@ module Registration_section = struct
                kinfo = kinfo (option unit @$ unit @$ bot);
                branch_if_none = halt_unit;
                branch_if_some = IDrop (kinfo_unitunit, halt_unit);
+               k = halt_unit;
              })
         ()
   end
@@ -929,6 +929,7 @@ module Registration_section = struct
                kinfo = kinfo (union unit unit @$ bot);
                branch_if_left = halt_unit;
                branch_if_right = halt_unit;
+               k = halt_unit;
              })
         ()
   end
@@ -959,6 +960,7 @@ module Registration_section = struct
                    ( kinfo (unit @$ list unit @$ unit @$ bot),
                      IDrop (kinfo (list unit @$ unit @$ bot), halt_unit) );
                branch_if_nil = halt_unit;
+               k = halt_unit;
              })
         ()
 
@@ -1128,8 +1130,12 @@ module Registration_section = struct
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
+        |> WithExceptions.Option.get ~loc:__LOC__
       in
       (key, map)
 
@@ -1138,10 +1144,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IEmpty_map
         ~kinstr:
           (IEmpty_map
-             ( kinfo_unit,
-               unit_cmp,
-               unit,
-               halt (map unit_cmp unit @$ unit @$ bot) ))
+             (kinfo_unit, unit_cmp, halt (map unit_cmp unit @$ unit @$ bot)))
         ()
 
     (*
@@ -1155,11 +1158,7 @@ module Registration_section = struct
     let map_map_code =
       IMap_map
         ( kinfo (map int_cmp unit @$ unit @$ bot),
-          IFailwith
-            ( kinfo (pair int unit @$ unit @$ bot),
-              0,
-              pair int unit,
-              halt_unitunit ),
+          IFailwith (kinfo (pair int unit @$ unit @$ bot), 0, pair int unit),
           halt (map int_cmp unit @$ unit @$ bot) )
 
     let () =
@@ -1309,8 +1308,12 @@ module Registration_section = struct
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
+        |> WithExceptions.Option.get ~loc:__LOC__
       in
       let big_map =
         raise_if_error
@@ -1898,6 +1901,7 @@ module Registration_section = struct
                kinfo = kinfo (bool @$ unit @$ bot);
                branch_if_true = halt_unit;
                branch_if_false = halt_unit;
+               k = halt_unit;
              })
         ()
 
@@ -2010,7 +2014,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IFailwith
         ~amplification:100
-        ~kinstr:(IFailwith (kinfo_unit, 0, unit, halt_unit))
+        ~kinstr:(IFailwith (kinfo_unit, 0, unit))
         ()
   end
 

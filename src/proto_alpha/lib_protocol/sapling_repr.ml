@@ -93,3 +93,108 @@ let transaction_get_memo_size (transaction : Sapling.UTXO.transaction) =
   | {ciphertext; _} :: _ ->
       (* Encoding ensures all ciphertexts have the same memo size. *)
       Some (Sapling.Ciphertext.get_memo_size ciphertext)
+
+open Cache_memory_helpers
+
+(* This should be exported by [lib_sapling] rather than implemented here. *)
+let input_in_memory_size =
+  (* type input =
+   *   Sapling.UTXO.input = {
+   *   cv : Sapling.CV.t;
+   *   nf : Sapling.Nullifier.t;
+   *   rk : Sapling.UTXO.rk;
+   *   proof_i : Sapling.UTXO.spend_proof;
+   *   signature : Sapling.UTXO.spend_sig;
+   * } *)
+  let cv_size = string_size_gen 32 in
+  let nf_size = string_size_gen 32 in
+  let rk_size = string_size_gen 32 in
+  let proof_i_size = string_size_gen @@ (48 + 96 + 48) in
+  let signature_size = string_size_gen 64 in
+  header_size +! (word_size *? 5) +! cv_size +! nf_size +! rk_size
+  +! proof_i_size +! signature_size
+
+let ciphertext_size =
+  (* type t = {
+   *   cv : CV.t;
+   *   epk : DH.epk;
+   *   payload_enc : Bytes.t;
+   *   nonce_enc : Crypto_box.nonce;
+   *   payload_out : Bytes.t;
+   *   nonce_out : Crypto_box.nonce;
+   * } *)
+  let cv_size = string_size_gen 32 in
+  let epk_size = string_size_gen 32 in
+  let nonce_enc_size =
+    string_size_gen 24
+    (* from lib_hacl_glue/unix/hacl.ml:Nonce.size *)
+  in
+  let payload_out_size =
+    string_size_gen (32 + 32 + 16)
+    (* from lib_sapling/core.ml:Ciphertext.encoding *)
+  in
+  let nonce_out_size = string_size_gen 24 in
+  let fixed_payload_data_size =
+    11 + 8 + 32 + 16 + 4
+    (* from lib_sapling/core.ml:Ciphertext.get_memo_size *)
+  in
+
+  fun memo_size ->
+    let payload_size = string_size_gen (memo_size + fixed_payload_data_size) in
+    header_size +! (word_size *? 6) +! cv_size +! epk_size +! payload_size
+    +! nonce_enc_size +! payload_out_size +! nonce_out_size
+
+let output_in_memory_size =
+  (* type output = {
+   *   cm : Commitment.t;
+   *   proof_o : output_proof;
+   *   ciphertext : Ciphertext.t;
+   * } *)
+  let cm_size = string_size_gen 32 in
+  let proof_o_size = string_size_gen @@ (48 + 96 + 48) in
+  let ciphertext_size = ciphertext_size in
+
+  fun memo_size ->
+    header_size +! (word_size *? 3) +! cm_size +! proof_o_size
+    +! ciphertext_size memo_size
+
+(** Returns an approximation of the in-memory size of a Sapling transaction.  *)
+let transaction_in_memory_size (transaction : Sapling.UTXO.transaction) =
+  (* type transaction =
+   *   transaction = {
+   *   inputs : Sapling.UTXO.input list;
+   *   outputs : Sapling.UTXO.output list;
+   *   binding_sig : Sapling.UTXO.binding_sig;
+   *   balance : int64;
+   *   root : Sapling.Hash.t;
+   * } *)
+  let binding_sig_size = string_size_gen 64 in
+  let balance_size = int64_size in
+  let root_size = string_size_gen 32 in
+  let inputs = List.length transaction.inputs in
+  let outputs = List.length transaction.outputs in
+  let memo_size =
+    Option.value ~default:0 (transaction_get_memo_size transaction)
+  in
+  header_size +! (word_size *? 5)
+  +! (list_cell_size input_in_memory_size *? inputs)
+  +! (list_cell_size (output_in_memory_size memo_size) *? outputs)
+  +! binding_sig_size +! balance_size +! root_size
+
+(** Returns an approximation of the in-memory size of a Sapling diff.  *)
+let diff_in_memory_size ({commitments_and_ciphertexts; nullifiers} : diff) =
+  let cms_and_cts = List.length commitments_and_ciphertexts in
+  let nfs = List.length nullifiers in
+  let cm_size = string_size_gen 32 in
+  let nf_size = string_size_gen 32 in
+  let memo_size =
+    (* All memo_size in a diff should be equal (see invariant enforced by
+       [diff] encoding above) *)
+    match commitments_and_ciphertexts with
+    | [] -> 0
+    | (_, ct) :: _ -> Sapling.Ciphertext.get_memo_size ct
+  in
+  header_size +! (word_size *? 2)
+  +! list_cell_size (boxed_tup2 cm_size (ciphertext_size memo_size))
+     *? cms_and_cts
+  +! (list_cell_size nf_size *? nfs)

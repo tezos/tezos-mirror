@@ -701,3 +701,11 @@ let cached_contracts cctxt ~chain ~block =
 let contract_rank cctxt ~chain ~block contract =
   let cb = (chain, block) in
   Alpha_services.Cache.contract_rank cctxt cb contract
+
+let contract_cache_size cctxt ~chain ~block =
+  let cb = (chain, block) in
+  Alpha_services.Cache.contract_cache_size cctxt cb
+
+let contract_cache_size_limit cctxt ~chain ~block =
+  let cb = (chain, block) in
+  Alpha_services.Cache.contract_cache_size_limit cctxt cb

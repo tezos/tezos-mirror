@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest_functionalArray
+    Invocation:   dune build @src/lib_stdlib/test/runtest
     Subject:      Functional arrays
  *)
 

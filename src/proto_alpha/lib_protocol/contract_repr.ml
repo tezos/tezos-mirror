@@ -41,6 +41,20 @@ end)
 
 type contract = t
 
+let blake2b_hash_size =
+  let open Cache_memory_helpers in
+  header_size +! word_size +! string_size_gen 20
+
+let public_key_hash_in_memory_size =
+  let open Cache_memory_helpers in
+  header_size +! word_size +! blake2b_hash_size
+
+let in_memory_size =
+  let open Cache_memory_helpers in
+  function
+  | Implicit _ -> header_size +! word_size +! public_key_hash_in_memory_size
+  | Originated _ -> header_size +! word_size +! blake2b_hash_size
+
 type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function

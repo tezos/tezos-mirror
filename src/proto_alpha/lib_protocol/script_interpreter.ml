@@ -485,14 +485,27 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* options *)
       | ICons_some (_, k) ->
           (step [@ocaml.tailcall]) g gas k ks (Some accu) stack
-      | ICons_none (_, _, k) ->
+      | ICons_none (_, k) ->
           (step [@ocaml.tailcall]) g gas k ks None (accu, stack)
-      | IIf_none {branch_if_none; branch_if_some; _} -> (
+      | IIf_none {branch_if_none; branch_if_some; k; _} -> (
           match accu with
           | None ->
               let (accu, stack) = stack in
-              (step [@ocaml.tailcall]) g gas branch_if_none ks accu stack
-          | Some v -> (step [@ocaml.tailcall]) g gas branch_if_some ks v stack)
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_none
+                (KCons (k, ks))
+                accu
+                stack
+          | Some v ->
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_some
+                (KCons (k, ks))
+                v
+                stack)
       (* pairs *)
       | ICons_pair (_, k) ->
           let (b, stack) = stack in
@@ -509,10 +522,24 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* unions *)
       | ICons_left (_, k) -> (step [@ocaml.tailcall]) g gas k ks (L accu) stack
       | ICons_right (_, k) -> (step [@ocaml.tailcall]) g gas k ks (R accu) stack
-      | IIf_left {branch_if_left; branch_if_right; _} -> (
+      | IIf_left {branch_if_left; branch_if_right; k; _} -> (
           match accu with
-          | L v -> (step [@ocaml.tailcall]) g gas branch_if_left ks v stack
-          | R v -> (step [@ocaml.tailcall]) g gas branch_if_right ks v stack)
+          | L v ->
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_left
+                (KCons (k, ks))
+                v
+                stack
+          | R v ->
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_right
+                (KCons (k, ks))
+                v
+                stack)
       (* lists *)
       | ICons_list (_, k) ->
           let (tl, stack) = stack in
@@ -522,14 +549,26 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let stack = (accu, stack) in
           let accu = Script_list.empty in
           (step [@ocaml.tailcall]) g gas k ks accu stack
-      | IIf_cons {branch_if_cons; branch_if_nil; _} -> (
+      | IIf_cons {branch_if_cons; branch_if_nil; k; _} -> (
           match accu.elements with
           | [] ->
               let (accu, stack) = stack in
-              (step [@ocaml.tailcall]) g gas branch_if_nil ks accu stack
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_nil
+                (KCons (k, ks))
+                accu
+                stack
           | hd :: tl ->
               let tl = {elements = tl; length = accu.length - 1} in
-              (step [@ocaml.tailcall]) g gas branch_if_cons ks hd (tl, stack))
+              (step [@ocaml.tailcall])
+                g
+                gas
+                branch_if_cons
+                (KCons (k, ks))
+                hd
+                (tl, stack))
       | IList_map (_, body, k) ->
           (ilist_map [@ocaml.tailcall]) id g gas (body, k) ks accu stack
       | IList_size (_, k) ->
@@ -557,7 +596,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_set.size accu in
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* maps *)
-      | IEmpty_map (_, ty, _, k) ->
+      | IEmpty_map (_, ty, k) ->
           let res = Script_map.empty ty and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_map (_, body, k) ->
@@ -870,11 +909,24 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_int.lognot x in
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* control *)
-      | IIf {branch_if_true; branch_if_false; _} ->
+      | IIf {branch_if_true; branch_if_false; k; _} ->
           let (res, stack) = stack in
           if accu then
-            (step [@ocaml.tailcall]) g gas branch_if_true ks res stack
-          else (step [@ocaml.tailcall]) g gas branch_if_false ks res stack
+            (step [@ocaml.tailcall])
+              g
+              gas
+              branch_if_true
+              (KCons (k, ks))
+              res
+              stack
+          else
+            (step [@ocaml.tailcall])
+              g
+              gas
+              branch_if_false
+              (KCons (k, ks))
+              res
+              stack
       | ILoop (_, body, k) ->
           let ks = KLoop_in (body, KCons (k, ks)) in
           (next [@ocaml.tailcall]) g gas ks accu stack
@@ -894,7 +946,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks lam' stack
       | ILambda (_, lam, k) ->
           (step [@ocaml.tailcall]) g gas k ks lam (accu, stack)
-      | IFailwith (_, kloc, tv, _) -> ifailwith None g gas kloc tv accu
+      | IFailwith (_, kloc, tv) -> ifailwith None g gas kloc tv accu
       (* comparison *)
       | ICompare (_, ty, k) ->
           let a = accu in
@@ -1515,7 +1567,7 @@ and log :
   | ILsr_nat (kinfo, k) ->
       let extra = (kinfo, k) in
       (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas extra ks accu stack
-  | IFailwith (_, kloc, tv, _) ->
+  | IFailwith (_, kloc, tv) ->
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
   | IExec (_, k) ->
       (iexec [@ocaml.tailcall]) (Some logger) g gas k ks accu stack
@@ -1704,28 +1756,12 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     | [] -> None
     | diff -> Some diff
   in
-  let storage_size = Script_repr.node_size (Micheline.root unparsed_storage) in
-  let cached_contract_code_size =
-    (*
-
-       Notice that a cached contract contains both the source code
-       and the internal representation of this code.
-
-       Under the assumption that the internal representation of a code
-       is smaller than its source code, then the value we compute is
-       an over-approximation.
-
-    *)
-    2 * code_size
-  in
-
-  ( unparsed_storage,
-    ops,
-    ctxt,
-    lazy_storage_diff,
+  let script =
     Ex_script
-      {code_size; code; arg_type; storage; storage_type; root_name; views},
-    cached_contract_code_size + storage_size )
+      {code_size; code; arg_type; storage; storage_type; root_name; views}
+  in
+  let code_size = Script_ir_translator.script_size script in
+  (unparsed_storage, ops, ctxt, lazy_storage_diff, script, code_size)
 
 type execution_result = {
   ctxt : context;
