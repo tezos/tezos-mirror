@@ -1041,9 +1041,8 @@ module Make
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
-    (* The presence of [pv] is tempoary, to make changes easier to reread *)
-    let recyle_operations pv ~from_branch ~to_branch ~live_blocks
-        ~classification ~pending ~chain_db ~handle_branch_refused =
+    let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
+        ~pending ~chain_db ~handle_branch_refused =
       handle_live_operations
         chain_db
         ~from_branch
@@ -1060,15 +1059,7 @@ module Make
            pending)
       >>= fun pending ->
       Classification.flush classification ~handle_branch_refused ;
-      (* Could be implemented as Operation_hash.Map.filter_s which
-         does not exist for the moment. *)
-      Operation_hash.Map.fold_s
-        (fun oph op pending ->
-          pre_filter pv oph op >|= function
-          | true -> Operation_hash.Map.add oph op pending
-          | false -> pending)
-        pending
-        Operation_hash.Map.empty
+      Lwt.return pending
 
     let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
@@ -1094,7 +1085,6 @@ module Make
       >>= fun validation_state ->
       pv.validation_state <- validation_state ;
       recyle_operations
-        pv
         ~from_branch:old_predecessor
         ~to_branch:new_predecessor
         ~live_blocks:new_live_blocks
@@ -1102,6 +1092,16 @@ module Make
         ~pending:pv.shell.pending
         ~chain_db:pv.shell.parameters.chain_db
         ~handle_branch_refused
+      >>= fun new_pending_operations ->
+      (* Could be implemented as Operation_hash.Map.filter_s which
+         does not exist for the moment. *)
+      Operation_hash.Map.fold_s
+        (fun oph op pending ->
+          pre_filter pv oph op >|= function
+          | true -> Operation_hash.Map.add oph op pending
+          | false -> pending)
+        new_pending_operations
+        Operation_hash.Map.empty
       >>= fun new_pending_operations ->
       Event.(emit operations_not_flushed)
         (Operation_hash.Map.cardinal new_pending_operations)
