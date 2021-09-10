@@ -42,12 +42,8 @@ let var_annot_size (Var_annot _) = !!0
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0
 
-let metadata_size {annot; size = _} = h2w +! option_size type_annot_size annot
-
-let hh6w = (word_size *? 6) +! (header_size *? 2)
-
 let (comparable_ty_size, ty_size) =
-  let base metadata = h1w +! metadata_size metadata in
+  let base {annot; size = _} = hh3w +! option_size type_annot_size annot in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
