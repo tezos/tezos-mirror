@@ -56,7 +56,6 @@ let typecheck_by_tezos =
       5
     >>=? fun (block, _accounts) ->
     Incremental.begin_construction
-      ~priority:0
       ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
       block
     >>=? fun vs ->
