@@ -51,11 +51,12 @@ let () =
     | "--test" ->
         dump
           Default_parameters.(
-            parameters_of_constants ~with_commitments:true constants_sandbox)
+            parameters_of_constants
+              ~commitments:(Lazy.force test_commitments)
+              constants_sandbox)
           "test-parameters.json"
     | "--mainnet" ->
         dump
-          Default_parameters.(
-            parameters_of_constants ~with_commitments:true constants_mainnet)
+          Default_parameters.(parameters_of_constants constants_mainnet)
           "mainnet-parameters.json"
     | s -> print_usage_and_fail s

@@ -19,6 +19,7 @@
  (modules gen)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha_parameters
+                   -open Tezos_protocol_alpha
                    -linkall)))
 
 (rule
@@ -39,3 +40,8 @@
 (install
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

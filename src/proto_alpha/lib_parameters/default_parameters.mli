@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,6 +32,8 @@ val constants_sandbox : Constants.parametric
 
 val constants_test : Constants.parametric
 
+val test_commitments : Commitment.t list lazy_t
+
 val make_bootstrap_account :
   Signature.public_key_hash * Signature.public_key * Tez.t ->
   Parameters.bootstrap_account
@@ -38,7 +41,7 @@ val make_bootstrap_account :
 val parameters_of_constants :
   ?bootstrap_accounts:Parameters.bootstrap_account list ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
-  ?with_commitments:bool ->
+  ?commitments:Commitment.t list ->
   Constants.parametric ->
   Parameters.t
 
