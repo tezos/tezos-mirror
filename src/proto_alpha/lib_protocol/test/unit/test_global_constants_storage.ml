@@ -391,7 +391,7 @@ let test_fold_does_not_stack_overflow =
            ()
            node
            (fun _ _ -> ())
-           (fun k _ node -> k () node))
+           (fun _ node k -> k () node))
 
 let tests =
   [

@@ -132,9 +132,9 @@ module Internal_for_tests : sig
     'accumulator ->
     Script_repr.node ->
     ('accumulator -> Script_repr.node -> 'return) ->
-    (('accumulator -> Script_repr.node -> 'return) ->
-    'accumulator ->
+    ('accumulator ->
     Script_repr.node ->
+    ('accumulator -> Script_repr.node -> 'return) ->
     'return) ->
     'return
 
