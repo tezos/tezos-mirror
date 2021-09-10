@@ -98,16 +98,14 @@ let (comparable_ty_size, ty_size) =
     | Chest_t a -> ret_succ_adding accu @@ base a
     | Pair_t ((_ty1, fa1, va1), (_ty2, fa2, va2), a) ->
         ret_succ_adding accu
-        @@ base a
-           +! ((word_size *? 8) +! (header_size *? 2))
+        @@ base a +! hh8w
            +! option_size field_annot_size fa1
            +! option_size var_annot_size va1
            +! option_size field_annot_size fa2
            +! option_size var_annot_size va2
     | Union_t ((_ty1, fa1), (_ty2, fa2), a) ->
         ret_succ_adding accu
-        @@ base a
-           +! ((word_size *? 6) +! (header_size *? 2))
+        @@ base a +! hh6w
            +! option_size field_annot_size fa1
            +! option_size field_annot_size fa2
     | Lambda_t (_ty1, _ty2, a) ->

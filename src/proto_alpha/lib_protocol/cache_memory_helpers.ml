@@ -100,9 +100,11 @@ let h3w = header_size +! (word_size *? 3)
 
 let h4w = header_size +! (word_size *? 4)
 
+let hh3w = (word_size *? 3) +! (header_size *? 2)
+
 let hh6w = (word_size *? 6) +! (header_size *? 2)
 
-let hh3w = (word_size *? 3) +! (header_size *? 2)
+let hh8w = (word_size *? 8) +! (header_size *? 2)
 
 let z_size z =
   let numbits = Z.numbits z in
