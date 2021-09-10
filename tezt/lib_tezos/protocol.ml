@@ -25,13 +25,12 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Edo | Florence | Granada | Alpha
+type t = Florence | Granada | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Edo -> "Edo"
   | Florence -> "Florence"
   | Granada -> "Granada"
 
@@ -40,7 +39,6 @@ let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Edo -> "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
   | Florence -> "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
   | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
 
@@ -56,7 +54,6 @@ let parameter_file ?(constants = default_constants) protocol =
   let directory =
     match protocol with
     | Alpha -> "proto_alpha"
-    | Edo -> "proto_008_PtEdo2Zk"
     | Florence -> "proto_009_PsFLoren"
     | Granada -> "proto_010_PtGRANAD"
   in
@@ -64,7 +61,6 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function
   | Alpha -> "alpha"
-  | Edo -> "008-PtEdo2Zk"
   | Florence -> "009-PsFLoren"
   | Granada -> "010-PtGRANAD"
 
@@ -99,17 +95,15 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
 
 let next_protocol = function
   | Granada -> Some Alpha
-  | Edo -> Some Florence
   | Florence -> Some Granada
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Granada
   | Granada -> Some Florence
-  | Florence -> Some Edo
-  | Edo -> None
+  | Florence -> None
 
-let all = [Alpha; Edo; Florence; Granada]
+let all = [Alpha; Florence; Granada]
 
 let current_mainnet = Granada
 
