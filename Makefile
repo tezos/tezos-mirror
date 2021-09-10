@@ -45,7 +45,9 @@ endif
 		src/bin_snoop/main_snoop.exe \
 		src/bin_proxy_server/main_proxy_server.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
+		$(foreach p, $(active_protocol_directories), \
+		  $(shell if [ ! -z $(wildcard src/proto_$(p)/bin_endorser/*.ml) ]; then \
+		             echo src/proto_$(p)/bin_endorser/main_endorser_$(p).exe; fi)) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
@@ -61,7 +63,9 @@ endif
 	@cp -f _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
 	@for p in $(active_protocol_directories) ; do \
 	   cp -f _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
-	   cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   if [ -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe ]; then \
+	      cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   fi ; \
 	   cp -f _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	   mkdir -p src/proto_$$p/parameters ; \
 	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
@@ -153,6 +157,10 @@ test-nonproto-unit: $(NONPROTO_TARGETS)
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit
 
+.PHONY: test-unit-alpha
+test-unit-alpha:
+	@dune build @src/proto_alpha/lib_protocol/runtest
+
 .PHONY: test-python
 test-python: all
 	@$(MAKE) -C tests_python all
@@ -160,6 +168,10 @@ test-python: all
 .PHONY: test-python-alpha
 test-python-alpha: all
 	@make -C tests_python alpha
+
+.PHONY: test-python-tenderbake
+test-python-tenderbake: all
+	@make -C tests_python tenderbake
 
 .PHONY: test-flextesa
 test-flextesa:
@@ -191,6 +203,11 @@ test-coverage:
 	-@$(MAKE) test-unit
 	-@$(MAKE) test-python
 	-@$(MAKE) test-tezt
+
+.PHONY: test-coverage-tenderbake
+test-coverage-tenderbake:
+	-@$(MAKE) test-unit-alpha
+	-@$(MAKE) test-python-tenderbake
 
 .PHONY: lint-opam-dune
 lint-opam-dune:
