@@ -56,7 +56,7 @@ val sub : 'a list -> int -> 'a list
 
 (** [shuffle l] is a list that contains the same elements as [l] but in a random
     order. *)
-val shuffle : 'a list -> 'a list
+val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
 
 (** Get the index of an element in a list. *)
 val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
