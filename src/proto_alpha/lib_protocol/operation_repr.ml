@@ -912,9 +912,7 @@ let script_lazy_expr_size (expr : Script_repr.lazy_expr) =
     header_size
 
 let script_repr_size ({code; storage} : Script_repr.t) =
-  ret_adding
-    (script_lazy_expr_size code ++ script_lazy_expr_size storage)
-    (header_size +! (word_size *? 2))
+  ret_adding (script_lazy_expr_size code ++ script_lazy_expr_size storage) h2w
 
 let internal_manager_operation_size (type a) (op : a manager_operation) =
   match op with
@@ -927,7 +925,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
   | Origination {delegate; script; credit = _; preorigination} ->
       ret_adding
         (script_repr_size script)
-        (header_size +! (word_size *? 4)
+        (h4w
         +! option_size
              (fun _ -> Contract_repr.public_key_hash_in_memory_size)
              delegate
@@ -935,7 +933,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
         +! option_size Contract_repr.in_memory_size preorigination)
   | Delegation pkh_opt ->
       ( Nodes.zero,
-        header_size +! word_size
+        h1w
         +! option_size
              (fun _ -> Contract_repr.public_key_hash_in_memory_size)
              pkh_opt )
@@ -954,4 +952,4 @@ let packed_internal_operation_in_memory_size :
       let nonce_size = word_size in
       ret_adding
         (internal_manager_operation_size operation)
-        (header_size +! (word_size *? 2) +! source_size +! nonce_size)
+        (h2w +! source_size +! nonce_size)

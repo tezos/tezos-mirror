@@ -173,11 +173,14 @@ let view_signature_size (View_signature {name; input_ty; output_ty}) =
 
 let script_expr_hash_size = Script_expr_hash.size
 
-let peano_shape_proof k = (header_size +! h1w) *? k
+let peano_shape_proof =
+  let scale = header_size +! h1w in
+  fun k -> scale *? k
 
-let stack_prefix_preservation_witness_size k =
+let stack_prefix_preservation_witness_size =
   let kinfo_size = h2w in
-  (header_size +! (h2w +! kinfo_size)) *? k
+  let scale = header_size +! (h2w +! kinfo_size) in
+  fun k -> scale *? k
 
 let comb_gadt_witness_size = peano_shape_proof
 

@@ -262,9 +262,7 @@ let diff_in_memory_size kind diff =
   | Remove -> zero
   | Update {init; updates} ->
       let ops = get_ops kind in
-      ret_adding
-        (init_size ops init ++ updates_size ops updates)
-        (header_size +! (word_size *? 2))
+      ret_adding (init_size ops init ++ updates_size ops updates) h2w
 
 (**
   [apply_updates ctxt ops ~id init] applies the updates [updates] on lazy
@@ -382,7 +380,7 @@ let item_in_memory_size
         _id_is_a_Z_fitting_in_an_int_for_a_long_time,
         diff )) =
   let open Cache_memory_helpers in
-  ret_adding (diff_in_memory_size kind diff) (header_size +! (word_size *? 3))
+  ret_adding (diff_in_memory_size kind diff) h3w
 
 type diffs = diffs_item list
 
