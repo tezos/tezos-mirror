@@ -94,7 +94,7 @@ let poke bytes ofs bits v =
   check_peek_poke_args "poke" bytes ofs bits ;
   poke_unsafe bytes ofs bits v
 
-let%test_unit "random_read_writes" =
+let%expect_test "random_read_writes" =
   let bytes_length = 45 in
   let bit_length = bytes_length * 8 in
   (* max_data_bit_width = 29 to to stay within Random.int bounds.
@@ -120,7 +120,7 @@ let%test_unit "random_read_writes" =
     assert false
   with _ -> ()
 
-let%test_unit "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
+let%expect_test "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
   let fail_or_success f =
     try
       f () ;
@@ -160,7 +160,7 @@ let%test_unit "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
     assert (unsafe_result = check_result)
   done
 
-let%test_unit "sequential_read_writes" =
+let%expect_test "sequential_read_writes" =
   let bytes = Bytes.make 45 '\000' in
   let bits = Bytes.length bytes * 8 in
   (* max_data_bit_width = 29 to stay within Random.int bounds.
@@ -179,7 +179,7 @@ let%test_unit "sequential_read_writes" =
     List.iter (fun (ofs, len, v) -> assert (peek bytes ofs len = v)) (init 0 [])
   done
 
-let%test_unit "read_over_write" =
+let%expect_test "read_over_write" =
   (* Check that non-overlapping writes really do not overlap. *)
   let bytes = Bytes.make 45 '\000' in
   let bits = Bytes.length bytes * 8 in
@@ -279,7 +279,7 @@ let life_expectancy_histogram
 
 let approx_count {count; _} = Array.fold_left ( + ) 0 count
 
-let%test_unit "consistent_add_mem_countdown" =
+let%expect_test "consistent_add_mem_countdown" =
   for _ = 0 to 100 do
     let index_bits = Random.int 16 + 1 in
     let hashes = Random.int 7 + 1 in
@@ -306,7 +306,7 @@ let%test_unit "consistent_add_mem_countdown" =
     List.iter (fun x -> assert (not (mem bloomer x))) all
   done
 
-let%test_unit "consistent_add_countdown_count" =
+let%expect_test "consistent_add_countdown_count" =
   let module Set = Hashtbl.Make (struct
     include Int
 
@@ -357,6 +357,8 @@ let%test_unit "consistent_add_countdown_count" =
     assert (approx_count bloomer = 0)
   done
 
+(* FIXME: Should this really be a unit test.
+   What about a moving this in a standalone binray ? *)
 let%test_unit "false_positive_rate" =
   (* We acknowledge the results published in "On the false-positive
      rate of Bloom filters" (Information Processing Letters, volume
