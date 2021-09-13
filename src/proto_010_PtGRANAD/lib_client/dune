@@ -15,7 +15,7 @@
   tezos-rpc
   uri)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

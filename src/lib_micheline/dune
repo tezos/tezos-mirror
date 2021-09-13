@@ -13,7 +13,7 @@
   tezos-error-monad
   data-encoding)
  (inline_tests (flags -verbose) (modes native js))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (js_of_ocaml)
  (flags
   (:standard)
