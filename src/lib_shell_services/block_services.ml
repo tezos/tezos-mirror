@@ -1031,7 +1031,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (fun t -> t#version)
         |> seal
 
+      (* If you update this datatype, please update also [supported_version]. *)
       type t_with_version = Version_0 of t | Version_1 of t
+
+      (* This value should be consistent with [t_with_version]. *)
+      let supported_version = [0; 1]
 
       let pending_operations_encoding =
         union
@@ -1055,9 +1059,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ]
 
       let pending_operations_version_dispatcher ~version pending_operations =
-        if version = 0 then Some (Version_0 pending_operations)
-        else if version = 1 then Some (Version_1 pending_operations)
-        else None
+        if version = 0 then RPC_answer.return (Version_0 pending_operations)
+        else if version = 1 then
+          RPC_answer.return (Version_1 pending_operations)
+        else
+          RPC_answer.fail
+            (RPC_error.bad_version ~given:version ~supported:supported_version)
 
       let pending_operations path =
         RPC_service.get_service

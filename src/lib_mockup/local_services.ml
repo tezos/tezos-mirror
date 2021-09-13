@@ -287,7 +287,7 @@ module Make (E : MENV) = struct
                   pooled_operations
                 >>= function
                 | Error _ -> RPC_answer.fail [Cannot_parse_op]
-                | Ok applied -> (
+                | Ok applied ->
                     let pending_operations =
                       {
                         E.Block_services.Mempool.applied;
@@ -297,14 +297,10 @@ module Make (E : MENV) = struct
                         unprocessed = Operation_hash.Map.empty;
                       }
                     in
-                    match
-                      E.Block_services.Mempool
-                      .pending_operations_version_dispatcher
-                        ~version:params#version
-                        pending_operations
-                    with
-                    | None -> RPC_answer.not_found
-                    | Some t -> Lwt.return (`Ok t)))))
+                    E.Block_services.Mempool
+                    .pending_operations_version_dispatcher
+                      ~version:params#version
+                      pending_operations)))
 
   let with_chain chain k =
     check_chain chain >>= function

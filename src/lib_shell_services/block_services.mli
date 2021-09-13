@@ -391,7 +391,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t_with_version
 
     val pending_operations_version_dispatcher :
-      version:int -> t -> t_with_version option
+      version:int -> t -> t_with_version RPC_answer.t Lwt.t
 
     (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
     val pending_operations :

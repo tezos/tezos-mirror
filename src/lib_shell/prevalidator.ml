@@ -714,7 +714,7 @@ module Make
              pv.shell.banned_operations <- Operation_hash.Set.empty ;
              return_unit) ;
        dir :=
-         RPC_directory.register
+         RPC_directory.gen_register
            !dir
            (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
            (fun pv params () ->
@@ -774,13 +774,9 @@ module Make
                  unprocessed;
                }
              in
-             match
-               Proto_services.Mempool.pending_operations_version_dispatcher
-                 ~version:params#version
-                 pending_operations
-             with
-             | None -> raise Not_found
-             | Some t -> return t) ;
+             Proto_services.Mempool.pending_operations_version_dispatcher
+               ~version:params#version
+               pending_operations) ;
        dir :=
          RPC_directory.register
            !dir
@@ -1392,7 +1388,7 @@ let pipeline_length (t : t) =
   Prevalidator.Worker.Queue.pending_requests_length w
 
 let empty_rpc_directory : unit RPC_directory.t =
-  RPC_directory.register
+  RPC_directory.gen_register
     RPC_directory.empty
     (Block_services.Empty.S.Mempool.pending_operations RPC_path.open_root)
     (fun _pv params () ->
@@ -1405,13 +1401,9 @@ let empty_rpc_directory : unit RPC_directory.t =
           unprocessed = Operation_hash.Map.empty;
         }
       in
-      match
-        Block_services.Empty.Mempool.pending_operations_version_dispatcher
-          ~version:params#version
-          pending_operations
-      with
-      | None -> raise Not_found
-      | Some t -> return t)
+      Block_services.Empty.Mempool.pending_operations_version_dispatcher
+        ~version:params#version
+        pending_operations)
 
 let rpc_directory : t option RPC_directory.t =
   RPC_directory.register_dynamic_directory
