@@ -44,10 +44,9 @@ opam:$PKG:
     TZ_PIPELINE_KIND: "$TZ_PIPELINE_KIND"
     TZ_SCHEDULE_KIND: "$TZ_SCHEDULE_KIND"
   script:
-    - ./scripts/opam-pin.sh
-    - opam depext --yes $PKG
-    - opam install --yes $PKG
-    - opam reinstall --yes --with-test $PKG
+    - echo run job
 EOF
 } >> opam-ci.yml
+
+break
 done

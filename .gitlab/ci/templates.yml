@@ -10,6 +10,9 @@ variables:
   # Sets the number of tries before failing opam downloads.
   OPAMRETRIES: "5"
 
+  TEZOS_DEFAULT_BRANCH: "dune-changes__master_full"
+  TEZOS_DEFAULT_NAMESPACE: "nomadic-labs"
+
 # Basic, specialised, minimal, orthogonal templates
 
 # Some settings we want by default on all jobs
@@ -34,11 +37,11 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: on_success
 
@@ -47,34 +50,34 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: manual
 
-# Rules for all the jobs that are run only for the master branch and the like
+# Rules for all the jobs that are run only for the dune-changes__master_full branch and the like
 # (tags, releases, etc.)
-.rules_template__master_and_releases:
+.rules_template__dune-changes__master_fullmaster_and_releases:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
 
-# Rules for all the jobs that are run only for the master branch
-.rules_template__master:
+# Rules for all the jobs that are run only for the dune-changes__master_full branch
+.rules_template__dune-changes__master_fullmaster:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
 
@@ -83,11 +86,11 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
       when: always
@@ -98,8 +101,8 @@ variables:
 
 .rules_template__opam_child_pipeline_tests:
   rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # Run on push to the default branch (i.e dune-changes__master_full).
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
       when: always
     # Run on scheduled builds.
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
@@ -129,8 +132,8 @@ variables:
 
 .rules_template__trigger_opam_child_pipeline:
   rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # Run on push to the default branch (i.e dune-changes__master_full).
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
       when: always
     # Run on scheduled builds.
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'

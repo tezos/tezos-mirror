@@ -39,20 +39,25 @@ stages:
   - test_coverage
   - manual
 
+example_job:
+  script:
+    - echo "lol"
+
 include:
   - .gitlab/ci/templates.yml
 
 # Actual jobs are defined in these included files
 
   - .gitlab/ci/bootstrap-opam-pipeline.yml
-  - .gitlab/ci/build.yml
-  - .gitlab/ci/lints.yml
-  - .gitlab/ci/unittest.yml
-  - .gitlab/ci/integration.yml
-  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/coq.yml
-  - .gitlab/ci/tezt.yml
-  - .gitlab/ci/doc.yml
-  - .gitlab/ci/publish.yml
-  - .gitlab/ci/coverage.yml
-  - .gitlab/ci/test-doc-scripts.yml
+
+  # - .gitlab/ci/build.yml
+  # - .gitlab/ci/lints.yml
+  # - .gitlab/ci/unittest.yml
+  # - .gitlab/ci/integration.yml
+  # - .gitlab/ci/liquidity-baking-scripts-integrity.yml
+  # - .gitlab/ci/coq.yml
+  # - .gitlab/ci/tezt.yml
+  # - .gitlab/ci/doc.yml
+  # - .gitlab/ci/publish.yml
+  # - .gitlab/ci/coverage.yml
+  # - .gitlab/ci/test-doc-scripts.yml
