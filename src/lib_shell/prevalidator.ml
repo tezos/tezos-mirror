@@ -98,6 +98,21 @@ type types_state_shell = {
   mutable banned_operations : Operation_hash.Set.t;
 }
 
+(** A wrapper over chain-related modules, to make client code easier to
+    emulate, and hence to test *)
+type chain_tools = {
+  clear_or_cancel : Operation_hash.t -> unit;
+      (** Removes the operation from the distributed database. *)
+  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+      (** Puts the operation in the distributed database. Returns [false] if
+          the [hash] is already in the distributed database *)
+  new_blocks :
+    from_block:Store.Block.t ->
+    to_block:Store.Block.t ->
+    (Store.Block.t * Store.Block.t list) Lwt.t;
+  read_predecessor_opt : Store.Block.t -> Store.Block.t option Lwt.t;
+}
+
 (* [handle_live_operations] and [recycle_operations] will ultimately
    move to [Prevalidator_classification]. This is an intermediate state. *)
 
@@ -126,9 +141,8 @@ type types_state_shell = {
                    |
               from_branch = ancestor
     *)
-let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
-    old_mempool =
-  let chain_store = Distributed_db.chain_store chain_db in
+let handle_live_operations ~(chain : chain_tools) ~from_branch ~to_branch
+    ~live_blocks old_mempool =
   let rec pop_block ancestor block mempool =
     let hash = Store.Block.hash block in
     if Block_hash.equal hash ancestor then Lwt.return mempool
@@ -137,12 +151,12 @@ let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
       List.fold_left_s
         (List.fold_left_s (fun mempool op ->
              let h = Operation.hash op in
-             Distributed_db.inject_operation chain_db h op >|= fun (_ : bool) ->
+             chain.inject_operation h op >|= fun () ->
              Operation_hash.Map.add h op mempool))
         mempool
         operations
       >>= fun mempool ->
-      Store.Block.read_predecessor_opt chain_store block >>= function
+      chain.read_predecessor_opt block >>= function
       | None ->
           (* Can this happen? If yes, there's nothing more to pop anyway,
              so returning the accumulator. It's not the mempool that
@@ -158,18 +172,13 @@ let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
   in
   let push_block mempool block =
     let operations = Store.Block.all_operation_hashes block in
-    List.iter
-      (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
-      operations ;
+    List.iter (List.iter chain.clear_or_cancel) operations ;
     List.fold_left
       (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
       mempool
       operations
   in
-  Store.Chain_traversal.new_blocks
-    chain_store
-    ~from_block:from_branch
-    ~to_block:to_branch
+  chain.new_blocks ~from_block:from_branch ~to_block:to_branch
   >>= fun (ancestor, path) ->
   pop_block (Store.Block.hash ancestor) from_branch old_mempool
   >>= fun mempool ->
@@ -179,15 +188,13 @@ let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
       (fun _oph op -> Block_hash.Set.mem op.Operation.shell.branch live_blocks)
       new_mempool
   in
-  Operation_hash.Map.iter
-    (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
-    outdated ;
+  Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
   Lwt.return new_mempool
 
 let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
-    ~pending ~chain_db ~handle_branch_refused =
+    ~pending ~(chain : chain_tools) ~handle_branch_refused =
   handle_live_operations
-    chain_db
+    ~chain
     ~from_branch
     ~to_branch
     ~live_blocks
@@ -203,6 +210,27 @@ let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
   >>= fun pending ->
   Classification.flush classification ~handle_branch_refused ;
   Lwt.return pending
+
+(** How to create an instance of {!chain_tools} from a {!Distributed_db.chain_db}.
+    Prefer short-lived values, to avoid hiding mutable state for too long. *)
+let mk_chain_tools (chain_db : Distributed_db.chain_db) : chain_tools =
+  let new_blocks ~from_block ~to_block =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
+  in
+  let read_predecessor_opt block =
+    let chain_store = Distributed_db.chain_store chain_db in
+    Store.Block.read_predecessor_opt chain_store block
+  in
+  let inject_operation oph op =
+    Distributed_db.inject_operation chain_db oph op >|= ignore
+  in
+  {
+    clear_or_cancel = Distributed_db.Operation.clear_or_cancel chain_db;
+    inject_operation;
+    new_blocks;
+    read_predecessor_opt;
+  }
 
 module type T = sig
   module Proto : Registered_protocol.T
@@ -1117,7 +1145,7 @@ module Make
         ~live_blocks:new_live_blocks
         ~classification:pv.shell.classification
         ~pending:pv.shell.pending
-        ~chain_db:pv.shell.parameters.chain_db
+        ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
         ~handle_branch_refused
       >>= fun new_pending_operations ->
       (* Could be implemented as Operation_hash.Map.filter_s which
