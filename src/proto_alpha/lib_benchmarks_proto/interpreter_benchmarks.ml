@@ -94,7 +94,7 @@ module Default_config = struct
           map_size = {min = 10; max = 1000};
         };
       sapling = {sapling_txs_file = {|/no/such/file|}; seed = None};
-      comb = {max_depth = 500};
+      comb = {max_depth = 1000};
     }
 
   let sapling_config_encoding =
