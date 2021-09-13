@@ -31,6 +31,6 @@ include
     with type 'error trace := 'error TzTrace.trace
 
 include
-  Sig.MONAD_EXT
+  Sig.MONAD_EXTENSION
     with type error := error
      and type 'error trace := 'error TzTrace.trace

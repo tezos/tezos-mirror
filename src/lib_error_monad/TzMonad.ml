@@ -27,4 +27,4 @@
 type error = TzCore.error = ..
 
 include TzLwtreslib.Monad
-include Monad_ext_maker.Make (TzCore) (TzTrace) (TzLwtreslib.Monad)
+include Monad_extension_maker.Make (TzCore) (TzTrace) (TzLwtreslib.Monad)

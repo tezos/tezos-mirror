@@ -42,8 +42,6 @@ type error = TzCore.error = ..
 
 include Sig.CORE with type error := error
 
-include Sig.EXT with type error := error
-
 include Sig.WITH_WRAPPED with type error := error
 
 module TzTrace : Sig.TRACE with type 'error trace = 'error list
@@ -55,7 +53,7 @@ include
     with type 'error trace := 'error TzTrace.trace
 
 include
-  Sig.MONAD_EXT
+  Sig.MONAD_EXTENSION
     with type error := error
      and type 'error trace := 'error TzTrace.trace
 

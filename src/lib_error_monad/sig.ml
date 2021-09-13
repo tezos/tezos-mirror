@@ -50,18 +50,11 @@ module type PREFIX = sig
 end
 
 module type CORE = sig
-  type error
+  type error = ..
 
   val error_encoding : error Data_encoding.t
 
   val pp : Format.formatter -> error -> unit
-end
-
-(** [EXT] is the extensions on top of a [CORE]. The separation is largely
-    artificial and will most likely disappear with the next round of
-    refactoring. See https://gitlab.com/tezos/tezos/-/issues/1579 *)
-module type EXT = sig
-  type error = ..
 
   (** The error data type is extensible. Each module can register specialized
       error serializers
@@ -164,8 +157,6 @@ module type WITH_WRAPPED = sig
 
     include CORE with type error := unwrapped
 
-    include EXT with type error := unwrapped
-
     (** [unwrap e] returns [Some] when [e] matches variant constructor [C]
         and [None] otherwise *)
     val unwrap : error -> unwrapped option
@@ -216,12 +207,12 @@ module type TRACE = sig
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 end
 
-(** [MONAD_EXT] is the Tezos-specific extension to the generic monad provided by
-    Lwtreslib. It sets some defaults (e.g., it defaults traced failures), it
-    brings some qualified identifiers into the main unqualified part (e.g.,
-    [return_unit]), it provides some tracing helpers and some in-monad assertion
-    checks. *)
-module type MONAD_EXT = sig
+(** [MONAD_EXTENSION] is the Tezos-specific extension to the generic monad
+    provided by Lwtreslib. It sets some defaults (e.g., it defaults traced
+    failures), it brings some qualified identifiers into the main unqualified
+    part (e.g., [return_unit]), it provides some tracing helpers and some
+    in-monad assertion checks. *)
+module type MONAD_EXTENSION = sig
   (** for substitution *)
   type error
 
