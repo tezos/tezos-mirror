@@ -38,25 +38,22 @@ open Michelson_v1_primitives
 *)
 let bottom_up_fold_cps initial_accumulator node initial_k f =
   let rec traverse_node accu node k =
+    f accu node @@ fun accu node ->
     match node with
-    | String _ | Int _ | Bytes _ -> f k accu node
+    | String _ | Int _ | Bytes _ -> k accu node
     | Prim (loc, prim, args, annot) ->
         (traverse_nodes [@ocaml.tailcall]) accu args @@ fun accu args ->
-        f k accu (Prim (loc, prim, args, annot))
+        f accu (Prim (loc, prim, args, annot)) k
     | Seq (loc, elts) ->
         (traverse_nodes [@ocaml.tailcall]) accu elts @@ fun accu elts ->
-        f k accu (Seq (loc, elts))
+        f accu (Seq (loc, elts)) k
   and traverse_nodes accu nodes k =
     match nodes with
     | [] -> k accu []
     | node :: nodes ->
-        f
-          (fun accu node ->
-            (traverse_node [@ocaml.tailcall]) accu node @@ fun accu node ->
-            (traverse_nodes [@ocaml.tailcall]) accu nodes @@ fun accu nodes ->
-            k accu (node :: nodes))
-          accu
-          node
+        (traverse_node [@ocaml.tailcall]) accu node @@ fun accu node ->
+        (traverse_nodes [@ocaml.tailcall]) accu nodes @@ fun accu nodes ->
+        k accu (node :: nodes)
   in
   traverse_node initial_accumulator node initial_k
 
@@ -201,7 +198,7 @@ let expand_node context node =
     node
     (fun (context, _, did_expansion) node ->
       return (context, node, did_expansion))
-    (fun k (context, map, did_expansion) node ->
+    (fun (context, map, did_expansion) node k ->
       match node with
       | Prim (_, H_constant, args, annot) -> (
           (* Charge for validating the b58check hash. *)

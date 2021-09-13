@@ -756,9 +756,9 @@ module Global_constants_storage : sig
       'accumulator ->
       Script.node ->
       ('accumulator -> Script.node -> 'return) ->
-      (('accumulator -> Script.node -> 'return) ->
-      'accumulator ->
+      ('accumulator ->
       Script_repr.node ->
+      ('accumulator -> Script.node -> 'return) ->
       'return) ->
       'return
 
