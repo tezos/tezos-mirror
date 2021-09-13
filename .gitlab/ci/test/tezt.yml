@@ -1,13 +1,10 @@
-# We use the --job option to split tests into jobs of roughly the same duration.
-# This is based on a file that contains timings of test results, generated with --record.
-# To rebalance jobs, update this record with:
+# We use the --job option to split tests into jobs of roughly the same
+# duration. This is based on a file that contains timings of test results,
+# generated with --record. To rebalance jobs, update this record with:
 #
 #   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
 
-tezt:
-  extends:
-    - .integration_template
-    - .template__coverage_files
+.tezt_template:
   artifacts:
     reports:
       junit: tezt-junit.xml
@@ -16,10 +13,30 @@ tezt:
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
     expire_in: 1 day
+    # certain tests can be blacklisted by adding it to this variable
     when: always
-  parallel: 9
+  variables:
+    TESTS: ""
   script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json
+    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json
+
+tezt:
+  extends:
+    - .integration_template
+    - .template__coverage_files
+    - .tezt_template
+  parallel: 9
+
+# these are tezt tests as above, but run using the static binaries
+tezt:static-binaries:
+  extends:
+    - .integration_template
+    - .tezt_template
+  dependencies:
+    - build:static-x86_64-linux-binaries
+  parallel: 2
+  variables:
+    TESTS: "cli rpc"
 
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #
