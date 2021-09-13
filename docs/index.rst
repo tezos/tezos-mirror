@@ -114,6 +114,7 @@ in the :ref:`introduction <howtoget>`.
 
    user/key-management
    user/node-configuration
+   user/versioning
    user/snapshots
    user/history_modes
    user/multinetwork
