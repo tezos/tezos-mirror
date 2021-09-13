@@ -98,12 +98,34 @@ type types_state_shell = {
   mutable banned_operations : Operation_hash.Set.t;
 }
 
+(* [handle_live_operations] and [recycle_operations] will ultimately
+   move to [Prevalidator_classification]. This is an intermediate state. *)
+
 (** [handle_live_operations chain_db from_branch to_branch live_blocks old_mempool]
-    gathers the operations from [from_branch] that are NOT in [to_branch],
-    so that they are considered pending afterwards. Obtained operations
-    are eligible to be propagated. On the other hand, all newly included operations
-    are cleared and won't be propagated. Please note that, when
-    we solely increment the head, there are only operations in [to_branch]. *)
+    returns the operations from:
+
+    1. [old_mempool],
+    2. [from_branch] that are NOT in [to_branch].
+
+    Returned operations can be considered pending afterwards and
+    are eligible to be propagated. On the other hand, all operations
+    from [ancestor] to [to_branch] are cleared and won't be propagated.
+
+    Most general case:
+                             to_branch ┐
+                                /      │
+              from_branch      .       ├ path
+                   \          /        │
+                    .        .         ┘
+                     \      /
+                     ancestor
+
+    Increment the head case:
+
+                to_branch = path
+                   |
+              from_branch = ancestor
+    *)
 let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
     old_mempool =
   let chain_store = Distributed_db.chain_store chain_db in
@@ -126,7 +148,13 @@ let handle_live_operations chain_db ~from_branch ~to_branch ~live_blocks
              so returning the accumulator. It's not the mempool that
              should crash, should this case happen. *)
           Lwt.return mempool
-      | Some predecessor -> pop_block ancestor predecessor mempool
+      | Some predecessor ->
+          (* This is a tailcall, which is nice; that is why we annotate
+             here. But it is not required for the code to be correct.
+             Given the maximum size of possible reorgs, even if the call
+             was not tail recursive; we wouldn't reach the runtime's stack
+             limit. *)
+          (pop_block [@tailcall]) ancestor predecessor mempool
   in
   let push_block mempool block =
     let operations = Store.Block.all_operation_hashes block in
