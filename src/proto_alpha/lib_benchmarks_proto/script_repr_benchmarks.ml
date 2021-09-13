@@ -49,24 +49,6 @@ module Script_repr_shared_config = struct
     Sparse_vec.String.of_list [("nodes", float_of_int micheline_nodes)]
 end
 
-(* Eventually this should be merged in the protocol (and then lib-micheline) *)
-let rec micheline_nodes node acc k =
-  match node with
-  | Micheline.Int (_, _) -> k (acc + 1)
-  | Micheline.String (_, _) -> k (acc + 1)
-  | Micheline.Bytes (_, _) -> k (acc + 1)
-  | Micheline.Prim (_, _, subterms, _) ->
-      micheline_nodes_list subterms (acc + 1) k
-  | Micheline.Seq (_, subterms) -> micheline_nodes_list subterms (acc + 1) k
-
-and micheline_nodes_list subterms acc k =
-  match subterms with
-  | [] -> k acc
-  | n :: nodes ->
-      micheline_nodes_list nodes acc (fun acc -> micheline_nodes n acc k)
-
-let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
-
 module Sampler = Micheline_sampler.Make (struct
   type prim = Michelson_v1_primitives.prim
 
@@ -113,15 +95,14 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
   let models = [("size_translator_model", size_based_model)]
 
   let micheline_nodes_benchmark node =
-    let node = Micheline.root node in
-    let nodes = micheline_nodes node in
+    let nodes = Script_repr.micheline_nodes node in
     let workload = {micheline_nodes = nodes} in
     let closure () = ignore (Script_repr.micheline_nodes node) in
     Generator.Plain {workload; closure}
 
   let make_bench rng_state _cfg () =
     let term = Sampler.sample rng_state in
-    micheline_nodes_benchmark (Micheline.strip_locations term)
+    micheline_nodes_benchmark term
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
