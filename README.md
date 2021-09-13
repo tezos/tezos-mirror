@@ -1,12 +1,10 @@
-# Tezos
+# Tezos Octez implementation
 
 ## Introduction
 
-Tezos is a distributed consensus platform with meta-consensus
-capability. Tezos not only comes to consensus about the state of its ledger,
-like Bitcoin or Ethereum. It also comes to consensus about how the
-protocol and the nodes should adapt and upgrade. For more information about
-the project, see https://tezos.com.
+Tezos is a blockchain that offers both  _consensus_ and _meta-consensus_, by which we mean that Tezos comes to consensus both about the state of its ledger, and  _also_ about how the
+protocol and the nodes should adapt and upgrade.
+For more information about the project, see https://tezos.com.
 
 ## Getting started
 
@@ -19,7 +17,8 @@ available at https://tezos.gitlab.io/.
 
 ## The Tezos software
 
-This repository hosts an implementation of the Tezos blockchain called **Octez**, including a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
+This repository hosts **Octez**, an implementation of the Tezos blockchain.
+**Octez** provides a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
 
 In more detail, this git repository contains:
 - the source code, in directory src/
