@@ -38,8 +38,8 @@ type width_function = depth:int -> int Base_samplers.sampler
     empirically. *)
 val reasonable_width_function : width_function
 
-(** [Parameters] specifies samplers for leaves, primitives and annotations. *)
-module type Parameters = sig
+(** [Base_samplers] specifies samplers for leaves, primitives and annotations. *)
+module type Base_samplers = sig
   (** The type of primitives. *)
   type prim
 
@@ -67,4 +67,4 @@ module type S = sig
 end
 
 (** [Make] instantiates a micheline sampler. *)
-module Make (P : Parameters) : S with type prim = P.prim
+module Make (P : Base_samplers) : S with type prim = P.prim

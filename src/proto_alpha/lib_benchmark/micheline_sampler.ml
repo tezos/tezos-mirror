@@ -28,8 +28,8 @@
 
 type width_function = depth:int -> int Base_samplers.sampler
 
-(** [Parameters] specifies samplers for leaves, primitives and annotations. *)
-module type Parameters = sig
+(** [Base_samplers] specifies samplers for leaves, primitives and annotations. *)
+module type Base_samplers = sig
   (** The type of primitives. *)
   type prim
 
@@ -70,7 +70,7 @@ let reasonable_width_function ~depth rng_state =
       ~range:{min = 0; max = 20 / (Bits.numbits depth + 1)}
       rng_state)
 
-module Make (P : Parameters) : S with type prim = P.prim = struct
+module Make (P : Base_samplers) : S with type prim = P.prim = struct
   type prim = P.prim
 
   let sample (w : width_function) rng_state =
