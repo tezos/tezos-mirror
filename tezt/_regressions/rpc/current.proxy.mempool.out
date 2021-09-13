@@ -3454,55 +3454,65 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                   "pending_operations"
                 ],
                 "description": "List the prevalidated operations.",
-                "query": [],
+                "query": [
+                  {
+                    "name": "version",
+                    "kind": {
+                      "single": {
+                        "id": "single",
+                        "name": "int"
+                      }
+                    }
+                  }
+                ],
                 "output": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "type": "object",
-                    "properties": {
-                      "applied": {
-                        "type": "array",
-                        "items": {
-                          "description": "An operation's shell header.",
-                          "type": "object",
-                          "properties": {
-                            "hash": {
-                              "$ref": "#/definitions/Operation_hash"
-                            },
-                            "branch": {
-                              "$ref": "#/definitions/block_hash"
-                            },
-                            "contents": {
-                              "type": "array",
-                              "items": {
-                                "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
-                              }
-                            },
-                            "signature": {
-                              "$ref": "#/definitions/Signature"
+                    "oneOf": [
+                      {
+                        "title": "new_encoding_pending_operations",
+                        "type": "object",
+                        "properties": {
+                          "applied": {
+                            "type": "array",
+                            "items": {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                "branch": {
+                                  "$ref": "#/definitions/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/definitions/Signature"
+                                }
+                              },
+                              "required": [
+                                "signature",
+                                "contents",
+                                "branch",
+                                "hash"
+                              ],
+                              "additionalProperties": false
                             }
                           },
-                          "required": [
-                            "signature",
-                            "contents",
-                            "branch",
-                            "hash"
-                          ],
-                          "additionalProperties": false
-                        }
-                      },
-                      "refused": {
-                        "type": "array",
-                        "items": {
-                          "type": "array",
-                          "items": [
-                            {
-                              "$ref": "#/definitions/Operation_hash"
-                            },
-                            {
+                          "refused": {
+                            "type": "array",
+                            "items": {
                               "description": "An operation's shell header.",
                               "type": "object",
                               "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
@@ -3530,26 +3540,21 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "signature",
                                 "contents",
                                 "branch",
-                                "protocol"
+                                "protocol",
+                                "hash"
                               ],
                               "additionalProperties": false
                             }
-                          ],
-                          "additionalItems": false
-                        }
-                      },
-                      "branch_refused": {
-                        "type": "array",
-                        "items": {
-                          "type": "array",
-                          "items": [
-                            {
-                              "$ref": "#/definitions/Operation_hash"
-                            },
-                            {
+                          },
+                          "branch_refused": {
+                            "type": "array",
+                            "items": {
                               "description": "An operation's shell header.",
                               "type": "object",
                               "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
@@ -3577,26 +3582,21 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "signature",
                                 "contents",
                                 "branch",
-                                "protocol"
+                                "protocol",
+                                "hash"
                               ],
                               "additionalProperties": false
                             }
-                          ],
-                          "additionalItems": false
-                        }
-                      },
-                      "branch_delayed": {
-                        "type": "array",
-                        "items": {
-                          "type": "array",
-                          "items": [
-                            {
-                              "$ref": "#/definitions/Operation_hash"
-                            },
-                            {
+                          },
+                          "branch_delayed": {
+                            "type": "array",
+                            "items": {
                               "description": "An operation's shell header.",
                               "type": "object",
                               "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
@@ -3624,38 +3624,262 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "signature",
                                 "contents",
                                 "branch",
-                                "protocol"
+                                "protocol",
+                                "hash"
                               ],
                               "additionalProperties": false
                             }
-                          ],
-                          "additionalItems": false
-                        }
-                      },
-                      "unprocessed": {
-                        "type": "array",
-                        "items": {
-                          "type": "array",
-                          "items": [
-                            {
-                              "$ref": "#/definitions/Operation_hash"
-                            },
-                            {
-                              "$ref": "#/definitions/next_operation"
+                          },
+                          "unprocessed": {
+                            "type": "array",
+                            "items": {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                "protocol": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                  ]
+                                },
+                                "branch": {
+                                  "$ref": "#/definitions/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/definitions/Signature"
+                                }
+                              },
+                              "required": [
+                                "signature",
+                                "contents",
+                                "branch",
+                                "protocol",
+                                "hash"
+                              ],
+                              "additionalProperties": false
                             }
-                          ],
-                          "additionalItems": false
-                        }
+                          }
+                        },
+                        "required": [
+                          "unprocessed",
+                          "branch_delayed",
+                          "branch_refused",
+                          "refused",
+                          "applied"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "title": "old_encoding_pending_operations",
+                        "type": "object",
+                        "properties": {
+                          "applied": {
+                            "type": "array",
+                            "items": {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                "branch": {
+                                  "$ref": "#/definitions/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/definitions/Signature"
+                                }
+                              },
+                              "required": [
+                                "signature",
+                                "contents",
+                                "branch",
+                                "hash"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "refused": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/definitions/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/definitions/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/definitions/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "error",
+                                    "signature",
+                                    "contents",
+                                    "branch",
+                                    "protocol"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ],
+                              "additionalItems": false
+                            }
+                          },
+                          "branch_refused": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/definitions/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/definitions/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/definitions/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "error",
+                                    "signature",
+                                    "contents",
+                                    "branch",
+                                    "protocol"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ],
+                              "additionalItems": false
+                            }
+                          },
+                          "branch_delayed": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/definitions/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/definitions/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/definitions/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "error",
+                                    "signature",
+                                    "contents",
+                                    "branch",
+                                    "protocol"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ],
+                              "additionalItems": false
+                            }
+                          },
+                          "unprocessed": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                {
+                                  "$ref": "#/definitions/next_operation"
+                                }
+                              ],
+                              "additionalItems": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "unprocessed",
+                          "branch_delayed",
+                          "branch_refused",
+                          "refused",
+                          "applied"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "unprocessed",
-                      "branch_delayed",
-                      "branch_refused",
-                      "refused",
-                      "applied"
                     ],
-                    "additionalProperties": false,
                     "definitions": {
                       "010-PtGRANAD.block_header.alpha.full_header": {
                         "title": "Shell header",
@@ -4848,2043 +5072,28 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "toplevel": {
                       "fields": [
                         {
-                          "kind": "dyn",
-                          "num_fields": 1,
-                          "size": "Uint30"
-                        },
-                        {
-                          "name": "applied",
                           "layout": {
-                            "layout": {
-                              "name": "X_0",
-                              "kind": "Ref"
-                            },
-                            "kind": "Seq"
+                            "name": "X_0",
+                            "kind": "Ref"
                           },
+                          "kind": "anon",
                           "data_kind": {
-                            "kind": "Variable"
-                          },
-                          "kind": "named"
-                        },
-                        {
-                          "kind": "dyn",
-                          "num_fields": 1,
-                          "size": "Uint30"
-                        },
-                        {
-                          "name": "refused",
-                          "layout": {
-                            "layout": {
-                              "name": "X_2",
-                              "kind": "Ref"
-                            },
-                            "kind": "Seq"
-                          },
-                          "data_kind": {
-                            "kind": "Variable"
-                          },
-                          "kind": "named"
-                        },
-                        {
-                          "kind": "dyn",
-                          "num_fields": 1,
-                          "size": "Uint30"
-                        },
-                        {
-                          "name": "branch_refused",
-                          "layout": {
-                            "layout": {
-                              "name": "X_5",
-                              "kind": "Ref"
-                            },
-                            "kind": "Seq"
-                          },
-                          "data_kind": {
-                            "kind": "Variable"
-                          },
-                          "kind": "named"
-                        },
-                        {
-                          "kind": "dyn",
-                          "num_fields": 1,
-                          "size": "Uint30"
-                        },
-                        {
-                          "name": "branch_delayed",
-                          "layout": {
-                            "layout": {
-                              "name": "X_8",
-                              "kind": "Ref"
-                            },
-                            "kind": "Seq"
-                          },
-                          "data_kind": {
-                            "kind": "Variable"
-                          },
-                          "kind": "named"
-                        },
-                        {
-                          "kind": "dyn",
-                          "num_fields": 1,
-                          "size": "Uint30"
-                        },
-                        {
-                          "name": "unprocessed",
-                          "layout": {
-                            "layout": {
-                              "name": "X_11",
-                              "kind": "Ref"
-                            },
-                            "kind": "Seq"
-                          },
-                          "data_kind": {
-                            "kind": "Variable"
-                          },
-                          "kind": "named"
+                            "kind": "Dynamic"
+                          }
                         }
                       ]
                     },
                     "fields": [
                       {
                         "description": {
-                          "title": "X_11"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              }
-                            },
-                            {
-                              "layout": {
-                                "name": "X_12",
-                                "kind": "Ref"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_12"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "kind": "dyn",
-                              "num_fields": 5,
-                              "size": "Uint30"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "branch",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 2,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "contents",
-                              "layout": {
-                                "layout": {
-                                  "name": "010-PtGRANAD.operation.alpha.contents",
-                                  "kind": "Ref"
-                                },
-                                "kind": "Seq"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 64,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.inlined.endorsement"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "branch",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "operations",
-                              "layout": {
-                                "name": "010-PtGRANAD.inlined.endorsement.contents",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "size": 5,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.inlined.endorsement.contents"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 5,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Endorsement"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.block_header.alpha.full_header"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "level",
-                              "layout": {
-                                "size": "Int32",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 4,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "proto",
-                              "layout": {
-                                "size": "Uint8",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "predecessor",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "timestamp",
-                              "layout": {
-                                "size": "Int64",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 8,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "validation_pass",
-                              "layout": {
-                                "size": "Uint8",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "operations_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "name": "fitness",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "fitness",
-                              "layout": {
-                                "layout": {
-                                  "name": "fitness.elem",
-                                  "kind": "Ref"
-                                },
-                                "kind": "Seq"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "context",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "priority",
-                              "layout": {
-                                "size": "Uint16",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 2,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "proof_of_work_nonce",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 8,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "option_indicator",
-                              "name": "seed_nonce_hash"
-                            },
-                            {
-                              "name": "seed_nonce_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "liquidity_baking_escape_vote",
-                              "layout": {
-                                "kind": "Bool"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 64,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "fitness.elem"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "kind": "Variable"
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "public_key_hash"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 21,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Ed25519.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Ed25519"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Secp256k1.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Secp256k1"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "P256.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "P256"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "public_key"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Ed25519.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Ed25519"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Secp256k1.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 33,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Secp256k1"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "P256.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 33,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "P256"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "N.t",
-                          "description": "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order."
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "N.t",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_13"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "entrypoint",
-                              "layout": {
-                                "name": "010-PtGRANAD.entrypoint",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "value",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.entrypoint"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "default"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "root"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "do"
-                            },
-                            {
-                              "tag": 3,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "set_delegate"
-                            },
-                            {
-                              "tag": 4,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "remove_delegate"
-                            },
-                            {
-                              "tag": 255,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint8"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "String"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  }
-                                }
-                              ],
-                              "name": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.contract_id"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 22,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Signature.Public_key_hash",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Implicit"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Contract_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "padding",
-                                  "layout": {
-                                    "kind": "Padding"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Originated"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.scripted.contracts"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "code",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "storage",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_9"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "kind": "dyn",
-                              "num_fields": 5,
-                              "size": "Uint30"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "branch",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 2,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "contents",
-                              "layout": {
-                                "layout": {
-                                  "name": "010-PtGRANAD.operation.alpha.contents",
-                                  "kind": "Ref"
-                                },
-                                "kind": "Seq"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 64,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "name": "error",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "error",
-                              "layout": {
-                                "kind": "String"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_2"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              }
-                            },
-                            {
-                              "layout": {
-                                "name": "X_9",
-                                "kind": "Ref"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
                           "title": "X_0"
                         },
                         "encoding": {
-                          "fields": [
-                            {
-                              "name": "hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "branch",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 2,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "contents",
-                              "layout": {
-                                "layout": {
-                                  "name": "010-PtGRANAD.operation.alpha.contents",
-                                  "kind": "Ref"
-                                },
-                                "kind": "Seq"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 64,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "010-PtGRANAD.operation.alpha.contents"
-                        },
-                        "encoding": {
                           "tag_size": "Uint8",
                           "kind": {
                             "kind": "Dynamic"
                           },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Endorsement"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "nonce",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Seed_nonce_revelation"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "op1",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.inlined.endorsement",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "op2",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.inlined.endorsement",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "slot",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Double_endorsement_evidence"
-                            },
-                            {
-                              "tag": 3,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "bh1",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.block_header.alpha.full_header",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "bh2",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.block_header.alpha.full_header",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Double_baking_evidence"
-                            },
-                            {
-                              "tag": 4,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "pkh",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "secret",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Activate_account"
-                            },
-                            {
-                              "tag": 5,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "period",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "proposals",
-                                  "layout": {
-                                    "layout": {
-                                      "kind": "Bytes"
-                                    },
-                                    "kind": "Seq"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Proposals"
-                            },
-                            {
-                              "tag": 6,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "period",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "proposal",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "ballot",
-                                  "layout": {
-                                    "size": "Int8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Ballot"
-                            },
-                            {
-                              "tag": 10,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "endorsement",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.inlined.endorsement",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "slot",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Endorsement_with_slot"
-                            },
-                            {
-                              "tag": 17,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "arbitrary",
-                                  "layout": {
-                                    "kind": "String"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Failing_noop"
-                            },
-                            {
-                              "tag": 107,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "fee",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "counter",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "gas_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "storage_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "public_key",
-                                  "layout": {
-                                    "name": "public_key",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Reveal"
-                            },
-                            {
-                              "tag": 108,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "fee",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "counter",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "gas_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "storage_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "amount",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "destination",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.contract_id",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 22,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "option_indicator",
-                                  "name": "parameters"
-                                },
-                                {
-                                  "name": "parameters",
-                                  "layout": {
-                                    "name": "X_13",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Transaction"
-                            },
-                            {
-                              "tag": 109,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "fee",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "counter",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "gas_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "storage_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "balance",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "option_indicator",
-                                  "name": "delegate"
-                                },
-                                {
-                                  "name": "delegate",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "script",
-                                  "layout": {
-                                    "name": "010-PtGRANAD.scripted.contracts",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Origination"
-                            },
-                            {
-                              "tag": 110,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "source",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "fee",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "counter",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "gas_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "storage_limit",
-                                  "layout": {
-                                    "name": "N.t",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "option_indicator",
-                                  "name": "delegate"
-                                },
-                                {
-                                  "name": "delegate",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Delegation"
-                            }
-                          ]
+                          "cases": []
                         }
                       }
                     ]
