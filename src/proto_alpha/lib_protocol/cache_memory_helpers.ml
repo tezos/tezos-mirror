@@ -123,7 +123,7 @@ let ret_succ_adding (nodes, size) added = (Nodes.succ nodes, size +! added)
 let ret_succ (nodes, size) = (Nodes.succ nodes, size)
 
 let option_size some x =
-  let some x = header_size +! word_size +! some x in
+  let some x = h1w +! some x in
   Option.fold ~none:!!0 ~some x
 
 let option_size_vec some x =
