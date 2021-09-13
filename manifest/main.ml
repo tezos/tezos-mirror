@@ -964,12 +964,23 @@ let tezos_micheline =
     ~inline_tests:ppx_expect
 
 let _tezos_micheline_tests =
-  tests
-    ["test_parser"; "test_diff"]
+  private_lib
+    "test_parser"
     ~path:"src/lib_micheline/test"
     ~opam:"tezos-micheline"
-    ~modes:[Native; JS]
-    ~deps:[tezos_micheline |> open_; alcotest]
+    ~inline_tests:ppx_expect
+    ~modules:["test_parser"]
+    ~deps:[tezos_micheline |> open_]
+    ~js_compatible:true
+
+let _tezos_micheline_tests =
+  private_lib
+    "test_diff"
+    ~path:"src/lib_micheline/test"
+    ~opam:"tezos-micheline"
+    ~inline_tests:ppx_expect
+    ~modules:["test_diff"]
+    ~deps:[tezos_micheline |> open_]
     ~js_compatible:true
 
 let tezos_base =
