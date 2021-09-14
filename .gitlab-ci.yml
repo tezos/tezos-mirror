@@ -160,8 +160,6 @@ stages:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_COMMIT_BRANCH =~ /coverage/'
-      when: always
     - when: manual
       allow_failure: true
 
