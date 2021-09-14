@@ -100,6 +100,8 @@ let h3w = header_size +! (word_size *? 3)
 
 let h4w = header_size +! (word_size *? 4)
 
+let h5w = header_size +! (word_size *? 5)
+
 let hh3w = (word_size *? 3) +! (header_size *? 2)
 
 let hh6w = (word_size *? 6) +! (header_size *? 2)
@@ -127,7 +129,7 @@ let option_size some x =
   Option.fold ~none:!!0 ~some x
 
 let option_size_vec some x =
-  let some x = ret_adding (some x) (header_size +! word_size) in
+  let some x = ret_adding (some x) h1w in
   Option.fold ~none:zero ~some x
 
 let list_cell_size elt_size =
@@ -136,10 +138,7 @@ let list_cell_size elt_size =
 
 let list_fold_size elt_size list =
   List.fold_left
-    (fun accu elt ->
-      ret_succ_adding
-        (accu ++ elt_size elt)
-        (header_size +! word_size +! word_size))
+    (fun accu elt -> ret_succ_adding (accu ++ elt_size elt) h2w)
     zero
     list
 

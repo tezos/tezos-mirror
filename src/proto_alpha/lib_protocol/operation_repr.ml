@@ -919,7 +919,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
   | Transaction {amount = _; parameters; entrypoint; destination} ->
       ret_adding
         (script_lazy_expr_size parameters)
-        (header_size +! (word_size *? 4) +! int64_size
+        (h4w +! int64_size
         +! string_size_gen (String.length entrypoint)
         +! Contract_repr.in_memory_size destination)
   | Origination {delegate; script; credit = _; preorigination} ->
