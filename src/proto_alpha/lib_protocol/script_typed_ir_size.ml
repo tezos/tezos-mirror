@@ -340,6 +340,7 @@ let rec value_size :
     | Never_key _ -> ( match x with _ -> .)
   in
   value_traverse ty x accu {apply; apply_comparable}
+ [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]
 
 and big_map_size :
     type a b.

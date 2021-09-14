@@ -2178,6 +2178,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
   match ty with
   | L ty -> aux init ty x (fun accu -> accu)
   | R cty -> aux' init cty x (fun accu -> accu)
+  [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty = function
   | Item_t (ty, _, _) -> ty
