@@ -223,7 +223,7 @@ module type MONAD_EXTENSION = sig
 
   type 'a tzresult = ('a, tztrace) result
 
-  val classify_errors : tztrace -> error_category
+  val classify_trace : tztrace -> error_category
 
   val return : 'a -> ('a, 'e) result Lwt.t
 

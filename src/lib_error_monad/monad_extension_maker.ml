@@ -79,7 +79,7 @@ end)
 
   let pp_print_error_first = Trace.pp_print_top Error.pp
 
-  let classify_errors trace =
+  let classify_trace trace =
     Trace.fold
       (fun c e -> Sig.combine_category c (Error.classify_error e))
       `Temporary

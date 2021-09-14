@@ -376,6 +376,8 @@ struct
     (* below is for backward compatibility *)
     include Error_monad_traversors
 
+    let classify_errors = classify_trace
+
     let ( >>|? ) = ( >|=? )
   end
 
