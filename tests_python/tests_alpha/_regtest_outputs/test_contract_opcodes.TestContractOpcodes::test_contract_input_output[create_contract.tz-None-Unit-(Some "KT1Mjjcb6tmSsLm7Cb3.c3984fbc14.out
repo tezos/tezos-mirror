@@ -13,37 +13,37 @@ emitted operations
   big_map diff
     
   trace
-    - location: 8 (remaining gas: 1039991.656 units remaining)
+    - location: 8 (remaining gas: 1039987.356 units remaining)
       [ (Pair Unit None)  	 ]
-    - location: 8 (remaining gas: 1039991.646 units remaining)
+    - location: 8 (remaining gas: 1039987.346 units remaining)
       [  ]
-    - location: 9 (remaining gas: 1039991.636 units remaining)
+    - location: 9 (remaining gas: 1039987.336 units remaining)
       [ Unit  	 ]
-    - location: 10 (remaining gas: 1039991.621 units remaining)
+    - location: 10 (remaining gas: 1039987.321 units remaining)
       [ 50000  	@amount
         Unit  	 ]
-    - location: 11 (remaining gas: 1039991.606 units remaining)
+    - location: 11 (remaining gas: 1039987.306 units remaining)
       [ None  	
         50000  	@amount
         Unit  	 ]
-    - location: 13 (remaining gas: 1039991 units remaining)
+    - location: 13 (remaining gas: 1039986.700 units remaining)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	
         "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"  	 ]
-    - location: 25 (remaining gas: 1039990.985 units remaining)
+    - location: 25 (remaining gas: 1039986.685 units remaining)
       [ "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"  	 ]
-    - location: 27 (remaining gas: 1039990.970 units remaining)
+    - location: 27 (remaining gas: 1039986.670 units remaining)
       [ (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 28 (remaining gas: 1039990.955 units remaining)
+    - location: 28 (remaining gas: 1039986.655 units remaining)
       [ {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 25 (remaining gas: 1039990.925 units remaining)
+    - location: 25 (remaining gas: 1039986.625 units remaining)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	
         {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 30 (remaining gas: 1039990.910 units remaining)
+    - location: 30 (remaining gas: 1039986.610 units remaining)
       [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 31 (remaining gas: 1039990.895 units remaining)
+    - location: 31 (remaining gas: 1039986.595 units remaining)
       [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
               (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"))  	 ]
 
