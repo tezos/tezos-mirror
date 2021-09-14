@@ -11,7 +11,7 @@ The whole Octez software is versioned by releases, see :doc:`../releases/release
 Protocol versions
 -----------------
 
-The Tezos economic protocol is versioned at a different pace, according to a :doc:`active/voting`, see :doc:`../protocols/naming`.
+The Tezos economic protocol is versioned at a different pace, according to a :doc:`voting process <../active/voting>`, see :doc:`../protocols/naming`.
 
 Protocol environment versions
 -----------------------------
@@ -79,4 +79,3 @@ For example::
 
    The version 4 for RPC GET chains/main/mempool/pending_operations
    is deprecated and may be removed in the next major release of Octez.
-
