@@ -31,7 +31,7 @@ publish:docker_manual:
   stage: manual
   needs: []
   rules:
-    - if: '$CI_COMMIT_TAG || $CI_COMMIT_BRANCH =~ /docker/'
+    - if: '$CI_COMMIT_BRANCH =~ /docker/'
       when: on_success
     - if: $CI_COMMIT_BRANCH
       when: manual
