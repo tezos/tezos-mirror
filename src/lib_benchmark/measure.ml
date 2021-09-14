@@ -338,9 +338,9 @@ let save :
     | Ok res -> res
   in
   let serialized_workload = {bench_name = Bench.name; measurement_bytes} in
-  let bytes =
+  let str =
     match
-      Data_encoding.Binary.to_bytes
+      Data_encoding.Binary.to_string
         serialized_workload_encoding
         serialized_workload
     with
@@ -353,9 +353,7 @@ let save :
     | Ok res -> res
   in
   Lwt_main.run
-    ( Tezos_stdlib_unix.Lwt_utils_unix.create_file
-        filename
-        (Bytes.unsafe_to_string bytes)
+    ( Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
     >>= fun _nwritten -> Lwt.return_unit )
 
 let load : filename:string -> packed_measurement =
@@ -370,9 +368,8 @@ let load : filename:string -> packed_measurement =
   Lwt_main.run
   @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
        Format.eprintf "Measure.load: loaded %s\n" filename ;
-       let bytes = Bytes.unsafe_of_string str in
        match
-         Data_encoding.Binary.of_bytes serialized_workload_encoding bytes
+         Data_encoding.Binary.of_string serialized_workload_encoding str
        with
        | Ok {bench_name; measurement_bytes} -> (
            match Registration.find_benchmark bench_name with

@@ -2665,9 +2665,7 @@ module Raw_importer : IMPORTER = struct
     in
     Lwt_utils_unix.read_file protocol_tbl_filename >>= fun table_bytes ->
     match
-      Data_encoding.Binary.of_bytes_opt
-        Protocol_levels.encoding
-        (Bytes.unsafe_of_string table_bytes)
+      Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
     with
     | Some table -> return table
     | None ->
@@ -2717,7 +2715,7 @@ module Raw_importer : IMPORTER = struct
     in
     Lwt_utils_unix.copy_file ~src ~dst >>= fun () ->
     Lwt_utils_unix.read_file dst >>= fun protocol_sources ->
-    match Protocol.of_bytes (Bytes.unsafe_of_string protocol_sources) with
+    match Protocol.of_string protocol_sources with
     | None -> fail (Cannot_decode_protocol protocol_hash)
     | Some p ->
         let hash = Protocol.hash p in
@@ -2955,7 +2953,7 @@ module Tar_importer : IMPORTER = struct
     in
     Onthefly.copy_to_file t.tar file ~dst >>= fun () ->
     Lwt_utils_unix.read_file dst >>= fun protocol_sources ->
-    match Protocol.of_bytes (Bytes.unsafe_of_string protocol_sources) with
+    match Protocol.of_string protocol_sources with
     | None -> fail (Cannot_decode_protocol protocol_hash)
     | Some p ->
         let hash = Protocol.hash p in

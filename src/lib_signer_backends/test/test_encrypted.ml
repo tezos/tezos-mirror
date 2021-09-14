@@ -20,7 +20,7 @@ let loops = 10
 
 let passwords =
   List.map
-    Bytes.unsafe_of_string
+    Bytes.of_string
     [
       "ahThie5H";
       "aVah7eid";

@@ -48,9 +48,8 @@ let read_file file =
       let path = Naming.encoded_file_path file in
       Lwt_utils_unix.read_file path)
     (fun str ->
-      let bytes = Bytes.unsafe_of_string str in
       let encoding = Naming.file_encoding file in
-      Lwt.return (Data_encoding.Binary.of_bytes_opt encoding bytes))
+      Lwt.return (Data_encoding.Binary.of_string_opt encoding str))
     (fun _ -> Lwt.return_none)
 
 let get (Stored_data v) =
@@ -63,10 +62,10 @@ let write_file encoded_file data =
       let encoder data =
         if Naming.is_json_file encoded_file then
           Data_encoding.Json.construct encoding data
-          |> Data_encoding.Json.to_string |> Bytes.unsafe_of_string
-        else Data_encoding.Binary.to_bytes_exn encoding data
+          |> Data_encoding.Json.to_string
+        else Data_encoding.Binary.to_string_exn encoding data
       in
-      let bytes = encoder data in
+      let str = encoder data in
       let tmp_filename = path ^ "_tmp" in
       (* Write in a new temporary file then swap the files to avoid
          partial writes. *)
@@ -77,7 +76,7 @@ let write_file encoded_file data =
       >>= fun fd ->
       Lwt.catch
         (fun () ->
-          Lwt_utils_unix.write_bytes fd bytes >>= fun () ->
+          Lwt_utils_unix.write_string fd str >>= fun () ->
           Lwt_unix.close fd >>= fun () ->
           Lwt_unix.rename tmp_filename path >>= fun () -> return_unit)
         (fun exn -> Lwt_utils_unix.safe_close fd >>= fun _ -> Lwt.fail exn))

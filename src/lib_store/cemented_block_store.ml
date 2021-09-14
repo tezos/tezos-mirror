@@ -310,9 +310,8 @@ let read_block_metadata ?location cemented_store block_level =
                   in
                   let metadata = Zip.read_entry in_file entry in
                   Zip.close_in in_file ;
-                  let metadata = Bytes.unsafe_of_string metadata in
                   return_some
-                    (Data_encoding.Binary.of_bytes_exn
+                    (Data_encoding.Binary.of_string_exn
                        Block_repr.metadata_encoding
                        metadata))
                 (fun _ ->
@@ -350,14 +349,14 @@ let cement_blocks_metadata cemented_store blocks =
             let level = Block_repr.level block in
             match Block_repr.metadata block with
             | Some metadata ->
-                let metadata_bytes =
-                  Data_encoding.Binary.to_bytes_exn
+                let metadata =
+                  Data_encoding.Binary.to_string_exn
                     Block_repr.metadata_encoding
                     metadata
                 in
                 Zip.add_entry
                   ~level:default_compression_level
-                  (Bytes.unsafe_to_string metadata_bytes)
+                  metadata
                   out_file
                   (Int32.to_string level)
             | None -> ())

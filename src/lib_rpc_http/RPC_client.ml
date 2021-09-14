@@ -225,7 +225,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           Json_repr_bson.bytes_to_bson
             ~laziness:false
             ~copy:false
-            (Bytes.unsafe_of_string body)
+            (Bytes.of_string body)
         with
         | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
             let error = Format.asprintf "(at offset: %d) %s" pos msg in

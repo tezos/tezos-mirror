@@ -564,7 +564,7 @@ module Simple = struct
      | RangedInt _ -> Format.pp_print_int fmt value
      | RangedFloat _ -> pp_print_compact_float fmt value
      | Float -> pp_print_compact_float fmt value
-     | Bytes _ -> pp_print_shortened_string fmt (Bytes.unsafe_to_string value)
+     | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
      | String _ -> pp_print_shortened_string fmt value
      | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (

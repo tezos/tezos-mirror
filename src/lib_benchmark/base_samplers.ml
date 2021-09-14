@@ -56,7 +56,7 @@ let uniform_string ~nbytes state =
   String.init nbytes (fun _ -> uniform_byte state)
 
 let uniform_bytes ~nbytes state =
-  Bytes.unsafe_of_string (uniform_string ~nbytes state)
+  Bytes.init nbytes (fun _ -> uniform_byte state)
 
 let uniform_nat ~nbytes state = Z.of_bits (uniform_string state ~nbytes)
 
@@ -139,7 +139,7 @@ module Adversarial = struct
     if card <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     let (prefix, strs) = strings ~prefix_size ~card state in
-    let p = Bytes.unsafe_of_string prefix in
-    let ls = List.map Bytes.unsafe_of_string strs in
+    let p = Bytes.of_string prefix in
+    let ls = List.map Bytes.of_string strs in
     (p, ls)
 end
