@@ -66,7 +66,7 @@ end = struct
           (`Msg
             (Format.asprintf
                "Failed to read b58check_encoding data: %a"
-               Error_monad.pp_print_error
+               Error_monad.pp_print_trace
                err))
 
   let short_hash_string = Irmin.Type.(unstage (short_hash string))

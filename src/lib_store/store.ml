@@ -1667,7 +1667,7 @@ module Chain = struct
         Format.kasprintf
           (fun e -> fail (Missing_commit_info e))
           "%a"
-          Error_monad.pp_print_error
+          Error_monad.pp_print_trace
           err)
       (fun () ->
         Context.retrieve_commit_info index header >>=? fun tup ->

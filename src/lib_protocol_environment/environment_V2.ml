@@ -576,7 +576,7 @@ struct
 
     let make_trace_encoding e = TzTrace.encoding e
 
-    let pp_trace = pp_print_error
+    let pp_trace = pp_print_trace
 
     type 'err trace = 'err TzTrace.trace
   end

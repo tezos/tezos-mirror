@@ -1245,7 +1245,7 @@ let commands network () =
                                | _ -> true)
                         |> String.concat " "
                         |> String.map (function '\n' | '\t' -> ' ' | c -> c))
-                  | el -> cctxt#message "Error:@ %a" pp_print_error el)
+                  | el -> cctxt#message "Error:@ %a" pp_print_trace el)
                   >>= fun () -> failwith "Failed to submit proposals"));
       command
         ~group

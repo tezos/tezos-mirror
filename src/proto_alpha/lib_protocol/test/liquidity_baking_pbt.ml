@@ -54,7 +54,7 @@ let extract_qcheck_tzresult : unit tzresult Lwt.t -> bool =
  fun p ->
   match Lwt_main.run p with
   | Ok () -> true
-  | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_error err
+  | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_trace err
 
 let rec run_and_check check scenarios env state =
   match scenarios with

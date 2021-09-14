@@ -210,7 +210,7 @@ let test_simple_merge block_store =
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
-      Assert.fail_msg "merging failed: %a" pp_print_error err)
+      Assert.fail_msg "merging failed: %a" pp_print_trace err)
     ~finalizer:(fun _ -> assert_presence_in_block_store block_store all_blocks)
     ~history_mode:Archive
     ~new_head:head
@@ -259,7 +259,7 @@ let test_consecutive_concurrent_merges block_store =
     Block_store.merge_stores
       block_store
       ~on_error:(fun err ->
-        Assert.fail_msg "merging failed: %a" pp_print_error err)
+        Assert.fail_msg "merging failed: %a" pp_print_trace err)
       ~finalizer:(fun _ -> assert_presence_in_block_store block_store cycle)
       ~history_mode:Archive
       ~new_head
@@ -271,7 +271,7 @@ let test_consecutive_concurrent_merges block_store =
   List.iter
     (function
       | Ok () -> ()
-      | Error err -> Assert.fail_msg "merging failed: %a" pp_print_error err)
+      | Error err -> Assert.fail_msg "merging failed: %a" pp_print_trace err)
     res ;
   Block_store.await_merging block_store >>= fun () ->
   assert_presence_in_block_store ~with_metadata:true block_store all_blocks
@@ -290,7 +290,7 @@ let test_ten_cycles_merge block_store =
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
-      Assert.fail_msg "merging failed: %a" pp_print_error err)
+      Assert.fail_msg "merging failed: %a" pp_print_trace err)
     ~finalizer:(fun _ -> return_unit)
     ~history_mode:Archive
     ~new_head:head
@@ -370,7 +370,7 @@ let test_merge_with_branches block_store =
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
-      Assert.fail_msg "merging failed: %a" pp_print_error err)
+      Assert.fail_msg "merging failed: %a" pp_print_trace err)
     ~finalizer:(fun _ -> return_unit)
     ~history_mode:Archive
     ~new_head:head
@@ -397,7 +397,7 @@ let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
-      Assert.fail_msg "merging failed: %a" pp_print_error err)
+      Assert.fail_msg "merging failed: %a" pp_print_trace err)
     ~finalizer:(fun _ -> return_unit)
     ~history_mode
     ~new_head:head
@@ -613,7 +613,7 @@ let wrap_test ?(keep_dir = false) (name, g) =
     | Error err ->
         Format.printf
           "@\nCannot instanciate block store:@\n%a@."
-          Error_monad.pp_print_error
+          Error_monad.pp_print_trace
           err ;
         Lwt.fail Alcotest.Test_error
     | Ok block_store -> (
@@ -625,7 +625,7 @@ let wrap_test ?(keep_dir = false) (name, g) =
         | Error err ->
             Format.printf
               "@\nTest failed:@\n%a@."
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               err ;
             Lwt.fail Alcotest.Test_error)
   in

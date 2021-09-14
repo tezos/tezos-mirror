@@ -82,7 +82,7 @@ let wrap f _switch () =
               let vl = Protocol_validator.create db in
               f vl _switch ()
           | Error error ->
-              Format.printf "Could not get p2p:\n   %a\n" pp_print_error error ;
+              Format.printf "Could not get p2p:\n   %a\n" pp_print_trace error ;
               Format.print_flush () ;
               Lwt.return_unit))
 

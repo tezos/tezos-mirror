@@ -335,11 +335,11 @@ let run () =
       in
       loop ())
     ~on_error:(fun err ->
-      Format.kasprintf ok "error: %a" pp_print_error err >>=? fun () -> exit 1)
+      Format.kasprintf ok "error: %a" pp_print_trace err >>=? fun () -> exit 1)
 
 let () =
   match Lwt_main.run (run ()) with
   | Ok () -> ()
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

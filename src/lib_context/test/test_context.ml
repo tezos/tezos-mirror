@@ -39,7 +39,7 @@ let ( >>=! ) x f =
   x >>= fun result ->
   match result with
   | Error trace ->
-      let message = Format.asprintf "%a" Error_monad.pp_print_error trace in
+      let message = Format.asprintf "%a" Error_monad.pp_print_trace trace in
       Assert.fail_msg "%s" message
   | Ok x -> f x
 

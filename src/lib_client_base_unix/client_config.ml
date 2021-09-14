@@ -324,7 +324,7 @@ let sources_parameter () =
           failwith
             "Can't parse the file specified by --sources as JSON: %s@,%a"
             path
-            pp_print_error
+            pp_print_trace
             errs
       | Ok json -> (
           try
@@ -539,7 +539,7 @@ let read_config_file config_file =
       failwith
         "Can't parse the configuration file as a JSON: %s@,%a"
         config_file
-        pp_print_error
+        pp_print_trace
         errs
   | Ok cfg_json -> (
       try return @@ Cfg_file.from_json cfg_json

@@ -55,8 +55,8 @@ let michelson_type_to_ex_ty (typ : Protocol.Alpha_context.Script.expr)
   |> Protocol.Environment.wrap_tzresult
   |> function
   | Ok t -> t
-  | Error errs ->
-      Format.eprintf "%a@." pp_print_error errs ;
+  | Error trace ->
+      Format.eprintf "%a@." pp_print_trace trace ;
       raise (Failure "Test_helpers.michelson_type_to_ex_ty: error")
 
 let base_type_to_ex_ty ty =

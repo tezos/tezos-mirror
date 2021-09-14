@@ -514,7 +514,7 @@ let accept t fd point =
     Error_monad.dont_wait
       (fun () -> P2p_fd.close fd)
       (fun trace ->
-        Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
+        Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
   else
@@ -583,7 +583,7 @@ let connect ?timeout t point =
             point_info ;
           (P2p_fd.close fd >>= function
            | Error trace ->
-               Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+               Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
                Lwt.return_unit
            | Ok () -> Lwt.return_unit)
           >>= fun () ->

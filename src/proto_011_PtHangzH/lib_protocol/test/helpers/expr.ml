@@ -32,8 +32,8 @@ let from_string str : Script.expr =
   let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
   (match errs with
   | [] -> ()
-  | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+  | trace ->
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace trace ;
       raise Expression_from_string) ;
   ast.expanded
 

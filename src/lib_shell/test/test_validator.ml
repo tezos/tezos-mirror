@@ -74,7 +74,7 @@ let init_validator
   | Error errors ->
       Format.printf
         "Could not initialize validator:\n   %a\n"
-        pp_print_error
+        pp_print_trace
         errors ;
       Format.print_flush () ;
       Lwt.return_unit
@@ -99,7 +99,7 @@ let validator_events validator block_validator chain _switch () =
     chain
   >>= function
   | Error trace ->
-      Format.printf "Error:\n   %a\n" pp_print_error trace ;
+      Format.printf "Error:\n   %a\n" pp_print_trace trace ;
       Format.print_flush () ;
       Lwt.return_unit
   | Ok _ ->

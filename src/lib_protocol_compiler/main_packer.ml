@@ -48,7 +48,7 @@ let () =
         Format.kasprintf
           Stdlib.failwith
           "Failed to read TEZOS_PROTOCOL: %a"
-          pp_print_error
+          pp_print_trace
           err
   in
   let version = Protocol.module_name_of_env_version protocol.expected_env in

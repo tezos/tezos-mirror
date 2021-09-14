@@ -108,5 +108,5 @@ let () =
   with
   | Ok () -> ()
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

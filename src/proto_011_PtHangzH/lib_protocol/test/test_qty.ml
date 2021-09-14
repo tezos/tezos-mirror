@@ -153,7 +153,7 @@ let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       f () >|= function
       | Ok () -> ()
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+      | Error trace ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace trace)
 
 let tests = List.map wrap tests

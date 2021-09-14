@@ -44,7 +44,7 @@ let () =
     (fun c -> Contract_without_code c)
 
 let print_errors (cctxt : #Client_context.printer) errs =
-  cctxt#error "%a" Error_monad.pp_print_error errs >>= fun () -> return_unit
+  cctxt#error "%a" Error_monad.pp_print_trace errs >>= fun () -> return_unit
 
 let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Script.expr) ~entrypoint =

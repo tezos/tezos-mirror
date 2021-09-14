@@ -39,7 +39,7 @@ let (hash, sources) =
       Format.kasprintf
         Stdlib.failwith
         "Failed to read TEZOS_PROTOCOL: %a"
-        pp_print_error
+        pp_print_trace
         err
 
 let () =

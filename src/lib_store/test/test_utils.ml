@@ -180,7 +180,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
           >>=? fun () -> return_unit))
   >>= function
   | Error err ->
-      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
   | Ok r -> Lwt.return r
 
@@ -222,7 +222,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             (fun () -> Store.close_store store >>= fun _ -> Lwt.return_unit)))
   >>= function
   | Error err ->
-      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
   | Ok () -> Lwt.return_unit
 

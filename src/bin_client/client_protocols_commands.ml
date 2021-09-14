@@ -75,14 +75,14 @@ let commands () =
                 cctxt#error
                   "Error while injecting protocol from %s: %a"
                   dirname
-                  Error_monad.pp_print_error
+                  Error_monad.pp_print_trace
                   err
                 >>= fun () -> return_unit)
           (fun exn ->
             cctxt#error
               "Error while injecting protocol from %s: %a"
               dirname
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               [Error_monad.Exn exn]
             >>= fun () -> return_unit));
     command
@@ -134,7 +134,7 @@ let commands () =
         | Error err ->
             cctxt#error
               "Error while fetching protocol: %a"
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               err
             >>= fun () -> return_unit);
   ]

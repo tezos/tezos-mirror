@@ -218,9 +218,9 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     let open Format in
     function
     | Applied _ -> pp_print_string ppf "applied"
-    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
-    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
-    | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
+    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_trace err
+    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
+    | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
     | Outdated -> pp_print_string ppf "outdated"
 end
 

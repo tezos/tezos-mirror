@@ -115,7 +115,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
               (fun () ->
                 Lwt_utils_unix.safe_close cfd
                 >|= Result.iter_error
-                      (Format.eprintf "Uncaught error: %a\n%!" pp_print_error))))
+                      (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace))))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     loop fd

@@ -82,7 +82,7 @@ let read_args () =
           | Error errs ->
               Format.printf
                 "Parameters parsing error : %a ==> using default parameters\n%!"
-                Error_monad.pp_print_error
+                Error_monad.pp_print_trace
                 errs ;
               Lwt.return default_args.params)
     |> Lwt_main.run
@@ -425,5 +425,5 @@ let () =
       Format.printf "Success.@." ;
       exit 0
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

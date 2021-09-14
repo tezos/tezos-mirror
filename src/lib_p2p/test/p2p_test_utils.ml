@@ -171,7 +171,7 @@ let run_nodes client server =
   Process.detach ~prefix:"client: " (fun channel ->
       (Lwt_utils_unix.safe_close main_socket >>= function
        | Error trace ->
-           Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+           Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
            Lwt.return_unit
        | Ok () -> Lwt.return_unit)
       >>= fun () ->

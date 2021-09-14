@@ -141,7 +141,7 @@ let read_proto destination final_protocol_file =
             Stdlib.failwith
             "Failed to read TEZOS_PROTOCOL in %s:@ %a"
             source_dir
-            pp_print_error
+            pp_print_trace
             err )
 
 let main () =

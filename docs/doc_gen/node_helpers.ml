@@ -70,5 +70,5 @@ let with_node f =
   Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run >>= function
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       Stdlib.exit 1

@@ -60,7 +60,7 @@ module Answer = struct
         Lwt_canceler.on_cancel st.canceler (fun () ->
             Lwt_utils_unix.safe_close socket >>= function
             | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
                 Lwt.return_unit
             | Ok () -> Lwt.return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
@@ -166,7 +166,7 @@ module Sender = struct
         Lwt_canceler.on_cancel st.canceler (fun () ->
             Lwt_utils_unix.safe_close socket >>= function
             | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
                 Lwt.return_unit
             | Ok () -> Lwt.return_unit) ;
         Lwt_unix.setsockopt socket Lwt_unix.SO_BROADCAST true ;
@@ -177,7 +177,7 @@ module Sender = struct
         Lwt_unix.sendto socket msg 0 Message.length [] addr >>= fun _len ->
         Lwt_utils_unix.safe_close socket >>= function
         | Error trace ->
-            Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
             Lwt.return_unit
         | Ok () -> Lwt.return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())

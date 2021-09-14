@@ -85,7 +85,7 @@ let init_chain ?(history_mode = History_mode.Archive) base_dir =
     state_genesis_block
   >>= function
   | Error err ->
-      Format.kasprintf Lwt.fail_with "init error: %a" pp_print_error err
+      Format.kasprintf Lwt.fail_with "init error: %a" pp_print_trace err
   | Ok store -> Lwt.return store
 
 (** [init_mock_p2p] initializes a mock p2p *)

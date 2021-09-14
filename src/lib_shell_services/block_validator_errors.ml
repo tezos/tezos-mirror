@@ -314,7 +314,7 @@ let pp_block_error ppf = function
       Format.fprintf
         ppf
         "Failed to validate the economic-protocol content of the block: %a."
-        Error_monad.pp_print_error
+        Error_monad.pp_print_trace
         err
   | Invalid_protocol_environment_transition (before, after) ->
       Format.fprintf

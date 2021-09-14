@@ -84,14 +84,14 @@ let expect_result line pr exp got =
     match (got, exp) with
     | (Ok got, Ok exp) -> got = exp
     | (Error got, Error exp) ->
-        let got = Format.asprintf "%a" pp_print_error got in
+        let got = Format.asprintf "%a" pp_print_trace got in
         Stringext.find_from got ~pattern:exp <> None
     | _ -> false
   then Lwt.return_unit
   else
     let pr_got ppf = function
       | Ok v -> pr ppf v
-      | Error e -> pp_print_error ppf e
+      | Error e -> pp_print_trace ppf e
     in
     let pr_exp ppf = function
       | Ok v -> pr ppf v
@@ -546,7 +546,7 @@ let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       f () >>= function
       | Ok () -> Lwt.return_unit
-      | Error err -> Format.kasprintf Lwt.fail_with "%a" pp_print_error err)
+      | Error err -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace err)
 
 (* main *)
 

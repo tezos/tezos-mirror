@@ -265,7 +265,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
               pp
               ()
               file_path
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               el)
       (function
         | e ->
@@ -436,7 +436,7 @@ module Query = struct
                   fmt
                   "@[Parse error:@ wrong JSON for %S: %a@]"
                   path
-                  pp_print_error
+                  pp_print_trace
                   el)
         | `Cannot_recognize_section sec ->
             fprintf

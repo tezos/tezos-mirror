@@ -3279,7 +3279,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
                (Target_block_validation_failed
                   (Block_header.hash block_header, errs)))
            "%a"
-           pp_print_error
+           pp_print_trace
            errs)
     >>=? fun (block_validation_result, _) ->
     check_context_hash_consistency
@@ -3816,7 +3816,7 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
                  (Target_block_validation_failed
                     (Block_header.hash block_header, errs)))
              "%a"
-             pp_print_error
+             pp_print_trace
              errs)
       >>=? fun (block_validation_result, _) ->
       check_context_hash_consistency_legacy

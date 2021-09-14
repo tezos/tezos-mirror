@@ -504,7 +504,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
      | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
      | Error err ->
          Lwt_exit.exit_and_wait 1 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_error err))
+         `Error (false, Format.asprintf "%a" pp_print_trace err))
 
 module Term = struct
   let verbosity =

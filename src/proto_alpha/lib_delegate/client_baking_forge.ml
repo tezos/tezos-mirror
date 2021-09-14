@@ -208,7 +208,7 @@ let () =
         "@[Failed to preapply %a:@ @[<v 4>%a@]@]"
         Operation_hash.pp_short
         h
-        pp_print_error
+        pp_print_trace
         err)
     Data_encoding.(
       obj2

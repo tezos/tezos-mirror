@@ -147,7 +147,7 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
   |> function
   | Ok t -> t
   | Error errs ->
-      Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+      Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
       raise (Failure "Michelson_generation.michelson_type_to_ex_ty: error")
 
 let base_type_to_ex_ty ty =

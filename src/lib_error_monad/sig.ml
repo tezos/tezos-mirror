@@ -244,9 +244,9 @@ module type MONAD_EXTENSION = sig
 
   val error : 'error -> ('a, 'error trace) result
 
-  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
+  (* NOTE: Right now we leave this [pp_print_trace] named as is. Later on we
      might rename it to [pp_print_trace]. *)
-  val pp_print_error : Format.formatter -> error trace -> unit
+  val pp_print_trace : Format.formatter -> error trace -> unit
 
   (** Pretty-prints the top error of a trace *)
   val pp_print_top_error_of_trace : Format.formatter -> error trace -> unit

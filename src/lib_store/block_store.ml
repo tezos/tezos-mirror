@@ -1074,7 +1074,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                 protect
                   ~on_error:(fun err ->
                     (* Failures should be handled using [get_merge_status] *)
-                    let msg = Format.asprintf "%a" pp_print_error err in
+                    let msg = Format.asprintf "%a" pp_print_trace err in
                     Store_events.(emit merge_error)
                       (cementing_highwatermark, new_head_lafl, msg)
                     >>= fun () -> on_error (Merge_error :: err))
@@ -1239,7 +1239,7 @@ let pp_merge_status fmt status =
   match status with
   | Not_running -> Format.fprintf fmt "not running"
   | Running -> Format.fprintf fmt "running"
-  | Merge_failed err -> Format.fprintf fmt "merge failed %a" pp_print_error err
+  | Merge_failed err -> Format.fprintf fmt "merge failed %a" pp_print_trace err
 
 let await_merging block_store =
   Lwt_mutex.lock block_store.merge_mutex >>= fun () ->

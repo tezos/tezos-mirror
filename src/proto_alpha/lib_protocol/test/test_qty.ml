@@ -154,6 +154,6 @@ let wrap (n, f) =
       f () >|= function
       | Ok () -> ()
       | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let tests = List.map wrap tests

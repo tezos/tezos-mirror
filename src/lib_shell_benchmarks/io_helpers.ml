@@ -30,7 +30,7 @@
 let assert_ok ~msg = function
   | Ok x -> x
   | Error errs ->
-      Format.eprintf "%s:@.%a@." msg pp_print_error errs ;
+      Format.eprintf "%s:@.%a@." msg pp_print_trace errs ;
       exit 1
 
 let prepare_genesis base_dir =

@@ -64,7 +64,7 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
         cctxt
       >>=? fun () -> retry_on_disconnection cctxt f
   | Error err ->
-      cctxt#error "Unexpected error: %a. Exiting..." pp_print_error err
+      cctxt#error "Unexpected error: %a. Exiting..." pp_print_trace err
 
 module Endorser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive

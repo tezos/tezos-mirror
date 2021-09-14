@@ -454,6 +454,6 @@ let wrap_test_legacy ?(keep_dir = false) test : string Alcotest_lwt.test_case =
       | Error errs ->
           Format.printf
             "@\nError while running test:@\n%a@."
-            Error_monad.pp_print_error
+            Error_monad.pp_print_trace
             errs ;
           Lwt.fail Alcotest.Test_error)

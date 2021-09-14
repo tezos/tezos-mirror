@@ -210,7 +210,7 @@ let lwt_emit (status : status) =
   >>= function
   | Ok () -> Lwt.return_unit
   | Error el ->
-      Format.kasprintf Lwt.fail_with "Snapshot_event.emit: %a" pp_print_error el
+      Format.kasprintf Lwt.fail_with "Snapshot_event.emit: %a" pp_print_trace el
 
 type error +=
   | Wrong_snapshot_export of History_mode.Legacy.t * History_mode.Legacy.t

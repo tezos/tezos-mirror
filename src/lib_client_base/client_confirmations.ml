@@ -73,7 +73,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     | Error err ->
         ctxt#warning
           "Error while fetching block (ignored): %a"
-          pp_print_error
+          pp_print_trace
           err
         >>= fun () ->
         (* Will be retried when a new head arrives *)

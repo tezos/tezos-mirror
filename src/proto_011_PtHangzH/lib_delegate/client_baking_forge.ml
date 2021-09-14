@@ -201,15 +201,15 @@ let () =
     ~id:"Client_baking_forge.failed_to_preapply"
     ~title:"Fail to preapply an operation"
     ~description:""
-    ~pp:(fun ppf (op, err) ->
+    ~pp:(fun ppf (op, trace) ->
       let h = Tezos_base.Operation.hash op in
       Format.fprintf
         ppf
         "@[Failed to preapply %a:@ @[<v 4>%a@]@]"
         Operation_hash.pp_short
         h
-        pp_print_error
-        err)
+        pp_print_trace
+        trace)
     Data_encoding.(
       obj2
         (req "operation" (dynamic_size Tezos_base.Operation.encoding))

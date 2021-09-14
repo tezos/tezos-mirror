@@ -953,6 +953,6 @@ let (list_solvers, list_models) =
         Format.err_formatter
         ~executable_name:(Filename.basename Sys.executable_name)
         ~global_options:Global_options.options
-        ~default:(fun fmt err -> Error_monad.pp_print_error fmt [err])
+        ~default:(fun fmt err -> Error_monad.pp_print_trace fmt [err])
         errors ;
       exit 1

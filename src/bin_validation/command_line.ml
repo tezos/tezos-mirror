@@ -63,5 +63,5 @@ let run () =
        (Lwt_exit.wrap_and_exit main_promise >>= function
         | Ok () -> Lwt_exit.exit_and_wait 0
         | Error err ->
-            Format.eprintf "%a\n%!" pp_print_error err ;
+            Format.eprintf "%a\n%!" pp_print_trace err ;
             Lwt_exit.exit_and_wait 1))

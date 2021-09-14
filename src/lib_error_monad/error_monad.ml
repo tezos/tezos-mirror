@@ -142,7 +142,7 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
     | Ok () | Error [] -> fail Timeout
     | Error (h :: _) -> raise h
 
-let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
+let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_trace
 
 let cancel_with_exceptions canceler =
   Lwt_canceler.cancel canceler >>= function

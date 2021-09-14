@@ -323,7 +323,7 @@ let test_forge () =
   in
   Example.Validator.verify_update transaction state key >>= function
   | Error l ->
-      pp_print_error Format.err_formatter l ;
+      pp_print_trace Format.err_formatter l ;
       assert false
   | Ok (_, new_state) -> (
       let nf = (List.hd transaction.inputs).nf in

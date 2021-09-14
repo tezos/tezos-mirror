@@ -75,7 +75,7 @@ end)
           (function x -> Error x);
       ]
 
-  let pp_print_error = Trace.pp_print Error.pp
+  let pp_print_trace = Trace.pp_print Error.pp
 
   let pp_print_top_error_of_trace = Trace.pp_print_top Error.pp
 

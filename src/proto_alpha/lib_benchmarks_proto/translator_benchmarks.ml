@@ -380,7 +380,7 @@ module Typechecking_code : Benchmark.S = struct
           in
           match Environment.wrap_tzresult result with
           | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+              Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
               bad_code name node stack In_protocol
           | Ok _ -> ()
         in
@@ -462,7 +462,7 @@ module Unparsing_code : Benchmark.S = struct
           in
           match Environment.wrap_tzresult result with
           | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+              Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
               bad_code name node stack In_protocol
           | Ok _ -> ()
         in

@@ -98,7 +98,7 @@ let test_bad_contract_parameter () =
         source' ;
       return_unit
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let test_multiplication_close_to_overflow_passes () =
   test_context () >>=? fun ctx ->
@@ -114,7 +114,7 @@ let test_multiplication_close_to_overflow_passes () =
   >>= function
   | Ok _ -> return_unit
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let read_file filename =
   let ch = open_in filename in

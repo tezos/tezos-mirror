@@ -86,7 +86,7 @@ module C = struct
         ~name:"delegation_error"
         ~msg:
           "{function} returned an error, ignoring it but this is bad: {trace}"
-        ~pp2:pp_print_error
+        ~pp2:pp_print_trace
         ("function", Data_encoding.string)
         ("trace", Error_monad.trace_encoding)
   end
