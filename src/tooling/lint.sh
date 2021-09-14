@@ -90,6 +90,10 @@ update_all_dot_ocamlformats () {
     done
 }
 
+function shellcheck_script () {
+    shellcheck --external-sources "$1"
+}
+
 check_scripts () {
     # Gather scripts
     scripts=$(find "${source_directories[@]}" packaging/ tests_python/ scripts/ -name "*.sh" -type f -print)
@@ -115,7 +119,7 @@ check_scripts () {
     for script in ${scripts}; do
         if [[ "${shellcheck_skips}" == *"${script}"* ]]; then
           # check whether the skipped script, in reality, is warning-free
-          if shellcheck "${script}" > /dev/null; then
+          if shellcheck_script "${script}" > /dev/null; then
               say "$script shellcheck marked as SKIPPED but actually pass: update shellcheck_skips ❌️"
               exit_code=1
           else
@@ -125,7 +129,7 @@ check_scripts () {
           fi
         else
           # script is not skipped, let's shellcheck it
-          if shellcheck --external-sources "${script}"; then
+          if shellcheck_script "${script}"; then
             say "$script shellcheck PASSED ✅"
           else
             say "$script shellcheck FAILED ❌"
