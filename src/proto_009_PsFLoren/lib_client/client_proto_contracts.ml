@@ -35,7 +35,7 @@ module ContractEntity = struct
 
   let of_source s =
     Contract.of_b58check s |> Environment.wrap_tzresult
-    |> record_trace (failure "bad contract notation")
+    |> record_trace (error_of_fmt "bad contract notation")
     |> Lwt.return
 
   let to_source s = return (Contract.to_b58check s)

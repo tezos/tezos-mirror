@@ -71,7 +71,7 @@ let trace_exn exn f = trace (Exn exn) f
 let generic_trace fmt =
   Format.kasprintf (fun str -> trace_exn (Failure str)) fmt
 
-let failure fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
+let error_of_fmt fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
 
 type error += Canceled
 

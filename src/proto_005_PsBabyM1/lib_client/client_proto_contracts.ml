@@ -37,7 +37,7 @@ module ContractEntity = struct
     match Contract.of_b58check s with
     | Error _ as err ->
         Lwt.return (Environment.wrap_error err)
-        |> trace (failure "bad contract notation")
+        |> trace (error_of_fmt "bad contract notation")
     | Ok s -> return s
 
   let to_source s = return (Contract.to_b58check s)

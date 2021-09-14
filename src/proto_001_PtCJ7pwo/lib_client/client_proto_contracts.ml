@@ -37,7 +37,7 @@ module ContractEntity = struct
     match Contract.of_b58check s with
     | Error _ as err ->
         Lwt.return (Environment.wrap_error err)
-        |> trace (failure "bad contract notation")
+        |> trace (error_of_fmt "bad contract notation")
     | Ok s -> return s
 
   let to_source s = return (Contract.to_b58check s)
@@ -157,5 +157,5 @@ let may_check_key sourcePubKey sourcePubKeyHash =
         (Ed25519.Public_key_hash.equal
            (Ed25519.Public_key.hash sourcePubKey)
            sourcePubKeyHash)
-        (failure "Invalid public key in `client_proto_endorsement`")
+        (error_of_fmt "Invalid public key in `client_proto_endorsement`")
   | None -> return_unit

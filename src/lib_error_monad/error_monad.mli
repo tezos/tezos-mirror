@@ -157,9 +157,9 @@ val generic_trace :
 
 val pp_exn : Format.formatter -> exn -> unit
 
-(** [failure …] is like [error_with …] but the error isn't wrapped in a trace
+(** [error_of_fmt …] is like [error_with …] but the error isn't wrapped in a trace
     in a result. *)
-val failure : ('a, Format.formatter, unit, error) format4 -> 'a
+val error_of_fmt : ('a, Format.formatter, unit, error) format4 -> 'a
 
 (** Wrapped OCaml/Lwt exception *)
 type error += Exn of exn

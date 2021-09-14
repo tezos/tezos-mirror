@@ -151,7 +151,7 @@ let assert_valid_operations_hash shell_header operations =
     (Operation_list_list_hash.equal
        operations_hash
        shell_header.Tezos_base.Block_header.operations_hash)
-    (failure "Client_baking_forge.inject_block: inconsistent header.")
+    (error_of_fmt "Client_baking_forge.inject_block: inconsistent header.")
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     ~priority ~delegate_pkh ~delegate_sk ~level operations
