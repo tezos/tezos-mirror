@@ -838,7 +838,7 @@ let tez_of_string_exn index field s =
   match Tez.of_string s with
   | Some t -> ok t
   | None ->
-      generic_error
+      error_with
         "Invalid %s notation at entry %i, field \"%s\": %s"
         Client_proto_args.tez_sym
         index

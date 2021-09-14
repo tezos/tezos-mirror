@@ -52,7 +52,7 @@ let () =
       | _ -> None)
     (fun msg -> Exn (Failure msg))
 
-let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
+let error_with fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 

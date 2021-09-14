@@ -193,7 +193,7 @@ module Secret_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check s = Base58.simple_encode b58check_encoding s
 

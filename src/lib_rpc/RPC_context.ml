@@ -115,7 +115,7 @@ let gone s p q =
   in
   fail (Gone {meth; uri})
 
-let generic_error s p q =
+let error_with s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
@@ -156,7 +156,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Created _
         | `Conflict None
         | `No_content ->
-            generic_error s p q
+            error_with s p q
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
@@ -200,7 +200,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Created _
         | `Conflict None
         | `No_content ->
-            generic_error s p q
+            error_with s p q
   end
 
 let make_call s (ctxt : #simple) = ctxt#call_service s

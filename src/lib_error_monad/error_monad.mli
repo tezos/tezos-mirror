@@ -59,7 +59,7 @@ include
 
 (** {1 Exception-Error bridge} *)
 
-(** [generic_error] is for generic failure within the [Result] monad. You
+(** [error_with] is for generic failure within the [Result] monad. You
     should use this function rarely: only when there isn't a more specific
     error.
 
@@ -71,9 +71,9 @@ include
     Note: this is somewhat equivalent to [Stdlib.failwith] in that it is a
     generic failure mechanism with a simple error message that should be
     replaced by a specific exception in most cases. *)
-val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
+val error_with : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
 
-(** [failwith] is like {!generic_error} but for the LwtResult-monad. The same
+(** [failwith] is like {!error_with} but for the LwtResult-monad. The same
     usage notes apply. *)
 val failwith : ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 -> 'a
 
@@ -146,7 +146,7 @@ val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
     exceptions. *)
 
 (** [generic_trace … r] is [r] where the trace (if any) is enriched with
-  [generic_error …]. *)
+  [error_with …]. *)
 val generic_trace :
   ( 'a,
     Format.formatter,
@@ -157,7 +157,7 @@ val generic_trace :
 
 val pp_exn : Format.formatter -> exn -> unit
 
-(** [failure …] is like [generic_error …] but the error isn't wrapped in a trace
+(** [failure …] is like [error_with …] but the error isn't wrapped in a trace
     in a result. *)
 val failure : ('a, Format.formatter, unit, error) format4 -> 'a
 

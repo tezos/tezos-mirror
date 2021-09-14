@@ -144,7 +144,7 @@ struct
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
       match Uri.get_query_param uri "pkh" with
-      | None -> generic_error "Missing the query parameter: 'pkh=tz1...'"
+      | None -> error_with "Missing the query parameter: 'pkh=tz1...'"
       | Some key ->
           Signature.Public_key_hash.of_b58check key >|? fun key ->
           (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
@@ -191,8 +191,8 @@ struct
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
       match (Uri.host uri, Uri.port uri) with
-      | (None, _) -> generic_error "Missing host address"
-      | (_, None) -> generic_error "Missing host port"
+      | (None, _) -> error_with "Missing host address"
+      | (_, None) -> error_with "Missing host port"
       | (Some path, Some port) ->
           let pkh = Uri.path uri in
           let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in

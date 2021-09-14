@@ -92,7 +92,7 @@ module V0toV3
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
     return (fun _ ->
         Lwt.return
-          (Error_monad.generic_error
+          (Error_monad.error_with
              "element_of_key called on environment protocol < V3"))
 
   type cache_key = Context.Cache.key
