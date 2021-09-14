@@ -50,8 +50,7 @@ module Disk_memory_table (P : PARAMETERS) = struct
   let known (st : store) (k : P.key) = Lwt.return @@ mem st k
 
   let read st k =
-    Lwt.return
-      (Option.fold ~some:ok ~none:(Error_monad.error_exn Not_found) (find st k))
+    match find st k with Some v -> return v | None -> fail_with_exn Not_found
 
   let read_opt st k = Lwt.return @@ find st k
 end

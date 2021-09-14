@@ -65,7 +65,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           failwith "Port already in use."
-      | exn -> Lwt.return (error_exn exn))
+      | exn -> fail_with_exn exn)
 
 let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
     ~require_auth (cctxt : #Client_context.wallet) =

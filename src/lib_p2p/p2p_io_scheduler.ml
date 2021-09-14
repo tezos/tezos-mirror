@@ -358,7 +358,7 @@ module ReadIO = struct
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
             fail P2p_errors.Connection_closed
-        | exn -> Lwt.return (error_exn exn))
+        | exn -> fail_with_exn exn)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.t
 
@@ -411,7 +411,7 @@ module WriteIO = struct
         | Unix.Unix_error (Unix.EPIPE, _, _)
         | Lwt.Canceled | End_of_file ->
             fail P2p_errors.Connection_closed
-        | exn -> Lwt.return (error_exn exn))
+        | exn -> fail_with_exn exn)
 
   (* [close] does nothing, it will still be possible to push values to
      the network. *)

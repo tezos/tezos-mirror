@@ -1886,8 +1886,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                        >>= fun () -> notify ()
                       else Lwt.return_unit)
                       >>= fun () -> copy_protocols ()))
-            (function
-              | End_of_file -> return_unit | exn -> Lwt.return (error_exn exn))
+            (function End_of_file -> return_unit | exn -> fail_with_exn exn)
         in
         Lwt.finalize
           (fun () -> copy_protocols ())
@@ -2278,8 +2277,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               should_filter_indexes ))
         (fun exn ->
           Lwt_utils_unix.safe_close ro_fd >>= fun _ ->
-          Lwt_utils_unix.safe_close rw_fd >>= fun _ ->
-          Lwt.return (error_exn exn))
+          Lwt_utils_unix.safe_close rw_fd >>= fun _ -> fail_with_exn exn)
     in
     Store.Unsafe.open_for_snapshot_export
       ~store_dir

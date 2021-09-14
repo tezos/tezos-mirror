@@ -34,7 +34,7 @@ let parse_parameter f m =
       @@
       match f p with
       | Some x -> Ok x
-      | None -> Error (Error_monad.error_of_exn (Failure m)))
+      | None -> Error_monad.error_with_exn (Failure m))
 
 module Benchmark_cmd = struct
   (* ----------------------------------------------------------------------- *)

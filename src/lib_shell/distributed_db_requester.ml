@@ -127,7 +127,7 @@ module Fake_operation_storage = struct
 
   let known _ _ = Lwt.return_false
 
-  let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
+  let read _ _ = fail_with_exn Not_found
 
   let read_opt _ _ = Lwt.return_none
 end
@@ -273,7 +273,7 @@ module Protocol_storage = struct
 
   let read store ph =
     read_opt store ph >>= function
-    | None -> Lwt.return (Error_monad.error_exn Not_found)
+    | None -> fail_with_exn Not_found
     | Some p -> return p
 end
 

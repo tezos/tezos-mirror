@@ -77,37 +77,58 @@ val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
     usage notes apply. *)
 val failwith : ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 -> 'a
 
-(** [error_exn exc] wraps the exception [exc] within an (unspecified) error
-    within a trace within a result. It is meant as a way to switch from
-    exception-based error management to tzresult-based error management, e.g.,
-    when calling external libraries that use exceptions.
+(** [error_with_exn exc] errors out within [tzresult]. The payload is
+    unspecified but it includes the info from the exception.
+
+    It is meant as a way to switch from exception-based error management to
+    tzresult-based error management, e.g., when calling external libraries that
+    use exceptions.
 
 {[
-   try Ok (parse_input s) with Lex_error | Parse_error as exc -> error_exn exc
+   try Ok (parse_input s) with Lex_error | Parse_error as exc -> error_with_exn exc
 ]}
 
-    [error_exn] is named after {!error} which is the function that fails within
-    the TracedResult monad. If you need a lower-level function that constructs
-    the error trace but doesn't wrap it in a [result], you can use
-    {!error_of_exn}. *)
-val error_exn : exn -> 'a tzresult
+    [error_with_exn] is named after {!error} which is the function that fails
+    within the TracedResult monad. If you need a lower-level function that
+    constructs the error or trace but doesn't wrap it in a [result], you can use
+    {!error_of_exn} or {!trace_of_exn}. *)
+val error_with_exn : exn -> 'a tzresult
 
-(** [error_of_exn e] is a trace that carries the exception [e]. This function is
+(** [fail_with_exn exc] errors out within [tzresult Lwt.t]. The payload is
+    unspecified but it includes the info from the exception.
+
+    It is meant as a way to switch, inside of Lwt code, from exception-based
+    error management to tzresult-based error management, e.g., when calling
+    external libraries that use exceptions.
+
+{[
+   Lwt.catch
+      (fun () -> parse_input s)
+      (function
+         | Lex_error | Parse_error as exc -> fail_with_exn exc
+         | exn -> raise exn (* re-raise by default *))
+]}
+
+    [fail_with_exn] is named after {!fail} which is the function that fails
+    within the LwtTracedResult monad. If you need a lower-level function that
+    constructs the error or trace but doesn't wrap it in a [result], you can use
+    {!error_of_exn} or {!trace_of_exn}. If you need to fail, but outside of Lwt,
+    you can use {!error_with_exn}. *)
+val fail_with_exn : exn -> 'a tzresult Lwt.t
+
+(** [error_of_exn e] is an error that carries the exception [e]. This function is
     intended to be used when interacting with a part of the code (most likely an
-    external library) which uses exception. E.g.,
+    external library) which uses exception.
 
-{[
-try
-   Ok (make_some_call parameter)
-with
-  | (Not_found | Failure _) as e ->
-        Error (error_of_exn e)
-]}
+    See also {!trace_of_exn} and {!error_with_exn}. *)
+val error_of_exn : exn -> error
 
-    [error_of_exn] converts (by wrapping) an exception into a traced error. If
-    you intend to place this value in an [Error] construct, you can use
-    {!error_exn} instead. *)
-val error_of_exn : exn -> error trace
+(** [error_of_exn e] is a trace that carries an error that carries the exception
+    [e]. This function is intended to be used when interacting with a part of
+    the code (most likely an external library) which uses exception.
+
+    See also {!error_of_exn} and {!error_with_exn}. *)
+val trace_of_exn : exn -> error trace
 
 (** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
     constructor of a result into a [tzresult]. This is intended for use when
