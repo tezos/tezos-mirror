@@ -4,7 +4,7 @@ set -e
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 
-#shellcheck source=version.sh
+#shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
 # This script verifies a Rust system with the correct version is setup on the

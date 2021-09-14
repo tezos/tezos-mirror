@@ -119,7 +119,7 @@ check_scripts () {
           say "$script shellcheck SKIPPED ⚠️"
         else
           # script is not skipped, let's shellcheck it
-          if shellcheck "${script}"; then
+          if shellcheck --external-sources "${script}"; then
             say "$script shellcheck PASSED ✅"
           else
             say "$script shellcheck FAILED ❌"

@@ -3,6 +3,7 @@
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
+#shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
@@ -23,4 +24,8 @@ opam depext conf-gmp conf-libev conf-perl conf-pkg-config conf-hidapi ctypes-for
 ## `--dev`. But this would probably break the CI, so we postponed this
 ## change until someone have some spare time. (@pirbo, @hnrgrgr)
 
+# here we cannot use double quotes because otherwise the list of opam packages
+# will be intepreted as a string and not as a list of strings leading to
+# an error.
+# shellcheck disable=SC2086
 opam install $opams --deps-only --with-test --criteria="-notuptodate,-changed,-removed"
