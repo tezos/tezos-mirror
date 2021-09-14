@@ -1,190 +1,24 @@
-
-(library
- (name key_encoding_vectors_lib)
- (modules key_encoding_vectors)
-)
-
-(library
- (name roundtrips_lib)
- (modules roundtrips)
- (libraries alcotest-glue)
-)
-
-(library
- (name test_crypto_tests)
- (modules)
- (libraries key_encoding_vectors_lib
-            roundtrips_lib
-            tezos-crypto
-            tezos-stdlib
-            alcotest-glue
-            zarith
-            )
- )
-
-(library
- (name test_crypto_box)
- (modules test_crypto_box)
- (libraries test_crypto_tests)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_base58)
- (modules test_base58)
- (libraries test_crypto_tests)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_blake2b)
- (modules test_blake2b)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_deterministic_nonce)
- (modules test_deterministic_nonce)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_ed25519)
- (modules test_ed25519)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_hacl)
- (modules test_hacl vectors_p256)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_merkle)
- (modules test_merkle)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_p256)
- (modules test_p256)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_pvss)
- (modules test_pvss)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_signature)
- (modules test_signature)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_timelock)
- (modules test_timelock)
- (libraries test_crypto_tests roundtrips_lib)
- (flags (:standard -open Tezos_stdlib
-                   -open Roundtrips_lib
-                   -open Key_encoding_vectors_lib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding))
- )
-
-(library
- (name test_context_hash)
- (modules test_context_hash)
- (libraries test_crypto_tests)
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_crypto))
- )
-
 (tests
- (names test_run
-        test_prop_signature_pk
-        test_prop_signature
-        test_prop_hacl_hash
-        )
- (modules test_run test_prop_signature_pk test_prop_signature test_prop_hacl_hash)
- (libraries test_crypto_box
-            test_base58
-            test_blake2b
-            test_deterministic_nonce
-            test_ed25519
-            test_hacl
-            test_merkle
-            test_p256
-            test_pvss
-            test_signature
-            test_timelock
-            test_context_hash
-            tezos-hacl-glue-unix
-            data-encoding
-            alcotest-glue-unix
-            alcotest-lwt
-            qcheck-alcotest
-            tezos-test-helpers)
+ (names
+  test_run
+  test_prop_signature_pk
+  test_prop_signature
+  test_prop_hacl_hash)
  (package tezos-crypto)
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Data_encoding)))
+ (libraries
+  tezos-crypto
+  tezos-stdlib
+  alcotest-glue
+  zarith
+  tezos-hacl-glue-unix
+  data-encoding
+  alcotest-glue-unix
+  alcotest-lwt
+  qcheck-alcotest
+  tezos-test-helpers)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_crypto
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding)))

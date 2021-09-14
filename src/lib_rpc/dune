@@ -1,10 +1,6 @@
 (library
  (name tezos_rpc)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc)
- (libraries data-encoding
-            tezos-error-monad
-            resto
-            resto-directory)
- (flags (:standard -open Data_encoding
-                   -open Tezos_error_monad)))
+ (instrumentation (backend bisect_ppx))
+ (libraries data-encoding tezos-error-monad resto resto-directory)
+ (flags (:standard -open Data_encoding -open Tezos_error_monad)))
