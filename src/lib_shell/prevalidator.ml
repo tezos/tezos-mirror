@@ -98,19 +98,39 @@ type types_state_shell = {
   mutable banned_operations : Operation_hash.Set.t;
 }
 
+(** Functions to query data on a polymorphic block-like type ['block]. *)
+type 'block block_tools = {
+  hash : 'block -> Block_hash.t;  (** The hash of a block *)
+  operations : 'block -> Operation.t list list;
+      (** The list of operations of a block ordered by their validation pass *)
+  all_operation_hashes : 'block -> Operation_hash.t list list;
+      (** The list of hashes of operations of a block ordered by their
+          validation pass. Could be implemented
+          using {!operations} but this lets an alternative implementation
+          to be provided. *)
+}
+
 (** A wrapper over chain-related modules, to make client code easier to
     emulate, and hence to test *)
-type chain_tools = {
+type 'block chain_tools = {
   clear_or_cancel : Operation_hash.t -> unit;
       (** Removes the operation from the distributed database. *)
   inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
       (** Puts the operation in the distributed database. Returns [false] if
           the [hash] is already in the distributed database *)
   new_blocks :
-    from_block:Store.Block.t ->
-    to_block:Store.Block.t ->
-    (Store.Block.t * Store.Block.t list) Lwt.t;
-  read_predecessor_opt : Store.Block.t -> Store.Block.t option Lwt.t;
+    from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
+      (** [new_blocks ~from_block ~to_block] returns a pair [(ancestor,
+          path)], where [ancestor] is the common ancestor of [from_block]
+          and [to_block] and where [path] is the chain from [ancestor]
+          (excluded) to [to_block] (included).
+
+          @raise assert failure when the two provided blocks do not belong
+          to the same [chain]. *)
+  read_predecessor_opt : 'block -> 'block option Lwt.t;
+      (** [read_predecessor_opt block] returns
+          the direct predecessor of [block] or [None] if it cannot
+          be found. *)
 }
 
 (* [handle_live_operations] and [recycle_operations] will ultimately
@@ -141,13 +161,14 @@ type chain_tools = {
                    |
               from_branch = ancestor
     *)
-let handle_live_operations ~(chain : chain_tools) ~from_branch ~to_branch
+let handle_live_operations ~(block_store : 'block block_tools)
+    ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
     ~live_blocks old_mempool =
-  let rec pop_block ancestor block mempool =
-    let hash = Store.Block.hash block in
+  let rec pop_block ancestor (block : 'block) mempool =
+    let hash = block_store.hash block in
     if Block_hash.equal hash ancestor then Lwt.return mempool
     else
-      let operations = Store.Block.operations block in
+      let operations = block_store.operations block in
       List.fold_left_s
         (List.fold_left_s (fun mempool op ->
              let h = Operation.hash op in
@@ -171,7 +192,7 @@ let handle_live_operations ~(chain : chain_tools) ~from_branch ~to_branch
           (pop_block [@tailcall]) ancestor predecessor mempool
   in
   let push_block mempool block =
-    let operations = Store.Block.all_operation_hashes block in
+    let operations = block_store.all_operation_hashes block in
     List.iter (List.iter chain.clear_or_cancel) operations ;
     List.fold_left
       (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
@@ -180,7 +201,7 @@ let handle_live_operations ~(chain : chain_tools) ~from_branch ~to_branch
   in
   chain.new_blocks ~from_block:from_branch ~to_block:to_branch
   >>= fun (ancestor, path) ->
-  pop_block (Store.Block.hash ancestor) from_branch old_mempool
+  pop_block (block_store.hash ancestor) from_branch old_mempool
   >>= fun mempool ->
   let new_mempool = List.fold_left push_block mempool path in
   let (new_mempool, outdated) =
@@ -192,8 +213,10 @@ let handle_live_operations ~(chain : chain_tools) ~from_branch ~to_branch
   Lwt.return new_mempool
 
 let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
-    ~pending ~(chain : chain_tools) ~handle_branch_refused =
+    ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
+    ~handle_branch_refused =
   handle_live_operations
+    ~block_store
     ~chain
     ~from_branch
     ~to_branch
@@ -211,9 +234,18 @@ let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
   Classification.flush classification ~handle_branch_refused ;
   Lwt.return pending
 
+(** The concrete production instance of {!block_tools} *)
+let block_tools : Store.Block.t block_tools =
+  {
+    hash = Store.Block.hash;
+    operations = Store.Block.operations;
+    all_operation_hashes = Store.Block.all_operation_hashes;
+  }
+
 (** How to create an instance of {!chain_tools} from a {!Distributed_db.chain_db}.
     Prefer short-lived values, to avoid hiding mutable state for too long. *)
-let mk_chain_tools (chain_db : Distributed_db.chain_db) : chain_tools =
+let mk_chain_tools (chain_db : Distributed_db.chain_db) :
+    Store.Block.t chain_tools =
   let new_blocks ~from_block ~to_block =
     let chain_store = Distributed_db.chain_store chain_db in
     Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
@@ -1145,6 +1177,7 @@ module Make
         ~live_blocks:new_live_blocks
         ~classification:pv.shell.classification
         ~pending:pv.shell.pending
+        ~block_store:block_tools
         ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
         ~handle_branch_refused
       >>= fun new_pending_operations ->
