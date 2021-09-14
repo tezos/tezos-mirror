@@ -31,45 +31,16 @@
    changes, changing Fq12 signature to a group. Functions like
    check_bytes, add, one, negate and order have been removed from the API
    (https://gitlab.com/dannywillems/ocaml-bls12-381/-/commit/1dfb8bd813d12539b4007af095f3125646477319).
-   Removed values cited above can be mocked with anything because it was not
-   used in the environment. Only Fq12.eq and Fq12.one is required to be
-   correctly implemented. Therefore, the implementation is replaced with a
-   `failwith "Not implemented".
-
-   Also, bls12-381.1.0.0 added Bls12_381.Pairing.pairing_check which does
-   exactly the same job than the Michelson instruction IPairing_check_bls12_381
-   is expected to do. Therefore, the complete module Pairing is not required
-   anymore in Tezos_crypto.
+   A package bls12-381-legacy.0.4.3 (version used up to v3) has been released
+   without depending on the virtual package bls12-381 to be used in Tezos in
+   harmony with the new implementations of bls12-381-unix.
+   The content of this file is simply the content of Tezos_crypto.BLS12_381
+   using bls12-381-legacy instead of the virtual package and its implementation.
 *)
 
-module Bls12_381 = Bls12_381_legacy.Bls12_381
-include Bls12_381.Pairing
-module Fr = Bls12_381.Fr
-
-module Fq12 = struct
-  include Bls12_381.Fq12
-
-  (* https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/9866159b4bad662ef650a3d7ffcf98240c6d2713/src/blst/fq12.ml#L32 *)
-  let order =
-    let fq_order =
-      Z.of_string
-        "4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787"
-    in
-    Z.pow fq_order 12
-
-  (* https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/9866159b4bad662ef650a3d7ffcf98240c6d2713/src/blst/fq12.ml#L96
-  *)
-  let zero =
-    let bs = Bytes.make size_in_bytes '\000' in
-    of_bytes_exn bs
-
-  let check_bytes _x = failwith "Not implemented"
-
-  let add _x _y = failwith "Not implemented"
-
-  let negate _x = failwith "Not implemented"
-end
-
-module Gt = Fq12
-module G1 = Bls12_381.G1.Uncompressed
-module G2 = Bls12_381.G2.Uncompressed
+module Fr = Bls12_381_legacy.Fr
+module Fq12 = Bls12_381_legacy.Fq12
+module Gt = Bls12_381_legacy.Fq12
+module G1 = Bls12_381_legacy.G1.Uncompressed
+module G2 = Bls12_381_legacy.G2.Uncompressed
+include Bls12_381_legacy.Pairing
