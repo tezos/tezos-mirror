@@ -270,11 +270,10 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       (function
         | e ->
             failwith
-              "ERROR while Handling %a: %a\n%!"
+              "ERROR while Handling %a: %s\n%!"
               pp
               ()
-              Error_monad.pp_exn
-              e)
+              (Printexc.to_string e))
 
   let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
@@ -427,10 +426,9 @@ module Query = struct
             | `Encoding (path, exn) ->
                 fprintf
                   fmt
-                  "@[Parse error:@ wrong encoding for %S: %a@]"
+                  "@[Parse error:@ wrong encoding for %S: %s@]"
                   path
-                  pp_exn
-                  exn
+                  (Printexc.to_string exn)
             | `Json (path, el) ->
                 fprintf
                   fmt

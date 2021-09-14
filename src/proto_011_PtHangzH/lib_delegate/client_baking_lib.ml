@@ -75,7 +75,7 @@ let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
           load cctxt nonces_location >>=? fun nonces ->
           let nonces = add nonces block_hash seed_nonce in
           save cctxt nonces_location nonces)
-      |> trace_exn (Failure "Error while recording block"))
+      |> trace (error_of_exn (Failure "Error while recording block")))
   >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return_unit

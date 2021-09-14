@@ -145,12 +145,6 @@ val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
     The following functions allow you to enrich existing traces with wrapped
     exceptions. *)
 
-(** [record_trace_exn exc r] is [record_trace (error_of_exn exc) r] *)
-val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
-
-(** [trace_exn exc r] is [trace (error_of_exn exc) r] *)
-val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
-
 (** [generic_trace … r] is [r] where the trace (if any) is enriched with
   [generic_error …]. *)
 val generic_trace :

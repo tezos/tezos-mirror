@@ -66,7 +66,7 @@ let date_parameter option_name build =
         return (build t)
       with
       | Invalid_argument e -> failwith "In `%s %S`, %s" option_name s e
-      | e -> failwith "Exn: %a" pp_exn e)
+      | e -> failwith "Exn: %s" (Printexc.to_string e))
 
 let flat_pp pp o =
   Format.(

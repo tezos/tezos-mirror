@@ -71,7 +71,7 @@ let parse_param_file name =
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name >>=? fun json ->
     match Data_encoding.Json.destruct Parameters.encoding json with
     | exception exn ->
-        failwith "Parameters : Invalid JSON file - %a" Error_monad.pp_exn exn
+        failwith "Parameters : Invalid JSON file - %s" (Printexc.to_string exn)
     | param -> return param
 
 let read_args () =
