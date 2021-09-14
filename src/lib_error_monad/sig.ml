@@ -248,8 +248,8 @@ module type MONAD_EXTENSION = sig
      might rename it to [pp_print_trace]. *)
   val pp_print_error : Format.formatter -> error trace -> unit
 
-  (** Pretty prints a trace as the message of its first error *)
-  val pp_print_error_first : Format.formatter -> error trace -> unit
+  (** Pretty-prints the top error of a trace *)
+  val pp_print_top_error_of_trace : Format.formatter -> error trace -> unit
 
   val trace_encoding : error trace Data_encoding.t
 

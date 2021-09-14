@@ -77,7 +77,7 @@ end)
 
   let pp_print_error = Trace.pp_print Error.pp
 
-  let pp_print_error_first = Trace.pp_print_top Error.pp
+  let pp_print_top_error_of_trace = Trace.pp_print_top Error.pp
 
   let classify_trace trace =
     Trace.fold

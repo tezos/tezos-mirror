@@ -218,7 +218,9 @@ let test_get_registered_mockup_no_env =
       Persistence.get_registered_mockup None (mock_printer ()) >>= function
       | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
-          let actual = Format.asprintf "%a" pp_print_error_first errors in
+          let actual =
+            Format.asprintf "%a" pp_print_top_error_of_trace errors
+          in
           return
           @@ Alcotest.check'
                Alcotest.string
@@ -246,7 +248,9 @@ let test_get_registered_mockup_not_found =
       >>= function
       | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
-          let actual = Format.asprintf "%a" pp_print_error_first errors in
+          let actual =
+            Format.asprintf "%a" pp_print_top_error_of_trace errors
+          in
           let expected =
             Format.asprintf
               "Requested protocol with hash %a not found in available mockup \
