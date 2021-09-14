@@ -1,5 +1,9 @@
 (test
  (name test_registration)
  (package tezos-error-monad)
- (libraries tezos-error-monad data-encoding lwt.unix alcotest-lwt)
+ (libraries
+  tezos-error-monad
+  data-encoding
+  lwt.unix
+  alcotest-lwt)
  (flags (:standard -open Tezos_error_monad)))

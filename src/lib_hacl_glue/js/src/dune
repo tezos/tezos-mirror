@@ -10,7 +10,8 @@
  (public_name tezos-hacl-glue-js)
  (implements tezos-hacl-glue)
  (instrumentation (backend bisect_ppx))
- (libraries hacl-star-raw-empty)
+ (libraries
+  hacl-star-raw-empty)
  (modules hacl))
 
 (install (section lib) (package tezos-hacl-glue-js) (files hacl_stubs.js))

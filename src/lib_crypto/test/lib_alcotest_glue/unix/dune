@@ -2,4 +2,5 @@
  (name alcotest_glue_unix)
  (public_name alcotest-glue-unix)
  (implements alcotest-glue)
- (libraries alcotest))
+ (libraries
+  alcotest))

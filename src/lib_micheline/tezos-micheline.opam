@@ -1,17 +1,19 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.0" }
-  "data-encoding" { >= "0.4" & < "0.5" }
-  "tezos-error-monad"
+  "ppx_inline_test" {with-test}
   "uutf"
+  "zarith" { < "1.12" }
+  "tezos-stdlib"
+  "tezos-error-monad"
+  "data-encoding" { >= "0.4" & < "0.5" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "ppx_inline_test"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -6,20 +6,23 @@
 
 (library
  (name tezos_base_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-base.unix)
- (flags (:standard -open Tezos_error_monad
-                   -open Tezos_crypto
-                   -open Tezos_base
-                   -open Tezos_stdlib
-                   -open Tezos_stdlib_unix
-                   -open Data_encoding))
- (libraries data-encoding
-            tezos-crypto
-            bls12-381-unix
-            ; unix implementation of hacl
-            tezos-hacl-glue-unix
-            tezos-base
-            tezos-stdlib
-            tezos-stdlib-unix
-            tezos-error-monad))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  data-encoding
+  tezos-crypto
+  bls12-381-unix
+  ; unix implementation of hacl
+  tezos-hacl-glue-unix
+  tezos-base
+  tezos-stdlib
+  tezos-stdlib-unix
+  tezos-error-monad)
+ (flags
+  (:standard
+   -open Tezos_error_monad
+   -open Tezos_crypto
+   -open Tezos_base
+   -open Tezos_stdlib
+   -open Tezos_stdlib_unix
+   -open Data_encoding)))
