@@ -41,7 +41,13 @@ let load_and_elaborate ctxt addr =
       Script_ir_translator.(
         parse_script ctxt script ~legacy:true ~allow_forged_in_storage:true
         >>=? fun (ex_script, ctxt) ->
-        return (ctxt, Some (script, ex_script, script_size ex_script)))
+        (* We consume gas after the fact in order to not have to instrument
+           [script_size] (for efficiency).
+           This is safe, as we already pay gas proportional to storage size
+           in [parse_script] beforehand. *)
+        let (size, cost) = script_size ex_script in
+        Gas.consume ctxt cost >>?= fun ctxt ->
+        return (ctxt, Some (script, ex_script, size)))
 
 module Client = struct
   type cached_value = cached_contract
@@ -74,16 +80,18 @@ module Cache = (val Cache.register_exn (module Client))
 
 let find ctxt addr =
   let identifier = identifier_of_contract addr in
-  Cache.find ctxt identifier >>= function
+  Cache.find ctxt identifier >>=? function
   | Some (unparsed_script, ex_script) ->
       return (ctxt, identifier, Some (unparsed_script, ex_script))
   | None -> (
-      load_and_elaborate ctxt addr >|=? function
-      | (ctxt, None) -> (ctxt, identifier, None)
+      load_and_elaborate ctxt addr >>=? function
+      | (ctxt, None) -> return (ctxt, identifier, None)
       | (ctxt, Some (unparsed_script, script_ir, size)) ->
           let cached_value = (unparsed_script, script_ir) in
-          let ctxt = Cache.update ctxt identifier (Some (cached_value, size)) in
-          (ctxt, identifier, Some (unparsed_script, script_ir)))
+          Lwt.return
+            ( Cache.update ctxt identifier (Some (cached_value, size))
+            >>? fun ctxt ->
+              ok (ctxt, identifier, Some (unparsed_script, script_ir)) ))
 
 let update ctxt identifier updated_script approx_size =
   Cache.update ctxt identifier (Some (updated_script, approx_size))

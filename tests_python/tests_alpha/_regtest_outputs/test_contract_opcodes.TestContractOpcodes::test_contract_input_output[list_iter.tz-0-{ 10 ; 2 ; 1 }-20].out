@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039994.915 units remaining)
+  - location: 8 (remaining gas: 1039992.715 units remaining)
     [ (Pair { 10 ; 2 ; 1 } 0)  	 ]
-  - location: 8 (remaining gas: 1039994.905 units remaining)
+  - location: 8 (remaining gas: 1039992.705 units remaining)
     [ { 10 ; 2 ; 1 }  	@parameter ]
-  - location: 9 (remaining gas: 1039994.895 units remaining)
+  - location: 9 (remaining gas: 1039992.695 units remaining)
     [ 1  	
       { 10 ; 2 ; 1 }  	@parameter ]
-  - location: 12 (remaining gas: 1039994.885 units remaining)
+  - location: 12 (remaining gas: 1039992.685 units remaining)
     [ { 10 ; 2 ; 1 }  	@parameter
       1  	 ]
-  - location: 13 (remaining gas: 1039994.885 units remaining)
+  - location: 13 (remaining gas: 1039992.685 units remaining)
     [ 10  	@parameter.elt
       1  	 ]
-  - location: 15 (remaining gas: 1039994.806 units remaining)
+  - location: 15 (remaining gas: 1039992.606 units remaining)
     [ 10  	 ]
-  - location: 13 (remaining gas: 1039994.791 units remaining)
+  - location: 13 (remaining gas: 1039992.591 units remaining)
     [ 2  	@parameter.elt
       10  	 ]
-  - location: 15 (remaining gas: 1039994.712 units remaining)
+  - location: 15 (remaining gas: 1039992.512 units remaining)
     [ 20  	 ]
-  - location: 13 (remaining gas: 1039994.697 units remaining)
+  - location: 13 (remaining gas: 1039992.497 units remaining)
     [ 1  	@parameter.elt
       20  	 ]
-  - location: 15 (remaining gas: 1039994.618 units remaining)
+  - location: 15 (remaining gas: 1039992.418 units remaining)
     [ 20  	 ]
-  - location: 13 (remaining gas: 1039994.603 units remaining)
+  - location: 13 (remaining gas: 1039992.403 units remaining)
     [ 20  	 ]
-  - location: 16 (remaining gas: 1039994.588 units remaining)
+  - location: 16 (remaining gas: 1039992.388 units remaining)
     [ {}  	
       20  	 ]
-  - location: 18 (remaining gas: 1039994.573 units remaining)
+  - location: 18 (remaining gas: 1039992.373 units remaining)
     [ (Pair {} 20)  	 ]
 

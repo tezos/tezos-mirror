@@ -641,35 +641,38 @@ let apply_manager_operation_content :
           Contract.originated_from_current_nonce
             ~since:before_operation
             ~until:ctxt
-          >|=? fun originated_contracts ->
-          let ctxt =
-            Script_cache.update
-              ctxt
-              cache_key
-              ( {script with storage = Script.lazy_expr storage},
-                updated_cached_script )
-              updated_size
-          in
-          let result =
-            Transaction_result
-              {
-                storage = Some storage;
-                lazy_storage_diff;
-                balance_updates =
-                  Receipt.cleanup_balance_updates
-                    [
-                      (Contract payer, Debited fees, Block_application);
-                      (Contract source, Debited amount, Block_application);
-                      (Contract destination, Credited amount, Block_application);
-                    ];
-                originated_contracts;
-                consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-                storage_size = new_size;
-                paid_storage_size_diff;
-                allocated_destination_contract;
-              }
-          in
-          (ctxt, result, operations))
+          >>=? fun originated_contracts ->
+          Lwt.return
+            ( Script_cache.update
+                ctxt
+                cache_key
+                ( {script with storage = Script.lazy_expr storage},
+                  updated_cached_script )
+                updated_size
+            >|? fun ctxt ->
+              let result =
+                Transaction_result
+                  {
+                    storage = Some storage;
+                    lazy_storage_diff;
+                    balance_updates =
+                      Receipt.cleanup_balance_updates
+                        [
+                          (Contract payer, Debited fees, Block_application);
+                          (Contract source, Debited amount, Block_application);
+                          ( Contract destination,
+                            Credited amount,
+                            Block_application );
+                        ];
+                    originated_contracts;
+                    consumed_gas =
+                      Gas.consumed ~since:before_operation ~until:ctxt;
+                    storage_size = new_size;
+                    paid_storage_size_diff;
+                    allocated_destination_contract;
+                  }
+              in
+              (ctxt, result, operations) ))
   | Origination {delegate; script; preorigination; credit} ->
       Script.force_decode_in_context ctxt script.storage
       (* see [note] *)
@@ -1538,14 +1541,13 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                in
-               let ctxt =
-                 Script_cache.update
-                   ctxt
-                   cache_key
-                   ( {script with storage = Script.lazy_expr storage},
-                     updated_cached_script )
-                   updated_size
-               in
+               Script_cache.update
+                 ctxt
+                 cache_key
+                 ( {script with storage = Script.lazy_expr storage},
+                   updated_cached_script )
+                 updated_size
+               >>?= fun ctxt ->
                let result =
                  Transaction_result
                    {

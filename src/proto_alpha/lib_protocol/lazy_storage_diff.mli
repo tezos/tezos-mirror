@@ -46,7 +46,7 @@ val make :
 
 type diffs = diffs_item list
 
-val diffs_in_memory_size : diffs -> Cache_memory_helpers.sint
+val diffs_in_memory_size : diffs -> Cache_memory_helpers.nodes_and_size
 
 val encoding : diffs Data_encoding.t
 
@@ -62,7 +62,7 @@ val fresh :
   (Raw_context.t * 'id) tzresult Lwt.t
 
 (**
-  Initializes the storage for all lazy storage kind. 
+  Initializes the storage for all lazy storage kind.
   This is useful for genesis only.
   Protocol updates need to initialize new lazy storage kinds.
 *)

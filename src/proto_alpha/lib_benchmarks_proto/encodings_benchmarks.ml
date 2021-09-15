@@ -173,7 +173,7 @@ module Encoding_micheline : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.map
           (function
             | Michelson_generation.Data {term; typ = _}
@@ -244,7 +244,7 @@ module Decoding_micheline : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load_file file in
+        let terms = Michelson_generation.load ~filename:file in
         List.map
           (function
             | Michelson_generation.Data {term; typ = _}

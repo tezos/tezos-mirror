@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (remaining gas: 1039992.742 units remaining)
+  - location: 12 (remaining gas: 1039989.842 units remaining)
     [ (Pair 1 { Elt 1 0 } None)  	 ]
-  - location: 12 (remaining gas: 1039992.732 units remaining)
+  - location: 12 (remaining gas: 1039989.832 units remaining)
     [ 1  	@parameter
       (Pair { Elt 1 0 } None)  	@storage ]
-  - location: 13 (remaining gas: 1039992.717 units remaining)
+  - location: 13 (remaining gas: 1039989.817 units remaining)
     [ (Pair { Elt 1 0 } None)  	@storage ]
-  - location: 15 (remaining gas: 1039992.707 units remaining)
+  - location: 15 (remaining gas: 1039989.807 units remaining)
     [ { Elt 1 0 }  	 ]
-  - location: 16 (remaining gas: 1039992.697 units remaining)
+  - location: 16 (remaining gas: 1039989.797 units remaining)
     [ { Elt 1 0 }  	
       { Elt 1 0 }  	 ]
-  - location: 13 (remaining gas: 1039992.667 units remaining)
+  - location: 13 (remaining gas: 1039989.767 units remaining)
     [ 1  	@parameter
       { Elt 1 0 }  	
       { Elt 1 0 }  	 ]
-  - location: 17 (remaining gas: 1039992.517 units remaining)
+  - location: 17 (remaining gas: 1039989.617 units remaining)
     [ True  	
       { Elt 1 0 }  	 ]
-  - location: 18 (remaining gas: 1039992.502 units remaining)
+  - location: 18 (remaining gas: 1039989.602 units remaining)
     [ (Some True)  	
       { Elt 1 0 }  	 ]
-  - location: 19 (remaining gas: 1039992.492 units remaining)
+  - location: 19 (remaining gas: 1039989.592 units remaining)
     [ { Elt 1 0 }  	
       (Some True)  	 ]
-  - location: 20 (remaining gas: 1039992.477 units remaining)
+  - location: 20 (remaining gas: 1039989.577 units remaining)
     [ (Pair { Elt 1 0 } (Some True))  	 ]
-  - location: 21 (remaining gas: 1039992.462 units remaining)
+  - location: 21 (remaining gas: 1039989.562 units remaining)
     [ {}  	
       (Pair { Elt 1 0 } (Some True))  	 ]
-  - location: 23 (remaining gas: 1039992.447 units remaining)
+  - location: 23 (remaining gas: 1039989.547 units remaining)
     [ (Pair {} { Elt 1 0 } (Some True))  	 ]
 

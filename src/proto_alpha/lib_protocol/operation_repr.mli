@@ -249,7 +249,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 val equal : 'a operation -> 'b operation -> ('a, 'b) eq option
 
 val packed_internal_operation_in_memory_size :
-  packed_internal_operation -> Cache_memory_helpers.sint
+  packed_internal_operation -> Cache_memory_helpers.nodes_and_size
 
 module Encoding : sig
   type 'b case =

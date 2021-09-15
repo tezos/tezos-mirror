@@ -474,5 +474,6 @@ val get_single_sapling_state :
   (Sapling.Id.t option * context) tzresult
 
 (** [script_size script] returns an overapproximation of the size of
-    the in-memory representation of [script]. *)
-val script_size : ex_script -> int
+    the in-memory representation of [script] as well as the cost
+    associated to computing that overapproximation. *)
+val script_size : ex_script -> int * Gas_limit_repr.cost

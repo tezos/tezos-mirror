@@ -118,6 +118,8 @@ Cache
 
 - MRs: :gl:`!3234` :gl:`!3419`
 
+- Gas instrumentation implemented in MR :gl:`!3430`
+
 Context Storage Flattening
 --------------------------
 

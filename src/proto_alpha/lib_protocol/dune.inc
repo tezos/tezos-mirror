@@ -95,10 +95,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -197,10 +199,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -299,10 +303,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
@@ -423,10 +429,12 @@ include Tezos_raw_protocol_alpha.Main
    Init_storage
    Sapling_validator
    Global_constants_storage
+   Cache_costs
    Alpha_context
    Script_tc_errors
    Script_typed_ir
    Script_typed_ir_size
+   Script_typed_ir_size_costs
    Michelson_v1_gas
    Script_ir_annot
    Script_list
@@ -564,10 +572,12 @@ include Tezos_raw_protocol_alpha.Main
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_storage.mli global_constants_storage.ml
+   cache_costs.mli cache_costs.ml
    alpha_context.mli alpha_context.ml
    script_tc_errors.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
+   script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml

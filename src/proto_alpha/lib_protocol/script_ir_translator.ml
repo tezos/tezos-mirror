@@ -5744,22 +5744,26 @@ let parse_code :
        (arg_type_full, None)
        ret_type_full
        code_field)
-  >|=? fun (code, ctxt) ->
-  Saturation_repr.(
+  >>=? fun (code, ctxt) ->
+  Lwt.return
+    (let open Script_typed_ir_size in
     let view_size view =
-      Script_typed_ir_size.(
-        add
-          (add (node_size view.view_code) (node_size view.input_ty))
-          (node_size view.output_ty))
+      node_size view.view_code ++ node_size view.input_ty
+      ++ node_size view.output_ty
     in
-    let views_size =
-      SMap.fold (fun _ v s -> add (view_size v) s) views (safe_int 0)
-    in
+    let views_size = SMap.fold (fun _ v s -> view_size v ++ s) views zero in
     (* The size of the storage_type and the arg_type is counted by
        [lambda_size]. *)
-    let ir_size = Script_typed_ir_size.lambda_size code in
-    let code_size = add views_size ir_size in
-    (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
+    let ir_size = lambda_size code in
+    let (nodes, code_size) = views_size ++ ir_size in
+    (* We consume gas after the fact in order to not have to instrument
+       [node_size] (for efficiency).
+       This is safe, as we already pay gas proportional to [views_size]
+       and [ir_size] during their typechecking. *)
+    Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes)
+    >>? fun ctxt ->
+    ok
+      (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -6785,5 +6789,8 @@ let script_size
         root_name = _;
         views = _;
       }) =
-  let storage_size = Script_typed_ir_size.value_size storage_type storage in
-  Saturation_repr.(add code_size storage_size |> to_int)
+  let (nodes, storage_size) =
+    Script_typed_ir_size.value_size storage_type storage
+  in
+  let cost = Script_typed_ir_size_costs.nodes_cost ~nodes in
+  (Saturation_repr.(add code_size storage_size |> to_int), cost)

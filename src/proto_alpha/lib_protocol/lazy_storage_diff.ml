@@ -55,9 +55,9 @@ module type OPS = sig
 
   val updates_encoding : updates Data_encoding.t
 
-  val alloc_in_memory_size : alloc -> Cache_memory_helpers.sint
+  val alloc_in_memory_size : alloc -> Cache_memory_helpers.nodes_and_size
 
-  val updates_in_memory_size : updates -> Cache_memory_helpers.sint
+  val updates_in_memory_size : updates -> Cache_memory_helpers.nodes_and_size
 
   val bytes_size_for_empty : Z.t
 
@@ -83,14 +83,16 @@ module Big_map = struct
 
   let alloc_in_memory_size {key_type; value_type} =
     let open Cache_memory_helpers in
-    header_size +! (word_size *? 2) +! expr_size key_type
-    +! expr_size value_type
+    ret_adding
+      (expr_size key_type ++ expr_size value_type)
+      (header_size +! (word_size *? 2))
 
   let updates_in_memory_size updates =
     let open Cache_memory_helpers in
     let update_size {key; key_hash = _; value} =
-      header_size +! (word_size *? 3) +! expr_size key +? Script_expr_hash.size
-      +! option_size expr_size value
+      ret_adding
+        (expr_size key ++ option_size_vec expr_size value)
+        (header_size +! (word_size *? 3) +? Script_expr_hash.size)
     in
     list_fold_size update_size updates
 
@@ -160,9 +162,10 @@ module Sapling_state = struct
 
   let alloc_in_memory_size {memo_size = (_ : int)} =
     let open Cache_memory_helpers in
-    header_size +! word_size
+    (Nodes.zero, header_size +! word_size)
 
-  let updates_in_memory_size = Sapling_repr.diff_in_memory_size
+  let updates_in_memory_size update =
+    (Cache_memory_helpers.Nodes.zero, Sapling_repr.diff_in_memory_size update)
 
   let bytes_size_for_empty = Z.of_int 33
 
@@ -238,16 +241,19 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
     ]
 
 let init_size :
-    type i a u. (i, a, u) ops -> (i, a) init -> Cache_memory_helpers.sint =
+    type i a u.
+    (i, a, u) ops -> (i, a) init -> Cache_memory_helpers.nodes_and_size =
  fun (module OPS) init ->
   let open Cache_memory_helpers in
   match init with
   | Existing -> zero
   | Copy {src = _id_is_a_Z_fitting_in_an_int_for_a_long_time} ->
-      header_size +! word_size
-  | Alloc alloc -> header_size +! word_size +! OPS.alloc_in_memory_size alloc
+      (Nodes.zero, header_size +! word_size)
+  | Alloc alloc ->
+      ret_adding (OPS.alloc_in_memory_size alloc) (header_size +! word_size)
 
-let updates_size : type i a u. (i, a, u) ops -> u -> Cache_memory_helpers.sint =
+let updates_size :
+    type i a u. (i, a, u) ops -> u -> Cache_memory_helpers.nodes_and_size =
  fun (module OPS) updates -> OPS.updates_in_memory_size updates
 
 let diff_in_memory_size kind diff =
@@ -256,8 +262,7 @@ let diff_in_memory_size kind diff =
   | Remove -> zero
   | Update {init; updates} ->
       let ops = get_ops kind in
-      header_size +! (word_size *? 2) +! init_size ops init
-      +! updates_size ops updates
+      ret_adding (init_size ops init ++ updates_size ops updates) h2w
 
 (**
   [apply_updates ctxt ops ~id init] applies the updates [updates] on lazy
@@ -375,7 +380,7 @@ let item_in_memory_size
         _id_is_a_Z_fitting_in_an_int_for_a_long_time,
         diff )) =
   let open Cache_memory_helpers in
-  header_size +! (word_size *? 3) +! diff_in_memory_size kind diff
+  ret_adding (diff_in_memory_size kind diff) h3w
 
 type diffs = diffs_item list
 

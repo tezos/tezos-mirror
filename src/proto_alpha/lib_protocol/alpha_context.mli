@@ -936,14 +936,14 @@ module Cache : sig
 
         [update ctxt i None] removes [i] from the subcache. *)
     val update :
-      context -> identifier -> (cached_value * size) option -> context
+      context -> identifier -> (cached_value * size) option -> context tzresult
 
     (** [find ctxt i = Some v] if [v] is the value associated to [i]
        in the subcache. Returns [None] if there is no such value in
        the subcache. This function is in the Lwt monad because if the
        value may have not been constructed (see the lazy loading
        mode in {!Environment_context}), it is constructed on the fly. *)
-    val find : context -> identifier -> cached_value option Lwt.t
+    val find : context -> identifier -> cached_value option tzresult Lwt.t
 
     (** [list_identifiers ctxt] returns the list of the
        identifiers of the cached values along with their respective
@@ -1257,7 +1257,7 @@ module Lazy_storage : sig
 
   val encoding : diffs Data_encoding.t
 
-  val diffs_in_memory_size : diffs -> Cache_memory_helpers.sint
+  val diffs_in_memory_size : diffs -> Cache_memory_helpers.nodes_and_size
 
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
 
@@ -1859,7 +1859,7 @@ module Operation : sig
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
   val packed_internal_operation_in_memory_size :
-    packed_internal_operation -> Cache_memory_helpers.sint
+    packed_internal_operation -> Cache_memory_helpers.nodes_and_size
 
   val pack : 'kind operation -> packed_operation
 

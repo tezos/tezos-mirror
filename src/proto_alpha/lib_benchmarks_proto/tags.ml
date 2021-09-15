@@ -28,3 +28,5 @@ let interpreter = "interpreter"
 let translator = "translator"
 
 let encoding = "encoding"
+
+let cache = "cache"
