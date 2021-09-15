@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** MCMC-based Michelson data and code samplers. *)
+
 open StaTz
 
 let print_m (term : Mikhailsky.node) =
@@ -97,17 +99,17 @@ module Make_generic (P : Sampler_parameters_sig) = struct
   let generator ~burn_in = P.(Sampler.mcmc ~verbosity ~initial ~burn_in)
 end
 
-module Code (X : sig
-  module Samplers : Michelson_samplers_base.Full_S
+module Code
+    (Michelson_base : Michelson_samplers_base.S)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+      val rng_state : Random.State.t
 
-  val rng_state : Random.State.t
+      val target_size : int
 
-  val target_size : int
-
-  val verbosity : [`Silent | `Progress | `Trace]
-end) =
+      val verbosity : [`Silent | `Progress | `Trace]
+    end) =
 struct
-  module Autocomp = Autocomp.Make (X.Samplers)
+  module Autocomp = Autocomp.Make (Michelson_base) (Crypto_samplers)
 
   module MCMC = Make_generic (struct
     let initial =
@@ -150,18 +152,19 @@ struct
     Stats.map_gen to_michelson (MCMC.generator ~burn_in)
 end
 
-module Data (X : sig
-  module Samplers : Michelson_samplers_base.Full_S
+module Data
+    (Michelson_base : Michelson_samplers_base.S)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
+      val rng_state : Random.State.t
 
-  val rng_state : Random.State.t
+      val target_size : int
 
-  val target_size : int
-
-  val verbosity : [`Silent | `Progress | `Trace]
-end) =
+      val verbosity : [`Silent | `Progress | `Trace]
+    end) =
 struct
-  module Autocomp = Autocomp.Make (X.Samplers)
-  module Rewrite_rules = Rules.Data_rewrite_leaves (X.Samplers)
+  module Autocomp = Autocomp.Make (Michelson_base) (Crypto_samplers)
+  module Rewrite_rules =
+    Rules.Data_rewrite_leaves (Michelson_base) (Crypto_samplers)
 
   module MCMC = Make_generic (struct
     let initial =

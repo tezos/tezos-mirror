@@ -116,27 +116,29 @@ and tnames_of_comparable_type :
   | Script_typed_ir.Option_key (ty, _) ->
       tnames_of_comparable_type ty (`TOption :: acc)
 
-module Config = struct
-  open Michelson_samplers_parameters
-
-  let parameters =
-    {
-      int_size = {min = 8; max = 32};
-      string_size = {min = 8; max = 128};
-      bytes_size = {min = 8; max = 128};
-      stack_size = {min = 3; max = 8};
-      type_size = {min = 1; max = 15};
-      list_size = {min = 0; max = 1000};
-      set_size = {min = 0; max = 1000};
-      map_size = {min = 0; max = 1000};
-    }
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+  let algo = `Default
 
   let size = 16
+end)
 
-  let algo = `Default
-end
-
-module Sampler = Michelson_samplers.Make (Config)
+module Sampler =
+  Michelson_samplers.Make
+    (struct
+      let parameters =
+        {
+          base_parameters =
+            {
+              Michelson_samplers_base.int_size = {min = 8; max = 32};
+              string_size = {min = 8; max = 128};
+              bytes_size = {min = 8; max = 128};
+            };
+          list_size = {min = 10; max = 1000};
+          set_size = {min = 10; max = 1000};
+          map_size = {min = 10; max = 1000};
+        }
+    end)
+    (Crypto_samplers)
 
 let pp_stats = Stats.pp_fin_fun pp_type_name
 

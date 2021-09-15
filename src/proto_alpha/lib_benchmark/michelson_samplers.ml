@@ -26,6 +26,50 @@
 open Protocol
 open Script_typed_ir
 
+(** This module exposes a functor implementing various samplers for Michelson.
+    These allow to sample:
+    - types and comparable types (given a target size),
+    - values and comparable values of a given Michelson type (given some more
+      parameters fixed at functor instantiation time)
+    - stacks
+
+    Note that some kind of values might not be supported. At the time of writing,
+    the value sampler doesn't handle the following types:
+    - Sapling transaction and states
+    - Timelock chests and chest keys
+    - Operations
+    - Lambdas (ie code)
+
+    For the latter, consider using the samplers in {!Michelson_mcmc_samplers}.
+*)
+
+(** Parameters for the Michelson samplers. *)
+type parameters = {
+  base_parameters : Michelson_samplers_base.parameters;
+  list_size : Base_samplers.range;
+      (** The range of the size, measured in number of elements, in which lists must be sampled.*)
+  set_size : Base_samplers.range;
+      (** The range of the size, measured in number of elements, in which sets must be sampled.*)
+  map_size : Base_samplers.range;
+      (** The range of the size, measured in number of bindings, in which maps must be sampled.*)
+}
+
+(** Encoding for sampler prameters. *)
+let parameters_encoding =
+  let open Data_encoding in
+  let range_encoding = Base_samplers.range_encoding in
+  conv
+    (fun {base_parameters; list_size; set_size; map_size} ->
+      (base_parameters, (list_size, set_size, map_size)))
+    (fun (base_parameters, (list_size, set_size, map_size)) ->
+      {base_parameters; list_size; set_size; map_size})
+    (merge_objs
+       Michelson_samplers_base.parameters_encoding
+       (obj3
+          (req "list_size" range_encoding)
+          (req "set_size" range_encoding)
+          (req "map_size" range_encoding)))
+
 (* ------------------------------------------------------------------------- *)
 (* Helpers. *)
 
@@ -301,27 +345,7 @@ let sample_list state ~range ~sampler =
   (length, list)
 
 module type S = sig
-  val sampling_parameters : Michelson_samplers_parameters.t
-
-  module Crypto_samplers : Crypto_samplers.Finite_key_pool_S
-
-  module Michelson_base : sig
-    val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
-
-    val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
-
-    val signature : Tezos_crypto.Signature.t sampler
-
-    val string : Alpha_context.Script_string.t sampler
-
-    val bytes : bytes sampler
-
-    val tez : Alpha_context.Tez.tez sampler
-
-    val timestamp : Alpha_context.Script_timestamp.t sampler
-
-    val bool : bool sampler
-  end
+  module Michelson_base : Michelson_samplers_base.S
 
   module Random_type : sig
     val m_type : size:int -> Script_ir_translator.ex_ty sampler
@@ -343,8 +367,13 @@ exception SamplingError of string
 
 let fail_sampling error = raise (SamplingError error)
 
-module Make (P : Michelson_samplers_parameters.S) : S = struct
-  include Michelson_samplers_base.Make_full (P)
+module Make (P : sig
+  val parameters : parameters
+end)
+(Crypto_samplers : Crypto_samplers.Finite_key_pool_S) : S = struct
+  module Michelson_base = Michelson_samplers_base.Make (struct
+    let parameters = P.parameters.base_parameters
+  end)
 
   let memo_size =
     Alpha_context.Sapling.Memo_size.parse_z Z.zero |> Result.get_ok
@@ -565,7 +594,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
     let address rng_state =
-      if Michelson_base.bool rng_state then
+      if Base_samplers.uniform_bool rng_state then
         ( Alpha_context.Contract.implicit_contract
             (Crypto_samplers.pkh rng_state),
           "default" )
@@ -602,7 +631,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Key_hash_t _ -> Crypto_samplers.pkh
         | Key_t _ -> Crypto_samplers.pk
         | Timestamp_t _ -> Michelson_base.timestamp
-        | Bool_t _ -> Michelson_base.bool
+        | Bool_t _ -> Base_samplers.uniform_bool
         | Address_t _ -> address
         | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
             M.(
@@ -611,12 +640,13 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
               return (left_v, right_v))
         | Union_t ((left_t, _), (right_t, _), _) ->
             fun rng_state ->
-              if Michelson_base.bool rng_state then L (value left_t rng_state)
+              if Base_samplers.uniform_bool rng_state then
+                L (value left_t rng_state)
               else R (value right_t rng_state)
         | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
         | Option_t (ty, _) ->
             fun rng_state ->
-              if Michelson_base.bool rng_state then None
+              if Base_samplers.uniform_bool rng_state then None
               else Some (value ty rng_state)
         | List_t (elt_ty, _) -> generate_list elt_ty
         | Set_t (elt_ty, _) -> generate_set elt_ty
@@ -659,13 +689,17 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       in
       Script_typed_ir.{elements; length}
 
+    (* Note that we might very well generate sets smaller than the specified range (consider the
+       case of a set of type [unit]). *)
     and generate_set :
         type elt.
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty rng_state ->
       let ety = comparable_downcast elt_ty in
-      let {Script_typed_ir.elements; length = _} =
-        generate_list ety rng_state
+      let (_, elements) =
+        (* TODO: fix interface of list sampler *)
+        sample_list rng_state ~range:P.parameters.set_size ~sampler:(fun () ->
+            value ety rng_state)
       in
       List.fold_left
         (fun set x -> Script_set.update x true set)

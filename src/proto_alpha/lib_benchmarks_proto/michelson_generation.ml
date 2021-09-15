@@ -103,30 +103,31 @@ let load ~filename =
 
 (* ----------------------------------------------------------------------- *)
 
-let michelson_samplers =
-  let module Config = struct
-    open Michelson_samplers_parameters
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+  let size = 16
 
-    let parameters =
-      {
-        int_size = {min = 8; max = 32};
-        string_size = {min = 8; max = 128};
-        bytes_size = {min = 8; max = 128};
-        stack_size = {min = 3; max = 8};
-        type_size = {min = 1; max = 15};
-        list_size = {min = 0; max = 1000};
-        set_size = {min = 0; max = 1000};
-        map_size = {min = 0; max = 1000};
-      }
+  let algo = `Default
+end)
 
-    let size = 16
+module Samplers =
+  Michelson_samplers.Make
+    (struct
+      let parameters =
+        {
+          Michelson_samplers.base_parameters =
+            {
+              int_size = {min = 8; max = 32};
+              string_size = {min = 8; max = 128};
+              bytes_size = {min = 8; max = 128};
+            };
+          list_size = {min = 0; max = 1000};
+          set_size = {min = 0; max = 1000};
+          map_size = {min = 0; max = 1000};
+        }
+    end)
+    (Crypto_samplers)
 
-    let algo = `Default
-  end in
-  let module Samplers = Michelson_samplers.Make (Config) in
-  (module Samplers : Michelson_samplers.S)
-
-module Samplers = (val michelson_samplers)
+module Michelson_base_samplers = Samplers.Michelson_base
 
 (* ----------------------------------------------------------------------- *)
 
@@ -184,15 +185,16 @@ let make_data_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen = Michelson_mcmc_samplers.Data (struct
-    module Samplers = Samplers
+  let module Gen =
+    Michelson_mcmc_samplers.Data (Michelson_base_samplers) (Crypto_samplers)
+      (struct
+        let rng_state = rng_state
 
-    let rng_state = rng_state
+        let target_size = target_size
 
-    let target_size = target_size
-
-    let verbosity = `Silent
-  end) in
+        let verbosity = `Silent
+      end)
+  in
   let burn_in = target_size * config.burn_in_multiplier in
   let generator = Gen.generator ~burn_in in
   let (term, typ) = StaTz.Stats.sample_gen generator in
@@ -202,15 +204,16 @@ let make_code_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen = Michelson_mcmc_samplers.Code (struct
-    module Samplers = Samplers
+  let module Gen =
+    Michelson_mcmc_samplers.Code (Michelson_base_samplers) (Crypto_samplers)
+      (struct
+        let rng_state = rng_state
 
-    let rng_state = rng_state
+        let target_size = target_size
 
-    let target_size = target_size
-
-    let verbosity = `Silent
-  end) in
+        let verbosity = `Silent
+      end)
+  in
   let burn_in = target_size * config.burn_in_multiplier in
   let generator = Gen.generator ~burn_in in
   let (term, (bef, _aft)) = StaTz.Stats.sample_gen generator in

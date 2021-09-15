@@ -15,6 +15,7 @@
  (flags (:standard
          -open Tezos_micheline
          -open Tezos_protocol_alpha
+         -open Tezos_benchmark
          -open Tezos_benchmark_type_inference_alpha
          -open Tezos_benchmark_alpha
          -open Tezos_alpha_test_helpers)))

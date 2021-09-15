@@ -67,27 +67,32 @@ let iter_n_es n f =
 *)
 
 module Samplers = struct
-  let parameters =
-    let open Michelson_samplers_parameters in
-    let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
-    {
-      int_size = size;
-      string_size = size;
-      bytes_size = size;
-      stack_size = size;
-      type_size = size;
-      list_size = size;
-      set_size = size;
-      map_size = size;
-    }
+  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32}
 
-  include Michelson_samplers.Make (struct
-    let parameters = parameters
-
+  module Crypto_samplers =
+  Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
     let size = 10
 
     let algo = `Default
   end)
+
+  include
+    Michelson_samplers.Make
+      (struct
+        let parameters : Michelson_samplers.parameters =
+          {
+            base_parameters =
+              {
+                Michelson_samplers_base.int_size = size;
+                string_size = size;
+                bytes_size = size;
+              };
+            list_size = size;
+            set_size = size;
+            map_size = size;
+          }
+      end)
+      (Crypto_samplers)
 
   let random_state = Random.State.make [|37; 73; 17; 71; 42|]
 
@@ -97,23 +102,15 @@ module Samplers = struct
 
   let sample_value ty = Random_value.value ty random_state
 
-  module Full = Michelson_samplers_base.Make_full (struct
-    let parameters = parameters
+  module Gen =
+    Michelson_mcmc_samplers.Code (Michelson_base) (Crypto_samplers)
+      (struct
+        let rng_state = random_state
 
-    let algo = `Default
+        let target_size = 500
 
-    let size = 16
-  end)
-
-  module Gen = Michelson_mcmc_samplers.Code (struct
-    module Samplers = Full
-
-    let rng_state = random_state
-
-    let target_size = 500
-
-    let verbosity = `Silent
-  end)
+        let verbosity = `Silent
+      end)
 
   (* Delay and cache the generator as it's expensive to create. *)
   let generator = lazy (Gen.generator ~burn_in:(500 * 7))
