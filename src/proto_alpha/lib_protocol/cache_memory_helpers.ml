@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type SNodes = sig
+  type t = private int
+
+  val zero : t
+
+  val one : t [@@ocaml.warning "-32"]
+
+  val succ : t -> t
+
+  val add : t -> t -> t
+
+  val to_int : t -> int
+end
+
 (** The [Nodes] module is used to count the number of computation steps
     performed when evaluating the size of the in-memory graph corresponding
     to an OCaml value.
@@ -40,19 +54,7 @@
     are bounded above by the number of nodes traversed when computing
     an OCaml value.
  *)
-module Nodes : sig
-  type t = private int
-
-  val zero : t
-
-  val one : t [@@ocaml.warning "-32"]
-
-  val succ : t -> t
-
-  val add : t -> t -> t
-
-  val to_int : t -> int
-end = struct
+module Nodes : SNodes = struct
   type t = int
 
   let zero = 0
