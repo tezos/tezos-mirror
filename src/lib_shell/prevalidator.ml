@@ -1556,3 +1556,22 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
+
+module Internal_for_tests = struct
+  (** Functions to query data on a polymorphic block-like type ['block]. *)
+  type nonrec 'block block_tools = 'block block_tools = {
+    hash : 'block -> Block_hash.t;
+    operations : 'block -> Operation.t list list;
+    all_operation_hashes : 'block -> Operation_hash.t list list;
+  }
+
+  type nonrec 'block chain_tools = 'block chain_tools = {
+    clear_or_cancel : Operation_hash.t -> unit;
+    inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+    new_blocks :
+      from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
+    read_predecessor_opt : 'block -> 'block option Lwt.t;
+  }
+
+  let handle_live_operations = handle_live_operations
+end

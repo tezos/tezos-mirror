@@ -3,6 +3,7 @@
         test_locator
         test_synchronisation_heuristic_fuzzy
         test_prevalidation
+        test_prevalidator
         test_prevalidator_classification)
  (libraries tezos-base
             tezos-base-test-helpers
@@ -47,7 +48,12 @@
 
 (rule
  (alias runtest)
-(package tezos-shell)
+ (package tezos-shell)
+ (action (run %{exe:test_prevalidator.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
  (action (run %{exe:test_prevalidator_classification.exe})))
 
 (rule
