@@ -95,18 +95,19 @@ variables:
         - /docs
       when: always
     - when: never
+
 .rules_template__development_opam:
   rules:
+    # Run on push to the default branch (i.e master).
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
+    # Run on scheduled builds.
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: always
+    # Run when the branch name contains the `opam` keyword.
     - if: '$CI_COMMIT_BRANCH =~ /opam/'
       when: always
+    # Run when opam changes are detected.
     - if: '$TZ_OPAM_FILES_MODIFIED == "true"'
       when: always
     - when: never
@@ -127,8 +128,18 @@ variables:
     - when: never
 
 # Rules for jobs that should run only during merge requests.
-.rules_template__merge_requests:
+.rules_template__opam_pipeline:
   rules:
+    # Run on push to the default branch (i.e master).
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
+    # Run on scheduled builds.
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when the branch name contains the `opam` keyword.
+    - if: '$CI_COMMIT_BRANCH =~ /opam/'
+      when: always
+    # Run on merge requests.
     - if: '$CI_MERGE_REQUEST_PROJECT_ID'
       when: always
     - when: never # default
