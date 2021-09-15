@@ -335,10 +335,6 @@ end
 
 let () = Registration_helpers.register (module Unparsing_data)
 
-(* The new elaborator expects one more element at the bottom of the stack. *)
-let cushion_stack_type type_list =
-  type_list @ [Michelson_generation.base_type_to_michelson_type Type.unit]
-
 module Typechecking_code : Benchmark.S = struct
   include Config
   include Default_boilerplate

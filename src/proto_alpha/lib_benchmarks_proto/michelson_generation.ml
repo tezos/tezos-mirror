@@ -152,9 +152,6 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
       Format.eprintf "%a@." Error_monad.pp_print_trace trace ;
       Stdlib.failwith "Michelson_generation.michelson_type_to_ex_ty: error"
 
-let base_type_to_ex_ty ty =
-  michelson_type_to_ex_ty (base_type_to_michelson_type ty)
-
 (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
 let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
   let node = typ.node in
@@ -182,9 +179,6 @@ let rec michelson_type_list_to_ex_stack_ty
           in
           match ex_stack_ty with
           | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
-
-let stack_type_to_ex_stack_ty ty =
-  michelson_type_list_to_ex_stack_ty (stack_type_to_michelson_type_list ty)
 
 let make_data_sampler rng_state config =
   let target_size =
