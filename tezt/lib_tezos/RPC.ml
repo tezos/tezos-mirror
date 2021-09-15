@@ -119,6 +119,26 @@ let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   in
   Client.rpc ?endpoint ?hooks GET path client
 
+type ctxt_type = Bytes | Json
+
+let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
+
+let get_context_value ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    ?(ctxt_type = Json) ~value_path client =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      ctxt_type_to_string ctxt_type;
+    ]
+    @ value_path
+  in
+  Client.rpc ?endpoint ?hooks GET path client
+
 let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?delegate client =
   let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
