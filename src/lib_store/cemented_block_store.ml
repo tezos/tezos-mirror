@@ -566,7 +566,7 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
     in
     let cemented_files = Array.to_list cemented_blocks_files in
     (* Start by updating the indexes by filtering blocks that are
-           below the offset *)
+       below the offset *)
     Cemented_block_hash_index.filter
       cemented_store.cemented_block_hash_index
       (fun (level, _) -> Compare.Int32.(level > last_level_to_purge)) ;
