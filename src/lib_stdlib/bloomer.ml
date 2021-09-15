@@ -357,139 +357,148 @@ let%expect_test "consistent_add_countdown_count" =
     assert (approx_count bloomer = 0)
   done
 
-(* FIXME: Should this really be a unit test.
-   What about a moving this in a standalone binray ? *)
-let%test_unit "false_positive_rate" =
-  (* We acknowledge the results published in "On the false-positive
-     rate of Bloom filters" (Information Processing Letters, volume
-     108, issue 4, 2008, pages 210-213) stating that the model formula
-     below is wrong.
+let%test_module "false_positive_rate" =
+  (module struct
+    (* We acknowledge the results published in "On the false-positive
+       rate of Bloom filters" (Information Processing Letters, volume
+       108, issue 4, 2008, pages 210-213) stating that the model formula
+       below is wrong.
 
-     However, we still use the original approximation made by Bloom to
-     check the behaviour of this implementation, as it is close enough
-     for security yet much simpler to compute. *)
-  let runs =
-    [|
-      (18, 4);
-      (18, 6);
-      (18, 8);
-      (18, 10);
-      (20, 2);
-      (20, 4);
-      (20, 6);
-      (20, 8);
-      (20, 9);
-      (20, 10);
-      (20, 11);
-      (20, 12);
-      (20, 13);
-      (20, 14);
-      (21, 2);
-      (21, 3);
-      (21, 4);
-      (21, 5);
-      (22, 2);
-      (22, 3);
-      (22, 4);
-      (22, 5);
-      (22, 6);
-      (22, 8);
-    |]
-  in
-  let steps = 995 in
-  let init_samples = 5_000 in
-  let samples_per_step = 1_000 in
-  let data =
-    Array.map
-      (fun (index_bits, hashes) ->
-        let countdown_bits = 1 in
-        let hash v =
-          Bytes.init
-            (((hashes * index_bits) + 7) / 8)
-            (fun i -> Char.chr (Hashtbl.hash (v, i) mod 256))
-        in
-        let bloomer = create ~hash ~index_bits ~hashes ~countdown_bits in
-        let add, cur =
-          let cur = ref 0 in
-          ( (fun n ->
-              for _ = 1 to n do
-                add bloomer !cur ;
-                incr cur
-              done),
-            fun () -> !cur )
-        in
-        add init_samples ;
-        ( float (Bytes.length bloomer.filter) /. 1024.,
-          index_bits,
-          hashes,
-          Array.init steps @@ fun i ->
-          add samples_per_step ;
-          let n = init_samples + ((i + 1) * samples_per_step) in
-          let expected_fp_proba =
-            let e = 2.718281828459045 in
-            (1.
-            -. (e ** (-.float hashes *. float n /. float (1 lsl index_bits))))
-            ** float hashes
+       However, we still use the original approximation made by Bloom to
+       check the behaviour of this implementation, as it is close enough
+       for security yet much simpler to compute. *)
+    let runs =
+      [|
+        (18, 4);
+        (18, 6);
+        (18, 8);
+        (18, 10);
+        (20, 2);
+        (20, 4);
+        (20, 6);
+        (20, 8);
+        (20, 9);
+        (20, 10);
+        (20, 11);
+        (20, 12);
+        (20, 13);
+        (20, 14);
+        (21, 2);
+        (21, 3);
+        (21, 4);
+        (21, 5);
+        (22, 2);
+        (22, 3);
+        (22, 4);
+        (22, 5);
+        (22, 6);
+        (22, 8);
+      |]
+
+    let steps = 995
+
+    let init_samples = 5_000
+
+    let samples_per_step = 1_000
+
+    let compute_data () =
+      Array.map
+        (fun (index_bits, hashes) ->
+          let countdown_bits = 1 in
+          let hash v =
+            Bytes.init
+              (((hashes * index_bits) + 7) / 8)
+              (fun i -> Char.chr (Hashtbl.hash (v, i) mod 256))
           in
-          let actual_proba =
-            let falses = ref 0 in
-            for j = 1 to 500 do
-              if mem bloomer (cur () + j) then incr falses
-            done ;
-            float !falses /. 500.
+          let bloomer = create ~hash ~index_bits ~hashes ~countdown_bits in
+          let add, cur =
+            let cur = ref 0 in
+            ( (fun n ->
+                for _ = 1 to n do
+                  add bloomer !cur ;
+                  incr cur
+                done),
+              fun () -> !cur )
           in
-          (if abs_float (expected_fp_proba -. actual_proba) >= 0.1 then
-           let message =
-             Format.asprintf
-               "wrong false positive rate for n=%d, m=%d,k=%d, expected %g, \
-                got %g"
-               n
+          add init_samples ;
+          ( float (Bytes.length bloomer.filter) /. 1024.,
+            index_bits,
+            hashes,
+            Array.init steps @@ fun i ->
+            add samples_per_step ;
+            let n = init_samples + ((i + 1) * samples_per_step) in
+            let expected_fp_proba =
+              let e = 2.718281828459045 in
+              (1.
+              -. (e ** (-.float hashes *. float n /. float (1 lsl index_bits)))
+              )
+              ** float hashes
+            in
+            let actual_proba =
+              let falses = ref 0 in
+              for j = 1 to 500 do
+                if mem bloomer (cur () + j) then incr falses
+              done ;
+              float !falses /. 500.
+            in
+            if abs_float (expected_fp_proba -. actual_proba) >= 0.1 then
+              Printf.printf
+                "wrong false positive rate for n=%d, m=%d,k=%d, expected %g, \
+                 got %g\n"
+                n
+                (1 lsl index_bits)
+                hashes
+                expected_fp_proba
+                actual_proba ;
+            (expected_fp_proba, actual_proba) ))
+        runs
+
+    let%expect_test _ =
+      ignore
+        (compute_data () : (float * int * int * (float * float) array) array) ;
+      [%expect {||}]
+
+    let%test_unit _ =
+      match Sys.getenv_opt "BLOOMER_TEST_GNUPLOT_PATH" with
+      | Some path ->
+          let data = compute_data () in
+          for run = 0 to Array.length runs - 1 do
+            let kb, index_bits, hashes, values = data.(run) in
+            (let fp = open_out (Format.asprintf "%s/run_%02d.plot" path run) in
+             Printf.fprintf
+               fp
+               "set title 'false positive rate (bits=%d (%g KiB), hashes=%d)'\n\
+                %!"
                (1 lsl index_bits)
-               hashes
-               expected_fp_proba
-               actual_proba
-           in
-           failwith message) ;
-          (expected_fp_proba, actual_proba) ))
-      runs
-  in
-  match Sys.getenv_opt "BLOOMER_TEST_GNUPLOT_PATH" with
-  | Some path ->
-      for run = 0 to Array.length runs - 1 do
-        let kb, index_bits, hashes, values = data.(run) in
-        (let fp = open_out (Format.asprintf "%s/run_%02d.plot" path run) in
-         Printf.fprintf
-           fp
-           "set title 'false positive rate (bits=%d (%g KiB), hashes=%d)'\n%!"
-           (1 lsl index_bits)
-           kb
-           hashes ;
-         Printf.fprintf fp "set xlabel 'insertions'\n" ;
-         Printf.fprintf fp "set ylabel 'rate'\n" ;
-         Printf.fprintf fp "set yrange [0:1]\n" ;
-         Printf.fprintf fp "set terminal 'png' size 800,600\n" ;
-         Printf.fprintf fp "set output 'run_%02d.png'\n" run ;
-         Printf.fprintf
-           fp
-           "plot 'run_%02d.dat' using 1:2 title 'expected', 'run_%02d.dat' \
-            using 1:3 title 'obtained'\n\
-            %!"
-           run
-           run ;
-         close_out fp) ;
-        let fp = open_out (Format.asprintf "%s/run_%02d.dat" path run) in
-        for step = 0 to steps - 1 do
-          Printf.fprintf
-            fp
-            "%d %f %f\n"
-            (init_samples + (step * samples_per_step))
-            (fst values.(step))
-            (snd values.(step))
-        done ;
-        flush fp ;
-        close_out fp
-      done
-  | None ->
-      Format.eprintf
-        "Set the BLOOMER_TEST_GNUPLOT_PATH to a directory to get some human \
-         readable test results."
+               kb
+               hashes ;
+             Printf.fprintf fp "set xlabel 'insertions'\n" ;
+             Printf.fprintf fp "set ylabel 'rate'\n" ;
+             Printf.fprintf fp "set yrange [0:1]\n" ;
+             Printf.fprintf fp "set terminal 'png' size 800,600\n" ;
+             Printf.fprintf fp "set output 'run_%02d.png'\n" run ;
+             Printf.fprintf
+               fp
+               "plot 'run_%02d.dat' using 1:2 title 'expected', 'run_%02d.dat' \
+                using 1:3 title 'obtained'\n\
+                %!"
+               run
+               run ;
+             close_out fp) ;
+            let fp = open_out (Format.asprintf "%s/run_%02d.dat" path run) in
+            for step = 0 to steps - 1 do
+              Printf.fprintf
+                fp
+                "%d %f %f\n"
+                (init_samples + (step * samples_per_step))
+                (fst values.(step))
+                (snd values.(step))
+            done ;
+            flush fp ;
+            close_out fp
+          done
+      | None ->
+          Format.eprintf
+            "Set the BLOOMER_TEST_GNUPLOT_PATH to a directory to get some \
+             human readable test results."
+  end)
