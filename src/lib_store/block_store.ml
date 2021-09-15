@@ -408,22 +408,32 @@ let expected_savepoint block_store ~target_offset =
         let cycle = cemented_block_files.(nb_files - target_offset) in
         Lwt.return cycle.start_level
 
-(* [available_savepoint block_store expected_level] aims to check that
-   the [expected_level] can be used as a valid savepoint (that is to
-   say, contains metadata). It returns the [expected_level] if it is
-   valid. Returns the current savepoint otherwise .*)
-let available_savepoint block_store expected_level =
+(* [available_savepoint block_store current_head savepoint_candidate]
+   aims to check that the [savepoint_candidate] can be used as a valid
+   savepoint (that is to say, contains metadata). It returns the
+   [savepoint_candidate] block descriptor if it is valid. Returns the
+   current savepoint otherwise. *)
+let available_savepoint block_store current_head savepoint_candidate =
+  let head_hash = Block_repr.hash current_head in
   savepoint block_store >>= fun current_savepoint ->
-  if expected_level < snd current_savepoint then
-    Lwt.return (snd current_savepoint)
-  else Lwt.return expected_level
+  let new_savepoint_level =
+    if savepoint_candidate < snd current_savepoint then snd current_savepoint
+    else savepoint_candidate
+  in
+  let distance =
+    Int32.(to_int (sub (Block_repr.level current_head) new_savepoint_level))
+  in
+  (read_block ~read_metadata:false block_store (Block (head_hash, distance))
+   >>=? function
+   | Some b -> return b
+   | None -> fail (Wrong_predecessor (head_hash, distance)))
+  >>=? fun block -> return (descriptor block)
 
-(* [preserved_block block_store expected_level] returns the preserved
-   block if the given [expected_level] is higher that the current
-   preserved block. The preserved block aims to be the one needed and
-   maintained available to export snapshot. That is to say, the block:
-   lafl(head) - max_op_ttl(lafl). *)
-let preserved_block block_store current_head expected_level =
+(* [preserved_block block_store current_head] returns the
+   preserved block candidate level. The preserved block aims to be the
+   one needed and maintained available to export snapshot. That is to
+   say, the block: lafl(head) - max_op_ttl(lafl). *)
+let preserved_block block_store current_head =
   let head_hash = Block_repr.hash current_head in
   read_block_metadata block_store (Block (head_hash, 0))
   >|=? WithExceptions.Option.get ~loc:__LOC__
@@ -432,25 +442,18 @@ let preserved_block block_store current_head expected_level =
   let head_max_op_ttl =
     Int32.of_int (Block_repr.max_operations_ttl current_head_metadata)
   in
-  let block_to_preserve = Int32.(max 0l (sub head_lafl head_max_op_ttl)) in
-  let new_block_level = min block_to_preserve expected_level in
-  let distance =
-    Int32.(to_int (sub (Block_repr.level current_head) new_block_level))
-  in
-  (read_block ~read_metadata:false block_store (Block (head_hash, distance))
-   >>=? function
-   | Some b -> return b
-   | None -> fail (Wrong_predecessor (head_hash, distance)))
-  >>=? fun block -> return (descriptor block)
+  return Int32.(max 0l (sub head_lafl head_max_op_ttl))
 
 (* [infer_savepoint block_store current_head ~target_offset] returns
    the savepoint candidate for an history mode switch. *)
 let infer_savepoint block_store current_head ~target_offset =
   expected_savepoint block_store ~target_offset
   >>= fun expected_savepoint_level ->
-  available_savepoint block_store expected_savepoint_level
-  >>= fun available_savepoint ->
-  preserved_block block_store current_head available_savepoint
+  preserved_block block_store current_head >>=? fun preserved_savepoint_level ->
+  let savepoint_candidate =
+    min preserved_savepoint_level expected_savepoint_level
+  in
+  available_savepoint block_store current_head savepoint_candidate
 
 (* [expected_caboose block_store ~target_offset] computes the
    expected caboose based on the [target_offset]). None is returned if
@@ -493,7 +496,21 @@ let infer_caboose block_store savepoint current_head ~target_offset
   | Full _ -> (
       match expected_caboose block_store ~target_offset with
       | Some expected_caboose ->
-          preserved_block block_store current_head expected_caboose
+          preserved_block block_store current_head >>=? fun preserved_caboose ->
+          let new_caboose_level = min expected_caboose preserved_caboose in
+          let head_hash = Block_repr.hash current_head in
+          let distance =
+            Int32.(
+              to_int (sub (Block_repr.level current_head) new_caboose_level))
+          in
+          (read_block
+             ~read_metadata:false
+             block_store
+             (Block (head_hash, distance))
+           >>=? function
+           | Some b -> return b
+           | None -> fail (Wrong_predecessor (head_hash, distance)))
+          >>=? fun block -> return (descriptor block)
       | None -> return savepoint)
   | Rolling r ->
       let offset =
