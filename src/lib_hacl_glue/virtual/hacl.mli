@@ -89,7 +89,7 @@ end
 module Blake2b : sig
   type t
 
-  type hash = Hash of Bytes.t
+  type hash = Hash of Bytes.t [@@unboxed]
 
   (** [direct ?key inbuf len] is the Blake2b hash of length [len],
       using [key] if present. *)
