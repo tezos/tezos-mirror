@@ -106,7 +106,9 @@ let complete term =
     bef'
     Type.Stack.pp
     aft' ;
-  let node = Micheline.strip_locations @@ Michelson.of_mikhailsky term state in
+  let node =
+    Micheline.strip_locations @@ Mikhailsky_to_michelson.convert term state
+  in
   Test_helpers.typecheck_by_tezos bef' node
 
 open Mikhailsky

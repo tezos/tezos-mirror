@@ -71,20 +71,20 @@ let project_option (aft : Type.Stack.t) =
   | Type.Base.Option_t t -> t
   | _ -> raise Unexpected_base_type
 
-let rec of_mikhailsky_raw : Mikhailsky.node -> (int, 'a) Micheline.node =
+let rec convert_raw : Mikhailsky.node -> (int, 'a) Micheline.node =
  fun node ->
   match node with
   | Micheline.Int (_, i) -> Micheline.Int (0, i)
   | Micheline.Prim (_, head, subterms, annots) ->
       let head = Mikhailsky_prim.to_michelson head in
-      Micheline.Prim (0, head, List.map of_mikhailsky_raw subterms, annots)
+      Micheline.Prim (0, head, List.map convert_raw subterms, annots)
   | Micheline.String (_, s) -> Micheline.String (0, s)
   | Micheline.Bytes (_, b) -> Micheline.Bytes (0, b)
   | Micheline.Seq (_, subterms) ->
-      Micheline.Seq (0, List.map of_mikhailsky_raw subterms)
+      Micheline.Seq (0, List.map convert_raw subterms)
 
 (* We assume that the term has been completed. *)
-let rec of_mikhailsky :
+let rec convert :
     Mikhailsky.node -> Kernel.Path.t -> (int, 'a) Micheline.node Inference.M.t =
  fun node path ->
   let open Inference.M in
@@ -96,7 +96,7 @@ let rec of_mikhailsky :
   | Micheline.Prim (_, prim, [term], _)
     when Mikhailsky_prim.kind prim = Annot_kind ->
       let path = Kernel.Path.at_index 0 path in
-      of_mikhailsky term path
+      convert term path
   (* Fail on holes *)
   | Micheline.Prim (_, I_Hole, _, _) | Micheline.Prim (_, D_Hole, _, _) ->
       raise Mikhailsky.Term_contains_holes
@@ -112,7 +112,7 @@ let rec of_mikhailsky :
           Autocomp.replace_vars r >>= fun r ->
           let r = unparse_type r in
           let head = Mikhailsky_prim.to_michelson I_LEFT in
-          return (Micheline.Prim (0, head, [of_mikhailsky_raw r], annots)))
+          return (Micheline.Prim (0, head, [convert_raw r], annots)))
   | Micheline.Prim (_, I_RIGHT, [], annots) -> (
       get_instr_annot path >>= fun ty_opt ->
       match ty_opt with
@@ -124,12 +124,12 @@ let rec of_mikhailsky :
           Autocomp.replace_vars l >>= fun l ->
           let l = unparse_type l in
           let head = Mikhailsky_prim.to_michelson I_RIGHT in
-          return (Micheline.Prim (0, head, [of_mikhailsky_raw l], annots)))
+          return (Micheline.Prim (0, head, [convert_raw l], annots)))
   | Micheline.Prim (_, (I_LEFT | I_RIGHT), _, _) ->
       raise Mikhailsky.Ill_formed_mikhailsky
   (* Add type information for lambdas *)
   | Micheline.Prim (_, I_LAMBDA, [code], annots) -> (
-      of_mikhailsky code (Kernel.Path.at_index 0 path) >>= fun code ->
+      convert code (Kernel.Path.at_index 0 path) >>= fun code ->
       get_instr_annot path >>= fun ty_opt ->
       match ty_opt with
       | None -> raise (Cannot_get_type (node, path))
@@ -145,10 +145,7 @@ let rec of_mikhailsky :
           let head = Mikhailsky_prim.to_michelson I_LAMBDA in
           return
             (Micheline.Prim
-               ( 0,
-                 head,
-                 [of_mikhailsky_raw dom; of_mikhailsky_raw range; code],
-                 annots )))
+               (0, head, [convert_raw dom; convert_raw range; code], annots)))
   (* Add type information for empty_set, empty_map *)
   | Micheline.Prim (_, I_EMPTY_SET, [], annots) -> (
       get_instr_annot path >>= fun ty_opt ->
@@ -161,7 +158,7 @@ let rec of_mikhailsky :
           Autocomp.replace_vars elt >>= fun elt ->
           let elt = unparse_type elt in
           let head = Mikhailsky_prim.to_michelson I_EMPTY_SET in
-          return (Micheline.Prim (0, head, [of_mikhailsky_raw elt], annots)))
+          return (Micheline.Prim (0, head, [convert_raw elt], annots)))
   | Micheline.Prim (_, I_EMPTY_MAP, [], annots) -> (
       get_instr_annot path >>= fun ty_opt ->
       match ty_opt with
@@ -173,8 +170,8 @@ let rec of_mikhailsky :
           Autocomp.replace_vars k >>= fun k ->
           Inference.instantiate_base v >>= fun v ->
           Autocomp.replace_vars v >>= fun v ->
-          let k = of_mikhailsky_raw (unparse_type k) in
-          let v = of_mikhailsky_raw (unparse_type v) in
+          let k = convert_raw (unparse_type k) in
+          let v = convert_raw (unparse_type v) in
           let head = Mikhailsky_prim.to_michelson I_EMPTY_MAP in
           return (Micheline.Prim (0, head, [k; v], annots)))
   (* Add type information for UNPACK *)
@@ -189,7 +186,7 @@ let rec of_mikhailsky :
           Autocomp.replace_vars elt >>= fun elt ->
           let elt = unparse_type elt in
           let head = Mikhailsky_prim.to_michelson I_UNPACK in
-          return (Micheline.Prim (0, head, [of_mikhailsky_raw elt], annots)))
+          return (Micheline.Prim (0, head, [convert_raw elt], annots)))
   (* Add type information for NIL *)
   | Micheline.Prim (_, I_NIL, [], annots) -> (
       get_instr_annot path >>= fun ty_opt ->
@@ -202,7 +199,7 @@ let rec of_mikhailsky :
           Autocomp.replace_vars elt >>= fun elt ->
           let elt = unparse_type elt in
           let head = Mikhailsky_prim.to_michelson I_NIL in
-          return (Micheline.Prim (0, head, [of_mikhailsky_raw elt], annots)))
+          return (Micheline.Prim (0, head, [convert_raw elt], annots)))
   | Micheline.Prim (_, I_NIL, _, _) -> raise Mikhailsky.Ill_formed_mikhailsky
   (* Project out type information from arithmetic ops *)
   | Prim (_, ((I_ADD | I_SUB | I_MUL | I_EDIV) as instr), [_ty1; _ty2], annots)
@@ -214,19 +211,19 @@ let rec of_mikhailsky :
   (* Base case *)
   | Micheline.Prim (_, head, subterms, annots) ->
       let head = Mikhailsky_prim.to_michelson head in
-      of_mikhailsky_list path 0 subterms [] >>= fun subterms ->
+      convert_list path 0 subterms [] >>= fun subterms ->
       return (Micheline.Prim (0, head, subterms, annots))
   | Micheline.Seq (_, subterms) ->
-      of_mikhailsky_list path 0 subterms [] >>= fun subterms ->
+      convert_list path 0 subterms [] >>= fun subterms ->
       return (Micheline.Seq (0, subterms))
 
-and of_mikhailsky_list path i subterms acc =
+and convert_list path i subterms acc =
   let open Inference.M in
   match subterms with
   | [] -> return (List.rev acc)
   | subterm :: tl ->
       let path' = Kernel.Path.at_index i path in
-      of_mikhailsky subterm path' >>= fun term ->
-      of_mikhailsky_list path (i + 1) tl (term :: acc)
+      convert subterm path' >>= fun term ->
+      convert_list path (i + 1) tl (term :: acc)
 
-let of_mikhailsky node state = fst (of_mikhailsky node Kernel.Path.root state)
+let convert node state = fst (convert node Kernel.Path.root state)

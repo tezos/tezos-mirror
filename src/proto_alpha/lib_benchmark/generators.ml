@@ -67,7 +67,7 @@ struct
     let typing = Lazy.force typing in
     let (node, typ, state) = Autocomp.complete_code typing term X.rng_state in
     let node =
-      Micheline.strip_locations @@ Michelson.of_mikhailsky node state
+      Micheline.strip_locations @@ Mikhailsky_to_michelson.convert node state
     in
     (node, typ)
 
@@ -136,7 +136,7 @@ struct
         Stdlib.failwith "in generators.ml: unrecoverable failure"
     in
     let node =
-      Micheline.strip_locations @@ Michelson.of_mikhailsky node state
+      Micheline.strip_locations @@ Mikhailsky_to_michelson.convert node state
     in
     (node, typ)
 
