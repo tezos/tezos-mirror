@@ -94,8 +94,7 @@ module Make_generic (P : Sampler_parameters_sig) = struct
 
   module Sampler = MH.Make (MH_params)
 
-  let generator ~burn_in =
-    Sampler.mcmc ~verbosity:P.verbosity ~initial:P.initial ~burn_in
+  let generator ~burn_in = P.(Sampler.mcmc ~verbosity ~initial ~burn_in)
 end
 
 module Code (X : sig

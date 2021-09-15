@@ -28,7 +28,7 @@
 open Protocol
 
 (** [generator_config] specifies some parameters to the
-    {!Tezos_benchmark_alpha.Generators} Michelson code and data generators. *)
+    {!Tezos_benchmark_alpha.Michelson_mcmc_samplers} Michelson code and data generators. *)
 type generator_config = {
   target_size : Base_samplers.range;
       (** The target size of the terms, in number of nodes, is sampled uniformly
@@ -91,11 +91,11 @@ val michelson_type_to_ex_ty :
 (** Samplers *)
 
 (** [make_data_sampler] constructs a Michelson data sampler based on the
-    infrastructure available in {!Tezos_benchmark_alpha.Generators}. *)
+    infrastructure available in {!Tezos_benchmark_alpha.Michelson_mcmc_samplers}. *)
 val make_data_sampler : Random.State.t -> generator_config -> michelson_data
 
 (** [make_code_sampler] constructs a Michelson code sampler based on the
-    infrastructure available in {!Tezos_benchmark_alpha.Generators}. *)
+    infrastructure available in {!Tezos_benchmark_alpha.Michelson_mcmc_samplers}. *)
 val make_code_sampler : Random.State.t -> generator_config -> michelson_data
 
 (** [Samplers] is an instance of the direct-style (non-MCMC based) samplers

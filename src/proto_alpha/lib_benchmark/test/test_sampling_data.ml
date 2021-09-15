@@ -61,7 +61,7 @@ module Full = Michelson_samplers_base.Make_full (struct
   let size = 16
 end)
 
-module Gen = Generators.Data (struct
+module Gen = Michelson_mcmc_samplers.Data (struct
   module Samplers = Full
 
   let rng_state = state

@@ -105,7 +105,7 @@ module Samplers = struct
     let size = 16
   end)
 
-  module Gen = Generators.Code (struct
+  module Gen = Michelson_mcmc_samplers.Code (struct
     module Samplers = Full
 
     let rng_state = random_state

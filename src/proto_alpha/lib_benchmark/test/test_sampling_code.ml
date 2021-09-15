@@ -64,7 +64,7 @@ end)
 (* ------------------------------------------------------------------------- *)
 (* MCMC instantiation *)
 
-module Gen = Generators.Code (struct
+module Gen = Michelson_mcmc_samplers.Code (struct
   module Samplers = Full
 
   let rng_state = state

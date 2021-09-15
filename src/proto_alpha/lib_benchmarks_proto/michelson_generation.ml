@@ -184,7 +184,7 @@ let make_data_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen = Generators.Data (struct
+  let module Gen = Michelson_mcmc_samplers.Data (struct
     module Samplers = Samplers
 
     let rng_state = rng_state
@@ -202,7 +202,7 @@ let make_code_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen = Generators.Code (struct
+  let module Gen = Michelson_mcmc_samplers.Code (struct
     module Samplers = Samplers
 
     let rng_state = rng_state
