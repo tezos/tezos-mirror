@@ -221,8 +221,8 @@ val cement_blocks :
   unit tzresult Lwt.t
 
 (** [trigger_gc cemented_store history_mode] garbage collects metadata
-   chunks and/or chunks from the [cemented_store] depending on the
-   {!History_mode.t}:
+    chunks and/or chunks from the [cemented_store] depending on the
+    {!History_mode.t}:
 
     - in [Archive] mode, nothing is done;
 
