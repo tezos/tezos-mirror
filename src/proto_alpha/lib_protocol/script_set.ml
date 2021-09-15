@@ -34,7 +34,7 @@ let get (Set_tag x) = x
 
 let empty : type a. a comparable_ty -> a set =
  fun ty ->
-  let module OPS = Set.Make (struct
+  let module OPS : Boxed_set_OPS with type elt = a = Set.Make (struct
     type t = a
 
     let compare = Script_comparable.compare_comparable ty
