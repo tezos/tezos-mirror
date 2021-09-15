@@ -195,8 +195,8 @@ val get_highest_cemented_level : t -> int32 option
 
 (** [get_cemented_block_by_level cemented_store ~read_metadata level]
     reads the cemented block at [level] in [cemented_store], if it
-    exists. It also retrieves the metadata depending on
-    [read_metadata]. *)
+    exists. It also tries to retrieves the metadata depending on
+    [read_metadata] but do not fail if no metadata is available. *)
 val get_cemented_block_by_level :
   t -> read_metadata:bool -> int32 -> Block_repr.block option tzresult Lwt.t
 
