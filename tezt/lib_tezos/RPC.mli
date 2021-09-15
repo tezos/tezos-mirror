@@ -138,6 +138,7 @@ val get_mempool_pending_operations :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
+  ?version:string ->
   Client.t ->
   JSON.t Lwt.t
 

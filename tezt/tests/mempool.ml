@@ -2051,6 +2051,89 @@ let test_do_not_reclassify =
   let* () = check_mempool_ops ~log:true client2 ~applied:2 ~refused:0 in
   unit
 
+let get_refused_operation_hash_list_v0 mempool =
+  List.map
+    (fun op -> JSON.(op |=> 0 |> as_string))
+    JSON.(mempool |-> "refused" |> as_list)
+
+let get_refused_operation_hash_list_v1 mempool =
+  List.map get_hash JSON.(mempool |-> "refused" |> as_list)
+
+(** This test tries to check the format of different versions of
+    pending_operations RPC.
+
+   Scenario:
+
+   + Node 1 activates a protocol
+
+   + Inject operation on node_1 with low fees
+
+   + Bake empty block to classify operation as refused
+
+   + Get the hash of the operation using different versions of pending_operation RPC
+     and check that they are the same *)
+let test_pending_operation_version =
+  Protocol.register_test
+    ~__FILE__
+    ~title:""
+    ~tags:["mempool"; "pending_operations"; "version"]
+  @@ fun protocol ->
+  let open Lwt in
+  (* Step 1 *)
+  (* Initialise one node *)
+  let* node_1 =
+    Node.init
+      ?event_level:(Some "debug")
+      [Synchronisation_threshold 0; Private_mode]
+  in
+  let* client_1 = Client.init ~endpoint:(Node node_1) () in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 in
+  (* Step 2 *)
+  (* Inject refused operation *)
+  let* branch = RPC.get_branch client_1 >|= JSON.as_string in
+  let* _ =
+    forge_and_inject_operation
+      ~branch
+      ~fee:10
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:1
+      ~signer:Constant.bootstrap1
+      ~client:client_1
+  in
+  (* Step 3 *)
+  (* Bake empty block to force operation to be classify as refused *)
+  let dummy_baking = wait_for_flush node_1 in
+  let* () = bake_empty_mempool client_1 in
+  let* () = dummy_baking in
+  (* Step 4 *)
+  (* Get pending operations using different version of the RPC and check  *)
+  let* mempool_v0 = RPC.get_mempool_pending_operations client_1 in
+  let* mempool_v1 = RPC.get_mempool_pending_operations ~version:"1" client_1 in
+  let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
+  let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
+  try
+    if not (List.for_all2 String.equal ophs_refused_v0 ophs_refused_v1) then
+      Format.kasprintf
+        (Test.fail "%s")
+        "Refused operation hash list should have the same elements. Got : %a \
+         (version 1) and %a (version 2)"
+        (Format.pp_print_list (fun ppf oph -> Format.fprintf ppf "%s" oph))
+        ophs_refused_v0
+        (Format.pp_print_list (fun ppf oph -> Format.fprintf ppf "%s" oph))
+        ophs_refused_v1 ;
+    unit
+  with Invalid_argument _ ->
+    Format.kasprintf
+      (Test.fail "%s")
+      "Refused operation hash list should have the same number of elements. \
+       Got : %d (version 1) and %d (version 2)"
+      (List.length ophs_refused_v0)
+      (List.length ophs_refused_v1)
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
@@ -2062,4 +2145,5 @@ let register ~protocols =
   unban_all_operations ~protocols ;
   ban_operation_branch_refused_reevaluated ~protocols ;
   recycling_branch_refused ~protocols ;
-  test_do_not_reclassify ~protocols
+  test_do_not_reclassify ~protocols ;
+  test_pending_operation_version ~protocols
