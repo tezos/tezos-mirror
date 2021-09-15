@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039992.715 units remaining)
+  - location: 8 (remaining gas: 1039992.773 units remaining)
     [ (Pair { 3 ; 6 ; 9 } 0)  	 ]
-  - location: 8 (remaining gas: 1039992.705 units remaining)
+  - location: 8 (remaining gas: 1039992.763 units remaining)
     [ { 3 ; 6 ; 9 }  	@parameter ]
-  - location: 9 (remaining gas: 1039992.695 units remaining)
+  - location: 9 (remaining gas: 1039992.753 units remaining)
     [ 1  	
       { 3 ; 6 ; 9 }  	@parameter ]
-  - location: 12 (remaining gas: 1039992.685 units remaining)
+  - location: 12 (remaining gas: 1039992.743 units remaining)
     [ { 3 ; 6 ; 9 }  	@parameter
       1  	 ]
-  - location: 13 (remaining gas: 1039992.685 units remaining)
+  - location: 13 (remaining gas: 1039992.743 units remaining)
     [ 3  	@parameter.elt
       1  	 ]
-  - location: 15 (remaining gas: 1039992.606 units remaining)
+  - location: 15 (remaining gas: 1039992.664 units remaining)
     [ 3  	 ]
-  - location: 13 (remaining gas: 1039992.591 units remaining)
+  - location: 13 (remaining gas: 1039992.649 units remaining)
     [ 6  	@parameter.elt
       3  	 ]
-  - location: 15 (remaining gas: 1039992.512 units remaining)
+  - location: 15 (remaining gas: 1039992.570 units remaining)
     [ 18  	 ]
-  - location: 13 (remaining gas: 1039992.497 units remaining)
+  - location: 13 (remaining gas: 1039992.555 units remaining)
     [ 9  	@parameter.elt
       18  	 ]
-  - location: 15 (remaining gas: 1039992.418 units remaining)
+  - location: 15 (remaining gas: 1039992.476 units remaining)
     [ 162  	 ]
-  - location: 13 (remaining gas: 1039992.403 units remaining)
+  - location: 13 (remaining gas: 1039992.461 units remaining)
     [ 162  	 ]
-  - location: 16 (remaining gas: 1039992.388 units remaining)
+  - location: 16 (remaining gas: 1039992.446 units remaining)
     [ {}  	
       162  	 ]
-  - location: 18 (remaining gas: 1039992.373 units remaining)
+  - location: 18 (remaining gas: 1039992.431 units remaining)
     [ (Pair {} 162)  	 ]
 
