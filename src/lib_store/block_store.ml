@@ -581,8 +581,8 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
         (Cannot_switch_history_mode
            {previous_mode = previous_history_mode; next_mode = new_history_mode})
 
-let compute_new_savepoint block_store history_mode ~min_level_to_preserve
-    ~new_head ~cycles_to_cement =
+let compute_new_savepoint block_store history_mode ~new_store
+    ~min_level_to_preserve ~new_head ~cycles_to_cement =
   let nb_cycles_to_cement = List.length cycles_to_cement in
   assert (nb_cycles_to_cement > 0) ;
   Stored_data.get block_store.savepoint >>= fun savepoint ->
@@ -618,14 +618,31 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
       if Compare.Int32.(snd savepoint >= min_block_level) then return savepoint
       else
         let cemented_cycles_len = List.length cemented_cycles in
-        (* If the offset is 0, the minimum block to preserve will be
-           the savepoint. *)
+        (* If the offset is 0, the savepoint will be the minimum block
+           to preserve. *)
         if offset = 0 then return min_block_descr
         else if
           (* If the number of cemented cycles is not yet the offset,
              then the savepoint will be unchanged. *)
           cemented_cycles_len < offset
-        then return savepoint
+        then
+          (* In case of a freshly imported rolling snapshot, we may
+             drag the savepoint if it was not set on a cycle
+             start. Otherwise, the savepoint would be missing from the
+             store. We drag the savepoint only if it is not in the new
+             floating store nor in the cycles to cements. *)
+          let (savepoint_hash, savepoint_level) = savepoint in
+          let is_savepoint_in_cemented =
+            List.exists
+              (fun (l, h) -> l <= savepoint_level && savepoint_level <= h)
+              cycles_to_cement
+          in
+          if not is_savepoint_in_cemented then
+            Floating_block_store.mem new_store savepoint_hash
+            >>= fun is_savepoint_in_new_store ->
+            if not is_savepoint_in_new_store then return min_block_descr
+            else return savepoint
+          else return savepoint
         else
           (* Else we shift the savepoint by [nb_cycles_to_cement]
              cycles *)
@@ -721,6 +738,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     final_hash
     max_nb_blocks_to_retrieve
   >>= fun lafl_predecessors ->
+  (* [min_level_to_preserve] is the lowest block that we want to keep
+     in the floating stores. *)
   let min_level_to_preserve =
     if List.length lafl_predecessors > 0 then
       Block_repr.level
@@ -804,6 +823,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   compute_new_savepoint
     block_store
     history_mode
+    ~new_store
     ~min_level_to_preserve
     ~new_head
     ~cycles_to_cement
