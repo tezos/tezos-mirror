@@ -164,26 +164,26 @@ module Cost_of = struct
       S.safe_int 49_700 + (v0 + (v0 lsr 3))
 
     (* model N_IComb *)
-    (* Approximating 3.315655 x term *)
+    (* Approximating 3.531001 x term *)
     (* Note: size >= 2, so the cost is never 0 *)
     let cost_N_IComb size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      (S.safe_int 3 * v0) + (v0 lsr 2)
+      (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
 
     (* model N_IComb_get *)
-    (* Approximating 0.531991 x term *)
+    (* Approximating 0.573180 x term *)
     let cost_N_IComb_get size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 5 + (v0 lsr 1) + (v0 lsr 5)
+      S.safe_int 30 + (v0 lsr 1) + (v0 lsr 4)
 
     (* model N_IComb_set *)
-    (* Approximating 1.268749 x term *)
+    (* Approximating 1.365745 x term *)
     let cost_N_IComb_set size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 10 + (v0 + (v0 lsr 2))
+      S.safe_int 10 + (v0 + (v0 lsr 2) + (v0 lsr 3))
 
     (* Model N_ICompare *)
     (* Approximating 0.024413 x term *)
@@ -249,10 +249,7 @@ module Cost_of = struct
       S.safe_int 20 + (v0 + (v0 lsr 1) + (v0 lsr 3))
 
     (* model N_IView *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/1608
-       Need to determine a proper constant
-    *)
-    let cost_N_IView = S.safe_int 100000
+    let cost_N_IView = S.safe_int 1370
 
     (* model N_IDrop *)
     let cost_N_IDrop = S.safe_int 10
@@ -559,6 +556,14 @@ module Cost_of = struct
     (* model N_INow *)
     let cost_N_INow = S.safe_int 25
 
+    (* model N_IOpen_chest *)
+    (* 612000 + chest * 19 + time * 19050 *)
+    let cost_N_IOpen_chest ~chest ~time =
+      let open S_syntax in
+      let v0 = S.safe_int chest in
+      let v1 = S.safe_int time in
+      S.safe_int 612_000 + (S.safe_int 19 * v0) + (S.safe_int 19050 * v1)
+
     (* model N_IOr *)
     let cost_N_IOr = S.safe_int 15
 
@@ -679,11 +684,11 @@ module Cost_of = struct
     let cost_N_ITransfer_tokens = S.safe_int 30
 
     (* model N_IUncomb *)
-    (* Approximating 3.772151 x term *)
+    (* Approximating 3.944710 x term *)
     let cost_N_IUncomb size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 25 + (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 2)
+      S.safe_int 25 + (S.safe_int 4 * v0)
 
     (* model N_IUnpair *)
     let cost_N_IUnpair = S.safe_int 10
@@ -843,6 +848,16 @@ module Cost_of = struct
     (* model DECODING_SIGNATURE_secp256k1 *)
     let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 30
 
+    (* model DECODING_Chest_key *)
+    let cost_DECODING_Chest_key = S.safe_int 7200
+
+    (* model DECODING_Chest *)
+    (* Approximating 0.039349 x term *)
+    let cost_DECODING_Chest ~bytes =
+      let open S_syntax in
+      let v0 = S.safe_int bytes in
+      S.safe_int 7400 + (v0 lsr 5) + (v0 lsr 7)
+
     (* model ENCODING_CHAIN_ID *)
     let cost_ENCODING_CHAIN_ID = S.safe_int 50
 
@@ -872,6 +887,16 @@ module Cost_of = struct
 
     (* model ENCODING_SIGNATURE_secp256k1 *)
     let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 40
+
+    (* model ENCODING_Chest_key *)
+    let cost_ENCODING_Chest_key = S.safe_int 13500
+
+    (* model ENCODING_Chest *)
+    (* Approximating 0.120086 x term *)
+    let cost_ENCODING_Chest ~plaintext_size =
+      let open S_syntax in
+      let v0 = S.safe_int plaintext_size in
+      S.safe_int 16630 + (v0 lsr 3)
 
     (* model TIMESTAMP_READABLE_DECODING *)
     let cost_TIMESTAMP_READABLE_DECODING = S.safe_int 120
@@ -1292,8 +1317,10 @@ module Cost_of = struct
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
-    (* FIXME *)
-    let open_chest ~chest:_ ~time:_ = atomic_step_cost (S.safe_int 3)
+    let open_chest ~chest ~time =
+      let plaintext = Timelock.get_plaintext_size chest in
+      let log_time = Z.log2 Z.(add one time) in
+      atomic_step_cost (cost_N_IOpen_chest ~chest:plaintext ~time:log_time)
 
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
@@ -1678,11 +1705,9 @@ module Cost_of = struct
     let proof_argument n =
       atomic_step_cost (S.mul (S.safe_int n) (S.safe_int 50))
 
-    (* FIXME *)
-    let chest_key = Gas.write_bytes_cost 1
+    let chest_key = atomic_step_cost cost_DECODING_Chest_key
 
-    (* FIXME *)
-    let chest = Gas.write_bytes_cost 1
+    let chest ~bytes = atomic_step_cost (cost_DECODING_Chest ~bytes)
   end
 
   module Unparsing = struct
@@ -1787,10 +1812,9 @@ module Cost_of = struct
       let cms = List.length d.commitments_and_ciphertexts in
       atomic_step_cost (cost_SAPLING_DIFF_ENCODING ~nfs ~cms)
 
-    (* FIXME *)
-    let chest_key = Gas.write_bytes_cost 1
+    let chest_key = atomic_step_cost cost_ENCODING_Chest_key
 
-    (* FIXME *)
-    let chest = Gas.write_bytes_cost 1
+    let chest ~plaintext_size =
+      atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
   end
 end

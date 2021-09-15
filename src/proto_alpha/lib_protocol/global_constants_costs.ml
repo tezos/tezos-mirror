@@ -25,28 +25,23 @@
 
 module S = Saturation_repr
 
-(* Computed by typing the contract
-   "{parameter unit; storage unit; code FAILWITH}"
-   and evaluating
-   [(8 * Obj.reachable_words (Obj.repr typed_script))]
-   where [typed_script] is of type [ex_script] *)
-let minimal_size_of_typed_contract_in_bytes = 688
-
-let approximate_cardinal bytes =
-  S.safe_int (bytes / minimal_size_of_typed_contract_in_bytes)
-
 let log2 x = S.safe_int (1 + S.numbits x)
 
-let cache_update_constant = S.safe_int 600
+let ( + ) = S.add
 
-let cache_update_coeff = S.safe_int 57
+let ( lsr ) = S.shift_right
 
-(* Cost of calling [Environment_cache.update]. *)
-let cache_update ~cache_size_in_bytes =
-  let approx_card = approximate_cardinal cache_size_in_bytes in
-  Gas_limit_repr.atomic_step_cost
-    S.(add cache_update_constant (mul cache_update_coeff (log2 approx_card)))
+(* Approximating 200 + 1.266960 * number of bytes *)
+let expr_to_address_in_context_cost bytes =
+  let v0 = Bytes.length bytes |> S.safe_int in
+  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
 
-(* Cost of calling [Environment_cache.find].
-   This overapproximates [cache_find] slightly. *)
-let cache_find = cache_update
+let expand_constants_branch_cost =
+  Gas_limit_repr.atomic_step_cost @@ S.safe_int 4095
+
+(* Approximating 100 + 4.639474 * n*log(n) *)
+let expand_no_constants_branch_cost node =
+  let v0 = Script_repr.micheline_nodes node |> S.safe_int in
+  let v0 = S.mul v0 (log2 v0) in
+  S.safe_int 100 + S.mul (S.safe_int 4) v0 + (v0 lsr 1) + (v0 lsr 3)
+  |> Gas_limit_repr.atomic_step_cost

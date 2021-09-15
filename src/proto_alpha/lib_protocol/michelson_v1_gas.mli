@@ -486,7 +486,7 @@ module Cost_of : sig
 
     val chest_key : Gas.cost
 
-    val chest : Gas.cost
+    val chest : bytes:int -> Gas.cost
   end
 
   module Unparsing : sig
@@ -538,6 +538,6 @@ module Cost_of : sig
 
     val chest_key : Gas.cost
 
-    val chest : Gas.cost
+    val chest : plaintext_size:int -> Gas.cost
   end
 end

@@ -512,18 +512,13 @@ struct
   let create_benchmark rng_state _config () =
     let open Micheline in
     let expr = Micheline_sampler.sample rng_state |> strip_locations in
-    let size =
+    let b =
       Script_repr.lazy_expr expr |> Script_repr.force_bytes
-      |> Environment.wrap_tzresult |> assert_ok |> Bytes.length
+      |> Environment.wrap_tzresult |> assert_ok
     in
-    let (context, _) = Execution_context.make ~rng_state |> assert_ok_lwt in
-    let closure () =
-      ignore
-      @@ Alpha_context.Global_constants_storage.Internal_for_tests
-         .expr_to_address_in_context
-           context
-           expr
-    in
+    let size = Bytes.length b in
+
+    let closure () = ignore (Script_expr_hash.hash_bytes [b]) in
     Generator.Plain {workload = size; closure}
 
   let create_benchmarks ~rng_state ~bench_num config =
@@ -683,16 +678,19 @@ module Global_constants_storage_expand_models = struct
        than linearly. I think I would have to fine tune the sampler to better test
        past this amount; however, I don't think it's necessary - to get large orders
        of nodes, you need to use constants, in which case the cost of
-       [Script_expr_hash.of_b58check_opt] will dominate. Therefore I think this linear
-       model is sufficient. *)
+       [Script_expr_hash.of_b58check_opt] will dominate. A n*log(n) model seems
+       accurate enough for the range of values tested.
+    *)
     let models =
       [
         ( "Global_constants_storage_expand_no_constant_branch",
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:(linear ~coeff:(Free_variable.of_string "number of nodes")))
-        );
+              ~model:
+                (nlogn
+                   ~intercept:(Free_variable.of_string "cst")
+                   ~coeff:(Free_variable.of_string "number of nodes"))) );
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants

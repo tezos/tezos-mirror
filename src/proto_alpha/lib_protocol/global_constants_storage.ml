@@ -58,32 +58,7 @@ let bottom_up_fold_cps initial_accumulator node initial_k f =
   traverse_node initial_accumulator node initial_k
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
-module Gas_model = struct
-  open Saturation_repr
-
-  let ( + ) = Saturation_repr.add
-
-  let ( lsl ) = Saturation_repr.shift_left
-
-  let ( lsr ) = Saturation_repr.shift_right
-
-  (* Approximating 31.8578476398 * number of bytes *)
-  let expr_to_address_in_context_cost bytes =
-    let v0 = Bytes.length bytes |> safe_int in
-    Gas_limit_repr.atomic_step_cost
-    @@ ((v0 lsl 4) + (v0 lsl 3) + (v0 lsl 2) + (v0 lsl 1) + v0 + (v0 lsr 1))
-
-  (* Approximating 4156.4530516 *)
-  let expand_constants_branch_cost =
-    Gas_limit_repr.atomic_step_cost @@ safe_int 4156
-
-  (* Approximating 24.534511699 * number of nodes *)
-  let expand_no_constants_branch_cost node =
-    let size = Script_repr.micheline_nodes node |> safe_int in
-    Gas_limit_repr.atomic_step_cost
-    @@ (shift_left size 4 + shift_left size 3 + shift_right size 1)
-end
-
+module Gas_costs = Global_constants_costs
 module Expr_hash_map = Map.Make (Script_expr_hash)
 
 type error += Expression_too_deep
@@ -171,8 +146,10 @@ let get context hash =
 
 let expr_to_address_in_context context expr =
   let lexpr = Script_repr.lazy_expr expr in
+  Raw_context.consume_gas context @@ Script_repr.force_bytes_cost lexpr
+  >>? fun context ->
   Script_repr.force_bytes lexpr >>? fun b ->
-  Raw_context.consume_gas context @@ Gas_model.expr_to_address_in_context_cost b
+  Raw_context.consume_gas context @@ Gas_costs.expr_to_address_in_context_cost b
   >|? fun context -> (context, Script_expr_hash.hash_bytes [b])
 
 let node_too_large node =
@@ -190,7 +167,7 @@ let expand_node context node =
      that gets expanded. *)
   Raw_context.consume_gas
     context
-    (Gas_model.expand_no_constants_branch_cost node)
+    (Gas_costs.expand_no_constants_branch_cost node)
   >>?= fun context ->
   bottom_up_fold_cps
     (* We carry a Boolean representing whether we
@@ -203,7 +180,7 @@ let expand_node context node =
       match node with
       | Prim (_, H_constant, args, annot) -> (
           (* Charge for validating the b58check hash. *)
-          Raw_context.consume_gas context Gas_model.expand_constants_branch_cost
+          Raw_context.consume_gas context Gas_costs.expand_constants_branch_cost
           >>?= fun context ->
           match (args, annot) with
           (* A constant Prim should always have a single String argument,
@@ -217,7 +194,7 @@ let expand_node context node =
                       (* Charge traversing the newly retrieved node *)
                       Raw_context.consume_gas
                         context
-                        (Gas_model.expand_no_constants_branch_cost node)
+                        (Gas_costs.expand_no_constants_branch_cost node)
                       >>?= fun context -> k (context, map, true) node
                   | None ->
                       get context hash >>=? fun (context, expr) ->
@@ -225,7 +202,7 @@ let expand_node context node =
                       let node = root expr in
                       Raw_context.consume_gas
                         context
-                        (Gas_model.expand_no_constants_branch_cost node)
+                        (Gas_costs.expand_no_constants_branch_cost node)
                       >>?= fun context ->
                       k (context, Expr_hash_map.add hash node map, true) node))
           | _ -> fail Badly_formed_constant_expression)

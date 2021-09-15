@@ -445,9 +445,7 @@ let ir_model ?specialization instr_or_cont =
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
           model_1 instr_or_cont (affine_model name)
-      (* Like DupN and DropN, this instruction's model is in two affine parts. *)
-      | N_IComb_get -> model_1 instr_or_cont (break_model name 512)
-      | N_IComb | N_IComb_set | N_IUncomb ->
+      | N_IComb_get | N_IComb | N_IComb_set | N_IUncomb ->
           model_1 instr_or_cont (affine_model name)
       | N_ITicket | N_IRead_ticket -> model_0 instr_or_cont (const1_model name)
       | N_ISplit_ticket -> model_2 instr_or_cont (split_ticket_model name)
