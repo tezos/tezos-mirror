@@ -25,23 +25,23 @@
 
 module S = Saturation_repr
 
-let ( + ) = S.add
+let log2 x = S.safe_int (1 + S.numbits x)
 
-let ( lsl ) = S.shift_left
+let ( + ) = S.add
 
 let ( lsr ) = S.shift_right
 
-(* Approximating 31.8578476398 * number of bytes *)
+(* Approximating 200 + 1.266960 * number of bytes *)
 let expr_to_address_in_context_cost bytes =
   let v0 = Bytes.length bytes |> S.safe_int in
-  Gas_limit_repr.atomic_step_cost
-  @@ ((v0 lsl 4) + (v0 lsl 3) + (v0 lsl 2) + (v0 lsl 1) + v0 + (v0 lsr 1))
+  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
 
-(* Approximating 4156.4530516 *)
 let expand_constants_branch_cost =
-  Gas_limit_repr.atomic_step_cost @@ S.safe_int 4156
+  Gas_limit_repr.atomic_step_cost @@ S.safe_int 4095
 
-(* Approximating 24.534511699 * number of nodes *)
+(* Approximating 100 + 4.639474 * n*log(n) *)
 let expand_no_constants_branch_cost node =
-  let size = Script_repr.micheline_nodes node |> S.safe_int in
-  Gas_limit_repr.atomic_step_cost @@ ((size lsl 4) + (size lsl 3) + (size lsl 1))
+  let v0 = Script_repr.micheline_nodes node |> S.safe_int in
+  let v0 = S.mul v0 (log2 v0) in
+  S.safe_int 100 + S.mul (S.safe_int 4) v0 + (v0 lsr 1) + (v0 lsr 3)
+  |> Gas_limit_repr.atomic_step_cost

@@ -37,14 +37,9 @@ let approximate_cardinal bytes =
 
 let log2 x = S.safe_int (1 + S.numbits x)
 
-(* The following constants were obtained
-   on a non-canonical machine.
+let cache_update_constant = S.safe_int 600
 
-   FIXME replace two following constants by results obtained
-   from benchmark machine. *)
-let cache_update_constant = S.safe_int 500
-
-let cache_update_coeff = S.safe_int 50
+let cache_update_coeff = S.safe_int 57
 
 (* Cost of calling [Environment_cache.update]. *)
 let cache_update ~cache_size_in_bytes =

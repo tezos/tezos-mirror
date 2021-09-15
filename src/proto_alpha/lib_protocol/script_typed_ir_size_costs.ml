@@ -30,5 +30,5 @@ module S = Saturation_repr
 let nodes_cost ~nodes =
   let open S in
   let nodes = Cache_memory_helpers.Nodes.to_int nodes in
-  let coeff = safe_int 50 in
+  let coeff = safe_int 45 in
   Gas_limit_repr.atomic_step_cost (mul coeff (S.safe_int nodes))
