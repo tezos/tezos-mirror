@@ -922,6 +922,15 @@ module Make
         >>= fun (_ : bool) ->
         pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
         return_unit)
+      else if
+        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
+      then
+        failwith
+          "Operation %a is branched on a block %a which is too old"
+          Operation_hash.pp
+          oph
+          Block_hash.pp
+          op.Operation.shell.branch
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->

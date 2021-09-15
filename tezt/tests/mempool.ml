@@ -2430,7 +2430,14 @@ let injecting_old_operation_fails =
   let process =
     RPC.spawn_inject_operation ~data:(`String (op_str_hex ^ signature)) client
   in
-  Process.check_error process
+  let injection_error_rex =
+    rex
+      ~opts:[`Dotall]
+      "Fatal error:\n\
+      \  Command failed: Operation .* is branched on a block .* which is too \
+       old"
+  in
+  Process.check_error ~msg:injection_error_rex process
 
 let register ~protocols =
   flush_mempool ~protocols ;
