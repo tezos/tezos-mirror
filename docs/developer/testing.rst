@@ -488,8 +488,15 @@ Tezt integration and regression tests
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
-  Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
-  include your new test in :src:`.gitlab-ci.yml`.
+  
+  Any non-protocol tests located in a folder named ``src/**/test/`` will be
+  picked up automatically by the CI. No intervention is necessary.
+
+  Protocol tests must be added to :src:`.gitlab/ci/unittest.yml` under the
+  protocol that they are testing. For example, to run a new protocol test for
+  ``proto_XXX_YYYYYYYY``, add the corresponding
+  ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
+  ``make`` invocation.
 
 Other (including Flextesa)
   For other types of tests, you need to manually modify the

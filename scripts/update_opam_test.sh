@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# See `update_unit_test.sh` for documentation.
+# See `update_integration_test.sh` for documentation.
 
 set -e
 
