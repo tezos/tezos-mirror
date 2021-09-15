@@ -181,14 +181,31 @@ let remove_cache_entry cache key entry =
     removed_entries = KeySet.add key cache.removed_entries;
   }
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/1591
+(* The dean is the oldest entry.
 
-   Make sure that inserting a large cache entry is costly.
+   The complexity of this operation is logarithmic in the number of
+   entries in the cache. Along a given chain, [dean cache] only
+   increases. *)
+let dean cache : (int64 * key) option = Int64Map.min_binding cache.lru
 
-   The cache size limit is enforced in-between block. This means that
-   the in-memory cache can grow beyond its cache limit during block
-   validation. We need a protection mechanism to avoid very large
-   cache entries to be added to the cache. *)
+let remove_dean cache =
+  match dean cache with
+  | None -> cache
+  | Some (_, key) -> (
+      match KeyMap.find key cache.map with
+      | None -> assert false
+      (* because [lru] must point to keys that are in [map]. *)
+      | Some (_, entry) -> remove_cache_entry cache key entry)
+
+let rec enforce_size_limit cache =
+  if cache.size > cache.limit then
+    remove_dean cache
+    (* [size] has decreased strictly because if size > limit, then the
+       cache cannot be empty. Hence, this recursive call will
+       converge. *)
+    |> enforce_size_limit
+  else cache
+
 let insert_cache_entry cache key ((_, {size; birth; _}) as entry) =
   {
     cache with
@@ -198,6 +215,7 @@ let insert_cache_entry cache key ((_, {size; birth; _}) as entry) =
     lru = Int64Map.add birth key cache.lru;
     removed_entries = KeySet.remove key cache.removed_entries;
   }
+  |> enforce_size_limit
 
 let insert_cache cache key value size cache_nonce =
   (* Conforming to entry size invariant: we need this size to be
@@ -219,22 +237,6 @@ let update_cache cache key entry =
 let update t key entry =
   let cache = cache_of_key t key in
   update_cache_with t key.cache_index (update_cache cache key entry)
-
-(* The dean is the oldest entry.
-
-   The complexity of this operation is logarithmic in the number of
-   entries in the cache. Along a given chain, [dean cache] only
-   increases. *)
-let dean cache : (int64 * key) option = Int64Map.min_binding cache.lru
-
-let remove_dean cache =
-  match dean cache with
-  | None -> cache
-  | Some (_, key) -> (
-      match KeyMap.find key cache.map with
-      | None -> assert false
-      (* because [lru] must point to keys that are in [map]. *)
-      | Some (_, entry) -> remove_cache_entry cache key entry)
 
 (* We maintain the number of entries removal for the last
    [entries_removals_window_width] blocks to determine the life
@@ -290,15 +292,6 @@ let future_cache_expectation t ~time_in_blocks =
 
 let clear t =
   Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
-
-let rec enforce_size_limit cache =
-  if cache.size > cache.limit then
-    remove_dean cache
-    (* [size] has decreased strictly because if size > limit, then the
-       cache cannot be empty. Hence, this recursive call will
-       converge. *)
-    |> enforce_size_limit
-  else cache
 
 let record_entries_removals cache =
   let entries_removals =
