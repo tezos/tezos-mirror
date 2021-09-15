@@ -209,8 +209,9 @@ val mem : block_store -> key -> bool tzresult Lwt.t
 val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
 
 (** [read_block ~read_metadata block_store key] reads the block [key]
-    in [block_store] if present. Return [None] if the block is
-    unknown. *)
+   in [block_store] if present. Return [None] if the block is
+   unknown. If [read_metadata] is set to [true] it tries to retreive
+   the metadata but do not fail if it is not available. *)
 val read_block :
   read_metadata:bool -> block_store -> key -> Block_repr.t option tzresult Lwt.t
 
