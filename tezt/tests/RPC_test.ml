@@ -751,6 +751,9 @@ let test_mempool ?endpoint client =
   in
   let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1765
+
+     Once openapi-diff is integrated, this test could be removed. *)
   (* Call describe on mempool RPCs and record the output. *)
   let describe_path =
     sf
