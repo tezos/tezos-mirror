@@ -510,8 +510,7 @@ Measuring test coverage in the CI
 
 To measure test coverage in the CI, trigger the jobs ``test_coverage[...]`` in
 stage ``test_coverage`` These jobs can either be triggered manually
-from the Gitlab CI web interface, or by pushing a branch whose name
-contains ``coverage``.  These jobs build Octez with coverage
+from the Gitlab CI web interface. These jobs build Octez with coverage
 instrumentation, and then run respectively:
 
  - ``make test-unit``, executing all unit, integration and property-based tests
