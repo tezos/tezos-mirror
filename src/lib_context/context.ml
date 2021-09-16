@@ -564,8 +564,6 @@ module Dumpable_context = struct
           | (`Node, h) ->
               `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
         (obj2 (req "kind" kind_encoding) (req "value" bytes))
-
-    let to_hash = function `Blob h -> h | `Node h -> h
   end
 
   type commit_info = Info.t
@@ -639,22 +637,25 @@ module Dumpable_context = struct
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
@@ -913,8 +914,6 @@ module Dumpable_context_legacy = struct
           | (`Node, h) ->
               `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
         (obj2 (req "kind" kind_encoding) (req "value" bytes))
-
-    let to_hash = function `Blob h -> h | `Node h -> h
   end
 
   type commit_info = Info.t
@@ -991,22 +990,25 @@ module Dumpable_context_legacy = struct
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
