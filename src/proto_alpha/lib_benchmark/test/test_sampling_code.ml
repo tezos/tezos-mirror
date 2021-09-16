@@ -61,7 +61,9 @@ end)
 (* MCMC instantiation *)
 
 module Gen =
-  Michelson_mcmc_samplers.Code (Michelson_base_samplers) (Crypto_samplers)
+  Michelson_mcmc_samplers.Make_code_sampler
+    (Michelson_base_samplers)
+    (Crypto_samplers)
     (struct
       let rng_state = state
 

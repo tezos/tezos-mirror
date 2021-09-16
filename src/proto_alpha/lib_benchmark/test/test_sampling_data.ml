@@ -58,7 +58,9 @@ module Michelson_base_samplers = Michelson_samplers_base.Make (struct
 end)
 
 module Gen =
-  Michelson_mcmc_samplers.Data (Michelson_base_samplers) (Crypto_samplers)
+  Michelson_mcmc_samplers.Make_data_sampler
+    (Michelson_base_samplers)
+    (Crypto_samplers)
     (struct
       let rng_state = state
 

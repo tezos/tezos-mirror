@@ -103,7 +103,7 @@ module Samplers = struct
   let sample_value ty = Random_value.value ty random_state
 
   module Gen =
-    Michelson_mcmc_samplers.Code (Michelson_base) (Crypto_samplers)
+    Michelson_mcmc_samplers.Make_code_sampler (Michelson_base) (Crypto_samplers)
       (struct
         let rng_state = random_state
 

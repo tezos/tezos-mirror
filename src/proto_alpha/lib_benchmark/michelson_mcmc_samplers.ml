@@ -99,7 +99,7 @@ module Make_generic (P : Sampler_parameters_sig) = struct
   let generator ~burn_in = P.(Sampler.mcmc ~verbosity ~initial ~burn_in)
 end
 
-module Code
+module Make_code_sampler
     (Michelson_base : Michelson_samplers_base.S)
     (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
       val rng_state : Random.State.t
@@ -152,7 +152,7 @@ struct
     Stats.map_gen to_michelson (MCMC.generator ~burn_in)
 end
 
-module Data
+module Make_data_sampler
     (Michelson_base : Michelson_samplers_base.S)
     (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) (X : sig
       val rng_state : Random.State.t
