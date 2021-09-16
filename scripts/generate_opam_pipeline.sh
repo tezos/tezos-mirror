@@ -37,7 +37,7 @@ opam:$PKG:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_opam
+    - .rules_template__opam_child_pipeline_tests
   stage: packaging
   variables:
     TZ_OPAM_FILES_MODIFIED: "$TZ_OPAM_FILES_MODIFIED"

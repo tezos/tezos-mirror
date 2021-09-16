@@ -96,7 +96,7 @@ variables:
       when: always
     - when: never
 
-.rules_template__development_opam:
+.rules_template__opam_child_pipeline_tests:
   rules:
     # Run on push to the default branch (i.e master).
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
@@ -127,8 +127,7 @@ variables:
       when: always
     - when: never
 
-# Rules for jobs that should run only during merge requests.
-.rules_template__opam_pipeline:
+.rules_template__trigger_opam_child_pipeline:
   rules:
     # Run on push to the default branch (i.e master).
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
