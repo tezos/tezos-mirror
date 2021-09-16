@@ -45,8 +45,6 @@ module type Kinded_hash = sig
 
   type hash
 
-  val to_hash : t -> hash
-
   val encoding : t Data_encoding.t
 end
 
