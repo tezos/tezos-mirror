@@ -147,9 +147,6 @@ module Samplers = struct
         Format.eprintf "%a@." pp_print_trace errs ;
         raise (Failure "Test_helpers.michelson_type_to_ex_ty: error")
 
-  let base_type_to_ex_ty ty =
-    michelson_type_to_ex_ty (base_type_to_michelson_type ty)
-
   (* Convert a list of Micheline-encoded Michelson types to the
      internal GADT format. *)
   let rec michelson_type_list_to_ex_stack_ty
