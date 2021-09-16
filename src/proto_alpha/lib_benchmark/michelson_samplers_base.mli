@@ -23,29 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Samplers for basic Michelson values (not including pairs, unions, tickets, big maps, etc) *)
+
 open Protocol
-open Sampling_helpers
+open Base_samplers
 
 (** Parameters for basic samplers *)
 type parameters = {
   int_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which big integers must be sampled.*)
   string_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which strings must be sampled.*)
   bytes_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which [bytes] must be sampled.*)
 }
 
-(** Encoding for basic samplers parameters *)
-let parameters_encoding =
-  let open Data_encoding in
-  let range = Base_samplers.range_encoding in
-  conv
-    (fun {int_size; string_size; bytes_size} ->
-      (int_size, string_size, bytes_size))
-    (fun (int_size, string_size, bytes_size) ->
-      {int_size; string_size; bytes_size})
-    (obj3
-       (req "int_size" range)
-       (req "string_size" range)
-       (req "bytes_size" range))
+(** Encoding for [parameters] *)
+val parameters_encoding : parameters Data_encoding.t
 
 (** A module of type [S] packs samplers used to construct basic Michelson values. *)
 module type S = sig
@@ -64,64 +58,10 @@ module type S = sig
   val timestamp : Alpha_context.Script_timestamp.t sampler
 end
 
-(* Samplers for basic Michelson types. *)
-
-module Make (P : sig
-  val parameters : parameters
-end) : S = struct
-  let int rng_state =
-    let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.of_zint i
-
-  let nat rng_state =
-    let i = Base_samplers.nat ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.abs (Alpha_context.Script_int.of_zint i)
-
-  let signature rng_state =
-    let i = Random.State.int rng_state 4 in
-    match i with
-    | 0 -> (
-        let open Ed25519 in
-        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with
-        | None -> assert false
-        | Some s -> Signature.of_ed25519 s)
-    | 1 -> (
-        let open Secp256k1 in
-        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with
-        | None -> assert false
-        | Some s -> Signature.of_secp256k1 s)
-    | 2 -> (
-        let open P256 in
-        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with
-        | None -> assert false
-        | Some s -> Signature.of_p256 s)
-    | _ -> (
-        let open Signature in
-        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with None -> assert false | Some s -> s)
-
-  let string rng_state =
-    let s =
-      Base_samplers.readable_ascii_string
-        ~size:P.parameters.string_size
-        rng_state
-    in
-    match Protocol.Alpha_context.Script_string.of_string s with
-    | Ok s -> s
-    | Error _ -> assert false
-
-  let bytes = Base_samplers.bytes ~size:P.parameters.bytes_size
-
-  let tez rng_state =
-    let i = Random.State.int64 rng_state (Int64.of_int max_int) in
-    match Protocol.Alpha_context.Tez.of_mutez i with
-    | Some res -> res
-    | None -> assert false
-
-  let timestamp rng_state =
-    let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Protocol.Alpha_context.Script_timestamp.of_zint i
-end
+(** The [Make] functor instantiates a module of type [S], where the
+    samplers satisfy the given parameters. *)
+module Make : functor
+  (P : sig
+     val parameters : parameters
+   end)
+  -> S
