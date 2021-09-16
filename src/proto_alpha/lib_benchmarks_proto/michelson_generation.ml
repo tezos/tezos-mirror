@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 type generator_config = {
   target_size : Base_samplers.range;
   burn_in_multiplier : int;
@@ -73,42 +71,6 @@ module Samplers =
 module Michelson_base_samplers = Samplers.Michelson_base
 
 (* ----------------------------------------------------------------------- *)
-
-(* Convert a Micheline-encoded type to its internal GADT format. *)
-let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
-    (ctxt : Alpha_context.t) =
-  Script_ir_translator.parse_ty
-    ctxt
-    ~legacy:false
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:false
-    ~allow_ticket:false
-    (Micheline.root typ)
-  |> Environment.wrap_tzresult
-  |> function
-  | Ok t -> t
-  | Error trace ->
-      Format.eprintf "%a@." Error_monad.pp_print_trace trace ;
-      Stdlib.failwith "Michelson_generation.michelson_type_to_ex_ty: error"
-
-(* Convert a list of Micheline-encoded Michelson types to the
-     internal GADT format. *)
-let rec michelson_type_list_to_ex_stack_ty
-    (stack_ty : Alpha_context.Script.expr list) ctxt =
-  let open Script_ir_translator in
-  let open Script_typed_ir in
-  match stack_ty with
-  | [] -> (Ex_stack_ty Bot_t, ctxt)
-  | hd :: tl -> (
-      let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
-      match ex_ty with
-      | Ex_ty ty -> (
-          let (ex_stack_ty, ctxt) =
-            michelson_type_list_to_ex_stack_ty tl ctxt
-          in
-          match ex_stack_ty with
-          | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
 
 let make_data_sampler rng_state config =
   let target_size =

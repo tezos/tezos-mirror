@@ -109,53 +109,6 @@ let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
   Mikhailsky.to_michelson typ
 
-(* Convert a Micheline-encoded type to its internal GADT format. *)
-let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
-    (ctxt : Alpha_context.t) =
-  Script_ir_translator.parse_ty
-    ctxt
-    ~legacy:false
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:false
-    ~allow_ticket:false
-    (Micheline.root typ)
-  |> Environment.wrap_tzresult
-  |> function
-  | Ok t -> t
-  | Error errs ->
-      Format.eprintf "%a@." Error_monad.pp_print_error errs ;
-      Stdlib.failwith "Michelson_generation.michelson_type_to_ex_ty: error"
-
-(* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
-  let node = typ.node in
-  match node with
-  | Type.Stack.Stack_var_t _ ->
-      Stdlib.failwith "stack_type_to_michelson_type_list: bug found"
-  | Type.Stack.Empty_t -> []
-  | Type.Stack.Item_t (ty, tl) ->
-      base_type_to_michelson_type ty :: stack_type_to_michelson_type_list tl
-
-(* Convert a list of Micheline-encoded Michelson types to the
-     internal GADT format. *)
-let rec michelson_type_list_to_ex_stack_ty
-    (stack_ty : Alpha_context.Script.expr list) ctxt =
-  let open Script_ir_translator in
-  let open Script_typed_ir in
-  match stack_ty with
-  | [] -> (Ex_stack_ty Bot_t, ctxt)
-  | hd :: tl -> (
-      let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
-      match ex_ty with
-      | Ex_ty ty -> (
-          let (ex_stack_ty, ctxt) =
-            michelson_type_list_to_ex_stack_ty tl ctxt
-          in
-          match ex_stack_ty with
-          | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
-  [@@ocaml.warning "-32"]
-
 module type Sampler_parameters_sig = sig
   val initial : State_space.t
 
@@ -274,8 +227,8 @@ struct
     in
     {
       term = node;
-      bef = stack_type_to_michelson_type_list bef;
-      aft = stack_type_to_michelson_type_list aft;
+      bef = Type_helpers.stack_type_to_michelson_type_list bef;
+      aft = Type_helpers.stack_type_to_michelson_type_list aft;
     }
 
   let generator ~burn_in =

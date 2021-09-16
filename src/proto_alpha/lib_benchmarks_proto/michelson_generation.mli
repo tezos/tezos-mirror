@@ -25,8 +25,6 @@
 
 (** {2 Wrappers around some Michelson generators and related helpers} *)
 
-open Protocol
-
 (** [generator_config] specifies some parameters to the
     {!Tezos_benchmark_alpha.Michelson_mcmc_samplers} Michelson code and data generators. *)
 type generator_config = {
@@ -45,23 +43,6 @@ type generator_config = {
 val default_generator_config : generator_config
 
 val generator_config_encoding : generator_config Data_encoding.t
-
-(** Type conversion helpers *)
-
-(** [michelson_type_list_to_ex_stack_ty] converts a list of types in
-    Micheline form to a stack type in IR form. *)
-val michelson_type_list_to_ex_stack_ty :
-  Alpha_context.Script.expr list ->
-  Alpha_context.t ->
-  Script_ir_translator.ex_stack_ty * Alpha_context.t
-
-(** [michelson_type_to_ex_ty ty ctxt] parses the type [ty].
-
-    @raise Failure if an error arises during parsing. *)
-val michelson_type_to_ex_ty :
-  Alpha_context.Script.expr ->
-  Alpha_context.t ->
-  Script_ir_translator.ex_ty * Alpha_context.t
 
 (** Samplers *)
 

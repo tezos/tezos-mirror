@@ -103,7 +103,7 @@ let complete term =
   let node =
     Micheline.strip_locations @@ Mikhailsky_to_michelson.convert term state
   in
-  let bef' = Test_helpers.stack_type_to_michelson_type_list bef' in
+  let bef' = Type_helpers.stack_type_to_michelson_type_list bef' in
   Test_helpers.typecheck_by_tezos bef' node
 
 open Mikhailsky

@@ -78,7 +78,7 @@ end = struct
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
+          Type_helpers.michelson_type_to_ex_ty michelson_type ctxt
         in
         match ex_ty with
         | Script_ir_translator.Ex_ty ty -> (
@@ -234,7 +234,7 @@ end = struct
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
         let node = Micheline.root expr in

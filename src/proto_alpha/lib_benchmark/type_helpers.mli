@@ -23,63 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+(** Type conversion helpers *)
 
-let rng_state = Random.State.make [|42; 987897; 54120|]
+open Protocol
 
-let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
-  Micheline_printer.print_expr
-    fmtr
-    (Micheline_printer.printable
-       Protocol.Michelson_v1_primitives.string_of_prim
-       expr)
+(** Exception raised in case an error occurs in this module. *)
+exception Type_helpers_error of string
 
-let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
-    print_script_expr
-    fmtr
-    exprs
+(** [michelson_type_list_to_ex_stack_ty] converts a list of types in
+    Micheline form to a stack type in IR form.
 
-let typecheck_by_tezos =
-  let context_init_memory ~rng_state =
-    Context.init
-      ~rng_state
-      ~initial_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-    >>=? fun (block, _accounts) ->
-    Incremental.begin_construction
-      ~priority:0
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
-      block
-    >>=? fun vs ->
-    let ctxt = Incremental.alpha_ctxt vs in
-    (* Required for eg Create_contract *)
-    return
-    @@ Protocol.Alpha_context.Contract.init_origination_nonce
-         ctxt
-         Tezos_crypto.Operation_hash.zero
-  in
-  fun bef node ->
-    Stdlib.Result.get_ok
-      (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (bef, ctxt) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) = bef in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_ir_translator.Lambda
-             ctxt
-             ~legacy:false
-             (Micheline.root node)
-             bef
-           >|= Protocol.Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+    @raise Type_helpers_error if parsing the Michelson type fails.
+ *)
+val michelson_type_list_to_ex_stack_ty :
+  Alpha_context.Script.expr list ->
+  Alpha_context.t ->
+  Script_ir_translator.ex_stack_ty * Alpha_context.t
+
+(** [michelson_type_to_ex_ty ty ctxt] parses the type [ty].
+
+    @raise Type_helpers_error if an error arises during parsing. *)
+val michelson_type_to_ex_ty :
+  Alpha_context.Script.expr ->
+  Alpha_context.t ->
+  Script_ir_translator.ex_ty * Alpha_context.t
+
+(** [stack_type_to_michelson_type_list] converts a Mikhailsky stack type
+    to a stack represented as a list of Micheline expressions, each
+    element denoting a type on the stack type.
+
+    @raise Type_helpers_error if the stack type contains variables. *)
+val stack_type_to_michelson_type_list : Type.Stack.t -> Script_repr.expr list
+
+(** [base_type_to_ex_ty] converts a Mikhailsky type to a Michelson one. *)
+val base_type_to_ex_ty :
+  Type.Base.t -> Alpha_context.t -> Script_ir_translator.ex_ty * Alpha_context.t
