@@ -2102,7 +2102,7 @@ module Registration_section = struct
             let (Script_ir_translator.Ex_comparable_ty cmp_ty) =
               Samplers.Random_type.m_comparable_type ~size rng_state
             in
-            let ty = Michelson_samplers.comparable_downcast cmp_ty in
+            let ty = Script_ir_translator.ty_of_comparable_ty cmp_ty in
             let value = Samplers.Random_value.comparable cmp_ty rng_state in
             let kinstr =
               ICompare (kinfo (ty @$ ty @$ bot), cmp_ty, halt (int @$ bot))

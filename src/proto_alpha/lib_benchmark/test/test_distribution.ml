@@ -2,6 +2,7 @@ open StaTz
 open Tezos_benchmark
 open Michelson_samplers
 open Protocol
+open Internal_for_tests
 
 module Comparable_type_name = struct
   type t = type_name

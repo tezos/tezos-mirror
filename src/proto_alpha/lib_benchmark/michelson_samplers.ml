@@ -26,35 +26,13 @@
 open Protocol
 open Script_typed_ir
 
-(** This module exposes a functor implementing various samplers for Michelson.
-    These allow to sample:
-    - types and comparable types (given a target size),
-    - values and comparable values of a given Michelson type (given some more
-      parameters fixed at functor instantiation time)
-    - stacks
-
-    Note that some kind of values might not be supported. At the time of writing,
-    the value sampler doesn't handle the following types:
-    - Sapling transaction and states
-    - Timelock chests and chest keys
-    - Operations
-    - Lambdas (ie code)
-
-    For the latter, consider using the samplers in {!Michelson_mcmc_samplers}.
-*)
-
-(** Parameters for the Michelson samplers. *)
 type parameters = {
   base_parameters : Michelson_samplers_base.parameters;
   list_size : Base_samplers.range;
-      (** The range of the size, measured in number of elements, in which lists must be sampled.*)
   set_size : Base_samplers.range;
-      (** The range of the size, measured in number of elements, in which sets must be sampled.*)
   map_size : Base_samplers.range;
-      (** The range of the size, measured in number of bindings, in which maps must be sampled.*)
 }
 
-(** Encoding for sampler prameters. *)
 let parameters_encoding =
   let open Data_encoding in
   let range_encoding = Base_samplers.range_encoding in
@@ -110,39 +88,6 @@ type type_name =
   | `TBls12_381_g2
   | `TBls12_381_fr
   | `TTicket ]
-
-let all_type_names : type_name array =
-  [|
-    `TUnit;
-    `TInt;
-    `TNat;
-    `TSignature;
-    `TString;
-    `TBytes;
-    `TMutez;
-    `TKey_hash;
-    `TKey;
-    `TTimestamp;
-    `TAddress;
-    `TBool;
-    `TPair;
-    `TUnion;
-    `TLambda;
-    `TOption;
-    `TList;
-    `TSet;
-    `TMap;
-    `TBig_map;
-    `TContract;
-    `TSapling_transaction;
-    `TSapling_state;
-    `TOperation;
-    `TChain_id;
-    `TBls12_381_g1;
-    `TBls12_381_g2;
-    `TBls12_381_fr;
-    `TTicket;
-  |]
 
 type atomic_type_name =
   [ `TUnit
@@ -239,26 +184,6 @@ type comparable_type_name =
 (* Ensure inclusion of comparable_type_name in type_name *)
 let (_ : comparable_type_name -> type_name) = fun x -> (x :> type_name)
 
-let all_comparable_type_names : comparable_type_name array =
-  [|
-    `TUnit;
-    `TInt;
-    `TNat;
-    `TSignature;
-    `TString;
-    `TBytes;
-    `TMutez;
-    `TBool;
-    `TKey_hash;
-    `TKey;
-    `TTimestamp;
-    `TChain_id;
-    `TAddress;
-    `TPair;
-    `TUnion;
-    `TOption;
-  |]
-
 type 'a comparable_and_atomic = 'a
   constraint 'a = [< comparable_type_name] constraint 'a = [< atomic_type_name]
 
@@ -289,20 +214,6 @@ let all_comparable_non_atomic_type_names : 'a comparable_and_non_atomic array =
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
 
-let type_names_count = Array.length all_type_names
-
-let atomic_type_names_count = Array.length all_atomic_type_names
-
-let non_atomic_type_names_count = Array.length all_non_atomic_type_names
-
-let comparable_type_names_count = Array.length all_comparable_type_names
-
-let comparable_atomic_type_names_count =
-  Array.length all_comparable_atomic_type_names
-
-let comparable_non_atomic_type_names_count =
-  Array.length all_comparable_non_atomic_type_names
-
 (* ------------------------------------------------------------------------- *)
 (* Uniform type name generators *)
 
@@ -313,16 +224,8 @@ let uniform : 'a array -> 'a sampler =
   let i = Random.State.int rng_state (Array.length arr) in
   arr.(i)
 
-let uniform_type_name : type_name sampler = uniform all_type_names
-
 let uniform_atomic_type_name : atomic_type_name sampler =
   uniform all_atomic_type_names
-
-let uniform_non_atomic_type_name : non_atomic_type_name sampler =
-  uniform all_non_atomic_type_names
-
-let uniform_comparable_type_name : comparable_type_name sampler =
-  uniform all_comparable_type_names
 
 let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
   uniform all_comparable_atomic_type_names
@@ -330,11 +233,6 @@ let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
 let uniform_comparable_non_atomic_type_name :
     'a comparable_and_non_atomic sampler =
   uniform all_comparable_non_atomic_type_names
-
-(* ------------------------------------------------------------------------- *)
-(* Existentially packed typed value. *)
-
-type ex_value = Ex_value : {typ : 'a Script_typed_ir.ty; v : 'a} -> ex_value
 
 (* ------------------------------------------------------------------------- *)
 (* Random generation functor. *)
@@ -826,4 +724,8 @@ end)
             return ((elt, tl) : a * b)
         | Bot_t -> return (EmptyCell, EmptyCell)
   end
+end
+
+module Internal_for_tests = struct
+  type nonrec type_name = type_name
 end
