@@ -115,20 +115,6 @@ module Samplers = struct
   (* Delay and cache the generator as it's expensive to create. *)
   let generator = lazy (Gen.generator ~burn_in:(500 * 7))
 
-  let base_type_to_michelson_type (typ : Type.Base.t) =
-    let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
-    Mikhailsky.to_michelson typ
-
-  (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-  let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
-    let node = typ.node in
-    match node with
-    | Type.Stack.Stack_var_t _ ->
-        Stdlib.failwith "stack_type_to_michelson_type_list: bug found"
-    | Type.Stack.Empty_t -> []
-    | Type.Stack.Item_t (ty, tl) ->
-        base_type_to_michelson_type ty :: stack_type_to_michelson_type_list tl
-
   type exdescr =
     | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
 
