@@ -117,11 +117,13 @@ module Michelson_gen_cmd = struct
       | "data" ->
           Stdlib.List.init terms_count (fun _i ->
               progress () ;
-              Michelson_generation.make_data_sampler rng_state cfg)
+              Michelson_mcmc_samplers.Data
+                (Michelson_generation.make_data_sampler rng_state cfg))
       | "code" ->
           Stdlib.List.init terms_count (fun _i ->
               progress () ;
-              Michelson_generation.make_code_sampler rng_state cfg)
+              Michelson_mcmc_samplers.Code
+                (Michelson_generation.make_code_sampler rng_state cfg))
       | _ ->
           Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
           exit 1

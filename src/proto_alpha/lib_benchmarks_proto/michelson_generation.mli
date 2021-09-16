@@ -73,7 +73,7 @@ val make_data_sampler :
 (** [make_code_sampler] constructs a Michelson code sampler based on the
     infrastructure available in {!Tezos_benchmark_alpha.Michelson_mcmc_samplers}. *)
 val make_code_sampler :
-  Random.State.t -> generator_config -> Michelson_mcmc_samplers.michelson_data
+  Random.State.t -> generator_config -> Michelson_mcmc_samplers.michelson_code
 
 (** [Samplers] is an instance of the direct-style (non-MCMC based) samplers
     implemented in {!Tezos_benchmark_alpha.Michelson_samplers}. *)

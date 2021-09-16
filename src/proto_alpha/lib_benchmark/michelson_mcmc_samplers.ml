@@ -31,26 +31,27 @@ open StaTz
 (** MCMC samplers can either produced data or code. Note that the samplers
     natively produce data and code in Micheline (ie untyped) form. *)
 
-(** [michelson_data] is the type of Michelson data, as produced by the
-    samplers. *)
-type michelson_data =
-  | Code of {
-      term : Script_repr.expr;
-          (** [term] is a typeable Michelson program in Micheline form. *)
-      bef : Script_repr.expr list;
-          (** [bef] is an input stack type for which [term] is a well-typed script. *)
-      aft : Script_repr.expr list;
-          (** [aft] is the stack type corresponding to the execution of [term]
-              on a stack of type [bef]. *)
-    }
-  | Data of {
-      term : Script_repr.expr;
-          (** [term] is a typeable Michelson data in Micheline form. *)
-      typ : Script_repr.expr;  (** [typ] is the type of [term]. *)
-    }
+type michelson_code = {
+  term : Script_repr.expr;
+      (** [term] is a typeable Michelson program in Micheline form. *)
+  bef : Script_repr.expr list;
+      (** [bef] is an input stack type for which [term] is a well-typed script. *)
+  aft : Script_repr.expr list;
+      (** [aft] is the stack type corresponding to the execution of [term]
+        on a stack of type [bef]. *)
+}
+
+type michelson_data = {
+  term : Script_repr.expr;
+      (** [term] is a typeable Michelson data in Micheline form. *)
+  typ : Script_repr.expr;  (** [typ] is the type of [term]. *)
+}
+
+(** A [michelson_sample] is either a code sample or a data sample. *)
+type michelson_sample = Code of michelson_code | Data of michelson_data
 
 (** Encoding used for saving or loading data. *)
-let michelson_data_list_encoding =
+let michelson_sample_list_encoding =
   let open Data_encoding in
   let e = Script_repr.expr_encoding in
   list
@@ -74,7 +75,9 @@ let michelson_data_list_encoding =
 (** Saving a list of samples to a file. *)
 let save ~filename ~terms =
   let bytes =
-    match Data_encoding.Binary.to_bytes michelson_data_list_encoding terms with
+    match
+      Data_encoding.Binary.to_bytes michelson_sample_list_encoding terms
+    with
     | Error err ->
         Format.eprintf
           "Michelson_mcmc_samplers.save: encoding failed (%a); exiting"
@@ -106,7 +109,7 @@ let load ~filename =
       exit 1
   in
   let bytes = Bytes.of_string string in
-  match Data_encoding.Binary.of_bytes michelson_data_list_encoding bytes with
+  match Data_encoding.Binary.of_bytes michelson_sample_list_encoding bytes with
   | Ok result -> result
   | Error err ->
       Format.eprintf
@@ -287,12 +290,11 @@ struct
     let node =
       Micheline.strip_locations @@ Mikhailsky_to_michelson.convert node state
     in
-    Code
-      {
-        term = node;
-        bef = stack_type_to_michelson_type_list bef;
-        aft = stack_type_to_michelson_type_list aft;
-      }
+    {
+      term = node;
+      bef = stack_type_to_michelson_type_list bef;
+      aft = stack_type_to_michelson_type_list aft;
+    }
 
   let generator ~burn_in =
     let open StaTz in
@@ -362,7 +364,7 @@ struct
     let node =
       Micheline.strip_locations @@ Mikhailsky_to_michelson.convert node state
     in
-    Data {term = node; typ = base_type_to_michelson_type typ}
+    {term = node; typ = base_type_to_michelson_type typ}
 
   let generator ~burn_in =
     let open StaTz in

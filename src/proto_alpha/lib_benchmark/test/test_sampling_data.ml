@@ -79,11 +79,11 @@ let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
 
 let _ =
   for _i = 0 to 1000 do
-    match StaTz.Stats.sample_gen generator with
-    | Code _ -> assert false
-    | Data {term = michelson; typ} ->
-        if verbose then (
-          Format.eprintf "result:@." ;
-          Format.eprintf "type: %a@." Test_helpers.print_script_expr typ ;
-          Format.eprintf "%a@." Test_helpers.print_script_expr michelson)
+    let Michelson_mcmc_samplers.{term = michelson; typ} =
+      StaTz.Stats.sample_gen generator
+    in
+    if verbose then (
+      Format.eprintf "result:@." ;
+      Format.eprintf "type: %a@." Test_helpers.print_script_expr typ ;
+      Format.eprintf "%a@." Test_helpers.print_script_expr michelson)
   done

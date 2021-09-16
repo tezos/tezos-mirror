@@ -105,11 +105,10 @@ end = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> value_size_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    value_size_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
@@ -274,11 +273,10 @@ end = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
       Michelson_generation.make_code_sampler rng_state cfg.generator_config
-    with
-    | Code {term; bef; aft = _} -> kinstr_size_benchmark rng_state term bef
-    | _ -> assert false
+    in
+    kinstr_size_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
