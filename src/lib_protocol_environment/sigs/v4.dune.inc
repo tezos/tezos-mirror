@@ -51,6 +51,7 @@
    v4/s.mli
    v4/blake2B.mli
    v4/bls12_381.mli
+   v4/bls_signature.mli
    v4/ed25519.mli
    v4/secp256k1.mli
    v4/p256.mli
