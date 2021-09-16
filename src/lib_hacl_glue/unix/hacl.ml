@@ -134,7 +134,7 @@ end
 module Blake2b = struct
   type t = Bytes.t
 
-  type hash = Hash of Bytes.t
+  type hash = Hash of Bytes.t [@@unboxed]
 
   let direct ?(key = Bytes.create 0) inbuf len =
     if len < 1 || len > 64 then
