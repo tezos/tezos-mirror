@@ -44,7 +44,7 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
     (Micheline.root typ)
   |> Environment.wrap_tzresult
   |> function
-  | Ok (ex_ty, ctxt) -> (ex_ty, ctxt)
+  | Ok (ex_ty, _ctxt) -> ex_ty
   | Error errs ->
       let msg =
         Format.asprintf
@@ -61,16 +61,14 @@ let rec michelson_type_list_to_ex_stack_ty
   let open Script_ir_translator in
   let open Script_typed_ir in
   match stack_ty with
-  | [] -> (Ex_stack_ty Bot_t, ctxt)
+  | [] -> Ex_stack_ty Bot_t
   | hd :: tl -> (
-      let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
+      let ex_ty = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with
       | Ex_ty ty -> (
-          let (ex_stack_ty, ctxt) =
-            michelson_type_list_to_ex_stack_ty tl ctxt
-          in
+          let ex_stack_ty = michelson_type_list_to_ex_stack_ty tl ctxt in
           match ex_stack_ty with
-          | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
+          | Ex_stack_ty tl -> Ex_stack_ty (Item_t (ty, tl, None))))
 
 let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in

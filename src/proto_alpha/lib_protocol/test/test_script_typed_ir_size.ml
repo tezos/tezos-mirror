@@ -139,7 +139,7 @@ module Samplers = struct
     let accounts = Account.generate_accounts 1 in
     Block.alpha_context accounts >>=? fun ctxt ->
     let code = Micheline.root sample in
-    let (Ex_stack_ty bef, _) =
+    let (Ex_stack_ty bef) =
       Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
     in
     Script_ir_translator.(parse_instr Lambda ctxt ~legacy:true code bef)

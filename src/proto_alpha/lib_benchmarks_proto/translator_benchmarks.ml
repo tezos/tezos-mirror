@@ -193,9 +193,7 @@ module Typechecking_data : Benchmark.S = struct
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Type_helpers.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -267,9 +265,7 @@ module Unparsing_data : Benchmark.S = struct
       (michelson_type : Protocol.Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Type_helpers.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -347,7 +343,7 @@ module Typechecking_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
+        let ex_stack_ty =
           Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
@@ -423,7 +419,7 @@ module Unparsing_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
+        let ex_stack_ty =
           Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
