@@ -28,29 +28,16 @@
 open Protocol
 open StaTz
 
-(** MCMC samplers can either produced data or code. Note that the samplers
-    natively produce data and code in Micheline (ie untyped) form. *)
-
 type michelson_code = {
   term : Script_repr.expr;
-      (** [term] is a typeable Michelson program in Micheline form. *)
   bef : Script_repr.expr list;
-      (** [bef] is an input stack type for which [term] is a well-typed script. *)
   aft : Script_repr.expr list;
-      (** [aft] is the stack type corresponding to the execution of [term]
-        on a stack of type [bef]. *)
 }
 
-type michelson_data = {
-  term : Script_repr.expr;
-      (** [term] is a typeable Michelson data in Micheline form. *)
-  typ : Script_repr.expr;  (** [typ] is the type of [term]. *)
-}
+type michelson_data = {term : Script_repr.expr; typ : Script_repr.expr}
 
-(** A [michelson_sample] is either a code sample or a data sample. *)
 type michelson_sample = Code of michelson_code | Data of michelson_data
 
-(** Encoding used for saving or loading data. *)
 let michelson_sample_list_encoding =
   let open Data_encoding in
   let e = Script_repr.expr_encoding in
@@ -72,7 +59,6 @@ let michelson_sample_list_encoding =
            (fun (term, typ) -> Data {term; typ});
        ]
 
-(** Saving a list of samples to a file. *)
 let save ~filename ~terms =
   let bytes =
     match
@@ -97,7 +83,6 @@ let save ~filename ~terms =
       (Printexc.to_string exn) ;
     exit 1
 
-(** Loading a list of samples from a file. *)
 let load ~filename =
   let open TzPervasives in
   let string =
@@ -169,10 +154,7 @@ let rec michelson_type_list_to_ex_stack_ty
           in
           match ex_stack_ty with
           | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
-
-let print_m (term : Mikhailsky.node) =
-  Mikhailsky.pp Format.str_formatter term ;
-  Format.flush_str_formatter ()
+  [@@ocaml.warning "-32"]
 
 module type Sampler_parameters_sig = sig
   val initial : State_space.t
