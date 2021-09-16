@@ -38,6 +38,18 @@ type error +=
   | Restore_context_failure
   | Inconsistent_imported_block_legacy of Block_hash.t * Block_hash.t
 
+(* A hash that has been tagged with the kind of the value that it references
+   (either a node or a blob). *)
+module type Kinded_hash = sig
+  type t
+
+  type hash
+
+  val to_hash : t -> hash
+
+  val encoding : t Data_encoding.t
+end
+
 module type Dump_interface = sig
   type index
 
@@ -58,8 +70,6 @@ module type Dump_interface = sig
   val batch : index -> (batch -> 'a Lwt.t) -> 'a Lwt.t
 
   val commit_info_encoding : commit_info Data_encoding.t
-
-  val hash_encoding : hash Data_encoding.t
 
   val hash_equal : hash -> hash -> bool
 
@@ -85,6 +95,8 @@ module type Dump_interface = sig
     val encoding : t Data_encoding.t
   end
 
+  module Kinded_hash : Kinded_hash with type hash := hash
+
   (* Commit manipulation (for parents) *)
   val context_parents : context -> Commit_hash.t list
 
@@ -108,7 +120,7 @@ module type Dump_interface = sig
       depth-first post-order traversal. Branch children are visited in ascending
       key order. Memory usage is linear in the size of the tree. *)
   val tree_iteri_unique :
-    ([`Branch of (step * hash) list | `Leaf of contents] -> unit Lwt.t) ->
+    ([`Branch of (step * Kinded_hash.t) list | `Leaf of contents] -> unit Lwt.t) ->
     tree ->
     int Lwt.t
 
@@ -119,7 +131,7 @@ module type Dump_interface = sig
 
   val add_bytes : batch -> bytes -> tree Lwt.t
 
-  val add_dir : batch -> (step * hash) list -> tree option Lwt.t
+  val add_dir : batch -> (step * Kinded_hash.t) list -> tree option Lwt.t
 end
 
 module type S = sig
@@ -182,8 +194,6 @@ module type Dump_interface_legacy = sig
 
   val commit_info_encoding : commit_info Data_encoding.t
 
-  val hash_encoding : hash Data_encoding.t
-
   val hash_equal : hash -> hash -> bool
 
   module Block_header : sig
@@ -244,6 +254,8 @@ module type Dump_interface_legacy = sig
     val encoding : t Data_encoding.t
   end
 
+  module Kinded_hash : Kinded_hash with type hash := hash
+
   (* commit manipulation (for parents) *)
   val context_parents : context -> Commit_hash.t list
 
@@ -267,7 +279,9 @@ module type Dump_interface_legacy = sig
       depth-first post-order traversal. Branch children are visited in ascending
       key order. Memory usage is linear in the size of the tree. *)
   val tree_iteri_unique :
-    (int -> [`Branch of (step * hash) list | `Leaf of contents] -> unit Lwt.t) ->
+    (int ->
+    [`Branch of (step * Kinded_hash.t) list | `Leaf of contents] ->
+    unit Lwt.t) ->
     tree ->
     unit Lwt.t
 
@@ -278,7 +292,7 @@ module type Dump_interface_legacy = sig
 
   val add_bytes : batch -> bytes -> tree Lwt.t
 
-  val add_dir : batch -> (step * hash) list -> tree option Lwt.t
+  val add_dir : batch -> (step * Kinded_hash.t) list -> tree option Lwt.t
 end
 
 module type S_legacy = sig
