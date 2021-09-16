@@ -169,18 +169,21 @@ module Samplers = struct
     | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
 
   let sample_ir_code () =
-    let (sample, (bef, _)) = StaTz.Stats.sample_gen @@ Lazy.force generator in
-    let accounts = Account.generate_accounts 1 in
-    Block.alpha_context accounts >>=? fun ctxt ->
-    let code = Micheline.root sample in
-    let stack = stack_type_to_michelson_type_list bef in
-    let (Ex_stack_ty bef, _) = michelson_type_list_to_ex_stack_ty stack ctxt in
-    Script_ir_translator.(parse_instr Lambda ctxt ~legacy:true code bef)
-    >>= wrap
-    >>=? fun (ir_code, _) ->
-    match ir_code with
-    | Script_ir_translator.Typed ir_code -> return (sample, Ex_descr ir_code)
-    | _ -> assert false
+    match StaTz.Stats.sample_gen @@ Lazy.force generator with
+    | Data _ -> assert false
+    | Code {term = sample; bef = stack; aft = _} -> (
+        let accounts = Account.generate_accounts 1 in
+        Block.alpha_context accounts >>=? fun ctxt ->
+        let code = Micheline.root sample in
+        let (Ex_stack_ty bef, _) =
+          michelson_type_list_to_ex_stack_ty stack ctxt
+        in
+        Script_ir_translator.(parse_instr Lambda ctxt ~legacy:true code bef)
+        >>= wrap
+        >>=? fun (ir_code, _) ->
+        match ir_code with
+        | Script_ir_translator.Typed ir_code -> return (sample, Ex_descr ir_code)
+        | _ -> assert false)
 end
 
 module Printers = struct

@@ -27,6 +27,20 @@ open Tezos_error_monad.Error_monad
 
 let rng_state = Random.State.make [|42; 987897; 54120|]
 
+let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
+  Micheline_printer.print_expr
+    fmtr
+    (Micheline_printer.printable
+       Protocol.Michelson_v1_primitives.string_of_prim
+       expr)
+
+let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
+  Format.pp_print_list
+    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
+    print_script_expr
+    fmtr
+    exprs
+
 let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
   Mikhailsky.to_michelson typ
@@ -110,8 +124,7 @@ let typecheck_by_tezos =
     Stdlib.Result.get_ok
       (Lwt_main.run
          ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let stack = stack_type_to_michelson_type_list bef in
-           let (bef, ctxt) = michelson_type_list_to_ex_stack_ty stack ctxt in
+           let (bef, ctxt) = michelson_type_list_to_ex_stack_ty bef ctxt in
            let (Protocol.Script_ir_translator.Ex_stack_ty bef) = bef in
            Protocol.Script_ir_translator.parse_instr
              Protocol.Script_ir_translator.Lambda

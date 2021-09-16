@@ -115,10 +115,10 @@ end = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> value_size_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -277,17 +277,17 @@ end = struct
     match
       Michelson_generation.make_code_sampler rng_state cfg.generator_config
     with
-    | Code {term; bef} -> kinstr_size_benchmark rng_state term bef
+    | Code {term; bef; aft = _} -> kinstr_size_benchmark rng_state term bef
     | _ -> assert false
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> kinstr_size_benchmark rng_state term bef)
             | _ -> None)
           terms

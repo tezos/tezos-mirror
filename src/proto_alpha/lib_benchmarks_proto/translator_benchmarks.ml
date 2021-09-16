@@ -239,10 +239,10 @@ module Typechecking_data : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> typechecking_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -321,10 +321,10 @@ module Unparsing_data : Benchmark.S = struct
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> unparsing_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -388,17 +388,18 @@ module Typechecking_code : Benchmark.S = struct
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
     match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> typechecking_code_benchmark rng_state term bef
+    | Code {term; bef; aft = _} ->
+        typechecking_code_benchmark rng_state term bef
     | Data _ -> assert false
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> typechecking_code_benchmark rng_state term bef)
             | _ -> None)
           terms
@@ -470,17 +471,17 @@ module Unparsing_code : Benchmark.S = struct
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
     match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> unparsing_code_benchmark rng_state term bef
+    | Code {term; bef; aft = _} -> unparsing_code_benchmark rng_state term bef
     | Data _ -> assert false
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> unparsing_code_benchmark rng_state term bef)
             | _ -> None)
           terms
