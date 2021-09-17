@@ -494,4 +494,4 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
 
-(* Vanity nonce: TBD *)
+(* Vanity nonce: 0105005008491999 *)
