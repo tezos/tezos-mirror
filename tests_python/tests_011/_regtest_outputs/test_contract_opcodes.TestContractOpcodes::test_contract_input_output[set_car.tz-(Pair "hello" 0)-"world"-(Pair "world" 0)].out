@@ -1,0 +1,49 @@
+tests_011/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_car.tz-(Pair "hello" 0)-"world"-(Pair "world" 0)]
+
+storage
+  (Pair "world" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039988.591 units remaining)
+    [ (Pair "world" "hello" 0)  	 ]
+  - location: 9 (remaining gas: 1039988.581 units remaining)
+    [ (Pair "world" "hello" 0)  	
+      (Pair "world" "hello" 0)  	 ]
+  - location: 10 (remaining gas: 1039988.571 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "world" "hello" 0)  	 ]
+  - location: 11 (remaining gas: 1039988.556 units remaining)
+    [ (Pair "world" "hello" 0)  	 ]
+  - location: 13 (remaining gas: 1039988.546 units remaining)
+    [ "world"  	@parameter ]
+  - location: 11 (remaining gas: 1039988.516 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 15 (remaining gas: 1039988.506 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 16 (remaining gas: 1039988.496 units remaining)
+    [ "hello"  	
+      (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 17 (remaining gas: 1039988.486 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 18 (remaining gas: 1039988.476 units remaining)
+    [ 0  	@storage.n
+      "world"  	@parameter ]
+  - location: 19 (remaining gas: 1039988.466 units remaining)
+    [ "world"  	@parameter
+      0  	@storage.n ]
+  - location: 20 (remaining gas: 1039988.451 units remaining)
+    [ (Pair "world" 0)  	@storage ]
+  - location: 21 (remaining gas: 1039988.436 units remaining)
+    [ {}  	
+      (Pair "world" 0)  	@storage ]
+  - location: 23 (remaining gas: 1039988.421 units remaining)
+    [ (Pair {} "world" 0)  	 ]
+

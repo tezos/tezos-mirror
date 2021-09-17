@@ -1,0 +1,46 @@
+tests_011/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[self_address.tz-Unit-Unit-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039985.599 units remaining)
+    [ (Pair Unit Unit)  	 ]
+  - location: 7 (remaining gas: 1039985.589 units remaining)
+    [  ]
+  - location: 8 (remaining gas: 1039985.579 units remaining)
+    [ { DROP ; SELF_ADDRESS }  	 ]
+  - location: 14 (remaining gas: 1039985.569 units remaining)
+    [ Unit  	
+      { DROP ; SELF_ADDRESS }  	 ]
+  - location: 12 (remaining gas: 1039985.559 units remaining)
+    [  ]
+  - location: 13 (remaining gas: 1039985.544 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
+  - location: 15 (remaining gas: 1039985.514 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 16 (remaining gas: 1039985.499 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 17 (remaining gas: 1039985.489 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self.address
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 20 (remaining gas: 1039985.453 units remaining)
+    [ 0  	 ]
+  - location: 21 (remaining gas: 1039985.438 units remaining)
+    [ True  	 ]
+  - location: 22 (remaining gas: 1039985.428 units remaining)
+    [  ]
+  - location: 22 (remaining gas: 1039985.413 units remaining)
+    [  ]
+  - location: 28 (remaining gas: 1039985.403 units remaining)
+    [ Unit  	 ]
+  - location: 29 (remaining gas: 1039985.388 units remaining)
+    [ {}  	
+      Unit  	 ]
+  - location: 31 (remaining gas: 1039985.373 units remaining)
+    [ (Pair {} Unit)  	 ]
+

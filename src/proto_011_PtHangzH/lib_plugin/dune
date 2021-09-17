@@ -1,0 +1,23 @@
+(library
+ (name tezos_protocol_plugin_011_PtHangzH)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-protocol-plugin-011-PtHangzH)
+ (libraries tezos-base
+            tezos-protocol-011-PtHangzH)
+ (modules (:standard) \ Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_011_PtHangzH)))
+
+(library
+ (name tezos_protocol_plugin_011_PtHangzH_registerer)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-protocol-plugin-011-PtHangzH-registerer)
+ (libraries tezos-base
+            tezos-embedded-protocol-011-PtHangzH
+            tezos-protocol-plugin-011-PtHangzH
+            tezos-shell)
+ (modules Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_011_PtHangzH
+                   -open Tezos_protocol_plugin_011_PtHangzH
+                   -open Tezos_shell)))
