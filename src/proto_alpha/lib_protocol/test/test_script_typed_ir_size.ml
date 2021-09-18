@@ -31,7 +31,6 @@
     Subject:    Script_typed_ir computes good approximation of values' sizes
 *)
 
-open Tezos_benchmark_alpha
 open Protocol
 
 (*
@@ -118,16 +117,12 @@ module Samplers = struct
 
   let generator = Gen.generator ~burn_in:(500 * 7)
 
-  let base_type_to_michelson_type
-      (typ : Tezos_benchmark_type_inference_alpha.Type.Base.t) =
-    let open Tezos_benchmark_type_inference_alpha in
+  let base_type_to_michelson_type (typ : Type.Base.t) =
     let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
     Mikhailsky.to_michelson typ
 
   (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-  let rec stack_type_to_michelson_type_list
-      (typ : Tezos_benchmark_type_inference_alpha.Type.Stack.t) =
-    let open Tezos_benchmark_type_inference_alpha in
+  let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
     let node = typ.node in
     match node with
     | Type.Stack.Stack_var_t _ ->
@@ -201,7 +196,7 @@ module Printers = struct
        f ctxt >>= wrap >>=? fun node ->
        let printable =
          Micheline_printer.printable
-           Tezos_protocol_alpha.Protocol.Michelson_v1_primitives.string_of_prim
+           Protocol.Michelson_v1_primitives.string_of_prim
            node
        in
        let b = Buffer.create 13 in

@@ -76,8 +76,7 @@ val load : filename:string -> michelson_data list
 (** [base_type_to_michelson_type] converts a type as produced by the
     type inference engine in {!Tezos_benchmark_type_inference_alpha.Inference}
     to a type in IR form. *)
-val base_type_to_michelson_type :
-  Tezos_benchmark_type_inference_alpha.Type.Base.t -> Script_repr.expr
+val base_type_to_michelson_type : Type.Base.t -> Script_repr.expr
 
 (** [michelson_type_list_to_ex_stack_ty] converts a list of types in
     Micheline form to a stack type in IR form. *)
@@ -98,9 +97,7 @@ val michelson_type_to_ex_ty :
     type inference engine in {!Tezos_benchmark_type_inference_alpha.Inference}
     into a type in IR form. *)
 val base_type_to_ex_ty :
-  Tezos_benchmark_type_inference_alpha.Type.Base.t ->
-  Alpha_context.t ->
-  Script_ir_translator.ex_ty * Alpha_context.t
+  Type.Base.t -> Alpha_context.t -> Script_ir_translator.ex_ty * Alpha_context.t
 
 (** [stack_type_to_ex_stack_ty] converts a stack type as produced by the
     type inference engine in {!Tezos_benchmark_type_inference_alpha.Inference}
@@ -108,7 +105,7 @@ val base_type_to_ex_ty :
 
     @raise Failure if a stack type variable occurs in the argument. *)
 val stack_type_to_ex_stack_ty :
-  Tezos_benchmark_type_inference_alpha.Type.Stack.t ->
+  Type.Stack.t ->
   Alpha_context.t ->
   Script_ir_translator.ex_stack_ty * Alpha_context.t
 
