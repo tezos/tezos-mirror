@@ -54,7 +54,7 @@ let test_get_on_nonexistent_fails =
       expr_to_hash expr |> Environment.wrap_tzresult >>?= fun hash ->
       Global_constants_storage.get context hash
       >|= Environment.wrap_tzresult
-      >>= assert_error_id __LOC__ "proto.alpha.Nonexistent_global")
+      >>= assert_proto_error_id __LOC__ "Nonexistent_global")
 
 (** If registering an expression yields a hash [h] and context [c],
     then [get c h] should yield the original expression. *)
@@ -84,7 +84,7 @@ let test_register_fails_with_unregistered_references =
       create_context () >>=? fun context ->
       Global_constants_storage.register context prim_with_constant
       >|= Environment.wrap_tzresult
-      >>= assert_error_id __LOC__ "proto.alpha.Nonexistent_global")
+      >>= assert_proto_error_id __LOC__ "Nonexistent_global")
 
 (** Same test as [test_register_fails_with_unregistered_references]
     but with random values. *)
@@ -98,7 +98,7 @@ let test_register_fails_with_unregistered_references_pbt =
       assume_expr_not_too_large expr ;
       Global_constants_storage.register context expr
       >|= Environment.wrap_tzresult
-      >>= assert_error_id __LOC__ "proto.alpha.Nonexistent_global")
+      >>= assert_proto_error_id __LOC__ "Nonexistent_global")
 
 let rec grow n node =
   match n with n when n <= 0 -> node | n -> grow (n - 1) (Seq (-1, [node]))
@@ -117,7 +117,7 @@ let test_register_fails_if_too_deep =
       create_context () >>=? fun context ->
       Global_constants_storage.register context vdeep_expr
       >|= Environment.wrap_tzresult
-      >>= assert_error_id __LOC__ "proto.alpha.Expression_too_deep")
+      >>= assert_proto_error_id __LOC__ "Expression_too_deep")
 
 (** [expand] on an expression containing a nonexistent global
     constant returns an error. *)
@@ -132,7 +132,7 @@ let test_expand_nonexistent_fails =
   assume_expr_not_too_large expr ;
   Global_constants_storage.expand context expr
   >|= Environment.wrap_tzresult
-  >>= assert_error_id __LOC__ "proto.alpha.Nonexistent_global"
+  >>= assert_proto_error_id __LOC__ "Nonexistent_global"
 
 (** Expanding an expression without constants should yield the same expression. *)
 let test_expand_no_constants =
@@ -240,9 +240,7 @@ let test_expand_reject_ill_formed =
         let expected = Expr.from_string expr in
         Global_constants_storage.expand context expected
         >|= Environment.wrap_tzresult
-        >>= assert_error_id
-              __LOC__
-              "proto.alpha.Badly_formed_constant_expression"
+        >>= assert_proto_error_id __LOC__ "Badly_formed_constant_expression"
       in
       (* constant with an argument other than String fails *)
       test "constant 9" >>=? fun () ->
@@ -293,7 +291,7 @@ let test_reject_use_of_inner_constant =
         (Expr.from_string
         @@ Format.sprintf "{ constant (constant \"%s\") } " hash)
       >|= Environment.wrap_tzresult
-      >>= assert_error_id __LOC__ "proto.alpha.Badly_formed_constant_expression")
+      >>= assert_proto_error_id __LOC__ "Badly_formed_constant_expression")
 
 (** [test_expand] accepts an expression [stored] to be
     registered in the store, an expression [expr] that includes a template slot for

@@ -46,8 +46,11 @@ let assert_expr_equal loc =
     "Michelson Expressions Not Equal"
     Michelson_v1_printer.print_expr
 
-let assert_error_id loc id result =
-  let test err = (Error_monad.find_info_of_error err).id = id in
+let assert_proto_error_id loc id result =
+  let test err =
+    (Error_monad.find_info_of_error err).id
+    = "proto." ^ Protocol.name ^ "." ^ id
+  in
   Assert.error ~loc result test
 
 let expr_to_hash expr =
@@ -99,7 +102,7 @@ let test_registration_of_bad_expr_fails () =
     ~value:(Script_repr.lazy_expr expr)
   >>=? fun op ->
   Incremental.add_operation b op
-  >>= assert_error_id __LOC__ "proto.alpha.Badly_formed_constant_expression"
+  >>= assert_proto_error_id __LOC__ "Badly_formed_constant_expression"
 
 (* You cannot register the same expression twice. *)
 let test_no_double_register () =
@@ -119,7 +122,7 @@ let test_no_double_register () =
     ~value:(Script_repr.lazy_expr expr)
   >>=? fun op ->
   Incremental.add_operation b op
-  >>= assert_error_id __LOC__ "proto.alpha.Expression_already_registered"
+  >>= assert_proto_error_id __LOC__ "Expression_already_registered"
 
 let tests =
   [

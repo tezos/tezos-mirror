@@ -43,8 +43,11 @@ let assert_expr_equal loc =
     "Michelson Expressions Not Equal"
     Michelson_v1_printer.print_expr
 
-let assert_error_id loc id result =
-  let test err = (Error_monad.find_info_of_error err).id = id in
+let assert_proto_error_id loc id result =
+  let test err =
+    (Error_monad.find_info_of_error err).id
+    = "proto." ^ Protocol.name ^ "." ^ id
+  in
   Assert.error ~loc result test
 
 let assert_ok_lwt x =
