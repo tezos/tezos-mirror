@@ -1603,7 +1603,17 @@ module RPC = struct
           let ctxt = Gas.set_limit ctxt gas in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
+            {
+              source;
+              payer;
+              self = dummy_contract;
+              amount;
+              chain_id;
+              now = Script_timestamp.now ctxt;
+              level =
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs;
+            }
           in
           Script_interpreter.execute
             ctxt
@@ -1659,7 +1669,17 @@ module RPC = struct
           let ctxt = Gas.set_limit ctxt gas in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
+            {
+              source;
+              payer;
+              self = dummy_contract;
+              amount;
+              chain_id;
+              now = Script_timestamp.now ctxt;
+              level =
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs;
+            }
           in
           let module Unparsing_mode = struct
             let unparsing_mode = unparsing_mode
@@ -1725,7 +1745,17 @@ module RPC = struct
           let ctxt = Gas.set_limit ctxt gas in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = contract; amount = Tez.zero; chain_id}
+            {
+              source;
+              payer;
+              self = contract;
+              amount = Tez.zero;
+              chain_id;
+              now = Script_timestamp.now ctxt;
+              level =
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs;
+            }
           in
           let parameter =
             View_helpers.make_view_parameter

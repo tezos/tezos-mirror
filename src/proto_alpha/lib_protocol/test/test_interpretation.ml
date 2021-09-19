@@ -34,6 +34,8 @@ let default_step_constants =
     self = default_source;
     amount = Tez.zero;
     chain_id = Chain_id.zero;
+    now = Script_timestamp.of_zint Z.zero;
+    level = Script_int.zero_n;
   }
 
 (** Helper function that parses and types a script, its initial storage and

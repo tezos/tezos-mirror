@@ -50,6 +50,10 @@ type step_constants = {
       (** The amount of the current transaction, as returned by AMOUNT. *)
   chain_id : Chain_id.t;
       (** The chain id of the chain, as returned by CHAIN_ID. *)
+  now : Script_timestamp.t;
+      (** The earliest time at which the current block could have been timestamped, as returned by NOW. *)
+  level : Script_int.n Script_int.num;
+      (** The level of the current block, as returned by LEVEL. *)
 }
 
 (* Preliminary definitions. *)

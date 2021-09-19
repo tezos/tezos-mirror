@@ -96,6 +96,8 @@ type step_constants = Script_typed_ir.step_constants = {
   self : Contract.t;
   amount : Tez.t;
   chain_id : Chain_id.t;
+  now : Script_timestamp.t;
+  level : Script_int.n Script_int.num;
 }
 
 (* ---- Run-time errors -----------------------------------------------------*)
@@ -1145,14 +1147,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks balance (accu, stack)
       | ILevel (_, k) ->
-          let level =
-            (Level.current (context_from_outdated_context ctxt)).level
-            |> Raw_level.to_int32 |> Script_int.of_int32 |> Script_int.abs
-          in
-          (step [@ocaml.tailcall]) g gas k ks level (accu, stack)
-      | INow (_, k) ->
-          let now = Script_timestamp.now (context_from_outdated_context ctxt) in
-          (step [@ocaml.tailcall]) g gas k ks now (accu, stack)
+          (step [@ocaml.tailcall]) g gas k ks sc.level (accu, stack)
+      | INow (_, k) -> (step [@ocaml.tailcall]) g gas k ks sc.now (accu, stack)
       | ICheck_signature (_, k) ->
           let key = accu and (signature, (message, stack)) = stack in
           let res = Signature.check key signature message in
