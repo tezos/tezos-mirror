@@ -33,6 +33,10 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
+    ( "011",
+      "011 Hangzhou",
+      Some "/include/rpc_introduction.rst.inc",
+      "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r" );
     ( "",
       "010 Granada",
       Some "/include/rpc_introduction.rst.inc",

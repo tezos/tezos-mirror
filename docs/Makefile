@@ -10,11 +10,13 @@ DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+HANGZHOU_LONG = PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
 GRANADA_LONG = PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 ACTIVE_LONG = $(GRANADA_LONG)
 
 ALPHA_SHORT    = alpha
 GRANADA_SHORT = 010-PtGRANAD
+HANGZHOU_SHORT = 011-PtHangzH
 ACTIVE_SHORT = $(GRANADA_SHORT)
 
 SCRIPTSDIR		= scripts
@@ -31,6 +33,11 @@ manuals: main
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
 	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
+    # 011 (Hangzhou) protocol
+	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-client.html
+	@../tezos-baker-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-baker.html
+	@../tezos-endorser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-endorser.html
+	@../tezos-accuser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-accuser.html
     # 010 (Granada) protocol
 	@../tezos-client -protocol $(GRANADA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-client.html
 	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker.html
@@ -72,6 +79,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
 	$(CHECKXREFS) 010
+	$(CHECKXREFS) -l 011
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -101,6 +109,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index "011" > 011/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
@@ -163,5 +172,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 010/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst active/rpc.rst 010/rpc.rst 011/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 010/tezos-*.html 011/tezos-*.html alpha/tezos-*.html
