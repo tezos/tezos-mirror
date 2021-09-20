@@ -23,43 +23,74 @@ be documented here either.
 Node
 ----
 
-- GET ``/workers/prevalidators``: The field ``backlog`` always returns
-  an empty list. The events in this backlog can be obtained in a
-  different way: either via stdout, or by configuring a new sink for
-  events via the environment variable ``TEZOS_EVENTS_CONFIG`` (should
-  be set before launching the node)
+Client
+------
 
+Baker / Endorser / Accuser
+--------------------------
 
-- GET ``/chains/<chain_id>/mempool/monitor_operation``: Output is
-  extended to include operation hashes (field name is ``hash``) and
-  errors (field name is ``error``) when the operation was classified
-  as ``Branch_delayed``, ``Branch_refused`` or ``Refused``.
+Proxy server
+------------
 
--  Better handling of mempool cache in the `distributed_db` which
-   should make the `distributed_db` RAM consumption strongly
-   correlated to the one of the mempool.
+Protocol Compiler And Environment
+---------------------------------
 
--  Fixed wrong error message in case of p2p network address binding collision.
+Codec
+-----
 
--  Updated the output of the ``/stats/gc`` RPC entry point: it now also
+Docker Images
+-------------
+
+Miscellaneous
+-------------
+
+Version 11.0~rc1
+================
+
+Node
+----
+
+-  **Breaking change**:
+   updated the output of the ``/stats/gc`` RPC entry point: it now also
    reports the number of full major collections made by the OCaml
-   garbage collector. Because this changes the JSON schema of this
-   existing RPC entry point, it is a breaking change.
+   garbage collector.
 
--  Added new RPCs to ban/unban operations locally:
+-  **Breaking change**:
+   updated the encoding of chain validator events.
+   The output of RPC ``GET /workers/chain_validators/<chain_id>``
+   was modified as a result.
 
-   -  POST ``/chains/<chain_id>/mempool/ban_operation``: Ban a given
+-  Updated RPC ``GET /workers/prevalidators``: field ``backlog`` now
+   always returns an empty list. The events in this backlog can now be
+   obtained either via stdout, or by configuring a new sink for events
+   via the environment variable ``TEZOS_EVENTS_CONFIG`` (to be set
+   before launching the node).
+
+-  Updated RPC ``GET /chains/<chain_id>/mempool/monitor_operation``:
+   output was extended to include operation hashes (field name is
+   ``hash``) and errors (field name is ``error``) when the operation
+   is classified as ``Branch_delayed``, ``Branch_refused`` or ``Refused``.
+
+-  Improved how the distributed database (DDB) handles the mempool cache.
+   This should make the DDB RAM consumption strongly correlated
+   to the one of the mempool.
+
+-  Fixed wrong error message in case of P2P network address binding collision.
+
+-  Added new RPCs to ban/unban operations locally.
+
+   -  POST ``/chains/<chain_id>/mempool/ban_operation``: ban a given
       operation hash. The operation is removed from the mempool, and
       its effect is reverted if it was applied. It is also added to
       the prevalidator's set of banned operations, to prevent it from
       being fetched/processed/injected in the future.
-   -  POST ``/chains/<chain_id>/mempool/unban_operation``: Unban a given
+
+   -  POST ``/chains/<chain_id>/mempool/unban_operation``: unban a given
       operation hash, removing it from the prevalidator's set of banned
       operations. Nothing happens if the operation was not banned.
-   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
-      all operations, i.e. clear the set of banned operations.
 
-- Change chain validator event encoding. RPC GET  ``/workers/chain_validators/<chain_id>`` is modified.
+   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: unban
+      all operations, i.e. clear the set of banned operations.
 
 -  Added the possibility to use the ``~``, ``-`` and ``+`` operators
    when querying blocks by their level using the
@@ -76,6 +107,11 @@ Node
    on flush, leading to these operations being potentially reevaluated
    in the future (e.g. if they are advertised again by a peer).
 
+-  Removed the built-in network aliases for Edonet and Florencenet,
+   since Edo and Florence have been replaced by Granada.
+
+-  Added a built-in network alias for Hangzhounet.
+
 Client
 ------
 
@@ -90,7 +126,7 @@ Client
    ``unban operation <operation_hash>``, and ``unban all operations``
    that call the corresponding RPCs.
 
--  Made mode light ``--endpoint``/``--sources`` consistency check
+-  Made mode light ``--endpoint`` / ``--sources`` consistency check
    happen earlier, so that it is guaranteed to catch mismatches.
 
 -  Added commands ``list proxy protocols`` and ``list light protocols``,
@@ -99,33 +135,36 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
-Proxy server
-------------
+-  Removed baker, endorser and accuser for Edo and Florence, since they
+   have been replaced by Granada.
 
 Protocol Compiler And Environment
 ---------------------------------
 
 -  Added a new version of the protocol environment (V3).
 
-   -  Update some dependency libraries that have had releases since V2
+   -  Updated some dependency libraries that have had releases since V2.
 
-   -  Improve safety by removing access to some potentially dangerous functions
+   -  Improved safety by removing access to some potentially dangerous functions
       (functions that make assumptions about their input, functions that rely on
-      implicit comparison, etc.)
+      implicit comparison, etc.).
 
-   -  New features: Timelock, FallbackArray
+   -  Added new features: ``Timelock`` and ``FallbackArray``.
 
-   -  New feature: chunked transfer encoded RPCs to allow RPCs with large
-      responses to be processed in chunks.
-
-Codec
------
+   -  Added new feature: RPC outputs can now be chunked.
+      RPCs that use this feature in the protocol can now respond without blocking
+      during the encoding of the output.
 
 Docker Images
 -------------
 
-Miscellaneous
--------------
+-  The entrypoint script now starts the node with ``--allow-all-rpc``.
+   This means that ACLs are inactive in the Docker image on the default RPC port.
+   Note that the Docker image does not expose this port by default.
+   If you use ``tezos-docker-manager.sh``, it will expose this port only to
+   other Octez containers.
+   In summary, you can now call all RPCs if you use Docker images, without
+   compromising security as long as you do not explicitely expose the RPC port.
 
 Version 10.2
 ============
