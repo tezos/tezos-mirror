@@ -1,0 +1,21 @@
+tests_011/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_size.tz-111-{ 1 ; 2 ; 3 ; 4 ; 5 ; 6 }-6]
+
+storage
+  6
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039993.095 units remaining)
+    [ (Pair { 1 ; 2 ; 3 ; 4 ; 5 ; 6 } 111)  	 ]
+  - location: 8 (remaining gas: 1039993.085 units remaining)
+    [ { 1 ; 2 ; 3 ; 4 ; 5 ; 6 }  	@parameter ]
+  - location: 9 (remaining gas: 1039993.070 units remaining)
+    [ 6  	 ]
+  - location: 10 (remaining gas: 1039993.055 units remaining)
+    [ {}  	
+      6  	 ]
+  - location: 12 (remaining gas: 1039993.040 units remaining)
+    [ (Pair {} 6)  	 ]
+

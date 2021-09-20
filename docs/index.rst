@@ -156,6 +156,21 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: 011 Hangzhou Protocol doc:
+
+   011/michelson
+   011/proof_of_stake
+   011/consensus
+   011/sapling
+   011/voting
+   011/glossary
+   011/cli-commands
+   011/rpc
+   011/liquidity_baking
+   011/timelock
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/michelson
@@ -203,6 +218,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/008_edo
    protocols/009_florence
    protocols/010_granada
+   protocols/011_hangzhou
    protocols/alpha
 
 .. toctree::

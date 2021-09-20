@@ -1,0 +1,350 @@
+tests_011/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[comparisons.tz-{}-{ -9999999; -1 ; 0 ; 1 ; 9999999 }-{ { False ; False ; False ; True ; True } ;\n    { False ; False ; True ; True ; True } ;\n    { True ; True ; False ; False ; False } ;\n    { True ; True ; True ; False ; False } ;\n    { True ; True ; False ; True ; True } ;\n    { False ; False ; True ; False ; False } }]
+
+storage
+  { { False ; False ; False ; True ; True } ;
+    { False ; False ; True ; True ; True } ;
+    { True ; True ; False ; False ; False } ;
+    { True ; True ; True ; False ; False } ;
+    { True ; True ; False ; True ; True } ;
+    { False ; False ; True ; False ; False } }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039967.677 units remaining)
+    [ (Pair { -9999999 ; -1 ; 0 ; 1 ; 9999999 } {})  	 ]
+  - location: 10 (remaining gas: 1039967.667 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 11 (remaining gas: 1039967.652 units remaining)
+    [ {}  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 14 (remaining gas: 1039967.637 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 16 (remaining gas: 1039967.627 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.627 units remaining)
+    [ -9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 19 (remaining gas: 1039967.612 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.597 units remaining)
+    [ -1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 19 (remaining gas: 1039967.582 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.567 units remaining)
+    [ 0  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 19 (remaining gas: 1039967.552 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.537 units remaining)
+    [ 1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 19 (remaining gas: 1039967.522 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.507 units remaining)
+    [ 9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 19 (remaining gas: 1039967.492 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 17 (remaining gas: 1039967.477 units remaining)
+    [ { False ; False ; True ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 14 (remaining gas: 1039967.447 units remaining)
+    [ {}  	
+      { False ; False ; True ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 20 (remaining gas: 1039967.437 units remaining)
+    [ { False ; False ; True ; False ; False }  	
+      {}  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 21 (remaining gas: 1039967.422 units remaining)
+    [ { { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 22 (remaining gas: 1039967.407 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 24 (remaining gas: 1039967.397 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.397 units remaining)
+    [ -9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 27 (remaining gas: 1039967.382 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.367 units remaining)
+    [ -1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 27 (remaining gas: 1039967.352 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.337 units remaining)
+    [ 0  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 27 (remaining gas: 1039967.322 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.307 units remaining)
+    [ 1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 27 (remaining gas: 1039967.292 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.277 units remaining)
+    [ 9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 27 (remaining gas: 1039967.262 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 25 (remaining gas: 1039967.247 units remaining)
+    [ { True ; True ; False ; True ; True }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 22 (remaining gas: 1039967.217 units remaining)
+    [ { { False ; False ; True ; False ; False } }  	
+      { True ; True ; False ; True ; True }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 28 (remaining gas: 1039967.207 units remaining)
+    [ { True ; True ; False ; True ; True }  	
+      { { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 29 (remaining gas: 1039967.192 units remaining)
+    [ { { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 30 (remaining gas: 1039967.177 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 32 (remaining gas: 1039967.167 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.167 units remaining)
+    [ -9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 35 (remaining gas: 1039967.152 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.137 units remaining)
+    [ -1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 35 (remaining gas: 1039967.122 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.107 units remaining)
+    [ 0  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 35 (remaining gas: 1039967.092 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.077 units remaining)
+    [ 1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 35 (remaining gas: 1039967.062 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.047 units remaining)
+    [ 9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 35 (remaining gas: 1039967.032 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 33 (remaining gas: 1039967.017 units remaining)
+    [ { True ; True ; True ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 30 (remaining gas: 1039966.987 units remaining)
+    [ { { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { True ; True ; True ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 36 (remaining gas: 1039966.977 units remaining)
+    [ { True ; True ; True ; False ; False }  	
+      { { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 37 (remaining gas: 1039966.962 units remaining)
+    [ { { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 38 (remaining gas: 1039966.947 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 40 (remaining gas: 1039966.937 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.937 units remaining)
+    [ -9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 43 (remaining gas: 1039966.922 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.907 units remaining)
+    [ -1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 43 (remaining gas: 1039966.892 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.877 units remaining)
+    [ 0  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 43 (remaining gas: 1039966.862 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.847 units remaining)
+    [ 1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 43 (remaining gas: 1039966.832 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.817 units remaining)
+    [ 9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 43 (remaining gas: 1039966.802 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 41 (remaining gas: 1039966.787 units remaining)
+    [ { True ; True ; False ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 38 (remaining gas: 1039966.757 units remaining)
+    [ { { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { True ; True ; False ; False ; False }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 44 (remaining gas: 1039966.747 units remaining)
+    [ { True ; True ; False ; False ; False }  	
+      { { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 45 (remaining gas: 1039966.732 units remaining)
+    [ { { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 46 (remaining gas: 1039966.717 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 48 (remaining gas: 1039966.707 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.707 units remaining)
+    [ -9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 51 (remaining gas: 1039966.692 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.677 units remaining)
+    [ -1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 51 (remaining gas: 1039966.662 units remaining)
+    [ False  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.647 units remaining)
+    [ 0  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 51 (remaining gas: 1039966.632 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.617 units remaining)
+    [ 1  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 51 (remaining gas: 1039966.602 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.587 units remaining)
+    [ 9999999  	@parameter.elt
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 51 (remaining gas: 1039966.572 units remaining)
+    [ True  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 49 (remaining gas: 1039966.557 units remaining)
+    [ { False ; False ; True ; True ; True }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 46 (remaining gas: 1039966.527 units remaining)
+    [ { { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { False ; False ; True ; True ; True }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 52 (remaining gas: 1039966.517 units remaining)
+    [ { False ; False ; True ; True ; True }  	
+      { { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 53 (remaining gas: 1039966.502 units remaining)
+    [ { { False ; False ; True ; True ; True } ;
+        { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 54 (remaining gas: 1039966.487 units remaining)
+    [ { -9999999 ; -1 ; 0 ; 1 ; 9999999 }  	@parameter ]
+  - location: 56 (remaining gas: 1039966.487 units remaining)
+    [ -9999999  	@parameter.elt ]
+  - location: 58 (remaining gas: 1039966.472 units remaining)
+    [ False  	 ]
+  - location: 56 (remaining gas: 1039966.457 units remaining)
+    [ -1  	@parameter.elt ]
+  - location: 58 (remaining gas: 1039966.442 units remaining)
+    [ False  	 ]
+  - location: 56 (remaining gas: 1039966.427 units remaining)
+    [ 0  	@parameter.elt ]
+  - location: 58 (remaining gas: 1039966.412 units remaining)
+    [ False  	 ]
+  - location: 56 (remaining gas: 1039966.397 units remaining)
+    [ 1  	@parameter.elt ]
+  - location: 58 (remaining gas: 1039966.382 units remaining)
+    [ True  	 ]
+  - location: 56 (remaining gas: 1039966.367 units remaining)
+    [ 9999999  	@parameter.elt ]
+  - location: 58 (remaining gas: 1039966.352 units remaining)
+    [ True  	 ]
+  - location: 56 (remaining gas: 1039966.337 units remaining)
+    [ { False ; False ; False ; True ; True }  	 ]
+  - location: 54 (remaining gas: 1039966.307 units remaining)
+    [ { { False ; False ; True ; True ; True } ;
+        { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	
+      { False ; False ; False ; True ; True }  	 ]
+  - location: 59 (remaining gas: 1039966.297 units remaining)
+    [ { False ; False ; False ; True ; True }  	
+      { { False ; False ; True ; True ; True } ;
+        { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	 ]
+  - location: 60 (remaining gas: 1039966.282 units remaining)
+    [ { { False ; False ; False ; True ; True } ;
+        { False ; False ; True ; True ; True } ;
+        { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	 ]
+  - location: 61 (remaining gas: 1039966.267 units remaining)
+    [ {}  	
+      { { False ; False ; False ; True ; True } ;
+        { False ; False ; True ; True ; True } ;
+        { True ; True ; False ; False ; False } ;
+        { True ; True ; True ; False ; False } ;
+        { True ; True ; False ; True ; True } ;
+        { False ; False ; True ; False ; False } }  	 ]
+  - location: 63 (remaining gas: 1039966.252 units remaining)
+    [ (Pair {}
+            { { False ; False ; False ; True ; True } ;
+              { False ; False ; True ; True ; True } ;
+              { True ; True ; False ; False ; False } ;
+              { True ; True ; True ; False ; False } ;
+              { True ; True ; False ; True ; True } ;
+              { False ; False ; True ; False ; False } })  	 ]
+

@@ -143,3 +143,12 @@ duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
                                  src/bin_codec/dune
 duplicate_and_replace -${pattern} -${replacement} \
                       src/bin_codec/tezos-codec.opam
+
+# activate in proxy
+duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
+                                 src/bin_proxy_server/dune
+duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
+                                 src/bin_proxy_server/dune
+# TODO: currently there is no protocol in the .opam, but there should be
+#duplicate_and_replace -${pattern} -${replacement} \
+#                      src/bin_proxy_server/tezos-proxy-server.opam

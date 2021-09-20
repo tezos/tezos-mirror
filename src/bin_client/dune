@@ -62,6 +62,9 @@
             (select void_for_linking-010-PtGRANAD from
               (tezos-client-010-PtGRANAD-commands-registration -> void_for_linking-010-PtGRANAD.empty)
               (-> void_for_linking-010-PtGRANAD.empty))
+            (select void_for_linking-011-PtHangzH from
+              (tezos-client-011-PtHangzH-commands-registration -> void_for_linking-011-PtHangzH.empty)
+              (-> void_for_linking-011-PtHangzH.empty))
 
             (select void_for_linking-alpha from
               (tezos-client-alpha-commands-registration -> void_for_linking-alpha.empty)
@@ -82,6 +85,9 @@
             (select void_for_linking-baking-010-PtGRANAD from
               (tezos-baking-010-PtGRANAD-commands.registration -> void_for_linking-baking-010-PtGRANAD.empty)
               (-> void_for_linking-baking-010-PtGRANAD.empty))
+            (select void_for_linking-baking-011-PtHangzH from
+              (tezos-baking-011-PtHangzH-commands.registration -> void_for_linking-baking-011-PtHangzH.empty)
+              (-> void_for_linking-baking-011-PtHangzH.empty))
 
             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             ; If you modify this file around here, modify src/bin_proxy_server/dune too! ;
@@ -99,6 +105,9 @@
             (select void_for_linking-010-PtGRANAD-protocol-plugin from
               (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-010-PtGRANAD-protocol-plugin.empty)
               (-> void_for_linking-010-PtGRANAD-protocol-plugin.empty))
+            (select void_for_linking-011-PtHangzH-protocol-plugin from
+              (tezos-protocol-plugin-011-PtHangzH -> void_for_linking-011-PtHangzH-protocol-plugin.empty)
+              (-> void_for_linking-011-PtHangzH-protocol-plugin.empty))
             (select void_for_linking-alpha-protocol-plugin from
               (tezos-protocol-plugin-alpha -> void_for_linking-alpha-protocol-plugin.empty)
               (-> void_for_linking-alpha-protocol-plugin.empty))
@@ -133,16 +142,19 @@
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-009-PsFLoren.empty "")
    (write-file void_for_linking-010-PtGRANAD.empty "")
+   (write-file void_for_linking-011-PtHangzH.empty "")
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
    (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-baking-009-PsFLoren.empty "")
    (write-file void_for_linking-baking-010-PtGRANAD.empty "")
+   (write-file void_for_linking-baking-011-PtHangzH.empty "")
    (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
    (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin.empty "")
    (write-file void_for_linking-009-PsFLoren-protocol-plugin.empty "")
    (write-file void_for_linking-010-PtGRANAD-protocol-plugin.empty "")
+   (write-file void_for_linking-011-PtHangzH-protocol-plugin.empty "")
    (write-file void_for_linking-alpha-protocol-plugin.empty "")
 )))
 

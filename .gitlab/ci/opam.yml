@@ -46,6 +46,11 @@ opam-bin:tezos-accuser-010-PtGRANAD:
   variables:
     package: tezos-accuser-010-PtGRANAD
 
+opam-bin:tezos-accuser-011-PtHangzH:
+  extends: .opam_bin_template
+  variables:
+    package: tezos-accuser-011-PtHangzH
+
 opam-bin:tezos-accuser-alpha:
   extends: .opam_bin_template
   variables:
@@ -65,6 +70,11 @@ opam-bin:tezos-baker-010-PtGRANAD:
   extends: .opam_bin_template
   variables:
     package: tezos-baker-010-PtGRANAD
+
+opam-bin:tezos-baker-011-PtHangzH:
+  extends: .opam_bin_template
+  variables:
+    package: tezos-baker-011-PtHangzH
 
 opam-bin:tezos-baker-alpha:
   extends: .opam_bin_template
@@ -95,6 +105,11 @@ opam-bin:tezos-endorser-010-PtGRANAD:
   extends: .opam_bin_template
   variables:
     package: tezos-endorser-010-PtGRANAD
+
+opam-bin:tezos-endorser-011-PtHangzH:
+  extends: .opam_bin_template
+  variables:
+    package: tezos-endorser-011-PtHangzH
 
 opam-bin:tezos-endorser-alpha:
   extends: .opam_bin_template
@@ -201,6 +216,11 @@ opam:tezos-010-PtGRANAD-test-helpers:
   variables:
     package: tezos-010-PtGRANAD-test-helpers
 
+opam:tezos-011-PtHangzH-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-011-PtHangzH-test-helpers
+
 opam:tezos-accuser-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
@@ -215,6 +235,11 @@ opam:tezos-accuser-010-PtGRANAD-commands:
   extends: .opam_template
   variables:
     package: tezos-accuser-010-PtGRANAD-commands
+
+opam:tezos-accuser-011-PtHangzH-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-011-PtHangzH-commands
 
 opam:tezos-accuser-alpha-commands:
   extends: .opam_template
@@ -256,6 +281,16 @@ opam:tezos-baking-010-PtGRANAD-commands:
   variables:
     package: tezos-baking-010-PtGRANAD-commands
 
+opam:tezos-baking-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-011-PtHangzH
+
+opam:tezos-baking-011-PtHangzH-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-011-PtHangzH-commands
+
 opam:tezos-baking-alpha:
   extends: .opam_template
   variables:
@@ -286,6 +321,11 @@ opam:tezos-benchmark-010-PtGRANAD:
   variables:
     package: tezos-benchmark-010-PtGRANAD
 
+opam:tezos-benchmark-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-011-PtHangzH
+
 opam:tezos-benchmark-alpha:
   extends: .opam_template
   variables:
@@ -306,6 +346,11 @@ opam:tezos-benchmark-type-inference-010-PtGRANAD:
   variables:
     package: tezos-benchmark-type-inference-010-PtGRANAD
 
+opam:tezos-benchmark-type-inference-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-011-PtHangzH
+
 opam:tezos-benchmark-type-inference-alpha:
   extends: .opam_template
   variables:
@@ -315,6 +360,11 @@ opam:tezos-benchmarks-proto-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-benchmarks-proto-010-PtGRANAD
+
+opam:tezos-benchmarks-proto-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmarks-proto-011-PtHangzH
 
 opam:tezos-benchmarks-proto-alpha:
   extends: .opam_template
@@ -451,6 +501,21 @@ opam:tezos-client-010-PtGRANAD-commands-registration:
   variables:
     package: tezos-client-010-PtGRANAD-commands-registration
 
+opam:tezos-client-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangzH
+
+opam:tezos-client-011-PtHangzH-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangzH-commands
+
+opam:tezos-client-011-PtHangzH-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-011-PtHangzH-commands-registration
+
 opam:tezos-client-alpha:
   extends: .opam_template
   variables:
@@ -510,6 +575,11 @@ opam:tezos-client-sapling-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-client-sapling-010-PtGRANAD
+
+opam:tezos-client-sapling-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-011-PtHangzH
 
 opam:tezos-client-sapling-alpha:
   extends: .opam_template
@@ -591,6 +661,11 @@ opam:tezos-embedded-protocol-010-PtGRANAD:
   variables:
     package: tezos-embedded-protocol-010-PtGRANAD
 
+opam:tezos-embedded-protocol-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-011-PtHangzH
+
 opam:tezos-embedded-protocol-alpha:
   extends: .opam_template
   variables:
@@ -630,6 +705,11 @@ opam:tezos-endorser-010-PtGRANAD-commands:
   extends: .opam_template
   variables:
     package: tezos-endorser-010-PtGRANAD-commands
+
+opam:tezos-endorser-011-PtHangzH-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-endorser-011-PtHangzH-commands
 
 opam:tezos-endorser-alpha-commands:
   extends: .opam_template
@@ -826,6 +906,21 @@ opam:tezos-protocol-010-PtGRANAD-tests:
   variables:
     package: tezos-protocol-010-PtGRANAD-tests
 
+opam:tezos-protocol-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-011-PtHangzH
+
+opam:tezos-protocol-011-PtHangzH-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-011-PtHangzH-parameters
+
+opam:tezos-protocol-011-PtHangzH-tests:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-011-PtHangzH-tests
+
 opam:tezos-protocol-alpha:
   extends: .opam_template
   variables:
@@ -941,6 +1036,11 @@ opam:tezos-protocol-functor-010-PtGRANAD:
   variables:
     package: tezos-protocol-functor-010-PtGRANAD
 
+opam:tezos-protocol-functor-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-011-PtHangzH
+
 opam:tezos-protocol-functor-alpha:
   extends: .opam_template
   variables:
@@ -1015,6 +1115,16 @@ opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
   extends: .opam_template
   variables:
     package: tezos-protocol-plugin-010-PtGRANAD-registerer
+
+opam:tezos-protocol-plugin-011-PtHangzH:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-011-PtHangzH
+
+opam:tezos-protocol-plugin-011-PtHangzH-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-011-PtHangzH-registerer
 
 opam:tezos-protocol-plugin-alpha:
   extends: .opam_template

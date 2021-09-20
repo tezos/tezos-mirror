@@ -28,6 +28,7 @@
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_environment_alpha
                    -open Tezos_benchmark_alpha
+                   -open Tezos_benchmark_type_inference_alpha
                    -open Tezos_alpha_test_helpers
                    -open Tezos_base_test_helpers)))
 

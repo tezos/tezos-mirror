@@ -1,0 +1,46 @@
+tests_011/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_cdr.tz-(Pair "hello" 500)-3-(Pair "hello" 3)]
+
+storage
+  (Pair "hello" 3)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039989.258 units remaining)
+    [ (Pair 3 "hello" 500)  	 ]
+  - location: 9 (remaining gas: 1039989.248 units remaining)
+    [ (Pair 3 "hello" 500)  	
+      (Pair 3 "hello" 500)  	 ]
+  - location: 10 (remaining gas: 1039989.238 units remaining)
+    [ (Pair "hello" 500)  	@storage
+      (Pair 3 "hello" 500)  	 ]
+  - location: 11 (remaining gas: 1039989.223 units remaining)
+    [ (Pair 3 "hello" 500)  	 ]
+  - location: 13 (remaining gas: 1039989.213 units remaining)
+    [ 3  	@parameter ]
+  - location: 11 (remaining gas: 1039989.183 units remaining)
+    [ (Pair "hello" 500)  	@storage
+      3  	@parameter ]
+  - location: 15 (remaining gas: 1039989.173 units remaining)
+    [ (Pair "hello" 500)  	@storage
+      (Pair "hello" 500)  	@storage
+      3  	@parameter ]
+  - location: 16 (remaining gas: 1039989.163 units remaining)
+    [ 500  	
+      (Pair "hello" 500)  	@storage
+      3  	@parameter ]
+  - location: 17 (remaining gas: 1039989.153 units remaining)
+    [ (Pair "hello" 500)  	@storage
+      3  	@parameter ]
+  - location: 18 (remaining gas: 1039989.143 units remaining)
+    [ "hello"  	@storage.s
+      3  	@parameter ]
+  - location: 19 (remaining gas: 1039989.128 units remaining)
+    [ (Pair "hello" 3)  	@storage ]
+  - location: 20 (remaining gas: 1039989.113 units remaining)
+    [ {}  	
+      (Pair "hello" 3)  	@storage ]
+  - location: 22 (remaining gas: 1039989.098 units remaining)
+    [ (Pair {} "hello" 3)  	 ]
+

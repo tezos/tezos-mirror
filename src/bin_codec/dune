@@ -38,6 +38,9 @@
             (select void_for_linking-010-PtGRANAD from
               (tezos-client-010-PtGRANAD -> void_for_linking-010-PtGRANAD.empty)
               (-> void_for_linking-010-PtGRANAD.empty))
+            (select void_for_linking-011-PtHangzH from
+              (tezos-client-011-PtHangzH -> void_for_linking-011-PtHangzH.empty)
+              (-> void_for_linking-011-PtHangzH.empty))
  )
  (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives
@@ -58,4 +61,5 @@
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-009-PsFLoren.empty "")
    (write-file void_for_linking-010-PtGRANAD.empty "")
+   (write-file void_for_linking-011-PtHangzH.empty "")
 )))

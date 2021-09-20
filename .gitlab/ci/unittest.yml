@@ -62,6 +62,16 @@ unit:010_PtGRANAD:
       src/proto_010_PtGRANAD/lib_client.test_proto
       src/proto_010_PtGRANAD/lib_protocol.test_proto
 
+unit:011_PtHangzH:
+  extends: .unit_test_template
+  script:
+     - >
+       make
+       src/proto_011_PtHangzH/lib_benchmark/lib_benchmark_type_inference.test_proto
+       src/proto_011_PtHangzH/lib_benchmark.test_proto
+       src/proto_011_PtHangzH/lib_client.test_proto
+       src/proto_011_PtHangzH/lib_protocol.test_proto
+
 unit:alpha:
   extends: .unit_test_template
   script:
@@ -71,7 +81,6 @@ unit:alpha:
        src/proto_alpha/lib_benchmark.test_proto
        src/proto_alpha/lib_client.test_proto
        src/proto_alpha/lib_protocol.test_proto
-
 unit:non-proto:
   extends: .unit_test_template
   script:

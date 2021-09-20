@@ -1,0 +1,10 @@
+(tests
+ (names test_uf
+        test_inference)
+ (package tezos-benchmark-type-inference-011-PtHangzH)
+ (libraries tezos-micheline tezos-micheline-rewriting
+            tezos-benchmark-type-inference-011-PtHangzH tezos-protocol-011-PtHangzH
+            tezos-error-monad tezos-client-011-PtHangzH)
+ (flags
+    (:standard -open Tezos_micheline
+               -open Tezos_benchmark_type_inference_011_PtHangzH)))
