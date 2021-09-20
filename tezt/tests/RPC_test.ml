@@ -751,16 +751,33 @@ let test_mempool ?endpoint client =
   in
   let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1765
+
+     Once openapi-diff is integrated, this test could be removed. *)
   (* Call describe on mempool RPCs and record the output. *)
   let describe_path =
     sf
       "http://localhost:%d/describe/chains/main/mempool?recurse=yes"
       (get_client_port client)
   in
-  let proc_describe =
-    Process.spawn ~hooks:mempool_hooks "curl" ["-s"; describe_path]
+  let message = Log.quote_shell_command "curl" ["-s"; describe_path] in
+  Regression.capture ("\n" ^ message) ;
+  let proc_describe = Process.spawn "curl" ["-s"; describe_path] in
+  let* output = Process.check_and_read_stdout proc_describe in
+  (* To ease the reading of the output (which is expected to be a JSON
+     value), we prettify the output. It makes easier to interpret
+     regressions. *)
+  let prettified_output =
+    output
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1766
+
+       End of line characters are trimmed because the /describe/ RPC may
+       introduce them in string litteral which seems forbidden by the JSON
+       standard. *)
+    |> replace_string ~all:true (rex "\n") ~by:""
+    |> JSON.parse ~origin:message |> JSON.encode
   in
-  let* _output_monitor = Process.check_and_read_stdout proc_describe in
+  Regression.capture prettified_output ;
   unit
 
 let start_with_acl address acl =
