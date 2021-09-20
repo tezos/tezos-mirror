@@ -312,6 +312,7 @@ module type T = sig
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
     mutable filter_config : Filter.Mempool.config;
+    lock : Lwt_mutex.t;
   }
 
   module Types : Worker_intf.TYPES with type state = types_state
@@ -381,6 +382,7 @@ module Make
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
     mutable filter_config : Filter.Mempool.config;
+    lock : Lwt_mutex.t;
   }
 
   module Types = struct
@@ -810,22 +812,10 @@ module Make
          RPC_directory.gen_register
            !dir
            (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-           (fun
-             {
-               shell =
-                 {
-                   classification =
-                     {applied_rev; refused; branch_refused; branch_delayed; _};
-                   _;
-                 };
-               operation_stream;
-               _;
-             }
-             params
-             ()
-           ->
+           (fun pv params () ->
+             Lwt_mutex.with_lock pv.lock @@ fun () ->
              let (op_stream, stopper) =
-               Lwt_watcher.create_stream operation_stream
+               Lwt_watcher.create_stream pv.operation_stream
              in
              (* Convert ops *)
              let map_op error (hash, op) =
@@ -841,19 +831,23 @@ module Make
              in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
-               if params#applied then List.filter_map (map_op []) applied_rev
+               if params#applied then
+                 List.filter_map (map_op []) pv.shell.classification.applied_rev
                else []
              in
              let refused =
                if params#refused then
-                 Operation_hash.Map.fold fold_op (Classification.map refused) []
+                 Operation_hash.Map.fold
+                   fold_op
+                   (Classification.map pv.shell.classification.refused)
+                   []
                else []
              in
              let branch_refused =
                if params#branch_refused then
                  Operation_hash.Map.fold
                    fold_op
-                   (Classification.map branch_refused)
+                   (Classification.map pv.shell.classification.branch_refused)
                    []
                else []
              in
@@ -861,7 +855,7 @@ module Make
                if params#branch_delayed then
                  Operation_hash.Map.fold
                    fold_op
-                   (Classification.map branch_delayed)
+                   (Classification.map pv.shell.classification.branch_delayed)
                    []
                else []
              in
@@ -1142,6 +1136,7 @@ module Make
               | Head_increment | Ignored_head -> false
               | Branch_switch -> true)
           in
+          Lwt_mutex.with_lock pv.lock @@ fun () ->
           on_flush ~handle_branch_refused pv block live_blocks live_operations
       | Request.Notify (peer, mempool) ->
           on_notify w pv.shell peer mempool >>= fun () -> return_unit
@@ -1220,6 +1215,7 @@ module Make
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
                initialize from config file *)
             Filter.Mempool.default_config;
+          lock = Lwt_mutex.create ();
         }
       in
       Seq.iter_s
