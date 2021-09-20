@@ -1,6 +1,6 @@
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 393349af19bb54e3cb790ac8ef54a72adc71aecf
+  build_deps_image_version: 25f9d287058434f1b9940bc8c734e486b59b42b9
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
@@ -36,7 +36,7 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
@@ -49,7 +49,7 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
@@ -63,7 +63,7 @@ variables:
       when: never
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
@@ -85,11 +85,11 @@ variables:
       when: always
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /doc/'
+    - if: '$CI_COMMIT_BRANCH =~ /doc/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /doc/'
       when: always
     - changes:
         - /docs
@@ -105,7 +105,7 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     # Run when the branch name contains the `opam` keyword.
-    - if: '$CI_COMMIT_BRANCH =~ /opam/'
+    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
       when: always
     # Run when opam changes are detected.
     - if: '$TZ_OPAM_FILES_MODIFIED == "true"'
@@ -123,7 +123,7 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
-    - if: '$CI_COMMIT_BRANCH =~ /arm64/'
+    - if: '$CI_COMMIT_BRANCH =~ /arm64/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /arm64/'
       when: always
     - when: manual
       allow_failure: true
@@ -143,7 +143,7 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     # Run when the branch name contains the `opam` keyword.
-    - if: '$CI_COMMIT_BRANCH =~ /opam/'
+    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
       when: always
     # Run on merge requests.
     - if: '$CI_MERGE_REQUEST_PROJECT_ID'
