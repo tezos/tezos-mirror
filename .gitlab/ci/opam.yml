@@ -796,11 +796,6 @@ opam:tezos-protocol-009-PsFLoren-parameters:
   variables:
     package: tezos-protocol-009-PsFLoren-parameters
 
-opam:tezos-protocol-009-PsFLoren-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-009-PsFLoren-tests
-
 opam:tezos-protocol-010-PtGRANAD:
   extends: .opam_template
   variables:
