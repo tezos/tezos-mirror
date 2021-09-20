@@ -1,6 +1,6 @@
 #! /bin/sh
 
-set -e
+set -eu
 
 ci_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 script_dir="$(dirname "$ci_dir")"

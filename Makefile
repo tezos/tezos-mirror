@@ -25,7 +25,7 @@ COBERTURA_REPORT := _coverage_report/cobertura.xml
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
+TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server tezos-print-version \
     $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
     $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \

@@ -86,8 +86,9 @@ module Baker = struct
           ()
       in
       cctxt#message
-        "Baker v%s (%s) for %a started."
-        Tezos_version.Version.current_string
+        "Baker v%a (%s) for %a started."
+        Tezos_version.Version.pp
+        Tezos_version.Current_git_info.version
         Tezos_version.Current_git_info.abbreviated_commit_hash
         Protocol_hash.pp_short
         Protocol.hash
@@ -121,8 +122,9 @@ module Accuser = struct
         ()
       >>=? fun valid_blocks_stream ->
       cctxt#message
-        "Accuser v%s (%s) for %a started."
-        Tezos_version.Version.current_string
+        "Accuser v%a (%s) for %a started."
+        Tezos_version.Version.pp
+        Tezos_version.Current_git_info.version
         Tezos_version.Current_git_info.abbreviated_commit_hash
         Protocol_hash.pp_short
         Protocol.hash

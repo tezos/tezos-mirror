@@ -77,6 +77,7 @@ build_release:docker_amd64:
   extends:
     - .build_docker_release_template
     - .rules_template__master_and_releases
+    - .docker_registry_auth
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
   stage: build_release
@@ -87,6 +88,7 @@ build_release:docker_arm64:
   extends:
     - .build_docker_release_template
     - .rules_template__master_and_releases
+    - .docker_registry_auth
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
   stage: build_release

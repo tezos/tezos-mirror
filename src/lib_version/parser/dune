@@ -1,0 +1,8 @@
+(library
+  (public_name tezos-version.parser)
+  (name tezos_version_parser)
+  (preprocess (pps ppx_deriving.show ppx_deriving.make))
+  (modules tezos_version_parser)
+)
+(ocamllex tezos_version_parser)
+
