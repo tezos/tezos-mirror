@@ -26,14 +26,25 @@
 (* Note: please try to keep this module free of *any* dependency so that
    a script can trivially run the toplevel on it to get the version number. *)
 
-type additional_info = Dev | RC of int | Release
+open Version_parser
+
+type additional_info = Version_parser.additional_info =
+  | Dev
+  | RC of int
+  | Release
+
+type t = Version_parser.t = {
+  major : int;
+  minor : int;
+  additional_info : additional_info;
+}
+
+let parse_version s = version_tag (Lexing.from_string s)
 
 let string_of_additional_info = function
   | Dev -> "+dev"
   | RC n -> "~rc" ^ string_of_int n
   | Release -> ""
-
-type t = {major : int; minor : int; additional_info : additional_info}
 
 let to_string {major; minor; additional_info} =
   string_of_int major ^ "." ^ string_of_int minor
