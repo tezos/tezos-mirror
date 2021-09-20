@@ -44,6 +44,7 @@ endif
 		src/lib_protocol_compiler/main_native.exe \
 		src/bin_snoop/main_snoop.exe \
 		src/bin_proxy_server/main_proxy_server.exe \
+		src/lib_version/print_version.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
