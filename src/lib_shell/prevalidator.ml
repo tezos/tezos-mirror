@@ -136,11 +136,14 @@ type 'block chain_tools = {
 (* [handle_live_operations] and [recycle_operations] will ultimately
    move to [Prevalidator_classification]. This is an intermediate state. *)
 
-(** [handle_live_operations chain_db from_branch to_branch live_blocks old_mempool]
+(** [handle_live_operations chain_db from_branch to_branch is_branch_alive old_mempool]
     returns the operations from:
 
     1. [old_mempool],
-    2. [from_branch] that are NOT in [to_branch].
+    2. [from_branch] that are NOT in [to_branch],
+
+    for the subset of these operations whose branch is up-to-date according
+    to [is_branch_alive] (operations that are not alive are cleared).
 
     Returned operations can be considered pending afterwards and
     are eligible to be propagated. On the other hand, all operations
@@ -163,7 +166,7 @@ type 'block chain_tools = {
     *)
 let handle_live_operations ~(block_store : 'block block_tools)
     ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
-    ~live_blocks old_mempool =
+    ~(is_branch_alive : Block_hash.t -> bool) old_mempool =
   let rec pop_block ancestor (block : 'block) mempool =
     let hash = block_store.hash block in
     if Block_hash.equal hash ancestor then Lwt.return mempool
@@ -206,7 +209,7 @@ let handle_live_operations ~(block_store : 'block block_tools)
   let new_mempool = List.fold_left push_block mempool path in
   let (new_mempool, outdated) =
     Operation_hash.Map.partition
-      (fun _oph op -> Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+      (fun _oph op -> is_branch_alive op.Operation.shell.branch)
       new_mempool
   in
   Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
@@ -220,7 +223,7 @@ let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
     ~chain
     ~from_branch
     ~to_branch
-    ~live_blocks
+    ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
     (Operation_hash.Map.union
        (fun _key v _ -> Some v)
        (Classification.to_map
