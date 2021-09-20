@@ -8,6 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
+  "ppx_deriving"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
