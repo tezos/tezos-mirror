@@ -17,6 +17,7 @@ depends: [
   "pyml"
   "pyml-plot"
   "ocamlgraph"
+  "prbnmcn-stats"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
