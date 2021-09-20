@@ -10,3 +10,5 @@
  ; Ensures the hash update whenever a source file is modified ;
  (deps (universe) (:script get-git-info.mlt))
  (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
+
+(ocamllex version_parser)
