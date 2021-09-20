@@ -47,3 +47,5 @@ let committer_date =
   if String.equal raw_committer_date ("$Format" ^ ":%ci$") then
     Generated_git_info.committer_date
   else raw_committer_date
+
+let version = Generated_git_info.git_describe

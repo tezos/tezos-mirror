@@ -729,3 +729,13 @@ def originate(
     bake(client, baker)
     assert check_block_contains_operations(client, [origination.operation_hash])
     return origination
+
+
+def get_tezos_node_version() -> str:
+    cmd = ["dune", "exec", "../src/lib_version/tezos_print_version.exe"]
+    process_ret = subprocess.run(
+        cmd, capture_output=True, text=True, check=True
+    )
+    version = process_ret.stdout.strip()
+    assert version, "version should not be empty"
+    return version
