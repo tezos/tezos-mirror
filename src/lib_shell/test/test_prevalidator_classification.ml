@@ -33,7 +33,7 @@
 open Lib_test.Qcheck_helpers
 
 module Operation_map = struct
-  let pp ppf map =
+  let pp_with_trace ppf map =
     Format.fprintf
       ppf
       "[%a]"
@@ -47,7 +47,7 @@ module Operation_map = struct
              op))
       (Operation_hash.Map.bindings map)
 
-  let pp2 ppf map =
+  let pp ppf map =
     Format.fprintf
       ppf
       "[%a]"
@@ -347,7 +347,7 @@ let test_flush_empties_all_except_refused =
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
-    ~pp:Operation_map.pp
+    ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
     ~expected:refused_before
     ~actual:refused_after
@@ -372,7 +372,7 @@ let test_flush_empties_all_except_refused_and_branch_refused =
   in
   let _ =
     qcheck_eq'
-      ~pp:Operation_map.pp
+      ~pp:Operation_map.pp_with_trace
       ~eq:Operation_map.eq
       ~expected:branch_refused_before
       ~actual:branch_refused_after
@@ -381,7 +381,7 @@ let test_flush_empties_all_except_refused_and_branch_refused =
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
   qcheck_eq'
-    ~pp:Operation_map.pp
+    ~pp:Operation_map.pp_with_trace
     ~eq:Operation_map.eq
     ~expected:refused_before
     ~actual:refused_after
@@ -712,7 +712,7 @@ module To_map = struct
     let to_string ((t, (oph, _op)), _classification) =
       Format.asprintf
         "Starting with:@. %a@.and operation hash %a@. "
-        Operation_map.pp2
+        Operation_map.pp
         (to_map_all t)
         Operation_hash.pp
         oph
@@ -761,7 +761,7 @@ module To_map = struct
     let to_string ((t, (oph, _op)), _classification) =
       Format.asprintf
         "Starting with:@. %a@.and operation hash %a@. "
-        Operation_map.pp2
+        Operation_map.pp
         (to_map_all t)
         Operation_hash.pp
         oph
