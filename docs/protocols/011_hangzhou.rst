@@ -1,13 +1,13 @@
-Protocol Alpha
-==============
+Protocol Hangzhou
+=================
 
-This page contains all the relevant information for protocol Alpha
+This page contains all the relevant information for protocol Hangzhou
 (see :ref:`naming_convention`).
 
 The code can be found in the :src:`src/proto_011_PtHangzH` directory of the
 ``master`` branch of Tezos.
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Hangzhou with respect
 to Granada.
 
 .. contents::
