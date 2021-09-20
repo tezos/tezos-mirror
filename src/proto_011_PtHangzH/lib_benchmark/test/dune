@@ -9,7 +9,7 @@
             tezos-011-PtHangzH-test-helpers
             tezos-error-monad
             alcotest-lwt
-            staTz)
+            prbnmcn-stats)
 ;; uncomment to enable gprof profiling
 ;; (ocamlopt_flags (:standard -p -ccopt -no-pie))
  (flags (:standard

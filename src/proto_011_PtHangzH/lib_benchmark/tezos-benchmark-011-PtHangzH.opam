@@ -19,7 +19,7 @@ depends: [
   "hashcons"
   "benchmark-utils"
   "tezos-011-PtHangzH-test-helpers"
-  "staTz"
+  "prbnmcn-stats"
   "tezos-micheline" { with-test }
   "tezos-error-monad" { with-test }
   "alcotest-lwt" { with-test }
