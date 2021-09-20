@@ -12,7 +12,7 @@
   hashcons
   benchmark-utils
   tezos-alpha-test-helpers
-  staTz)
+  prbnmcn-stats)
  (library_flags (:standard -linkall))
  (private_modules kernel rules state_space)
  (flags (:standard -open Tezos_stdlib
