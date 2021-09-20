@@ -1177,11 +1177,25 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:(list processed_operation_encoding)
           RPC_path.(path / "monitor_operations")
 
+      let get_filter_query =
+        let open RPC_query in
+        query (fun include_default ->
+            object
+              method include_default = include_default
+            end)
+        |+ field
+             ~descr:"Show fields equal to their default value (set by default)"
+             "include_default"
+             RPC_arg.bool
+             true
+             (fun t -> t#include_default)
+        |> seal
+
       let get_filter path =
         RPC_service.get_service
           ~description:
             {|Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. "minimal_nanotez_per_gas_unit": [ "100", "1" ].|}
-          ~query:RPC_query.empty
+          ~query:get_filter_query
           ~output:json
           RPC_path.(path / "filter")
 

@@ -653,9 +653,14 @@ module Make
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1876
      Remove this function upon the next release of [data-encoding]. *)
 
-  let get_filter pv =
+  (** Returns a json describing the prevalidator's [filter_config].
+      The boolean [include_default] ([true] by default) indicates
+      whether the json should include the fields which have a value
+      equal to their default value. *)
+  let get_filter_config_json ?(include_default = true) pv =
+    let include_default_fields = if include_default then `Always else `Never in
     data_encoding_json_construct
-      ~include_default_fields:`Always
+      ~include_default_fields
       Filter.Mempool.config_encoding
       pv.filter_config
 
@@ -678,7 +683,11 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.get_filter RPC_path.open_root)
-           (fun pv () () -> return (get_filter pv)) ;
+           (fun pv params () ->
+             return
+               (get_filter_config_json
+                  ~include_default:params#include_default
+                  pv)) ;
        dir :=
          RPC_directory.register
            !dir
