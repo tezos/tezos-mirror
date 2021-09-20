@@ -313,7 +313,7 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
   in
   let parameters_edo =
     JSON.parse_file
-    @@ Protocol.parameter_file ~constants:Constants_mainnet Protocol.Florence
+    @@ Protocol.parameter_file ~constants:Constants_mainnet Protocol.Granada
   in
   let blocks_per_cycle_edo =
     JSON.(parameters_edo |-> "blocks_per_cycle" |> as_int)

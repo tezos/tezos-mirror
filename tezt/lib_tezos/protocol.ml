@@ -25,21 +25,17 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Florence | Granada | Alpha
+type t = Granada | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function
-  | Alpha -> "Alpha"
-  | Florence -> "Florence"
-  | Granada -> "Granada"
+let name = function Alpha -> "Alpha" | Granada -> "Granada"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Florence -> "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
   | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
 
 let default_constants = Constants_sandbox
@@ -54,15 +50,11 @@ let parameter_file ?(constants = default_constants) protocol =
   let directory =
     match protocol with
     | Alpha -> "proto_alpha"
-    | Florence -> "proto_009_PsFLoren"
     | Granada -> "proto_010_PtGRANAD"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
-let daemon_name = function
-  | Alpha -> "alpha"
-  | Florence -> "009-PsFLoren"
-  | Granada -> "010-PtGRANAD"
+let daemon_name = function Alpha -> "alpha" | Granada -> "010-PtGRANAD"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -93,17 +85,11 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
   Lwt.return overriden_parameters
 
-let next_protocol = function
-  | Granada -> Some Alpha
-  | Florence -> Some Granada
-  | Alpha -> None
+let next_protocol = function Granada -> Some Alpha | Alpha -> None
 
-let previous_protocol = function
-  | Alpha -> Some Granada
-  | Granada -> Some Florence
-  | Florence -> None
+let previous_protocol = function Alpha -> Some Granada | Granada -> None
 
-let all = [Alpha; Florence; Granada]
+let all = [Alpha; Granada]
 
 let current_mainnet = Granada
 
