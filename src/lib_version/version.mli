@@ -38,7 +38,10 @@
     [Release] means "no additional information".
     This is an actual released version.
     No additional info is printed. *)
-type additional_info = Dev | RC of int | Release
+type additional_info = Version_parser.additional_info =
+  | Dev
+  | RC of int
+  | Release
 
 (** Convert additional version information to a string.
 
@@ -68,3 +71,6 @@ val current : t
 
 (** Same as [to_string current]. *)
 val current_string : string
+
+(* Parse a version in tezos format. Return None if the version cannot be parsed *)
+val parse_version : string -> t option
