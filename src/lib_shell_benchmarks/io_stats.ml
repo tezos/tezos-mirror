@@ -101,11 +101,6 @@ let context_statistics base_dir context_hash =
   Tezos_context.Context.close index >>= fun () ->
   Lwt.return (tree_statistics tree)
 
-open StaTz
-
-let empirical_of_list (l : int list) : int Stats.emp =
-  Stats.empirical_of_raw_data (Array.of_list l)
-
 let matrix_of_int_list (l : int list) =
   let arr = Array.map float_of_int (Array.of_list l) in
   Pyplot.Matrix.init ~lines:(Array.length arr) ~cols:1 ~f:(fun l _ -> arr.(l))
