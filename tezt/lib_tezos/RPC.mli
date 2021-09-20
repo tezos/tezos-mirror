@@ -161,6 +161,15 @@ val mempool_unban_operation :
 val mempool_unban_all_operations :
   ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
 
+(** Call RPC POST /chains/[chain]/mempool/filter *)
+val post_mempool_filter :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
   ?endpoint:Client.endpoint ->

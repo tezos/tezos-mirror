@@ -54,7 +54,10 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
-(** Note that [applied] and [in_mempool] are intentionally unbounded. *)
+(** Note that [applied] and [in_mempool] are intentionally unbounded.
+    See the mli for detailed documentation.
+    All operations must maintain the invariant about [in_mempool]
+    described in the mli. *)
 type t = {
   parameters : parameters;
   refused : bounded_map;
@@ -74,14 +77,23 @@ let create parameters =
     applied_rev = [];
   }
 
-let clear (classes : t) ~handle_branch_refused =
+let set_of_bounded_map bounded_map =
+  Operation_hash.Map.fold
+    (fun oph _ acc -> Operation_hash.Set.add oph acc)
+    bounded_map.map
+    Operation_hash.Set.empty
+
+let flush (classes : t) ~handle_branch_refused =
   if handle_branch_refused then (
     Ringo.Ring.clear classes.branch_refused.ring ;
     classes.branch_refused.map <- Operation_hash.Map.empty) ;
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
   classes.applied_rev <- [] ;
-  classes.in_mempool <- Operation_hash.Set.empty
+  classes.in_mempool <-
+    Operation_hash.Set.union
+      (set_of_bounded_map classes.refused)
+      (set_of_bounded_map classes.branch_refused)
 
 let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 
@@ -238,4 +250,25 @@ module Internal_for_tests = struct
       applied_rev
       in_mempool_pp
       in_mempool
+
+  let set_of_bounded_map = set_of_bounded_map
+
+  let pp_t_sizes pp t =
+    let show_bounded_map name bounded_map =
+      Format.sprintf
+        "%s map: %d, %s ring: %d"
+        name
+        (Operation_hash.Map.cardinal bounded_map.map)
+        name
+        (List.length (Ringo.Ring.elements bounded_map.ring))
+    in
+    Format.fprintf
+      pp
+      "map_size_limit: %d\n%s\n%s\n%s\napplied_rev: %d\nin_mempool: %d"
+      t.parameters.map_size_limit
+      (show_bounded_map "refused" t.refused)
+      (show_bounded_map "branch_refused" t.branch_refused)
+      (show_bounded_map "branch_delayed" t.branch_delayed)
+      (List.length t.applied_rev)
+      (Operation_hash.Set.cardinal t.in_mempool)
 end

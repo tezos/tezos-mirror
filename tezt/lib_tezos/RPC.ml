@@ -93,6 +93,10 @@ let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
   let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
   Client.rpc ?endpoint POST path client
 
+let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "filter"] in
+  Client.rpc ?endpoint ?hooks ~data POST path client
+
 let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
     client =
   let path =
