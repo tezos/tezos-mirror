@@ -12,7 +12,7 @@ run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
 depends: [
   "dune" {build & >= "2.0"}
   "tezos-micheline"
-  "zarith"
+  "zarith" { >= "1.12" & < "1.13" }
   "tezos-stdlib"
   "tezos-error-monad"
   "alcotest-lwt" {with-test}
