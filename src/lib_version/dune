@@ -2,6 +2,7 @@
  (name tezos_version)
  (instrumentation (backend bisect_ppx))
  (public_name tezos-version)
+ (modules bin_version node_version version version_parser generated_git_info current_git_info)
  (libraries tezos-base)
  (flags (:standard -open Tezos_base__TzPervasives)))
 
@@ -12,3 +13,12 @@
  (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
 
 (ocamllex version_parser)
+
+(executable
+ (name print_version)
+ (public_name print-version)
+ (package tezos-version)
+ (modules print_version)
+ (libraries tezos-version tezos-base.unix)
+ (flags (:standard -open Tezos_version))
+ )
