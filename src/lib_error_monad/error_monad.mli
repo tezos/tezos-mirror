@@ -174,21 +174,12 @@ val error_of_exn : exn -> error
     *)
 val error_of_fmt : ('a, Format.formatter, unit, error) format4 -> 'a
 
-(** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
-    constructor of a result into a [tzresult]. This is intended for use when
-    interacting with code that uses exceptions wrapped in a [result]. E.g.,
-
-{[
-let p : int Lwt.t = … in
-Lwt_result.catch p >|= tzresult_of_exn_result
-]} *)
-val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
-
-(** {2 Misc helpers} *)
+(** {2 Standard errors} *)
 
 (** Wrapped OCaml/Lwt exception *)
 type error += Exn of exn
 
+(** Cancelation *)
 type error += Canceled
 
 (** {2 Catching exceptions} *)
