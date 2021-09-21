@@ -541,6 +541,8 @@ let test_delegates protocol ?endpoint client =
         test_delegates_on_unregistered_alpha ~contracts ?endpoint client
     | Protocol.Granada ->
         test_delegates_on_unregistered_granada ~contracts ?endpoint client
+    | Protocol.Hangzhou ->
+        test_delegates_on_unregistered_alpha ~contracts ?endpoint client
   in
 
   unit

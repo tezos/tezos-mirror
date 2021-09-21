@@ -25,11 +25,14 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Granada | Alpha
+type t = Granada | Hangzhou | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function Alpha -> "Alpha" | Granada -> "Granada"
+let name = function
+  | Alpha -> "Alpha"
+  | Granada -> "Granada"
+  | Hangzhou -> "Hangzhou"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -37,6 +40,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+  | Hangzhou -> "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
 
 let default_constants = Constants_sandbox
 
@@ -51,10 +55,14 @@ let parameter_file ?(constants = default_constants) protocol =
     match protocol with
     | Alpha -> "proto_alpha"
     | Granada -> "proto_010_PtGRANAD"
+    | Hangzhou -> "proto_011_PtHangzH"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
-let daemon_name = function Alpha -> "alpha" | Granada -> "010-PtGRANAD"
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Granada -> "010-PtGRANAD"
+  | Hangzhou -> "011-PtHangzH"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -115,11 +123,17 @@ let write_parameter_file :
   let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
   Lwt.return overriden_parameters
 
-let next_protocol = function Granada -> Some Alpha | Alpha -> None
+let next_protocol = function
+  | Granada -> Some Hangzhou
+  | Hangzhou -> Some Alpha
+  | Alpha -> None
 
-let previous_protocol = function Alpha -> Some Granada | Granada -> None
+let previous_protocol = function
+  | Alpha -> Some Hangzhou
+  | Hangzhou -> Some Granada
+  | Granada -> None
 
-let all = [Alpha; Granada]
+let all = [Alpha; Granada; Hangzhou]
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)

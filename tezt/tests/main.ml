@@ -32,9 +32,9 @@
             other files.
  *)
 
-let protocols = [Protocol.Alpha; Protocol.Granada]
+let protocols = [Protocol.Alpha; Protocol.Hangzhou; Protocol.Granada]
 
-let migrate_from = Protocol.Granada
+let migrate_from = Protocol.Hangzhou
 
 let migrate_to = Protocol.Alpha
 
