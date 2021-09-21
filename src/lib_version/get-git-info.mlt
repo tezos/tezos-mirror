@@ -1,6 +1,7 @@
 #!/usr/bin/env ocaml
 ;;
-#load "unix.cma"
+
+#load "unix.cma";;
 
 let query ?env ~default cmd =
   let run_git () =
@@ -20,8 +21,13 @@ let hash = query ~env:"GIT_SHORTREF" ~default:"unknown" "git show -s --pretty=fo
 
 let date = query ~env:"GIT_DATETIME" ~default:"not-available" "git show -s --pretty=format:%ci"
 
+(* find the most recent tag. If one commit is associated with two or more tags,
+   output always the most recently added tag *)
+let git_describe = query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags"
+
 let () =
   Format.printf
-    "@[<v>let commit_hash = \"%s\"@,let committer_date = \"%s\"@]@."
+    "@[<v>let commit_hash = \"%s\"@,let committer_date = \"%s\"@,let git_describe = \"%s\"@]@."
     hash
     date
+    git_describe
