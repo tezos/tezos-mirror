@@ -5,7 +5,6 @@ docs/introduction/install-opam-scratch.sh
 docs/introduction/install-opam.sh
 docs/introduction/use-docker-granadanet.sh
 scripts/baker-version-stats.sh
-scripts/check_opam_test.sh
 scripts/ci/create_docker_image.build.sh
 scripts/ci/create_docker_image.minimal.sh
 scripts/ci/docker_registry_delete.sh
@@ -29,7 +28,6 @@ scripts/tezos-docker-manager.sh
 scripts/update_hashes.sh
 scripts/update_integration_test.sh
 scripts/update_opam_repo.sh
-scripts/update_opam_test.sh
 scripts/user_activated_upgrade.sh
 scripts/version.sh
 src/bin_client/bash-completion.sh

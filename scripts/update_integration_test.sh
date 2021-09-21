@@ -3,11 +3,7 @@
 # Usage: ./scripts/update_integration_test.sh
 
 # This script is for automatically updating the tests in
-# `.gitlab/ci/integration.yml`. This script specifically updates the integration
-# tests; the script `update_opam_test.sh` is for upgrading the packaging tests.
-# Both scripts are similar in structure and the documentation in this one stands
-# for the documentation of the other. Note that step 2 varies from script to
-# script, but the logic and the intent is the same.
+# `.gitlab/ci/integration.yml`. This script specifically updates the integration tests.
 
 set -e
 
