@@ -134,6 +134,7 @@ stages:
         - /docs
       when: always
     - when: never
+
 .rules_template__development_opam:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
@@ -159,6 +160,15 @@ stages:
 .rules_template__development_coverage:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - when: manual
+      allow_failure: true
+
+.rules_template__development_arm64:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH =~ /arm64/'
       when: always
     - when: manual
       allow_failure: true

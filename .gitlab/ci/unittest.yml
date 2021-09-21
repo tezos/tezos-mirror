@@ -16,7 +16,6 @@ test-script-gen-genesis:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: test
-  needs: ["build"]
   before_script:
     - . ./scripts/version.sh
   retry: 2
@@ -27,8 +26,10 @@ test-script-gen-genesis:
 
 .unit_test_template:
   extends: .test_template
+  variables:
+    ARCH: ""
   artifacts:
-    name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
     paths:
       - test_results
     reports:
@@ -36,8 +37,22 @@ test-script-gen-genesis:
     expire_in: 1 day
     when: always
 
-unit:010_PtGRANAD:
+.unit_test_template_x86_64:
   extends: .unit_test_template
+  needs: ["build_x86_64"]
+  variables:
+    ARCH: "x86_64"
+
+.unit_test_template_arm64:
+  extends: .unit_test_template
+  needs: ["build_arm64"]
+  variables:
+    ARCH: "arm64"
+  tags:
+    - arm64
+
+unit:010_PtGRANAD:
+  extends: .unit_test_template_x86_64
   script:
     - >
       make
@@ -57,7 +72,7 @@ unit:011_PtHangzH:
        src/proto_011_PtHangzH/lib_protocol.test_proto
 
 unit:alpha:
-  extends: .unit_test_template
+  extends: .unit_test_template_x86_64
   script:
      - >
        make
@@ -65,17 +80,23 @@ unit:alpha:
        src/proto_alpha/lib_benchmark.test_proto
        src/proto_alpha/lib_client.test_proto
        src/proto_alpha/lib_protocol.test_proto
-unit:non-proto:
-  extends: .unit_test_template
+
+unit:non-proto-x86_64:
+  extends: .unit_test_template_x86_64
+  script:
+    - make test-nonproto-unit
+
+unit:non-proto-arm64:
+  extends: .unit_test_template_arm64
   script:
     - make test-nonproto-unit
 
 unit:js_components:
-  extends: .test_template
+  extends: .unit_test_template_x86_64
   script:
     - dune build @runtest_js
 
 unit:protocol_compiles:
-  extends: .test_template
+  extends: .unit_test_template_x86_64
   script:
     - dune build @runtest_compile_protocol

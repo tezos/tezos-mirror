@@ -17,7 +17,7 @@
 .opam_bin_template:
   extends:
     - .test_template
-  needs: [build]
+  needs: ["build_x86_64"]
   # We set the dependencies to [] to force the job to run without any artifacts
   # produced by previous stages.
   dependencies: []

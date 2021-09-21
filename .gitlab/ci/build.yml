@@ -1,8 +1,9 @@
+---
+
 .build_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
   stage: build
   before_script:
     - . ./scripts/version.sh
@@ -10,9 +11,11 @@
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
 
-build:
+.build:
   extends: .build_template
   needs: []
+  variables:
+    ARCH: ""
   script:
     # We remove protocols not needed for tests in order to speed up the CI.
     - ./scripts/remove-old-protocols.sh
@@ -37,7 +40,7 @@ build:
       - _build
       - tezos-*
   artifacts:
-    name: "build-$CI_COMMIT_REF_SLUG"
+    name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
       - tezos-*
       - src/proto_*/parameters/*.json
@@ -47,16 +50,16 @@ build:
 
 build_arm64:
   extends:
-    - .build_template
-    - .rules_template__extended_test_pipeline
-  needs: []
-  script:
-    - . ./scripts/version.sh
-    - dune build @all
-    - dune install --prefix install_root
-  artifacts:
-    name: "build-$CI_COMMIT_REF_SLUG"
-    paths:
-      - install_root/bin/tezos-*
+    - .build
+    - .rules_template__development_arm64
+  variables:
+    ARCH: "arm64"
   tags:
     - arm64
+
+build_x86_64:
+  extends:
+    - .build
+    - .rules_template__development
+  variables:
+    ARCH: "x86_64"
