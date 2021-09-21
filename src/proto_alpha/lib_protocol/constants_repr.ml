@@ -336,7 +336,6 @@ module Proto_previous = struct
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez_repr.t;
-    michelson_maximum_type_size : int;
     seed_nonce_revelation_tip : Tez_repr.t;
     origination_size : int;
     block_security_deposit : Tez_repr.t;
@@ -370,7 +369,6 @@ module Proto_previous = struct
             c.hard_gas_limit_per_block,
             c.proof_of_work_threshold ),
           ( ( c.tokens_per_roll,
-              c.michelson_maximum_type_size,
               c.seed_nonce_revelation_tip,
               c.origination_size,
               c.block_security_deposit,
@@ -399,7 +397,6 @@ module Proto_previous = struct
                hard_gas_limit_per_block,
                proof_of_work_threshold ),
              ( ( tokens_per_roll,
-                 michelson_maximum_type_size,
                  seed_nonce_revelation_tip,
                  origination_size,
                  block_security_deposit,
@@ -429,7 +426,6 @@ module Proto_previous = struct
           hard_gas_limit_per_block;
           proof_of_work_threshold;
           tokens_per_roll;
-          michelson_maximum_type_size;
           seed_nonce_revelation_tip;
           origination_size;
           block_security_deposit;
@@ -465,9 +461,8 @@ module Proto_previous = struct
                Gas_limit_repr.Arith.z_integral_encoding)
             (req "proof_of_work_threshold" int64))
          (merge_objs
-            (obj10
+            (obj9
                (req "tokens_per_roll" Tez_repr.encoding)
-               (req "michelson_maximum_type_size" uint16)
                (req "seed_nonce_revelation_tip" Tez_repr.encoding)
                (req "origination_size" int31)
                (req "block_security_deposit" Tez_repr.encoding)
