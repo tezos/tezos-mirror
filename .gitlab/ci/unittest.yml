@@ -56,8 +56,6 @@ unit:010_PtGRANAD:
   script:
     - >
       make
-      src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference.test_proto
-      src/proto_010_PtGRANAD/lib_benchmark.test_proto
       src/proto_010_PtGRANAD/lib_client.test_proto
       src/proto_010_PtGRANAD/lib_protocol.test_proto
 
