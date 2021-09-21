@@ -23,62 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+(** Samplers for basic Michelson values (not including pairs, unions, tickets, big maps, etc) *)
 
-let rng_state = Random.State.make [|42; 987897; 54120|]
+open Protocol
+open Base_samplers
 
-let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
-  Micheline_printer.print_expr
-    fmtr
-    (Micheline_printer.printable
-       Protocol.Michelson_v1_primitives.string_of_prim
-       expr)
+(** Parameters for basic samplers *)
+type parameters = {
+  int_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which big integers must be sampled.*)
+  string_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which strings must be sampled.*)
+  bytes_size : Base_samplers.range;
+      (** The range of the size, measured in bytes, in which [bytes] must be sampled.*)
+}
 
-let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
-    print_script_expr
-    fmtr
-    exprs
+(** Encoding for [parameters] *)
+val parameters_encoding : parameters Data_encoding.t
 
-let typecheck_by_tezos =
-  let context_init_memory ~rng_state =
-    Context.init
-      ~rng_state
-      ~initial_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-    >>=? fun (block, _accounts) ->
-    Incremental.begin_construction
-      ~priority:0
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
-      block
-    >>=? fun vs ->
-    let ctxt = Incremental.alpha_ctxt vs in
-    (* Required for eg Create_contract *)
-    return
-    @@ Protocol.Alpha_context.Contract.init_origination_nonce
-         ctxt
-         Tezos_crypto.Operation_hash.zero
-  in
-  fun bef node ->
-    Stdlib.Result.get_ok
-      (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_ir_translator.Lambda
-             ctxt
-             ~legacy:false
-             (Micheline.root node)
-             bef
-           >|= Protocol.Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+(** A module of type [S] packs samplers used to construct basic Michelson values. *)
+module type S = sig
+  val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
+
+  val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
+
+  val signature : Tezos_crypto.Signature.t sampler
+
+  val string : Alpha_context.Script_string.t sampler
+
+  val bytes : bytes sampler
+
+  val tez : Alpha_context.Tez.tez sampler
+
+  val timestamp : Alpha_context.Script_timestamp.t sampler
+end
+
+(** The [Make] functor instantiates a module of type [S], where the
+    samplers satisfy the given parameters. *)
+module Make : functor
+  (P : sig
+     val parameters : parameters
+   end)
+  -> S
