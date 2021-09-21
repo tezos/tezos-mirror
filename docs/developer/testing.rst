@@ -516,7 +516,7 @@ instrumentation, and then run respectively:
  - ``make test-unit``, executing all unit, integration and property-based tests
  - ``make test-python-alpha``, executing the Python system tests for
    protocol Alpha. We restrict to protocol Alpha to avoid CI timeouts.
- - ``make test-tezt-timeout``, executing the full set of Tezt tests with a
+ - ``make test-tezt-coverage``, executing the full set of Tezt tests with a
    timeout of 30 minutes per test case.
 
 Finally the coverage reports are generated: one for

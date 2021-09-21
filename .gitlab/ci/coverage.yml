@@ -20,7 +20,7 @@ test_coverage:
         - test-python-alpha
         # Tezt tests are run with an individual timeout, to work around
         # https://gitlab.com/tezos/tezos/-/issues/1652
-        - test-tezt-timeout
+        - test-tezt-coverage
   variables:
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
