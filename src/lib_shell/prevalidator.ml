@@ -185,7 +185,7 @@ let handle_live_operations ~(block_store : 'block block_tools)
           (* Can this happen? If yes, there's nothing more to pop anyway,
              so returning the accumulator. It's not the mempool that
              should crash, should this case happen. *)
-          Lwt.return mempool
+          Event.(emit predecessor_less_block ancestor) >|= fun () -> mempool
       | Some predecessor ->
           (* This is a tailcall, which is nice; that is why we annotate
              here. But it is not required for the code to be correct.
