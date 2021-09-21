@@ -1,9 +1,0 @@
-(executable
- (name test)
- (libraries bigarray numerics))
-
-
-(alias
- (name runtest)
-  (deps    (:exe test.exe))
-(action (run %{exe})))

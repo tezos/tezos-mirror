@@ -40,22 +40,6 @@ for more details.
 #### Differences with the initial library
 None
 
-### statz
-- Basic statistical functions.
-- Cloned from: [statz](https://gitlab.com/igarnier/statz)
-- Dependency to lib-benchmark.
-
-#### Differences with the initial library
-None
-
-### numerics
-- Operations on matrices on vectors
-- Cloned from: [numerics](https://gitlab.com/igarnier/numerics)
-- Dependency to statz.
-
-#### Differences with the initial library
-None
-
 ### benchmark-utils
 - Contains no tests; just stubs to system calls so unclear what we would be testing.
 - C stubs useful for benchmarking, pinning cpus, ...

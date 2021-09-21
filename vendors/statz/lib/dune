@@ -1,5 +1,0 @@
-(library
-  (name staTz)
-  (public_name staTz)
-  (libraries numerics)
-  (ocamlopt_flags (-warn-error -39)))
