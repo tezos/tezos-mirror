@@ -5,10 +5,6 @@ DAEMON = constants.GRANADA_DAEMON
 PARAMETERS = constants.GRANADA_PARAMETERS
 FOLDER = constants.GRANADA_FOLDER
 
-PREV_HASH = constants.FLORENCE
-PREV_DAEMON = constants.FLORENCE_DAEMON
-PREV_PARAMETERS = constants.FLORENCE_PARAMETERS
-
 
 def activate(
     client,

@@ -31,16 +31,6 @@
 ##BEGIN_OPAM_BIN##
 # this section is updated using the script scripts/update_opam_test.sh
 
-opam-bin:tezos-accuser-008-PtEdo2Zk:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-accuser-008-PtEdo2Zk
-
-opam-bin:tezos-accuser-009-PsFLoren:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-accuser-009-PsFLoren
-
 opam-bin:tezos-accuser-010-PtGRANAD:
   extends: .opam_bin_template
   variables:
@@ -55,16 +45,6 @@ opam-bin:tezos-accuser-alpha:
   extends: .opam_bin_template
   variables:
     package: tezos-accuser-alpha
-
-opam-bin:tezos-baker-008-PtEdo2Zk:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-baker-008-PtEdo2Zk
-
-opam-bin:tezos-baker-009-PsFLoren:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-baker-009-PsFLoren
 
 opam-bin:tezos-baker-010-PtGRANAD:
   extends: .opam_bin_template
@@ -90,16 +70,6 @@ opam-bin:tezos-codec:
   extends: .opam_bin_template
   variables:
     package: tezos-codec
-
-opam-bin:tezos-endorser-008-PtEdo2Zk:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-endorser-008-PtEdo2Zk
-
-opam-bin:tezos-endorser-009-PsFLoren:
-  extends: .opam_bin_template
-  variables:
-    package: tezos-endorser-009-PsFLoren
 
 opam-bin:tezos-endorser-010-PtGRANAD:
   extends: .opam_bin_template
@@ -201,16 +171,6 @@ opam:staTz:
   variables:
     package: staTz
 
-opam:tezos-008-PtEdo2Zk-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-008-PtEdo2Zk-test-helpers
-
-opam:tezos-009-PsFLoren-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-009-PsFLoren-test-helpers
-
 opam:tezos-010-PtGRANAD-test-helpers:
   extends: .opam_template
   variables:
@@ -220,16 +180,6 @@ opam:tezos-011-PtHangzH-test-helpers:
   extends: .opam_template
   variables:
     package: tezos-011-PtHangzH-test-helpers
-
-opam:tezos-accuser-008-PtEdo2Zk-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-008-PtEdo2Zk-commands
-
-opam:tezos-accuser-009-PsFLoren-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-009-PsFLoren-commands
 
 opam:tezos-accuser-010-PtGRANAD-commands:
   extends: .opam_template
@@ -250,26 +200,6 @@ opam:tezos-alpha-test-helpers:
   extends: .opam_template
   variables:
     package: tezos-alpha-test-helpers
-
-opam:tezos-baking-008-PtEdo2Zk:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-008-PtEdo2Zk
-
-opam:tezos-baking-008-PtEdo2Zk-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-008-PtEdo2Zk-commands
-
-opam:tezos-baking-009-PsFLoren:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-009-PsFLoren
-
-opam:tezos-baking-009-PsFLoren-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-009-PsFLoren-commands
 
 opam:tezos-baking-010-PtGRANAD:
   extends: .opam_template
@@ -691,16 +621,6 @@ opam:tezos-embedded-protocol-genesis-carthagenet:
   variables:
     package: tezos-embedded-protocol-genesis-carthagenet
 
-opam:tezos-endorser-008-PtEdo2Zk-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-008-PtEdo2Zk-commands
-
-opam:tezos-endorser-009-PsFLoren-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-009-PsFLoren-commands
-
 opam:tezos-endorser-010-PtGRANAD-commands:
   extends: .opam_template
   variables:
@@ -861,11 +781,6 @@ opam:tezos-protocol-008-PtEdo2Zk-parameters:
   variables:
     package: tezos-protocol-008-PtEdo2Zk-parameters
 
-opam:tezos-protocol-008-PtEdo2Zk-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdo2Zk-tests
-
 opam:tezos-protocol-008-PtEdoTez:
   extends: .opam_template
   variables:
@@ -880,11 +795,6 @@ opam:tezos-protocol-009-PsFLoren-parameters:
   extends: .opam_template
   variables:
     package: tezos-protocol-009-PsFLoren-parameters
-
-opam:tezos-protocol-009-PsFLoren-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-009-PsFLoren-tests
 
 opam:tezos-protocol-010-PtGRANAD:
   extends: .opam_template

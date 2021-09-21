@@ -76,12 +76,6 @@
             (select void_for_linking-baking-alpha from
               (tezos-baking-alpha-commands.registration -> void_for_linking-baking-alpha.empty)
               (-> void_for_linking-baking-alpha.empty))
-            (select void_for_linking-baking-008-PtEdo2Zk from
-              (tezos-baking-008-PtEdo2Zk-commands.registration -> void_for_linking-baking-008-PtEdo2Zk.empty)
-              (-> void_for_linking-baking-008-PtEdo2Zk.empty))
-            (select void_for_linking-baking-009-PsFLoren from
-              (tezos-baking-009-PsFLoren-commands.registration -> void_for_linking-baking-009-PsFLoren.empty)
-              (-> void_for_linking-baking-009-PsFLoren.empty))
             (select void_for_linking-baking-010-PtGRANAD from
               (tezos-baking-010-PtGRANAD-commands.registration -> void_for_linking-baking-010-PtGRANAD.empty)
               (-> void_for_linking-baking-010-PtGRANAD.empty))
@@ -146,8 +140,6 @@
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
-   (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-baking-009-PsFLoren.empty "")
    (write-file void_for_linking-baking-010-PtGRANAD.empty "")
    (write-file void_for_linking-baking-011-PtHangzH.empty "")
    (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
