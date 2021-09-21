@@ -1886,8 +1886,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                        >>= fun () -> notify ()
                       else Lwt.return_unit)
                       >>= fun () -> copy_protocols ()))
-            (function
-              | End_of_file -> return_unit | exn -> Lwt.return (error_exn exn))
+            (function End_of_file -> return_unit | exn -> fail_with_exn exn)
         in
         Lwt.finalize
           (fun () -> copy_protocols ())
@@ -2278,8 +2277,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               should_filter_indexes ))
         (fun exn ->
           Lwt_utils_unix.safe_close ro_fd >>= fun _ ->
-          Lwt_utils_unix.safe_close rw_fd >>= fun _ ->
-          Lwt.return (error_exn exn))
+          Lwt_utils_unix.safe_close rw_fd >>= fun _ -> fail_with_exn exn)
     in
     Store.Unsafe.open_for_snapshot_export
       ~store_dir
@@ -3279,7 +3277,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
                (Target_block_validation_failed
                   (Block_header.hash block_header, errs)))
            "%a"
-           pp_print_error
+           pp_print_trace
            errs)
     >>=? fun (block_validation_result, _) ->
     check_context_hash_consistency
@@ -3816,7 +3814,7 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
                  (Target_block_validation_failed
                     (Block_header.hash block_header, errs)))
              "%a"
-             pp_print_error
+             pp_print_trace
              errs)
       >>=? fun (block_validation_result, _) ->
       check_context_hash_consistency_legacy

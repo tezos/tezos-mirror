@@ -31,7 +31,7 @@ let contract : Protocol.Alpha_context.Contract.t Alcotest.testable =
 let script_expr : Protocol.Alpha_context.Script.expr Alcotest.testable =
   Alcotest.testable Michelson_v1_printer.print_expr ( = )
 
-let trace : tztrace Alcotest.testable = Alcotest.testable pp_print_error ( = )
+let trace : tztrace Alcotest.testable = Alcotest.testable pp_print_trace ( = )
 
 let protocol_error : Environment.Error_monad.error Alcotest.testable =
   let open Environment.Error_monad in

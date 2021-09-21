@@ -748,7 +748,7 @@ let assert_fitness_increases ?(force = false) w distant_header =
          distant_header.Block_header.shell.fitness
          (Store.Block.fitness current_head)
        <= 0)
-    (failure "Fitness too low")
+    (error_of_fmt "Fitness too low")
 
 let assert_checkpoint w ((hash, _) as block_descr) =
   let pv = Worker.state w in

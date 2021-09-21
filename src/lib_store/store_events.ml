@@ -155,7 +155,7 @@ let inconsistent_store =
     ~level:Internal_event.Notice
     ~name:"inconsistent_store"
     ~msg:"the store is in an inconsistent state: {errs}"
-    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)
 
 let fix_store =

@@ -32,7 +32,7 @@ let print_invalid_blocks ppf (b : Shell_services.Chain.invalid_block) =
     Block_hash.pp
     b.hash
     b.level
-    pp_print_error
+    pp_print_trace
     b.errors
 
 let commands () =

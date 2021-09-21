@@ -96,7 +96,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
       Format.kasprintf
         Lwt.fail_with
         "ERROR@ Initializing Internal_event_unix:@ %a\n%!"
-        Error_monad.pp_print_error
+        Error_monad.pp_print_trace
         el
 
 let close () =
@@ -106,5 +106,5 @@ let close () =
       Format.kasprintf
         Lwt.fail_with
         "ERROR@ closing Internal_event_unix:@ %a\n%!"
-        Error_monad.pp_print_error
+        Error_monad.pp_print_trace
         el

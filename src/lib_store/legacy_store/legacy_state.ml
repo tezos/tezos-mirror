@@ -1030,14 +1030,15 @@ module Block = struct
     let hash = Block_header.hash_raw bytes in
     fail_unless
       (block_header.shell.validation_passes = List.length operations)
-      (failure "State.Block.store: invalid operations length")
+      (error_of_fmt "State.Block.store: invalid operations length")
     >>=? fun () ->
     fail_unless
       (block_header.shell.validation_passes = List.length operations_metadata)
-      (failure "State.Block.store: invalid operations_data length")
+      (error_of_fmt "State.Block.store: invalid operations_data length")
     >>=? fun () ->
     let inconsistent_failure =
-      failure "State.Block.store: inconsistent operations and operations_data"
+      error_of_fmt
+        "State.Block.store: inconsistent operations and operations_data"
     in
     (List.for_all2
        ~when_different_lengths:inconsistent_failure
@@ -1053,7 +1054,7 @@ module Block = struct
     Shared.use chain_state.block_store (fun store ->
         Legacy_store.Block.Invalid_block.known store hash
         >>= fun known_invalid ->
-        fail_when known_invalid (failure "Known invalid") >>=? fun () ->
+        fail_when known_invalid (error_of_fmt "Known invalid") >>=? fun () ->
         Legacy_store.Block.Contents.known (store, hash) >>= fun known ->
         if known then return_none
         else
@@ -1190,7 +1191,7 @@ module Block = struct
     let hash = Block_header.hash_raw bytes in
     Shared.use chain_state.block_store (fun store ->
         Header.known (store, hash) >>= fun known_valid ->
-        fail_when known_valid (failure "Known valid") >>=? fun () ->
+        fail_when known_valid (error_of_fmt "Known valid") >>=? fun () ->
         Legacy_store.Block.Invalid_block.known store hash
         >>= fun known_invalid ->
         if known_invalid then return_false

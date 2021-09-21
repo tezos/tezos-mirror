@@ -473,7 +473,7 @@ module Simple = struct
                Instead we just print the error on stderr. *)
             Format.eprintf
               "@[<hv 2>Failed to send event:@ %a@]@."
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               trace ;
             Lwt.return_unit)
       (fun exc ->
@@ -1249,7 +1249,7 @@ module Legacy_logging = struct
             Event.emit ~section (fun () -> Definition.make ?tags level message)
             >>= function
             | Ok () -> Lwt.return_unit
-            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
+            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
           fmt
       else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
   end
@@ -1390,7 +1390,7 @@ module Error_event = struct
             Format.kasprintf
               Lwt_log_core.error
               "Error while emitting error logging event !! %a"
-              pp_print_error
+              pp_print_trace
               el)
 end
 

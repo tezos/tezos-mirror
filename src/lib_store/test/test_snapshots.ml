@@ -324,7 +324,7 @@ let test store_path ~test_descr ?exported_block_level
               Assert.fail_msg
                 "Unexpected error in export. Expected error with %s - Got : %a"
                 (reason_to_string reason)
-                Error_monad.pp_print_error
+                Error_monad.pp_print_trace
                 err)
   in
   consistency_check () >>=? function

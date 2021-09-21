@@ -612,8 +612,6 @@ struct
       Error_core :
         sig
           include Tezos_error_monad.Sig.CORE with type error := unwrapped
-
-          include Tezos_error_monad.Sig.EXT with type error := unwrapped
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -631,7 +629,7 @@ struct
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
+      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
@@ -644,7 +642,7 @@ struct
 
     let make_trace_encoding e = TzTrace.encoding e
 
-    let pp_trace = pp_print_error
+    let pp_trace = pp_print_trace
 
     type 'err trace = 'err TzTrace.trace
 

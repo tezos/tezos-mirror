@@ -324,7 +324,7 @@ let sources_parameter () =
           failwith
             "Can't parse the file specified by --sources as JSON: %s@,%a"
             path
-            pp_print_error
+            pp_print_trace
             errs
       | Ok json -> (
           try
@@ -539,7 +539,7 @@ let read_config_file config_file =
       failwith
         "Can't parse the configuration file as a JSON: %s@,%a"
         config_file
-        pp_print_error
+        pp_print_trace
         errs
   | Ok cfg_json -> (
       try return @@ Cfg_file.from_json cfg_json
@@ -626,14 +626,14 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
   fail_on_non_mockup_dir cctxt >>=? fun () ->
   fail_when
     (Sys.file_exists bootstrap_accounts_file)
-    (failure
+    (error_of_fmt
        "Config file to write value of --%s exists already: %s"
        mockup_bootstrap_accounts
        bootstrap_accounts_file)
   >>=? fun () ->
   fail_when
     (Sys.file_exists protocol_constants_file)
-    (failure
+    (error_of_fmt
        "Config file to write value of --%s exists already: %s"
        mockup_protocol_constants
        protocol_constants_file)

@@ -43,14 +43,14 @@ let build_rpc_directory block_validator store =
       | Some p -> return p
       | None -> (
           Store.Protocol.read store hash >>= function
-          | None -> Lwt.return (Error_monad.error_exn Not_found)
+          | None -> fail_with_exn Not_found
           | Some p -> return p)) ;
   register1 Protocol_services.S.environment (fun hash () () ->
       match Registered_protocol.get_embedded_sources hash with
       | Some p -> return p.expected_env
       | None -> (
           Store.Protocol.read store hash >>= function
-          | None -> Lwt.return (Error_monad.error_exn Not_found)
+          | None -> fail_with_exn Not_found
           | Some p -> return p.expected_env)) ;
   register1 Protocol_services.S.fetch (fun hash () () ->
       Block_validator.fetch_and_compile_protocol block_validator hash

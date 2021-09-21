@@ -17,8 +17,8 @@ let expression_from_string str : Script.expr tzresult Lwt.t =
   let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
   (match errs with
   | [] -> ()
-  | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+  | trace ->
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace trace ;
       raise Expression_from_string) ;
   return ast.expanded
 
@@ -145,8 +145,8 @@ let test_typecheck_stack_overflow () =
               Script_tc_errors.Typechecking_too_many_recursive_calls)
            lst ->
       return ()
-  | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+  | Error trace ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace trace
 
 (* NOTE: this test fails with an out-of-memory exception. *)
 let _test_unparse_stack_overflow () =

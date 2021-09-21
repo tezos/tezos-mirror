@@ -129,7 +129,7 @@ module MakeRecReg () = struct
           (List.length traces)
           (Format.pp_print_list
              ~pp_sep:Format.pp_print_space
-             TzMonad.pp_print_error)
+             TzMonad.pp_print_trace)
           traces)
       (fun err_enc ->
         let open Data_encoding in

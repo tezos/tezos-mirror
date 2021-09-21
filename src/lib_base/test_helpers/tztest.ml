@@ -40,7 +40,7 @@ let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
       | Ok () -> Lwt.return_unit
       | Error err ->
           Tezos_stdlib_unix.Internal_event_unix.close () >>= fun () ->
-          Format.printf "@\n%a@." pp_print_error err ;
+          Format.printf "@\n%a@." pp_print_trace err ;
           Lwt.fail Alcotest.Test_error)
 
 let tztest_qcheck ~name generator f =
@@ -49,7 +49,7 @@ let tztest_qcheck ~name generator f =
       ( QCheck.Test.make ~name generator @@ fun x ->
         match Lwt_main.run (f x) with
         | Ok _ -> true
-        | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_error err )
+        | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_trace err )
   in
   Alcotest_lwt.test_case name speed (fun _sw () -> Lwt.return @@ run ())
 
@@ -69,7 +69,7 @@ let with_empty_mock_sink (f : unit -> unit Lwt.t) : unit Lwt.t =
     | Error errors ->
         Format.printf
           "Could not initialize mock sink:\n   %a\n"
-          pp_print_error
+          pp_print_trace
           errors ;
         Format.print_flush () ;
         Lwt.return_unit)

@@ -54,7 +54,7 @@ module Event = Internal_event.Make (Event_def)
 let emit level message =
   Event.emit ~section (fun () -> {level; message}) >>= function
   | Ok () -> Lwt.return_unit
-  | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_error e
+  | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace e
 
 (** Wrap an lwt computation so that it can return without waiting until the promise
     is resolved. *)

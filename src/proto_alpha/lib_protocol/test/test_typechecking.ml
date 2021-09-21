@@ -18,7 +18,7 @@ let expression_from_string str : Script.expr tzresult Lwt.t =
   (match errs with
   | [] -> ()
   | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace lst ;
       raise Expression_from_string) ;
   return ast.expanded
 
@@ -146,7 +146,7 @@ let test_typecheck_stack_overflow () =
            lst ->
       return ()
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 (* NOTE: this test fails with an out-of-memory exception. *)
 let _test_unparse_stack_overflow () =

@@ -54,7 +54,7 @@ module Merkle = struct
          (Format.asprintf
             "Failed to convert %s to a Context hash. Error is: %a"
             s
-            pp_print_error)
+            pp_print_trace)
 
   let rec merkle_node_to_irmin_tree repo mnode :
       (Store.tree, string) result Lwt.t =

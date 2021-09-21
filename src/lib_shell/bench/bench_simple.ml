@@ -57,5 +57,5 @@ let () =
       Format.printf "Success.@." ;
       exit 0
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

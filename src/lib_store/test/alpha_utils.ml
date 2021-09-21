@@ -556,7 +556,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         Store.Chain.set_head chain_store b >>=? fun _ ->
         Block_store.await_merging block_store >>= fun () ->
         (match Block_store.get_merge_status block_store with
-        | Merge_failed err -> Assert.fail_msg "%a" pp_print_error err
+        | Merge_failed err -> Assert.fail_msg "%a" pp_print_trace err
         | Running | Not_running -> ()) ;
         return b)
       else Store.Chain.set_head chain_store b >>=? fun _ -> return b

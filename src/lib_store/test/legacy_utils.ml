@@ -418,8 +418,7 @@ let wrap_test_legacy ?(keep_dir = false) test : string Alcotest_lwt.test_case =
           Lwt.catch
             (fun () -> f base_dir)
             (fun exn ->
-              Lwt_utils_unix.remove_dir base_dir >>= fun () ->
-              Lwt.return (Error_monad.error_exn exn)))
+              Lwt_utils_unix.remove_dir base_dir >>= fun () -> fail_with_exn exn))
     else
       let base_dir = Filename.temp_file prefix_dir "" in
       Lwt_unix.unlink base_dir >>= fun () ->
@@ -454,6 +453,6 @@ let wrap_test_legacy ?(keep_dir = false) test : string Alcotest_lwt.test_case =
       | Error errs ->
           Format.printf
             "@\nError while running test:@\n%a@."
-            Error_monad.pp_print_error
+            Error_monad.pp_print_trace
             errs ;
           Lwt.fail Alcotest.Test_error)

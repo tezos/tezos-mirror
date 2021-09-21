@@ -70,14 +70,14 @@ let is_connection_closed = function
   | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) -> true
   | Ok _ -> false
   | Error err ->
-      log_notice "Error: %a" pp_print_error err ;
+      log_notice "Error: %a" pp_print_trace err ;
       false
 
 let is_decoding_error = function
   | Error (Tezos_p2p_services.P2p_errors.Decoding_error _ :: _) -> true
   | Ok _ -> false
   | Error err ->
-      log_notice "Error: %a" pp_print_error err ;
+      log_notice "Error: %a" pp_print_trace err ;
       false
 
 (** Writing then reading through the same pipe a chunk of message [msg]
@@ -176,7 +176,7 @@ module Crypto_test = struct
                  (Bytes.to_string res)
                  (Bytes.to_string msg)
            | Error error ->
-               Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
+               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
 end
 
 (** Spawns a client and a server. The client connects to the server
@@ -240,7 +240,7 @@ module Nack = struct
     | Error (Tezos_p2p_services.P2p_errors.Rejected_by_nack _ :: _) -> true
     | Ok _ -> false
     | Error err ->
-        log_notice "Error: %a" pp_print_error err ;
+        log_notice "Error: %a" pp_print_trace err ;
         false
 
   let server ch sched socket =
@@ -532,7 +532,7 @@ let wrap n f =
           f () >>= function
           | Ok () -> Lwt.return_unit
           | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
+              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error ))
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in

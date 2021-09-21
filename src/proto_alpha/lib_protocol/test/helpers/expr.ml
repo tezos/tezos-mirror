@@ -33,7 +33,7 @@ let from_string str : Script.expr =
   (match errs with
   | [] -> ()
   | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace lst ;
       raise Expression_from_string) ;
   ast.expanded
 

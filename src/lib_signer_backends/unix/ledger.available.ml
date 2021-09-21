@@ -660,7 +660,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
               Global_cache.record pk_uri ~pkh ~pk ;
               return_some pk) )
         >>= function
-        | Error err -> failwith "%a" pp_print_error err
+        | Error err -> failwith "%a" pp_print_trace err
         | Ok v -> return v)
 
   let public_key_hash_maybe_prompt ?first_import pk_uri =

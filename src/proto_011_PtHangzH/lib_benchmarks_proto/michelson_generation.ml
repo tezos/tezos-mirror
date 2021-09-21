@@ -148,8 +148,8 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
   |> Environment.wrap_tzresult
   |> function
   | Ok t -> t
-  | Error errs ->
-      Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+  | Error trace ->
+      Format.eprintf "%a@." Error_monad.pp_print_trace trace ;
       Stdlib.failwith "Michelson_generation.michelson_type_to_ex_ty: error"
 
 let base_type_to_ex_ty ty =

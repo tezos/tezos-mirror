@@ -116,7 +116,7 @@ let ( >>=?? ) m f =
   m >>= function
   | Ok v -> f v
   | Error error ->
-      Format.printf "Error:\n   %a\n" pp_print_error error ;
+      Format.printf "Error:\n   %a\n" pp_print_trace error ;
       Format.print_flush () ;
       Lwt.return_unit
 

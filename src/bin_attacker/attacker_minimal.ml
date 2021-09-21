@@ -312,7 +312,7 @@ let main () =
           (lwt () >>= function
            | Ok () -> Lwt.return_unit
            | Error err ->
-               lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+               lwt_log_error "Error: %a" pp_print_trace err >>= fun () ->
                Lwt.return_unit))
   in
   let run_cmd_int_suffix lwt =
@@ -330,7 +330,7 @@ let main () =
           (lwt n >>= function
            | Ok () -> Lwt.return_unit
            | Error err ->
-               lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+               lwt_log_error "Error: %a" pp_print_trace err >>= fun () ->
                Lwt.return_unit))
   in
   let cmds =

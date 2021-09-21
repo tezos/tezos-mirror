@@ -379,8 +379,8 @@ module Typechecking_code : Benchmark.S = struct
                  bef)
           in
           match Environment.wrap_tzresult result with
-          | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+          | Error trace ->
+              Format.eprintf "%a@." Error_monad.pp_print_trace trace ;
               bad_code name node stack In_protocol
           | Ok _ -> ()
         in
@@ -461,8 +461,8 @@ module Unparsing_code : Benchmark.S = struct
                  (Micheline.root node))
           in
           match Environment.wrap_tzresult result with
-          | Error errs ->
-              Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+          | Error trace ->
+              Format.eprintf "%a@." Error_monad.pp_print_trace trace ;
               bad_code name node stack In_protocol
           | Ok _ -> ()
         in

@@ -454,7 +454,7 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
         (fun trace ->
           Format.eprintf
             "Uncaught error: %a\n%!"
-            Error_monad.pp_print_error
+            Error_monad.pp_print_trace
             trace)
         (fun exc ->
           Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))

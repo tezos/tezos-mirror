@@ -39,7 +39,7 @@ let join (type a) ~where eq (l1 : a t) (l2 : a t) =
   | (Some x, None) | (None, Some x) -> Result.return_some x
   | (Some x, Some y) ->
       if eq x y then Result.return_some x
-      else generic_error "Limit.join: error (%s)" where
+      else error_with "Limit.join: error (%s)" where
 
 let%test "join" =
   let check res y =
@@ -53,7 +53,7 @@ let%test "join" =
        (Result.is_ok (join ~where:__LOC__ Bool.equal (Some true) (Some false)))
 
 let get ~when_unknown = function
-  | None -> generic_error "Limit.get: %s" when_unknown
+  | None -> error_with "Limit.get: %s" when_unknown
   | Some x -> ok x
 
 let%test "get" =

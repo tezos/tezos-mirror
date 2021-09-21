@@ -27,7 +27,7 @@
 
 open Alcotest
 
-let trace : error trace testable = testable pp_print_error ( = )
+let trace : error trace testable = testable pp_print_trace ( = )
 
 let tzresults (type a) (t : a testable) : a tzresult testable = result t trace
 

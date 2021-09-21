@@ -1517,7 +1517,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
     in
     match Environment.wrap_tzresult res with
     | Error errs ->
-        Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+        Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
     | Ok (_aft_top, _aft, _ctxt) ->
         (* ((aft_top, aft), List.rev !trace, ctxt) *)
@@ -1553,7 +1553,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
     in
     match Environment.wrap_tzresult res with
     | Error errs ->
-        Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+        Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
     | Ok (_aft_top, _aft, _outdated_ctxt, _gas) ->
         (* ((aft_top, aft), List.rev !trace, outdated_ctxt, gas) *)

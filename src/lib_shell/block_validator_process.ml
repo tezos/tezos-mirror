@@ -538,15 +538,14 @@ module External_validator_process = struct
             vp.validator_process <- Uninitialized ;
             Events.(emit process_exited_abnormally status) >>= fun () ->
             return res)
-      (function
-        | errors ->
-            (match process#state with
-            | Running -> Lwt.return_unit
-            | Exited status ->
-                Events.(emit process_exited_abnormally status) >>= fun () ->
-                vp.validator_process <- Uninitialized ;
-                Lwt.return_unit)
-            >>= fun () -> Lwt.return (error_exn errors))
+      (fun exn ->
+        (match process#state with
+        | Running -> Lwt.return_unit
+        | Exited status ->
+            Events.(emit process_exited_abnormally status) >>= fun () ->
+            vp.validator_process <- Uninitialized ;
+            Lwt.return_unit)
+        >>= fun () -> fail_with_exn exn)
 
   let init
       ({user_activated_upgrades; user_activated_protocol_overrides} :

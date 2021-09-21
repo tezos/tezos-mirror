@@ -205,7 +205,7 @@ module Events = struct
       ~level:Notice
       ~name:"aborting_upgrade"
       ~msg:"failed to upgrade storage: {error}"
-      ~pp1:Error_monad.pp_print_error
+      ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let upgrade_status =

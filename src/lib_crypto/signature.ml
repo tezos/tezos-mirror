@@ -133,7 +133,7 @@ module Public_key_hash = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 pkh -> Ed25519.Public_key_hash.to_b58check pkh
@@ -303,7 +303,7 @@ module Public_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 pk -> Ed25519.Public_key.to_b58check pk
@@ -434,7 +434,7 @@ module Secret_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 sk -> Ed25519.Secret_key.to_b58check sk
@@ -568,8 +568,7 @@ let of_b58check_exn s =
 let of_b58check s =
   match of_b58check_opt s with
   | Some x -> Ok x
-  | None ->
-      generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+  | None -> error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
 let to_b58check = function
   | Ed25519 b -> Ed25519.to_b58check b

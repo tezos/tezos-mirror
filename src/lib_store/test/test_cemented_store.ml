@@ -92,7 +92,7 @@ let wrap_cemented_store_test (name, f) =
         | Error err ->
             Format.printf
               "@\nTest failed:@\n%a@."
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               err ;
             Lwt.fail Alcotest.Test_error
         | Ok () -> Lwt.return_unit)

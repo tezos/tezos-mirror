@@ -29,7 +29,8 @@ let error ~loc v f =
   match v with
   | Error err when List.exists f err -> return_unit
   | Ok _ -> failwith "Unexpected successful result (%s)" loc
-  | Error err -> failwith "@[Unexpected error (%s): %a@]" loc pp_print_error err
+  | Error trace ->
+      failwith "@[Unexpected error (%s): %a@]" loc pp_print_trace trace
 
 let proto_error ~loc v f =
   error ~loc v (function Environment.Ecoproto_error err -> f err | _ -> false)

@@ -237,5 +237,5 @@ let load_mainnet_bakers_public_keys base_dir =
   match Lwt_main.run ( load_mainnet_bakers_public_keys base_dir ) with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->
-    Format.eprintf "error:@.%a@." Error_monad.pp_print_error trace ;
+    Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
     exit 1

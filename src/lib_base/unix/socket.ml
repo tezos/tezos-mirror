@@ -50,7 +50,10 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
             | [] ->
                 Lwt.return
                   (Error
-                     (failure "could not connect to '%s'" host :: List.rev acc))
+                     (let err = error_of_fmt "could not connect to '%s'" host in
+                      match acc with
+                      | None -> TzTrace.make err
+                      | Some tr -> TzTrace.cons err tr))
             | {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} :: addrs
               -> (
                 let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
@@ -65,9 +68,15 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
                         Lwt_unix.connect sock ai_addr >>= fun () -> return sock))
                 >>= function
                 | Ok sock -> return sock
-                | Error e -> try_connect (e @ acc) addrs)
+                | Error (e : error trace) ->
+                    let acc =
+                      match acc with
+                      | None -> Some e
+                      | Some tr -> Some (TzTrace.conp e tr)
+                    in
+                    try_connect acc addrs)
           in
-          try_connect [] addrs)
+          try_connect None addrs)
 
 let with_connection ?timeout addr f =
   connect ?timeout addr >>=? fun conn ->

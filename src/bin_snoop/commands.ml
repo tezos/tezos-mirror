@@ -34,7 +34,7 @@ let parse_parameter f m =
       @@
       match f p with
       | Some x -> Ok x
-      | None -> Error (Error_monad.error_of_exn (Failure m)))
+      | None -> Error_monad.error_with_exn (Failure m))
 
 module Benchmark_cmd = struct
   (* ----------------------------------------------------------------------- *)
@@ -953,6 +953,6 @@ let (list_solvers, list_models) =
         Format.err_formatter
         ~executable_name:(Filename.basename Sys.executable_name)
         ~global_options:Global_options.options
-        ~default:(fun fmt err -> Error_monad.pp_print_error fmt [err])
+        ~default:(fun fmt err -> Error_monad.pp_print_trace fmt [err])
         errors ;
       exit 1

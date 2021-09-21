@@ -146,7 +146,7 @@ module Samplers = struct
     |> function
     | Ok t -> t
     | Error errs ->
-        Format.eprintf "%a@." pp_print_error errs ;
+        Format.eprintf "%a@." pp_print_trace errs ;
         raise (Failure "Test_helpers.michelson_type_to_ex_ty: error")
 
   let base_type_to_ex_ty ty =
@@ -206,7 +206,7 @@ module Printers = struct
     |> function
     | Ok s -> s
     | Error (errs : tztrace) ->
-        Format.eprintf "@[Error: %a@]" pp_print_error errs ;
+        Format.eprintf "@[Error: %a@]" pp_print_trace errs ;
         exit 1
 
   let string_of_value : type a. a Script_typed_ir.ty -> a -> string =

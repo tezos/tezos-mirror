@@ -100,7 +100,7 @@ let wrap n f =
                gen_points () ;
                aux n f
            | Error error ->
-               Format.kasprintf Stdlib.failwith "%a" pp_print_error error
+               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
          in
          aux n f))
 

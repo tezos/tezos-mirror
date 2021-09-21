@@ -43,13 +43,13 @@ let assert_ok_lwt x =
   match Lwt_main.run x with
   | Ok x -> x
   | Error errs ->
-      Format.eprintf "%a" pp_print_error errs ;
+      Format.eprintf "%a" pp_print_trace errs ;
       exit 1
 
 let assert_ok = function
   | Ok x -> x
   | Error errs ->
-      Format.eprintf "%a" pp_print_error errs ;
+      Format.eprintf "%a" pp_print_trace errs ;
       exit 1
 
 (** [seq_of_n_constants n hash] generates a Seq filled

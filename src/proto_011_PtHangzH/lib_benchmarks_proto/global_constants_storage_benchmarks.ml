@@ -42,14 +42,14 @@ open Protocol
 let assert_ok_lwt x =
   match Lwt_main.run x with
   | Ok x -> x
-  | Error errs ->
-      Format.eprintf "%a" pp_print_error errs ;
+  | Error trace ->
+      Format.eprintf "%a" pp_print_trace trace ;
       exit 1
 
 let assert_ok = function
   | Ok x -> x
-  | Error errs ->
-      Format.eprintf "%a" pp_print_error errs ;
+  | Error trace ->
+      Format.eprintf "%a" pp_print_trace trace ;
       exit 1
 
 (** [seq_of_n_constants n hash] generates a Seq filled

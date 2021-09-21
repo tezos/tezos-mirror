@@ -181,22 +181,22 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
                 Operation_hash.Set.add op.hash pv.live_operations;
             }
           in
-          try
-            let receipt =
-              Data_encoding.Binary.(
-                of_bytes_exn
-                  Proto.operation_receipt_encoding
-                  (to_bytes_exn Proto.operation_receipt_encoding receipt))
-            in
-            Applied (pv, receipt)
-          with exn ->
-            Refused
-              [Validation_errors.Cannot_serialize_operation_metadata; Exn exn])
-      | Error errors -> (
-          match classify_errors errors with
-          | `Branch -> Branch_refused errors
-          | `Permanent -> Refused errors
-          | `Temporary -> Branch_delayed errors)
+          match
+            Data_encoding.Binary.(
+              of_bytes_exn
+                Proto.operation_receipt_encoding
+                (to_bytes_exn Proto.operation_receipt_encoding receipt))
+          with
+          | receipt -> Applied (pv, receipt)
+          | exception exn ->
+              Refused
+                [Validation_errors.Cannot_serialize_operation_metadata; Exn exn]
+          )
+      | Error trace -> (
+          match classify_trace trace with
+          | `Branch -> Branch_refused trace
+          | `Permanent -> Refused trace
+          | `Temporary -> Branch_delayed trace)
 
   type status = {
     applied_operations :
@@ -218,9 +218,9 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     let open Format in
     function
     | Applied _ -> pp_print_string ppf "applied"
-    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
-    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
-    | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
+    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_trace err
+    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
+    | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
     | Outdated -> pp_print_string ppf "outdated"
 end
 

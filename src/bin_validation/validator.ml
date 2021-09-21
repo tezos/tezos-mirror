@@ -334,7 +334,7 @@ let main ?socket_dir () =
           in
           let t = List.fold_left TzTrace.conp texc texcs in
           Lwt.return (Error t))
-    (fun e -> Lwt.return (error_exn e))
+    fail_with_exn
   >>= function
   | Ok () -> Events.(emit terminated ()) >>= fun () -> return_unit
   | Error _ as errs ->

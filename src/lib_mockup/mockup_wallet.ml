@@ -54,7 +54,7 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
    | Some (pk_uri_found, _) ->
        fail_unless
          (pk_uri = pk_uri_found || force)
-         (failure
+         (error_of_fmt
             "public and secret keys '%s' don't correspond, please don't use \
              --force"
             name))

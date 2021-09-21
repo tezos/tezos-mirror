@@ -400,7 +400,7 @@ let process verbosity singleprocess block args =
   in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
-  | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
+  | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 
 module Term = struct
   let verbosity =

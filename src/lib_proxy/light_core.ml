@@ -99,7 +99,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                 (Uri.to_string uri)
                 (key_to_string key)
                 (chain_n_block_to_string chain block)
-                pp_print_error
+                pp_print_trace
                 trace
               >>= fun () ->
               get_first_merkle_tree

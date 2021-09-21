@@ -80,7 +80,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
             (* It is expected as nothing was pruned *)
             return_true
           else (
-            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error e ;
+            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace e ;
             Alcotest.fail
               "Should not fail to reconstruct (nothing_to_reconstruct raised).")
       | [Reconstruction.(Cannot_reconstruct History_mode.Archive)]
@@ -88,7 +88,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
           (* In both Archive and Rolling _ modes, the reconstruction should fail *)
           return_true
       | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
           Alcotest.fail "Should not fail")
   >>=? fun expected_to_fail ->
   if expected_to_fail then return_unit
@@ -208,7 +208,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             (* It is expected as nothing was pruned *)
             return_true
           else (
-            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error e ;
+            Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace e ;
             Alcotest.fail
               "Should not fail to reconstruct (nothing_to_reconstruct raised).")
       | [Reconstruction.(Cannot_reconstruct History_mode.Archive)] ->
@@ -216,7 +216,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
           return_true
       | Snapshots.[Invalid_export_block {reason = `Genesis; _}] -> return_true
       | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
           Alcotest.fail "Should not fail")
   >>=? fun expected_to_fail ->
   if expected_to_fail then return_unit

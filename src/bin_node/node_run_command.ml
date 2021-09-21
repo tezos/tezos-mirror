@@ -369,7 +369,7 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
       *)
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (RPC_Port_already_in_use [(addr, port)])
-      | exn -> Lwt.return (error_exn exn))
+      | exn -> fail_with_exn exn)
 
 let init_rpc (config : Node_config_file.t) node =
   List.fold_right_es
@@ -497,14 +497,14 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ~singleprocess
           ~force_history_mode_switch
           config)
-      (function exn -> Lwt.return (error_exn exn))
+      (function exn -> fail_with_exn exn)
   in
   Lwt_main.run
     (Lwt_exit.wrap_and_exit main_promise >>= function
      | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
      | Error err ->
          Lwt_exit.exit_and_wait 1 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_error err))
+         `Error (false, Format.asprintf "%a" pp_print_trace err))
 
 module Term = struct
   let verbosity =

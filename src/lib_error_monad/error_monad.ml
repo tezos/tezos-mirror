@@ -52,26 +52,26 @@ let () =
       | _ -> None)
     (fun msg -> Exn (Failure msg))
 
-let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
+let error_with fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
-let error_of_exn e = TzTrace.make @@ Exn e
+let error_of_exn e = Exn e
 
-let error_exn s = Error (TzTrace.make @@ Exn s)
+let trace_of_exn e = TzTrace.make @@ error_of_exn e
 
-let tzresult_of_exn_result r = Result.map_error error_of_exn r
+let error_with_exn e = Error (trace_of_exn e)
+
+let fail_with_exn e = Lwt.return (error_with_exn e)
+
+let tzresult_of_exn_result r = Result.map_error trace_of_exn r
 
 let trace_exn exn f = trace (Exn exn) f
 
 let generic_trace fmt =
   Format.kasprintf (fun str -> trace_exn (Failure str)) fmt
 
-let record_trace_exn exn f = record_trace (Exn exn) f
-
-let failure fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
-
-let pp_exn ppf exn = pp ppf (Exn exn)
+let error_of_fmt fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
 
 type error += Canceled
 
@@ -142,26 +142,26 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
     | Ok () | Error [] -> fail Timeout
     | Error (h :: _) -> raise h
 
-let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
+let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_trace
 
 let cancel_with_exceptions canceler =
   Lwt_canceler.cancel canceler >>= function
   | Ok () | Error [] -> Lwt.return_unit
   | Error (h :: _) -> raise h
 
-let catch ?catch_only f = TzLwtreslib.Result.catch_f ?catch_only f error_of_exn
+let catch ?catch_only f = TzLwtreslib.Result.catch_f ?catch_only f trace_of_exn
 
 let catch_e ?catch_only f =
-  TzLwtreslib.Result.catch_f ?catch_only f error_of_exn |> Result.join
+  TzLwtreslib.Result.catch_f ?catch_only f trace_of_exn |> Result.join
 
 let catch_f ?catch_only f exc_mapper =
   TzLwtreslib.Result.catch_f ?catch_only f (fun exc ->
       TzTrace.make (exc_mapper exc))
 
 let catch_s ?catch_only f =
-  TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error error_of_exn
+  TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error trace_of_exn
 
 let catch_es ?catch_only f =
   TzLwtreslib.Result.catch_s ?catch_only f
-  >|= Result.map_error error_of_exn
+  >|= Result.map_error trace_of_exn
   >|= Result.join

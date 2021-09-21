@@ -358,7 +358,7 @@ module ReadIO = struct
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
             fail P2p_errors.Connection_closed
-        | exn -> Lwt.return (error_exn exn))
+        | exn -> fail_with_exn exn)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.t
 
@@ -411,7 +411,7 @@ module WriteIO = struct
         | Unix.Unix_error (Unix.EPIPE, _, _)
         | Lwt.Canceled | End_of_file ->
             fail P2p_errors.Connection_closed
-        | exn -> Lwt.return (error_exn exn))
+        | exn -> fail_with_exn exn)
 
   (* [close] does nothing, it will still be possible to push values to
      the network. *)
@@ -533,7 +533,7 @@ let register st fd =
     Error_monad.dont_wait
       (fun () -> P2p_fd.close fd)
       (fun trace ->
-        Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
+        Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     raise Closed)
@@ -574,7 +574,7 @@ let register st fd =
         Lwt_pipe.close read_queue ;
         P2p_fd.close fd >>= function
         | Error trace ->
-            Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
             Lwt.return_unit
         | Ok () -> Lwt.return_unit) ;
     let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in

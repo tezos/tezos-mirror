@@ -172,13 +172,13 @@ let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
     (fun v ->
       safe_close fd >>= function
       | Error trace ->
-          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
           Lwt.return v
       | Ok () -> Lwt.return v)
     (fun exc ->
       safe_close fd >>= function
       | Error trace ->
-          Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+          Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
           raise exc
       | Ok () -> raise exc)
 

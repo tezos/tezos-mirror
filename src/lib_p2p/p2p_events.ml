@@ -86,7 +86,7 @@ module P2p_protocol = struct
       ~msg:"sending advertise to {peer} failed: {trace}"
       ~level:Warning
       ("peer", P2p_peer.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("trace", Error_monad.trace_encoding)
 
   let swap_succeeded =
@@ -104,7 +104,7 @@ module P2p_protocol = struct
       ~msg:"swap to {point} was interrupted: {trace}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("trace", Error_monad.trace_encoding)
 
   let swap_failed =
@@ -114,7 +114,7 @@ module P2p_protocol = struct
       ~msg:"swap to {point} failed: {trace}"
       ~level:Info
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("trace", Error_monad.trace_encoding)
 
   let swap_ack_received =
@@ -231,7 +231,7 @@ module P2p_connect_handler = struct
       ~msg:"authentication error for {point}: {errors}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
   let connection_rejected_by_peers =
@@ -257,7 +257,7 @@ module P2p_connect_handler = struct
       ~msg:"connection to {point} rejected by peer : {errors}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
   let connect_status =
@@ -276,7 +276,7 @@ module P2p_connect_handler = struct
       ~msg:"connection error for point {point}, disconnecting: {errors}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
   let authenticate_reject_protocol_mismatch =
@@ -308,7 +308,7 @@ module P2p_conn = struct
       ~name:"unexpected_error_answerer"
       ~msg:"answerer unexpected error: {errors}"
       ~level:Error
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
   let bytes_popped_from_queue =
@@ -442,7 +442,7 @@ module P2p_welcome = struct
       ~name:"incoming_error"
       ~msg:"incoming connection failed with {error}. Ignoring"
       ~level:Debug
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
       ("type", Data_encoding.string)
 
@@ -452,7 +452,7 @@ module P2p_welcome = struct
       ~name:"unexpected_error_welcome"
       ~msg:"unexpected error: {error}"
       ~level:Error
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let unexpected_error_closing_socket =
@@ -461,7 +461,7 @@ module P2p_welcome = struct
       ~name:"unexpected_error_closing_socket"
       ~msg:"unexpected error while closing socket: {error}"
       ~level:Error
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let incoming_connection_error =
@@ -544,7 +544,7 @@ module P2p_socket = struct
       ~name:"socket_write_error"
       ~level:Error
       ~msg:"unexpected error when writing to {peer}: {error}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
       ("peer", P2p_peer.Id.encoding)
 
@@ -585,7 +585,7 @@ module P2p_io_scheduler = struct
       ("direction", Data_encoding.string)
       ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
-      ~pp4:pp_print_error_first
+      ~pp4:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let wait_quota =
@@ -710,7 +710,7 @@ module P2p_pool = struct
       ~name:"parse_error_peers"
       ~msg:"failed to parse peers file: {error}"
       ~level:Error
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let saving_metadata =
@@ -727,7 +727,7 @@ module P2p_pool = struct
       ~name:"save_error_peers"
       ~msg:"failed to save peers file: {error}"
       ~level:Error
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 end
 
@@ -775,7 +775,7 @@ module Discovery = struct
       ~msg:"unexpected error in {worker} worker: {error}"
       ~level:Error
       ("worker", Data_encoding.string)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let unexpected_exit =
@@ -890,7 +890,7 @@ module P2p = struct
       ~level:Debug
       ~msg:"error sending message to {peer}: {error}"
       ("peer", P2p_peer.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let message_trysent =
@@ -908,7 +908,7 @@ module P2p = struct
       ~level:Debug
       ~msg:"error trysending message to {peer}: {error}"
       ("peer", P2p_peer.Id.encoding)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
 
   let broadcast =

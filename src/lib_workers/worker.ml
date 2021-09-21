@@ -484,7 +484,7 @@ struct
     >>= function
     | Ok () -> Lwt.return_unit
     | Error el ->
-        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_error el
+        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_trace el
 
   let log_event w evt =
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt)) >>= fun () ->

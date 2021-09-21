@@ -309,7 +309,7 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
             | (Rolling _, Full _) -> true
             | _ -> false)
       | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
           Alcotest.fail "Should not fail")
   >>=? fun expected_to_fail ->
   if expected_to_fail then return_unit

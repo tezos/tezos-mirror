@@ -71,7 +71,7 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (Proxy_server_RPC_Port_already_in_use [(address, port)])
-      | exn -> Lwt.return (error_exn exn))
+      | exn -> fail_with_exn exn)
 
 let run dir ({address; port; _} as args) =
   let log_cfg = Lwt_log_sink_unix.create_cfg () in

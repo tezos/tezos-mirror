@@ -189,7 +189,7 @@ let test_read_partial : QCheck.Test.t =
     qcheck_eq'
       ~pp:
         Format.(
-          pp_print_result ~ok:pp_print_int ~error:Error_monad.pp_print_error)
+          pp_print_result ~ok:pp_print_int ~error:Error_monad.pp_print_trace)
       ~expected
       ~actual
       ()

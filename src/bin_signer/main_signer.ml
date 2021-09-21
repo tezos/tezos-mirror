@@ -72,7 +72,7 @@ let magic_bytes_arg =
                 match int_of_string_opt s with
                 | Some b when 0 <= b && b <= 255 -> Ok b
                 | Some _ (* out of range *) | None (* not a number *) ->
-                    generic_error
+                    error_with
                       "Bad format for magic bytes, a series of numbers is \
                        expected, separated by commas.")
               (String.split ',' s))))

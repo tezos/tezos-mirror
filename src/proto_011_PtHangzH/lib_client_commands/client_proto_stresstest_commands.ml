@@ -392,12 +392,12 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       in
       Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
       return_unit
-  | Error e ->
+  | Error trace ->
       debug_msg (fun () ->
           cctxt#message
             "inject_transfer: error, op not injected: %a"
-            Error_monad.pp_print_error
-            e)
+            Error_monad.pp_print_trace
+            trace)
       >>= fun () -> return_unit
 
 let save_injected_operations (cctxt : Protocol_client_context.full) state =
@@ -414,11 +414,11 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   in
   cctxt#message "writing injected operations in file %s" path >>= fun () ->
   Lwt_utils_unix.Json.write_file path json >>= function
-  | Error e ->
+  | Error trace ->
       cctxt#message
         "could not write injected operations json file: %a"
-        Error_monad.pp_print_error
-        e
+        Error_monad.pp_print_trace
+        trace
   | Ok _ -> Lwt.return_unit
 
 let stat_on_exit (cctxt : Protocol_client_context.full) state =
@@ -539,7 +539,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
         ignore
           (cctxt#error
              "an error while getting the new head has been returned: %a"
-             Error_monad.pp_print_error
+             Error_monad.pp_print_trace
              trace))
       (fun exn ->
         ignore
@@ -709,11 +709,11 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
     =
   let json = Data_encoding.Json.construct source_list_encoding state.pool in
   let catch_write_error = function
-    | Error e ->
+    | Error trace ->
         cctxt#message
           "could not write back json file: %a"
-          Error_monad.pp_print_error
-          e
+          Error_monad.pp_print_trace
+          trace
     | Ok () -> Lwt.return_unit
   in
   match pool_source with
@@ -819,8 +819,8 @@ let generate_random_transactions =
             Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _retcode ->
                 stat_on_exit cctxt state >>= function
                 | Ok () -> Lwt.return_unit
-                | Error e ->
-                    cctxt#message "Error: %a" Error_monad.pp_print_error e)
+                | Error trace ->
+                    cctxt#message "Error: %a" Error_monad.pp_print_trace trace)
           in
           let save_pool () = save_pool_callback cctxt sources_json state in
           (* Register a callback for saving the pool when the tool is interrupted

@@ -179,7 +179,7 @@ let activate
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               trace)
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
@@ -205,7 +205,7 @@ let deactivate chain_db =
   Error_monad.dont_wait
     (fun () -> sends)
     (fun trace ->
-      Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_error trace)
+      Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_trace trace)
     (fun exc ->
       Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
   Distributed_db_requester.Raw_operation.shutdown

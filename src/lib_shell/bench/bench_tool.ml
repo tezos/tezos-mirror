@@ -71,7 +71,7 @@ let parse_param_file name =
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name >>=? fun json ->
     match Data_encoding.Json.destruct Parameters.encoding json with
     | exception exn ->
-        failwith "Parameters : Invalid JSON file - %a" Error_monad.pp_exn exn
+        failwith "Parameters : Invalid JSON file - %s" (Printexc.to_string exn)
     | param -> return param
 
 let read_args () =
@@ -82,7 +82,7 @@ let read_args () =
           | Error errs ->
               Format.printf
                 "Parameters parsing error : %a ==> using default parameters\n%!"
-                Error_monad.pp_print_error
+                Error_monad.pp_print_trace
                 errs ;
               Lwt.return default_args.params)
     |> Lwt_main.run
@@ -425,5 +425,5 @@ let () =
       Format.printf "Success.@." ;
       exit 0
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

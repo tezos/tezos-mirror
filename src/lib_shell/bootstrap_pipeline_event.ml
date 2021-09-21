@@ -193,5 +193,5 @@ let unexpected_error_while_fetching_headers =
     ~name:"unexpected_error_while_fetching_headers"
     ~msg:"unexpected error while fetching headers: {trace}"
     ~level:Error
-    ~pp1:pp_print_error_first
+    ~pp1:pp_print_top_error_of_trace
     ("trace", Error_monad.trace_encoding)

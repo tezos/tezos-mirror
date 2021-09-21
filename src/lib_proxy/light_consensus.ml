@@ -62,7 +62,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
                  %s. Error is: %a"
                 (Uri.to_string uri)
                 (Internal.key_to_string key)
-                pp_print_error
+                pp_print_trace
                 trace)
     | Ok None ->
         Lwt.return
