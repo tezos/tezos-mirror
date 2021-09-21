@@ -78,13 +78,13 @@ in more detail.
 
 
 .. csv-table:: Testing frameworks and their applications in Tezos. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
+               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression"
 
    "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
-   "-- Protocol",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",""
+   "-- Protocol",":ref:`AT <alcotest_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`",""
    "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client","",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
+   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
    "Networked nodes","--","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`","", ""
    "Endorser","","","",":ref:`FT <flextesa_section>`"
    "Baker","","","",":ref:`FT <flextesa_section>`"
@@ -126,6 +126,32 @@ Example tests:
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
+.. _ppx_expect_section:
+   
+Ppx_expect
+~~~~~~~~~~
+
+`Ppx_expect <https://github.com/janestreet/ppx_expect>`_ is a
+framework for writing tests for OCaml code generating textual output, similar to
+`Cram <https://bitheap.org/cram/>`_ which is used for testing command line applications.
+
+Typical use cases:
+ - Unit test, integration test leveraging existing printers instead of checking properties.
+ - Test that change on purpose over time. One can easily make tests
+   pass again with a single dune invocation ``dune runtest --auto-promote``
+
+Example tests:
+ - Unit tests for :src:`src/lib_micheline`, in :src:`src/lib_micheline/test/test_parser.ml`. To
+   execute them locally, run ``dune runtest src/lib_micheline/test`` in
+   the Tezos root.
+
+
+References:
+ - :doc:`Section in Tezos Developer Documentation on Ppx_expect <ppx_expect>`
+ - `Ppx_expect README <https://github.com/janestreet/ppx_expect>`_.
+ - `Dune documentation about inline expectation tests <https://dune.readthedocs.io/en/stable/tests.html#inline-expectation-tests>`_.
+ - `Ppx_inline_test README <https://github.com/janestreet/ppx_inline_test>`_.
+  
 .. _property_based_test:
 
 QCheck
