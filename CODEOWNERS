@@ -20,8 +20,10 @@
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_proxy_server        @Sir4ur0n @smelc
+/src/bin_snoop               @lrand
 
 /src/lib_base                @raphael-proust
+/src/lib_benchmark           @lrand
 /src/lib_context             @smelc
 /src/lib_error_monad         @raphael-proust
 /src/lib_mockup              @Sir4ur0n @smelc
@@ -30,11 +32,14 @@
 /src/lib_proxy               @Sir4ur0n @smelc
 /src/lib_proxy_server_config @Sir4ur0n @smelc
 /src/lib_rpc*                @smelc @raphael-proust
+/src/lib_shell_benchmarks    @lrand
 /src/lib_stdlib*             @raphael-proust
 /src/lib_test                @Sir4ur0n
 /src/lib_version             @romain.nl
 /src/lib_event_logging       @romain.nl
 /src/openapi                 @romain.nl
+/src/proto_*/lib_benchmark   @lrand
+/src/proto_*/lib_benchmarks_proto @lrand
 
 /scripts                     @romain.nl
 /scripts/pre_commit          @smelc
