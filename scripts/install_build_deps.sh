@@ -80,7 +80,10 @@ fi
 # opam packages that depend on Rust.
 "$script_dir"/install_build_deps.rust.sh
 
-opam install --yes opam-depext
+case $(opam --version) in
+    2.0.* )
+        opam install --yes opam-depext ;;
+esac
 
 "$script_dir"/install_build_deps.raw.sh
 
