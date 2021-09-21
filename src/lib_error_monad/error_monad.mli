@@ -160,9 +160,7 @@ val fail_with_exn : exn -> 'a tzresult Lwt.t
 
 (** [error_of_exn e] is an error that carries the exception [e]. This function
     is intended to be used when interacting with a part of the code (most likely
-    an external library) which uses exceptions.
-
-    See also {!trace_of_exn}. *)
+    an external library) which uses exceptions. *)
 val error_of_exn : exn -> error
 
 (** [error_of_fmt …] is like [error_with …] but the error isn't wrapped in a
@@ -176,20 +174,6 @@ val error_of_exn : exn -> error
     *)
 val error_of_fmt : ('a, Format.formatter, unit, error) format4 -> 'a
 
-(** [trace_of_exn e] is a trace that carries an error that carries the exception
-    [e]. This function is intended to be used when interacting with a part of
-    the code (most likely an external library) which uses exception. E.g.,
-
-{[
-match parse data with
-| value -> Ok value
-| exception Parse_error -> error Invalid_content (* specific, expected exception *)
-| exception exn -> Error (trace_of_exn exn) (* catch-all *)
-]}
-
-    See also {!error_of_exn}. *)
-val trace_of_exn : exn -> error trace
-
 (** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
     constructor of a result into a [tzresult]. This is intended for use when
     interacting with code that uses exceptions wrapped in a [result]. E.g.,
@@ -199,21 +183,6 @@ let p : int Lwt.t = … in
 Lwt_result.catch p >|= tzresult_of_exn_result
 ]} *)
 val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
-
-(** {2 Tracing with exceptions}
-
-    The following functions allow you to enrich existing traces with wrapped
-    exceptions. *)
-
-(** [generic_trace … r] is [r] where the trace (if any) is enriched with
-  [error_with …]. *)
-val generic_trace :
-  ( 'a,
-    Format.formatter,
-    unit,
-    ('b, error trace) result Lwt.t -> ('b, error trace) result Lwt.t )
-  format4 ->
-  'a
 
 (** {2 Misc helpers} *)
 

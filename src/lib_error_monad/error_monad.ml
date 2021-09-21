@@ -66,11 +66,6 @@ let fail_with_exn e = Lwt.return (error_with_exn e)
 
 let tzresult_of_exn_result r = Result.map_error trace_of_exn r
 
-let trace_exn exn f = trace (Exn exn) f
-
-let generic_trace fmt =
-  Format.kasprintf (fun str -> trace_exn (Failure str)) fmt
-
 let error_of_fmt fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
 
 type error += Canceled
