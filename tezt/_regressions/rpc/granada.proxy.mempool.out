@@ -214,8 +214,19 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "path": [
                   "filter"
                 ],
-                "description": "Get the configuration of the mempool filter.",
-                "query": [],
+                "description": "Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. \"minimal_nanotez_per_gas_unit\": [ \"100\", \"1\" ].",
+                "query": [
+                  {
+                    "name": "include_default",
+                    "description": "Show fields equal to their default value (set by default)",
+                    "kind": {
+                      "single": {
+                        "id": "single",
+                        "name": "bool"
+                      }
+                    }
+                  }
+                ],
                 "output": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#"
@@ -280,7 +291,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "path": [
                   "filter"
                 ],
-                "description": "Set the configuration of the mempool filter.",
+                "description": "Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.",
                 "query": [],
                 "input": {
                   "json_schema": {
@@ -316,13 +327,17 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "toplevel": {
                       "fields": [
                         {
+                          "kind": "dyn",
+                          "num_fields": 1,
+                          "size": "Uint30"
+                        },
+                        {
                           "layout": {
-                            "kind": "Zero_width"
+                            "kind": "String"
                           },
                           "kind": "anon",
                           "data_kind": {
-                            "size": 0,
-                            "kind": "Float"
+                            "kind": "Variable"
                           }
                         }
                       ]
