@@ -636,6 +636,8 @@ struct
     include
       Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
 
+    include Tezos_protocol_environment_structs.V3.M.Error_monad_trace_eval
+
     let dont_wait ex er f = dont_wait f er ex
 
     let trace_of_error e = TzTrace.make e
