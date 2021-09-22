@@ -1463,7 +1463,8 @@ let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
                load cctxt state.nonces_location >>=? fun nonces ->
                let nonces = add nonces block_hash seed_nonce in
                save cctxt state.nonces_location nonces)
-           |> trace (error_of_fmt "Error while recording nonce")
+           >|= record_trace_eval (fun () ->
+                   error_of_fmt "Error while recording nonce")
           else return_unit)
           >>=? fun () -> return_unit)
   | None -> return_unit

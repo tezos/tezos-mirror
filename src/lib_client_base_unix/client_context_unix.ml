@@ -82,7 +82,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
         if not (Sys.file_exists filename) then return default
         else
           Lwt_utils_unix.Json.read_file filename
-          |> trace (error_of_fmt "could not read the %s alias file" alias_name)
+          >|= record_trace_eval (fun () ->
+                  error_of_fmt "could not read the %s alias file" alias_name)
           >>=? fun json ->
           match Data_encoding.Json.destruct encoding json with
           | exception e ->
@@ -101,7 +102,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
             let filename = self#filename alias_name in
             let json = Data_encoding.Json.construct encoding list in
             Lwt_utils_unix.Json.write_file filename json)
-        |> trace (error_of_fmt "could not write the %s alias file." alias_name)
+        >|= record_trace_eval (fun () ->
+                error_of_fmt "could not write the %s alias file." alias_name)
   end
 
 class unix_prompter : Client_context.prompter =
