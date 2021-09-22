@@ -332,6 +332,36 @@ val spawn_transfer :
   t ->
   Process.t
 
+(** Run [tezos-client multiple transfers from giver using json_batch]. *)
+val multiple_transfers :
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  ?counter:int ->
+  ?arg:string ->
+  giver:string ->
+  json_batch:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [multiple_transfers], but do not wait for the process to exit. *)
+val spawn_multiple_transfers :
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  ?counter:int ->
+  ?arg:string ->
+  giver:string ->
+  json_batch:string ->
+  t ->
+  Process.t
+
 (** Run [tezos-client set delegate for <src> to <delegate>]. *)
 val set_delegate :
   ?endpoint:endpoint ->
