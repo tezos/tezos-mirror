@@ -518,6 +518,29 @@ let test_origination_from_unrevealed_fees =
   in
   return ()
 
+(** Test. Reproduce the scenario fixed by https://gitlab.com/tezos/tezos/-/merge_requests/3546 *)
+
+let test_multiple_transfers =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) multiple transfer simulation"
+    ~tags:["mockup"; "client"; "multiple"; "transfer"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let batch_line =
+    `O
+      [
+        ("destination", `String Constant.bootstrap1.identity);
+        ("amount", `String "0.02");
+      ]
+  in
+  let batch n = `A (List.init n (fun _ -> batch_line)) in
+  let file = Temp.file "batch.json" in
+  let oc = open_out file in
+  Ezjsonm.to_channel oc (batch 200) ;
+  close_out oc ;
+  Client.multiple_transfers ~giver:"bootstrap2" ~json_batch:file client
+
 let register ~protocols =
   test_rpc_list ~protocols ;
   test_same_transfer_twice ~protocols ;
@@ -526,7 +549,8 @@ let register ~protocols =
   test_simple_baking_event ~protocols ;
   test_multiple_baking ~protocols ;
   test_rpc_header_shell ~protocols ;
-  test_origination_from_unrevealed_fees ~protocols
+  test_origination_from_unrevealed_fees ~protocols ;
+  test_multiple_transfers ~protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success ~protocols ;
