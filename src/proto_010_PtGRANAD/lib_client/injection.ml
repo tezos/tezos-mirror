@@ -441,6 +441,29 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
+(*
+
+   {2 High-level description of the automatic gas patching algorithm}
+
+   When the user wants to inject a list of operations, some of which
+   might have unspecified gas, fees or storage limit, the client
+   performs a {e simulation} to estimate those limits and assign
+   sensible values to them.
+
+   The simulation works as follows:
+   1. limits are assigned to dummy, high values to ensure that the operations
+      can be simulated
+      - 1.a) when a list of operations is partially specified, the algorithm
+        allocates to each unspecified operation an equal portion of the
+        maximum gas per block minus the gas consumed by the operations that
+        do specify their limit
+   2. the algorithm retrieves the effectively consumed gas and storage from the
+      receipt
+   3. the algorithm assigns slight overapproximations to the operation
+   4. a default fee is computed and set
+
+*)
+
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     ~fee_parameter ~chain ~block ?branch
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
@@ -452,6 +475,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
              parametric =
                {
                  hard_gas_limit_per_operation;
+                 hard_gas_limit_per_block;
                  hard_storage_limit_per_operation;
                  origination_size;
                  cost_per_byte;
@@ -473,10 +497,39 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           user_storage_limit < Z.zero
           || hard_storage_limit_per_operation < user_storage_limit))
   in
+  let gas_patching_stats (Annotated_manager_operation.Manager_info c)
+      need_patching gas_consumed =
+    if user_gas_limit_needs_patching c.gas_limit then
+      (need_patching + 1, gas_consumed)
+    else
+      ( need_patching,
+        Gas.Arith.add
+          gas_consumed
+          (Limit.value ~when_unknown:Gas.Arith.zero c.gas_limit) )
+  in
+  let rec gas_patching_stats_list :
+      type kind.
+      kind Annotated_manager_operation.annotated_list ->
+      int ->
+      Saturation_repr.may_saturate Saturation_repr.t ->
+      int * Saturation_repr.may_saturate Saturation_repr.t =
+   fun op need_patching gas_consumed ->
+    match op with
+    | Single_manager minfo ->
+        gas_patching_stats minfo need_patching gas_consumed
+    | Cons_manager (minfo, rest) ->
+        let (need_patching, gas_consumed) =
+          gas_patching_stats minfo need_patching gas_consumed
+        in
+        gas_patching_stats_list rest need_patching gas_consumed
+  in
   let may_need_patching_single :
       type kind.
+      Gas.Arith.integral ->
       kind Annotated_manager_operation.t ->
-      kind Annotated_manager_operation.t option = function
+      kind Annotated_manager_operation.t option =
+   fun gas_limit_per_patched_op op ->
+    match op with
     | Manager_info c ->
         let needs_patching =
           Limit.is_unknown c.fee
@@ -488,7 +541,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           (* Set limits for simulation purposes *)
           let gas_limit =
             if user_gas_limit_needs_patching c.gas_limit then
-              Limit.known hard_gas_limit_per_operation
+              Limit.known gas_limit_per_patched_op
             else c.gas_limit
           in
           let storage_limit =
@@ -501,24 +554,39 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             (Manager_info
                {c with gas_limit; storage_limit; fee = Limit.known fee})
   in
-  let rec may_need_patching :
-      type kind.
-      kind Annotated_manager_operation.annotated_list ->
-      kind Annotated_manager_operation.annotated_list option = function
-    | Single_manager annotated_op -> (
-        match may_need_patching_single annotated_op with
-        | None -> None
-        | Some annotated_op -> Some (Single_manager annotated_op))
-    | Cons_manager (annotated_op, rest) -> (
-        let annotated_op_opt = may_need_patching_single annotated_op in
-        let rest_opt = may_need_patching rest in
-        match (annotated_op_opt, rest_opt) with
-        | (None, None) -> None
-        | _ ->
-            let op = Option.value ~default:annotated_op annotated_op_opt in
-            let rest = Option.value ~default:rest rest_opt in
-            Some (Cons_manager (op, rest)))
+  let may_need_patching gas_limit_per_patched_op ops =
+    let rec loop :
+        type kind.
+        kind Annotated_manager_operation.annotated_list ->
+        kind Annotated_manager_operation.annotated_list option = function
+      | Single_manager annotated_op ->
+          Option.map (fun op -> Annotated_manager_operation.Single_manager op)
+          @@ may_need_patching_single gas_limit_per_patched_op annotated_op
+      | Cons_manager (annotated_op, rest) -> (
+          let annotated_op_opt =
+            may_need_patching_single gas_limit_per_patched_op annotated_op
+          in
+          let rest_opt = loop rest in
+          match (annotated_op_opt, rest_opt) with
+          | (None, None) -> None
+          | _ ->
+              let op = Option.value ~default:annotated_op annotated_op_opt in
+              let rest = Option.value ~default:rest rest_opt in
+              Some (Cons_manager (op, rest)))
+    in
+    loop ops
   in
+  (*
+    The recursion here handles the case where an increased fee might increase the
+    size of the operation, and so require a recalculation of the gas costs.
+    Rationale for termination:
+    - the fee for size increases linearly with the size of the operation.
+    - however, when the size of the operation increase to make space for an
+      increased fee, the amount of new fee that can be added without increasing
+      the size of the block again increases exponentially.
+    - hence, there will eventually be a increase of size that will fit any new
+      fee without having to increase the size of the operation again.
+  *)
   let rec patch_fee : type kind. first:bool -> kind contents -> kind contents =
    fun ~first -> function
     | Manager_operation c as op -> (
@@ -645,7 +713,22 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         return (Cons (op, rest))
     | _ -> assert false
   in
-  match may_need_patching annotated_contents with
+  let gas_limit_per_patched_op =
+    let (need_gas_patching, gas_consumed) =
+      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
+    in
+    if need_gas_patching = 0 then hard_gas_limit_per_operation
+    else
+      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
+      let average_per_operation_gas =
+        Gas.Arith.integral_exn
+        @@ Z.div
+             (Gas.Arith.integral_to_z remaining_gas)
+             (Z.of_int need_gas_patching)
+      in
+      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
+  in
+  match may_need_patching gas_limit_per_patched_op annotated_contents with
   | Some annotated_for_simulation ->
       Lwt.return
         (Annotated_manager_operation.manager_list_from_annotated
