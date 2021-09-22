@@ -1822,7 +1822,7 @@ let set_filter_no_fee_requirement =
 
 (** Checks that arguments [applied] and [refused] are the number of operations
     in the mempool of [client] with the corresponding classification,
-    that both sets of operations are disjoint, and that there is no 
+    that both sets of operations are disjoint, and that there is no
     [branch_delayed], [branch_refused], or [unprocessed] operation.
     If [log] is [true], also logs the hash and fee of all applied
     and refused operations. *)
@@ -2134,6 +2134,119 @@ let test_pending_operation_version =
       (List.length ophs_refused_v0)
       (List.length ophs_refused_v1)
 
+(** This test tries to check that invalid operation can be injected on a local
+    node with private/injection/operation RPC *)
+let force_operation_injection =
+  let step1_msg =
+    "Step 1: Create one node with specific configuration that mimic a node \
+     with secure ACL policy"
+  in
+  let step2_msg =
+    "Step 2: Initialize a second node, connect both node and activate the \
+     protocol"
+  in
+  let step3_msg = "Step 3: Get the counter and the current branch" in
+  let step4_msg = "Step 4: Forge and sign operation with incorrect counter" in
+  let step5_msg =
+    "Step 5: Inject the operation on the secure node, and check for error \
+     because the operation was refused"
+  in
+  let step6_msg =
+    "Step 6: Force injection of operation on the secure node, and check for \
+     error because we don't have the right to use this rpc"
+  in
+  let step7_msg =
+    "Step 7: Inject operation on the local node, and check for error because \
+     the operation was refused"
+  in
+  let step8_msg = "Step 8: Force injection of operation on local node" in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"force invalid operation injection"
+    ~tags:["force"; "mempool"]
+  @@ fun protocol ->
+  Log.info "%s" step1_msg ;
+  let node1 = Node.create [] in
+  let* () = Node.config_init node1 [] in
+  let address =
+    Node.rpc_host node1 ^ ":" ^ string_of_int (Node.rpc_port node1)
+  in
+  let acl =
+    JSON.annotate ~origin:"whitelist"
+    @@ `A
+         [
+           `O
+             [
+               ("address", `String address);
+               ( "whitelist",
+                 `A
+                   [
+                     (* We do not add all RPC allowed in secure mode,
+                        only the ones that are useful for this test. *)
+                     `String "POST /injection/operation";
+                     `String "GET /chains/*/blocks/*/protocols";
+                     `String "GET /describe/**";
+                   ] );
+             ];
+         ]
+  in
+  Node.Config_file.update node1 (JSON.update "rpc" (JSON.put ("acl", acl))) ;
+  let* () = Node.identity_generate node1 in
+  let* () = Node.run node1 [Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node1 in
+  Log.info "%s" step2_msg ;
+  let* node2 = Node.init [Synchronisation_threshold 0] in
+  let* client1 = Client.init ~endpoint:Client.(Node node1) ()
+  and* client2 = Client.init ~endpoint:Client.(Node node2) () in
+  let* () = Client.Admin.connect_address client2 ~peer:node1
+  and* () = Client.activate_protocol ~protocol client2 in
+  let proto_activation_level = 1 in
+  let* _ = Node.wait_for_level node1 proto_activation_level
+  and* _ = Node.wait_for_level node2 proto_activation_level in
+  Log.info "Both nodes are at level %d." proto_activation_level ;
+  let open Lwt in
+  Log.info "%s" step3_msg ;
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client2
+    >|= JSON.as_int
+  in
+  let* branch = RPC.get_branch client2 >|= JSON.as_string in
+  Log.info "%s" step4_msg ;
+  let* op_str_hex =
+    forge_operation
+      ~branch
+      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
+      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~source:Constant.bootstrap2.identity
+      ~destination:Constant.bootstrap1.identity
+      ~counter (* Invalid counter *)
+      ~client:client2
+  in
+  let signature = sign_operation ~signer:Constant.bootstrap2 op_str_hex in
+  let signed_op = op_str_hex ^ signature in
+  Log.info "%s" step5_msg ;
+  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client1 in
+  let injection_error_rex =
+    rex
+      ~opts:[`Dotall]
+      "Fatal error:\n  Command failed: Error while applying operation.*:"
+  in
+  let* () = Process.check_error ~msg:injection_error_rex p in
+  Log.info "%s" step6_msg ;
+  let p =
+    RPC.spawn_private_inject_operation ~data:(`String signed_op) client1
+  in
+  let access_error_rex =
+    rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
+  in
+  let* () = Process.check_error ~msg:access_error_rex p in
+  Log.info "%s" step7_msg ;
+  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client2 in
+  let* () = Process.check_error ~msg:injection_error_rex p in
+  Log.info "%s" step8_msg ;
+  let* _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
@@ -2146,4 +2259,5 @@ let register ~protocols =
   ban_operation_branch_refused_reevaluated ~protocols ;
   recycling_branch_refused ~protocols ;
   test_do_not_reclassify ~protocols ;
-  test_pending_operation_version ~protocols
+  test_pending_operation_version ~protocols ;
+  force_operation_injection ~protocols
