@@ -141,12 +141,18 @@ end
       - Identities:
         [ return >=> f = f = f >=> return ]
 
-    where [ f >=> g =
-            fun x ->
-              let* y = f x in
-              let* z = g y in
-              return z
-          ]
+    assuming
+
+    [ ( let* ) = bind ].
+
+    and
+
+    [ f >=> g =
+      fun x ->
+        let* y = f x in
+        let* z = g y in
+        return z
+    ]
 
  *)
 module Monad : sig
