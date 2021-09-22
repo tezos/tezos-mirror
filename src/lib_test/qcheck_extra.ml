@@ -154,10 +154,9 @@ module Stateful_gen = struct
       let* a = x in
       return (f a)
 
-    let map2 f x y =
-      let* a = x in
-      let* b = y in
-      return (f a b)
+    let map2 f x y g =
+      let (g1, g2) = Random_pure.split g in
+      F.map2 f (x g1) (y g2)
 
     let join x =
       let* y = x in
