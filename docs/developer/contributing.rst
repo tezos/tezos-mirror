@@ -152,7 +152,9 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      than master. You can (should) activate these tests by including keywords in
      the branch name.
 
-     +  If your MR impacts OPAM packaging, use ``opam`` in the branch name.
+     + Use ``opam`` in the branch name if you want to explictly trigger
+       the OPAM packaging pipeline. Note that any OPAM related changes
+       will automatically trigger it.
 
 -  Prefer small atomic commits over a large one that does many things.
 -  Don’t mix refactoring, reindentation, whitespace deletion, or other style

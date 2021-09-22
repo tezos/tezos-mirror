@@ -22,7 +22,7 @@
     - . ./scripts/version.sh
     # 1. Some basic, fast sanity checks
     - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
-        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab/ci/templates.yml'." ;
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi

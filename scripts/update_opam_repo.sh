@@ -27,7 +27,7 @@
 #    created by the CI.
 #
 # 5. Update the variable `opam_repository_tag` in files
-#    `scripts/version.sh` and `.gitlab-ci.yml` with the hash of the
+#    `scripts/version.sh` and `.gitlab/ci/templates.yml` with the hash of the
 #    newly created commit in `tezos/opam-repository`.
 #
 # 6. Enjoy your new dependencies
@@ -116,5 +116,5 @@ git diff HEAD -- packages > "$target"
 echo
 echo "Wrote proposed update in: $target."
 echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
-echo 'And update accordingly the commit hash in: `.gitlab-ci.yml` and `scripts/version.sh`'
+echo 'And update accordingly the commit hash in: `.gitlab/ci/templates.yml` and `scripts/version.sh`'
 echo
