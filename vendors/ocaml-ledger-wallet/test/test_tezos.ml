@@ -1,16 +1,29 @@
+open Rresult
 open Ledgerwallet_tezos
 
 let vendor_id = 0x2C97
 let product_id = 0x0001
 
-let test_open_close () =
+let fail_on_error = function
+  | Result.Ok () -> ()
+  | Result.Error e ->
+     failwith
+       (Format.asprintf "Ledger error: %a" Ledgerwallet.Transport.pp_error e)
+
+let with_connection f =
   let h = Hidapi.open_id_exn ~vendor_id ~product_id in
-  Hidapi.close h
+  try
+    fail_on_error (f h) ;
+    Hidapi.close h
+  with exn ->
+    Hidapi.close h ;
+    raise exn
+
+let test_open_close () =
+  with_connection (fun _ -> R.ok ())
 
 let test_ping () =
-  let h = Hidapi.open_id_exn ~vendor_id ~product_id in
-  Ledgerwallet.Transport.ping h ;
-  Hidapi.close h
+  with_connection Ledgerwallet.Transport.ping
 
 let hard x =
   Int32.logor x 0x8000_0000l
@@ -22,22 +35,21 @@ let path = [
 let curves = [Ed25519; Secp256k1; Secp256r1]
 
 let msg = Cstruct.of_string "Voulez-vous coucher avec moi, ce soir ?"
-let msg_ba = Cstruct.to_bigarray msg
+let msg_bytes = Cstruct.to_bytes msg
 
 let test_getpk h curve =
-  let pk = get_public_key h curve path in
-  Alcotest.(check int "pklen"
-              (if curve = Ed25519 then 33 else 65) (Cstruct.len pk))
+  get_public_key h curve path >>| fun pk ->
+  Alcotest.(check int "pklen" 65 (Cstruct.len pk))
 
 let test_getpk () =
-  let h = Hidapi.open_id_exn ~vendor_id ~product_id in
-  List.iter (test_getpk h) curves ;
-  Hidapi.close h
+  with_connection (fun h ->
+      List.iter (fun x -> fail_on_error (test_getpk h x)) curves;
+      R.ok ())
 
 let test_sign h curve =
   let open Alcotest in
-  let pk = get_public_key h curve path in
-  let signature = sign h curve path msg in
+  get_public_key h curve path >>= fun pk ->
+  sign h curve path msg >>| fun signature ->
   match curve with
   | Ed25519 ->
       let pk = Tweetnacl.Sign.(pk_of_cstruct_exn (Cstruct.sub pk 1 pkbytes)) in
@@ -52,19 +64,16 @@ let test_sign h curve =
           check bool "sign Secp256k1" true (Uecc.verify pk ~msg:msg_ba ~signature)
     end
   | Secp256r1 -> begin
-      let pk = Cstruct.to_bigarray pk in
-      let signature = Cstruct.to_bigarray signature in
-      match Uecc.(pk_of_bytes secp256r1 pk) with
+      let pk = Cstruct.to_bytes pk in
+      let signature = Cstruct.to_bytes signature in
+      match Uecc.pk_of_bytes pk with
       | None -> assert false
       | Some pk ->
-          check bool "sign Secp256r1" true (Uecc.verify pk ~msg:msg_ba ~signature)
+          check bool "sign Secp256r1" true (Uecc.verify pk ~msg:msg_bytes ~signature)
     end
 
 let test_sign () =
-  let h = Hidapi.open_id_exn ~vendor_id ~product_id in
-  (* List.iter (test_sign h) curves ; *)
-  (* List.iter (test_sign h) [Secp256k1] ; *)
-  Hidapi.close h
+  List.iter (fun curve -> with_connection (fun h -> test_sign h curve)) curves
 
 let basic = [
   "open_close", `Quick, test_open_close ;
