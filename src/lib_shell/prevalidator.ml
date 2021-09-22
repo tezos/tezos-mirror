@@ -77,6 +77,8 @@ module Logger =
       let worker_name = "node_prevalidator"
     end)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1794
+          We should use chain_tools instead of chain_db *)
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
 module Classification = Prevalidator_classification
@@ -1496,7 +1498,7 @@ let current_request (t : t) =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.current_request w
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/1266
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
 
    This function is legacy and should be removed.  *)
 let last_events (_t : t) = []
