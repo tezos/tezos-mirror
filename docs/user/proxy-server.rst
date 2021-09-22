@@ -249,8 +249,7 @@ see the :ref:`Support <proxy_server_support>` section.
 Support
 ~~~~~~~
 
-The proxy server is a project led by
-`smelc <https://gitlab.com/smelc>`_ and `Sir4ur0n <https://gitlab.com/Sir4ur0n>`_.
+The proxy server is a project led by `smelc <https://gitlab.com/smelc>`_.
 To contact us:
 
 * We are on the `Tezos-dev slack <https://tezos-dev.slack.com>`_, or
