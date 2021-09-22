@@ -60,7 +60,7 @@ module Applicative = struct
 
     val map2 : ('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 
-    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val product : 'a t -> 'b t -> ('a * 'b) t
   end
 end
 
@@ -70,15 +70,17 @@ module Monad = struct
 
     val join : 'a t t -> 'a t
 
-    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val bind : 'a t -> ('a -> 'b t) -> 'b t
   end
 
   module Syntax (M : S) = struct
-    let ( let* ) = M.( let* )
+    let ( let* ) = M.bind
 
     let ( let+ ) x f = M.map f x
 
-    let ( and+ ) = M.( and+ )
+    let ( and+ ) = M.product
+
+    let ( and* ) = M.product
   end
 end
 
@@ -93,9 +95,9 @@ module Identity = struct
 
   let join x = x
 
-  let ( let* ) x f = f x
+  let bind x f = f x
 
-  let ( and+ ) x y = (x, y)
+  let product x y = (x, y)
 
   let run x = x
 end
@@ -142,9 +144,11 @@ module Stateful_gen = struct
 
     let return x _ = F.return x
 
-    let ( let* ) m f g =
+    let bind m f g =
       let (g1, g2) = Random_pure.split g in
-      F.( let* ) (m g1) (fun a -> f a g2)
+      F.bind (m g1) (fun a -> f a g2)
+
+    let ( let* ) = bind
 
     let map f x =
       let* a = x in
@@ -159,7 +163,9 @@ module Stateful_gen = struct
       let* y = x in
       y
 
-    let ( and+ ) x y = map2 (fun x y -> (x, y)) x y
+    let product x y = map2 (fun x y -> (x, y)) x y
+
+    let ( and+ ) = product
 
     let ( let+ ) x f = map f x
 

@@ -58,8 +58,11 @@ end
 
       - Composition:
         [ map f << map g = map (f << g) ]
+
       - Identity:
         [ map id = id ]
+
+      assuming [ f << g = fun x -> g (f x) ].
 
  *)
 module Functor : sig
@@ -78,19 +81,26 @@ end
 
     [
     let (and+) = map2 (fun x y -> (x,y))
+
     let map2 f x y =
       let+ a = x
       and+ b = y in
       f x y
     ]
+    assuming
+
+    [ (and+) = product ]
+
+    and
+
+    [ (let+) x f = map f x ].
 
     An [Applicative] should satisfy:
 
       - Associativity:
-        [ (and+) ((and+) x y) z =
-          (and+) x ((and+) y z) ]
+        [ product (product x y) z = product x (product y z) ]
       - Identities:
-        [ (and+) (return ()) x = x = (and+) x (return ()) ]
+        [ product (return ()) x = x = product x (return ()) ]
  *)
 module Applicative : sig
   module type S = sig
@@ -102,8 +112,8 @@ module Applicative : sig
     (** Map a binary function over the given value. *)
     val map2 : ('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 
-    (** Operator version of [map2]. *)
-    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    (** Combine the given values. See also [map2]. *)
+    val product : 'a t -> 'b t -> ('a * 'b) t
   end
 end
 
@@ -119,6 +129,10 @@ end
       let* y = x in
       y
     ]
+
+    assuming
+
+    [ ( let* ) = bind ].
 
     A [Monad] should satisfy:
 
@@ -143,7 +157,7 @@ module Monad : sig
     val join : 'a t t -> 'a t
 
     (** Monadic bind operator. *)
-    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val bind : 'a t -> ('a -> 'b t) -> 'b t
   end
 
   (** Utility to import let-syntax for any [Monad].
@@ -152,6 +166,8 @@ module Monad : sig
     *)
   module Syntax (M : S) : sig
     val ( let* ) : 'a M.t -> ('a -> 'b M.t) -> 'b M.t
+
+    val ( and* ) : 'a M.t -> 'b M.t -> ('a * 'b) M.t
 
     val ( let+ ) : 'a M.t -> ('a -> 'b) -> 'b M.t
 
