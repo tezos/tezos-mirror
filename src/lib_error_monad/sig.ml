@@ -265,13 +265,11 @@ module type MONAD_EXTENSION = sig
 
   (** Same as record_trace, for unevaluated error *)
   val record_trace_eval :
-    (unit -> ('err, 'err trace) result) ->
-    ('a, 'err trace) result ->
-    ('a, 'err trace) result
+    (unit -> 'err) -> ('a, 'err trace) result -> ('a, 'err trace) result
 
   (** Same as trace, for unevaluated Lwt error *)
   val trace_eval :
-    (unit -> ('err, 'err trace) result Lwt.t) ->
+    (unit -> 'err Lwt.t) ->
     ('b, 'err trace) result Lwt.t ->
     ('b, 'err trace) result Lwt.t
 
