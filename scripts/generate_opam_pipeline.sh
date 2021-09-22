@@ -36,6 +36,14 @@ stages:
     - opam depext --yes \${package}
     - opam install --yes \${package}
     - opam reinstall --yes --with-test \${package}
+  after_script:
+    # Stores logs in opam_logs/ for artifacts and outputs an excerpt on failure.
+    - OPAM_LOGS=opam_logs/ ./scripts/ci/opam_handle_output.sh
+  artifacts:
+    paths:
+      - opam_logs/
+    expire_in: 1 week
+    when: always
 
 opam:placeholder_job:
   stage: "packaging"
