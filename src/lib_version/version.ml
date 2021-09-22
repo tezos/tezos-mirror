@@ -23,14 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Note: please try to keep this module free of *any* dependency so that
-   a script can trivially run the toplevel on it to get the version number. *)
-
-open Version_parser
-
 type additional_info = Version_parser.additional_info =
   | Dev
   | RC of int
+  | RC_dev of int
   | Release
 
 type t = Version_parser.t = {
@@ -39,17 +35,14 @@ type t = Version_parser.t = {
   additional_info : additional_info;
 }
 
-let parse_version s = version_tag (Lexing.from_string s)
+let parse_version s = Version_parser.version_tag (Lexing.from_string s)
 
 let string_of_additional_info = function
   | Dev -> "+dev"
-  | RC n -> "~rc" ^ string_of_int n
+  | RC n -> Format.asprintf "~rc%d" n
+  | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
 
 let to_string {major; minor; additional_info} =
   string_of_int major ^ "." ^ string_of_int minor
   ^ string_of_additional_info additional_info
-
-let current = {major = 11; minor = 0; additional_info = Dev}
-
-let current_string = to_string current

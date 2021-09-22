@@ -2,17 +2,36 @@
  (name tezos_version)
  (instrumentation (backend bisect_ppx))
  (public_name tezos-version)
- (modules bin_version node_version version version_parser generated_git_info current_git_info)
- (libraries tezos-base)
+ (modules
+   bin_version
+   node_version
+   version
+   generated_git_info
+   current_git_info)
+ (libraries tezos-base tezos-version-parser)
  (flags (:standard -open Tezos_base__TzPervasives)))
+
+(library
+  (public_name tezos-version-parser)
+  (name version_parser)
+  (preprocess (pps ppx_deriving.show ppx_deriving.make))
+  (modules version_parser)
+)
+(ocamllex version_parser)
+
+(executable
+ (name get_git_info)
+ (modules get_git_info)
+ (libraries
+   dune-configurator
+   tezos-version-parser
+ )
+)
 
 (rule
  (targets generated_git_info.ml)
- ; Ensures the hash update whenever a source file is modified ;
- (deps (universe) (:script get-git-info.mlt))
- (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
-
-(ocamllex version_parser)
+ (action (run ./get_git_info.exe))
+)
 
 (executable
  (name print_version)
