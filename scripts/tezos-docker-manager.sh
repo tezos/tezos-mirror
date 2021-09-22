@@ -709,6 +709,13 @@ case $(basename "$0") in
         default_port=9732
         network=granadanet
         ;;
+    hangzhounet.sh)
+        docker_base_dir="$HOME/.tezos-hangzhounet"
+        docker_image=tezos/tezos:master
+        docker_compose_base_name=hangzhounet
+        default_port=9732
+        network=hangzhounet
+        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
         docker_image=tezos/tezos:master

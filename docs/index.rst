@@ -236,6 +236,7 @@ in the :ref:`introduction <howtoget>`.
    releases/version-8
    releases/version-9
    releases/version-10
+   releases/version-11
 
 .. toctree::
    :maxdepth: 2
