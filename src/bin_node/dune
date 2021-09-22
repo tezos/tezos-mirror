@@ -8,7 +8,9 @@
 ; "void_for_linking".
 
 (env
- (static (flags (:standard -ccopt -static)))
+ (static
+  (flags (:standard -ccopt -static))
+  (ocamlopt_flags (:standard -O3)))
  (release (ocamlopt_flags (:standard -O3))))
 
 (executable

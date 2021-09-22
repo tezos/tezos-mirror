@@ -1,6 +1,8 @@
 ; build static executable with --profile static
 (env
- (static (flags (:standard -ccopt -static)))
+ (static
+  (flags (:standard -ccopt -static))
+  (ocamlopt_flags (:standard -O3)))
  (release (ocamlopt_flags (:standard -O3))))
 
 (library
