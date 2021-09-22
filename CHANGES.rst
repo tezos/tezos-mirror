@@ -155,6 +155,8 @@ Client
 -  Added commands ``list proxy protocols`` and ``list light protocols``,
    to get the list of protocols supported by ``--mode proxy`` and ``--mode light``
 
+-  Fix gas simulation for operation batches for Granada, Hangzhou and Alpha
+
 Baker / Endorser / Accuser
 --------------------------
 
