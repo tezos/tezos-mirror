@@ -229,6 +229,19 @@ end)
 
 module String = Make (String)
 module Bytes = Make (Bytes)
-module Z = Make (Z)
+
+module Z = struct
+  type t = Z.t
+
+  include Z.Compare
+
+  let compare = Z.compare
+
+  let equal = Z.equal
+
+  let max = Z.max
+
+  let min = Z.min
+end
 
 let or_else c f = if c <> 0 then c else f ()
