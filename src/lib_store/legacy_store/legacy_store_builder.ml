@@ -222,9 +222,8 @@ let run () =
         | External_validation.Fork_test_chain _ (* TODO *)
         | External_validation.Init | External_validation.Commit_genesis _
         (* commit_genesis is done by [Legacy_state.init] *)
-        | External_validation.Restore_context_integrity ->
-            (* noop *) ok "noop"
-        | External_validation.Terminate -> ok "exiting" >>=? fun () -> exit 0
+        | External_validation.Terminate ->
+            ok "exiting" >>=? fun () -> exit 0
         | External_validation.Validate
             {
               chain_id;

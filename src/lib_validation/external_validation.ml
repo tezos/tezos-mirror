@@ -51,7 +51,6 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
-  | Restore_context_integrity
 
 let request_pp ppf = function
   | Init -> Format.fprintf ppf "process handshake"
@@ -76,7 +75,6 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
-  | Restore_context_integrity -> Format.fprintf ppf "restore context integrity"
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
@@ -187,9 +185,7 @@ let request_encoding =
         (obj1 (req "chain_id" Chain_id.encoding))
         (function
           | Commit_genesis {chain_id} -> Some chain_id
-          | Init | Validate _ | Fork_test_chain _ | Terminate
-          | Restore_context_integrity ->
-              None)
+          | Init | Validate _ | Fork_test_chain _ | Terminate -> None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
         (Tag 3)
@@ -209,12 +205,6 @@ let request_encoding =
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
-      case
-        (Tag 5)
-        ~title:"restore_integrity"
-        unit
-        (function Restore_context_integrity -> Some () | _ -> None)
-        (fun () -> Restore_context_integrity);
     ]
 
 let send pin encoding data =

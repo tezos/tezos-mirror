@@ -199,15 +199,6 @@ let run input output =
             commit
         in
         commit_genesis >>= fun () -> loop cache
-    | External_validation.Restore_context_integrity ->
-        let restore_context_integrity : unit Lwt.t =
-          let res = Context.restore_integrity context_index in
-          External_validation.send
-            output
-            (Error_monad.result_encoding Data_encoding.(option int31))
-            res
-        in
-        restore_context_integrity >>= fun () -> loop cache
     | External_validation.Validate
         {
           chain_id;

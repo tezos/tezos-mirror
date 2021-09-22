@@ -48,8 +48,6 @@ module type S = sig
 
   val close : t -> unit Lwt.t
 
-  val restore_context_integrity : t -> int option tzresult Lwt.t
-
   val apply_block :
     t ->
     Store.chain_store ->
@@ -209,10 +207,6 @@ module Internal_validator_process = struct
     let forked_header = Store.Block.header forking_block in
     Store.Block.context validator.chain_store forking_block >>=? fun context ->
     Block_validation.init_test_chain context forked_header
-
-  let restore_context_integrity validator =
-    let context_index = get_context_index validator.chain_store in
-    Lwt.return (Context.restore_integrity context_index)
 end
 
 (** Block validation using an external process *)
@@ -605,10 +599,6 @@ module External_validator_process = struct
     in
     send_request validator request Block_header.encoding
 
-  let restore_context_integrity validator =
-    let request = External_validation.Restore_context_integrity in
-    send_request validator request Data_encoding.(option int31)
-
   let close vp =
     Events.(emit close ()) >>= fun () ->
     match vp.validator_process with
@@ -685,9 +675,6 @@ let init validator_environment validator_kind =
       return (E {validator_process; validator})
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
-
-let restore_context_integrity (E {validator_process = (module VP); validator}) =
-  VP.restore_context_integrity validator
 
 let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
