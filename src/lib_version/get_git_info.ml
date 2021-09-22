@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commit_hash : string
+(* this is a script run at build time to get date, hash and version from git *)
 
-val abbreviated_commit_hash : string
+module Configurator = Configurator.V1
 
-val committer_date : string
+let query ?env ~default cmd =
+  let run_git () =
+    try
+      let (ic, oc, ec) = Unix.open_process_full cmd [||] in
+      let out = input_line ic in
+      if Unix.close_process_full (ic, oc, ec) = Unix.WEXITED 0 then out
+      else default
+    with
+    | End_of_file -> default
+    | _ ->
+        Printf.eprintf "Warning: Error while executing %s. using default" cmd ;
+        default
+  in
+  match env with
+  | None -> run_git ()
+  | Some env -> ( try Sys.getenv env with Not_found -> run_git ())
 
-(** current_version : is the version of the node.
-    it uses either the git tag or a default version *)
-val current_version : Version.t
+let hash =
+  query ~env:"GIT_SHORTREF" ~default:"unknown" "git show -s --pretty=format:%H"
+
+let date =
+  query
+    ~env:"GIT_DATETIME"
+    ~default:"not-available"
+    "git show -s --pretty=format:%ci"
+
+let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
+
+(* find the most recent tag. If one commit is associated with two or more tags,
+   output always the most recently added tag *)
+let git_describe =
+  let s = query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags" in
+  match parse_version s with
+  | None -> (
+      match parse_version (Sys.getenv "OPAM_PACKAGE_VERSION") with
+      | None | (exception Not_found) -> Tezos_version_parser.default
+      | Some v -> v)
+  | Some v -> v
+
+let lines =
+  [
+    Format.asprintf "let commit_hash = \"%s\"" hash;
+    Format.asprintf "let committer_date = \"%s\"" date;
+    Format.asprintf "let git_describe = %a" Tezos_version_parser.pp git_describe;
+  ]
+
+let () =
+  Configurator.main ~name:"tezos-git-vars" (fun _conf ->
+      Configurator.Flags.write_lines "generated_git_info.ml" lines)
