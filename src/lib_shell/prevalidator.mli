@@ -71,8 +71,10 @@ val shutdown : t -> unit Lwt.t
  * operations relevant to the specified context. *)
 val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 
-(** Notify the prevalidator worker of a new injected operation. *)
-val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
+(** [inject_operation t ~force op] notifies the prevalidator worker of a new
+    injected operation. If [force] is set to [true] the operation is injected
+    without any check. [force] should be used for test purpose only. *)
+val inject_operation : t -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
 (** Notify the prevalidator that a new head has been selected.
     [update] is used as an optimisation to know which operations

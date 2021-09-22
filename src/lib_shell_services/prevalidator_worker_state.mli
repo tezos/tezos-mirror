@@ -34,7 +34,7 @@ module Request : sig
         -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
-    | Inject : Operation.t -> unit t
+    | Inject : {op : Operation.t; force : bool} -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
     | Ban : Operation_hash.t -> unit t
