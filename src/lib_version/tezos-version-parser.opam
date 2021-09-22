@@ -7,11 +7,10 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.0" }
-  "tezos-base"
-  "tezos-version-parser"
+  "ppx_deriving" {build}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: version information generated from Git"
+synopsis: "Tezos: parser for ad-hoc tezos versioning schema"
