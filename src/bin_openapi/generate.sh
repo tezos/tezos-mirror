@@ -10,7 +10,7 @@
 # logic.
 
 # Ensure we are running from the root directory of the Tezos repository.
-cd "$(dirname "$0")"/../..
+cd "$(dirname "$0")"/../.. || exit 1
 
 # Tezos binaries.
 tezos_node=./tezos-node
@@ -40,11 +40,8 @@ openapi_json=docs/api/rpc-openapi.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
-# Build the executable
-dune build src/lib_version/print_version.exe
-
 # Get version number.
-version=$(_build/default/src/lib_version/print_version.exe)
+version=$(dune exec src/lib_version/print_version.exe)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
@@ -67,7 +64,7 @@ $tezos_client --base-dir $client_dir activate protocol $protocol_hash \
     with fitness 1 \
     and key activator \
     and parameters $protocol_parameters \
-    --timestamp $(TZ='AAA+1' date +%FT%TZ)
+    --timestamp "$(TZ='AAA+1' date +%FT%TZ)"
 
 # Wait a bit again...
 sleep 1
@@ -81,10 +78,10 @@ curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $me
 kill -9 "$node_pid"
 
 # Convert the RPC descriptions.
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" "$api_json" > "$openapi_json"
 echo "Generated OpenAPI specification: $openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" "$proto_api_json" > "$proto_openapi_json"
 echo "Generated OpenAPI specification: $proto_openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" "$mempool_api_json" > "$mempool_openapi_json"
 echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"

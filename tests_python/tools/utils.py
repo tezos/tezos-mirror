@@ -675,3 +675,13 @@ def originate(
     bake(client, baker)
     assert check_block_contains_operations(client, [origination.operation_hash])
     return origination
+
+
+# pylint: disable=subprocess-run-check
+def get_tezos_node_version() -> str:
+    cmd = ["dune", "exec", "../src/lib_version/print_version.exe"]
+    process_ret = subprocess.run(cmd, capture_output=True, text=True)
+    if process_ret.returncode == 0:
+        version = process_ret.stdout.strip()
+    assert version, "version should not be empty"
+    return version
