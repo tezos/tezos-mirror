@@ -19,22 +19,21 @@
 
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
-/src/bin_proxy_server        @Sir4ur0n @smelc
+/src/bin_proxy_server        @smelc
 /src/bin_snoop               @lrand
 
 /src/lib_base                @raphael-proust
 /src/lib_benchmark           @lrand
 /src/lib_context             @smelc
 /src/lib_error_monad         @raphael-proust
-/src/lib_mockup              @Sir4ur0n @smelc
-/src/lib_mockup_proxy        @Sir4ur0n @smelc
+/src/lib_mockup              @smelc
+/src/lib_mockup_proxy        @smelc
 /src/lib_protocol_environment @raphael-proust
-/src/lib_proxy               @Sir4ur0n @smelc
-/src/lib_proxy_server_config @Sir4ur0n @smelc
+/src/lib_proxy               @smelc
+/src/lib_proxy_server_config @smelc
 /src/lib_rpc*                @smelc @raphael-proust
 /src/lib_shell_benchmarks    @lrand
 /src/lib_stdlib*             @raphael-proust
-/src/lib_test                @Sir4ur0n
 /src/lib_version             @romain.nl
 /src/lib_event_logging       @romain.nl
 /src/openapi                 @romain.nl
@@ -46,7 +45,7 @@
 
 /tests_python                @smelc
 
-/tezt                        @romain.nl @Sir4ur0n @smelc
+/tezt                        @romain.nl @smelc
 
 /.gitlab                     @romain.nl @raphael-proust
 
@@ -69,7 +68,6 @@
 # @raphael-proust = Raphaël Proust
 # @romain.nl = Romain
 # @Saroupille = François Thiré
-# @Sir4ur0n = Julien Debon
 # @smelc = Clément Hurlin
 # @smondet = Seb Mondet
 # @sventimir = Sventimir
@@ -77,7 +75,7 @@
 # @vbotbol = vbot
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @Sir4ur0n @smelc @smondet @sventimir @tomjack @vbotbol @yrg
+* @arvidnl @camlspotter @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sventimir @tomjack @vbotbol @yrg
 
 # CODEOWNERS Owners
 #
