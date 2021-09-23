@@ -76,7 +76,7 @@ end = struct
     offset
 
   let dereference t off =
-    if off >= t.next_offset then
+    if off + t.elt_length > t.next_offset then
       Fmt.invalid_arg
         "Arena.dereference: reference doesn't belong to this arena" ;
     Bigstringaf.substring t.data ~off ~len:t.elt_length
@@ -196,7 +196,7 @@ end = struct
     2 * bucket_count
 
   let create ~elt_length ~initial_capacity =
-    let bucket_count = initial_capacity / 2 in
+    let bucket_count = max 1 (initial_capacity / 2) in
     let hashset = Array.make bucket_count Small_list.empty in
     let arena =
       Arena.create ~elt_length ~initial_capacity:(arena_capacity ~bucket_count)

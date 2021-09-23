@@ -13,6 +13,7 @@ depends: [
   "digestif" {>= "0.7.3"}
   "tezos-shell-services"
   "tezos-stdlib-unix"
+  "vector" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [
