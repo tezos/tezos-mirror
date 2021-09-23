@@ -312,8 +312,8 @@ let baking_priorities c level =
   f 0
 
 let endorsement_rights ctxt level =
-  List.fold_right_es
-    (fun slot acc ->
+  List.fold_left_es
+    (fun acc slot ->
       Roll.endorsement_rights_owner ctxt level ~slot >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
@@ -322,8 +322,8 @@ let endorsement_rights ctxt level =
         | Some (pk, slots, used) -> (pk, slot :: slots, used)
       in
       Signature.Public_key_hash.Map.add pkh right acc)
-    (0 --> (Constants.endorsers_per_block ctxt - 1))
     Signature.Public_key_hash.Map.empty
+    (List.rev (0 --> (Constants.endorsers_per_block ctxt - 1)))
 
 let[@coq_axiom_with_reason "gadt"] check_endorsement_right ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
