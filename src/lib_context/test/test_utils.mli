@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Tarides <contact@tarides.com>                          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Lwt_main.run
-    (Alcotest_lwt.run
-       "tezos-context"
-       [("context", Test_context.tests); ("utils", Test_utils.tests)])
+val tests : unit Alcotest_lwt.test_case list
