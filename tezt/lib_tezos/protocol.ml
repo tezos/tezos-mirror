@@ -91,8 +91,6 @@ let previous_protocol = function Alpha -> Some Granada | Granada -> None
 
 let all = [Alpha; Granada]
 
-let current_mainnet = Granada
-
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
 let add_to_test_parameters protocol title tags =

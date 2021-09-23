@@ -893,7 +893,7 @@ let register () =
   let register_current_mainnet test_mode_tag =
     check_rpc
       ~group_name:"current"
-      ~protocols:[Protocol.current_mainnet]
+      ~protocols:[Protocol.Granada]
       ~test_mode_tag
       ~rpcs:
         ([
