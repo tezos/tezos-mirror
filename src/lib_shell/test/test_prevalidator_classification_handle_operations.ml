@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator.exe
-    Subject:      Unit tests the [Prevalidator]
+    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe
+    Subject:      Unit tests [Prevalidator_classification.Internal_for_tests.handle_live_operations]
 *)
 
 open Lib_test.Qcheck_helpers
