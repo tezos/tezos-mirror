@@ -17,17 +17,8 @@ import pytest
 
 from launchers.sandbox import Sandbox
 from tools.constants import NODE_PARAMS
+from tools.utils import get_tezos_node_version
 from . import protocol
-
-
-def _get_tezos_node_version() -> str:
-    cmd = ["ocaml", "../scripts/print_version.ml"]
-    process_ret = subprocess.run(
-        cmd, check=True, capture_output=True, text=True
-    )
-    version = process_ret.stdout.strip()
-    assert version, "version should not be empty"
-    return version
 
 
 class TestOpenAPI:
@@ -57,7 +48,7 @@ class TestOpenAPI:
         # to give you time to inspect generated files before the
         # enclosing 'with' block finishes or to execute the dune
         # command manually while the temporary files are still there.
-        version = _get_tezos_node_version()
+        version = get_tezos_node_version()
         cmd = [
             "dune",
             "exec",
