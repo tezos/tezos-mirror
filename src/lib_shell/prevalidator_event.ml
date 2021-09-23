@@ -138,11 +138,3 @@ let operation_not_fetched =
     ~msg:"Operation {oph} was not fetched"
     ~level:Debug
     ("oph", Operation_hash.encoding)
-
-let predecessor_less_block =
-  declare_1
-    ~section
-    ~name:"predecessor_less_block"
-    ~msg:"Observing that a parent of block {blk_h} has no predecessor"
-    ~level:Warning
-    ("blk_h", Block_hash.encoding)

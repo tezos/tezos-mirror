@@ -123,6 +123,55 @@ val to_map :
   t ->
   Operation.t Operation_hash.Map.t
 
+(** Functions to query data on a polymorphic block-like type ['block]. *)
+type 'block block_tools = {
+  hash : 'block -> Block_hash.t;  (** The hash of a block *)
+  operations : 'block -> Operation.t list list;
+      (** The list of operations of a block ordered by their validation pass *)
+  all_operation_hashes : 'block -> Operation_hash.t list list;
+      (** The list of hashes of operations of a block ordered by their
+      validation pass. Could be implemented
+      using {!operations} but this lets an alternative implementation
+      to be provided. *)
+}
+
+(** A wrapper over chain-related modules, to make client code easier to
+    emulate, and hence to test *)
+type 'block chain_tools = {
+  clear_or_cancel : Operation_hash.t -> unit;
+      (** Removes the operation from the distributed database. *)
+  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+      (** Puts the operation in the distributed database. Returns [false] if
+      the [hash] is already in the distributed database *)
+  new_blocks :
+    from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
+      (** [new_blocks ~from_block ~to_block] returns a pair [(ancestor,
+      path)], where [ancestor] is the common ancestor of [from_block]
+      and [to_block] and where [path] is the chain from [ancestor]
+      (excluded) to [to_block] (included).
+
+      @raise assert failure when the two provided blocks do not belong
+      to the same [chain]. *)
+  read_predecessor_opt : 'block -> 'block option Lwt.t;
+      (** [read_predecessor_opt block] returns
+      the direct predecessor of [block] or [None] if it cannot
+      be found. *)
+}
+
+(** [recycle_operations] returns the new pending operations when
+    a reorganisation or a head update occurs.
+    See also {!Internal_for_tests.handle_live_operations}. *)
+val recycle_operations :
+  from_branch:'block ->
+  to_branch:'block ->
+  live_blocks:Block_hash.Set.t ->
+  classification:t ->
+  pending:Operation.t Operation_hash.Map.t ->
+  block_store:'block block_tools ->
+  chain:'block chain_tools ->
+  handle_branch_refused:bool ->
+  Operation.t Operation_hash.Map.t Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
@@ -141,4 +190,41 @@ module Internal_for_tests : sig
       and the sizes of its fields (number of elements in the map and
       in the ring of [bounded_map] / length of list / cardinal of set). *)
   val pp_t_sizes : Format.formatter -> t -> unit
+
+  (** [handle_live_operations chain_db from_branch to_branch is_branch_alive old_mempool]
+      returns the operations from:
+
+      1. [old_mempool],
+      2. [from_branch] that are NOT in [to_branch],
+
+      for the subset of these operations whose branch is up-to-date according
+      to [is_branch_alive] (operations that are not alive are cleared).
+
+      Returned operations can be considered pending afterwards and
+      are eligible to be propagated. On the other hand, all operations
+      from [ancestor] to [to_branch] are cleared and won't be propagated.
+
+      Most general case:
+                               to_branch ┐
+                                  /      │
+                from_branch      .       ├ path
+                     \          /        │
+                      .        .         ┘
+                       \      /
+                       ancestor
+
+      Increment the head case:
+
+                  to_branch = path
+                     |
+                from_branch = ancestor
+      *)
+  val handle_live_operations :
+    block_store:'block block_tools ->
+    chain:'block chain_tools ->
+    from_branch:'block ->
+    to_branch:'block ->
+    is_branch_alive:(Block_hash.t -> bool) ->
+    Operation.t Operation_hash.Map.t ->
+    Operation.t Operation_hash.Map.t Lwt.t
 end

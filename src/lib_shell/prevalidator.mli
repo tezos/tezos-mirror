@@ -125,30 +125,3 @@ val information : t -> Worker_types.worker_information
 val pipeline_length : t -> int
 
 val rpc_directory : t option RPC_directory.t
-
-(**/**)
-
-module Internal_for_tests : sig
-  type 'block block_tools = {
-    hash : 'block -> Block_hash.t;
-    operations : 'block -> Operation.t list list;
-    all_operation_hashes : 'block -> Operation_hash.t list list;
-  }
-
-  type 'block chain_tools = {
-    clear_or_cancel : Operation_hash.t -> unit;
-    inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
-    new_blocks :
-      from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
-    read_predecessor_opt : 'block -> 'block option Lwt.t;
-  }
-
-  val handle_live_operations :
-    block_store:'block block_tools ->
-    chain:'block chain_tools ->
-    from_branch:'block ->
-    to_branch:'block ->
-    is_branch_alive:(Block_hash.t -> bool) ->
-    Operation.t Operation_hash.Map.t ->
-    Operation.t Operation_hash.Map.t Lwt.t
-end

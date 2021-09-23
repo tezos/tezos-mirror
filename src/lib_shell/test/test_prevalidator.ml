@@ -32,6 +32,7 @@
 
 open Lib_test.Qcheck_helpers
 module Op_map = Operation_hash.Map
+module Classification = Prevalidator_classification
 
 (** Various functions about {!list} *)
 module List_extra = struct
@@ -242,7 +243,7 @@ module Block = struct
       in
       List.compare (List.compare compare_pair) t1.operations t2.operations
 
-  let tools : t Prevalidator.Internal_for_tests.block_tools =
+  let tools : t Classification.block_tools =
     let hash block = block.hash in
     let operations block = List.map (List.map snd) block.operations in
     let all_operation_hashes block = List.map (List.map fst) block.operations in
@@ -344,7 +345,7 @@ module Generators = struct
         last argument of [handle_live_operations].
     *)
   let chain_tools_gen :
-      (Block.t Prevalidator.Internal_for_tests.chain_tools
+      (Block.t Classification.chain_tools
       * Block.t Tree.tree
       * (Block.t * Block.t) option
       * Operation.t Operation_hash.Map.t)
@@ -410,7 +411,7 @@ module Generators = struct
       else map Option.some (oneofl heads_pairs)
     in
     let* old_mempool = old_mempool_gen tree in
-    let res : Block.t Prevalidator.Internal_for_tests.chain_tools =
+    let res : Block.t Classification.chain_tools =
       {
         clear_or_cancel = Fun.const ();
         inject_operation = (fun _ _ -> Lwt.return_unit);
@@ -483,7 +484,7 @@ let test_handle_live_operations_live_blocks_all_outdated =
     Op_map.bindings old_mempool |> List.map fst |> Operation_hash.Set.of_list
   in
   let actual : Operation_hash.Set.t =
-    Prevalidator.Internal_for_tests.handle_live_operations
+    Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
       ~chain
       ~from_branch
@@ -521,7 +522,7 @@ let test_handle_live_operations_path_spec =
     |> List.concat |> List.concat |> Operation_hash.Set.of_list
   in
   let actual =
-    Prevalidator.Internal_for_tests.handle_live_operations
+    Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
       ~chain
       ~from_branch
@@ -556,7 +557,7 @@ let test_handle_live_operations_clear =
       (values_from_to ~equal tree to_branch ancestor)
     |> List.concat |> List.concat |> Operation_hash.Set.of_list
   in
-  Prevalidator.Internal_for_tests.handle_live_operations
+  Classification.Internal_for_tests.handle_live_operations
     ~block_store:Block.tools
     ~chain
     ~from_branch
@@ -596,7 +597,7 @@ let test_handle_live_operations_inject =
       (values_from_to ~equal tree from_branch ancestor)
     |> List.concat |> List.concat |> Operation_hash.Set.of_list
   in
-  Prevalidator.Internal_for_tests.handle_live_operations
+  Classification.Internal_for_tests.handle_live_operations
     ~block_store:Block.tools
     ~chain
     ~from_branch

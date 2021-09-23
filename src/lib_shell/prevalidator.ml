@@ -100,147 +100,8 @@ type types_state_shell = {
   mutable banned_operations : Operation_hash.Set.t;
 }
 
-(** Functions to query data on a polymorphic block-like type ['block]. *)
-type 'block block_tools = {
-  hash : 'block -> Block_hash.t;  (** The hash of a block *)
-  operations : 'block -> Operation.t list list;
-      (** The list of operations of a block ordered by their validation pass *)
-  all_operation_hashes : 'block -> Operation_hash.t list list;
-      (** The list of hashes of operations of a block ordered by their
-          validation pass. Could be implemented
-          using {!operations} but this lets an alternative implementation
-          to be provided. *)
-}
-
-(** A wrapper over chain-related modules, to make client code easier to
-    emulate, and hence to test *)
-type 'block chain_tools = {
-  clear_or_cancel : Operation_hash.t -> unit;
-      (** Removes the operation from the distributed database. *)
-  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
-      (** Puts the operation in the distributed database. Returns [false] if
-          the [hash] is already in the distributed database *)
-  new_blocks :
-    from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
-      (** [new_blocks ~from_block ~to_block] returns a pair [(ancestor,
-          path)], where [ancestor] is the common ancestor of [from_block]
-          and [to_block] and where [path] is the chain from [ancestor]
-          (excluded) to [to_block] (included).
-
-          @raise assert failure when the two provided blocks do not belong
-          to the same [chain]. *)
-  read_predecessor_opt : 'block -> 'block option Lwt.t;
-      (** [read_predecessor_opt block] returns
-          the direct predecessor of [block] or [None] if it cannot
-          be found. *)
-}
-
-(* [handle_live_operations] and [recycle_operations] will ultimately
-   move to [Prevalidator_classification]. This is an intermediate state. *)
-
-(** [handle_live_operations chain_db from_branch to_branch is_branch_alive old_mempool]
-    returns the operations from:
-
-    1. [old_mempool],
-    2. [from_branch] that are NOT in [to_branch],
-
-    for the subset of these operations whose branch is up-to-date according
-    to [is_branch_alive] (operations that are not alive are cleared).
-
-    Returned operations can be considered pending afterwards and
-    are eligible to be propagated. On the other hand, all operations
-    from [ancestor] to [to_branch] are cleared and won't be propagated.
-
-    Most general case:
-                             to_branch ┐
-                                /      │
-              from_branch      .       ├ path
-                   \          /        │
-                    .        .         ┘
-                     \      /
-                     ancestor
-
-    Increment the head case:
-
-                to_branch = path
-                   |
-              from_branch = ancestor
-    *)
-let handle_live_operations ~(block_store : 'block block_tools)
-    ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
-    ~(is_branch_alive : Block_hash.t -> bool) old_mempool =
-  let rec pop_block ancestor (block : 'block) mempool =
-    let hash = block_store.hash block in
-    if Block_hash.equal hash ancestor then Lwt.return mempool
-    else
-      let operations = block_store.operations block in
-      List.fold_left_s
-        (List.fold_left_s (fun mempool op ->
-             let h = Operation.hash op in
-             chain.inject_operation h op >|= fun () ->
-             Operation_hash.Map.add h op mempool))
-        mempool
-        operations
-      >>= fun mempool ->
-      chain.read_predecessor_opt block >>= function
-      | None ->
-          (* Can this happen? If yes, there's nothing more to pop anyway,
-             so returning the accumulator. It's not the mempool that
-             should crash, should this case happen. *)
-          Event.(emit predecessor_less_block ancestor) >|= fun () -> mempool
-      | Some predecessor ->
-          (* This is a tailcall, which is nice; that is why we annotate
-             here. But it is not required for the code to be correct.
-             Given the maximum size of possible reorgs, even if the call
-             was not tail recursive; we wouldn't reach the runtime's stack
-             limit. *)
-          (pop_block [@tailcall]) ancestor predecessor mempool
-  in
-  let push_block mempool block =
-    let operations = block_store.all_operation_hashes block in
-    List.iter (List.iter chain.clear_or_cancel) operations ;
-    List.fold_left
-      (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
-      mempool
-      operations
-  in
-  chain.new_blocks ~from_block:from_branch ~to_block:to_branch
-  >>= fun (ancestor, path) ->
-  pop_block (block_store.hash ancestor) from_branch old_mempool
-  >>= fun mempool ->
-  let new_mempool = List.fold_left push_block mempool path in
-  let (new_mempool, outdated) =
-    Operation_hash.Map.partition
-      (fun _oph op -> is_branch_alive op.Operation.shell.branch)
-      new_mempool
-  in
-  Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
-  Lwt.return new_mempool
-
-let recyle_operations ~from_branch ~to_branch ~live_blocks ~classification
-    ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
-    ~handle_branch_refused =
-  handle_live_operations
-    ~block_store
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
-    (Operation_hash.Map.union
-       (fun _key v _ -> Some v)
-       (Classification.to_map
-          ~applied:true
-          ~branch_delayed:true
-          ~branch_refused:handle_branch_refused
-          ~refused:false
-          classification)
-       pending)
-  >>= fun pending ->
-  Classification.flush classification ~handle_branch_refused ;
-  Lwt.return pending
-
 (** The concrete production instance of {!block_tools} *)
-let block_tools : Store.Block.t block_tools =
+let block_tools : Store.Block.t Classification.block_tools =
   {
     hash = Store.Block.hash;
     operations = Store.Block.operations;
@@ -250,7 +111,7 @@ let block_tools : Store.Block.t block_tools =
 (** How to create an instance of {!chain_tools} from a {!Distributed_db.chain_db}.
     Prefer short-lived values, to avoid hiding mutable state for too long. *)
 let mk_chain_tools (chain_db : Distributed_db.chain_db) :
-    Store.Block.t chain_tools =
+    Store.Block.t Classification.chain_tools =
   let new_blocks ~from_block ~to_block =
     let chain_store = Distributed_db.chain_store chain_db in
     Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
@@ -1176,7 +1037,7 @@ module Make
         ()
       >>= fun validation_state ->
       pv.validation_state <- validation_state ;
-      recyle_operations
+      Classification.recycle_operations
         ~from_branch:old_predecessor
         ~to_branch:new_predecessor
         ~live_blocks:new_live_blocks
@@ -1558,22 +1419,3 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
-
-module Internal_for_tests = struct
-  (** Functions to query data on a polymorphic block-like type ['block]. *)
-  type nonrec 'block block_tools = 'block block_tools = {
-    hash : 'block -> Block_hash.t;
-    operations : 'block -> Operation.t list list;
-    all_operation_hashes : 'block -> Operation_hash.t list list;
-  }
-
-  type nonrec 'block chain_tools = 'block chain_tools = {
-    clear_or_cancel : Operation_hash.t -> unit;
-    inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
-    new_blocks :
-      from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
-    read_predecessor_opt : 'block -> 'block option Lwt.t;
-  }
-
-  let handle_live_operations = handle_live_operations
-end
