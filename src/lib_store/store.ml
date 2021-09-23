@@ -1077,7 +1077,6 @@ module Chain = struct
     | _ -> return_unit
 
   let set_head chain_store new_head =
-    Store_events.(emit set_head) (Block.descriptor new_head) >>= fun () ->
     Shared.update_with chain_store.chain_state (fun chain_state ->
         (* The merge cannot finish until we release the lock on the
            chain state so its status cannot change while this
