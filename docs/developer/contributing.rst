@@ -332,6 +332,17 @@ In particular it is one of the role of the merge dispatcher to suggest reviewers
 If you don't know who would be a good candidate to review your merge
 request, you can leave the field blank; but it may slow down the reviewing process.
 
+Merge Request "Draft" Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A merge request that is not yet ready for review should be marked
+as `draft <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+by prefixing its title with ``Draft:``.
+On ``tezos/tezos`` draft merge requests are ignored by reviewers.
+Marking merge requests as draft hence helps lower
+the number of merge requests that require attention from the
+:doc:`merge team<merge_team>`.
+
 .. _adding_new_dependencies:
 
 Special case: MRs that introduce a new dependency
