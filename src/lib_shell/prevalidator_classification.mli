@@ -111,18 +111,6 @@ val remove : Operation_hash.t -> t -> unit
     - [Refused] is discarded 1 or 2 times (if the corresponding bounded_map is full) *)
 val add : classification -> Operation_hash.t -> Operation.t -> t -> unit
 
-(** [map applied branch_delayed branch_refused refused t]
-    returns the pairs [(operation_hash, operation)] contained in [t].
-    Fields of [t] are included according to the value of the corresponding
-    named argument. *)
-val to_map :
-  applied:bool ->
-  branch_delayed:bool ->
-  branch_refused:bool ->
-  refused:bool ->
-  t ->
-  Operation.t Operation_hash.Map.t
-
 (** Functions to query data on a polymorphic block-like type ['block]. *)
 type 'block block_tools = {
   hash : 'block -> Block_hash.t;  (** The hash of a block *)
@@ -190,6 +178,18 @@ module Internal_for_tests : sig
       and the sizes of its fields (number of elements in the map and
       in the ring of [bounded_map] / length of list / cardinal of set). *)
   val pp_t_sizes : Format.formatter -> t -> unit
+
+  (** [map applied branch_delayed branch_refused refused t]
+    returns the pairs [(operation_hash, operation)] contained in [t].
+    Fields of [t] are included according to the value of the corresponding
+    named argument. *)
+  val to_map :
+    applied:bool ->
+    branch_delayed:bool ->
+    branch_refused:bool ->
+    refused:bool ->
+    t ->
+    Operation.t Operation_hash.Map.t
 
   (** [handle_live_operations chain_db from_branch to_branch is_branch_alive old_mempool]
       returns the operations from:

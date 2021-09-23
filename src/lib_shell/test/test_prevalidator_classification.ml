@@ -542,7 +542,7 @@ module To_map = struct
   (** [to_map_all] calls [Classification.to_map] with all named
       arguments set to [true] *)
   let to_map_all =
-    Classification.to_map
+    Classification.Internal_for_tests.to_map
       ~applied:true
       ~branch_delayed:true
       ~branch_refused:true
@@ -687,7 +687,7 @@ module To_map = struct
       (QCheck.make (QCheck.Gen.pair (Generators.t_gen ()) QCheck.Gen.bool))
     @@ fun (t, handle_branch_refused) ->
     let initial =
-      Classification.to_map
+      Classification.Internal_for_tests.to_map
         ~applied:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
@@ -707,7 +707,7 @@ module To_map = struct
     @@ fun (t, (oph, _)) ->
     let is_applied = Classification.is_applied oph t in
     let map =
-      Classification.to_map
+      Classification.Internal_for_tests.to_map
         ~applied:true
         ~branch_delayed:false
         ~branch_refused:false

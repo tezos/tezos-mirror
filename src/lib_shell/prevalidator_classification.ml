@@ -373,5 +373,7 @@ module Internal_for_tests = struct
       (List.length t.applied_rev)
       (Operation_hash.Set.cardinal t.in_mempool)
 
+  let to_map = to_map
+
   let handle_live_operations = handle_live_operations
 end
