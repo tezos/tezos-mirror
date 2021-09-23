@@ -115,7 +115,8 @@ module Samplers = struct
     let verbosity = `Silent
   end)
 
-  let generator = Gen.generator ~burn_in:(500 * 7)
+  (* Delay and cache the generator as it's expensive to create. *)
+  let generator = lazy (Gen.generator ~burn_in:(500 * 7))
 
   let base_type_to_michelson_type (typ : Type.Base.t) =
     let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
@@ -174,7 +175,7 @@ module Samplers = struct
     | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
 
   let sample_ir_code () =
-    let (sample, (bef, _)) = StaTz.Stats.sample_gen generator in
+    let (sample, (bef, _)) = StaTz.Stats.sample_gen @@ Lazy.force generator in
     let accounts = Account.generate_accounts 1 in
     Block.alpha_context accounts >>=? fun ctxt ->
     let code = Micheline.root sample in
