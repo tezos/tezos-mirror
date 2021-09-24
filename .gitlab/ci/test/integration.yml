@@ -114,6 +114,19 @@ integration:sandboxes:daemons-upgrade:
   # but only the binaries in the artifacts
   cache: {}
 
+integration:static-binaries:
+  extends:
+    - .integration_python_template
+  allow_failure: true
+  needs:
+    - build:static-x86_64-linux-binaries
+  dependencies:
+    - build:static-x86_64-linux-binaries
+  script:
+    - sudo cp -a ../tezos-binaries/* ../
+    - make -C ../ build-parameters
+    - poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
+
 integration:pytest:
   extends:
     - .integration_python_template
