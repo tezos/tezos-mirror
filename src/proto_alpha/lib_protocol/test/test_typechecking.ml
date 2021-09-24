@@ -886,6 +886,55 @@ let test_optimal_comb () =
   check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5 >>=? fun _ctxt ->
   return_unit
 
+(* Check that UNPACK on contract is forbidden.
+   See https://gitlab.com/tezos/tezos/-/issues/301 for the motivation
+   behind this restriction.
+  *)
+let test_contract_not_packable () =
+  let contract_unit =
+    Prim (0, Script.T_contract, [Prim (0, T_unit, [], [])], [])
+  in
+  test_context () >>=? fun ctxt ->
+  (* Test that [contract_unit] is parsable *)
+  (match Script_ir_translator.parse_any_ty ctxt ~legacy:false contract_unit with
+  | Ok _ -> return_unit
+  | Error _ -> Alcotest.failf "Could not parse (contract unit)")
+  >>=? fun () ->
+  (* Test that [contract_unit] is not packable *)
+  (match
+     Script_ir_translator.parse_packable_ty ctxt ~legacy:false contract_unit
+   with
+  | Ok _ ->
+      Alcotest.failf
+        "(contract unit) should not be packable, see \
+         https://gitlab.com/tezos/tezos/-/issues/301"
+  | Error _ -> return_unit)
+  >>=? fun () ->
+  (* Test that elaboration of the [UNPACK unit] instruction succeeds *)
+  (Script_ir_translator.parse_instr
+     Lambda
+     ctxt
+     ~legacy:false
+     (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
+     (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t, None))
+   >>= function
+   | Ok _ -> return_unit
+   | Error _ -> Alcotest.failf "Could not parse UNPACK unit")
+  >>=? fun () ->
+  (* Test that elaboration of the [UNPACK (contract unit)] instruction fails *)
+  Script_ir_translator.parse_instr
+    Lambda
+    ctxt
+    ~legacy:false
+    (Prim (0, I_UNPACK, [contract_unit], []))
+    (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t, None))
+  >>= function
+  | Ok _ ->
+      Alcotest.failf
+        "UNPACK (contract unit) should not be allowed, see \
+         https://gitlab.com/tezos/tezos/-/issues/301"
+  | Error _ -> return_unit
+
 let tests =
   [
     Tztest.tztest "test unparse view" `Quick test_unparse_view;
@@ -903,4 +952,8 @@ let tests =
     Tztest.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
     Tztest.tztest "test optimal comb data unparsing" `Quick test_optimal_comb;
     Tztest.tztest "test parse address" `Quick test_parse_address;
+    Tztest.tztest
+      "test unpackability of the contract type"
+      `Quick
+      test_contract_not_packable;
   ]
