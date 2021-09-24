@@ -237,6 +237,16 @@ let cannot_resolve_addr =
     ("addr", Data_encoding.string)
     ("field", Data_encoding.string)
 
+let cannot_resolve_bootstrap_peer_addr =
+  E.declare_2
+    ~name:"cannot_resolve_bootstrap_peer_addr"
+    ~msg:
+      "failed to resolve the bootstrap peer address '{addr}' in field \
+       '{field}', the node will not use this bootstrap peer"
+    ~level:Warning
+    ("addr", Data_encoding.string)
+    ("field", Data_encoding.string)
+
 let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   resolver addr >>= function
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
@@ -281,8 +291,11 @@ let validate_p2p_discovery_addr (config : Node_config_file.t) =
 
 let validate_p2p_bootstrap_addrs ~field peers =
   let aux addr =
-    validate_addr ~field ~addr ~resolver:(fun x ->
-        Node_config_file.resolve_bootstrap_addrs [x])
+    validate_addr
+      ~e_resolve:cannot_resolve_bootstrap_peer_addr
+      ~field
+      ~addr
+      (fun x -> Node_config_file.resolve_bootstrap_addrs [x])
   in
   List.filter_map_ep aux peers
 
