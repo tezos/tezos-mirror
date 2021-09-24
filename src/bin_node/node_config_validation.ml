@@ -237,18 +237,25 @@ let cannot_resolve_addr =
     ("addr", Data_encoding.string)
     ("field", Data_encoding.string)
 
-let validate_addr ~field ~addr ~resolver =
+let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   resolver addr >>= function
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
       return_some
-        (mk_alert ~event:cannot_parse_addr ~payload:(addr, field, why))
+        (mk_alert
+           ~event:(Option.value e_parse ~default:cannot_parse_addr)
+           ~payload:(addr, field, why))
   | Ok [] ->
-      return_some (mk_alert ~event:cannot_resolve_addr ~payload:(addr, field))
+      return_some
+        (mk_alert
+           ~event:(Option.value e_resolve ~default:cannot_resolve_addr)
+           ~payload:(addr, field))
   | Ok _ -> return_none
   | Error _ as e -> Lwt.return e
 
-let validate_addr_opt ~field ~addr ~resolver =
-  Option.filter_map_es (fun addr -> validate_addr ~field ~addr ~resolver) addr
+let validate_addr_opt ?e_resolve ?e_parse ~field ~addr resolver =
+  Option.filter_map_es
+    (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
+    addr
   >|=? Option.to_list
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =
@@ -256,7 +263,7 @@ let validate_rpc_listening_addrs (config : Node_config_file.t) =
     validate_addr
       ~field:"rpc.listen-addrs"
       ~addr
-      ~resolver:Node_config_file.resolve_rpc_listening_addrs
+      Node_config_file.resolve_rpc_listening_addrs
   in
   List.filter_map_ep aux config.rpc.listen_addrs
 
@@ -264,13 +271,13 @@ let validate_p2p_listening_addrs (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.listen-addr"
     ~addr:config.p2p.listen_addr
-    ~resolver:Node_config_file.resolve_listening_addrs
+    Node_config_file.resolve_listening_addrs
 
 let validate_p2p_discovery_addr (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.discovery-addr"
     ~addr:config.p2p.discovery_addr
-    ~resolver:Node_config_file.resolve_discovery_addrs
+    Node_config_file.resolve_discovery_addrs
 
 let validate_p2p_bootstrap_addrs ~field peers =
   let aux addr =
