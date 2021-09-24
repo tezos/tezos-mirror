@@ -1,6 +1,6 @@
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 393349af19bb54e3cb790ac8ef54a72adc71aecf
+  build_deps_image_version: 80457cb3cf22999f970e636a031d54b1ee40ec6a
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
