@@ -67,19 +67,25 @@ end = struct
 
   let event {event; _} = event
 
+  let prefix_with_level level msg =
+    Format.sprintf "%s: %s" (Internal_event.Level.to_string level) msg
+
   let declare_1 ~name ~msg ~level x =
+    let msg = prefix_with_level level msg in
     {
       level;
       event = Internal_event.Simple.declare_1 ~section ~name ~msg ~level x;
     }
 
   let declare_2 ~name ~msg ~level x y =
+    let msg = prefix_with_level level msg in
     {
       level;
       event = Internal_event.Simple.declare_2 ~section ~name ~msg ~level x y;
     }
 
   let declare_3 ~name ~msg ~level x y z =
+    let msg = prefix_with_level level msg in
     {
       level;
       event = Internal_event.Simple.declare_3 ~section ~name ~msg ~level x y z;
