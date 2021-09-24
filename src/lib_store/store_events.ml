@@ -270,7 +270,7 @@ let update_protocol_table =
 
 (* Warning *)
 let warning_incomplete_storage =
-  Internal_event.Simple.declare_1
+  declare_1
     ~level:Internal_event.Warning
     ~section
     ~name:"incomplete_storage"
