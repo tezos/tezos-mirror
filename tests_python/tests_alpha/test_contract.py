@@ -593,11 +593,13 @@ class TestContracts:
             # error message for DIP { FAILWITH }
             (
                 "dip_failwith.tz",
-                r'The FAIL instruction must appear in a tail position.'),
+                r'The FAIL instruction must appear in a tail position.',
+            ),
             # error message for MAP { FAILWITH }
             (
                 "map_failwith.tz",
-                r'The proper type of the return list cannot be inferred.'),
+                r'The proper type of the return list cannot be inferred.',
+            ),
         ],
     )
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
