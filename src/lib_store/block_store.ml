@@ -582,66 +582,61 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
         block_store
         ~head:new_head
         min_level_to_preserve
-      >>=? function
-      | min_block_to_preserve -> (
-          let ((_min_block_hash, min_block_level) as min_block_descr) =
-            Block_repr.descriptor min_block_to_preserve
+      >>=? fun min_block_to_preserve ->
+      let ((_min_block_hash, min_block_level) as min_block_descr) =
+        Block_repr.descriptor min_block_to_preserve
+      in
+      (* New savepoint = min min_level_to_preserve (min new lowest cemented block) *)
+      let cemented_cycles =
+        match
+          Cemented_block_store.cemented_blocks_files block_store.cemented_store
+        with
+        | None -> cycles_to_cement
+        | Some table ->
+            (Array.to_list table
+            |> List.map (fun {Cemented_block_store.start_level; end_level; _} ->
+                   (start_level, end_level)))
+            @ cycles_to_cement
+      in
+      if Compare.Int32.(snd savepoint >= min_block_level) then return savepoint
+      else
+        let cemented_cycles_len = List.length cemented_cycles in
+        (* If the offset is 0, the minimum block to preserve will be
+           the savepoint. *)
+        if offset = 0 then return min_block_descr
+        else if
+          (* If the number of cemented cycles is not yet the offset,
+             then the savepoint will be unchanged. *)
+          cemented_cycles_len < offset
+        then return savepoint
+        else
+          (* Else we shift the savepoint by [nb_cycles_to_cement]
+             cycles *)
+          let shifted_savepoint_level =
+            (* new lowest cemented block  *)
+            fst
+              (List.nth cemented_cycles (cemented_cycles_len - offset)
+              |> WithExceptions.Option.get ~loc:__LOC__)
           in
-          (* New savepoint = min min_level_to_preserve (min new lowest cemented block) *)
-          let cemented_cycles =
-            match
-              Cemented_block_store.cemented_blocks_files
-                block_store.cemented_store
-            with
-            | None -> cycles_to_cement
-            | Some table ->
-                (Array.to_list table
-                |> List.map
-                     (fun {Cemented_block_store.start_level; end_level; _} ->
-                       (start_level, end_level)))
-                @ cycles_to_cement
-          in
-          if Compare.Int32.(snd savepoint >= min_block_level) then
+          (* If the savepoint is still higher than the shifted
+             savepoint, preserve the savepoint *)
+          if Compare.Int32.(snd savepoint >= shifted_savepoint_level) then
             return savepoint
+          else if
+            (* If the new savepoint is still higher than the min block
+               to preserve, we choose the min block to preserve. *)
+            Compare.Int32.(shifted_savepoint_level >= min_block_level)
+          then return min_block_descr
           else
-            let cemented_cycles_len = List.length cemented_cycles in
-            (* If the offset is 0, the minimum block to preserve will be
-               the savepoint. *)
-            if offset = 0 then return min_block_descr
-            else if
-              (* If the number of cemented cycles is not yet the offset,
-                 then the savepoint will be unchanged. *)
-              cemented_cycles_len < offset
-            then return savepoint
-            else
-              (* Else we shift the savepoint by [nb_cycles_to_cement]
-                 cycles *)
-              let shifted_savepoint_level =
-                (* new lowest cemented block  *)
-                fst
-                  (List.nth cemented_cycles (cemented_cycles_len - offset)
-                  |> WithExceptions.Option.get ~loc:__LOC__)
-              in
-              (* If the savepoint is still higher than the shifted
-                 savepoint, preserve the savepoint *)
-              if Compare.Int32.(snd savepoint >= shifted_savepoint_level) then
-                return savepoint
-              else if
-                (* If the new savepoint is still higher than the min block
-                   to preserve, we choose the min block to preserve. *)
-                Compare.Int32.(shifted_savepoint_level >= min_block_level)
-              then return min_block_descr
-              else
-                (* Else the new savepoint is the one-cycle shifted
-                   savepoint. *)
-                read_predecessor_block_by_level_opt
-                  block_store
-                  ~head:new_head
-                  shifted_savepoint_level
-                >>=? function
-                | None ->
-                    fail (Cannot_retrieve_savepoint shifted_savepoint_level)
-                | Some savepoint -> return (Block_repr.descriptor savepoint)))
+            (* Else the new savepoint is the one-cycle shifted
+               savepoint. *)
+            read_predecessor_block_by_level_opt
+              block_store
+              ~head:new_head
+              shifted_savepoint_level
+            >>=? function
+            | None -> fail (Cannot_retrieve_savepoint shifted_savepoint_level)
+            | Some savepoint -> return (Block_repr.descriptor savepoint))
 
 let compute_new_caboose block_store history_mode ~new_savepoint
     ~min_level_to_preserve ~new_head =
@@ -683,7 +678,7 @@ module BlocksLAFL = Set.Make (Int32)
    updates the [new_store] by storing the predecessors of the
    [new_head_lafl] and preserving the
    [lowest_bound_to_preserve_in_floating]. It returns the cycles to
-   cemented from [new_head] to [cementing_highwatermark] and the
+   cement from [new_head] to [cementing_highwatermark] and the
    savepoint and caboose candidates. *)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
@@ -878,9 +873,10 @@ let check_store_consistency block_store ~cementing_highwatermark =
               {highest_cemented_level; cementing_highwatermark}))
 
 (* We want to keep in the floating store, at least, the blocks above
-   (new_head.lafl - (new_head.lafl).max_op_ttl)) Important: we might
+   (new_head.lafl - (new_head.lafl).max_op_ttl)). Important: we might
    not have this block so it should be treated as a potential lower
-   bound. *)
+   bound. Furethermore, we consider the current caboose as a potential
+   lower bound.*)
 let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
     ~new_head_metadata =
   (* Safety check: is the highwatermark consistent with our highest cemented block *)
@@ -957,7 +953,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
           ~rw_store:old_rw_store
           ~head:new_head
       in
-      match history_mode with
+      (match history_mode with
       | History_mode.Archive ->
           List.iter_es
             (fun cycle_range ->
@@ -965,7 +961,6 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
               (* In archive, we store the metadatas *)
               cement_blocks ~write_metadata:true block_store cycle)
             cycles_interval_to_cement
-          >>=? fun () -> return (new_savepoint, new_caboose)
       | Rolling offset ->
           let offset =
             (Option.value
@@ -990,9 +985,9 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             Cemented_block_store.trigger_gc
               block_store.cemented_store
               history_mode
-            >>= fun () -> return (new_savepoint, new_caboose)
+            >>= fun () -> return_unit
           else (* Don't cement any cycles! *)
-            return (new_savepoint, new_caboose)
+            return_unit
       | Full offset ->
           let offset =
             (Option.value
@@ -1013,15 +1008,15 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             Cemented_block_store.trigger_gc
               block_store.cemented_store
               history_mode
-            >>= fun () -> return (new_savepoint, new_caboose)
+            >>= fun () -> return_unit
           else
             List.iter_es
               (fun cycle_range ->
                 cycle_reader cycle_range >>=? fun cycle ->
                 (* In full 0, we do not store the metadata *)
                 cement_blocks ~write_metadata:false block_store cycle)
-              cycles_interval_to_cement
-            >>=? fun () -> return (new_savepoint, new_caboose))
+              cycles_interval_to_cement)
+      >>=? fun () -> return (new_savepoint, new_caboose))
     (fun exn ->
       Floating_block_store.close new_ro_store >>= fun () -> Lwt.fail exn)
   >>=? fun (new_savepoint, new_caboose) ->
@@ -1049,7 +1044,6 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       let new_head_lafl =
         Block_repr.last_allowed_fork_level new_head_metadata
       in
-
       Store_events.(emit start_merging_stores) new_head_lafl >>= fun () ->
       check_store_consistency block_store ~cementing_highwatermark
       >>=? fun () ->
