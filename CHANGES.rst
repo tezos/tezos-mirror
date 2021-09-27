@@ -131,6 +131,10 @@ Node
 
 -  Deprecated the ``chains/main/checkpoint`` RPC.
 
+-  The ``tezos-admin-client show current checkpoint`` command now
+   only outputs the current checkpoint. It no longer outputs the savepoint,
+   caboose and history mode.
+
 Client
 ------
 
