@@ -116,9 +116,19 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
     match mode with
     | `Node -> return None
     | `Proxy_server ->
+        (* When checking the split_key heuristic with {!heuristic_event_handler},
+           we don't want data to be discarded. Hence we keep data for
+           60 seconds. Any duration longer than the test duration is fine. As
+           this test takes approximately 10 seconds,
+           using 60 seconds here is safe. *)
+        let approximate_test_duration = 10 in
+        let sym_block_caching_time = 6 * approximate_test_duration in
+        let args =
+          Proxy_server.[Symbolic_block_caching_time sym_block_caching_time]
+        in
         (* We want Debug level events, for [heuristic_event_handler]
            to work properly *)
-        let* proxy_server = Proxy_server.init ~event_level:"debug" node in
+        let* proxy_server = Proxy_server.init ~args ~event_level:"debug" node in
         Proxy_server.on_event proxy_server @@ heuristic_event_handler () ;
         return @@ Some (Client.Proxy_server proxy_server)
   in
