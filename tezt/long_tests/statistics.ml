@@ -52,4 +52,4 @@ let stddev list =
         d *. d)
       list
   in
-  mean squared_diffs
+  sqrt (mean squared_diffs)
