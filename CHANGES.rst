@@ -23,6 +23,10 @@ be documented here either.
 Node
 ----
 
+- Added version ``1`` to RPC ``GET chains/main/mempool/pending_operations``.
+  It can be used by calling the RPC with the parameter ``?version=1``
+  (default version is still ``0``).
+
 Client
 ------
 
