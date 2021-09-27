@@ -78,7 +78,8 @@ Note that the reference to an existing issue on the first line is mandatory, to 
 The reference to an issue may be one of:
 
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
-- a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``), or ``smondet/merbocop#123`` (fully qualified).
+- a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``),
+  or ``oxheadalpha/merbocop#123`` (fully qualified).
 
 Documenting interfaces and implementations
 ------------------------------------------

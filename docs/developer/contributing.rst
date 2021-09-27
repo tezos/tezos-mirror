@@ -548,9 +548,9 @@ add a comment to justify it.
 In particular, the Merge-Request Bot may complain about :ref:`TODO/FIXME comments <todo_fixme>` without an issue number ensuring that the intended evolution is tracked.
 
 The code for the bot is at
-`smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course
-work-in-progress and new warnings and comments will appear little by little.
-We welcome specific issues or contributions there too.
+`oxheadalpha/merbocop <https://gitlab.com/oxheadalpha/merbocop>`__. It is of
+course work-in-progress and new warnings and comments will appear little by
+little. We welcome specific issues or contributions there too.
 
 .. _dev_tools:
 
