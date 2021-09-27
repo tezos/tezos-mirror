@@ -312,12 +312,12 @@ module Internal_for_tests = struct
       in_mempool = t.in_mempool;
     }
 
-  let bounded_map_pp ppf bounded_map =
+  let[@coverage off] bounded_map_pp ppf bounded_map =
     bounded_map.map |> Operation_hash.Map.bindings
     |> List.map (fun (key, _value) -> key)
     |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
 
-  let pp ppf
+  let[@coverage off] pp ppf
       {
         parameters;
         refused;
@@ -354,7 +354,7 @@ module Internal_for_tests = struct
 
   let set_of_bounded_map = set_of_bounded_map
 
-  let pp_t_sizes pp t =
+  let[@coverage off] pp_t_sizes pp t =
     let show_bounded_map name bounded_map =
       Format.sprintf
         "%s map: %d, %s ring: %d"
