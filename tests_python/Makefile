@@ -8,7 +8,8 @@ TYPECHECK=poetry run mypy
 # - unspecified-encoding (W1514)
 # - consider-using-with (R1732)
 # - consider-using-dict-items (C0206)
-PYLINT=poetry run pylint --disable C0330 --disable W1514 --disable R1732 --disable C0206
+PYLINTRC?=../.pylintrc
+PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint --disable C0330 --disable W1514 --disable R1732 --disable C0206
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447

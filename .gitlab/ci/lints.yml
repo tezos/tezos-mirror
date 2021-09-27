@@ -2,8 +2,6 @@ misc_checks:
   extends: .build_template
   stage: test
   needs: []
-  variables:
-    PYLINTRC: "../.pylintrc"
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
