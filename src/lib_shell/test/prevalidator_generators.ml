@@ -53,11 +53,11 @@ let operation_gen : Operation.t QCheck.Gen.t =
 
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck.Gen.t =
-  QCheck.Gen.oneofl
-    [`Applied; `Branch_delayed []; `Branch_refused []; `Refused []]
+  QCheck.Gen.oneofa
+    [|`Applied; `Branch_delayed []; `Branch_refused []; `Refused []|]
 
 let unrefused_classification_gen : classification QCheck.Gen.t =
-  QCheck.Gen.oneofl [`Applied; `Branch_delayed []; `Branch_refused []]
+  QCheck.Gen.oneofa [|`Applied; `Branch_delayed []; `Branch_refused []|]
 
 let parameters_gen : parameters QCheck.Gen.t =
   let open QCheck.Gen in

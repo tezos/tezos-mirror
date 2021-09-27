@@ -47,15 +47,15 @@ module List_extra = struct
         if List.exists (equal e1) l2 then Some e1
         else common_elem ~equal rest1 l2
 
-  (** [take_until  2 [0; 3; 2; 4; 2]] returns [Some [0; 3]]
-      [take_until -1 [0; 3; 2; 4; 2]] returns [None]
-      [take_until  0 [0]]             returns [Some []] *)
-  let rec take_until ~(equal : 'a -> 'a -> bool) (e : 'a) (l : 'a list) =
+  (** [take_until_if_found ((=) 2)  [0; 3; 2; 4; 2]] returns [Some [0; 3]]
+      [take_until_if_found ((=) -1) [0; 3; 2; 4; 2]] returns [None]
+      [take_until_if_found ((=) 0)  [0]]             returns [Some []] *)
+  let rec take_until_if_found ~(pred : 'a -> bool) (l : 'a list) =
     match l with
     | [] -> None
-    | fst :: _ when equal e fst -> Some []
+    | fst :: _ when pred fst -> Some []
     | fst :: rest_l -> (
-        match take_until ~equal e rest_l with
+        match take_until_if_found ~pred rest_l with
         | None -> None
         | Some tail -> Some (fst :: tail))
 end
@@ -367,7 +367,9 @@ module Generators = struct
       | Some ancestor -> (
           let to_parents = Tree.predecessors ~equal tree to_block in
           match
-            (to_parents, List_extra.take_until ~equal ancestor to_parents)
+            ( to_parents,
+              List_extra.take_until_if_found ~pred:(( = ) ancestor) to_parents
+            )
           with
           | ([], _) ->
               (* This case is not supported, because the production
@@ -435,7 +437,7 @@ let force_opt = function
 let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
     (start : 'a) (ancestor : 'a) : 'a list =
   Tree.predecessors ~equal tree start
-  |> List_extra.take_until ~equal ancestor
+  |> List_extra.take_until_if_found ~pred:(( = ) ancestor)
   |> force_opt
   |> fun preds -> start :: preds
 
