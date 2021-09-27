@@ -5,6 +5,7 @@
  (libraries
   hex
   zarith
+  zarith_stubs_js
   lwt)
  (inline_tests)
  (preprocess (pps ppx_inline_test)))

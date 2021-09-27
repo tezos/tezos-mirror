@@ -10,6 +10,7 @@ depends: [
   "ppx_inline_test" {with-test}
   "uutf"
   "zarith" { >= "1.12" & < "1.13" }
+  "zarith_stubs_js"
   "tezos-stdlib"
   "tezos-error-monad"
   "data-encoding" { >= "0.4" & < "0.5" }

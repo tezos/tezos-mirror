@@ -4,6 +4,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
+  zarith_stubs_js
   bls12-381
   tezos-base
   tezos-sapling

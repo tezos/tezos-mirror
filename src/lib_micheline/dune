@@ -5,6 +5,7 @@
  (libraries
   uutf
   zarith
+  zarith_stubs_js
   tezos-stdlib
   tezos-error-monad
   data-encoding)

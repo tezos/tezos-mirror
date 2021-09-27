@@ -3,7 +3,6 @@
  (modes js)
  (libraries
   tezos-hacl-glue-js
-  zarith_stubs_js
   js_of_ocaml-compiler
   js_of_ocaml)
  (preprocess (pps js_of_ocaml-ppx))

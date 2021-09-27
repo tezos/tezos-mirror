@@ -10,7 +10,6 @@ depends: [
   "tezos-hacl-glue"
   "hacl-star-raw-empty"
   "js_of_ocaml"
-  "zarith_stubs_js"
   "js_of_ocaml-ppx" {with-test}
 ]
 build: [
