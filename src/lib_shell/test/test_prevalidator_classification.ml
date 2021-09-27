@@ -735,6 +735,26 @@ module To_map = struct
       ~expected:is_in_mempool
       ~actual:(Operation_hash.Map.cardinal map = 1)
       ()
+
+  (** Tests that [Classification.to_map] returns an empty map if all parameters
+      are set to [false]  *)
+  let test_none =
+    QCheck.Test.make
+      ~name:"[to_map] returns an empty map if all parameters are set to [false]"
+      (QCheck.make (Generators.t_gen ()))
+    @@ fun t ->
+    qcheck_eq'
+      ~pp:map_pp
+      ~eq:map_eq
+      ~expected:Operation_hash.Map.empty
+      ~actual:
+        (Classification.Internal_for_tests.to_map
+           ~applied:false
+           ~branch_delayed:false
+           ~branch_refused:false
+           ~refused:false
+           t)
+      ()
 end
 
 let () =
@@ -757,5 +777,6 @@ let () =
             To_map.test_map_add_remove;
             To_map.test_flush;
             To_map.test_is_in_mempool;
+            To_map.test_none;
           ] );
     ]
