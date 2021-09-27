@@ -361,6 +361,102 @@ When changing an existing public RPC endpoint it is also important to consider,
 how does the change impact possible risks related to calling the endpoint.
 Should it be removed from the ACL?
 
+.. _RPC-versioning-dev:
+
+RPC Versioning
+--------------
+
+General information about RPC versioning can be found in
+:doc:`../user/versioning`.
+
+How to Version an RPC
+~~~~~~~~~~~~~~~~~~~~~
+
+If an RPC already has a query parameter ``version``, just add a
+variant to the corresponding type ``t_with_version`` (see
+:ref:`RPC-versioning-dev-adding-an-rpc`). Otherwise, the ``version``
+query parameter should be added (a natural number starting from
+``0``). See example `here
+<https://gitlab.com/tezos/tezos/-/merge_requests/3480>`_.
+
+For versioning an RPC which returns a type ``t``, you have to write in
+the service module of the RPC a type ``t_with_version`` which has one
+constructor by version. The encoding of ``t_with_version`` is simply
+constructed using the ``Data_encoding.union`` function.
+
+To ensure that the implementation of the RPC (the directory module)
+uses the version parameter we recommend that ``t_with_version`` is
+abstract and a dispatcher is written in the service file. This way,
+when a new version is added, only the dispatcher function needs to be
+updated. In general, the type for this dispatcher will be:
+
+.. code-block:: ocaml
+
+   val t_dispatcher : t -> ~version:int -> t_with_version
+
+A similar process can be followed to modify the input of an RPC.
+However, in that case, the semantics of ``union`` makes the parameter
+``version`` optional (all versions are supported by default). It is
+still interesting to version RPCs to allow removing older versions in the
+future.
+
+Notice that we use only one version number for both input and output
+of an RPC.
+
+.. _RPC-versioning-dev-adding-an-rpc:
+How to Add a New Version to an RPC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you modify the input or the output of an RPC, it is not always
+necessary to create a new version for the RPC. A new version should be
+brought in when a **breaking change** is introduced. Assume that an
+RPC returns the following JSON value:
+
+.. code-block:: json
+
+    {
+      "foo": 5,
+      "bar": {
+        "baz": 10
+      }
+    }
+
+If you introduce a new field ``foobar`` like this:
+
+.. code-block:: json
+
+    {
+      "foo": 5,
+      "bar": {
+        "baz": 10,
+        "foobar" : 5
+      }
+    }
+
+it should not be considered a breaking change. Indeed, many
+decoders which accept the former value also accept the latter.
+
+However, if you remove a field or change the encoding of a field in a
+non-extensible way as above, it should be considered a breaking change
+like the two examples below.
+
+.. code-block:: json
+
+    {
+      "foo": "bar",
+      "bar": {
+        "baz": 10
+      }
+    }
+
+.. code-block:: json
+
+    {     
+      "bar": {
+        "baz": 10
+      }
+    }
+
 Coding conventions
 ------------------
 
