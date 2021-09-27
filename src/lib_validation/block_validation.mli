@@ -34,6 +34,7 @@ type validation_store = {
   message : string option;
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
+      (** Oldest block for which reorganizations can happen *)
 }
 
 val may_patch_protocol :

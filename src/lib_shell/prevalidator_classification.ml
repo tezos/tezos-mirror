@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Event = struct
+  let section = ["prevalidator_classification"]
+
+  include Internal_event.Simple
+
+  let predecessor_less_block =
+    declare_1
+      ~section
+      ~name:"predecessor_less_block"
+      ~msg:"Observing that a parent of block {blk_h} has no predecessor"
+      ~level:Warning
+      ("blk_h", Block_hash.encoding)
+end
+
 type classification =
   [ `Applied
   | `Branch_delayed of tztrace
@@ -157,8 +171,7 @@ let handle_error oph op classification classes =
   bounded_map.map <- Operation_hash.Map.add oph (op, tztrace) bounded_map.map ;
   classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 
-let add ~notify classification oph op classes =
-  notify () ;
+let add classification oph op classes =
   match classification with
   | `Applied -> handle_applied oph op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->
@@ -187,6 +200,94 @@ let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
   +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
   +> (if branch_refused then classes.branch_refused.map else Map.empty)
   +> if refused then classes.refused.map else Map.empty
+
+type 'block block_tools = {
+  hash : 'block -> Block_hash.t;
+  operations : 'block -> Operation.t list list;
+  all_operation_hashes : 'block -> Operation_hash.t list list;
+}
+
+type 'block chain_tools = {
+  clear_or_cancel : Operation_hash.t -> unit;
+  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+  new_blocks :
+    from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
+  read_predecessor_opt : 'block -> 'block option Lwt.t;
+}
+
+(* There's detailed documentation in the mli *)
+let handle_live_operations ~(block_store : 'block block_tools)
+    ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
+    ~(is_branch_alive : Block_hash.t -> bool) old_mempool =
+  let rec pop_block ancestor (block : 'block) mempool =
+    let hash = block_store.hash block in
+    if Block_hash.equal hash ancestor then Lwt.return mempool
+    else
+      let operations = block_store.operations block in
+      List.fold_left_s
+        (List.fold_left_s (fun mempool op ->
+             let h = Operation.hash op in
+             chain.inject_operation h op >|= fun () ->
+             Operation_hash.Map.add h op mempool))
+        mempool
+        operations
+      >>= fun mempool ->
+      chain.read_predecessor_opt block >>= function
+      | None ->
+          (* Can this happen? If yes, there's nothing more to pop anyway,
+             so returning the accumulator. It's not the mempool that
+             should crash, should this case happen. *)
+          Event.(emit predecessor_less_block ancestor) >|= fun () -> mempool
+      | Some predecessor ->
+          (* This is a tailcall, which is nice; that is why we annotate
+             here. But it is not required for the code to be correct.
+             Given the maximum size of possible reorgs, even if the call
+             was not tail recursive; we wouldn't reach the runtime's stack
+             limit. *)
+          (pop_block [@tailcall]) ancestor predecessor mempool
+  in
+  let push_block mempool block =
+    let operations = block_store.all_operation_hashes block in
+    List.iter (List.iter chain.clear_or_cancel) operations ;
+    List.fold_left
+      (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
+      mempool
+      operations
+  in
+  chain.new_blocks ~from_block:from_branch ~to_block:to_branch
+  >>= fun (ancestor, path) ->
+  pop_block (block_store.hash ancestor) from_branch old_mempool
+  >>= fun mempool ->
+  let new_mempool = List.fold_left push_block mempool path in
+  let (new_mempool, outdated) =
+    Operation_hash.Map.partition
+      (fun _oph op -> is_branch_alive op.Operation.shell.branch)
+      new_mempool
+  in
+  Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
+  Lwt.return new_mempool
+
+let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
+    ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
+    ~handle_branch_refused =
+  handle_live_operations
+    ~block_store
+    ~chain
+    ~from_branch
+    ~to_branch
+    ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
+    (Operation_hash.Map.union
+       (fun _key v _ -> Some v)
+       (to_map
+          ~applied:true
+          ~branch_delayed:true
+          ~branch_refused:handle_branch_refused
+          ~refused:false
+          classification)
+       pending)
+  >>= fun pending ->
+  flush classification ~handle_branch_refused ;
+  Lwt.return pending
 
 module Internal_for_tests = struct
   (** [copy_bounded_map bm] returns a deep copy of [bm] *)
@@ -271,4 +372,8 @@ module Internal_for_tests = struct
       (show_bounded_map "branch_delayed" t.branch_delayed)
       (List.length t.applied_rev)
       (Operation_hash.Set.cardinal t.in_mempool)
+
+  let to_map = to_map
+
+  let handle_live_operations = handle_live_operations
 end
