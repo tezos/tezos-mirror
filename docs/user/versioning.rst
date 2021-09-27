@@ -1,6 +1,24 @@
 Versions
 ========
 
+Versioning concerns several components of Octez. This page explains the various corresponding versioning schemes, which are mostly independent of each other. Though, some relations do exist (e.g. when a new protocol is proposed, a new Octez release is usually delivered embedding the new proposal, for convenience); this is explained in some versioning schemes.
+
+Octez versions
+--------------
+
+The whole Octez software is versioned by releases, see :doc:`../releases/releases`.
+
+Protocol versions
+-----------------
+
+The Tezos economic protocol is versioned at a different pace, according to a :doc:`active/voting`, see :doc:`../protocols/naming`.
+
+Protocol environment versions
+-----------------------------
+
+The economic protocol can interact with the rest of the Octez software through a sandboxed API called a protocol environment. When new features are needed by a proposed protocol, a new environment version is created, see `Protocol environment versions <https://tezos.gitlab.io/developer/protocol_environment.html#environment-versions>`__.
+
+
 RPC Versioning
 --------------
 
