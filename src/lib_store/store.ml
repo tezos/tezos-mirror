@@ -1084,16 +1084,16 @@ module Chain = struct
         (* Also check the status to be extra-safe *)
         Block_store.status chain_store.block_store >>= fun store_status ->
         (match Block_store.get_merge_status chain_store.block_store with
-        | Merge_failed _ ->
+        | Merge_failed errs ->
             (* If the merge has failed, notify in the logs but don't
                trigger any merge. *)
-            Store_events.(emit notify_merge_error ()) >>= fun () ->
+            Store_events.(emit notify_merge_error errs) >>= fun () ->
             (* We mark the merge as on-going to prevent the merge from
                being triggered and to update on-disk values. *)
             return_true
         | Not_running when store_status <> Idle ->
             (* Degenerate case, do the same as the Merge_failed case *)
-            Store_events.(emit notify_merge_error ()) >>= fun () -> return_true
+            Store_events.(emit notify_merge_error []) >>= fun () -> return_true
         | Not_running -> return_false
         | Running -> return_true)
         >>=? fun is_merge_ongoing ->
