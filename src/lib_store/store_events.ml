@@ -278,9 +278,12 @@ let merge_error =
     ("message", Data_encoding.string)
 
 let notify_merge_error =
-  declare_0
+  declare_1
     ~section
     ~level:Internal_event.Error
     ~name:"notify_merge_error"
-    ~msg:"store merge has failed, restart the node to restore the consistency"
-    ()
+    ~msg:
+      "store merge has failed, restart the node to restore the consistency: \
+       {errs}"
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
+    ("errs", Error_monad.trace_encoding)
