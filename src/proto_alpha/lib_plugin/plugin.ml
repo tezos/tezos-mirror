@@ -2606,7 +2606,7 @@ module RPC = struct
         |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
         |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
                t.delegates)
-        |+ opt_field "max_round" RPC_arg.int (fun t -> t.max_round)
+        |+ opt_field "max_round" RPC_arg.nat (fun t -> t.max_round)
         |+ flag "all" (fun t -> t.all)
         |> seal
 
@@ -2962,7 +2962,7 @@ module RPC = struct
     let level_query : level_query RPC_query.t =
       let open RPC_query in
       query (fun offset -> {offset})
-      |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
+      |+ field "offset" RPC_arg.nat32 0l (fun t -> t.offset)
       |> seal
 
     let current_level =
