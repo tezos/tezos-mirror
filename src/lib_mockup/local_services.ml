@@ -258,7 +258,7 @@ module Make (E : MENV) = struct
       (* /chains/<chain_id>/mempool/pending_operations *)
       (E.Block_services.S.Mempool.pending_operations
       @@ Block_services.mempool_path Block_services.chain_path)
-      (fun ((), chain) () () ->
+      (fun ((), chain) params () ->
         check_chain chain >>= function
         | Error errs -> RPC_answer.fail errs
         | Ok () -> (
@@ -288,15 +288,19 @@ module Make (E : MENV) = struct
                 >>= function
                 | Error _ -> RPC_answer.fail [Cannot_parse_op]
                 | Ok applied ->
-                    Lwt.return
-                      (`Ok
-                        {
-                          E.Block_services.Mempool.applied;
-                          refused = Operation_hash.Map.empty;
-                          branch_refused = Operation_hash.Map.empty;
-                          branch_delayed = Operation_hash.Map.empty;
-                          unprocessed = Operation_hash.Map.empty;
-                        }))))
+                    let pending_operations =
+                      {
+                        E.Block_services.Mempool.applied;
+                        refused = Operation_hash.Map.empty;
+                        branch_refused = Operation_hash.Map.empty;
+                        branch_delayed = Operation_hash.Map.empty;
+                        unprocessed = Operation_hash.Map.empty;
+                      }
+                    in
+                    E.Block_services.Mempool
+                    .pending_operations_version_dispatcher
+                      ~version:params#version
+                      pending_operations)))
 
   let with_chain chain k =
     check_chain chain >>= function

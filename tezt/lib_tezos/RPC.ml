@@ -77,9 +77,16 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?endpoint ?hooks GET path client
 
-let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") client =
+let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
+    client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  Client.rpc ?endpoint ?hooks GET path client
+  Client.rpc
+    ?endpoint
+    ?hooks
+    ~query_string:(match version with None -> [] | Some v -> [("version", v)])
+    GET
+    path
+    client
 
 let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "ban_operation"] in
