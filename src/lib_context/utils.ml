@@ -23,24 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An arena of fixed-size strings w/ manual expansion. *)
-module Arena : sig
-  type t
+include Utils_intf
 
-  val create : elt_length:int -> initial_capacity:int -> t
-
-  val is_full : t -> bool
-
-  val expand : t -> int -> unit
-
-  type id
-
-  val allocate : t -> string -> id
-
-  val dereference : t -> id -> string
-
-  val elt_equal : t -> id -> string -> bool
-end = struct
+module Arena : Arena = struct
   type t = {
     elt_length : int;
     mutable data : Bigstring.t;
@@ -91,18 +76,7 @@ end = struct
     t.data <- new_data
 end
 
-(** A list type optimised for memory efficiency of small list sizes (~ 1-6). *)
-module Small_list : sig
-  type +'a t
-
-  val empty : _ t
-
-  val cons : 'a -> 'a t -> 'a t
-
-  val iter : ('a -> unit) -> 'a t -> unit
-
-  val exists : ('a -> bool) -> 'a t -> bool
-end = struct
+module Small_list : Small_list = struct
   type 'a t =
     | Tuple0
     | Tuple1 of 'a
@@ -175,16 +149,7 @@ end = struct
         fn a || fn b || fn c || fn d || fn e || fn f || fn g || List.exists fn l
 end
 
-(** A memory-compact set of fixed-size strings. *)
-module String_set : sig
-  type t
-
-  val create : elt_length:int -> initial_capacity:int -> t
-
-  val add : t -> string -> unit
-
-  val mem : t -> string -> bool
-end = struct
+module String_set : String_set = struct
   (* String elements are stored in an arena (to avoid header words + padding),
      and we keep a hash-set of pointers into the arena. *)
   type t = {arena : Arena.t; mutable hashset : Arena.id Small_list.t array}
