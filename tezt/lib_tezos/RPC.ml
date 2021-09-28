@@ -88,6 +88,10 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     path
     client
 
+let post_request_operations ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "mempool"; "request_operations"] in
+  Client.rpc ?endpoint ?hooks POST path client
+
 let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "ban_operation"] in
   Client.rpc ?endpoint ~data POST path client
