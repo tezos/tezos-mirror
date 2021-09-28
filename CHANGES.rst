@@ -146,6 +146,10 @@ Miscellaneous
 -  Added specific documentation pages about logging for users and
    developers.
 
+-  Some RPC entry points are stricter about their inputs. Specifically, some
+   RPCs where only positive integers would make sense will now error when
+   provided negative values (instead of, e.g., returning empty results).
+
 Version 11.0
 ============
 
