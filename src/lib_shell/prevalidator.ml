@@ -431,11 +431,6 @@ module Make
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
-  let is_endorsement (op : Proto.operation_data operation) =
-    Proto.acceptable_passes
-      {shell = op.raw.shell; protocol_data = op.protocol_data}
-    = [0]
-
   let filter_config pv =
     try
       match Protocol_hash.Map.find Proto.hash pv.filter_config with
@@ -896,27 +891,7 @@ module Make
   module Handlers = struct
     type self = worker
 
-    (* This piece of code is encompassed by the plugin and could be removed. *)
-    (* For every consensus operation which arrived before the block
-       they are branched on, we try to propagate them if the protocol
-       manages to apply the operation on the current validation state
-       or if the operation can be applied later on ([branch_delayed]
-       classification). *)
-    let may_propagate_unknown_branch_operation validation_state op =
-      ( Prevalidation.parse op >>?= fun op ->
-        let is_alternative_endorsement () =
-          Lwt.return validation_state >>=? fun validation_state ->
-          Prevalidation.apply_operation validation_state op >>= function
-          | Applied _ | Branch_delayed _ -> return_some op
-          | _ -> return_none
-        in
-        if is_endorsement op then is_alternative_endorsement () else return_none
-      )
-      >|= function
-      | Ok b -> b
-      | Error _ -> None
-
-    let on_arrived w (pv : state) oph op =
+    let on_arrived (pv : state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
       else
@@ -928,20 +903,10 @@ module Make
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then (
-              may_propagate_unknown_branch_operation pv.validation_state op
-              >>= function
-              | Some op ->
-                  let error = [Exn (Failure "Unknown branch operation")] in
-                  let notifier = mk_notifier pv.operation_stream in
-                  handle ~notifier pv.shell (`Parsed op) (`Branch_refused error) ;
-                  let pending = Operation_hash.Set.singleton oph in
-                  advertise w pv.shell {Mempool.empty with pending} ;
-                  return_unit
-              | None ->
-                  Distributed_db.Operation.clear_or_cancel
-                    pv.shell.parameters.chain_db
-                    oph ;
-                  return_unit)
+              Distributed_db.Operation.clear_or_cancel
+                pv.shell.parameters.chain_db
+                oph ;
+              return_unit)
             else (
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                  Should this have an influence on the peer's score ? *)
@@ -1159,7 +1124,7 @@ module Make
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject {op; force} -> on_inject pv ~force op
-      | Request.Arrived (oph, op) -> on_arrived w pv oph op
+      | Request.Arrived (oph, op) -> on_arrived pv oph op
       | Request.Advertise ->
           on_advertise pv.shell ;
           return_unit
