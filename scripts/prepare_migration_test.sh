@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /usr/bin/env sh
 
 set -e
 
@@ -19,6 +19,7 @@ Calling: ./scripts/link_protocol.sh $f_proto_dir."
     # shellcheck disable=SC2086
     ./scripts/link_protocol.sh $f_proto_dir
 }
+
 
 user_activated_upgrade () {
     f_proto_dir="$1"
@@ -87,11 +88,15 @@ Creating a yes-wallet in directory ${yes_wallet}."
     echo "You can now bake for foundation{1..8}."
 }
 
+first_hash() {
+    jq -r .hash < "$1"
+}
+
 #setting tmp dir
-if [[ -n "$TMP" ]]
+if [ -n "$TMP" ]
 then
     tmp_dir="$TMP"
-elif [[ -n "$TMPDIR" ]]
+elif [ -n "$TMPDIR" ]
 then
     tmp_dir="$TMPDIR"
 else
@@ -102,7 +107,7 @@ usage="Usage:
 
 This script prepares the environment to perform migration tests.
 
-Use the parameter 'manual' or ' auto' for respectively the manual or the
+Use the parameter 'manual' or 'auto' for respectively the manual or the
 automatic procedure.
 
 ## MANUAL PROCEDURE ##
@@ -166,7 +171,7 @@ in the imported chain is <block_hash>.
 
 # manual or auto mode
 #
-if ! { [[ $1 == "manual" ]] || [[ $1 == "auto" ]] ;}  || [ $# -lt 2 ]
+if ! { [ "$1" = "manual" ] || [ "$1" = "auto" ] ;}  || [ $# -lt 2 ]
 then
     echo "$usage"
     exit 1
@@ -175,14 +180,16 @@ else
 fi
 
 #set variable related to protocol, in particular \$proto_version and \$pred_proto_version
-if [[ "$2" =~ ^[a-z]+_[0-9][0-9][0-9]$ ]]
+if echo "$2" | grep -q '^[a-z]\+_[0-9][0-9][0-9]$';
 then
     proto_name="$2"
     proto_version=$(echo "$proto_name" | cut -d'_' -f2)
 
     proto_dir="src/proto_${proto_version}_*/"
 
-    pred_proto_version=$(printf "%03d" $((10#$proto_version -1)))
+    # strip leading zeros to prevent version being treated as octal
+    proto_version=$(echo "$proto_version" | sed 's/^0*//')
+    pred_proto_version=$(printf "%03d" $((proto_version - 1)))
 else
     pred_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     pred_proto_version=$(echo "$pred_proto_name" | cut -d'_' -f2)
@@ -198,9 +205,9 @@ fi
 
 echo "
 Setting environment for $mode test"
-if [[ $mode == "auto" ]]
+if [ "$mode" = "auto" ]
 then
-    #set \$path
+    #set \$snapshot_path
     if [ -n "$proto_name" ]
     then
         snapshot_path="$3"
@@ -223,7 +230,7 @@ then
 
     if [ -n "$proto_name" ]
     then
-        full_hash=$(jq .hash < ${proto_dir}/lib_protocol/TEZOS_PROTOCOL)
+        full_hash=$(first_hash ${proto_dir}/lib_protocol/TEZOS_PROTOCOL)
         sed -i.old -e 's/^let protocol = .*/let protocol = '"$full_hash"'/' ./tezt/manual_tests/migration.ml
     fi
 
@@ -254,9 +261,9 @@ the command for running the test above (the script needs not to be run again).
 Please adapt the test file ./tezt/manual_tests/migration.ml to your specific
 needs."
 
-elif [[ "$mode" == "manual" ]]
+elif [ "$mode" = "manual" ]
 then
-    #set \$level \$path
+    #set \$mig_level \$snapshot_path
     if [ -n "$proto_name" ]
     then
         mig_level=$3
@@ -268,7 +275,7 @@ then
         blockhash=$4
     fi
 
-    # check if \$level is set
+    # check if \$mig_level is set
     if [ -z "$mig_level" ]
     then
         echo "$usage"
@@ -277,11 +284,11 @@ then
 
     user_activated_upgrade $proto_dir "$mig_level"
 
-    pred_full_hash=$(jq -r .hash < src/proto_"${pred_proto_version}"_*/lib_protocol/TEZOS_PROTOCOL)
+    pred_full_hash=$(first_hash src/proto_"${pred_proto_version}"_*/lib_protocol/TEZOS_PROTOCOL)
     pred_short_hash=$(echo "$pred_full_hash" | head -c 8)
 
     # now calls correct scripts and renaming
-    if (( "$mig_level" <= 28082 ))
+    if [ "$mig_level" -le 28082 ];
     then
         # Env test use a fresh context and no yes-node/wallet
         echo "
@@ -301,7 +308,7 @@ $ tezos-client bake for bootstrap1 --minimal-timestamp
 In order to re-run the migration test, kill the sandboxed node and run the
 commands above (the script needs not to be run again)."
 
-    else # \$level > 28082
+    else # \$mig_level > 28082
 
         patch_yes_node
 
