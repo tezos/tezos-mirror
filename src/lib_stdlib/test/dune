@@ -13,4 +13,24 @@
   bigstring
   tezos-test-helpers
   qcheck-alcotest)
+ (modes native js)
  (flags (:standard -open Tezos_stdlib)))
+
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_bits.bc.js})))
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_tzList.bc.js})))
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_bounded_heap.bc.js})))
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_tzString.bc.js})))
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_fallbackArray.bc.js})))
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_functionalArray.bc.js})))

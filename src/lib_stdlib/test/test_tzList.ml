@@ -41,7 +41,7 @@ let rec permut = function
         in
         loop [] [] xs
       in
-      List.concat (List.map insert (permut xs))
+      List.concat_map insert (permut xs)
 
 let test_take_n _ =
   ListLabels.iter
