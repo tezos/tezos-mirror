@@ -284,7 +284,7 @@ type query = {depth : int}
 let depth_query =
   let open RPC_query in
   query (fun depth -> {depth})
-  |+ field "depth" RPC_arg.int 0 (fun t -> t.depth)
+  |+ field "depth" RPC_arg.nat 0 (fun t -> t.depth)
   |> seal
 
 let build_directory : type key. key t -> key RPC_directory.t =

@@ -2962,7 +2962,7 @@ module RPC = struct
     let level_query : level_query RPC_query.t =
       let open RPC_query in
       query (fun offset -> {offset})
-      |+ field "offset" RPC_arg.nat32 0l (fun t -> t.offset)
+      |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
       |> seal
 
     let current_level =

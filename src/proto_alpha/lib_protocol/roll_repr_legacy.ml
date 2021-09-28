@@ -27,7 +27,11 @@ include Compare.Int32
 
 type roll = t
 
-let encoding = Data_encoding.int32
+let encoding =
+  Data_encoding.(
+    with_decoding_guard
+      (fun t -> if t >= 0l then Ok () else Error "Positive int32 required")
+      int32)
 
 let first = 0l
 
@@ -35,7 +39,7 @@ let succ i = Int32.succ i
 
 let random sequence ~bound = Seed_repr.take_int32 sequence bound
 
-let rpc_arg = RPC_arg.like RPC_arg.int32 "roll"
+let rpc_arg = RPC_arg.like RPC_arg.nat32 "roll"
 
 let to_int32 v = v
 
