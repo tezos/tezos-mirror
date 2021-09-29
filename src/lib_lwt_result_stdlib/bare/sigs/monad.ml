@@ -38,7 +38,7 @@
     }
     In addition, the {!Lwt_syntax} module has [and*] and [and+] binding
     operators to allow concurrent evaluation of two or more promises, and the
-    {!Result_syntax} and {!Lwt_result_syntax] have [fail] functions to
+    {!Result_syntax} and {!Lwt_result_syntax} have [fail] functions to
     error-out.
 
     {2 Joins}
@@ -81,7 +81,7 @@ let* x = lwt_ok @@ f a b c in
 …
 ]}
 
-    {!Lwt_result_syntax.bind_from_result} lifts a plain result value into an
+    {!Lwt_result_syntax.bind_from_result} binds a plain result value into an
     Lwt-Result promise. It is used as a prefix-bind, with a contnuation:
 
 {[
@@ -90,23 +90,19 @@ bind_from_result (f u v w) @@ fun y ->
 …
 ]}
 
-    In the cases where performance is not a grave conver, it is also possible to
+    In the cases where performance is not a grave concern, it is also possible to
     use [Lwt.return] as a simple lifting function in the same style as [lwt_ok].
     More details on the matter within the documentation of
     {!Lwt_result_syntax.bind_from_result} itself. *)
 
 module type S = sig
-  (** {1 The tower of monads}
-
-      Each monad is given:
-      - a module that groups returns, lets, and joins,
-      - a set of infix operators outside of the specialised module. *)
+  (** {1 The tower of monads} *)
 
   (** {2 The Lwt monad: for concurrency} *)
 
-  (** Syntax module for Lwt. This is intended to be locally open in functions
-      that are within Lwt. Within this function, the code can use let-style
-      binders.
+  (** Syntax module for Lwt. This is intended to be opened locally in functions
+      which use Lwt for control-flow. Within the scope of this module, the code
+      can include binding operators, leading to a [let]-style syntax.
 
       See also {!Lwt} and {!Lwt.Syntax} *)
   module Lwt_syntax : sig
@@ -146,16 +142,16 @@ module type S = sig
         [return_error] is an alias for [Lwt.return_error]. *)
     val return_error : 'e -> (_, 'e) result Lwt.t
 
-    (** [let*] is a let-style version of {!Lwt.bind} and {!Lwt.( >>= )}. *)
+    (** [let*] is a binding operator alias for {!Lwt.bind} and {!Lwt.( >>= )}. *)
     val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
-    (** [and*] is a let-style version of {!Lwt.both} and {!Lwt.( <&> )}. *)
+    (** [and*] is a binding operator alias for {!Lwt.both} and {!Lwt.( <&> )}. *)
     val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
-    (** [let+] is a let-style version of {!Lwt.map} and {!Lwt.( >|= )}. *)
+    (** [let+] is a binding operator alias for {!Lwt.map} and {!Lwt.( >|= )}. *)
     val ( let+ ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
-    (** [and+] is a let-style version of {!Lwt.both} and {!Lwt.( <&> )}. *)
+    (** [and+] is a binding operator alias for {!Lwt.both} and {!Lwt.( <&> )}. *)
     val ( and+ ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
     (** [join] is the joining of concurrent unit values (it is [Lwt.join]). *)
@@ -170,9 +166,10 @@ module type S = sig
 
   (** {2 The (generic) Result monad: for success/failure} *)
 
-  (** Syntax module for Result. This is intended to be locally open in functions
-      that are within Result. Within this function, the code can use let-style
-      binders.
+  (** Syntax module for Result. This is intended to be opened locally in
+      functions which use [result] for control-flow. Within the scope of this
+      module, the code can include binding operators, leading to a [let]-style
+      syntax.
 
       See also {!Result} *)
   module Result_syntax : sig
@@ -207,10 +204,10 @@ module type S = sig
     (** [fail e] is [Error e]. It is also an alias for [error]. *)
     val fail : 'e -> ('a, 'e) result
 
-    (** [let*] is a let-style version of {!Result.bind} and [>>?]. *)
+    (** [let*] is a binding operator alias for {!Result.bind} and [>>?]. *)
     val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
 
-    (** [let+] is a let-style version of {!Result.map} and [>|?]. *)
+    (** [let+] is a binding operator alias for {!Result.map} and [>|?]. *)
     val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
 
     (** Note that we do not provide [and*] nor [and+]. Both of these are
@@ -229,9 +226,10 @@ module type S = sig
 
   (** {2 The combined Lwt+Result monad: for concurrent successes/failures} *)
 
-  (** Syntax module for LwtResult. This is intended to be locally open in
-      functions that are within Result. Within this function, the code can use
-      let-style binders.
+  (** Syntax module for Lwt+Result. This is intended to be opened locally in
+      functions which use Lwt and [result] for control-flow. Within the scope of
+      this module, the code can include binding operators, leading to a
+      [let]-style syntax.
 
       See also {!Lwt}, {!Result}, and {!Lwt_result}. *)
   module Lwt_result_syntax : sig
@@ -244,6 +242,7 @@ module type S = sig
     (** [return_none] is [Lwt.return (Ok None)] . *)
     val return_none : ('a option, 'e) result Lwt.t
 
+    (** [return_some x] is [Lwt.return (Ok (Some x))] . *)
     val return_some : 'a -> ('a option, 'e) result Lwt.t
 
     (** [return_nil] is [Lwt.return (Ok [])] . *)
@@ -265,13 +264,13 @@ module type S = sig
     (** [fail e] is [Lwt.return (Error e)]. *)
     val fail : 'e -> ('a, 'e) result Lwt.t
 
-    (** [let*] is a let-style version of {!Lwt_result.bind} and [>>=?]. *)
+    (** [let*] is a binding operator alias for {!Lwt_result.bind}. *)
     val ( let* ) :
       ('a, 'e) result Lwt.t ->
       ('a -> ('b, 'e) result Lwt.t) ->
       ('b, 'e) result Lwt.t
 
-    (** [let+] is a let-style version of {!Lwt_result.map} and [>|=?]. *)
+    (** [let+] is a binding operator alias for {!Lwt_result.map}. *)
     val ( let+ ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
 
     (** Note that we do not provide [and*] nor [and+]. Both of these are
@@ -300,13 +299,15 @@ in
       ('e -> 'f) -> ('a, 'e) result Lwt.t -> ('a, 'f) result Lwt.t
 
     (** The following values are for mixing expressions that are Lwt-only or
-        Result-only within the LwtResult monad. Note that there is a funcamental
-        difference between [result] and [Lwt.t]: the former can be simply
+        Result-only within the LwtResult monad. Note that there are fundamental
+        differences between [result] and [Lwt.t]: the former can be simply
         matched on (i.e., it is possible to get out of the monad at any point)
         whereas the latter can only be bound on (i.e., it is not possible to get
-        out of the monad). Consequently, the approaches for mixing in
-        expressions from either of these two monads are fundamentally different.
-        *)
+        out of the monad). In addition, the former is for aborting computations
+        on failures whereas the latter is for waiting before continuing.
+
+        Consequently, the approaches for mixing in expressions from either of
+        these two monads are fundamentally different. *)
 
     (** [lwt_ok] is for lifing an Lwt-only expression into the LwtResult monad.
         [lwt_ok p] is equivalent to [Lwt.bind p (fun x -> Lwt.return (Ok x))].

@@ -38,13 +38,33 @@ type error_category =
 
 (** {1 Assembling the different components of the error monad.} *)
 
+(** The main error type.
+
+    Whenever you add a variant to this type (with [type Error_monad.error += …])
+    you must also register the error with {!register_error_kind} (or
+    {!register_recursive_error_kind} if the error payload contains errors).
+
+    These errors are not meant to be inspected in general. Meaning that they
+    should not be matched upon. Consequently it is acceptable to register an
+    error in an implementation file and not mention it in the corresponding
+    interface file. *)
 type error = TzCore.error = ..
 
+(** [CORE]: encoding and pretty-printing for errors *)
 include
   Sig.CORE with type error := error and type error_category := error_category
 
+(** [WITH_WRAPPED]: wrapping of errors from other instantiations within this
+    one. Specifically, this is used to wrap errors of the economic protocol
+    (e.g., operation is invalid) within the errors of the shell (e.g., failed to
+    validate protocol data).
+
+    Functions from this module should only be used within the environment. *)
 include Sig.WITH_WRAPPED with type error := error
 
+(** [TzTrace]: trace module specific to the Tezos Error monad. The [trace] type
+    of this module is meant to become abstract in the medium-term (see
+    https://gitlab.com/tezos/tezos/-/issues/1577). *)
 module TzTrace : Sig.TRACE with type 'error trace = 'error list
 
 type 'error trace = 'error TzTrace.trace
@@ -75,6 +95,12 @@ module Lwt_tzresult_syntax :
     - [fail] does not wrap errors in traces,
     - there is no [and*] (because there is no way to compose errors). *)
 
+(** [MONAD_EXTENSION]: the Tezos-specific extension to the monad part of
+    [Error_monad]. It includes
+
+    - consistent defaults,
+    - some tracing helpers,
+    - some other misc helpers. *)
 include
   Sig.MONAD_EXTENSION
     with type error := error

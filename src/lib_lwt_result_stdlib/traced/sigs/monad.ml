@@ -28,28 +28,28 @@
 
     - The type ['error trace] is meant to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]).
-    - The functions [error_trace] and [fail_trace] allow failing immediately
-      with a trace-wrapped error.
-    - [{join,all,both}] return ['error trace] rather than ['error list].
+    - The functions {!Traced_result_syntax.fail} and
+      {!Traced_lwt_result_syntax.fail} wrap the provided error in a trace,
+    - [{join,all,both}] return ['error trace] rather than ['error list],
+    - The binding operators {!Traced_result_syntax.( and* )} and
+      {!Traced_lwt_result_syntax.( and* )} are available.
     *)
 module type S = sig
-  (** Most of it is defined in the non-traced monad. The rest is trace-specific,
-      occasionally shadowing. *)
+  (** Import the non-traced modules as-is *)
   include Bare_sigs.Monad.S
 
   (** ['error trace] is intended to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
-  (** {2 The traced Result monad: for success and traced failure}
+  (** {2 The traced Result monad: for successes and traced failures}
 
-      The [Traced_result_syntax] module is similar to the [Result_syntax] module with the
-      following differences:
+      The [Traced_result_syntax] module is similar to the [Result_syntax] module
+      with the following differences:
       - [fail] wraps the error in a trace,
       - [and*] and [and+] are provided
 
-      See {!Result_syntax}.
-    *)
+      See {!Result_syntax}. *)
   module Traced_result_syntax : sig
     val return : 'a -> ('a, 'error) result
 
@@ -66,8 +66,7 @@ module type S = sig
     val return_false : (bool, 'error) result
 
     (** [fail e] is [(Error (Trace.make e))] where [Trace] is the
-      {!Traced_sigs.Trace} module that provides the trace type and functions.
-      *)
+      {!Traced_sigs.Trace} module that provides the trace type and functions. *)
     val fail : 'error -> ('a, 'error trace) result
 
     val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
@@ -96,13 +95,12 @@ module type S = sig
 
   (** {2 The Lwt traced Result monad: for concurrent successes and traced failures}
 
-      The [Lwt_traced_result_syntax] module is similar to the [Lwt_result_syntax] module with the
-      following difference:
+      The [Lwt_traced_result_syntax] module is similar to the
+      [Lwt_result_syntax] module with the following difference:
       - [fail] wraps the error in a trace,
       - [and*] and [and+] are provided.
 
-      See {!Lwt_result_syntax}.
-  *)
+      See {!Lwt_result_syntax}. *)
   module Lwt_traced_result_syntax : sig
     val return : 'a -> ('a, 'error) result Lwt.t
 
@@ -119,8 +117,7 @@ module type S = sig
     val return_false : (bool, 'error) result Lwt.t
 
     (** [fail e] is [Lwt.return (Error (Trace.make e))] where [Trace] is the
-      {!Traced_sigs.Trace} module that provides the trace type and functions.
-      *)
+      {!Traced_sigs.Trace} module that provides the trace type and functions. *)
     val fail : 'error -> ('a, 'error trace) result Lwt.t
 
     val ( let* ) :
