@@ -36,6 +36,11 @@ include (
 include TzMonad
 module TzTrace = TzTrace
 
+(* We offer shorter names for monads. These short names only make sense in the
+   context of Tezos' error-monads which is why it is defined here. *)
+module Tzresult_syntax = Traced_result_syntax
+module Lwt_tzresult_syntax = Lwt_traced_result_syntax
+
 type 'error trace = 'error TzTrace.trace
 
 type error += Exn of exn

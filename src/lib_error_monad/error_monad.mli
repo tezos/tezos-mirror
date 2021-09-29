@@ -53,6 +53,28 @@ include
   Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
     with type 'error trace := 'error TzTrace.trace
 
+(** Syntax module (with let and returns) for the TzResult monad (i.e., the
+    TzTraced Result monad). *)
+module Tzresult_syntax : module type of TzLwtreslib.Monad.Traced_result_syntax
+
+(** Syntax module (with let and returns) for the TzResult+Lwt monad (i.e., the
+    Lwt TzTraced Result monad*)
+module Lwt_tzresult_syntax :
+    module type of TzLwtreslib.Monad.Lwt_traced_result_syntax
+
+(** Syntax module (with let and returns) for the error-agnostic Result monad is
+    available under the name [Result_syntax] from the [TRACED_MONAD].
+    Unlike {!Tzresult_syntax}, with syntax module
+    - [fail] does not wrap errors in traces,
+    - there is no [and*] (because there is no way to compose errors). *)
+
+(** Syntax module (with let and returns) for the Lwt and error-agnostic Result
+    combined monad is available under the name [Lwt_result_syntax] from the
+    [TRACED_MONAD].
+    Unlike {!Lwt_tzresult_syntax}, with syntax module
+    - [fail] does not wrap errors in traces,
+    - there is no [and*] (because there is no way to compose errors). *)
+
 include
   Sig.MONAD_EXTENSION
     with type error := error
