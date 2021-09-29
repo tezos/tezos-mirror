@@ -45,6 +45,11 @@ script:snapshot_alpha_and_link:
     - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
     - make
 
+script:test_release_versions:
+  extends: .test_template
+  script:
+    - ./scripts/test_release_version.sh
+
 ############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################
