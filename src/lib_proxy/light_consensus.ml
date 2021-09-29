@@ -88,7 +88,9 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
                      (pp_print_list pp_print_string)
                      errors)
         | Ok () -> (
-            Merkle.contains_merkle_tree store_tree mtree >>= function
+            let open Lwt_syntax in
+            let* r = Merkle.contains_merkle_tree store_tree mtree in
+            match r with
             | Ok _ -> Lwt.return Valid
             | Error err ->
                 Lwt.return
@@ -118,6 +120,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
   let consensus
       ({printer; min_agreement; chain; block; key; mtree; tree} : input)
       validating_endpoints =
+    let open Lwt_syntax in
     (* + 1 because there's the endpoint that provides data, that doesn't
        validate *)
     let nb_endpoints = List.length validating_endpoints + 1 in
@@ -129,29 +132,35 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
        data is, because the validating endpoints return trees that do NOT
        contain this key. *)
     let check_merkle_tree_with_endpoint (uri, rpc_context) =
-      Light_proto.merkle_tree
-        {rpc_context; chain; block; mode = Client}
-        key
-        Tezos_shell_services.Block_services.Hole
-      >>= validate uri key tree mtree
+      let* other_mtree =
+        Light_proto.merkle_tree
+          {rpc_context; chain; block; mode = Client}
+          key
+          Tezos_shell_services.Block_services.Hole
+      in
+      validate uri key tree mtree other_mtree
     in
-    Lwt_list.map_p check_merkle_tree_with_endpoint validating_endpoints
-    >>= fun validations ->
+    let* validations =
+      Lwt_list.map_p check_merkle_tree_with_endpoint validating_endpoints
+    in
     (* +1 because the endpoint that provided data obviously agrees *)
     let nb_agreements = count_valids validations + 1 in
     let agreement_reached = nb_agreements >= min_agreeing_endpoints in
-    warn_invalids printer validations >>= fun () ->
-    (if agreement_reached then Lwt.return_unit
-    else
-      printer#warning
-        "Light mode: min_agreement=%f, %d endpoints, %s%d agreeing endpoints, \
-         whereas %d (%d*%f rounded up) is the minimum; so about to fail."
-        min_agreement
-        nb_endpoints
-        (if nb_agreements > 0 then "only " else "")
-        nb_agreements
-        min_agreeing_endpoints
-        nb_endpoints
-        min_agreement)
-    >>= fun () -> return agreement_reached
+    let* () = warn_invalids printer validations in
+    let* () =
+      if agreement_reached then Lwt.return_unit
+      else
+        printer#warning
+          "Light mode: min_agreement=%f, %d endpoints, %s%d agreeing \
+           endpoints, whereas %d (%d*%f rounded up) is the minimum; so about \
+           to fail."
+          min_agreement
+          nb_endpoints
+          (if nb_agreements > 0 then "only " else "")
+          nb_agreements
+          min_agreeing_endpoints
+          nb_endpoints
+          min_agreement
+    in
+    return agreement_reached
 end
