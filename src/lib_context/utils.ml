@@ -72,7 +72,7 @@ module Arena : Arena = struct
     if new_len < old_len then
       Fmt.invalid_arg "Arena.expand: can't reduce the size of an existing arena" ;
     let new_data = Bigstringaf.create new_len in
-    Bigstringaf.blit t.data ~src_off:0 new_data ~dst_off:0 ~len:old_len ;
+    Bigstringaf.blit t.data ~src_off:0 new_data ~dst_off:0 ~len:t.next_offset ;
     t.data <- new_data
 end
 
