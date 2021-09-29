@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/current.proxy.delegates.out
+tezt/_regressions/rpc/granada.proxy.delegates.out
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

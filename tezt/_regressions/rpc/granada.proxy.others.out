@@ -1,6 +1,7 @@
-tezt/_regressions/rpc/current.client.others.out
+tezt/_regressions/rpc/granada.proxy.others.out
 
-./tezos-client rpc get /chains/main/blocks/head/context/constants
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/constants
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "preserved_cycles": 2,
@@ -22,7 +23,8 @@ tezt/_regressions/rpc/current.client.others.out
   "liquidity_baking_sunset_level": 4096,
   "liquidity_baking_escape_ema_threshold": 1000000 }
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "priority": 0, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
@@ -34,11 +36,13 @@ tezt/_regressions/rpc/current.client.others.out
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "priority": 8, "estimated_time": "[TIMESTAMP]" } ]
 
-./tezos-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/endorsing_rights
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
     "slots":
       [ 2, 13, 17, 19, 23, 24, 31, 34, 40, 46, 48, 53, 56, 60, 61, 62, 68,
@@ -73,5 +77,6 @@ tezt/_regressions/rpc/current.client.others.out
         191, 192, 193, 197, 199, 200, 218, 245, 248 ],
     "estimated_time": "[TIMESTAMP]" } ]
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "first": 1, "last": 8 }

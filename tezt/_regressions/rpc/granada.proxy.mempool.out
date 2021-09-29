@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/current.proxy.mempool.out
+tezt/_regressions/rpc/granada.proxy.mempool.out
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
 []

@@ -1,7 +1,6 @@
-tezt/_regressions/rpc/current.proxy.contracts.out
+tezt/_regressions/rpc/granada.client.contracts.out
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
@@ -11,120 +10,96 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/delegates
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get /chains/main/blocks/head/context/delegates
 [ "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "4000000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "4000000000000"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "0"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "0" }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "100000000", "counter": "1" }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "100000000"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "1"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 null
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "99999383"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -140,23 +115,20 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
       "storage":
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -164,15 +136,12 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints": {} }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -184,12 +153,10 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
               { "prim": "PAIR" } ] ] } ],
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -355,23 +322,20 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
       "storage":
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -379,11 +343,9 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -414,8 +376,7 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
                 "args": [ { "prim": "string" }, { "prim": "nat" } ],
                 "annots": [ "%add_right" ] } ] } } }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "storage",
         "args":
@@ -569,11 +530,10 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
                       { "prim": "PAIR" } ] ] } ] ] } ],
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
-./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
-./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "test"
   },
@@ -581,10 +541,9 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "dup"
   },
@@ -592,5 +551,4 @@ null
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null

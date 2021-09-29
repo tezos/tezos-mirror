@@ -1,6 +1,7 @@
-tezt/_regressions/rpc/current.client.contracts.out
+tezt/_regressions/rpc/granada.light.contracts.out
 
-./tezos-client rpc get /chains/main/blocks/head/context/contracts
+./tezos-client --mode light rpc get /chains/main/blocks/head/context/contracts
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[CONTRACT_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
@@ -10,96 +11,120 @@ tezt/_regressions/rpc/current.client.contracts.out
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get /chains/main/blocks/head/context/delegates
+./tezos-client --mode light rpc get /chains/main/blocks/head/context/delegates
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "4000000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "4000000000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "0", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "balance": "100000000", "counter": "1" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "100000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "1"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "99999383"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "4"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "balance": "0",
   "script":
     { "code":
@@ -115,20 +140,23 @@ Fatal error:
       "storage":
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client --mode light rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -136,12 +164,15 @@ Fatal error:
     "prim": "int"
   }
 }'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "entrypoints": {} }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -153,10 +184,12 @@ null
               { "prim": "PAIR" } ] ] } ],
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "balance": "0",
   "script":
     { "code":
@@ -322,20 +355,23 @@ null
       "storage":
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client --mode light rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -343,9 +379,11 @@ Fatal error:
     "prim": "int"
   }
 }'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -376,7 +414,8 @@ null
                 "args": [ { "prim": "string" }, { "prim": "nat" } ],
                 "annots": [ "%add_right" ] } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "code":
     [ { "prim": "storage",
         "args":
@@ -530,10 +569,11 @@ null
                       { "prim": "PAIR" } ] ] } ] ] } ],
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client --mode light rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "test"
   },
@@ -541,9 +581,10 @@ null
     "prim": "string"
   }
 }'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./tezos-client --mode light rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "dup"
   },
@@ -551,4 +592,5 @@ null
     "prim": "string"
   }
 }'
+protocol of light mode unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 null
