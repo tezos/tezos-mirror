@@ -391,7 +391,7 @@ let check_proof_of_work_stamp ctxt block =
       block.Block_header.shell
       block.protocol_data.contents
       proof_of_work_threshold
-  then ok_unit
+  then Result.return_unit
   else error Invalid_stamp
 
 let check_signature block chain_id key =
@@ -422,7 +422,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
-  else ok_unit
+  else Result.return_unit
 
 (* The minimal threshold on the endorsing power for the fast-path case
    is 60% of the maximal endorsing power. *)

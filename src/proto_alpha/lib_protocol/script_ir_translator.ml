@@ -162,7 +162,7 @@ let unexpected expr exp_kinds exp_ns exp_prims =
 
 let check_kind kinds expr =
   let kind = kind expr in
-  if List.exists (kind_equal kind) kinds then ok_unit
+  if List.exists (kind_equal kind) kinds then Result.return_unit
   else
     let loc = location expr in
     error (Invalid_kind (loc, kinds, kind))
@@ -1867,37 +1867,37 @@ let check_packable ~legacy loc root =
     | Big_map_t _ -> error (Unexpected_lazy_storage loc)
     | Sapling_state_t _ -> error (Unexpected_lazy_storage loc)
     | Operation_t _ -> error (Unexpected_operation loc)
-    | Unit_t _ -> ok_unit
-    | Int_t _ -> ok_unit
-    | Nat_t _ -> ok_unit
-    | Signature_t _ -> ok_unit
-    | String_t _ -> ok_unit
-    | Bytes_t _ -> ok_unit
-    | Mutez_t _ -> ok_unit
-    | Key_hash_t _ -> ok_unit
-    | Key_t _ -> ok_unit
-    | Timestamp_t _ -> ok_unit
-    | Address_t _ -> ok_unit
-    | Bool_t _ -> ok_unit
-    | Chain_id_t _ -> ok_unit
-    | Never_t _ -> ok_unit
-    | Set_t (_, _) -> ok_unit
+    | Unit_t _ -> Result.return_unit
+    | Int_t _ -> Result.return_unit
+    | Nat_t _ -> Result.return_unit
+    | Signature_t _ -> Result.return_unit
+    | String_t _ -> Result.return_unit
+    | Bytes_t _ -> Result.return_unit
+    | Mutez_t _ -> Result.return_unit
+    | Key_hash_t _ -> Result.return_unit
+    | Key_t _ -> Result.return_unit
+    | Timestamp_t _ -> Result.return_unit
+    | Address_t _ -> Result.return_unit
+    | Bool_t _ -> Result.return_unit
+    | Chain_id_t _ -> Result.return_unit
+    | Never_t _ -> Result.return_unit
+    | Set_t (_, _) -> Result.return_unit
     | Ticket_t _ -> error (Unexpected_ticket loc)
-    | Lambda_t (_, _, _) -> ok_unit
-    | Bls12_381_g1_t _ -> ok_unit
-    | Bls12_381_g2_t _ -> ok_unit
-    | Bls12_381_fr_t _ -> ok_unit
+    | Lambda_t (_, _, _) -> Result.return_unit
+    | Bls12_381_g1_t _ -> Result.return_unit
+    | Bls12_381_g2_t _ -> Result.return_unit
+    | Bls12_381_fr_t _ -> Result.return_unit
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
         check l_ty >>? fun () -> check r_ty
     | Union_t ((l_ty, _), (r_ty, _), _) -> check l_ty >>? fun () -> check r_ty
     | Option_t (v_ty, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
-    | Contract_t (_, _) when legacy -> ok_unit
+    | Contract_t (_, _) when legacy -> Result.return_unit
     | Contract_t (_, _) -> error (Unexpected_contract loc)
     | Sapling_transaction_t _ -> ok ()
-    | Chest_key_t _ -> ok_unit
-    | Chest_t _ -> ok_unit
+    | Chest_key_t _ -> Result.return_unit
+    | Chest_t _ -> Result.return_unit
   in
   check root
 
@@ -2098,10 +2098,10 @@ let[@coq_axiom_with_reason "use of exceptions"] well_formed_entrypoints
       | Some (Field_annot name) -> (Entrypoints.singleton name, true)
     in
     let (first_unreachable, all) = check full [] reachable (None, init) in
-    if not (Entrypoints.mem "default" all) then ok_unit
+    if not (Entrypoints.mem "default" all) then Result.return_unit
     else
       match first_unreachable with
-      | None -> ok_unit
+      | None -> Result.return_unit
       | Some path -> error (Unreachable_entrypoint path)
   with
   | Duplicate name -> error (Duplicate_entrypoint name)
@@ -2141,7 +2141,7 @@ let opened_ticket_type loc ty =
 
 let parse_unit ctxt ~legacy = function
   | Prim (loc, D_Unit, [], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((), ctxt)
   | Prim (loc, D_Unit, l, _) ->
@@ -2150,11 +2150,11 @@ let parse_unit ctxt ~legacy = function
 
 let parse_bool ctxt ~legacy = function
   | Prim (loc, D_True, [], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (true, ctxt)
   | Prim (loc, D_False, [], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>? fun () ->
       Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt)
   | Prim (loc, ((D_True | D_False) as c), l, _) ->
@@ -2375,7 +2375,7 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
   in
   match expr with
   | Prim (loc, D_Pair, l :: rs, annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () -> parse_comb loc l rs
   | Prim (loc, D_Pair, l, _) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
@@ -2386,13 +2386,13 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
 
 let parse_union parse_l parse_r ctxt ~legacy = function
   | Prim (loc, D_Left, [v], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_l ctxt v >|=? fun (v, ctxt) -> (L v, ctxt)
   | Prim (loc, D_Left, l, _) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | Prim (loc, D_Right, [v], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_r ctxt v >|=? fun (v, ctxt) -> (R v, ctxt)
   | Prim (loc, D_Right, l, _) ->
@@ -2401,14 +2401,15 @@ let parse_union parse_l parse_r ctxt ~legacy = function
 
 let parse_option parse_v ctxt ~legacy = function
   | Prim (loc, D_Some, [v], annot) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_v ctxt v >|=? fun (v, ctxt) -> (Some v, ctxt)
   | Prim (loc, D_Some, l, _) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | Prim (loc, D_None, [], annot) ->
       Lwt.return
-        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        ( (if legacy then Result.return_unit
+          else error_unexpected_annot loc annot)
         >|? fun () -> (None, ctxt) )
   | Prim (loc, D_None, l, _) ->
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
@@ -2543,7 +2544,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       (fun (last_value, map, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if legacy then ok_unit else error_unexpected_annot loc annot)
+            (if legacy then Result.return_unit
+            else error_unexpected_annot loc annot)
             >>?= fun () ->
             parse_comparable_data ?type_logger ctxt key_type k
             >>=? fun (k, ctxt) ->
@@ -2592,7 +2594,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       (fun (last_key, {map; size}, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if legacy then ok_unit else error_unexpected_annot loc annot)
+            (if legacy then Result.return_unit
+            else error_unexpected_annot loc annot)
             >>?= fun () ->
             parse_comparable_data ?type_logger ctxt key_type k
             >>=? fun (k, ctxt) ->
@@ -3070,7 +3073,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   let log_stack ctxt loc stack_ty aft =
     match (type_logger, script_instr) with
     | (None, _) | (Some _, (Seq (-1, _) | Int _ | String _ | Bytes _)) ->
-        ok_unit
+        Result.return_unit
     | (Some log, (Prim _ | Seq _)) ->
         (* Unparsing for logging done in an unlimited context as this
               is used only by the client and not the protocol *)
@@ -4316,7 +4319,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest, _)) ->
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
-          (if legacy then ok_unit else check_packable ~legacy:false loc v)
+          (if legacy then Result.return_unit
+          else check_packable ~legacy:false loc v)
           >>? fun () ->
           let instr = {apply = (fun kinfo _k -> IFailwith (kinfo, loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
@@ -4853,7 +4857,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+      (if legacy then Result.return_unit
+      else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))
@@ -5700,7 +5705,8 @@ let parse_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+  (if legacy then Result.return_unit
+  else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
   record_trace
@@ -5830,7 +5836,8 @@ let typecheck_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+  (if legacy then Result.return_unit
+  else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
   record_trace

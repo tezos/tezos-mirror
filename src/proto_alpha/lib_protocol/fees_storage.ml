@@ -136,4 +136,4 @@ let check_storage_limit c ~storage_limit =
       storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
     || Compare.Z.(storage_limit < Z.zero)
   then error Storage_limit_too_high
-  else ok_unit
+  else Result.return_unit
