@@ -65,8 +65,9 @@ let make_asynchronous_log_message_consumer () =
     (fun () ->
       Lwt_stream.iter_s
         (fun (level, s) ->
+          let open Lwt_syntax in
           (* Pause to avoid interleaving of execution *)
-          Lwt.pause () >>= fun () ->
+          let* () = Lwt.pause () in
           Lwt.catch
             (fun () ->
               match level with
