@@ -114,9 +114,15 @@ check_scripts () {
 
     for script in ${scripts}; do
         if [[ "${shellcheck_skips}" == *"${script}"* ]]; then
-          # script is skipped, we leave a log however, to incite
-          # devs to enhance the scripts
-          say "$script shellcheck SKIPPED ⚠️"
+          # check whether the skipped script, in reality, is warning-free
+          if shellcheck "${script}" > /dev/null; then
+              say "$script shellcheck marked as SKIPPED but actually pass: update shellcheck_skips ❌️"
+              exit_code=1
+          else
+              # script is skipped, we leave a log however, to incite
+              # devs to enhance the scripts
+              say "$script shellcheck SKIPPED ⚠️"
+          fi
         else
           # script is not skipped, let's shellcheck it
           if shellcheck --external-sources "${script}"; then
