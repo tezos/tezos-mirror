@@ -10,6 +10,7 @@ set -e
 VERSION=10.94
 RANDOMTAG="testtesttest"
 TESTBRANCH=$RANDOMTAG
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 cleanup () {
   set +e
@@ -18,8 +19,8 @@ cleanup () {
   git tag -d "v$VERSION" > /dev/null 2>&1
   git tag -d "v$VERSION"+rc1 > /dev/null 2>&1
   git tag -d "v$VERSION"-rc1 > /dev/null 2>&1
-  git checkout - || true
-  git branch -D $TESTBRANCH
+  git checkout "$CURRENT_BRANCH"
+  git branch -D $TESTBRANCH || true
 }
 trap cleanup EXIT INT
 
