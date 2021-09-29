@@ -91,7 +91,7 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  RPC_test.register () ;
+  RPC_test.register ~protocols ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)

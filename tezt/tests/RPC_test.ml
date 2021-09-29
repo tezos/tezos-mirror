@@ -320,9 +320,9 @@ let test_contracts ?endpoint client =
   in
   unit
 
-let test_delegates ~contracts ?endpoint client = 
+let test_delegates ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
-  
+
   let bootstrap = List.hd contracts in
   let* _ = RPC.Delegates.get ?endpoint ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_balance ?endpoint ~hooks ~pkh:bootstrap client in
@@ -354,13 +354,13 @@ let test_delegates ~contracts ?endpoint client =
   let* _ =
     RPC.Delegates.get_voting_power ?endpoint ~hooks ~pkh:bootstrap client
   in
-  
+
   unit
 
 (* Test the delegates RPC with unregistered baker for protocol Alpha. *)
-let test_delegates_on_unregistered_alpha ~contracts ?endpoint client = 
+let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   Log.info "Test with a PKH that is not a registered baker contract" ;
-  
+
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
   let* _ =
@@ -442,12 +442,12 @@ let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   unit
 
 (* Test the delegates RPC with unregistered baker for protocol Granada. *)
-let test_delegates_on_unregistered_granada ~contracts ?endpoint client = 
+let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
   Log.info "Test with a PKH that is not a registered baker contract" ;
 
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
-  
+
   let* _ =
     RPC.Delegates.spawn_get ?endpoint ~hooks ~pkh:unregistered_baker client
     |> Process.check ~expect_failure:true
@@ -520,19 +520,19 @@ let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
   in
   unit
 
-let get_contracts ?endpoint client = 
+let get_contracts ?endpoint client =
   let* _ = RPC.Contracts.get_all ?endpoint ~hooks client in
   let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
-  
+
   Lwt.return contracts
 
 (* Test the delegates RPC for protocol Alpha. *)
 let test_delegates_alpha ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  
+
   let* () = test_delegates ~contracts ?endpoint client in
   let* () = test_delegates_on_unregistered_alpha ~contracts ?endpoint client in
-  
+
   unit
 
 (* Test the delegates RPC for protocol Granada. *)
@@ -818,81 +818,57 @@ let test_no_service_at_valid_prefix address () =
   in
   unit
 
-let register () =
-  let register_alpha test_mode_tag =
-    check_rpc
-      ~group_name:"alpha"
-      ~protocols:[Protocol.Alpha]
-      ~test_mode_tag
-      ~rpcs:
-        ([
-           ("contracts", test_contracts, None, None);
-           ("delegates", test_delegates_alpha, None, None);
-           ( "votes",
-             test_votes,
-             Some
-               (* reduced periods duration to get to testing vote period faster *)
-               [
-                 (["blocks_per_cycle"], Some "4");
-                 (["blocks_per_voting_period"], Some "4");
-               ],
-             None );
-           ("others", test_others, None, None);
-         ]
-        @
-        match test_mode_tag with
-        | `Client_with_proxy_server | `Light -> []
-        | _ ->
-            [
-              ( "mempool",
-                test_mempool,
-                None,
-                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
-            ])
-      ()
+let register_protocol protocol test_mode_tag =
+  let test_delegates =
+    match protocol with
+    | Protocol.Alpha -> test_delegates_alpha
+    | Protocol.Granada -> test_delegates_granada
   in
-  let register_current_mainnet test_mode_tag =
-    check_rpc
-      ~group_name:"current"
-      ~protocols:[Protocol.Granada]
-      ~test_mode_tag
-      ~rpcs:
-        ([
-           ("contracts", test_contracts, None, None);
-           ("delegates", test_delegates_granada, None, None);
-           ( "votes",
-             test_votes,
-             Some
-               (* reduced periods duration to get to testing vote period faster *)
-               [
-                 (["blocks_per_cycle"], Some "4");
-                 (["blocks_per_voting_period"], Some "4");
-               ],
-             None );
-           ("others", test_others, None, None);
-         ]
-        @
-        match test_mode_tag with
-        | `Client_with_proxy_server | `Light -> []
-        | _ ->
-            [
-              ( "mempool",
-                test_mempool,
-                None,
-                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
-            ])
-      ()
-  in
+
+  check_rpc
+    ~group_name:(Protocol.tag protocol)
+    ~protocols:[protocol]
+    ~test_mode_tag
+    ~rpcs:
+      ([
+         ("contracts", test_contracts, None, None);
+         ("delegates", test_delegates, None, None);
+         ( "votes",
+           test_votes,
+           Some
+             (* reduced periods duration to get to testing vote period faster *)
+             [
+               (["blocks_per_cycle"], Some "4");
+               (["blocks_per_voting_period"], Some "4");
+             ],
+           None );
+         ("others", test_others, None, None);
+       ]
+      @
+      match test_mode_tag with
+      | `Client_with_proxy_server | `Light -> []
+      | _ ->
+          [
+            ( "mempool",
+              test_mempool,
+              None,
+              Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
+          ])
+    ()
+
+let register ~protocols =
   let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
+
   List.iter
     (fun mode ->
-      register_alpha mode ;
-      register_current_mainnet mode)
+      List.iter (fun protocol -> register_protocol protocol mode) protocols)
     modes ;
+
   let addresses = ["localhost"; "127.0.0.1"] in
   let mk_title list_type address =
     Format.sprintf "Test RPC %s @@ %s" list_type address
   in
+
   List.iter
     (fun addr ->
       Test.register
