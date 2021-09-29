@@ -49,6 +49,11 @@ script:test-gen-genesis:
   script:
     - dune build gen_genesis.exe
 
+script:test_release_versions:
+  extends: .test_template
+  script:
+    - ./scripts/test_release_version.sh
+
 ############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################

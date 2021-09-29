@@ -744,7 +744,7 @@ def check_static_binary(execname: str):
 
 
 def get_tezos_node_version() -> str:
-    cmd = ["dune", "exec", "../src/lib_version/tezos_print_version.exe"]
+    cmd = ["dune", "exec", "tezos-version"]
     process_ret = subprocess.run(
         cmd, capture_output=True, text=True, check=True
     )
