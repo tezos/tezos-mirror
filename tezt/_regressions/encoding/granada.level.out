@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.level.out
+tezt/_regressions/encoding/granada.level.out
 
 ./tezos-codec encode 010-PtGRANAD.level from '{
   "level": 1331,

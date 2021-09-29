@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.vote.ballots.out
+tezt/_regressions/encoding/granada.vote.ballots.out
 
 ./tezos-codec encode 010-PtGRANAD.vote.ballots from '{
   "yay": 2147483647,

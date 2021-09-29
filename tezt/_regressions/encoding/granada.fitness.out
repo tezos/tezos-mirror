@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.fitness.out
+tezt/_regressions/encoding/granada.fitness.out
 
 ./tezos-codec encode 010-PtGRANAD.fitness from '[
   "01",

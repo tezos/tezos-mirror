@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.cycle.out
+tezt/_regressions/encoding/granada.cycle.out
 
 ./tezos-codec encode 010-PtGRANAD.cycle from 2147483647
 7fffffff

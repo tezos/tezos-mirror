@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.operation.out
+tezt/_regressions/encoding/granada.operation.out
 
 ./tezos-codec encode 010-PtGRANAD.operation from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",

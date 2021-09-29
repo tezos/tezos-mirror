@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.vote.listings.out
+tezt/_regressions/encoding/granada.vote.listings.out
 
 ./tezos-codec encode 010-PtGRANAD.vote.listings from '[
   {

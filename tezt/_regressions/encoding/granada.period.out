@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.period.out
+tezt/_regressions/encoding/granada.period.out
 
 ./tezos-codec encode 010-PtGRANAD.period from '"2789"'
 0000000000000ae5

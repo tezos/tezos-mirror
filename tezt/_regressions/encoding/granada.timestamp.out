@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.timestamp.out
+tezt/_regressions/encoding/granada.timestamp.out
 
 ./tezos-codec encode 010-PtGRANAD.timestamp from '"2020-04-20T16:19:59Z"'
 000000005e9dcbaf

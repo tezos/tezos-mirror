@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.vote.ballot.out
+tezt/_regressions/encoding/granada.vote.ballot.out
 
 ./tezos-codec encode 010-PtGRANAD.vote.ballot from '"nay"'
 01

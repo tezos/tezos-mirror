@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/current.delegate.frozen_balance_by_cycles.out
+tezt/_regressions/encoding/granada.delegate.frozen_balance_by_cycles.out
 
 ./tezos-codec encode 010-PtGRANAD.delegate.frozen_balance_by_cycles from '[
   {
