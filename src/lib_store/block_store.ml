@@ -33,8 +33,7 @@ module Block_cache =
             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
        (Block_hash))
 
-(* TODO: make limits configurable *)
-let block_cache_limit = 100
+let default_block_cache_limit = 100
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
@@ -1222,7 +1221,7 @@ let may_recover_merge block_store =
               block_store.rw_floating_block_store <- rw ;
               write_status block_store Idle >>=? fun () -> return_unit))
 
-let load chain_dir ~genesis_block ~readonly =
+let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   Cemented_block_store.init chain_dir ~readonly >>=? fun cemented_store ->
   Floating_block_store.init chain_dir ~readonly RO
   >>= fun ro_floating_block_store ->
@@ -1236,7 +1235,10 @@ let load chain_dir ~genesis_block ~readonly =
   >>=? fun caboose ->
   Stored_data.init (Naming.block_store_status_file chain_dir) ~initial_data:Idle
   >>=? fun status_data ->
-  let block_cache = Block_cache.create block_cache_limit in
+  let block_cache =
+    Block_cache.create
+      (Option.value block_cache_limit ~default:default_block_cache_limit)
+  in
   let merge_scheduler = Lwt_idle_waiter.create () in
   let merge_mutex = Lwt_mutex.create () in
   let block_store =
@@ -1262,8 +1264,9 @@ let load chain_dir ~genesis_block ~readonly =
   fail_unless (status = Idle) Cannot_load_degraded_store >>=? fun () ->
   return block_store
 
-let create chain_dir ~genesis_block =
-  load chain_dir ~genesis_block ~readonly:false >>=? fun block_store ->
+let create ?block_cache_limit chain_dir ~genesis_block =
+  load chain_dir ?block_cache_limit ~genesis_block ~readonly:false
+  >>=? fun block_store ->
   store_block block_store genesis_block >>=? fun () -> return block_store
 
 let pp_merge_status fmt status =

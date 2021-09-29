@@ -314,19 +314,24 @@ val switch_history_mode :
   new_history_mode:History_mode.t ->
   unit tzresult Lwt.t
 
-(** [create ~chain_dir ~genesis_block] instantiates a fresh
-   [block_store] in directory [chain_dir] and stores the
+(** [create ?block_cache_limit ~chain_dir ~genesis_block] instantiates
+   a fresh [block_store] in directory [chain_dir] and stores the
    [genesis_block] in it. It fails if the given [chain_dir] is already
-   populated.*)
+   populated. Setting the [block_cache_limit] allows to override the
+   default block cache size. *)
 val create :
+  ?block_cache_limit:int ->
   [`Chain_dir] Naming.directory ->
   genesis_block:Block_repr.t ->
   block_store tzresult Lwt.t
 
-(** [load chain_dir ~genesis_block ~readonly] loads an existing
-    block_store from directory [chain_dir]. Setting [readonly] will
-    prevent new blocks from being stored. *)
+(** [load ?block_cache_limit chain_dir ~genesis_block ~readonly] loads
+   an existing block_store from directory [chain_dir]. Setting
+   [readonly] will prevent new blocks from being stored. Setting the
+   [block_cache_limit] allows to override the default block cache
+   size. *)
 val load :
+  ?block_cache_limit:int ->
   [`Chain_dir] Naming.directory ->
   genesis_block:Block_repr.t ->
   readonly:bool ->
