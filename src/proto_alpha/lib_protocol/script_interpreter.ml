@@ -1433,13 +1433,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* Tickets *)
       | ITicket (_, k) ->
           let contents = accu and (amount, stack) = stack in
-          let ticketer = (sc.self, "default") in
+          let ticketer = sc.self in
           let accu = {ticketer; contents; amount} in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IRead_ticket (_, k) ->
           let {ticketer; contents; amount} = accu in
           let stack = (accu, stack) in
-          let accu = (ticketer, (contents, amount)) in
+          let accu = ((ticketer, "default"), (contents, amount)) in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | ISplit_ticket (_, k) ->
           let ticket = accu and ((amount_a, amount_b), stack) = stack in
@@ -1459,10 +1459,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let result =
             if
               Compare.Int.(
-                Script_comparable.compare_address
-                  ticket_a.ticketer
-                  ticket_b.ticketer
-                = 0
+                Contract.compare ticket_a.ticketer ticket_b.ticketer = 0
                 && Script_comparable.compare_comparable
                      contents_ty
                      ticket_a.contents

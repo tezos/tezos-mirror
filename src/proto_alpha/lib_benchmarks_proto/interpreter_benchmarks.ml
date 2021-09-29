@@ -2707,9 +2707,8 @@ module Registration_section = struct
       let ticket =
         {
           ticketer =
-            ( Alpha_context.Contract.implicit_contract
-                Environment.Signature.Public_key_hash.zero,
-              "" );
+            Alpha_context.Contract.implicit_contract
+              Environment.Signature.Public_key_hash.zero;
           contents = ();
           amount = zero;
         }
