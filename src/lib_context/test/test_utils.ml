@@ -41,7 +41,7 @@ let check_invalid_arg pos f =
 
 module Small_list = struct
   module Small_list = struct
-    include Tezos_context.Utils.Small_list
+    include Tezos_context.Internal_for_tests.Utils.Small_list
 
     let to_list sl =
       let acc = ref [] in
@@ -88,7 +88,7 @@ module Small_list = struct
 end
 
 module Arena = struct
-  module Arena = Tezos_context.Utils.Arena
+  module Arena = Tezos_context.Internal_for_tests.Utils.Arena
 
   let test_is_full () =
     let arena = Arena.create ~elt_length:1 ~initial_capacity:0 in
@@ -166,7 +166,7 @@ module Arena = struct
 end
 
 module String_set = struct
-  module String_set = Tezos_context.Utils.String_set
+  module String_set = Tezos_context.Internal_for_tests.Utils.String_set
 
   let test_simple () =
     let set = String_set.create ~elt_length:1 ~initial_capacity:0 in

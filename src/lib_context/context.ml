@@ -1383,7 +1383,3 @@ let validate_context_hash_consistency_and_commit ~data_hash
     let ctxt_h = Hash.to_context_hash (Store.Commit.hash commit) in
     Context_hash.equal ctxt_h expected_context_hash
   else Lwt.return_false
-
-module Private = struct
-  module Utils = Utils
-end
