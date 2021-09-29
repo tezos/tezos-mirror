@@ -252,8 +252,6 @@ let raw_context_insert =
   in
   aux
 
-type error += Invalid_depth_arg of int
-
 type merkle_hash_kind = Contents | Node
 
 type merkle_node =
@@ -342,18 +340,6 @@ let merkle_tree_encoding : merkle_tree Data_encoding.t =
                (function Continue dir -> Some dir | _ -> None)
                (fun dir -> Continue dir);
            ]))
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"raw_context.invalid_depth"
-    ~title:"Invalid depth argument"
-    ~description:"The raw context extraction depth argument must be positive."
-    ~pp:(fun ppf depth ->
-      Format.fprintf ppf "Extraction depth %d is invalid" depth)
-    Data_encoding.(obj1 (req "depth" int31))
-    (function Invalid_depth_arg depth -> Some depth | _ -> None)
-    (fun depth -> Invalid_depth_arg depth)
 
 module type PROTO = sig
   val hash : Protocol_hash.t

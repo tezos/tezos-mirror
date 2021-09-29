@@ -94,8 +94,6 @@ val pp_raw_context : Format.formatter -> raw_context -> unit
     If [k] collides to a existing sub-tree in [c], the sub-tree is replaced by a new key-value pair. *)
 val raw_context_insert : string list * raw_context -> raw_context -> raw_context
 
-type error += Invalid_depth_arg of int
-
 (** The kind of a [merkle_node] *)
 type merkle_hash_kind =
   | Contents  (** The kind associated to leaves *)
