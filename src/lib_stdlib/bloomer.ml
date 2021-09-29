@@ -156,7 +156,7 @@ let%test_unit "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
               ints
           done)
     in
-    assert (unsafe_result <> check_result)
+    assert (unsafe_result = check_result)
   done
 
 let%test_unit "sequential_read_writes" =
