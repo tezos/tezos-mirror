@@ -75,6 +75,8 @@ let () =
   Baking.register ~protocols:[Alpha] ;
   Mempool.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
+  (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
+  Encoding.register ~protocols:[Alpha; Granada] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   Light.register_protocol_independent () ;
@@ -85,7 +87,6 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  Encoding.register () ;
   RPC_test.register () ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
