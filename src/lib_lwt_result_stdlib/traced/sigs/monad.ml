@@ -30,7 +30,7 @@
       [Trace] module ([with type 'error trace := 'error Trace.trace]).
     - The functions [error_trace] and [fail_trace] allow failing immediately
       with a trace-wrapped error.
-    - [{join,all,both}_{e,ep}] return ['error trace] rather than ['error list].
+    - [{join,all,both}] return ['error trace] rather than ['error list].
     *)
 module type S = sig
   (** Most of it is defined in the non-traced monad. The rest is trace-specific,
@@ -43,112 +43,119 @@ module type S = sig
 
   (** {2 The traced Result monad: for success and traced failure}
 
-      The [TracedResult] module is similar to the [Result] module with the
+      The [Traced_result_syntax] module is similar to the [Result_syntax] module with the
       following differences:
-      - only the monadic-core is exposed (no [iter], no [is_ok], etc.; you
-        need to manipulate the values explicitly to achieve that), and
-      - all the returned [result] carry ['e trace] in their [Error] constructor
-        (including [fail] which wraps the provided error into a singleton
-        trace).
+      - [fail] wraps the error in a trace,
+      - [and*] and [and+] are provided
+
+      See {!Result_syntax}.
     *)
-  module TracedResult : sig
-    val return : 'a -> ('a, 'error trace) result
+  module Traced_result_syntax : sig
+    val return : 'a -> ('a, 'error) result
 
-    val return_unit : (unit, 'error trace) result
+    val return_unit : (unit, 'error) result
 
-    val return_none : ('a option, 'error trace) result
+    val return_none : ('a option, 'error) result
 
-    val return_some : 'a -> ('a option, 'error trace) result
+    val return_some : 'a -> ('a option, 'error) result
 
-    val return_nil : ('a list, 'error trace) result
+    val return_nil : ('a list, 'error) result
 
-    val return_true : (bool, 'error trace) result
+    val return_true : (bool, 'error) result
 
-    val return_false : (bool, 'error trace) result
+    val return_false : (bool, 'error) result
 
-    (** [fail e] is [Error (Trace.make e)] where [Trace] is the
-      {!Traced_sigs.Trace} module that provides the trace type and functions. *)
+    (** [fail e] is [(Error (Trace.make e))] where [Trace] is the
+      {!Traced_sigs.Trace} module that provides the trace type and functions.
+      *)
     val fail : 'error -> ('a, 'error trace) result
 
-    val bind :
+    val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+    val ( and* ) :
+      ('a, 'e trace) result ->
+      ('b, 'e trace) result ->
+      ('a * 'b, 'e trace) result
+
+    val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+
+    val ( and+ ) :
+      ('a, 'e trace) result ->
+      ('b, 'e trace) result ->
+      ('a * 'b, 'e trace) result
+
+    val join : (unit, 'error trace) result list -> (unit, 'error trace) result
+
+    val all : ('a, 'error trace) result list -> ('a list, 'error trace) result
+
+    val both :
       ('a, 'error trace) result ->
-      ('a -> ('b, 'error trace) result) ->
-      ('b, 'error trace) result
-
-    val map :
-      ('a -> 'b) -> ('a, 'error trace) result -> ('b, 'error trace) result
-
-    val iter : ('a -> unit) -> ('a, 'error trace) result -> unit
+      ('b, 'error trace) result ->
+      ('a * 'b, 'error trace) result
   end
-
-  (** [error_trace e] is the monad-global alias for [TracedResult.fail e]. *)
-  val error_trace : 'error -> ('a, 'error trace) result
 
   (** {2 The Lwt traced Result monad: for concurrent successes and traced failures}
 
-      The [LwtTracedResult] module is similar to the [LwtResult] module with the
+      The [Lwt_traced_result_syntax] module is similar to the [Lwt_result_syntax] module with the
       following difference:
-      - all the returned [result] carry ['e trace] in their [Error] constructor
-        (including [fail] which wraps the provided error into a singleton
-        trace).
+      - [fail] wraps the error in a trace,
+      - [and*] and [and+] are provided.
+
+      See {!Lwt_result_syntax}.
   *)
-  module LwtTracedResult : sig
-    val return : 'a -> ('a, 'error trace) result Lwt.t
+  module Lwt_traced_result_syntax : sig
+    val return : 'a -> ('a, 'error) result Lwt.t
 
-    val return_unit : (unit, 'error trace) result Lwt.t
+    val return_unit : (unit, 'error) result Lwt.t
 
-    val return_none : ('a option, 'error trace) result Lwt.t
+    val return_none : ('a option, 'error) result Lwt.t
 
-    val return_some : 'a -> ('a option, 'error trace) result Lwt.t
+    val return_some : 'a -> ('a option, 'error) result Lwt.t
 
-    val return_nil : ('a list, 'error trace) result Lwt.t
+    val return_nil : ('a list, 'error) result Lwt.t
 
-    val return_true : (bool, 'error trace) result Lwt.t
+    val return_true : (bool, 'error) result Lwt.t
 
-    val return_false : (bool, 'error trace) result Lwt.t
+    val return_false : (bool, 'error) result Lwt.t
 
     (** [fail e] is [Lwt.return (Error (Trace.make e))] where [Trace] is the
       {!Traced_sigs.Trace} module that provides the trace type and functions.
       *)
     val fail : 'error -> ('a, 'error trace) result Lwt.t
 
-    val bind :
-      ('a, 'error trace) result Lwt.t ->
-      ('a -> ('b, 'error trace) result Lwt.t) ->
-      ('b, 'error trace) result Lwt.t
+    val ( let* ) :
+      ('a, 'e) result Lwt.t ->
+      ('a -> ('b, 'e) result Lwt.t) ->
+      ('b, 'e) result Lwt.t
 
-    val map :
-      ('a -> 'b) ->
+    val ( and* ) :
+      ('a, 'e trace) result Lwt.t ->
+      ('b, 'e trace) result Lwt.t ->
+      ('a * 'b, 'e trace) result Lwt.t
+
+    val ( let+ ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+
+    val ( and+ ) :
+      ('a, 'e trace) result Lwt.t ->
+      ('b, 'e trace) result Lwt.t ->
+      ('a * 'b, 'e trace) result Lwt.t
+
+    val lwt_ok : 'a Lwt.t -> ('a, 'e) result Lwt.t
+
+    val bind_from_result :
+      ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+    val join :
+      (unit, 'error trace) result Lwt.t list ->
+      (unit, 'error trace) result Lwt.t
+
+    val all :
+      ('a, 'error trace) result Lwt.t list ->
+      ('a list, 'error trace) result Lwt.t
+
+    val both :
       ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t
+      ('b, 'error trace) result Lwt.t ->
+      ('a * 'b, 'error trace) result Lwt.t
   end
-
-  (** [fail_trace e] is the monad-global alias for [LwtTracedResult.fail e]. *)
-  val fail_trace : 'error -> ('a, 'error trace) result Lwt.t
-
-  (** {1 Joins}
-
-      Joins are similar to the non-traced monad's functions of the same names.
-      The difference is that failures that are joined together are grouped in a
-      traced (using [Trace.conp]/[Trace.conp_list]) rather than returned as a
-      list. *)
-  val join_e : (unit, 'error trace) result list -> (unit, 'error trace) result
-
-  val all_e : ('a, 'error trace) result list -> ('a list, 'error trace) result
-
-  val both_e :
-    ('a, 'error trace) result ->
-    ('b, 'error trace) result ->
-    ('a * 'b, 'error trace) result
-
-  val join_ep :
-    (unit, 'error trace) result Lwt.t list -> (unit, 'error trace) result Lwt.t
-
-  val all_ep :
-    ('a, 'error trace) result Lwt.t list -> ('a list, 'error trace) result Lwt.t
-
-  val both_ep :
-    ('a, 'error trace) result Lwt.t ->
-    ('b, 'error trace) result Lwt.t ->
-    ('a * 'b, 'error trace) result Lwt.t
 end

@@ -94,22 +94,51 @@ module type S = sig
     'a t ->
     (unit, 'error list) result Lwt.t
 
+  (** [fold f m init] is
+{[
+let acc = f k1 d1 init in
+let acc = f k2 d2 acc in
+let acc = f k3 d3 acc in
+…
+]}
+      where [kN] is the key bound to [dN] in [m]. *)
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   (** [fold_e f m init] is
-      [f k1 d1 init >>? fun acc -> f k2 d2 acc >>? fun acc -> …] where [kN] is
-      the key bound to [dN] in [m]. *)
+{[
+let open Result_syntax in
+let* acc = f k1 d1 init in
+let* acc = f k2 d2 acc in
+let* acc = f k3 d3 acc in
+…
+]}
+      where [kN] is the key bound to [dN] in [m]. *)
   val fold_e :
     (key -> 'a -> 'b -> ('b, 'trace) result) ->
     'a t ->
     'b ->
     ('b, 'trace) result
 
+  (** [fold_s f m init] is
+{[
+let open Lwt_syntax in
+let* acc = f k1 d1 init in
+let* acc = f k2 d2 acc in
+let* acc = f k3 d3 acc in
+…
+]}
+      where [kN] is the key bound to [dN] in [m]. *)
   val fold_s : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
 
   (** [fold_es f m init] is
-      [f k1 d1 init >>=? fun acc -> f k2 d2 acc >>=? fun acc -> …] where [kN] is
-      the key bound to [dN] in [m]. *)
+{[
+let open Lwt_result_syntax in
+let* acc = f k1 d1 init in
+let* acc = f k2 d2 acc in
+let* acc = f k3 d3 acc in
+…
+]}
+      where [kN] is the key bound to [dN] in [m]. *)
   val fold_es :
     (key -> 'a -> 'b -> ('b, 'trace) result Lwt.t) ->
     'a t ->

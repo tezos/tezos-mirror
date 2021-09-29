@@ -29,49 +29,62 @@ module Make (Trace : Traced_sigs.Trace.S) :
 
   type 'error trace = 'error Trace.trace
 
-  let error_trace e = error (Trace.make e)
+  module Traced_result_syntax = struct
+    include Result_syntax
 
-  let fail_trace e = fail (Trace.make e)
+    let (fail[@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
 
-  module TracedResult = struct
-    include Result
+    let rec join_errors trace_acc = function
+      | Ok _ :: ts -> join_errors trace_acc ts
+      | Error trace :: ts -> join_errors (Trace.conp trace_acc trace) ts
+      | [] -> Error trace_acc
 
-    let fail x = error_trace x
+    let rec join = function
+      | [] -> Result_syntax.return_unit
+      | Ok () :: ts -> join ts
+      | Error trace :: ts -> join_errors trace ts
+
+    let all ts =
+      let rec aux acc = function
+        | [] -> Ok (Stdlib.List.rev acc)
+        | Ok v :: ts -> aux (v :: acc) ts
+        | Error trace :: ts -> join_errors trace ts
+      in
+      aux [] ts
+
+    let both a b =
+      match (a, b) with
+      | (Ok a, Ok b) -> Ok (a, b)
+      | (Error err, Ok _) | (Ok _, Error err) -> Error err
+      | (Error erra, Error errb) -> Error (Trace.conp erra errb)
+
+    let ( and* ) = both
+
+    let ( and+ ) = both
   end
 
-  module LwtTracedResult = struct
-    include LwtResult
+  module Lwt_traced_result_syntax = struct
+    include Lwt_result_syntax
 
-    let fail x = fail_trace x
+    let (fail[@ocaml.inline "always"]) = fun e -> fail (Trace.make e)
+
+    let join ts =
+      let open Lwt_syntax in
+      let+ ps = all ts in
+      Traced_result_syntax.join ps
+
+    let all ts =
+      let open Lwt_syntax in
+      let+ ps = all ts in
+      Traced_result_syntax.all ps
+
+    let both a b =
+      let open Lwt_syntax in
+      let+ (a, b) = both a b in
+      Traced_result_syntax.both a b
+
+    let ( and* ) = both
+
+    let ( and+ ) = both
   end
-
-  let rec join_e_errors trace_acc = function
-    | Ok _ :: ts -> join_e_errors trace_acc ts
-    | Error trace :: ts -> join_e_errors (Trace.conp trace_acc trace) ts
-    | [] -> Error trace_acc
-
-  let rec join_e = function
-    | [] -> Result.return_unit
-    | Ok () :: ts -> join_e ts
-    | Error trace :: ts -> join_e_errors trace ts
-
-  let all_e ts =
-    let rec aux acc = function
-      | [] -> Ok (Stdlib.List.rev acc)
-      | Ok v :: ts -> aux (v :: acc) ts
-      | Error trace :: ts -> join_e_errors trace ts
-    in
-    aux [] ts
-
-  let both_e a b =
-    match (a, b) with
-    | (Ok a, Ok b) -> Ok (a, b)
-    | (Error err, Ok _) | (Ok _, Error err) -> Error err
-    | (Error erra, Error errb) -> Error (Trace.conp erra errb)
-
-  let join_ep ts = all_p ts >|= join_e
-
-  let all_ep ts = all_p ts >|= all_e
-
-  let both_ep a b = both_p a b >|= fun (a, b) -> both_e a b
 end

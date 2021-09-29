@@ -23,26 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
-
 type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e
-
-(* Monad returns (positive, negative, and pre-allocated) *)
-let return x = Ok x
-
-let fail x = Error x
-
-let return_unit = Ok ()
-
-let return_none = Ok None
-
-let return_some x = Ok (Some x)
-
-let return_nil = Ok []
-
-let return_true = Ok true
-
-let return_false = Ok false
 
 (* constructors as functions, including _s variants *)
 let ok x = Ok x
@@ -57,7 +38,7 @@ let value r ~default = match r with Ok v -> v | Error _ -> default
 
 let value_f r ~default = match r with Ok v -> v | Error _ -> default ()
 
-let bind r f = match r with Ok v -> f v | Error _ as error -> error
+let bind = Stdlib.Result.bind
 
 let bind_s r f =
   match r with Ok v -> f v | Error _ as error -> Lwt.return error
@@ -76,7 +57,7 @@ let map f = function Ok v -> Ok (f v) | Error _ as error -> error
 let map_e f r = bind r f
 
 let map_s f = function
-  | Ok v -> f v >>= fun v -> Lwt.return (Ok v)
+  | Ok v -> Lwt.bind (f v) Lwt.return_ok
   | Error _ as error -> Lwt.return error
 
 let map_es f r = bind_s r f
@@ -86,8 +67,8 @@ let map_error f = function Ok _ as ok -> ok | Error e -> Error (f e)
 let map_error_e f r = bind_error r f
 
 let map_error_s f = function
-  | Ok v -> Lwt.return (Ok v)
-  | Error e -> f e >>= fun e -> Lwt.return (Error e)
+  | Ok v -> Lwt.return_ok v
+  | Error e -> Lwt.bind (f e) Lwt.return_error
 
 let map_error_es f r = bind_error_s r f
 
@@ -150,3 +131,17 @@ let catch_s ?(catch_only = fun _ -> true) f =
   Lwt.try_bind f Lwt.return_ok (function
       | (Stack_overflow | Out_of_memory) as e -> raise e
       | e -> if catch_only e then Lwt.return_error e else raise e)
+
+let return x = Ok x
+
+let return_unit = Ok ()
+
+let return_none = Ok None
+
+let return_some x = Ok (Some x)
+
+let return_nil = Ok []
+
+let return_true = Ok true
+
+let return_false = Ok false
