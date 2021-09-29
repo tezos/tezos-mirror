@@ -67,7 +67,8 @@ module Configuration = struct
       ]
 
   let of_file path =
-    Lwt_utils_unix.Json.read_file path >>=? fun json ->
+    let open Lwt_tzresult_syntax in
+    let* json = Lwt_utils_unix.Json.read_file path in
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 
   let apply {active_sinks} =
@@ -89,35 +90,42 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
       File_event_sink.Sink_implementation.uri_scheme;
     ]
   in
-  Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink () >>= fun () ->
-  ( (match Sys.(getenv_opt env_var_name) with
-    | None -> return_unit
-    | Some s ->
-        let uris =
-          TzString.split ' ' s
-          |> List.map (TzString.split '\n')
-          |> List.concat
-          |> List.map (TzString.split '\t')
-          |> List.concat
-          |> List.filter (( <> ) "")
-          |> List.map Uri.of_string
-        in
-        List.iter_es
-          (fun uri ->
-            match Uri.scheme uri with
-            | None ->
-                Configuration.of_file (Uri.path uri) >>=? fun cfg ->
-                Configuration.apply cfg
-            | Some _ -> Internal_event.All_sinks.activate uri)
-          uris
-        >>=? fun () ->
-        Internal_event.Debug_event.(
-          emit
-            (make
-               "Loaded URIs from environment"
-               ~attach:
-                 (`O [("variable", `String env_var_name); ("value", `String s)]))))
-  >>=? fun () -> Configuration.apply configuration )
+  Lwt_tzresult_syntax.(
+    let* () =
+      Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
+    in
+    let* () =
+      match Sys.(getenv_opt env_var_name) with
+      | None -> return_unit
+      | Some s ->
+          let uris =
+            TzString.split ' ' s
+            |> List.map (TzString.split '\n')
+            |> List.concat
+            |> List.map (TzString.split '\t')
+            |> List.concat
+            |> List.filter (( <> ) "")
+            |> List.map Uri.of_string
+          in
+          let* () =
+            List.iter_es
+              (fun uri ->
+                match Uri.scheme uri with
+                | None ->
+                    let* cfg = Configuration.of_file (Uri.path uri) in
+                    Configuration.apply cfg
+                | Some _ -> Internal_event.All_sinks.activate uri)
+              uris
+          in
+          Internal_event.Debug_event.(
+            emit
+              (make
+                 "Loaded URIs from environment"
+                 ~attach:
+                   (`O
+                     [("variable", `String env_var_name); ("value", `String s)])))
+    in
+    Configuration.apply configuration)
   >>= function
   | Ok () -> Lwt.return_unit
   | Error el ->

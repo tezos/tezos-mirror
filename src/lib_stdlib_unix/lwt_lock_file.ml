@@ -28,26 +28,32 @@ open Error_monad
 
 let try_with_lock ~when_locked ~filename f =
   protect (fun () ->
+      let open Lwt_tzresult_syntax in
       let flags =
         let open Unix in
         [O_CLOEXEC; O_TRUNC; O_CREAT; O_WRONLY]
       in
-      Lwt_unix.openfile filename flags 0o644 >>= fun fd ->
+      let* fd = Lwt_result.ok @@ Lwt_unix.openfile filename flags 0o644 in
       Lwt.finalize
         (fun () ->
-          Lwt.catch
-            (fun () ->
-              Lwt_unix.lockf fd Unix.F_TLOCK 0 >>= fun () -> return `Free)
-            (function
-              | Unix.Unix_error ((EAGAIN | EACCES | EDEADLK), _, _) ->
-                  return `Locked
-              | exn -> fail (Exn exn))
-          >>=? function
+          let* lock_status =
+            Lwt.catch
+              (fun () ->
+                let* () = Lwt_result.ok @@ Lwt_unix.lockf fd Unix.F_TLOCK 0 in
+                return `Free)
+              (function
+                | Unix.Unix_error ((EAGAIN | EACCES | EDEADLK), _, _) ->
+                    return `Locked
+                | exn -> fail (Exn exn))
+          in
+          match lock_status with
           | `Locked -> when_locked ()
           | `Free ->
               let pid_str = string_of_int (Unix.getpid ()) in
-              Lwt_unix.write_string fd pid_str 0 (String.length pid_str)
-              >>= fun _ ->
+              let* (_ : int) =
+                Lwt_result.ok
+                @@ Lwt_unix.write_string fd pid_str 0 (String.length pid_str)
+              in
               Lwt.finalize
                 (fun () -> f ())
                 (fun () -> Lwt_unix.lockf fd Unix.F_ULOCK 0))

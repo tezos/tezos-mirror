@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 exception Closed
 
@@ -100,7 +100,9 @@ module Bounded = struct
         q.current_size <- current_size + elt_size ;
         notify_push q ;
         Lwt.return_unit)
-      else wait_pop q >>= fun () -> push q elt
+      else
+        let* () = wait_pop q in
+        push q elt
 
   let push_now ({closed; queue; compute_size; current_size; max_size; _} as q)
       elt =
@@ -120,19 +122,23 @@ module Bounded = struct
       q.current_size <- current_size - elt_size ;
       Lwt.return elt)
     else if closed then Lwt.fail Closed
-    else wait_push q >>= fun () -> pop q
+    else
+      let* () = wait_push q in
+      pop q
 
   let rec pop_with_timeout timeout q =
     if not (Queue.is_empty q.queue) then (
       Lwt.cancel timeout ;
-      pop q >>= Lwt.return_some)
+      let* v = pop q in
+      Lwt.return_some v)
     else if Lwt.is_sleeping timeout then
       if q.closed then (
         Lwt.cancel timeout ;
         Lwt.fail Closed)
       else
         let waiter = wait_push q in
-        Lwt.pick [timeout; waiter] >>= fun () -> pop_with_timeout timeout q
+        let* () = Lwt.pick [timeout; waiter] in
+        pop_with_timeout timeout q
     else Lwt.return_none
 
   let rec peek ({closed; queue; _} as q) =
@@ -140,7 +146,9 @@ module Bounded = struct
       let (_elt_size, elt) = Queue.peek queue in
       Lwt.return elt
     else if closed then Lwt.fail Closed
-    else wait_push q >>= fun () -> peek q
+    else
+      let* () = wait_push q in
+      peek q
 
   let peek_all_now {queue; closed; _} =
     if not (Queue.is_empty queue) then
@@ -175,7 +183,7 @@ module Bounded = struct
       Lwt.return (List.map snd elements))
     else if q.closed then Lwt.fail Closed
     else
-      wait_push q >>= fun () ->
+      let* () = wait_push q in
       let (_, element) = Queue.pop q.queue in
       q.current_size <- 0 ;
       notify_pop q ;
@@ -236,25 +244,31 @@ module Unbounded = struct
   let rec pop ({closed; queue; _} as q) =
     if not (Queue.is_empty queue) then Lwt.return @@ Queue.pop queue
     else if closed then Lwt.fail Closed
-    else wait_push q >>= fun () -> pop q
+    else
+      let* () = wait_push q in
+      pop q
 
   let rec pop_with_timeout timeout q =
     if not (Queue.is_empty q.queue) then (
       Lwt.cancel timeout ;
-      pop q >>= Lwt.return_some)
+      let* v = pop q in
+      Lwt.return_some v)
     else if Lwt.is_sleeping timeout then
       if q.closed then (
         Lwt.cancel timeout ;
         Lwt.fail Closed)
       else
         let waiter = wait_push q in
-        Lwt.pick [timeout; waiter] >>= fun () -> pop_with_timeout timeout q
+        let* () = Lwt.pick [timeout; waiter] in
+        pop_with_timeout timeout q
     else Lwt.return_none
 
   let rec peek ({closed; queue; _} as q) =
     if not (Queue.is_empty queue) then Lwt.return @@ Queue.peek queue
     else if closed then Lwt.fail Closed
-    else wait_push q >>= fun () -> peek q
+    else
+      let* () = wait_push q in
+      peek q
 
   let peek_all_now {queue; closed; _} =
     if not (Queue.is_empty queue) then
@@ -281,7 +295,7 @@ module Unbounded = struct
     if not (Queue.is_empty q.queue) then Lwt.return @@ pop_all_queue q.queue
     else if q.closed then Lwt.fail Closed
     else
-      wait_push q >>= fun () ->
+      let* () = wait_push q in
       let element = Queue.pop q.queue in
       Lwt.return [element]
 

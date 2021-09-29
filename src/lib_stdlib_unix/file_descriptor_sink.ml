@@ -77,6 +77,7 @@ end) : Internal_event.SINK with type t = t = struct
     | `Stderr -> "file-descriptor-stderr"
 
   let configure uri =
+    let open Lwt_tzresult_syntax in
     let fail_parsing fmt =
       Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
     in
@@ -88,109 +89,113 @@ end) : Internal_event.SINK with type t = t = struct
       in
       match all with [] -> None | more -> Some (List.concat more)
     in
-    (match (Uri.get_query_param uri "level-at-least", section_prefixes) with
-    | (None, None) -> return (`Level_at_least Internal_event.Level.default)
-    | (Some l, None) -> (
-        match Internal_event.Level.of_string l with
-        | Some l -> return (`Level_at_least l)
-        | None -> fail_parsing "Wrong level: %S" l)
-    | (base_level, Some l) -> (
-        try
-          let sections =
-            let parse_section s =
-              match String.split_on_char ':' s with
-              | [one] ->
-                  ( Internal_event.Section.make_sanitized
-                      (String.split_on_char '.' one),
-                    Internal_event.Level.default )
-              | [one; two] ->
-                  let lvl =
-                    match Internal_event.Level.of_string two with
-                    | Some s -> s
-                    | None ->
-                        Format.kasprintf
-                          Stdlib.failwith
-                          "Wrong level name: %S in argument %S"
-                          two
-                          s
-                  in
-                  let section =
-                    match one with
-                    | "" -> Internal_event.Section.empty
-                    | _ ->
-                        Internal_event.Section.make_sanitized
-                          (String.split_on_char '.' one)
-                  in
-                  (section, lvl)
-              | _ ->
-                  Format.kasprintf
-                    Stdlib.failwith
-                    "Wrong section-level entry: %S"
-                    s
-            in
-            let pairs = List.map parse_section l in
-            match base_level with
-            | None -> pairs
-            | Some lvl -> (
-                match Internal_event.Level.of_string lvl with
-                | Some l -> (Internal_event.Section.empty, l) :: pairs
-                | None ->
+    let* filter =
+      match (Uri.get_query_param uri "level-at-least", section_prefixes) with
+      | (None, None) -> return (`Level_at_least Internal_event.Level.default)
+      | (Some l, None) -> (
+          match Internal_event.Level.of_string l with
+          | Some l -> return (`Level_at_least l)
+          | None -> fail_parsing "Wrong level: %S" l)
+      | (base_level, Some l) -> (
+          try
+            let sections =
+              let parse_section s =
+                match String.split_on_char ':' s with
+                | [one] ->
+                    ( Internal_event.Section.make_sanitized
+                        (String.split_on_char '.' one),
+                      Internal_event.Level.default )
+                | [one; two] ->
+                    let lvl =
+                      match Internal_event.Level.of_string two with
+                      | Some s -> s
+                      | None ->
+                          Format.kasprintf
+                            Stdlib.failwith
+                            "Wrong level name: %S in argument %S"
+                            two
+                            s
+                    in
+                    let section =
+                      match one with
+                      | "" -> Internal_event.Section.empty
+                      | _ ->
+                          Internal_event.Section.make_sanitized
+                            (String.split_on_char '.' one)
+                    in
+                    (section, lvl)
+                | _ ->
                     Format.kasprintf
                       Stdlib.failwith
-                      "Wrong level name %S in level-at-least argument"
-                      lvl)
-          in
-          return (`Per_section_prefix sections)
-        with Failure s -> fail_parsing "%s" s))
-    >>=? fun filter ->
-    (match Uri.get_query_param uri "format" with
-    | Some "netstring" -> return `Netstring
-    | Some "pp" -> return `Pp
-    | None | Some "one-per-line" -> return `One_per_line
-    | Some other -> fail_parsing "Unknown format: %S" other)
-    >>=? fun format ->
-    (match K.kind with
-    | `Path -> (
-        let flag name =
-          match Uri.get_query_param uri name with
-          | Some "true" -> true
-          | _ -> false
-        in
-        let with_pid = flag "with-pid" in
-        let fresh = flag "fresh" in
-        (match Uri.get_query_param uri "chmod" with
-        | Some n -> (
-            match int_of_string_opt n with
-            | Some i -> return i
-            | None ->
-                fail_parsing
-                  "Access-rights parameter should be an integer: %S"
-                  n)
-        | None -> return 0o600)
-        >>=? fun rights ->
-        match Uri.path uri with
-        | "" | "/" -> fail_parsing "Missing path configuration."
-        | path ->
-            let fixed_path =
-              if with_pid then
-                let ext = Filename.extension path in
-                let chopped =
-                  if ext = "" then path else Filename.chop_extension path
-                in
-                Format.asprintf "%s-%d%s" chopped (Unix.getpid ()) ext
-              else path
+                      "Wrong section-level entry: %S"
+                      s
+              in
+              let pairs = List.map parse_section l in
+              match base_level with
+              | None -> pairs
+              | Some lvl -> (
+                  match Internal_event.Level.of_string lvl with
+                  | Some l -> (Internal_event.Section.empty, l) :: pairs
+                  | None ->
+                      Format.kasprintf
+                        Stdlib.failwith
+                        "Wrong level name %S in level-at-least argument"
+                        lvl)
             in
-            protect (fun () ->
-                Lwt_unix.(
-                  let flags =
-                    [O_WRONLY; O_CREAT]
-                    @ if fresh then [O_TRUNC] else [O_APPEND]
+            return (`Per_section_prefix sections)
+          with Failure s -> fail_parsing "%s" s)
+    in
+    let* format =
+      match Uri.get_query_param uri "format" with
+      | Some "netstring" -> return `Netstring
+      | Some "pp" -> return `Pp
+      | None | Some "one-per-line" -> return `One_per_line
+      | Some other -> fail_parsing "Unknown format: %S" other
+    in
+    let* output =
+      match K.kind with
+      | `Path -> (
+          let flag name =
+            match Uri.get_query_param uri name with
+            | Some "true" -> true
+            | _ -> false
+          in
+          let with_pid = flag "with-pid" in
+          let fresh = flag "fresh" in
+          let* rights =
+            match Uri.get_query_param uri "chmod" with
+            | Some n -> (
+                match int_of_string_opt n with
+                | Some i -> return i
+                | None ->
+                    fail_parsing
+                      "Access-rights parameter should be an integer: %S"
+                      n)
+            | None -> return 0o600
+          in
+          match Uri.path uri with
+          | "" | "/" -> fail_parsing "Missing path configuration."
+          | path ->
+              let fixed_path =
+                if with_pid then
+                  let ext = Filename.extension path in
+                  let chopped =
+                    if ext = "" then path else Filename.chop_extension path
                   in
-                  openfile fixed_path flags rights)
-                >>= fun fd -> return fd))
-    | `Stdout -> return Lwt_unix.stdout
-    | `Stderr -> return Lwt_unix.stderr)
-    >>=? fun output ->
+                  Format.asprintf "%s-%d%s" chopped (Unix.getpid ()) ext
+                else path
+              in
+              protect (fun () ->
+                  lwt_ok
+                  @@ Lwt_unix.(
+                       let flags =
+                         [O_WRONLY; O_CREAT]
+                         @ if fresh then [O_TRUNC] else [O_APPEND]
+                       in
+                       openfile fixed_path flags rights)))
+      | `Stdout -> return Lwt_unix.stdout
+      | `Stderr -> return Lwt_unix.stderr
+    in
     let t = {output; lwt_bad_citizen_hack = ref []; filter; format} in
     return t
 
@@ -198,9 +203,9 @@ end) : Internal_event.SINK with type t = t = struct
 
   let output_one output to_write =
     protect (fun () ->
-        Lwt_mutex.with_lock write_mutex (fun () ->
-            Lwt_utils_unix.write_string output to_write)
-        >>= fun () -> return_unit)
+        Lwt_result.ok
+        @@ Lwt_mutex.with_lock write_mutex (fun () ->
+               Lwt_utils_unix.write_string output to_write))
 
   let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
@@ -252,25 +257,27 @@ end) : Internal_event.SINK with type t = t = struct
             Format.asprintf "%d:%s," (String.length bytes) bytes
       in
       lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
-      output_one output to_write >>= function
-      | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
-          (* The file descriptor was closed before the event arrived,
-             ignore it. *)
-          return_unit
-      | Error _ as err -> Lwt.return err
-      | Ok () ->
-          lwt_bad_citizen_hack :=
-            List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
-          return_unit)
+      Lwt.bind (output_one output to_write) (function
+          | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
+              (* The file descriptor was closed before the event arrived,
+                 ignore it. *)
+              return_unit
+          | Error _ as err -> Lwt.return err
+          | Ok () ->
+              lwt_bad_citizen_hack :=
+                List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
+              return_unit))
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; _} =
-    List.iter_es
-      (fun event_string -> output_one output event_string)
-      !lwt_bad_citizen_hack
-    >>=? fun () ->
+    let open Lwt_tzresult_syntax in
+    let* () =
+      List.iter_es
+        (fun event_string -> output_one output event_string)
+        !lwt_bad_citizen_hack
+    in
     match K.kind with
-    | `Path -> Lwt_unix.close output >>= fun () -> return_unit
+    | `Path -> lwt_ok @@ Lwt_unix.close output
     | `Stdout | `Stderr -> return_unit
 end
 
