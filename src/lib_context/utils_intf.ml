@@ -45,7 +45,8 @@ module type Arena = sig
   (** [allocate t s] adds the string [s] to arena [t], returning a reference to
       the storage location that may later be {!dereference}d to get back [s].
 
-      @raise Invalid_argument if [t] {!is_full} or if [s] has incorrect length. *)
+      @raise Invalid_argument if [t] {!is_full}. The behaviour is undefined if
+      the length of [s] is not equal to the [elt_length] of [t]. *)
   val allocate : t -> string -> id
 
   (** [dereference t id] is the string that was passed to the {!allocate} call

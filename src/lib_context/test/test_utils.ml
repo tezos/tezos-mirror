@@ -138,6 +138,8 @@ module Arena = struct
       let elt_length = 50 in
       let arena = Arena.create ~elt_length ~initial_capacity:2 in
       let elt = String.make elt_length 'x' in
+      (* Allocate a string of length 50 at offset 0, then another string
+         immediately after it, returning a pointer to offset 50. *)
       let (_ : Arena.id) = Arena.allocate arena elt in
       Arena.allocate arena elt
     in
