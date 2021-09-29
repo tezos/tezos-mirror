@@ -174,17 +174,17 @@ type chain_store
 
 (** {3 Initialization} *)
 
-(** [init ?patch_context ?commit_genesis ?history_mode ~store_dir
-    ~context_dir ~allow_testchains genesis] initializes the store and
-    a main chain store. If [store_dir] (resp. [context_dir]) does not
-    exist, a fresh store (resp. context) is created. Otherwise, it
-    loads the store (resp. context) from reading the adequate
-    directory. If [allow_testchains] is passed, the store will be able
-    to fork chains and instantiate testchain's sub chain stores, for
-    all chains contained in the store. The chain store created is
-    based on the [genesis] provided. Its chain identifier will be
-    computed using the {!Tezos_crypto.Chain_id.of_block_hash}
-    function.
+(** [init ?patch_context ?commit_genesis ?history_mode
+    ?block_cache_limit ~store_dir ~context_dir ~allow_testchains
+    genesis] initializes the store and a main chain store. If
+    [store_dir] (resp. [context_dir]) does not exist, a fresh store
+    (resp. context) is created. Otherwise, it loads the store
+    (resp. context) from reading the adequate directory. If
+    [allow_testchains] is passed, the store will be able to fork
+    chains and instantiate testchain's sub chain stores, for all
+    chains contained in the store. The chain store created is based on
+    the [genesis] provided. Its chain identifier will be computed
+    using the {!Tezos_crypto.Chain_id.of_block_hash} function.
 
     @param patch_context the handle called when initializing the
     context. It usually is passed when creating a sandboxed chain.
@@ -202,6 +202,9 @@ type chain_store
       Default: {!History_mode.default} (which should correspond to full
     with 5 extra preserved cycles.)
 
+    @param block_cache_limit allows to override the size of the block
+    cache to use. The minimal value is 1.
+
     @param readonly a flag that, if set to true, prevent writing
     throughout the store {b and} context.
       Default: false
@@ -211,6 +214,7 @@ val init :
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
+  ?block_cache_limit:int ->
   store_dir:string ->
   context_dir:string ->
   allow_testchains:bool ->

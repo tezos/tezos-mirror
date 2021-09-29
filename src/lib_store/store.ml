@@ -1677,9 +1677,9 @@ module Chain = struct
     | Ok v -> Lwt.return_some v
     | Error _ -> Lwt.return_none
 
-  let create_chain_store global_store chain_dir ?target ~chain_id
-      ?(expiration = None) ?genesis_block ~genesis ~genesis_context history_mode
-      =
+  let create_chain_store ?block_cache_limit global_store chain_dir ?target
+      ~chain_id ?(expiration = None) ?genesis_block ~genesis ~genesis_context
+      history_mode =
     (* Chain directory *)
     let genesis_block =
       match genesis_block with
@@ -1687,7 +1687,8 @@ module Chain = struct
       | Some genesis_block -> genesis_block
     in
     (* Block_store.create also stores genesis *)
-    Block_store.create chain_dir ~genesis_block >>=? fun block_store ->
+    Block_store.create ?block_cache_limit chain_dir ~genesis_block
+    >>=? fun block_store ->
     let chain_config = {history_mode; genesis; expiration} in
     Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
     >>=? fun () ->
@@ -1724,14 +1725,16 @@ module Chain = struct
     in
     return chain_store
 
-  let load_chain_store global_store chain_dir ~chain_id ~readonly =
+  let load_chain_store ?block_cache_limit global_store chain_dir ~chain_id
+      ~readonly =
     Stored_data.load (Naming.chain_config_file chain_dir)
     >>=? fun chain_config_data ->
     Stored_data.get chain_config_data >>= fun chain_config ->
     Stored_data.load (Naming.genesis_block_file chain_dir)
     >>=? fun genesis_block_data ->
     Stored_data.get genesis_block_data >>= fun genesis_block ->
-    Block_store.load chain_dir ~genesis_block ~readonly >>=? fun block_store ->
+    Block_store.load ?block_cache_limit chain_dir ~genesis_block ~readonly
+    >>=? fun block_store ->
     load_chain_state chain_dir block_store >>=? fun chain_state ->
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
@@ -2080,8 +2083,9 @@ module Protocol = struct
     Lwt_watcher.create_stream protocol_watcher
 end
 
-let create_store ~context_index ~chain_id ~genesis ~genesis_context
-    ?(history_mode = History_mode.default) ~allow_testchains store_dir =
+let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
+    ~genesis_context ?(history_mode = History_mode.default) ~allow_testchains
+    store_dir =
   let store_dir_path = Naming.dir_path store_dir in
   Lwt_utils_unix.create_dir store_dir_path >>= fun () ->
   Protocol_store.init store_dir >>= fun protocol_store ->
@@ -2100,6 +2104,7 @@ let create_store ~context_index ~chain_id ~genesis ~genesis_context
     }
   in
   Chain.create_chain_store
+    ?block_cache_limit
     global_store
     chain_dir
     ~chain_id
@@ -2111,8 +2116,8 @@ let create_store ~context_index ~chain_id ~genesis ~genesis_context
   global_store.main_chain_store <- Some main_chain_store ;
   return global_store
 
-let load_store ?history_mode store_dir ~context_index ~genesis ~chain_id
-    ~allow_testchains ~readonly () =
+let load_store ?history_mode ?block_cache_limit store_dir ~context_index
+    ~genesis ~chain_id ~allow_testchains ~readonly () =
   let chain_dir = Naming.chain_dir store_dir chain_id in
   protect
     (fun () ->
@@ -2148,7 +2153,12 @@ let load_store ?history_mode store_dir ~context_index ~genesis ~chain_id
       global_block_watcher;
     }
   in
-  Chain.load_chain_store global_store chain_dir ~chain_id ~readonly
+  Chain.load_chain_store
+    ?block_cache_limit
+    global_store
+    chain_dir
+    ~chain_id
+    ~readonly
   >>=? fun main_chain_store ->
   let stored_genesis = Chain.genesis main_chain_store in
   fail_unless
@@ -2172,7 +2182,7 @@ let main_chain_store store =
   WithExceptions.Option.get ~loc:__LOC__ store.main_chain_store
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
-    ~store_dir ~context_dir ~allow_testchains genesis =
+    ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   (match commit_genesis with
@@ -2197,6 +2207,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   if Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path then
     load_store
       ?history_mode
+      ?block_cache_limit
       store_dir
       ~context_index
       ~genesis
@@ -2208,6 +2219,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     (* Fresh store *)
     commit_genesis ~chain_id >>=? fun genesis_context ->
     create_store
+      ?block_cache_limit
       store_dir
       ~context_index
       ~chain_id
