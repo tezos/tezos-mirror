@@ -285,10 +285,6 @@ val check_protocol_commit_consistency :
 
 (** {b Warning} For testing purposes only *)
 
-module Private : sig
-  module Utils = Utils
-end
-
 val legacy_get_protocol_data_from_header :
   index -> Block_header.t -> Protocol_data_legacy.t Lwt.t
 
