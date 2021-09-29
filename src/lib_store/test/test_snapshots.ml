@@ -457,7 +457,7 @@ let test_rolling () =
     (* We don't have a way to lock two stores in the same process =>
        force merges by setting a new head via [bake] *)
     let open Filename.Infix in
-    let snapshot_path = store_dir // "snapshot.full" in
+    let snapshot_path = store_dir // "snapshot.rolling" in
     let chain_name = Distributed_db_version.Name.of_string "test" in
     let dst_dir = store_dir // "imported_store" in
     let dst_store_dir = dst_dir // "store" in
@@ -521,6 +521,135 @@ let test_rolling () =
         Alpha_utils.default_genesis_parameters.constants.blocks_per_cycle,
       test )
 
+(* This test aims to check that the caboose and savepoint are well
+   dragged when the first merge occurs, after a rolling snapshot
+   import on a block which is not on a cycle's bound. Indeed, in such
+   a scenario, the merge procedure may remove blocks bellow the lafl
+   without cementing them. It would result in non stored caboose
+   (rolling issue) and savepoint (rolling and full issue).
+   In this test, we need to increase the number of blocks per cycle to
+   avoid the max_op_ttl to hide this potential issue. The exported
+   block must be outside the max_op_ttl of the next checkpoint. *)
+let test_drag_after_import () =
+  let constants =
+    Default_parameters.{constants_test with blocks_per_cycle = 256l}
+  in
+  let patch_context ctxt =
+    let test_parameters =
+      let open Tezos_protocol_alpha_parameters in
+      {
+        Default_parameters.(parameters_of_constants constants) with
+        bootstrap_accounts = Alpha_utils.default_accounts;
+      }
+    in
+    Alpha_utils.patch_context
+      ctxt
+      ~json:(Default_parameters.json_of_parameters test_parameters)
+  in
+  let test (store_dir, context_dir) store =
+    let chain_store = Store.main_chain_store store in
+    Store.Chain.genesis_block chain_store >>= fun genesis_block ->
+    let nb_cycles_to_bake = 2 in
+    Alpha_utils.bake_until_n_cycle_end
+      chain_store
+      nb_cycles_to_bake
+      genesis_block
+    >>=? fun (_blocks, head) ->
+    (* We don't have a way to lock two stores in the same process =>
+        force merges by setting a new head via [bake] *)
+    let open Filename.Infix in
+    let snapshot_path = store_dir // "snapshot.rolling" in
+    let chain_name = Distributed_db_version.Name.of_string "test" in
+    let dst_dir = store_dir // "imported_store" in
+    let dst_store_dir = dst_dir // "store" in
+    let dst_context_dir = dst_dir // "context" in
+    (*FIXME test over Raw formats as well *)
+    (* export distance is higer than the 120 max_op_tt*)
+    let export_distance = 130 in
+    Store.Block.read_block
+      chain_store
+      (Store.Block.hash head)
+      ~distance:export_distance
+    >>=? fun export_block ->
+    let export_block_hash = Store.Block.hash export_block in
+    Snapshots.export
+      ~snapshot_path
+      Snapshots.Tar
+      ~rolling:true
+      ~block:(`Hash (export_block_hash, 0))
+      ~store_dir
+      ~context_dir
+      ~chain_name
+      genesis
+    >>=? fun () ->
+    Snapshots.import
+      ~snapshot_path
+      ~dst_store_dir
+      ~dst_context_dir
+      ~chain_name
+      ~user_activated_upgrades:[]
+      ~user_activated_protocol_overrides:[]
+      ~block:export_block_hash
+      genesis
+    >>=? fun () ->
+    Store.init
+      ~patch_context
+      ~readonly:false
+      ~store_dir:dst_store_dir
+      ~context_dir:dst_context_dir
+      ~allow_testchains:true
+      genesis
+    >>=? fun store' ->
+    let chain_store' = Store.main_chain_store store' in
+    (* Finish to bake the current cycle. *)
+    Alpha_utils.bake_until_cycle_end chain_store' export_block
+    >>=? fun (_, _head) ->
+    Store.Chain.savepoint chain_store'
+    >>= fun (savepoint_hash, savepoint_level) ->
+    Store.Block.read_block chain_store' savepoint_hash >>=? fun savepoint ->
+    Store.Block.get_block_metadata chain_store' savepoint >>=? fun metadata ->
+    let expected_caboose =
+      Int32.(
+        sub savepoint_level (of_int (Store.Block.max_operations_ttl metadata)))
+    in
+    Store.Chain.caboose chain_store' >>= fun (_, caboose_level) ->
+    let prn i = Format.sprintf "%ld" i in
+    Assert.equal
+      ~prn
+      ~msg:__LOC__
+      ~eq:Compare.Int32.equal
+      caboose_level
+      expected_caboose ;
+    let block_store = Store.Unsafe.get_block_store chain_store' in
+    let rec restart n head =
+      if n = 0 then return head
+      else
+        Alpha_utils.bake_until_cycle_end chain_store' head >>=? fun (_, head) ->
+        Block_store.await_merging block_store >>= fun () ->
+        Store.Chain.caboose chain_store' >>= fun (_, caboose_level) ->
+        Store.Chain.savepoint chain_store' >>= fun (_, savepoint_level) ->
+        List.iter_es
+          (fun level ->
+            Store.Block.read_block_by_level chain_store' level
+            >>=? fun _sucess -> return_unit)
+          Int32.(
+            List.map of_int (to_int caboose_level -- to_int savepoint_level))
+        >>=? fun () -> restart (n - 1) head
+    in
+    (* With the given constants, it is required to bake 7 cycles to
+       trigger the first merge. *)
+    restart 7 export_block >>=? fun _h -> return_unit
+  in
+  wrap_test
+    ~keep_dir:false
+    ~history_mode:History_mode.default
+    ~patch_context
+    ( Format.asprintf
+        "check caboose and savepoint drag after rolling import (blocks per \
+         cycle = %ld)"
+        constants.blocks_per_cycle,
+      test )
+
 (* TODO:
    export => import => export => import from full & rolling
    export equivalence
@@ -534,6 +663,7 @@ let tests speed =
         Tezos_protocol_alpha_parameters.Default_parameters.(
           parameters_of_constants constants_sandbox)
     in
-    test_rolling () :: generated_tests
+    test_rolling () :: test_drag_after_import () :: generated_tests
   in
+
   ("snapshots", test_cases)
