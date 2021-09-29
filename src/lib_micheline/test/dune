@@ -3,5 +3,10 @@
  (package tezos-micheline)
  (libraries
   tezos-micheline
-  alcotest-lwt)
+  alcotest)
+ (modes native js)
  (flags (:standard -open Tezos_micheline)))
+
+(rule
+  (alias runtest-js)
+  (action (run node %{dep:./test_parser.bc.js})))
