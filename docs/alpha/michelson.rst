@@ -1587,6 +1587,17 @@ Operations on optional values
     > COMPARE / (Some _) : None : S  =>  1 : S
     > COMPARE / (Some a) : (Some b) : S  =>  COMPARE / a : b : S
 
+- ``MAP body``: Apply the body expression to the value inside the option if there is one.
+
+::
+
+   :: option 'a : 'S -> option 'b : 'S
+      iff    body :: [ 'a : 'S -> 'b : 'S ]
+
+   > MAP body / None : S => None : S
+   > MAP body / (Some a) : S => (Some b) : S'
+      where body / a : S => b : S'
+
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
 
