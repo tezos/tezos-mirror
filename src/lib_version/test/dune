@@ -1,5 +1,6 @@
 (tests
  (names test_parser)
+ (package tezos-version)
  (libraries
    tezos-base.unix
    tezos-version
