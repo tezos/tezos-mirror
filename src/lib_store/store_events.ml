@@ -268,6 +268,30 @@ let update_protocol_table =
     ("block_level", Data_encoding.int32)
     ~pp4:pp_int32
 
+let restore_history_mode =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"restore_history_mode"
+    ~msg:
+      "history mode was sucessfully restored to {history_mode}, based on the \
+       configuration file or command line argument"
+    ("history_mode", History_mode.encoding)
+    ~pp1:History_mode.pp
+
+let restore_infered_history_mode =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"restore_infered_history_mode"
+    ~msg:
+      "history mode was sucessfully restored to {history_mode}. Warning: this \
+       history mode may differ from the one preceding the restore procedure \
+       and you may need to restart the node to explicitely force the history \
+       mode switch"
+    ("history_mode", History_mode.encoding)
+    ~pp1:History_mode.pp
+
 (* Warning *)
 let warning_incomplete_storage =
   declare_1

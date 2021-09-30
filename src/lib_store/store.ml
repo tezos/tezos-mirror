@@ -2135,7 +2135,11 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
           Lwt.return_error err
       | err ->
           Store_events.(emit inconsistent_store err) >>= fun () ->
-          Consistency.fix_consistency chain_dir context_index genesis
+          Consistency.fix_consistency
+            chain_dir
+            context_index
+            genesis
+            ?history_mode
           >>=? fun () ->
           Store_events.(emit store_was_fixed ()) >>= fun () -> return_unit)
   >>=? fun () ->
