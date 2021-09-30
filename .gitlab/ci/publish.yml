@@ -31,9 +31,9 @@ publish:docker_manual:
   stage: manual
   needs: []
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /docker/'
+    - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
       when: on_success
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
       when: manual
       allow_failure: true
     - when: never
