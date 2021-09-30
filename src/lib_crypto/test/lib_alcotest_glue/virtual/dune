@@ -1,5 +1,7 @@
 (library
  (name alcotest_glue)
  (public_name alcotest-glue)
- (libraries fmt re)
+ (libraries
+  fmt
+  re)
  (virtual_modules alcotest_glue))

@@ -1,14 +1,10 @@
-(tests
+(test
+ (name test_unix_error)
  (package tezos-base)
- (names test_unix_error)
  (libraries
-   tezos-base.unix
-   data-encoding
-   tezos-test-helpers
-   qcheck-alcotest
- )
- (flags (:standard
-          -open Tezos_base
-          -open Tezos_base_unix
-          -open Tezos_error_monad
-         )))
+  tezos-base.unix
+  data-encoding
+  tezos-test-helpers
+  qcheck-alcotest)
+ (flags
+  (:standard -open Tezos_base -open Tezos_base_unix -open Tezos_error_monad)))

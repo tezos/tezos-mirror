@@ -1,6 +1,7 @@
-(tests
- (names test_parser)
- (libraries tezos-micheline
-            alcotest-lwt)
+(test
+ (name test_parser)
  (package tezos-micheline)
+ (libraries
+  tezos-micheline
+  alcotest-lwt)
  (flags (:standard -open Tezos_micheline)))
