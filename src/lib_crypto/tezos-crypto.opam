@@ -16,7 +16,7 @@ depends: [
   "tezos-rpc"
   "tezos-stdlib"
   "ringo" { = "0.5" }
-  "zarith" { < "1.12" }
+  "zarith" { >= "1.12" & < "1.13" }
   "alcotest-glue" {with-test}
   "tezos-hacl-glue-unix" {with-test}
   "alcotest-glue-unix" {with-test}
