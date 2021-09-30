@@ -353,7 +353,12 @@ module Tests = struct
         | v ->
             check_good_approximation
               "value_size"
-              3
+              (* Used to be 3 but leads to flaky tests. Revert when
+                 determinism is restored and the protocol is more precise
+                 about value sizes.
+                 FIXME: https://gitlab.com/tezos/tezos/-/issues/1784
+                 FIXME: https://gitlab.com/tezos/tezos/-/issues/1834 *)
+              10
               (Printf.sprintf
                  "value #%d `%s' of type `%s'"
                  i
@@ -365,10 +370,15 @@ module Tests = struct
     | _ | (exception _) -> return ()
 
   let check_value_size_stats () =
+    (* Stddev set to 0.5, used to be 0.2 but leads to flaky tests.
+       Revert when determinism is restored and the protocol is more
+       precise about value sizes.
+       FIXME: https://gitlab.com/tezos/tezos/-/issues/1784
+       FIXME: https://gitlab.com/tezos/tezos/-/issues/1834 *)
     check_stats
       "value_size"
       ~expected_mean:(1., 0.2)
-      ~expected_stddev:(0., 0.25)
+      ~expected_stddev:(0., 0.5)
       ~expected_ratios:(1., 3.)
 
   let lambda_size nsamples =
