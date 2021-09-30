@@ -1,11 +1,11 @@
 (library
  (name tezos_context_helpers)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-context.helpers)
- (libraries tezos-base
-            tezos-context.encoding
-            tezos-context.sigs
-            irmin
-            irmin-pack)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-context.encoding
+  tezos-context.sigs
+  irmin
+  irmin-pack)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib)))
