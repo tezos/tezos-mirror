@@ -686,7 +686,7 @@ module Bootstrap_contract = struct
       (fun {delegate; amount; script} -> (delegate, amount, script))
       (fun (delegate, amount, script) -> {delegate; amount; script})
       (obj3
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate" Signature.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
          (req "script" Script.encoding))
 end

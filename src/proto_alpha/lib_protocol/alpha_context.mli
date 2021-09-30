@@ -2053,7 +2053,7 @@ module Parameters : sig
   }
 
   type bootstrap_contract = {
-    delegate : public_key_hash;
+    delegate : public_key_hash option;
     amount : Tez.t;
     script : Script.t;
   }
