@@ -16,7 +16,6 @@ scripts/install_sapling_parameters.sh
 scripts/link_protocol.sh
 scripts/opam-check.sh
 scripts/opam-remove.sh
-scripts/opam-test-all.sh
 scripts/opam-upgrade.sh
 scripts/release/binaries.sh
 scripts/release/create-release-with-static-binaries.sh
