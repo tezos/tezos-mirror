@@ -1,10 +1,9 @@
 (library
  (name tezos_shell_services_test_helpers)
  (public_name tezos-shell-services-test-helpers)
- (libraries tezos-base
-            tezos-shell-services
-            tezos-test-helpers
-            qcheck-core)
- (flags
-  (:standard -linkall
-    -open Tezos_base__TzPervasives)))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-test-helpers
+  qcheck-core)
+ (flags (:standard -linkall -open Tezos_base__TzPervasives)))

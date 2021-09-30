@@ -1,6 +1,6 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
@@ -10,8 +10,9 @@ depends: [
   "tezos-base"
   "irmin" { >= "2.7.2" }
   "irmin-pack" { >= "2.7.2" }
-  "digestif" {>= "0.7.3"}
   "tezos-shell-services"
+  "logs"
+  "digestif" { >= "0.7.3" }
   "tezos-stdlib-unix"
   "bigstringaf" { >= "0.2.0" }
   "vector" { with-test }
