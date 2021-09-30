@@ -113,6 +113,8 @@ let check_consistency chain_dir genesis =
     (Inconsistent_genesis
        {expected = genesis.block; got = Block_repr.hash genesis_block})
   >>=? fun () ->
+  Stored_data.load (Naming.chain_config_file chain_dir)
+  >>=? fun _chain_config ->
   Stored_data.load (Naming.caboose_file chain_dir) >>=? fun caboose_data ->
   Stored_data.get caboose_data >>= fun caboose ->
   Stored_data.load (Naming.savepoint_file chain_dir) >>=? fun savepoint_data ->
