@@ -153,14 +153,14 @@ In order to create the opam repository MR:
 - Create the opam repository MR from this branch.
 
 Fourth, back in your local copy of Tezos, **update the variables in the**
-``.gitlab-ci.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
+``.gitlab/ci/templates.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
 the ``build_deps_image_version`` and the ``opam_repository_tag`` variables
 to the hash of the ``HEAD`` commit of the opam repository MR. Commit
 this change with a title along the lines of “CI: use dependency
 ``foo``”.
 
 Fifth, still in your local copy of Tezos, **update the variables in the**
-``.gitlab-ci.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
+``.gitlab/ci/templates.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
 the variables ``build_deps_image_name`` to
 ``registry.gitlab.com/<your-organisation>/opam-repository`` and
 ``opam_repository_url`` to
@@ -212,7 +212,10 @@ organisation’s registry.
 Second, **fix the tezos MR**. Specifically you need to:
 
 - Remove the temporary commit that points the CI to the developer’s organisation registry.
-- Amend the commit that sets the commit hash in ``.gitlab-ci.yml`` and ``scripts/version.sh``. Specifically, amend the commit to set the variables to the commit hash of the ``HEAD`` commit on the ``master`` branch of the ``tezos/opam-repository`` repository. This ``HEAD`` commit is the one obtained from merging the MR in the previous step.
+- Amend the commit that sets the commit hash in ``.gitlab/ci/templates.yml`` and ``scripts/version.sh``.
+  Specifically, amend the commit to set the variables to the commit hash of the ``HEAD`` commit on the
+  ``master`` branch of the ``tezos/opam-repository`` repository. This ``HEAD`` commit is the one obtained from
+  merging the MR in the previous step.
 
 Third, wait for the ``opam-repository`` CI to finish, and **run the CI
 on the tezos MR**. Make sure that you also run the opam stage of the
