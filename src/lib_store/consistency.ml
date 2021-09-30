@@ -813,11 +813,11 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
 
 (* [fix_chain_state ~chain_dir ~head ~cementing_highwatermark
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
-   ~protocol_levels ~genesis ~genesis_context] writes, as
+   ~protocol_levels ~chain_config ~genesis ~genesis_context] writes, as
    [Stored_data.t], the given arguments. *)
 let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
     ~savepoint ~caboose ~alternate_heads ~forked_chains ~protocol_levels
-    ~genesis ~genesis_context =
+    ~chain_config ~genesis ~genesis_context =
   (* By setting each stored data, we erase the previous content. *)
   let rec init_protocol_table protocol_table = function
     | [] -> protocol_table
@@ -830,6 +830,8 @@ let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
   let protocol_table =
     init_protocol_table Protocol_levels.empty protocol_levels
   in
+  Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
+  >>=? fun () ->
   Stored_data.write_file (Naming.protocol_levels_file chain_dir) protocol_table
   >>=? fun () ->
   let genesis_block =
@@ -857,9 +859,8 @@ let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
   Stored_data.write_file (Naming.forked_chains_file chain_dir) forked_chains
   >>=? fun () -> return_unit
 
-(* [fix_chain_config ~chain_dir block_store genesis caboose savepoint]
-   infers the history mode and update the [chain_config]. *)
-let fix_chain_config chain_dir block_store genesis caboose savepoint =
+(* Infers the history mode by inspecting the state of the store. *)
+let infer_history_mode chain_dir block_store genesis caboose savepoint =
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let cemented_blocks_files =
     match Cemented_block_store.cemented_blocks_files cemented_block_store with
@@ -908,8 +909,28 @@ let fix_chain_config chain_dir block_store genesis caboose savepoint =
          full or rolling. We choose full as the less destructive. *)
       Full offset
   in
-  let chain_config = {history_mode; genesis; expiration = None} in
-  Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
+  Store_events.(emit restore_infered_history_mode history_mode) >>= fun () ->
+  return {history_mode; genesis; expiration = None}
+
+(* [fix_chain_config ?history_mode ~chain_dir block_store genesis
+   caboose savepoint] infers the history mode. *)
+let fix_chain_config ?history_mode chain_dir block_store genesis caboose
+    savepoint =
+  Stored_data.load (Naming.chain_config_file chain_dir) >>= function
+  | Ok chain_config ->
+      (* If the store's config is available, we use it as is. *)
+      Stored_data.get chain_config >>= return
+  | Error _ -> (
+      match history_mode with
+      (* Otherwise, we try to get the history mode that was given by
+         the command line or the config file. *)
+      | Some history_mode ->
+          Store_events.(emit restore_history_mode history_mode) >>= fun () ->
+          return {history_mode; genesis; expiration = None}
+      | None ->
+          (* If there is no hint in the config file nor the command
+             line, we try to infer the history mode. *)
+          infer_history_mode chain_dir block_store genesis caboose savepoint)
 
 let fix_cementing_highwatermark block_store =
   let cemented_block_store = Block_store.cemented_block_store block_store in
@@ -919,7 +940,7 @@ let fix_cementing_highwatermark block_store =
   Store_events.(emit fix_cementing_highwatermark cementing_highwatermark)
   >>= fun () -> Lwt.return cementing_highwatermark
 
-(* [fix_consistency store_dir context_index]
+(* [fix_consistency ?history_mode store_dir context_index]
    aims to fix a store in an inconsistent state. The fixing steps are:
     - the current head is set as the highest block level found in the
       floating stores,
@@ -934,7 +955,7 @@ let fix_cementing_highwatermark block_store =
    Assumptions:
     - context is valid and available
     - block store is valid and available *)
-let fix_consistency chain_dir context_index genesis =
+let fix_consistency ?history_mode chain_dir context_index genesis =
   Store_events.(emit fix_store ()) >>= fun () ->
   (* We suppose that the genesis block is accessible *)
   trace
@@ -952,8 +973,8 @@ let fix_consistency chain_dir context_index genesis =
   fix_savepoint_and_caboose chain_dir block_store head
   >>=? fun (savepoint, caboose) ->
   fix_checkpoint chain_dir block_store head >>=? fun checkpoint ->
-  fix_chain_config chain_dir block_store genesis caboose savepoint
-  >>=? fun () ->
+  fix_chain_config ?history_mode chain_dir block_store genesis caboose savepoint
+  >>=? fun chain_config ->
   fix_protocol_levels
     context_index
     block_store
@@ -972,6 +993,7 @@ let fix_consistency chain_dir context_index genesis =
     ~alternate_heads:[]
     ~forked_chains:Chain_id.Map.empty
     ~protocol_levels
+    ~chain_config
     ~genesis
     ~genesis_context:(Block_repr.context genesis_block)
   >>=? fun () ->
