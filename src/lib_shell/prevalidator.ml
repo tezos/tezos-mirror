@@ -240,7 +240,7 @@ module Logger =
     end)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1794
-          We should use chain_tools instead of chain_db *)
+   We should use chain_tools instead of chain_db *)
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
 module Classification = Prevalidator_classification
@@ -1265,7 +1265,7 @@ module Make
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/merge_requests/2668
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
 
      If the interface of worker would not use tzresult we would
      see that this is not necessary since the function
@@ -1380,7 +1380,6 @@ let current_request (t : t) =
   Prevalidator.Worker.current_request w
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
-
    This function is legacy and should be removed.  *)
 let last_events (_t : t) = []
 
