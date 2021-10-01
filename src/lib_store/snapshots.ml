@@ -605,16 +605,19 @@ type snapshot_header =
     }
 
 let pp_snapshot_header ppf = function
-  | Current_header (version, {chain_name; history_mode; block_hash; level; _})
-    ->
+  | Current_header
+      (version, {chain_name; history_mode; block_hash; level; timestamp; _}) ->
       Format.fprintf
         ppf
-        "chain %a, block hash %a at level %ld in %a (snapshot version %d)"
+        "chain %a, block hash %a at level %ld, timestamp %a in %a (snapshot \
+         version %d)"
         Distributed_db_version.Name.pp
         chain_name
         Block_hash.pp
         block_hash
         level
+        Time.Protocol.pp_hum
+        timestamp
         History_mode.pp_short
         history_mode
         version
