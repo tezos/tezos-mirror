@@ -112,11 +112,40 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       >>= fun () -> return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
+type simulation_params = {
+  input : Michelson_v1_parser.parsed;
+  unparsing_mode : Script_ir_translator.unparsing_mode;
+  now : string option;
+  level : Z.t option;
+  source : Contract.t option;
+  payer : Contract.t option;
+  gas : Gas.Arith.integral option;
+}
+
+type run_view_params = {
+  shared_params : simulation_params;
+  contract : Contract.t;
+  entrypoint : string;
+}
+
+type run_params = {
+  shared_params : simulation_params;
+  amount : Tez.t option;
+  balance : Tez.t;
+  program : Michelson_v1_parser.parsed;
+  storage : Michelson_v1_parser.parsed;
+  entrypoint : string option;
+}
+
 let run_view (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ~(contract : Contract.t) ~entrypoint
-    ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
-    ?payer ?gas () =
+    ~(chain : Chain_services.chain) ~block (params : run_view_params) =
+  let {
+    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    contract;
+    entrypoint;
+  } =
+    params
+  in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.run_view
     cctxt
@@ -133,13 +162,19 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~level
 
 let run (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
-    ~(program : Michelson_v1_parser.parsed)
-    ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
-    ?payer ?gas ?entrypoint () =
+    ~(chain : Chain_services.chain) ~block (params : run_params) =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let {
+    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    program;
+    amount;
+    balance;
+    storage;
+    entrypoint;
+  } =
+    params
+  in
+  let amount = Option.value ~default:Tez.fifty_cents amount in
   Plugin.RPC.Scripts.run_code
     cctxt
     (chain, block)
@@ -158,13 +193,19 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~level
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
-    ~(program : Michelson_v1_parser.parsed)
-    ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
-    ?payer ?gas ?entrypoint () =
+    ~(chain : Chain_services.chain) ~block (params : run_params) =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let {
+    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    program;
+    amount;
+    balance;
+    storage;
+    entrypoint;
+  } =
+    params
+  in
+  let amount = Option.value ~default:Tez.fifty_cents amount in
   Plugin.RPC.Scripts.trace_code
     cctxt
     (chain, block)

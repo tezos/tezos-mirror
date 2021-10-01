@@ -279,19 +279,15 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~amount
-            ~balance
-            ~program
-            ~storage
-            ~input
-            ~unparsing_mode
-            ~now
-            ~level
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
+            {
+              amount = Some amount;
+              balance;
+              program;
+              storage;
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              entrypoint;
+            }
           >>= fun res ->
           print_trace_result cctxt ~show_source ~parsed:program res
         else
@@ -299,19 +295,15 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~amount
-            ~balance
-            ~program
-            ~storage
-            ~input
-            ~unparsing_mode
-            ~now
-            ~level
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
+            {
+              amount = Some amount;
+              balance;
+              program;
+              storage;
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              entrypoint;
+            }
           >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
@@ -962,15 +954,11 @@ let commands () =
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
-          ?gas
-          ~contract
-          ~entrypoint
-          ~input
-          ?source
-          ?payer
-          ~unparsing_mode
-          ~now
-          ~level
-          ()
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            entrypoint;
+          }
         >>= fun res -> print_view_result cctxt res);
   ]
