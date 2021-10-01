@@ -237,11 +237,6 @@ let uniform_comparable_non_atomic_type_name :
 (* ------------------------------------------------------------------------- *)
 (* Random generation functor. *)
 
-let sample_list state ~range ~sampler =
-  let length = Base_samplers.sample_in_interval state ~range in
-  let list = List.init length (fun _i -> sampler ()) in
-  (length, list)
-
 module type S = sig
   module Michelson_base : Michelson_samplers_base.S
 
@@ -579,30 +574,33 @@ end)
     and generate_list :
         type elt.
         elt Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler =
-     fun elt_type rng_state ->
-      let (length, elements) =
-        (* TODO: fix interface of list sampler *)
-        sample_list rng_state ~range:P.parameters.list_size ~sampler:(fun () ->
-            value elt_type rng_state)
+     fun elt_type ->
+      let open M in
+      let* (length, elements) =
+        Structure_samplers.list
+          ~range:P.parameters.list_size
+          ~sampler:(value elt_type)
       in
-      Script_typed_ir.{elements; length}
+      return Script_typed_ir.{elements; length}
 
     (* Note that we might very well generate sets smaller than the specified range (consider the
        case of a set of type [unit]). *)
     and generate_set :
         type elt.
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
-     fun elt_ty rng_state ->
+     fun elt_ty ->
+      let open M in
       let ety = comparable_downcast elt_ty in
-      let (_, elements) =
-        (* TODO: fix interface of list sampler *)
-        sample_list rng_state ~range:P.parameters.set_size ~sampler:(fun () ->
-            value ety rng_state)
+      let* (_, elements) =
+        Structure_samplers.list
+          ~range:P.parameters.set_size
+          ~sampler:(value ety)
       in
-      List.fold_left
-        (fun set x -> Script_set.update x true set)
-        (Script_set.empty elt_ty)
-        elements
+      return
+      @@ List.fold_left
+           (fun set x -> Script_set.update x true set)
+           (Script_set.empty elt_ty)
+           elements
 
     and generate_map :
         type key elt.
