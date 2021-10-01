@@ -386,7 +386,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           c
     | Environment.Ecoproto_error err :: rest ->
         (match err with
-        | Script_interpreter.Bad_contract_parameter c ->
+        | Bad_contract_parameter c ->
             Format.fprintf
               ppf
               "Invalid argument passed to contract %a."
