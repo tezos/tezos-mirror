@@ -86,8 +86,7 @@ def compute_version_bytes(prefix, length, maximal_base58_size=1000):
 def main(prefix, length, maximal_base58_size=1000):
     base58_size, version_bytes = compute_version_bytes(prefix, length,
                                                        maximal_base58_size)
-    print("Base58 size: %s. Version bytes: %s" % (base58_size,
-                                                  version_bytes))
+    print(f"Base58 size: {base58_size}. Version bytes: {version_bytes}")
 
 if __name__ == "__main__":
     fire.Fire(main)
