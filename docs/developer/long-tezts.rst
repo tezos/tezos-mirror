@@ -120,6 +120,19 @@ Providing Large Data
 Your test may require data that is too large to commit in
 ``tezos/tezos``. For example, a benchmark in which measurement is
 dependent on some block's context would need to load the same data
-directory on each execution. This is also a work-in-progress, but a
-dedicacted AWS storage will be provided as well as a way to dowload
-files and archives from it to fullfill these needs.
+directory on each execution.
+
+There is an Amazon S3 bucket where you can
+upload your data which will be made available for your test. Data
+will be synchronized with the server your tests will be running on.
+
+For security reasons, this storage has its access limited to
+authorized people. If you want to upload data, please contact
+Jérémie Goldberg (@jgonlabs) or anyone with admin access on
+the Tezos AWS account to allow you to do so.
+
+Please note that the S3 storage root folder is mounted in ``/s3data/``.
+E.g. if your file is under ``/myfolder/myfile`` in the Amazon bucket, your
+tests will find it under ``/s3data/myfolder/myfile``.
+
+
