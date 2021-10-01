@@ -52,3 +52,17 @@ The merge team is always looking for software engineers with at least the follow
   ask for support.
 - You are relatively skilled in one of the technologies used in the ``tezos/tezos``
   repository, i.e. ``OCaml``, ``python``, ``CI``, building, packaging, etc.
+
+Helping the Merge Team
+----------------------
+
+Even if you are not in the merge team, you can help it! If you review a merge
+request and you think it is ready to be merged, you should click the *Approve* button
+even if your approval "doesn't count".
+
+If the merge request is not critical,
+or if you are knowledgeable on the merge request topic; your approval
+will make it easier for a merge team member to approve too.
+This is also an excellent way to show your skills and willingness to move development
+forward, contributing to potentially making you a merge team member in the future
+(see *Getting into the Merge Team* above).
