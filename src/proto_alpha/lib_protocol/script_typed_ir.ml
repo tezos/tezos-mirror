@@ -448,24 +448,25 @@ type 'elt set = Set_tag of (module Boxed_set with type elt = 'elt)
 
 *)
 module type Boxed_map_OPS = sig
-  type t
+  type 'a t
 
   type key
 
-  type value
+  val empty : 'value t
 
-  val empty : t
+  val add : key -> 'value -> 'value t -> 'value t
 
-  val add : key -> value -> t -> t
+  val remove : key -> 'value t -> 'value t
 
-  val remove : key -> t -> t
+  val find : key -> 'value t -> 'value option
 
-  val find : key -> t -> value option
-
-  val fold : (key -> value -> 'a -> 'a) -> t -> 'a -> 'a
+  val fold : (key -> 'value -> 'a -> 'a) -> 'value t -> 'a -> 'a
 
   val fold_es :
-    (key -> value -> 'a -> 'a tzresult Lwt.t) -> t -> 'a -> 'a tzresult Lwt.t
+    (key -> 'value -> 'a -> 'a tzresult Lwt.t) ->
+    'value t ->
+    'a ->
+    'a tzresult Lwt.t
 end
 
 module type Boxed_map = sig
@@ -475,9 +476,9 @@ module type Boxed_map = sig
 
   val key_ty : key comparable_ty
 
-  module OPS : Boxed_map_OPS with type key = key and type value = value
+  module OPS : Boxed_map_OPS with type key = key
 
-  val boxed : OPS.t
+  val boxed : value OPS.t
 
   val size : int
 end
