@@ -1200,10 +1200,7 @@ module Registration_section = struct
       in
       let (module M) = map in
       let key =
-        M.OPS.fold
-          (fun k _ -> function None -> Some k | x -> x)
-          (fst M.boxed)
-          None
+        M.OPS.fold (fun k _ -> function None -> Some k | x -> x) M.boxed None
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       (key, map)
@@ -1378,10 +1375,7 @@ module Registration_section = struct
       in
       let (module M) = map in
       let key =
-        M.OPS.fold
-          (fun k _ -> function None -> Some k | x -> x)
-          (fst M.boxed)
-          None
+        M.OPS.fold (fun k _ -> function None -> Some k | x -> x) M.boxed None
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let big_map =

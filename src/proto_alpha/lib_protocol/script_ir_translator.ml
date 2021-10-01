@@ -6557,7 +6557,7 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
             (ctxt, M.OPS.add k x m, ids_to_copy, acc))
           (ctxt, M.OPS.empty, ids_to_copy, acc)
-          (bindings (fst M.boxed))
+          (bindings M.boxed)
         >|=? fun (ctxt, m, ids_to_copy, acc) ->
         let module M = struct
           module OPS = M.OPS
@@ -6568,7 +6568,9 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
 
           let key_ty = M.key_ty
 
-          let boxed = (m, snd M.boxed)
+          let boxed = m
+
+          let size = M.size
         end in
         ( ctxt,
           (module M : Boxed_map with type key = M.key and type value = M.value),

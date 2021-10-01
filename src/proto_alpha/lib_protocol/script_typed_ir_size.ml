@@ -293,9 +293,8 @@ let rec value_size :
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
         let module M = (val x) in
-        let size = snd M.boxed in
         let boxing_space = !!300 in
-        ret_succ_adding accu (boxing_space +! (h5w *? size))
+        ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->
         (big_map_size [@ocaml.tailcall])
           ~count_lambda_nodes
