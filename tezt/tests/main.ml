@@ -74,6 +74,7 @@ let () =
   Baking.register ~protocols:[Alpha] ;
   Mempool.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
+  Stresstest_command.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
   (* Tests that are protocol-independent.
