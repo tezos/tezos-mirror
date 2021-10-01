@@ -110,10 +110,9 @@ One-Shot Tests
 --------------
 
 You may be interested in running some long tests using this framework
-on your own branch instead of ``master``. This is work-in-progress,
-but the goal is to make it easy to do, possibly with a manual job in
-your branch's CI pipeline that you could trigger to spawn the tests
-for your branch. Stay tuned.
+on your own branch instead of ``master``.
+
+See documentation in the README `here <https://gitlab.com/nomadic-labs/iac/terraform/tf-aws-performance-regression-oneshot-instance>`_
 
 Providing Large Data
 --------------------
