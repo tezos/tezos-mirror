@@ -37,6 +37,8 @@ val get_module :
 
 val empty : 'a comparable_ty -> ('a, 'b) map
 
+val empty_from : ('a, 'b) map -> ('a, 'c) map
+
 val fold :
   ('key -> 'value -> 'acc -> 'acc) -> ('key, 'value) map -> 'acc -> 'acc
 
@@ -51,7 +53,5 @@ val update : 'a -> 'b option -> ('a, 'b) map -> ('a, 'b) map
 val mem : 'key -> ('key, 'value) map -> bool
 
 val get : 'key -> ('key, 'value) map -> 'value option
-
-val key_ty : ('a, 'b) map -> 'a comparable_ty
 
 val size : ('a, 'b) map -> Script_int.n Script_int.num

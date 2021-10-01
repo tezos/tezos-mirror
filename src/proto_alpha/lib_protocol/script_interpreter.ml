@@ -400,7 +400,7 @@ and imap_map : type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) imap_map_type
  fun log_if_needed g gas (body, k) ks accu stack ->
   let map = accu in
   let xs = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
-  let ys = Script_map.(empty @@ key_ty map) in
+  let ys = Script_map.empty_from map in
   let ks = log_if_needed (KMap_enter_body (body, xs, ys, KCons (k, ks))) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack

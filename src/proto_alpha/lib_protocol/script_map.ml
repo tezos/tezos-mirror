@@ -32,8 +32,20 @@ let make x = Map_tag x
 
 let get_module (Map_tag x) = x
 
-let key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (Map_tag (module Box)) -> Box.OPS.key_ty
+let empty_from : type a b c. (a, b) map -> (a, c) map =
+ fun (Map_tag (module Box)) ->
+  Map_tag
+    (module struct
+      type key = a
+
+      type value = c
+
+      module OPS = Box.OPS
+
+      let boxed = OPS.empty
+
+      let size = 0
+    end)
 
 let empty : type a b. a comparable_ty -> (a, b) map =
  fun ty ->
