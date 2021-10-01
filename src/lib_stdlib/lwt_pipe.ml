@@ -92,14 +92,15 @@ module Bounded = struct
 
   let rec push ({closed; queue; current_size; max_size; compute_size; _} as q)
       elt =
-    let elt_size = compute_size elt in
     if closed then Lwt.fail Closed
-    else if current_size + elt_size < max_size || Queue.is_empty queue then (
-      Queue.push (elt_size, elt) queue ;
-      q.current_size <- current_size + elt_size ;
-      notify_push q ;
-      Lwt.return_unit)
-    else wait_pop q >>= fun () -> push q elt
+    else
+      let elt_size = compute_size elt in
+      if current_size + elt_size < max_size || Queue.is_empty queue then (
+        Queue.push (elt_size, elt) queue ;
+        q.current_size <- current_size + elt_size ;
+        notify_push q ;
+        Lwt.return_unit)
+      else wait_pop q >>= fun () -> push q elt
 
   let push_now ({closed; queue; compute_size; current_size; max_size; _} as q)
       elt =
@@ -158,14 +159,13 @@ module Bounded = struct
            notify_pop q ;
            elt)
 
-  let pop_all_queue : type a. a Queue.t -> a list =
-    fun (type a) q ->
-     let exception Local of a list in
-     let rec aux rev_acc =
-       let elt = try Queue.pop q with Queue.Empty -> raise (Local rev_acc) in
-       aux (elt :: rev_acc)
-     in
-     try aux [] with Local rev_acc -> List.rev rev_acc
+  let pop_all_queue q =
+    let rec aux rev_acc =
+      match Queue.pop q with
+      | exception Queue.Empty -> List.rev rev_acc
+      | elt -> (aux [@ocaml.tailcall]) (elt :: rev_acc)
+    in
+    aux []
 
   let pop_all q =
     if not (Queue.is_empty q.queue) then (
@@ -269,14 +269,13 @@ module Unbounded = struct
     if Queue.is_empty queue && closed then raise Closed ;
     Queue.take_opt queue
 
-  let pop_all_queue : type a. a Queue.t -> a list =
-    fun (type a) q ->
-     let exception Local of a list in
-     let rec aux rev_acc =
-       let elt = try Queue.pop q with Queue.Empty -> raise (Local rev_acc) in
-       aux (elt :: rev_acc)
-     in
-     try aux [] with Local rev_acc -> List.rev rev_acc
+  let pop_all_queue q =
+    let rec aux rev_acc =
+      match Queue.pop q with
+      | exception Queue.Empty -> List.rev rev_acc
+      | elt -> (aux [@ocaml.tailcall]) (elt :: rev_acc)
+    in
+    aux []
 
   let pop_all q =
     if not (Queue.is_empty q.queue) then Lwt.return @@ pop_all_queue q.queue
