@@ -23,74 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* ------------------------------------------------------------------------- *)
+(** Type conversion helpers *)
 
-type t = {
-  int_size : Base_samplers.range;
-  string_size : Base_samplers.range;
-  bytes_size : Base_samplers.range;
-  stack_size : Base_samplers.range;
-  type_size : Base_samplers.range;
-  list_size : Base_samplers.range;
-  set_size : Base_samplers.range;
-  map_size : Base_samplers.range;
-}
+open Protocol
 
-let encoding =
-  let open Data_encoding in
-  let range = Base_samplers.range_encoding in
-  conv
-    (fun {
-           int_size;
-           string_size;
-           bytes_size;
-           stack_size;
-           type_size;
-           list_size;
-           set_size;
-           map_size;
-         } ->
-      ( int_size,
-        string_size,
-        bytes_size,
-        stack_size,
-        type_size,
-        list_size,
-        set_size,
-        map_size ))
-    (fun ( int_size,
-           string_size,
-           bytes_size,
-           stack_size,
-           type_size,
-           list_size,
-           set_size,
-           map_size ) ->
-      {
-        int_size;
-        string_size;
-        bytes_size;
-        stack_size;
-        type_size;
-        list_size;
-        set_size;
-        map_size;
-      })
-    (obj8
-       (req "int_size" range)
-       (req "string_size" range)
-       (req "bytes_size" range)
-       (req "stack_size" range)
-       (req "michelson_type_size" range)
-       (req "list_size" range)
-       (req "set_size" range)
-       (req "map_size" range))
+(** Exception raised in case an error occurs in this module. *)
+exception Type_helpers_error of string
 
-module type S = sig
-  val parameters : t
+(** [michelson_type_list_to_ex_stack_ty] converts a list of types in
+    Micheline form to a stack type in IR form.
 
-  val size : int
+    @raise Type_helpers_error if parsing the Michelson type fails.
+ *)
+val michelson_type_list_to_ex_stack_ty :
+  Alpha_context.Script.expr list ->
+  Alpha_context.t ->
+  Script_ir_translator.ex_stack_ty
 
-  (* By default, the algo is chosen randomly (uniformly) *)
-  val algo : [`Algo of Signature.algo | `Default]
-end
+(** [michelson_type_to_ex_ty ty ctxt] parses the type [ty].
+
+    @raise Type_helpers_error if an error arises during parsing. *)
+val michelson_type_to_ex_ty :
+  Alpha_context.Script.expr -> Alpha_context.t -> Script_ir_translator.ex_ty
+
+(** [stack_type_to_michelson_type_list] converts a Mikhailsky stack type
+    to a stack represented as a list of Micheline expressions, each
+    element denoting a type on the stack type.
+
+    @raise Type_helpers_error if the stack type contains variables. *)
+val stack_type_to_michelson_type_list : Type.Stack.t -> Script_repr.expr list
+
+(** [base_type_to_ex_ty] converts a Mikhailsky type to a Michelson one. *)
+val base_type_to_ex_ty :
+  Type.Base.t -> Alpha_context.t -> Script_ir_translator.ex_ty

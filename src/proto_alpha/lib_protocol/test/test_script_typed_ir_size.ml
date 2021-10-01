@@ -67,27 +67,32 @@ let iter_n_es n f =
 *)
 
 module Samplers = struct
-  let parameters =
-    let open Michelson_samplers_parameters in
-    let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
-    {
-      int_size = size;
-      string_size = size;
-      bytes_size = size;
-      stack_size = size;
-      type_size = size;
-      list_size = size;
-      set_size = size;
-      map_size = size;
-    }
+  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32}
 
-  include Michelson_samplers.Make (struct
-    let parameters = parameters
-
+  module Crypto_samplers =
+  Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
     let size = 10
 
     let algo = `Default
   end)
+
+  include
+    Michelson_samplers.Make
+      (struct
+        let parameters : Michelson_samplers.parameters =
+          {
+            base_parameters =
+              {
+                Michelson_samplers_base.int_size = size;
+                string_size = size;
+                bytes_size = size;
+              };
+            list_size = size;
+            set_size = size;
+            map_size = size;
+          }
+      end)
+      (Crypto_samplers)
 
   let random_state = Random.State.make [|37; 73; 17; 71; 42|]
 
@@ -97,90 +102,32 @@ module Samplers = struct
 
   let sample_value ty = Random_value.value ty random_state
 
-  module Full = Michelson_samplers_base.Make_full (struct
-    let parameters = parameters
+  module Gen =
+    Michelson_mcmc_samplers.Make_code_sampler (Michelson_base) (Crypto_samplers)
+      (struct
+        let rng_state = random_state
 
-    let algo = `Default
+        let target_size = 500
 
-    let size = 16
-  end)
-
-  module Gen = Generators.Code (struct
-    module Samplers = Full
-
-    let rng_state = random_state
-
-    let target_size = 500
-
-    let verbosity = `Silent
-  end)
+        let verbosity = `Silent
+      end)
 
   (* Delay and cache the generator as it's expensive to create. *)
   let generator = lazy (Gen.generator ~burn_in:(500 * 7))
-
-  let base_type_to_michelson_type (typ : Type.Base.t) =
-    let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
-    Mikhailsky.to_michelson typ
-
-  (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-  let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
-    let node = typ.node in
-    match node with
-    | Type.Stack.Stack_var_t _ ->
-        Stdlib.failwith "stack_type_to_michelson_type_list: bug found"
-    | Type.Stack.Empty_t -> []
-    | Type.Stack.Item_t (ty, tl) ->
-        base_type_to_michelson_type ty :: stack_type_to_michelson_type_list tl
-
-  (* Convert a Micheline-encoded type to its internal GADT format. *)
-  let michelson_type_to_ex_ty (typ : Protocol.Alpha_context.Script.expr)
-      (ctxt : Protocol.Alpha_context.t) =
-    Protocol.Script_ir_translator.parse_ty
-      ctxt
-      ~legacy:false
-      ~allow_lazy_storage:false
-      ~allow_operation:false
-      ~allow_contract:false
-      ~allow_ticket:false
-      (Micheline.root typ)
-    |> Protocol.Environment.wrap_tzresult
-    |> function
-    | Ok t -> t
-    | Error errs ->
-        Format.eprintf "%a@." pp_print_trace errs ;
-        raise (Failure "Test_helpers.michelson_type_to_ex_ty: error")
-
-  let base_type_to_ex_ty ty =
-    michelson_type_to_ex_ty (base_type_to_michelson_type ty)
-
-  (* Convert a list of Micheline-encoded Michelson types to the
-     internal GADT format. *)
-  let rec michelson_type_list_to_ex_stack_ty
-      (stack_ty : Protocol.Alpha_context.Script.expr list) ctxt =
-    let open Protocol.Script_ir_translator in
-    let open Protocol.Script_typed_ir in
-    match stack_ty with
-    | [] -> (Ex_stack_ty Bot_t, ctxt)
-    | hd :: tl -> (
-        let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
-        match ex_ty with
-        | Ex_ty ty -> (
-            let (ex_stack_ty, ctxt) =
-              michelson_type_list_to_ex_stack_ty tl ctxt
-            in
-            match ex_stack_ty with
-            | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
 
   type exdescr =
     | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
 
   let sample_ir_code () =
-    let (sample, (bef, _)) = StaTz.Stats.sample_gen @@ Lazy.force generator in
+    let Michelson_mcmc_samplers.{term = sample; bef = stack; aft = _} =
+      StaTz.Stats.sample_gen (Lazy.force generator)
+    in
     let accounts = Account.generate_accounts 1 in
     Block.alpha_context accounts >>=? fun ctxt ->
     let code = Micheline.root sample in
-    let stack = stack_type_to_michelson_type_list bef in
-    let (Ex_stack_ty bef, _) = michelson_type_list_to_ex_stack_ty stack ctxt in
+    let (Ex_stack_ty bef) =
+      Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
+    in
     Script_ir_translator.(parse_instr Lambda ctxt ~legacy:true code bef)
     >>= wrap
     >>=? fun (ir_code, _) ->

@@ -26,6 +26,28 @@
 open Protocol
 open Script_typed_ir
 
+type parameters = {
+  base_parameters : Michelson_samplers_base.parameters;
+  list_size : Base_samplers.range;
+  set_size : Base_samplers.range;
+  map_size : Base_samplers.range;
+}
+
+let parameters_encoding =
+  let open Data_encoding in
+  let range_encoding = Base_samplers.range_encoding in
+  conv
+    (fun {base_parameters; list_size; set_size; map_size} ->
+      (base_parameters, (list_size, set_size, map_size)))
+    (fun (base_parameters, (list_size, set_size, map_size)) ->
+      {base_parameters; list_size; set_size; map_size})
+    (merge_objs
+       Michelson_samplers_base.parameters_encoding
+       (obj3
+          (req "list_size" range_encoding)
+          (req "set_size" range_encoding)
+          (req "map_size" range_encoding)))
+
 (* ------------------------------------------------------------------------- *)
 (* Helpers. *)
 
@@ -66,39 +88,6 @@ type type_name =
   | `TBls12_381_g2
   | `TBls12_381_fr
   | `TTicket ]
-
-let all_type_names : type_name array =
-  [|
-    `TUnit;
-    `TInt;
-    `TNat;
-    `TSignature;
-    `TString;
-    `TBytes;
-    `TMutez;
-    `TKey_hash;
-    `TKey;
-    `TTimestamp;
-    `TAddress;
-    `TBool;
-    `TPair;
-    `TUnion;
-    `TLambda;
-    `TOption;
-    `TList;
-    `TSet;
-    `TMap;
-    `TBig_map;
-    `TContract;
-    `TSapling_transaction;
-    `TSapling_state;
-    `TOperation;
-    `TChain_id;
-    `TBls12_381_g1;
-    `TBls12_381_g2;
-    `TBls12_381_fr;
-    `TTicket;
-  |]
 
 type atomic_type_name =
   [ `TUnit
@@ -195,26 +184,6 @@ type comparable_type_name =
 (* Ensure inclusion of comparable_type_name in type_name *)
 let (_ : comparable_type_name -> type_name) = fun x -> (x :> type_name)
 
-let all_comparable_type_names : comparable_type_name array =
-  [|
-    `TUnit;
-    `TInt;
-    `TNat;
-    `TSignature;
-    `TString;
-    `TBytes;
-    `TMutez;
-    `TBool;
-    `TKey_hash;
-    `TKey;
-    `TTimestamp;
-    `TChain_id;
-    `TAddress;
-    `TPair;
-    `TUnion;
-    `TOption;
-  |]
-
 type 'a comparable_and_atomic = 'a
   constraint 'a = [< comparable_type_name] constraint 'a = [< atomic_type_name]
 
@@ -245,20 +214,6 @@ let all_comparable_non_atomic_type_names : 'a comparable_and_non_atomic array =
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
 
-let type_names_count = Array.length all_type_names
-
-let atomic_type_names_count = Array.length all_atomic_type_names
-
-let non_atomic_type_names_count = Array.length all_non_atomic_type_names
-
-let comparable_type_names_count = Array.length all_comparable_type_names
-
-let comparable_atomic_type_names_count =
-  Array.length all_comparable_atomic_type_names
-
-let comparable_non_atomic_type_names_count =
-  Array.length all_comparable_non_atomic_type_names
-
 (* ------------------------------------------------------------------------- *)
 (* Uniform type name generators *)
 
@@ -269,16 +224,8 @@ let uniform : 'a array -> 'a sampler =
   let i = Random.State.int rng_state (Array.length arr) in
   arr.(i)
 
-let uniform_type_name : type_name sampler = uniform all_type_names
-
 let uniform_atomic_type_name : atomic_type_name sampler =
   uniform all_atomic_type_names
-
-let uniform_non_atomic_type_name : non_atomic_type_name sampler =
-  uniform all_non_atomic_type_names
-
-let uniform_comparable_type_name : comparable_type_name sampler =
-  uniform all_comparable_type_names
 
 let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
   uniform all_comparable_atomic_type_names
@@ -288,40 +235,10 @@ let uniform_comparable_non_atomic_type_name :
   uniform all_comparable_non_atomic_type_names
 
 (* ------------------------------------------------------------------------- *)
-(* Existentially packed typed value. *)
-
-type ex_value = Ex_value : {typ : 'a Script_typed_ir.ty; v : 'a} -> ex_value
-
-(* ------------------------------------------------------------------------- *)
 (* Random generation functor. *)
 
-let sample_list state ~range ~sampler =
-  let length = Base_samplers.sample_in_interval state ~range in
-  let list = List.init length (fun _i -> sampler ()) in
-  (length, list)
-
 module type S = sig
-  val sampling_parameters : Michelson_samplers_parameters.t
-
-  module Crypto_samplers : Crypto_samplers.Finite_key_pool_S
-
-  module Michelson_base : sig
-    val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
-
-    val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
-
-    val signature : Tezos_crypto.Signature.t sampler
-
-    val string : Alpha_context.Script_string.t sampler
-
-    val bytes : bytes sampler
-
-    val tez : Alpha_context.Tez.tez sampler
-
-    val timestamp : Alpha_context.Script_timestamp.t sampler
-
-    val bool : bool sampler
-  end
+  module Michelson_base : Michelson_samplers_base.S
 
   module Random_type : sig
     val m_type : size:int -> Script_ir_translator.ex_ty sampler
@@ -343,8 +260,13 @@ exception SamplingError of string
 
 let fail_sampling error = raise (SamplingError error)
 
-module Make (P : Michelson_samplers_parameters.S) : S = struct
-  include Michelson_samplers_base.Make_full (P)
+module Make (P : sig
+  val parameters : parameters
+end)
+(Crypto_samplers : Crypto_samplers.Finite_key_pool_S) : S = struct
+  module Michelson_base = Michelson_samplers_base.Make (struct
+    let parameters = P.parameters.base_parameters
+  end)
 
   let memo_size =
     Alpha_context.Sapling.Memo_size.parse_z Z.zero |> Result.get_ok
@@ -565,7 +487,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
     let address rng_state =
-      if Michelson_base.bool rng_state then
+      if Base_samplers.uniform_bool rng_state then
         ( Alpha_context.Contract.implicit_contract
             (Crypto_samplers.pkh rng_state),
           "default" )
@@ -602,7 +524,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Key_hash_t _ -> Crypto_samplers.pkh
         | Key_t _ -> Crypto_samplers.pk
         | Timestamp_t _ -> Michelson_base.timestamp
-        | Bool_t _ -> Michelson_base.bool
+        | Bool_t _ -> Base_samplers.uniform_bool
         | Address_t _ -> address
         | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
             M.(
@@ -611,12 +533,13 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
               return (left_v, right_v))
         | Union_t ((left_t, _), (right_t, _), _) ->
             fun rng_state ->
-              if Michelson_base.bool rng_state then L (value left_t rng_state)
+              if Base_samplers.uniform_bool rng_state then
+                L (value left_t rng_state)
               else R (value right_t rng_state)
         | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
         | Option_t (ty, _) ->
             fun rng_state ->
-              if Michelson_base.bool rng_state then None
+              if Base_samplers.uniform_bool rng_state then None
               else Some (value ty rng_state)
         | List_t (elt_ty, _) -> generate_list elt_ty
         | Set_t (elt_ty, _) -> generate_set elt_ty
@@ -651,26 +574,33 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     and generate_list :
         type elt.
         elt Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler =
-     fun elt_type rng_state ->
-      let (length, elements) =
-        (* TODO: fix interface of list sampler *)
-        sample_list rng_state ~range:P.parameters.list_size ~sampler:(fun () ->
-            value elt_type rng_state)
+     fun elt_type ->
+      let open M in
+      let* (length, elements) =
+        Structure_samplers.list
+          ~range:P.parameters.list_size
+          ~sampler:(value elt_type)
       in
-      Script_typed_ir.{elements; length}
+      return Script_typed_ir.{elements; length}
 
+    (* Note that we might very well generate sets smaller than the specified range (consider the
+       case of a set of type [unit]). *)
     and generate_set :
         type elt.
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
-     fun elt_ty rng_state ->
+     fun elt_ty ->
+      let open M in
       let ety = comparable_downcast elt_ty in
-      let {Script_typed_ir.elements; length = _} =
-        generate_list ety rng_state
+      let* (_, elements) =
+        Structure_samplers.list
+          ~range:P.parameters.set_size
+          ~sampler:(value ety)
       in
-      List.fold_left
-        (fun set x -> Script_set.update x true set)
-        (Script_set.empty elt_ty)
-        elements
+      return
+      @@ List.fold_left
+           (fun set x -> Script_set.update x true set)
+           (Script_set.empty elt_ty)
+           elements
 
     and generate_map :
         type key elt.
@@ -792,4 +722,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             return ((elt, tl) : a * b)
         | Bot_t -> return (EmptyCell, EmptyCell)
   end
+end
+
+module Internal_for_tests = struct
+  type nonrec type_name = type_name
 end

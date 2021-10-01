@@ -23,10 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Michelson_samplers_parameters
-open Sampling_helpers
+(** Autocompletion functions (removing holes from Mikhailsky terms). *)
 
-(* Autocompletion functions (removing holes from Mikhailsky terms). *)
+open Sampling_helpers
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
@@ -155,7 +154,10 @@ module SM = struct
   let return x _ s = (x, s) [@@inline]
 end
 
-module Make (P : Michelson_samplers_base.Full_S) = struct
+module Make
+    (Michelson_base : Michelson_samplers_base.S)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+struct
   (* Generates minimally sized random data of specified type.
      Used in autocompletion. *)
   (* /!\ Always call [instantiate_and_set] on the type argument of
@@ -169,35 +171,35 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
     | Var_t _v -> assert false
     | Unit_t -> return Mikhailsky.Data.unit
     | Int_t ->
-        sample @@ Base_samplers.int ~size:P.sampling_parameters.int_size
-        >>= fun i -> return (Mikhailsky.Data.big_integer i)
+        sample @@ Michelson_base.int >>= fun i ->
+        let i = Protocol.Script_int_repr.to_zint i in
+        return (Mikhailsky.Data.big_integer i)
     | Nat_t ->
-        sample @@ Base_samplers.nat ~size:P.sampling_parameters.int_size
-        >>= fun n -> return (Mikhailsky.Data.big_natural n)
+        sample @@ Michelson_base.nat >>= fun n ->
+        let n = Protocol.Script_int_repr.to_zint n in
+        return (Mikhailsky.Data.big_natural n)
     | Bool_t ->
         sample Base_samplers.uniform_bool >>= fun b ->
         if b then return Mikhailsky.Data.true_
         else return Mikhailsky.Data.false_
     | String_t ->
-        sample
-          (Base_samplers.readable_ascii_string
-             ~size:P.sampling_parameters.string_size)
-        >>= fun str -> return (Mikhailsky.Data.string str)
+        sample Michelson_base.string >>= fun str ->
+        let str = Protocol.Script_string_repr.to_string str in
+        return (Mikhailsky.Data.string str)
     | Bytes_t ->
-        sample (Base_samplers.bytes ~size:P.sampling_parameters.bytes_size)
-        >>= fun bytes -> return (Mikhailsky.Data.bytes bytes)
+        sample Michelson_base.bytes >>= fun bytes ->
+        return (Mikhailsky.Data.bytes bytes)
     | Key_hash_t ->
-        sample P.Crypto_samplers.pkh >>= fun pkh ->
+        sample Crypto_samplers.pkh >>= fun pkh ->
         return (Mikhailsky.Data.key_hash pkh)
     | Timestamp_t ->
-        sample P.Michelson_base.timestamp >>= fun tstamp ->
+        sample Michelson_base.timestamp >>= fun tstamp ->
         return (Mikhailsky.Data.timestamp tstamp)
     | Mutez_t ->
-        sample P.Michelson_base.tez >>= fun tz ->
+        sample Michelson_base.tez >>= fun tz ->
         return (Mikhailsky.Data.mutez tz)
     | Key_t ->
-        sample P.Crypto_samplers.pk >>= fun pk ->
-        return (Mikhailsky.Data.key pk)
+        sample Crypto_samplers.pk >>= fun pk -> return (Mikhailsky.Data.key pk)
     | Option_t ty ->
         sample Base_samplers.uniform_bool >>= fun b ->
         if b then return Mikhailsky.Data.none
@@ -206,7 +208,7 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
         generate_data lty >>= fun lv ->
         generate_data rty >>= fun rv -> return (Mikhailsky.Data.pair lv rv)
     | Union_t (lty, rty) ->
-        sample P.Michelson_base.bool >>= fun b ->
+        sample Base_samplers.uniform_bool >>= fun b ->
         if b then generate_data lty >>= fun v -> return (Mikhailsky.Data.left v)
         else generate_data rty >>= fun v -> return (Mikhailsky.Data.right v)
     | List_t _ty -> return (Mikhailsky.Data.list [])

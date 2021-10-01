@@ -578,7 +578,10 @@ module Instruction = struct
     ]
 end
 
-module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
+module Data_rewrite_leaves
+    (Michelson_base : Michelson_samplers_base.S)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+struct
   let hole_patt =
     let open Patt in
     prim_pred (fun prim -> prim = D_Hole) list_empty
@@ -715,7 +718,7 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
         Context_blind
           (fun () ->
             Mikhailsky.Data.big_integer
-              (Base_samplers.int ~size:P.sampling_parameters.int_size rng_state))
+              (Protocol.Script_int_repr.to_zint (Michelson_base.int rng_state)))
       in
       {type_constraint; replacement = [replacement]}
     in
@@ -745,15 +748,15 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
     in
     let replace_by_mutez rng_state =
       replacement_gen ~fresh:[] ~typ:Type.mutez ~replacement:(fun () ->
-          Mikhailsky.Data.mutez (P.Michelson_base.tez rng_state))
+          Mikhailsky.Data.mutez (Michelson_base.tez rng_state))
     in
     let replace_by_key_hash rng_state =
       replacement_gen ~fresh:[] ~typ:Type.key_hash ~replacement:(fun () ->
-          Mikhailsky.Data.key_hash (P.Crypto_samplers.pkh rng_state))
+          Mikhailsky.Data.key_hash (Crypto_samplers.pkh rng_state))
     in
     let replace_by_key rng_state =
       replacement_gen ~fresh:[] ~typ:Type.key ~replacement:(fun () ->
-          Mikhailsky.Data.key (P.Crypto_samplers.pk rng_state))
+          Mikhailsky.Data.key (Crypto_samplers.pk rng_state))
     in
     {
       rule_patt = match_hole;
@@ -912,7 +915,10 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
     ]
 end
 
-module Data (P : Michelson_samplers_base.Full_S) = struct
+module Data
+    (Michelson_base : Michelson_samplers_base.S)
+    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+struct
   let match_data_node =
     let open Patt in
     Pattern
@@ -955,7 +961,8 @@ module Data (P : Michelson_samplers_base.Full_S) = struct
     let guarded_replacements = [{type_constraint = No_cnstrnt; replacement}] in
     {rule_patt = Root; replacements = guarded_replacements}
 
-  module Data_rewrite_leaves_rules = Data_rewrite_leaves (P)
+  module Data_rewrite_leaves_rules =
+    Data_rewrite_leaves (Michelson_base) (Crypto_samplers)
 
   let rules rng_state =
     [
