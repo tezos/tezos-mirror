@@ -64,6 +64,9 @@ let () =
   User_activated_upgrade.register
     ~migrate_from:Protocol.current_mainnet
     ~migrate_to:Alpha ;
+  Protocol_table_update.register
+    ~migrate_from:Protocol.current_mainnet
+    ~migrate_to:Alpha ;
   (* TODO: the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run

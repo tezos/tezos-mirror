@@ -828,15 +828,28 @@ module Chain : sig
   val all_protocol_levels :
     chain_store -> Protocol_levels.activation_block Protocol_levels.t Lwt.t
 
-  (** [may_update_protocol_level chain_store ~protocol_level (block,
-      ph)] updates the protocol level for the protocol [ph] in
-      [chain_store] with the activation [block]. If a previous entry
-      is found, does nothing. *)
+  (** [may_update_protocol_level chain_store ?pred ?protocol_level
+      (block, ph)] updates the protocol level for the protocol [ph] in
+      [chain_store] with the activation [block]. If [pred] is not
+      provided, it reads the [block]'s predecessor and check that the
+      [block]'s protocol level is increasing compared to its
+      predecessor. If [protocol_level] is provided, we use this value
+      instead of the protocol level found in [block]. If a previous
+      entry is found, it overwrites it. *)
   val may_update_protocol_level :
     chain_store ->
-    protocol_level:int ->
+    ?pred:Block.block ->
+    ?protocol_level:int ->
     Block.block * Protocol_hash.t ->
     unit tzresult Lwt.t
+
+  (** [may_update_ancestor_protocol_level chain_store ~head] tries to
+      find the activation block of the [head]'s protocol, checks that
+      its an ancestor and tries to update it if that's not the case. If
+      the registered activation block is not reachable (already
+      pruned), this function does nothing. *)
+  val may_update_ancestor_protocol_level :
+    chain_store -> head:Block.block -> unit tzresult Lwt.t
 
   (** [watcher chain_store] instantiates a new block watcher for
       [chain_store]. *)
@@ -971,6 +984,15 @@ module Unsafe : sig
   (** [set_caboose chain_store caboose] sets the caboose for the
       [chain_store] without checks. *)
   val set_caboose : chain_store -> block_descriptor -> unit tzresult Lwt.t
+
+  (** [set_protocol_level chain_store protocol_level
+      (block, ph)] updates the protocol level for the protocol [ph] in
+      [chain_store] with the activation [block]. *)
+  val set_protocol_level :
+    chain_store ->
+    protocol_level:int ->
+    Block.block * Protocol_hash.t ->
+    unit tzresult Lwt.t
 
   (** Snapshots utility functions *)
 

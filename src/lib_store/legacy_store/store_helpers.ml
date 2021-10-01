@@ -23,7 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = Store_events
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["db"]
+
+  let serializing_error =
+    declare_1
+      ~section
+      ~name:"serializing_error"
+      ~msg:"exception while serializing value {write_error}"
+      ~level:Error
+      ~pp1:Data_encoding.Binary.pp_write_error
+      ("write_error", Data_encoding.Binary.write_error_encoding)
+end
+
 open Store_sigs
 
 module Make_value (V : ENCODED_VALUE) = struct

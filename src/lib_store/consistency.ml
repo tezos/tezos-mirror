@@ -82,6 +82,29 @@ let is_block_stored block_store (descriptor, expected_metadata, block_name) =
         | Some _ -> return_unit
       else return_unit
 
+let check_protocol_levels block_store ~caboose protocol_levels =
+  Protocol_levels.iter_es
+    (fun proto_level
+         {Protocol_levels.block = (hash, activation_level); protocol; _} ->
+      if Compare.Int32.(activation_level < snd caboose) then
+        (* Cannot say anything *)
+        return_unit
+      else if (* Do not check the fake protocol *)
+              proto_level = 0 then return_unit
+      else
+        (Block_store.read_block
+           ~read_metadata:false
+           block_store
+           (Block (hash, 0))
+         >>= function
+         | Error _ -> return_none
+         | Ok block_opt -> return block_opt)
+        >>=? function
+        | Some _ -> return_unit
+        | None ->
+            fail (Unexpected_missing_activation_block {block = hash; protocol}))
+    protocol_levels
+
 let check_invariant ~genesis ~caboose ~savepoint ~cementing_highwatermark
     ~checkpoint ~current_head ~alternate_heads =
   let ( <= ) descr descr' = Compare.Int32.(snd descr <= snd descr') in
@@ -127,7 +150,7 @@ let check_consistency chain_dir genesis =
   >>=? fun alternate_heads_data ->
   Stored_data.get alternate_heads_data >>= fun alternate_heads ->
   Stored_data.load (Naming.protocol_levels_file chain_dir)
-  >>=? fun _protocol_levels_data ->
+  >>=? fun protocol_levels_data ->
   Stored_data.load (Naming.invalid_blocks_file chain_dir)
   >>=? fun _invalid_blocks_data ->
   Stored_data.load (Naming.forked_chains_file chain_dir)
@@ -164,6 +187,8 @@ let check_consistency chain_dir genesis =
       >>= fun cementing_highwatermark ->
       check_cementing_highwatermark ~cementing_highwatermark block_store
       >>=? fun () ->
+      Stored_data.get protocol_levels_data >>= fun protocol_levels ->
+      check_protocol_levels block_store ~caboose protocol_levels >>=? fun () ->
       check_invariant
         ~genesis:genesis_descr
         ~caboose

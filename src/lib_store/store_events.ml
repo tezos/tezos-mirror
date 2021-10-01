@@ -251,6 +251,23 @@ let restore_protocol_activation =
     ~pp2:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+let update_protocol_table =
+  declare_4
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"update_protocol_table"
+    ~msg:
+      "the protocol table was updated: protocol {proto_hash} (level \
+       {proto_level}) was activated on block {block_hash} (level \
+       {block_level})"
+    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Protocol_hash.pp_short
+    ("proto_level", Data_encoding.int31)
+    ("block_hash", Block_hash.encoding)
+    ~pp3:Block_hash.pp
+    ("block_level", Data_encoding.int32)
+    ~pp4:pp_int32
+
 (* Warning *)
 let warning_incomplete_storage =
   Internal_event.Simple.declare_1

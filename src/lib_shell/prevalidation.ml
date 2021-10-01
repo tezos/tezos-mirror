@@ -61,15 +61,6 @@ module type T = sig
 
   val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
-  type status = {
-    applied_operations :
-      (Proto.operation_data operation * Proto.operation_receipt) list;
-    block_result : Tezos_protocol_environment.validation_result;
-    block_metadata : Proto.block_header_metadata;
-  }
-
-  val status : t -> Block_header.shell_header option -> status tzresult Lwt.t
-
   val validation_state : t -> Proto.validation_state
 
   val pp_result : Format.formatter -> result -> unit
@@ -198,20 +189,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
           | `Permanent -> Refused trace
           | `Temporary -> Branch_delayed trace)
 
-  type status = {
-    applied_operations :
-      (Proto.operation_data operation * Proto.operation_receipt) list;
-    block_result : Tezos_protocol_environment.validation_result;
-    block_metadata : Proto.block_header_metadata;
-  }
-
-  let status pv shell_header =
-    (* A pre-application should not commit into the protocol
-       caches. For this reason, [cache_nonce] is [None]. *)
-    Proto.finalize_block pv.state shell_header
-    >>=? fun (block_result, block_metadata) ->
-    return {block_metadata; block_result; applied_operations = pv.applied}
-
   let validation_state {state; _} = state
 
   let pp_result ppf =
@@ -329,8 +306,10 @@ let preapply chain_store ~user_activated_upgrades
       fitness = [];
     }
   in
-  Prevalidation.status validation_state (Some shell_header)
-  >>=? fun {block_result; _} ->
+  Proto.finalize_block
+    (Prevalidation.validation_state validation_state)
+    (Some shell_header)
+  >>=? fun (block_result, _) ->
   Block_validation.may_patch_protocol
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
