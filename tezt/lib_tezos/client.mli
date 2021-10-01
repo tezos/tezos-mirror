@@ -469,16 +469,16 @@ val spawn_originate_contract :
     the [stresstest] command. *)
 val write_bootstrap_stresstest_sources_file : t -> string Lwt.t
 
-(** [stresstest ?endpoint ~transfers ?tps client] calls
+(** [stresstest ?endpoint ?transfers ?tps client] calls
     [tezos-client stresstest transfer using <sources> --transfers <transfers> --tps <tps>],
     where [sources] is the result of {!write_bootstrap_stresstest_sources_file}.
 
     Default values:
     - [endpoint]: cf {!create}
-    - [tps]: do not provide the argument to the command
+    - [transfers] and [tps]: do not provide the argument to the command
 *)
 val stresstest :
-  ?endpoint:endpoint -> transfers:int -> ?tps:int -> t -> unit Lwt.t
+  ?endpoint:endpoint -> ?transfers:int -> ?tps:int -> t -> unit Lwt.t
 
 (** Same as {!stresstest}, but does not wait for the process to exit,
     and takes an additional argument [sources] to pass on to te command.
@@ -488,9 +488,9 @@ val stresstest :
     {!stresstest}. *)
 val spawn_stresstest :
   ?endpoint:endpoint ->
+  ?transfers:int ->
   ?tps:int ->
   sources:string ->
-  transfers:int ->
   t ->
   Process.t
 
