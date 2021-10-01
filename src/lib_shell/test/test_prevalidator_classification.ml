@@ -740,25 +740,31 @@ module To_map = struct
 end
 
 let () =
+  let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
     "Prevalidator_classification"
     [
-      ( "",
-        qcheck_wrap
+      mk_tests
+        "flush"
+        [
+          test_flush_empties_all_except_refused;
+          test_flush_empties_all_except_refused_and_branch_refused;
+        ];
+      mk_tests "is_in_mempool" [test_is_in_mempool_remove];
+      mk_tests "is_applied" [test_is_applied];
+      mk_tests "invariants" [test_invariants];
+      mk_tests "bounded" [Bounded.test_bounded];
+      mk_tests
+        "to_map"
+        To_map.
           [
-            test_flush_empties_all_except_refused;
-            test_flush_empties_all_except_refused_and_branch_refused;
-            test_is_in_mempool_remove;
-            test_is_applied;
-            test_invariants;
-            Bounded.test_bounded;
-            To_map.test_create;
-            To_map.test_add;
-            To_map.test_remove;
-            To_map.test_map_remove_add;
-            To_map.test_map_add_remove;
-            To_map.test_flush;
-            To_map.test_is_in_mempool;
-            To_map.test_none;
-          ] );
+            test_create;
+            test_add;
+            test_remove;
+            test_map_remove_add;
+            test_map_add_remove;
+            test_flush;
+            test_is_in_mempool;
+            test_none;
+          ];
     ]

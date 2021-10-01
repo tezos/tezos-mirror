@@ -648,7 +648,7 @@ let () =
   Alcotest.run
     "Prevalidator"
     [
-      ( "",
+      ( "handle_operations",
         qcheck_wrap
           [
             test_handle_live_operations_live_blocks_all_outdated;
