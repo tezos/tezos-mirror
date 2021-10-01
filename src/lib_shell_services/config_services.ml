@@ -23,22 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let path = RPC_path.(open_root / "config")
+
 module Network = struct
   let user_activated_upgrades =
     RPC_service.get_service
       ~description:"List of protocols to switch to at given levels"
       ~query:RPC_query.empty
       ~output:User_activated.upgrades_encoding
-      RPC_path.(root / "config" / "network" / "user_activated_upgrades")
+      RPC_path.(path / "network" / "user_activated_upgrades")
 
   let user_activated_protocol_overrides =
     RPC_service.get_service
       ~description:"List of protocols which replace other protocols"
       ~query:RPC_query.empty
       ~output:User_activated.protocol_overrides_encoding
-      RPC_path.(
-        root / "config" / "network" / "user_activated_protocol_overrides")
+      RPC_path.(path / "network" / "user_activated_protocol_overrides")
 end
+
+let history_mode_encoding =
+  Data_encoding.(obj1 (req "history_mode" History_mode.encoding))
+
+let history_mode =
+  RPC_service.get_service
+    ~description:"Returns the history mode of the node's underlying storage."
+    ~query:RPC_query.empty
+    ~output:history_mode_encoding
+    RPC_path.(path / "history_mode")
 
 let user_activated_upgrades cctxt =
   RPC_context.make_call Network.user_activated_upgrades cctxt () () ()

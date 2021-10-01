@@ -119,6 +119,22 @@ Node
 -  Improved the snapshot export mechanism by reducing both the export
    time and the memory footprint.
 
+-  Added new RPCs to inspect the storage status:
+
+   -  GET ``chains/main/levels/checkpoint``: checkpoint block hash and
+      level.
+   -  GET ``chains/main/levels/savepoint``: savepoint block hash and
+      level.
+   -  GET ``chains/main/levels/caboose``: caboose block hash and
+      level.
+   -  GET ``config/history_mode``: history mode of the node.
+
+-  Deprecated the ``chains/main/checkpoint`` RPC.
+
+-  The ``tezos-admin-client show current checkpoint`` command now
+   only outputs the current checkpoint. It no longer outputs the savepoint,
+   caboose and history mode.
+
 Client
 ------
 

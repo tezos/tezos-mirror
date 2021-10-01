@@ -90,21 +90,13 @@ let commands () =
       no_options
       (fixed ["show"; "current"; "checkpoint"])
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Chain.checkpoint cctxt ~chain:cctxt#chain ()
-        >>=? fun (block_header, save_point, caboose, history_mode) ->
+        Shell_services.Chain.Levels.checkpoint cctxt ~chain:cctxt#chain ()
+        >>=? fun (checkpoint_hash, checkpoint_level) ->
         cctxt#message
-          "@[<v 0>Checkpoint: %a@,\
-           Checkpoint level: %ld@,\
-           History mode: %a@,\
-           Savepoint level: %ld@,\
-           Caboose level: %ld@]"
+          "@[<v 0>Checkpoint: %a@,Checkpoint level: %ld@]"
           Block_hash.pp
-          (Block_header.hash block_header)
-          block_header.shell.level
-          History_mode.pp
-          history_mode
-          save_point
-          caboose
+          checkpoint_hash
+          checkpoint_level
         >>= fun () -> return ());
     command
       ~group

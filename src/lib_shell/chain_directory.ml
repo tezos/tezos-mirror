@@ -142,6 +142,12 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       Store.Chain.caboose chain_store >>= fun (_, caboose_level) ->
       let history_mode = Store.Chain.history_mode chain_store in
       return (checkpoint_header, savepoint_level, caboose_level, history_mode)) ;
+  register0 S.Levels.checkpoint (fun chain_store () () ->
+      Store.Chain.checkpoint chain_store >>= return) ;
+  register0 S.Levels.savepoint (fun chain_store () () ->
+      Store.Chain.savepoint chain_store >>= return) ;
+  register0 S.Levels.caboose (fun chain_store () () ->
+      Store.Chain.caboose chain_store >>= return) ;
   register0 S.is_bootstrapped (fun chain_store () () ->
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
