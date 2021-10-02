@@ -1432,12 +1432,14 @@ and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
-and ('key, 'value) big_map = {
-  id : Big_map.Id.t option;
-  diff : ('key, 'value) big_map_overlay;
-  key_type : 'key comparable_ty;
-  value_type : 'value ty;
-}
+and ('key, 'value) big_map =
+  | Big_map : {
+      id : Big_map.Id.t option;
+      diff : ('key, 'value) big_map_overlay;
+      key_type : 'key comparable_ty;
+      value_type : 'value ty;
+    }
+      -> ('key, 'value) big_map
 
 and ('a, 's, 'r, 'f) kdescr = {
   kloc : Script.location;

@@ -89,16 +89,16 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let k = accu and (_, (map, _)) = stack in
       Interp_costs.map_get_and_update k map
   | IBig_map_mem _ ->
-      let (map, _) = stack in
+      let (Big_map map, _) = stack in
       Interp_costs.big_map_mem map.diff
   | IBig_map_get _ ->
-      let (map, _) = stack in
+      let (Big_map map, _) = stack in
       Interp_costs.big_map_get map.diff
   | IBig_map_update _ ->
-      let (_, (map, _)) = stack in
+      let (_, (Big_map map, _)) = stack in
       Interp_costs.big_map_update map.diff
   | IBig_map_get_and_update _ ->
-      let (_, (map, _)) = stack in
+      let (_, (Big_map map, _)) = stack in
       Interp_costs.big_map_get_and_update map.diff
   | IAdd_seconds_to_timestamp _ ->
       let n = accu and (t, _) = stack in

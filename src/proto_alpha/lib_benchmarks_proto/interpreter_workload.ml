@@ -1203,17 +1203,18 @@ let extract_ir_sized_step :
       Instructions.map_get_and_update key_size (Size.map map)
   | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
   | (IEmpty_big_map (_, _, _, _), _) -> Instructions.empty_big_map
-  | (IBig_map_mem (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
+  | (IBig_map_mem (_, _), (v, (Big_map {diff = {size; _}; key_type; _}, _))) ->
       let key_size = Size.size_of_comparable_value key_type v in
       Instructions.big_map_mem key_size (Size.of_int size)
-  | (IBig_map_get (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
+  | (IBig_map_get (_, _), (v, (Big_map {diff = {size; _}; key_type; _}, _))) ->
       let key_size = Size.size_of_comparable_value key_type v in
       Instructions.big_map_get key_size (Size.of_int size)
-  | (IBig_map_update (_, _), (v, (_, ({diff = {size; _}; key_type; _}, _)))) ->
+  | ( IBig_map_update (_, _),
+      (v, (_, (Big_map {diff = {size; _}; key_type; _}, _))) ) ->
       let key_size = Size.size_of_comparable_value key_type v in
       Instructions.big_map_update key_size (Size.of_int size)
   | ( IBig_map_get_and_update (_, _),
-      (v, (_, ({diff = {size; _}; key_type; _}, _))) ) ->
+      (v, (_, (Big_map {diff = {size; _}; key_type; _}, _))) ) ->
       let key_size = Size.size_of_comparable_value key_type v in
       Instructions.big_map_get_and_update key_size (Size.of_int size)
   | (IConcat_string (_, _), (ss, _)) ->

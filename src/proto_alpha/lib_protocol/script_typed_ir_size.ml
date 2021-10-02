@@ -358,7 +358,7 @@ and big_map_size :
     b ty ->
     (a, b) big_map ->
     nodes_and_size =
- fun ~count_lambda_nodes accu cty ty' {id; diff; key_type; value_type} ->
+ fun ~count_lambda_nodes accu cty ty' (Big_map {id; diff; key_type; value_type}) ->
   (* [Map.bindings] cannot overflow and only consumes a
      logarithmic amount of stack. *)
   let diff_size =

@@ -473,7 +473,7 @@ module Ticket_collection = struct
    fun ctxt
        val_hty
        key_ty
-       {Script_typed_ir.id; diff = {map = _; size}; key_type = _; value_type}
+       (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
        acc
        k ->
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
