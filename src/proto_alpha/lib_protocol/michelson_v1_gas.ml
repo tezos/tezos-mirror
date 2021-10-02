@@ -1455,7 +1455,7 @@ module Cost_of = struct
       let open S_syntax in
       let (module Box) = Script_set.get set in
       let per_elt_cost =
-        Size.size_of_comparable_value Box.elt_ty elt
+        Size.size_of_comparable_value Box.OPS.elt_ty elt
         |> Size.to_int |> S.safe_int
       in
       let size = S.safe_int Box.size in
@@ -1466,7 +1466,7 @@ module Cost_of = struct
       let open S_syntax in
       let (module Box) = Script_set.get set in
       let per_elt_cost =
-        Size.size_of_comparable_value Box.elt_ty elt
+        Size.size_of_comparable_value Box.OPS.elt_ty elt
         |> Size.to_int |> S.safe_int
       in
       let size = S.safe_int Box.size in
@@ -1479,7 +1479,7 @@ module Cost_of = struct
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
       let per_elt_cost =
-        Size.size_of_comparable_value Box.key_ty elt
+        Size.size_of_comparable_value Box.OPS.key_ty elt
         |> Size.to_int |> S.safe_int
       in
       let size = S.safe_int Box.size in
@@ -1492,7 +1492,7 @@ module Cost_of = struct
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
       let per_elt_cost =
-        Size.size_of_comparable_value Box.key_ty elt
+        Size.size_of_comparable_value Box.OPS.key_ty elt
         |> Size.to_int |> S.safe_int
       in
       let size = S.safe_int Box.size in
@@ -1506,7 +1506,7 @@ module Cost_of = struct
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
       let per_elt_cost =
-        Size.size_of_comparable_value Box.key_ty elt
+        Size.size_of_comparable_value Box.OPS.key_ty elt
         |> Size.to_int |> S.safe_int
       in
       let size = S.safe_int Box.size in

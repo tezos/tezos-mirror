@@ -33,22 +33,24 @@ let make x = Map_tag x
 let get_module (Map_tag x) = x
 
 let key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (Map_tag (module Box)) -> Box.key_ty
+ fun (Map_tag (module Box)) -> Box.OPS.key_ty
 
 let empty : type a b. a comparable_ty -> (a, b) map =
  fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
+  let module OPS = struct
+    let key_ty = ty
 
-    let compare = Script_comparable.compare_comparable ty
-  end) in
+    include Map.Make (struct
+      type t = a
+
+      let compare = Script_comparable.compare_comparable ty
+    end)
+  end in
   Map_tag
     (module struct
       type key = a
 
       type value = b
-
-      let key_ty = ty
 
       module OPS = OPS
 
@@ -75,8 +77,6 @@ let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
       type key = a
 
       type value = b
-
-      let key_ty = Box.key_ty
 
       module OPS = Box.OPS
 

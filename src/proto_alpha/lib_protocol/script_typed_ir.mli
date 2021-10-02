@@ -274,6 +274,8 @@ module type Boxed_set_OPS = sig
 
   type elt
 
+  val elt_ty : elt comparable_ty
+
   val empty : t
 
   val add : elt -> t -> t
@@ -287,8 +289,6 @@ end
 
 module type Boxed_set = sig
   type elt
-
-  val elt_ty : elt comparable_ty
 
   module OPS : Boxed_set_OPS with type elt = elt
 
@@ -306,6 +306,8 @@ module type Boxed_map_OPS = sig
   type 'a t
 
   type key
+
+  val key_ty : key comparable_ty
 
   val empty : 'value t
 
@@ -328,8 +330,6 @@ module type Boxed_map = sig
   type key
 
   type value
-
-  val key_ty : key comparable_ty
 
   module OPS : Boxed_map_OPS with type key = key
 
