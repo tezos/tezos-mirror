@@ -50,7 +50,7 @@ let empty_from : type a b c. (a, b) map -> (a, c) map =
 let empty : type a b. a comparable_ty -> (a, b) map =
  fun ty ->
   let module OPS = struct
-    let key_ty = ty
+    let key_size = Gas_comparable_input_size.size_of_comparable_value ty
 
     include Map.Make (struct
       type t = a

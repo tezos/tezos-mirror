@@ -35,7 +35,7 @@ let get (Set_tag x) = x
 let empty : type a. a comparable_ty -> a set =
  fun ty ->
   let module OPS : Boxed_set_OPS with type elt = a = struct
-    let elt_ty = ty
+    let elt_size = Gas_comparable_input_size.size_of_comparable_value ty
 
     include Set.Make (struct
       type t = a

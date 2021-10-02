@@ -274,7 +274,7 @@ module type Boxed_set_OPS = sig
 
   type elt
 
-  val elt_ty : elt comparable_ty
+  val elt_size : elt -> int (* Gas_input_size.t *)
 
   val empty : t
 
@@ -307,7 +307,7 @@ module type Boxed_map_OPS = sig
 
   type key
 
-  val key_ty : key comparable_ty
+  val key_size : key -> int (* Gas_input_size.t *)
 
   val empty : 'value t
 
