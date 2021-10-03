@@ -1824,6 +1824,23 @@ type 'before dup_n_proof_argument =
       ('before, 'a) dup_n_gadt_witness * 'a ty
       -> 'before dup_n_proof_argument
 
+let rec make_dug_proof_argument :
+    type a s x.
+    location ->
+    int ->
+    x ty ->
+    (a, s) stack_ty ->
+    (a, s, x) dug_proof_argument option =
+ fun loc n x stk ->
+  match (n, stk) with
+  | (0, rest) -> Some (Dug_proof_argument (KRest, Item_t (x, rest)))
+  | (n, Item_t (v, rest)) ->
+      make_dug_proof_argument loc (n - 1) x rest
+      |> Option.map @@ fun (Dug_proof_argument (n', aft')) ->
+         let kinfo = {iloc = loc; kstack_ty = aft'} in
+         Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft'))
+  | (_, _) -> None
+
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty)
     (entrypoints : full entrypoints) entrypoint :
@@ -3095,32 +3112,17 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc dig (Item_t (x, aft))
   | (Prim (loc, I_DIG, (([] | _ :: _ :: _) as l), _), _) ->
       fail (Invalid_arity (loc, I_DIG, 1, List.length l))
-  | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack)) ->
+  | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack)) -> (
       parse_uint10 n >>?= fun whole_n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument whole_n) >>?= fun ctxt ->
-      let rec make_proof_argument :
-          type a s x.
-          int ->
-          x ty ->
-          (a, s) stack_ty ->
-          (a, s, x) dug_proof_argument tzresult =
-       fun n x stk ->
-        match (Compare.Int.(n = 0), stk) with
-        | (true, rest) -> ok @@ Dug_proof_argument (KRest, Item_t (x, rest))
-        | (false, Item_t (v, rest)) ->
-            make_proof_argument (n - 1) x rest
-            >|? fun (Dug_proof_argument (n', aft')) ->
-            let kinfo = {iloc = loc; kstack_ty = aft'} in
-            Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft'))
-        | (_, _) ->
-            let whole_stack = serialize_stack_for_error ctxt whole_stack in
-            error (Bad_stack (loc, I_DUG, whole_n, whole_stack))
-      in
       error_unexpected_annot loc result_annot >>?= fun () ->
-      make_proof_argument whole_n x whole_stack
-      >>?= fun (Dug_proof_argument (n', aft)) ->
-      let dug = {apply = (fun kinfo k -> IDug (kinfo, whole_n, n', k))} in
-      typed ctxt loc dug aft
+      match make_dug_proof_argument loc whole_n x whole_stack with
+      | None ->
+          let whole_stack = serialize_stack_for_error ctxt whole_stack in
+          fail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
+      | Some (Dug_proof_argument (n', aft)) ->
+          let dug = {apply = (fun kinfo k -> IDug (kinfo, whole_n, n', k))} in
+          typed ctxt loc dug aft)
   | (Prim (loc, I_DUG, [_], result_annot), stack) ->
       Lwt.return
         ( error_unexpected_annot loc result_annot >>? fun () ->
