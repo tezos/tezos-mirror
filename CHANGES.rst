@@ -161,6 +161,9 @@ Client
 
 -  Fix gas simulation for operation batches for Granada, Hangzhou and Alpha
 
+-  Added timestamp display of the snapshot's block target when running
+   the ``tezos-node snapshot info`` command.
+
 Baker / Endorser / Accuser
 --------------------------
 
