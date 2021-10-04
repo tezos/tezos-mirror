@@ -936,25 +936,25 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICons_pair
-        ~kinstr:(ICons_pair (kinfo_unitunit, halt (pair unit unit @$ bot)))
+        ~kinstr:(ICons_pair (kinfo_unitunit, halt (cpair unit unit @$ bot)))
         ()
 
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICar
-        ~kinstr:(ICar (kinfo (pair unit unit @$ bot), halt_unit))
+        ~kinstr:(ICar (kinfo (cpair unit unit @$ bot), halt_unit))
         ()
 
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICdr
-        ~kinstr:(ICdr (kinfo (pair unit unit @$ bot), halt_unit))
+        ~kinstr:(ICdr (kinfo (cpair unit unit @$ bot), halt_unit))
         ()
 
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IUnpair
-        ~kinstr:(IUnpair (kinfo (pair unit unit @$ bot), halt_unitunit))
+        ~kinstr:(IUnpair (kinfo (cpair unit unit @$ bot), halt_unitunit))
         ()
   end
 
@@ -1017,13 +1017,13 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ILeft
-        ~kinstr:(ICons_left (kinfo_unit, halt (union unit unit @$ bot)))
+        ~kinstr:(ICons_left (kinfo_unit, halt (cunion unit unit @$ bot)))
         ()
 
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IRight
-        ~kinstr:(ICons_right (kinfo_unit, halt (union unit unit @$ bot)))
+        ~kinstr:(ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)))
         ()
 
     let () =
@@ -1032,7 +1032,7 @@ module Registration_section = struct
         ~kinstr:
           (IIf_left
              {
-               kinfo = kinfo (union unit unit @$ bot);
+               kinfo = kinfo (cunion unit unit @$ bot);
                branch_if_left = halt_unit;
                branch_if_right = halt_unit;
                k = halt_unit;
@@ -1254,14 +1254,14 @@ module Registration_section = struct
     let map_map_code =
       IMap_map
         ( kinfo (map int_cmp unit @$ unit @$ bot),
-          ICdr (kinfo (pair int unit @$ unit @$ bot), halt_unitunit),
+          ICdr (kinfo (cpair int unit @$ unit @$ bot), halt_unitunit),
           halt (map int_cmp unit @$ unit @$ bot) )
      *)
 
     let map_map_code =
       IMap_map
         ( kinfo (map int_cmp unit @$ unit @$ bot),
-          IFailwith (kinfo (pair int unit @$ unit @$ bot), 0, pair int unit),
+          IFailwith (kinfo (cpair int unit @$ unit @$ bot), 0, cpair int unit),
           halt (map int_cmp unit @$ unit @$ bot) )
 
     let () =
@@ -1282,7 +1282,7 @@ module Registration_section = struct
     let kmap_iter_code =
       IMap_iter
         ( kinfo (map int_cmp unit @$ unit @$ bot),
-          IDrop (kinfo (pair int unit @$ unit @$ bot), halt_unit),
+          IDrop (kinfo (cpair int unit @$ unit @$ bot), halt_unit),
           halt_unit )
 
     let () =
@@ -1745,7 +1745,7 @@ module Registration_section = struct
         ~kinstr:
           (IEdiv_teznat
              ( kinfo (mutez @$ nat @$ bot),
-               halt (option (pair mutez mutez) @$ bot) ))
+               halt (option (cpair mutez mutez) @$ bot) ))
         ~stack_sampler:(fun cfg rng_state ->
           let (_, samplers) = make_default_samplers cfg.sampler in
           fun () ->
@@ -1760,7 +1760,7 @@ module Registration_section = struct
         ~kinstr:
           (IEdiv_tez
              ( kinfo (mutez @$ mutez @$ bot),
-               halt (option (pair nat mutez) @$ bot) ))
+               halt (option (cpair nat mutez) @$ bot) ))
         ()
   end
 
@@ -1870,7 +1870,7 @@ module Registration_section = struct
         ~intercept_stack:(zero, (zero, eos))
         ~kinstr:
           (IEdiv_int
-             (kinfo (int @$ int @$ bot), halt (option (pair int nat) @$ bot)))
+             (kinfo (int @$ int @$ bot), halt (option (cpair int nat) @$ bot)))
         ()
 
     let () =
@@ -1879,7 +1879,7 @@ module Registration_section = struct
         ~intercept_stack:(zero_n, (zero, eos))
         ~kinstr:
           (IEdiv_nat
-             (kinfo (nat @$ int @$ bot), halt (option (pair int nat) @$ bot)))
+             (kinfo (nat @$ int @$ bot), halt (option (cpair int nat) @$ bot)))
         ()
 
     let () =
@@ -1983,10 +1983,11 @@ module Registration_section = struct
         ICons_right ->
         IHalt
        *)
-      let cons_r = ICons_right (kinfo_unit, halt (union unit unit @$ bot)) in
+      let cons_r = ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop_left
-        ~kinstr:(ILoop_left (kinfo (union unit unit @$ bot), cons_r, halt_unit))
+        ~kinstr:
+          (ILoop_left (kinfo (cunion unit unit @$ bot), cons_r, halt_unit))
         ()
 
     let () =
@@ -2034,9 +2035,9 @@ module Registration_section = struct
         let descr =
           {
             kloc = 0;
-            kbef = pair unit unit @$ bot;
+            kbef = cpair unit unit @$ bot;
             kaft = unit @$ bot;
-            kinstr = ICdr (kinfo (pair unit unit @$ bot), halt_unit);
+            kinstr = ICdr (kinfo (cpair unit unit @$ bot), halt_unit);
           }
         in
         Lam (descr, Micheline.Int (0, Z.zero))
@@ -2045,7 +2046,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IApply
         ~kinstr:
           (IApply
-             ( kinfo (unit @$ lambda (pair unit unit) unit @$ bot),
+             ( kinfo (unit @$ lambda (cpair unit unit) unit @$ bot),
                unit,
                halt (lambda unit unit @$ bot) ))
         ~stack_sampler:(fun _cfg _rng_state () -> ((), (code, eos)))
@@ -2181,11 +2182,11 @@ module Registration_section = struct
         let descr =
           {
             kloc = 0;
-            kbef = pair unit unit @$ bot;
+            kbef = cpair unit unit @$ bot;
             kaft = pair_list_operation_unit @$ bot;
             kinstr =
               ICdr
-                ( kinfo (pair unit unit @$ bot),
+                ( kinfo (cpair unit unit @$ bot),
                   INil
                     ( kinfo (unit @$ bot),
                       ICons_pair
@@ -2689,14 +2690,15 @@ module Registration_section = struct
         ~kinstr:
           (IRead_ticket
              ( kinfo (ticket unit_cmp @$ bot),
-               halt (pair address (pair unit nat) @$ ticket unit_cmp @$ bot) ))
+               halt (cpair address (cpair unit nat) @$ ticket unit_cmp @$ bot)
+             ))
         ()
 
     let split_ticket_instr =
       let ticket_unit = ticket unit_cmp in
       let pair_ticket_unit_ticket_unit = pair ticket_unit ticket_unit in
       ISplit_ticket
-        ( kinfo (ticket_unit @$ pair nat nat @$ bot),
+        ( kinfo (ticket_unit @$ cpair nat nat @$ bot),
           halt (option pair_ticket_unit_ticket_unit @$ bot) )
 
     let () =
@@ -2796,7 +2798,7 @@ module Registration_section = struct
       IOpen_chest
         ( kinfo
             (Michelson_types.chest_key @$ Michelson_types.chest @$ nat @$ bot),
-          halt (union bytes bool @$ bot) )
+          halt (cunion bytes bool @$ bot) )
 
     let resulting_stack chest chest_key time =
       let chest = Script_timelock.make_chest chest in
@@ -2945,7 +2947,7 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont =
             KLoop_in_left
-              (ICons_right (kinfo_unit, halt (union unit unit @$ bot)), KNil)
+              (ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)), KNil)
           in
           let stack = (R (), eos) in
           fun () -> Ex_stack_and_cont {stack; cont})
@@ -3076,7 +3078,7 @@ module Registration_section = struct
         ()
 
     let map_enter_body_code =
-      let kbody = ICdr (kinfo (pair int unit @$ unit @$ bot), halt_unitunit) in
+      let kbody = ICdr (kinfo (cpair int unit @$ unit @$ bot), halt_unitunit) in
       fun accu -> KMap_enter_body (kbody, accu, Script_map.empty int_cmp, KNil)
 
     let () =
@@ -3126,7 +3128,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_KMap_exit_body
         ~cont_and_stack_sampler:(fun cfg rng_state ->
           let kbody =
-            ICdr (kinfo (pair int unit @$ unit @$ bot), halt_unitunit)
+            ICdr (kinfo (cpair int unit @$ unit @$ bot), halt_unitunit)
           in
           fun () ->
             let (key, map) = Maps.generate_map_and_key_in_map cfg rng_state in
