@@ -45,26 +45,26 @@ let ty_traverse_f =
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
     match cty with
-    | Unit_key -> ret_succ_adding accu base_basic
-    | Int_key -> ret_succ_adding accu base_basic
-    | Nat_key -> ret_succ_adding accu base_basic
-    | Signature_key -> ret_succ_adding accu base_basic
-    | String_key -> ret_succ_adding accu base_basic
-    | Bytes_key -> ret_succ_adding accu base_basic
-    | Mutez_key -> ret_succ_adding accu base_basic
-    | Key_hash_key -> ret_succ_adding accu base_basic
-    | Key_key -> ret_succ_adding accu base_basic
-    | Timestamp_key -> ret_succ_adding accu base_basic
-    | Address_key -> ret_succ_adding accu base_basic
-    | Tx_rollup_l2_address_key -> ret_succ_adding accu base_basic
-    | Bool_key -> ret_succ_adding accu base_basic
-    | Chain_id_key -> ret_succ_adding accu base_basic
-    | Never_key -> ret_succ_adding accu base_basic
-    | Pair_key (_ty1, _ty2, a, YesYes) ->
+    | Unit_t -> ret_succ_adding accu base_basic
+    | Int_t -> ret_succ_adding accu base_basic
+    | Nat_t -> ret_succ_adding accu base_basic
+    | Signature_t -> ret_succ_adding accu base_basic
+    | String_t -> ret_succ_adding accu base_basic
+    | Bytes_t -> ret_succ_adding accu base_basic
+    | Mutez_t -> ret_succ_adding accu base_basic
+    | Key_hash_t -> ret_succ_adding accu base_basic
+    | Key_t -> ret_succ_adding accu base_basic
+    | Timestamp_t -> ret_succ_adding accu base_basic
+    | Address_t -> ret_succ_adding accu base_basic
+    | Tx_rollup_l2_address_t -> ret_succ_adding accu base_basic
+    | Bool_t -> ret_succ_adding accu base_basic
+    | Chain_id_t -> ret_succ_adding accu base_basic
+    | Never_t -> ret_succ_adding accu base_basic
+    | Pair_t (_ty1, _ty2, a, YesYes) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Union_key (_ty1, _ty2, a, YesYes) ->
+    | Union_t (_ty1, _ty2, a, YesYes) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Option_key (_ty, a, Yes) ->
+    | Option_t (_ty, a, Yes) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
   and apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
    fun accu ty ->
@@ -330,26 +330,26 @@ let rec value_size :
       type a. nodes_and_size -> a comparable_ty -> a -> nodes_and_size =
    fun accu ty x ->
     match ty with
-    | Unit_key -> ret_succ accu
-    | Int_key -> ret_succ_adding accu (script_int_size x)
-    | Nat_key -> ret_succ_adding accu (script_nat_size x)
-    | Signature_key -> ret_succ_adding accu signature_size
-    | String_key -> ret_succ_adding accu (script_string_size x)
-    | Bytes_key -> ret_succ_adding accu (bytes_size x)
-    | Mutez_key -> ret_succ_adding accu mutez_size
-    | Key_hash_key -> ret_succ_adding accu (key_hash_size x)
-    | Key_key -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_key -> ret_succ_adding accu (timestamp_size x)
-    | Address_key -> ret_succ_adding accu (address_size x)
-    | Tx_rollup_l2_address_key ->
+    | Unit_t -> ret_succ accu
+    | Int_t -> ret_succ_adding accu (script_int_size x)
+    | Nat_t -> ret_succ_adding accu (script_nat_size x)
+    | Signature_t -> ret_succ_adding accu signature_size
+    | String_t -> ret_succ_adding accu (script_string_size x)
+    | Bytes_t -> ret_succ_adding accu (bytes_size x)
+    | Mutez_t -> ret_succ_adding accu mutez_size
+    | Key_hash_t -> ret_succ_adding accu (key_hash_size x)
+    | Key_t -> ret_succ_adding accu (public_key_size x)
+    | Timestamp_t -> ret_succ_adding accu (timestamp_size x)
+    | Address_t -> ret_succ_adding accu (address_size x)
+    | Tx_rollup_l2_address_t ->
         ret_succ_adding accu (tx_rollup_l2_address_size x)
-    | Bool_key -> ret_succ accu
-    | Pair_key (_, _, _, YesYes) -> ret_succ_adding accu h2w
-    | Union_key (_, _, _, YesYes) -> ret_succ_adding accu h1w
-    | Option_key (_, _, Yes) ->
+    | Bool_t -> ret_succ accu
+    | Pair_t (_, _, _, YesYes) -> ret_succ_adding accu h2w
+    | Union_t (_, _, _, YesYes) -> ret_succ_adding accu h1w
+    | Option_t (_, _, Yes) ->
         ret_succ_adding accu (option_size (fun _ -> !!0) x)
-    | Chain_id_key -> ret_succ_adding accu chain_id_size
-    | Never_key -> ( match x with _ -> .)
+    | Chain_id_t -> ret_succ_adding accu chain_id_size
+    | Never_t -> ( match x with _ -> .)
   in
   value_traverse ty x accu {apply; apply_comparable}
  [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]

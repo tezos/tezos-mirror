@@ -180,9 +180,9 @@ let rec ty_of_comparable_ty :
   | Chain_id_key -> Chain_id_t
   | Pair_key (l, r, meta, YesYes) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Union_key (l, r, meta, YesYes) ->
+  | Union_t (l, r, meta, YesYes) ->
       Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Option_key (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
+  | Option_t (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
