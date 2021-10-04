@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type argument =
+  (* If you're considering adding [--endpoint] and [--rpc-addr],
+     beware that, for the moment, they are automatically computed in
+     {!create} below *)
+  | Symbolic_block_caching_time of int
+
 module Parameters = struct
   type persistent_state = {
     arguments : string list;
@@ -62,12 +68,20 @@ let set_ready t =
 let handle_event t ({name; _} : event) =
   match name with "starting_proxy_rpc_server.v0" -> set_ready t | _ -> ()
 
-let create ?runner ?name ?rpc_port node =
+let create ?runner ?name ?rpc_port ?(args = []) node =
   let path = Constant.tezos_proxy_server in
   let rpc_port =
     match rpc_port with None -> fresh_port () | Some port -> port
   in
-  let arguments =
+  let user_arguments =
+    List.map
+      (function
+        | Symbolic_block_caching_time s ->
+            ["--sym-block-caching-time"; Int.to_string s])
+      args
+    |> List.concat
+  in
+  let connection_arguments =
     [
       "--endpoint";
       "http://localhost:" ^ string_of_int (Node.rpc_port node);
@@ -80,6 +94,7 @@ let create ?runner ?name ?rpc_port node =
       "http://127.0.0.1:" ^ string_of_int rpc_port;
     ]
   in
+  let arguments = connection_arguments @ user_arguments in
   let t =
     create ?runner ~path ?name {arguments; pending_ready = []; rpc_port; runner}
   in
@@ -114,8 +129,8 @@ let wait_for_ready t =
         resolver :: t.persistent_state.pending_ready ;
       check_event t "starting_proxy_rpc_server.v0" promise
 
-let init ?runner ?name ?rpc_port ?event_level node =
-  let* endpoint = create ?runner ?name ?rpc_port node in
+let init ?runner ?name ?rpc_port ?event_level ?args node =
+  let* endpoint = create ?runner ?name ?rpc_port ?args node in
   let* () = run ?event_level endpoint [] in
   let* () = wait_for_ready endpoint in
   return endpoint
