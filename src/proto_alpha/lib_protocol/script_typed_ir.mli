@@ -187,38 +187,6 @@ end
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
-type _ comparable_ty =
-  | Unit_key : unit comparable_ty
-  | Never_key : never comparable_ty
-  | Int_key : z num comparable_ty
-  | Nat_key : n num comparable_ty
-  | Signature_key : signature comparable_ty
-  | String_key : Script_string.t comparable_ty
-  | Bytes_key : Bytes.t comparable_ty
-  | Mutez_key : Tez.t comparable_ty
-  | Bool_key : bool comparable_ty
-  | Key_hash_key : public_key_hash comparable_ty
-  | Key_key : public_key comparable_ty
-  | Timestamp_key : Script_timestamp.t comparable_ty
-  | Chain_id_key : Script_chain_id.t comparable_ty
-  | Address_key : address comparable_ty
-  | Tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
-  | Pair_key :
-      'a comparable_ty
-      * 'b comparable_ty
-      * ('a, 'b) pair ty_metadata
-      * (yes, yes, yes) dand
-      -> ('a, 'b) pair comparable_ty
-  | Union_key :
-      'a comparable_ty
-      * 'b comparable_ty
-      * ('a, 'b) union ty_metadata
-      * (yes, yes, yes) dand
-      -> ('a, 'b) union comparable_ty
-  | Option_key :
-      'v comparable_ty * 'v option ty_metadata * yes dbool
-      -> 'v option comparable_ty
-
 module type Boxed_set_OPS = sig
   type t
 
@@ -1405,6 +1373,8 @@ and ('ty, 'comparable) ty =
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> ('a ticket, no) ty
   | Chest_key_t : (Script_timelock.chest_key, no) ty
   | Chest_t : (Script_timelock.chest, no) ty
+
+and 'ty comparable_ty = ('ty, yes) ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :

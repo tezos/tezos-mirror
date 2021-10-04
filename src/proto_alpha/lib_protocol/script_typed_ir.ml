@@ -312,38 +312,6 @@ type end_of_stack = empty_cell * empty_cell
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
-type _ comparable_ty =
-  | Unit_key : unit comparable_ty
-  | Never_key : never comparable_ty
-  | Int_key : z num comparable_ty
-  | Nat_key : n num comparable_ty
-  | Signature_key : signature comparable_ty
-  | String_key : Script_string.t comparable_ty
-  | Bytes_key : Bytes.t comparable_ty
-  | Mutez_key : Tez.t comparable_ty
-  | Bool_key : bool comparable_ty
-  | Key_hash_key : public_key_hash comparable_ty
-  | Key_key : public_key comparable_ty
-  | Timestamp_key : Script_timestamp.t comparable_ty
-  | Chain_id_key : Script_chain_id.t comparable_ty
-  | Address_key : address comparable_ty
-  | Tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
-  | Pair_key :
-      'a comparable_ty
-      * 'b comparable_ty
-      * ('a, 'b) pair ty_metadata
-      * (yes, yes, yes) dand
-      -> ('a, 'b) pair comparable_ty
-  | Union_key :
-      'a comparable_ty
-      * 'b comparable_ty
-      * ('a, 'b) union ty_metadata
-      * (yes, yes, yes) dand
-      -> ('a, 'b) union comparable_ty
-  | Option_key :
-      'v comparable_ty * 'v option ty_metadata * yes dbool
-      -> 'v option comparable_ty
-
 (*
 
    This signature contains the exact set of functions used in the
@@ -1307,6 +1275,8 @@ and ('ty, 'comparable) ty =
   | Chest_key_t : (Script_timelock.chest_key, no) ty
   | Chest_t : (Script_timelock.chest, no) ty
 
+and 'ty comparable_ty = ('ty, yes) ty
+
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
       ('ty, _) ty * ('ty2, 'rest) stack_ty
@@ -1823,16 +1793,15 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
       meta_basic
 
 let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
-  | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
-  | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
-  | Chain_id_key | Address_key | Tx_rollup_l2_address_key ->
+  | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
+  | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
+  | Tx_rollup_l2_address_t ->
       meta_basic
-  | Pair_key (_, _, meta, YesYes) -> meta
-  | Union_key (_, _, meta, YesYes) -> meta
-  | Option_key (_, meta, Yes) -> meta
+  | Pair_t (_, _, meta, YesYes) -> meta
+  | Union_t (_, _, meta, YesYes) -> meta
+  | Option_t (_, meta, Yes) -> meta
 
-let ty_size : type v vc. (v, vc) ty -> v Type_size.t =
- fun t -> (ty_metadata t).size
+let ty_size t = (ty_metadata t).size
 
 let comparable_ty_size t = (comparable_ty_metadata t).size
 
@@ -1876,55 +1845,55 @@ type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
 let unit_t = Unit_t
 
-let unit_key = Unit_key
+let unit_key = unit_t
 
 let int_t = Int_t
 
-let int_key = Int_key
+let int_key = int_t
 
 let nat_t = Nat_t
 
-let nat_key = Nat_key
+let nat_key = nat_t
 
 let signature_t = Signature_t
 
-let signature_key = Signature_key
+let signature_key = signature_t
 
 let string_t = String_t
 
-let string_key = String_key
+let string_key = string_t
 
 let bytes_t = Bytes_t
 
-let bytes_key = Bytes_key
+let bytes_key = bytes_t
 
 let mutez_t = Mutez_t
 
-let mutez_key = Mutez_key
+let mutez_key = mutez_t
 
 let key_hash_t = Key_hash_t
 
-let key_hash_key = Key_hash_key
+let key_hash_key = key_hash_t
 
 let key_t = Key_t
 
-let key_key = Key_key
+let key_key = key_t
 
 let timestamp_t = Timestamp_t
 
-let timestamp_key = Timestamp_key
+let timestamp_key = timestamp_t
 
 let address_t = Address_t
 
-let address_key = Address_key
+let address_key = address_t
 
 let bool_t = Bool_t
 
-let bool_key = Bool_key
+let bool_key = bool_t
 
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
-let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
+let tx_rollup_l2_address_key = tx_rollup_l2_address_t
 
 let pair_t :
     type a ac b bc.
@@ -1940,8 +1909,8 @@ let comparable_pair_t loc l r =
   Pair_t (l, r, {size}, YesYes)
 
 let pair_key loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Pair_key (l, r, {size}, YesYes)
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  Pair_t (l, r, {size}, YesYes)
 
 let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
@@ -1962,8 +1931,8 @@ let union_bytes_bool_t =
   Union_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
 
 let union_key loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Union_key (l, r, {size}, YesYes)
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  Union_t (l, r, {size}, YesYes)
 
 let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -2007,8 +1976,7 @@ let option_pair_int_nat_t =
       Yes )
 
 let option_key loc t =
-  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
-  Option_key (t, {size}, Yes)
+  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size}, Yes)
 
 let list_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
@@ -2043,11 +2011,11 @@ let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
 let chain_id_t = Chain_id_t
 
-let chain_id_key = Chain_id_key
+let chain_id_key = chain_id_t
 
 let never_t = Never_t
 
-let never_key = Never_key
+let never_key = never_t
 
 let bls12_381_g1_t = Bls12_381_g1_t
 
@@ -2274,13 +2242,13 @@ let (ty_traverse, comparable_ty_traverse) =
     in
     let return () = (continue [@ocaml.tailcall]) accu in
     match ty with
-    | Unit_key | Int_key | Nat_key | Signature_key | String_key | Bytes_key
-    | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
-    | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
+    | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
+    | Bool_t | Chain_id_t | Never_t ->
         (return [@ocaml.tailcall]) ()
-    | Pair_key (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Union_key (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Option_key (ty, _, Yes) -> (next [@ocaml.tailcall]) ty
+    | Pair_t (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Union_t (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Option_t (ty, _, Yes) -> (next [@ocaml.tailcall]) ty
   and aux' :
       type ret t tc accu.
       accu ty_traverse -> accu -> (t, tc) ty -> (accu -> ret) -> ret =
@@ -2444,17 +2412,17 @@ let value_traverse (type t tc) (ty : ((t, tc) ty, t comparable_ty) union)
     in
     let return () = (continue [@ocaml.tailcall]) accu in
     match ty with
-    | Unit_key | Int_key | Nat_key | Signature_key | String_key | Bytes_key
-    | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
-    | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
+    | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
+    | Bool_t | Chain_id_t | Never_t ->
         (return [@ocaml.tailcall]) ()
-    | Pair_key (ty1, ty2, _, YesYes) ->
+    | Pair_t (ty1, ty2, _, YesYes) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
-    | Union_key (ty1, ty2, _, YesYes) -> (
+    | Union_t (ty1, ty2, _, YesYes) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)
-    | Option_key (ty, _, Yes) -> (
+    | Option_t (ty, _, Yes) -> (
         match x with
         | None -> (return [@ocaml.tailcall]) ()
         | Some v -> (next [@ocaml.tailcall]) ty v)
