@@ -100,7 +100,7 @@ module Ticket_inspection = struct
      case.
 
      Note that in case tickets are made comparable, this function needs to change
-     so that constructors like [Union_key] and [Pair_key] are traversed
+     so that constructors like [Union_t] and [Pair_t] are traversed
      recursively.
   *)
   let has_tickets_of_comparable :
@@ -109,24 +109,24 @@ module Ticket_inspection = struct
    fun key_ty k ->
     let open Script_typed_ir in
     match key_ty with
-    | Unit_key -> (k [@ocaml.tailcall]) False_ht
-    | Never_key -> (k [@ocaml.tailcall]) False_ht
-    | Int_key -> (k [@ocaml.tailcall]) False_ht
-    | Nat_key -> (k [@ocaml.tailcall]) False_ht
-    | Signature_key -> (k [@ocaml.tailcall]) False_ht
-    | String_key -> (k [@ocaml.tailcall]) False_ht
-    | Bytes_key -> (k [@ocaml.tailcall]) False_ht
-    | Mutez_key -> (k [@ocaml.tailcall]) False_ht
-    | Bool_key -> (k [@ocaml.tailcall]) False_ht
-    | Key_hash_key -> (k [@ocaml.tailcall]) False_ht
-    | Key_key -> (k [@ocaml.tailcall]) False_ht
-    | Timestamp_key -> (k [@ocaml.tailcall]) False_ht
-    | Chain_id_key -> (k [@ocaml.tailcall]) False_ht
-    | Address_key -> (k [@ocaml.tailcall]) False_ht
-    | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) False_ht
-    | Pair_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
-    | Union_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
-    | Option_key (_, _, Yes) -> (k [@ocaml.tailcall]) False_ht
+    | Unit_t -> (k [@ocaml.tailcall]) False_ht
+    | Never_t -> (k [@ocaml.tailcall]) False_ht
+    | Int_t -> (k [@ocaml.tailcall]) False_ht
+    | Nat_t -> (k [@ocaml.tailcall]) False_ht
+    | Signature_t -> (k [@ocaml.tailcall]) False_ht
+    | String_t -> (k [@ocaml.tailcall]) False_ht
+    | Bytes_t -> (k [@ocaml.tailcall]) False_ht
+    | Mutez_t -> (k [@ocaml.tailcall]) False_ht
+    | Bool_t -> (k [@ocaml.tailcall]) False_ht
+    | Key_hash_t -> (k [@ocaml.tailcall]) False_ht
+    | Key_t -> (k [@ocaml.tailcall]) False_ht
+    | Timestamp_t -> (k [@ocaml.tailcall]) False_ht
+    | Chain_id_t -> (k [@ocaml.tailcall]) False_ht
+    | Address_t -> (k [@ocaml.tailcall]) False_ht
+    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) False_ht
+    | Pair_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
+    | Union_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
+    | Option_t (_, _, Yes) -> (k [@ocaml.tailcall]) False_ht
 
   (* Short circuit pairing of two [has_tickets] values.
      If neither left nor right branch contains a ticket, [False_ht] is
@@ -274,24 +274,24 @@ module Ticket_collection = struct
    fun ctxt comp_ty acc k ->
     let open Script_typed_ir in
     match comp_ty with
-    | Unit_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Never_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Int_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Nat_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Signature_key -> (k [@ocaml.tailcall]) ctxt acc
-    | String_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Bytes_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Mutez_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Bool_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Key_hash_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Key_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Timestamp_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Chain_id_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Address_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Pair_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
-    | Union_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
-    | Option_key (_, _, Yes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Unit_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Never_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Int_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Nat_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Signature_t -> (k [@ocaml.tailcall]) ctxt acc
+    | String_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Bytes_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Mutez_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Bool_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Key_hash_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Key_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Timestamp_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Chain_id_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Address_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ctxt acc
+    | Pair_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Union_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Option_t (_, _, Yes) -> (k [@ocaml.tailcall]) ctxt acc
 
   let tickets_of_set :
       type a ret.
