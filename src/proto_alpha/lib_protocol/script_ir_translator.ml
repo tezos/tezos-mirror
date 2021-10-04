@@ -1754,14 +1754,17 @@ type toplevel = {
   views : view_map;
 }
 
-type ('arg, 'storage) code = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-  arg_type : 'arg ty;
-  storage_type : 'storage ty;
-  views : view_map;
-  entrypoints : 'arg entrypoints;
-  code_size : Cache_memory_helpers.sint;
-}
+type ('arg, 'storage) code =
+  | Code : {
+      code :
+        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+      arg_type : 'arg ty;
+      storage_type : 'storage ty;
+      views : view_map;
+      entrypoints : 'arg entrypoints;
+      code_size : Cache_memory_helpers.sint;
+    }
+      -> ('arg, 'storage) code
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
 
@@ -5359,7 +5362,8 @@ let parse_code :
     Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes)
     >>? fun ctxt ->
     ok
-      ( Ex_code {code; arg_type; storage_type; views; entrypoints; code_size},
+      ( Ex_code
+          (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
         ctxt ))
 
 let parse_storage :
@@ -5399,7 +5403,8 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
   >>=? fun ( Ex_code
-               {code; arg_type; storage_type; views; entrypoints; code_size},
+               (Code
+                 {code; arg_type; storage_type; views; entrypoints; code_size}),
              ctxt ) ->
   parse_storage
     ?type_logger

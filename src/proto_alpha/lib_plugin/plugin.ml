@@ -2437,14 +2437,15 @@ module RPC = struct
           let code = Script.lazy_expr expr in
           Script_ir_translator.parse_code ~legacy ctxt ~code
           >>=? fun ( Ex_code
-                       {
-                         code;
-                         arg_type;
-                         storage_type;
-                         views;
-                         entrypoints;
-                         code_size;
-                       },
+                       (Code
+                         {
+                           code;
+                           arg_type;
+                           storage_type;
+                           views;
+                           entrypoints;
+                           code_size;
+                         }),
                      ctxt ) ->
           Script_ir_translator.parse_data
             ~legacy
