@@ -1938,7 +1938,6 @@ type (_, _) dig_proof_argument =
 type (_, _, _) dug_proof_argument =
   | Dug_proof_argument :
       (('a, 's, 'x, 'a * 's, 'b, 't, 'c, 'u) stack_prefix_preservation_witness
-      * unit
       * ('c, 'u) stack_ty)
       -> ('b, 't, 'x) dug_proof_argument
 
@@ -3221,12 +3220,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
        fun n x stack_annot stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) ->
-            ok @@ Dug_proof_argument (KRest, (), Item_t (x, rest, stack_annot))
+            ok @@ Dug_proof_argument (KRest, Item_t (x, rest, stack_annot))
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) x stack_annot rest
-            >|? fun (Dug_proof_argument (n', (), aft')) ->
+            >|? fun (Dug_proof_argument (n', aft')) ->
             let kinfo = {iloc = loc; kstack_ty = aft'} in
-            Dug_proof_argument (KPrefix (kinfo, n'), (), Item_t (v, aft', annot))
+            Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft', annot))
         | (_, _) ->
             serialize_stack_for_error ctxt whole_stack
             >>? fun (whole_stack, _ctxt) ->
@@ -3234,7 +3233,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       error_unexpected_annot loc result_annot >>?= fun () ->
       make_proof_argument whole_n x stack_annot whole_stack
-      >>?= fun (Dug_proof_argument (n', (), aft)) ->
+      >>?= fun (Dug_proof_argument (n', aft)) ->
       let dug = {apply = (fun kinfo k -> IDug (kinfo, whole_n, n', k))} in
       typed ctxt loc dug aft
   | (Prim (loc, I_DUG, [_], result_annot), stack) ->
