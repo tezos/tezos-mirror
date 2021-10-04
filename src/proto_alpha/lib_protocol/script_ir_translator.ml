@@ -1362,7 +1362,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        pair_t loc tl tr >|? fun ty -> return ctxt ty
+        pair_t loc tl tr >|? fun (Ty_ex_c ty) -> return ctxt ty
     | Prim (loc, T_or, [utl; utr], annot) -> (
         (match ret with
         | Don't_parse_entrypoints ->
@@ -1397,7 +1397,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         | Don't_parse_entrypoints ->
             let (Ex_ty tl) = parsed_l in
             let (Ex_ty tr) = parsed_r in
-            union_t loc tl tr >|? fun ty -> ((Ex_ty ty : ret), ctxt)
+            union_t loc tl tr >|? fun (Ty_ex_c ty) -> ((Ex_ty ty : ret), ctxt)
         | Parse_entrypoints ->
             let (Ex_parameter_ty_and_entrypoints
                   {arg_type = tl; entrypoints = left}) =
@@ -1407,7 +1407,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
                   {arg_type = tr; entrypoints = right}) =
               parsed_r
             in
-            union_t loc tl tr >|? fun arg_type ->
+            union_t loc tl tr >|? fun (Ty_ex_c arg_type) ->
             let entrypoints =
               {name; nested = Entrypoints_Union {left; right}}
             in
@@ -1721,8 +1721,8 @@ let parse_storage_ty :
             remaining_storage
           >>? fun (Ex_ty remaining_storage, ctxt) ->
           check_composed_type_annot loc storage_annot >>? fun () ->
-          pair_t loc big_map_ty remaining_storage >|? fun ty -> (Ex_ty ty, ctxt)
-      )
+          pair_t loc big_map_ty remaining_storage >|? fun (Ty_ex_c ty) ->
+          (Ex_ty ty, ctxt))
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 let check_packable ~legacy loc root =
@@ -1907,12 +1907,12 @@ let rec make_comb_set_proof_argument :
   match (n, ty) with
   | (0, _) -> ok @@ Comb_set_proof_argument (Comb_set_zero, value_ty)
   | (1, Pair_t (_hd_ty, tl_ty, _)) ->
-      pair_t loc value_ty tl_ty >|? fun after_ty ->
+      pair_t loc value_ty tl_ty >|? fun (Ty_ex_c after_ty) ->
       Comb_set_proof_argument (Comb_set_one, after_ty)
   | (n, Pair_t (hd_ty, tl_ty, _)) ->
       make_comb_set_proof_argument ctxt stack_ty loc (n - 2) value_ty tl_ty
       >>? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
-      pair_t loc hd_ty tl_ty' >|? fun after_ty ->
+      pair_t loc hd_ty tl_ty' >|? fun (Ty_ex_c after_ty) ->
       Comb_set_proof_argument (Comb_set_plus_two comb_set_left_witness, after_ty)
   | _ ->
       let whole_stack = serialize_stack_for_error ctxt stack_ty in
@@ -2962,7 +2962,7 @@ and parse_view_returning :
         (Some "return of view", strip_locations output_ty, output_ty_loc))
     (parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty)
   >>?= fun (Ex_ty output_ty', ctxt) ->
-  pair_t input_ty_loc input_ty' storage_type >>?= fun pair_ty ->
+  pair_t input_ty_loc input_ty' storage_type >>?= fun (Ty_ex_c pair_ty) ->
   parse_instr
     ?type_logger
     ~stack_depth:0
@@ -3326,7 +3326,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* pairs *)
   | (Prim (loc, I_PAIR, [], annot), Item_t (a, Item_t (b, rest))) ->
       check_constr_annot loc annot >>?= fun () ->
-      pair_t loc a b >>?= fun ty ->
+      pair_t loc a b >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       let cons_pair = {apply = (fun kinfo k -> ICons_pair (kinfo, k))} in
       typed ctxt loc cons_pair stack_ty
@@ -3343,7 +3343,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             make_proof_argument (n - 1) tl_ty
             >>? fun (Comb_proof_argument (comb_witness, Item_t (b_ty, tl_ty')))
               ->
-            pair_t loc a_ty b_ty >|? fun pair_t ->
+            pair_t loc a_ty b_ty >|? fun (Ty_ex_c pair_t) ->
             Comb_proof_argument (Comb_succ comb_witness, Item_t (pair_t, tl_ty'))
         | _ ->
             let whole_stack = serialize_stack_for_error ctxt stack_ty in
@@ -3426,7 +3426,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty tr, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
       let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, k))} in
-      union_t loc tl tr >>?= fun ty ->
+      union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_left stack_ty
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest)) ->
@@ -3434,7 +3434,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty tl, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
       let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, k))} in
-      union_t loc tl tr >>?= fun ty ->
+      union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
@@ -3671,7 +3671,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
-      pair_t loc k elt >>?= fun ty ->
+      pair_t loc k elt >>?= fun (Ty_ex_c ty) ->
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3713,7 +3713,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
       let key = ty_of_comparable_ty comp_elt in
-      pair_t loc key element_ty >>?= fun ty ->
+      pair_t loc key element_ty >>?= fun (Ty_ex_c ty) ->
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3868,7 +3868,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             apply = (fun kinfo k -> ISapling_verify_update_deprecated (kinfo, k));
           }
         in
-        pair_t loc int_t state_ty >>?= fun pair_ty ->
+        pair_t loc int_t state_ty >>?= fun (Ty_ex_c pair_ty) ->
         option_t loc pair_ty >>?= fun ty ->
         let stack = Item_t (ty, rest) in
         typed ctxt loc instr stack
@@ -3885,8 +3885,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr =
         {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
       in
-      pair_t loc int_t state_ty >>?= fun pair_ty ->
-      pair_t loc bytes_t pair_ty >>?= fun pair_ty ->
+      pair_t loc int_t state_ty >>?= fun (Ty_ex_c pair_ty) ->
+      pair_t loc bytes_t pair_ty >>?= fun (Ty_ex_c pair_ty) ->
       option_t loc pair_ty >>?= fun ty ->
       let stack = Item_t (ty, rest) in
       typed ctxt loc instr stack
@@ -4595,8 +4595,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
-      pair_t loc arg_type storage_type >>?= fun arg_type_full ->
-      pair_t loc list_operation_t storage_type >>?= fun ret_type_full ->
+      pair_t loc arg_type storage_type >>?= fun (Ty_ex_c arg_type_full) ->
+      pair_t loc list_operation_t storage_type
+      >>?= fun (Ty_ex_c ret_type_full) ->
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
@@ -4860,7 +4861,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     ) ->
       check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
-      pair_t loc ticket_t ticket_t >>?= fun pair_tickets_ty ->
+      pair_t loc ticket_t ticket_t >>?= fun (Ty_ex_c pair_tickets_ty) ->
       option_t loc pair_tickets_ty >>?= fun res_ty ->
       let instr = {apply = (fun kinfo k -> ISplit_ticket (kinfo, k))} in
       let stack = Item_t (res_ty, rest) in
@@ -5421,9 +5422,10 @@ let parse_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  pair_t storage_type_loc arg_type storage_type >>?= fun arg_type_full ->
+  pair_t storage_type_loc arg_type storage_type
+  >>?= fun (Ty_ex_c arg_type_full) ->
   pair_t storage_type_loc list_operation_t storage_type
-  >>?= fun ret_type_full ->
+  >>?= fun (Ty_ex_c ret_type_full) ->
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
@@ -5517,9 +5519,10 @@ let typecheck_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  pair_t storage_type_loc arg_type storage_type >>?= fun arg_type_full ->
+  pair_t storage_type_loc arg_type storage_type
+  >>?= fun (Ty_ex_c arg_type_full) ->
   pair_t storage_type_loc list_operation_t storage_type
-  >>?= fun ret_type_full ->
+  >>?= fun (Ty_ex_c ret_type_full) ->
   let type_logger loc ~stack_ty_before ~stack_ty_after =
     type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map
   in

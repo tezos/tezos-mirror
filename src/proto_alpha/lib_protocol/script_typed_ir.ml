@@ -1793,6 +1793,8 @@ let ty_size t = (ty_metadata t).size
 
 let comparable_ty_size t = (comparable_ty_metadata t).size
 
+type 'v ty_ex_c = Ty_ex_c : 'v ty -> 'v ty_ex_c [@@ocaml.unboxed]
+
 let unit_t = Unit_t
 
 let unit_key = Unit_key
@@ -1847,7 +1849,7 @@ let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
 
 let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Pair_t (l, r, {size})
+  Ty_ex_c (Pair_t (l, r, {size}))
 
 let pair_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
@@ -1857,7 +1859,7 @@ let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
 let union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Union_t (l, r, {size})
+  Ty_ex_c (Union_t (l, r, {size}))
 
 let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three})
 
@@ -2343,5 +2345,5 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
   | R cty -> aux' init cty x (fun accu -> accu)
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
-let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty = function
-  | Item_t (ty, _) -> ty
+let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
+  | Item_t (ty, _) -> Ty_ex_c ty

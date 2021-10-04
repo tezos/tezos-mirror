@@ -850,7 +850,7 @@ module Registration_section = struct
       else
         match comb_acc with
         | Ex_value {value; ty} ->
-            let ty = pair unit ty in
+            let (Ty_ex_c ty) = pair unit ty in
             make_comb (comb_width - 1) (Ex_value {value = ((), value); ty})
 
     let () =
@@ -2178,7 +2178,7 @@ module Registration_section = struct
     let () =
       let lambda =
         let open Script_typed_ir in
-        let pair_list_operation_unit = pair (list operation) unit in
+        let (Ty_ex_c pair_list_operation_unit) = pair (list operation) unit in
         let descr =
           {
             kloc = 0;
@@ -2462,8 +2462,10 @@ module Registration_section = struct
         let kinstr =
           let spl_state = sapling_state memo_size in
           let spl_tx = sapling_transaction memo_size in
-          let pair_int_spl_state = pair int spl_state in
-          let pair_bytes_pair_int_spl_state = pair bytes pair_int_spl_state in
+          let (Ty_ex_c pair_int_spl_state) = pair int spl_state in
+          let (Ty_ex_c pair_bytes_pair_int_spl_state) =
+            pair bytes pair_int_spl_state
+          in
           ISapling_verify_update
             ( kinfo (spl_tx @$ spl_state @$ bot),
               halt (option pair_bytes_pair_int_spl_state @$ bot) )
@@ -2668,7 +2670,7 @@ module Registration_section = struct
         ()
 
     let () =
-      let pair_bls12_381_g1_g2 = pair bls12_381_g1 bls12_381_g2 in
+      let (Ty_ex_c pair_bls12_381_g1_g2) = pair bls12_381_g1 bls12_381_g2 in
       simple_benchmark
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
         ~kinstr:
@@ -2697,7 +2699,9 @@ module Registration_section = struct
 
     let split_ticket_instr =
       let ticket_unit = ticket unit_cmp in
-      let pair_ticket_unit_ticket_unit = pair ticket_unit ticket_unit in
+      let (Ty_ex_c pair_ticket_unit_ticket_unit) =
+        pair ticket_unit ticket_unit
+      in
       ISplit_ticket
         ( kinfo (ticket_unit @$ cpair nat nat @$ bot),
           halt (option pair_ticket_unit_ticket_unit @$ bot) )
@@ -2745,7 +2749,7 @@ module Registration_section = struct
 
     let join_tickets_instr =
       let ticket_str = ticket string_cmp in
-      let pair_ticket_str_ticket_str = pair ticket_str ticket_str in
+      let (Ty_ex_c pair_ticket_str_ticket_str) = pair ticket_str ticket_str in
       IJoin_tickets
         ( kinfo (pair_ticket_str_ticket_str @$ bot),
           string_cmp,

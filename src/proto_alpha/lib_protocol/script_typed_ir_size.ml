@@ -433,11 +433,8 @@ and kinstr_size :
     | ISwap (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IConst (kinfo, x, k) ->
         let accu = ret_succ_adding accu (base kinfo +! word_size) in
-        (value_size [@ocaml.tailcall])
-          ~count_lambda_nodes
-          accu
-          (L (stack_top_ty (kinfo_of_kinstr k).kstack_ty))
-          x
+        let (Ty_ex_c top_ty) = stack_top_ty (kinfo_of_kinstr k).kstack_ty in
+        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu (L top_ty) x
     | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)

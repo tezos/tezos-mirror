@@ -382,7 +382,7 @@ end)
             let* (Ex_ty right) = m_type ~size:rsize in
             match pair_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
@@ -396,7 +396,7 @@ end)
             let* (Ex_ty right) = m_type ~size:rsize in
             match union_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
             match option_t (-1) t with
