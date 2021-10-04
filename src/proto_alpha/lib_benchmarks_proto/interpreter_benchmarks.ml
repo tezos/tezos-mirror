@@ -850,9 +850,8 @@ module Registration_section = struct
       else
         match comb_acc with
         | Ex_value {value; ty} ->
-            make_comb
-              (comb_width - 1)
-              (Ex_value {value = ((), value); ty = pair unit ty})
+            let ty = pair unit ty in
+            make_comb (comb_width - 1) (Ex_value {value = ((), value); ty})
 
     let () =
       let unpair n =
@@ -2178,11 +2177,12 @@ module Registration_section = struct
     let () =
       let lambda =
         let open Script_typed_ir in
+        let pair_list_operation_unit = pair (list operation) unit in
         let descr =
           {
             kloc = 0;
             kbef = pair unit unit @$ bot;
-            kaft = pair (list operation) unit @$ bot;
+            kaft = pair_list_operation_unit @$ bot;
             kinstr =
               ICdr
                 ( kinfo (pair unit unit @$ bot),
@@ -2190,8 +2190,7 @@ module Registration_section = struct
                     ( kinfo (unit @$ bot),
                       ICons_pair
                         ( kinfo (list operation @$ unit @$ bot),
-                          IHalt (kinfo (pair (list operation) unit @$ bot)) ) )
-                );
+                          IHalt (kinfo (pair_list_operation_unit @$ bot)) ) ) );
           }
         in
         Lam (descr, Micheline.Int (0, Z.zero))
@@ -2462,9 +2461,10 @@ module Registration_section = struct
         let kinstr =
           let spl_state = sapling_state memo_size in
           let spl_tx = sapling_transaction memo_size in
+          let pair_int_spl_state = pair int spl_state in
           ISapling_verify_update
             ( kinfo (spl_tx @$ spl_state @$ bot),
-              halt (option (pair int spl_state) @$ bot) )
+              halt (option pair_int_spl_state @$ bot) )
 
         let prepare_sapling_execution_environment sapling_forge_rng_seed
             sapling_transition =
@@ -2666,12 +2666,12 @@ module Registration_section = struct
         ()
 
     let () =
+      let pair_bls12_381_g1_g2 = pair bls12_381_g1 bls12_381_g2 in
       simple_benchmark
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
         ~kinstr:
           (IPairing_check_bls12_381
-             ( kinfo (list (pair bls12_381_g1 bls12_381_g2) @$ bot),
-               halt (bool @$ bot) ))
+             (kinfo (list pair_bls12_381_g1_g2 @$ bot), halt (bool @$ bot)))
         ()
   end
 
@@ -2693,9 +2693,11 @@ module Registration_section = struct
         ()
 
     let split_ticket_instr =
+      let ticket_unit = ticket unit_cmp in
+      let pair_ticket_unit_ticket_unit = pair ticket_unit ticket_unit in
       ISplit_ticket
-        ( kinfo (ticket unit_cmp @$ pair nat nat @$ bot),
-          halt (option (pair (ticket unit_cmp) (ticket unit_cmp)) @$ bot) )
+        ( kinfo (ticket_unit @$ pair nat nat @$ bot),
+          halt (option pair_ticket_unit_ticket_unit @$ bot) )
 
     let () =
       let zero = Alpha_context.Script_int.zero_n in
@@ -2739,10 +2741,12 @@ module Registration_section = struct
         ()
 
     let join_tickets_instr =
+      let ticket_str = ticket string_cmp in
+      let pair_ticket_str_ticket_str = pair ticket_str ticket_str in
       IJoin_tickets
-        ( kinfo (pair (ticket string_cmp) (ticket string_cmp) @$ bot),
+        ( kinfo (pair_ticket_str_ticket_str @$ bot),
           string_cmp,
-          halt (option (ticket string_cmp) @$ bot) )
+          halt (option ticket_str @$ bot) )
 
     let () =
       benchmark
