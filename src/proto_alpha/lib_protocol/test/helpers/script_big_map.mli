@@ -36,7 +36,7 @@ val update :
   *)
 val of_list :
   'key Protocol.Script_typed_ir.comparable_ty ->
-  'value Protocol.Script_typed_ir.ty ->
+  ('value, _) Protocol.Script_typed_ir.ty ->
   ('key * 'value) list ->
   Protocol.Alpha_context.t ->
   (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)

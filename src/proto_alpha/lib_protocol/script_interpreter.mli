@@ -126,7 +126,7 @@ val execute_with_typed_parameter :
   step_constants ->
   script:Script.t ->
   entrypoint:Entrypoint.t ->
-  parameter_ty:'a Script_typed_ir.ty ->
+  parameter_ty:('a, _) Script_typed_ir.ty ->
   location:Script.location ->
   parameter:'a ->
   internal:bool ->

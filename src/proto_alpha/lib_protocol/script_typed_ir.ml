@@ -311,6 +311,8 @@ type end_of_stack = empty_cell * empty_cell
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
+type (_, _) eq = Eq : ('a, 'a) eq
+
 type _ comparable_ty =
   | Unit_key : unit comparable_ty
   | Never_key : never comparable_ty
@@ -627,7 +629,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
   | IEmpty_big_map :
       ('a, 's) kinfo
       * 'b comparable_ty
-      * 'c ty
+      * ('c, _) ty
       * (('b, 'c) big_map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IBig_map_mem :
@@ -837,7 +839,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
       ('a, ('a * 'b, 'c) lambda * 's) kinfo
-      * 'a ty
+      * ('a, _) ty
       * (('b, 'c) lambda, 's, 'r, 'f) kinstr
       -> ('a, ('a * 'b, 'c) lambda * 's, 'r, 'f) kinstr
   | ILambda :
@@ -846,7 +848,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty
+      ('a, 's) kinfo * Script.location * ('a, _) ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -886,7 +888,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a typed_contract, 's, 'r, 'f) kinstr
   | IContract :
       (address, 's) kinfo
-      * 'a ty
+      * ('a, _) ty
       * Entrypoint.t
       * ('a typed_contract option, 's, 'r, 'f) kinstr
       -> (address, 's, 'r, 'f) kinstr
@@ -904,8 +906,8 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (public_key_hash, 's, 'r, 'f) kinstr
   | ICreate_contract : {
       kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
-      storage_type : 'a ty;
-      arg_type : 'b ty;
+      storage_type : ('a, _) ty;
+      arg_type : ('b, _) ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
       views : view_map;
       entrypoints : 'b entrypoints;
@@ -934,10 +936,10 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       (public_key, 's) kinfo * (public_key_hash, 's, 'r, 'f) kinstr
       -> (public_key, 's, 'r, 'f) kinstr
   | IPack :
-      ('a, 's) kinfo * 'a ty * (bytes, 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('a, _) ty * (bytes, 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IUnpack :
-      (bytes, 's) kinfo * 'a ty * ('a option, 's, 'r, 'f) kinstr
+      (bytes, 's) kinfo * ('a, _) ty * ('a option, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
   | IBlake2b :
       (bytes, 's) kinfo * (bytes, 's, 'r, 'f) kinstr
@@ -956,7 +958,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | ISelf :
       ('a, 's) kinfo
-      * 'b ty
+      * ('b, _) ty
       * Entrypoint.t
       * ('b typed_contract, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
@@ -1143,7 +1145,7 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract =
   | Typed_contract : {
-      arg_ty : 'arg ty;
+      arg_ty : ('arg, _) ty;
       address : address;
     }
       -> 'arg typed_contract
@@ -1226,58 +1228,74 @@ and logger = {
 and to_be_replaced = unit
 
 (* ---- Auxiliary types -----------------------------------------------------*)
-and 'ty ty =
-  | Unit_t : unit ty
-  | Int_t : z num ty
-  | Nat_t : n num ty
-  | Signature_t : signature ty
-  | String_t : Script_string.t ty
-  | Bytes_t : bytes ty
-  | Mutez_t : Tez.t ty
-  | Key_hash_t : public_key_hash ty
-  | Key_t : public_key ty
-  | Timestamp_t : Script_timestamp.t ty
-  | Address_t : address ty
-  | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
-  | Bool_t : bool ty
+and ('ty, 'comparable) ty =
+  | Unit_t : (unit, to_be_replaced) ty
+  | Int_t : (z num, to_be_replaced) ty
+  | Nat_t : (n num, to_be_replaced) ty
+  | Signature_t : (signature, to_be_replaced) ty
+  | String_t : (Script_string.t, to_be_replaced) ty
+  | Bytes_t : (bytes, to_be_replaced) ty
+  | Mutez_t : (Tez.t, to_be_replaced) ty
+  | Key_hash_t : (public_key_hash, to_be_replaced) ty
+  | Key_t : (public_key, to_be_replaced) ty
+  | Timestamp_t : (Script_timestamp.t, to_be_replaced) ty
+  | Address_t : (address, to_be_replaced) ty
+  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, to_be_replaced) ty
+  | Bool_t : (bool, to_be_replaced) ty
   | Pair_t :
-      'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
-      -> ('a, 'b) pair ty
+      ('a, to_be_replaced) ty
+      * ('b, to_be_replaced) ty
+      * ('a, 'b) pair ty_metadata
+      * to_be_replaced
+      -> (('a, 'b) pair, to_be_replaced) ty
   | Union_t :
-      'a ty * 'b ty * ('a, 'b) union ty_metadata * to_be_replaced
-      -> ('a, 'b) union ty
+      ('a, to_be_replaced) ty
+      * ('b, to_be_replaced) ty
+      * ('a, 'b) union ty_metadata
+      * to_be_replaced
+      -> (('a, 'b) union, to_be_replaced) ty
   | Lambda_t :
-      'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
-      -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * 'v option ty_metadata * to_be_replaced -> 'v option ty
-  | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
-  | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
+      ('arg, _) ty * ('ret, _) ty * ('arg, 'ret) lambda ty_metadata
+      -> (('arg, 'ret) lambda, to_be_replaced) ty
+  | Option_t :
+      ('v, to_be_replaced) ty * 'v option ty_metadata * to_be_replaced
+      -> ('v option, to_be_replaced) ty
+  | List_t :
+      ('v, _) ty * 'v boxed_list ty_metadata
+      -> ('v boxed_list, to_be_replaced) ty
+  | Set_t : 'v comparable_ty * 'v set ty_metadata -> ('v set, to_be_replaced) ty
   | Map_t :
-      'k comparable_ty * 'v ty * ('k, 'v) map ty_metadata
-      -> ('k, 'v) map ty
+      'k comparable_ty * ('v, _) ty * ('k, 'v) map ty_metadata
+      -> (('k, 'v) map, to_be_replaced) ty
   | Big_map_t :
-      'k comparable_ty * 'v ty * ('k, 'v) big_map ty_metadata
-      -> ('k, 'v) big_map ty
+      'k comparable_ty * ('v, _) ty * ('k, 'v) big_map ty_metadata
+      -> (('k, 'v) big_map, to_be_replaced) ty
   | Contract_t :
-      'arg ty * 'arg typed_contract ty_metadata
-      -> 'arg typed_contract ty
-  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
+      ('arg, _) ty * 'arg typed_contract ty_metadata
+      -> ('arg typed_contract, to_be_replaced) ty
+  | Sapling_transaction_t :
+      Sapling.Memo_size.t
+      -> (Sapling.transaction, to_be_replaced) ty
   | Sapling_transaction_deprecated_t :
       Sapling.Memo_size.t
-      -> Sapling.Legacy.transaction ty
-  | Sapling_state_t : Sapling.Memo_size.t -> Sapling.state ty
-  | Operation_t : operation ty
-  | Chain_id_t : Script_chain_id.t ty
-  | Never_t : never ty
-  | Bls12_381_g1_t : Script_bls.G1.t ty
-  | Bls12_381_g2_t : Script_bls.G2.t ty
-  | Bls12_381_fr_t : Script_bls.Fr.t ty
-  | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t : Script_timelock.chest_key ty
-  | Chest_t : Script_timelock.chest ty
+      -> (Sapling.Legacy.transaction, to_be_replaced) ty
+  | Sapling_state_t : Sapling.Memo_size.t -> (Sapling.state, to_be_replaced) ty
+  | Operation_t : (operation, to_be_replaced) ty
+  | Chain_id_t : (Script_chain_id.t, to_be_replaced) ty
+  | Never_t : (never, to_be_replaced) ty
+  | Bls12_381_g1_t : (Script_bls.G1.t, to_be_replaced) ty
+  | Bls12_381_g2_t : (Script_bls.G2.t, to_be_replaced) ty
+  | Bls12_381_fr_t : (Script_bls.Fr.t, to_be_replaced) ty
+  | Ticket_t :
+      'a comparable_ty * 'a ticket ty_metadata
+      -> ('a ticket, to_be_replaced) ty
+  | Chest_key_t : (Script_timelock.chest_key, to_be_replaced) ty
+  | Chest_t : (Script_timelock.chest, to_be_replaced) ty
 
 and ('top_ty, 'resty) stack_ty =
-  | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
+  | Item_t :
+      ('ty, _) ty * ('ty2, 'rest) stack_ty
+      -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
 and ('key, 'value) big_map =
@@ -1285,7 +1303,7 @@ and ('key, 'value) big_map =
       id : Big_map.Id.t option;
       diff : ('key, 'value) big_map_overlay;
       key_type : 'key comparable_ty;
-      value_type : 'value ty;
+      value_type : ('value, _) ty;
     }
       -> ('key, 'value) big_map
 
@@ -1349,8 +1367,8 @@ and (_, _) dup_n_gadt_witness =
 and ('input, 'output) view_signature =
   | View_signature : {
       name : Script_string.t;
-      input_ty : 'input ty;
-      output_ty : 'output ty;
+      input_ty : ('input, _) ty;
+      output_ty : ('output, _) ty;
     }
       -> ('input, 'output) view_signature
 
@@ -1358,7 +1376,7 @@ and 'kind manager_operation =
   | Transaction : {
       transaction : Alpha_context.transaction;
       location : Script.location;
-      parameters_ty : 'a ty;
+      parameters_ty : ('a, _) ty;
       parameters : 'a;
     }
       -> Kind.transaction manager_operation
@@ -1766,7 +1784,7 @@ let kinstr_rewritek :
 
 let meta_basic = {size = Type_size.one}
 
-let ty_metadata : type a. a ty -> a ty_metadata = function
+let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
   | Tx_rollup_l2_address_t ->
@@ -1795,11 +1813,48 @@ let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
   | Union_key (_, _, meta) -> meta
   | Option_key (_, meta) -> meta
 
-let ty_size t = (ty_metadata t).size
+let ty_size : type v vc. (v, vc) ty -> v Type_size.t =
+ fun t -> (ty_metadata t).size
 
 let comparable_ty_size t = (comparable_ty_metadata t).size
 
-type 'v ty_ex_c = Ty_ex_c : 'v ty -> 'v ty_ex_c [@@ocaml.unboxed]
+let is_comparable : type v c. (v, c) ty -> (c, to_be_replaced) eq = function
+  | Never_t -> Eq
+  | Unit_t -> Eq
+  | Int_t -> Eq
+  | Nat_t -> Eq
+  | Signature_t -> Eq
+  | String_t -> Eq
+  | Bytes_t -> Eq
+  | Mutez_t -> Eq
+  | Bool_t -> Eq
+  | Key_hash_t -> Eq
+  | Key_t -> Eq
+  | Timestamp_t -> Eq
+  | Chain_id_t -> Eq
+  | Address_t -> Eq
+  | Tx_rollup_l2_address_t -> Eq
+  | Pair_t _ -> Eq
+  | Union_t _ -> Eq
+  | Option_t _ -> Eq
+  | Lambda_t _ -> Eq
+  | List_t _ -> Eq
+  | Set_t _ -> Eq
+  | Map_t _ -> Eq
+  | Big_map_t _ -> Eq
+  | Ticket_t _ -> Eq
+  | Contract_t _ -> Eq
+  | Sapling_transaction_t _ -> Eq
+  | Sapling_transaction_deprecated_t _ -> Eq
+  | Sapling_state_t _ -> Eq
+  | Operation_t -> Eq
+  | Bls12_381_g1_t -> Eq
+  | Bls12_381_g2_t -> Eq
+  | Bls12_381_fr_t -> Eq
+  | Chest_t -> Eq
+  | Chest_key_t -> Eq
+
+type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
 let unit_t = Unit_t
 
@@ -1853,8 +1908,14 @@ let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
 let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
 
-let pair_t loc l r =
+let pair_t :
+    type a ac b bc.
+    Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult
+    =
+ fun loc l r ->
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  let Eq = is_comparable l in
+  let Eq = is_comparable r in
   Ty_ex_c (Pair_t (l, r, {size}, ()))
 
 let pair_key loc l r =
@@ -1863,8 +1924,14 @@ let pair_key loc l r =
 
 let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
-let union_t loc l r =
+let union_t :
+    type a ac b bc.
+    Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) union ty_ex_c tzresult
+    =
+ fun loc l r ->
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
+  let Eq = is_comparable l in
+  let Eq = is_comparable r in
   Ty_ex_c (Union_t (l, r, {size}, ()))
 
 let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three}, ())
@@ -1877,8 +1944,13 @@ let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Lambda_t (l, r, {size})
 
-let option_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size}, ())
+let option_t :
+    type v c.
+    Script.location -> (v, c) ty -> (v option, to_be_replaced) ty tzresult =
+ fun loc t ->
+  Type_size.compound1 loc (ty_size t) >|? fun size ->
+  let Eq = is_comparable t in
+  Option_t (t, {size}, ())
 
 let option_mutez_t = Option_t (mutez_t, {size = Type_size.two}, ())
 
@@ -2159,7 +2231,7 @@ let kinstr_traverse i init f =
   aux init i (fun accu -> accu)
 
 type 'a ty_traverse = {
-  apply : 't. 'a -> 't ty -> 'a;
+  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a;
   apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
 }
 
@@ -2188,11 +2260,11 @@ let (ty_traverse, comparable_ty_traverse) =
     | Union_key (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2
     | Option_key (ty, _) -> (next [@ocaml.tailcall]) ty
   and aux' :
-      type ret t accu. accu ty_traverse -> accu -> t ty -> (accu -> ret) -> ret
-      =
+      type ret t tc accu.
+      accu ty_traverse -> accu -> (t, tc) ty -> (accu -> ret) -> ret =
    fun f accu ty continue ->
     let accu = f.apply accu ty in
-    match (ty : t ty) with
+    match (ty : (t, tc) ty) with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
     | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
@@ -2218,15 +2290,20 @@ let (ty_traverse, comparable_ty_traverse) =
         (next' [@ocaml.tailcall]) f accu ty1 continue
     | Contract_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
   and next2' :
-      type a b ret accu.
-      accu ty_traverse -> accu -> a ty -> b ty -> (accu -> ret) -> ret =
+      type a ac b bc ret accu.
+      accu ty_traverse ->
+      accu ->
+      (a, ac) ty ->
+      (b, bc) ty ->
+      (accu -> ret) ->
+      ret =
    fun f accu ty1 ty2 continue ->
     (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
     (aux' [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
     (continue [@ocaml.tailcall]) accu
   and next' :
-      type a ret accu. accu ty_traverse -> accu -> a ty -> (accu -> ret) -> ret
-      =
+      type a ac ret accu.
+      accu ty_traverse -> accu -> (a, ac) ty -> (accu -> ret) -> ret =
    fun f accu ty1 continue ->
     (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
     (continue [@ocaml.tailcall]) accu
@@ -2248,13 +2325,14 @@ let stack_ty_traverse (type a t) (sty : (a, t) stack_ty) init f =
   aux init sty
 
 type 'a value_traverse = {
-  apply : 't. 'a -> 't ty -> 't -> 'a;
+  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a;
   apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
 }
 
-let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
-    =
-  let rec aux : type ret t. 'accu -> t ty -> t -> ('accu -> ret) -> ret =
+let value_traverse (type t tc) (ty : ((t, tc) ty, t comparable_ty) union)
+    (x : t) init f =
+  let rec aux : type ret t tc. 'accu -> (t, tc) ty -> t -> ('accu -> ret) -> ret
+      =
    fun accu ty x continue ->
     let accu = f.apply accu ty x in
     let next2 ty1 ty2 x1 x2 =
@@ -2315,9 +2393,13 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
         (aux' [@ocaml.tailcall]) accu ty' x @@ fun accu ->
         (on_list' [@ocaml.tailcall]) accu ty' xs continue
   and on_bindings :
-      type ret k v.
-      'accu -> k comparable_ty -> v ty -> ('accu -> ret) -> (k * v) list -> ret
-      =
+      type ret k v vc.
+      'accu ->
+      k comparable_ty ->
+      (v, vc) ty ->
+      ('accu -> ret) ->
+      (k * v) list ->
+      ret =
    fun accu kty ty' continue xs ->
     match xs with
     | [] -> (continue [@ocaml.tailcall]) accu

@@ -256,7 +256,7 @@ module type S = sig
   end
 
   module rec Random_value : sig
-    val value : 'a Script_typed_ir.ty -> 'a sampler
+    val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
 
@@ -489,7 +489,7 @@ end)
 
   (* Type-directed generation of random values. *)
   module rec Random_value : sig
-    val value : 'a Script_typed_ir.ty -> 'a sampler
+    val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
 
@@ -538,7 +538,7 @@ end)
     let signature rng_state =
       Script_signature.make (Michelson_base.signature rng_state)
 
-    let rec value : type a. a Script_typed_ir.ty -> a sampler =
+    let rec value : type a ac. (a, ac) Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
         match typ with
@@ -597,16 +597,17 @@ end)
         | Chest_t -> fail_sampling "Michelson_samplers: chest not handled yet"
 
     and generate_lambda :
-        type arg ret.
-        arg Script_typed_ir.ty ->
-        ret Script_typed_ir.ty ->
+        type arg argc ret retc.
+        (arg, argc) Script_typed_ir.ty ->
+        (ret, retc) Script_typed_ir.ty ->
         (arg, ret) Script_typed_ir.lambda sampler =
      fun _arg_ty _ret_ty _rng_state ->
       fail_sampling "Michelson_samplers: lambda not handled yet"
 
     and generate_list :
-        type elt.
-        elt Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler =
+        type elt eltc.
+        (elt, eltc) Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler
+        =
      fun elt_type ->
       let open M in
       let* (length, elements) =
@@ -636,9 +637,9 @@ end)
            elements
 
     and generate_map :
-        type key elt.
+        type key elt eltc.
         key Script_typed_ir.comparable_ty ->
-        elt Script_typed_ir.ty ->
+        (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.map sampler =
      fun key_ty elt_ty rng_state ->
       let size =
@@ -654,9 +655,9 @@ end)
         elts
 
     and generate_big_map :
-        type key elt.
+        type key elt eltc.
         key Script_typed_ir.comparable_ty ->
-        elt Script_typed_ir.ty ->
+        (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.big_map sampler =
       let open Script_typed_ir in
       fun key_ty elt_ty rng_state ->
@@ -688,8 +689,9 @@ end)
             fail_sampling "raise_if_error"
 
     and generate_contract :
-        type arg.
-        arg Script_typed_ir.ty -> arg Script_typed_ir.typed_contract sampler =
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
       let* address = value address_t in
@@ -726,7 +728,8 @@ end)
       | None -> assert false
 
     and generate_ticket :
-        type a. a Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
+        type a ac.
+        (a, ac) Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
      fun ty rng_state ->
       let contents = value ty rng_state in
       let ticketer =

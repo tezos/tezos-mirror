@@ -144,8 +144,8 @@ module Ticket_inspection = struct
      it collapses whole branches where no types embed tickets to [False_ht].
   *)
   let rec has_tickets_of_ty :
-      type a ret. a Script_typed_ir.ty -> (a, ret) continuation -> ret tzresult
-      =
+      type a ac ret.
+      (a, ac) Script_typed_ir.ty -> (a, ret) continuation -> ret tzresult =
    fun ty k ->
     let open Script_typed_ir in
     match ty with
@@ -220,9 +220,9 @@ module Ticket_inspection = struct
     | Chest_key_t -> (k [@ocaml.tailcall]) False_ht
 
   and has_tickets_of_pair :
-      type a b c ret.
-      a Script_typed_ir.ty ->
-      b Script_typed_ir.ty ->
+      type a ac b bc c ret.
+      (a, ac) Script_typed_ir.ty ->
+      (b, bc) Script_typed_ir.ty ->
       pair:(a has_tickets -> b has_tickets -> c has_tickets) ->
       (c, ret) continuation ->
       ret tzresult =
@@ -232,9 +232,9 @@ module Ticket_inspection = struct
             (k [@ocaml.tailcall]) (pair_has_tickets pair ht1 ht2)))
 
   and has_tickets_of_key_and_value :
-      type k v t ret.
+      type k v vc t ret.
       k Script_typed_ir.comparable_ty ->
-      v Script_typed_ir.ty ->
+      (v, vc) Script_typed_ir.ty ->
       pair:(k has_tickets -> v has_tickets -> t has_tickets) ->
       (t, ret) continuation ->
       ret tzresult =
@@ -308,11 +308,11 @@ module Ticket_collection = struct
     (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc k
 
   let rec tickets_of_value :
-      type a ret.
+      type a ac ret.
       include_lazy:bool ->
       Alpha_context.context ->
       a Ticket_inspection.has_tickets ->
-      a Script_typed_ir.ty ->
+      (a, ac) Script_typed_ir.ty ->
       a ->
       accumulator ->
       ret continuation ->
@@ -406,11 +406,11 @@ module Ticket_collection = struct
         (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
 
   and tickets_of_list :
-      type a ret.
+      type a ac ret.
       Alpha_context.context ->
       include_lazy:bool ->
       a Ticket_inspection.has_tickets ->
-      a Script_typed_ir.ty ->
+      (a, ac) Script_typed_ir.ty ->
       a list ->
       accumulator ->
       ret continuation ->
@@ -438,11 +438,11 @@ module Ticket_collection = struct
     | [] -> (k [@ocaml.tailcall]) ctxt acc
 
   and tickets_of_map :
-      type k v ret.
+      type k v vc ret.
       include_lazy:bool ->
       Alpha_context.context ->
       v Ticket_inspection.has_tickets ->
-      v Script_typed_ir.ty ->
+      (v, vc) Script_typed_ir.ty ->
       (k, v) Script_typed_ir.map ->
       accumulator ->
       ret continuation ->
@@ -515,7 +515,7 @@ end
 
 type 'a has_tickets =
   | Has_tickets :
-      'a Ticket_inspection.has_tickets * 'a Script_typed_ir.ty
+      'a Ticket_inspection.has_tickets * ('a, _) Script_typed_ir.ty
       -> 'a has_tickets
 
 let type_has_tickets ctxt ty =

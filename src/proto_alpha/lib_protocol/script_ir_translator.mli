@@ -70,11 +70,11 @@ type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> ex_comparable_ty
 
-type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
+type ex_ty = Ex_ty : ('a, _) Script_typed_ir.ty -> ex_ty
 
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {
-      arg_type : 'a Script_typed_ir.ty;
+      arg_type : ('a, _) Script_typed_ir.ty;
       entrypoints : 'a Script_typed_ir.entrypoints;
     }
       -> ex_parameter_ty_and_entrypoints
@@ -90,9 +90,9 @@ type ex_script =
             'storage )
           Script_typed_ir.pair )
         Script_typed_ir.lambda;
-      arg_type : 'arg Script_typed_ir.ty;
+      arg_type : ('arg, _) Script_typed_ir.ty;
       storage : 'storage;
-      storage_type : 'storage Script_typed_ir.ty;
+      storage_type : ('storage, _) Script_typed_ir.ty;
       views : Script_typed_ir.view_map;
       entrypoints : 'arg Script_typed_ir.entrypoints;
       code_size : Cache_memory_helpers.sint;
@@ -114,8 +114,8 @@ type ('arg, 'storage) code =
             'storage )
           Script_typed_ir.pair )
         Script_typed_ir.lambda;
-      arg_type : 'arg Script_typed_ir.ty;
-      storage_type : 'storage Script_typed_ir.ty;
+      arg_type : ('arg, _) Script_typed_ir.ty;
+      storage_type : ('storage, _) Script_typed_ir.ty;
       views : Script_typed_ir.view_map;
       entrypoints : 'arg Script_typed_ir.entrypoints;
       code_size : Cache_memory_helpers.sint;
@@ -181,7 +181,7 @@ type type_logger =
 (** Create an empty big_map *)
 val empty_big_map :
   'a Script_typed_ir.comparable_ty ->
-  'b Script_typed_ir.ty ->
+  ('b, _) Script_typed_ir.ty ->
   ('a, 'b) Script_typed_ir.big_map
 
 val big_map_mem :
@@ -219,9 +219,11 @@ val big_map_get_and_update :
 val ty_eq :
   error_details:'error_trace error_details ->
   Script.location ->
-  'a Script_typed_ir.ty ->
-  'b Script_typed_ir.ty ->
-  (('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq, 'error_trace) Gas_monad.t
+  ('a, 'ac) Script_typed_ir.ty ->
+  ('b, 'bc) Script_typed_ir.ty ->
+  ( (('a, 'ac) Script_typed_ir.ty, ('b, 'bc) Script_typed_ir.ty) eq,
+    'error_trace )
+  Gas_monad.t
 
 (** {3 Parsing and Typechecking Michelson} *)
 val parse_comparable_data :
@@ -236,14 +238,14 @@ val parse_data :
   context ->
   legacy:bool ->
   allow_forged:bool ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   Script.node ->
   ('a * context) tzresult Lwt.t
 
 val unparse_data :
   context ->
   unparsing_mode ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   'a ->
   (Script.node * context) tzresult Lwt.t
 
@@ -310,7 +312,7 @@ val parse_view_returning :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
-  'storage Script_typed_ir.ty ->
+  ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view ->
   ('storage ex_view * context) tzresult Lwt.t
 
@@ -318,7 +320,7 @@ val typecheck_views :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
-  'storage Script_typed_ir.ty ->
+  ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view_map ->
   context tzresult Lwt.t
 
@@ -344,7 +346,7 @@ val parse_ty :
 val unparse_ty :
   loc:'loc ->
   context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   ('loc Script.michelson_node * context) tzresult
 
 val unparse_comparable_ty :
@@ -354,7 +356,8 @@ val unparse_comparable_ty :
   ('loc Script.michelson_node * context) tzresult
 
 val ty_of_comparable_ty :
-  'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
+  'a Script_typed_ir.comparable_ty ->
+  ('a, Script_typed_ir.to_be_replaced) Script_typed_ir.ty
 
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
@@ -362,7 +365,7 @@ val parse_toplevel :
 val unparse_parameter_ty :
   loc:'loc ->
   context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   entrypoints:'a Script_typed_ir.entrypoints ->
   ('loc Script.michelson_node * context) tzresult
 
@@ -378,7 +381,7 @@ val typecheck_code :
   Script.expr ->
   (type_map * context) tzresult Lwt.t
 
-val serialize_ty_for_error : 'a Script_typed_ir.ty -> Script.expr
+val serialize_ty_for_error : ('a, _) Script_typed_ir.ty -> Script.expr
 
 val parse_code :
   ?type_logger:type_logger ->
@@ -392,7 +395,7 @@ val parse_storage :
   context ->
   legacy:bool ->
   allow_forged:bool ->
-  'storage Script_typed_ir.ty ->
+  ('storage, _) Script_typed_ir.ty ->
   storage:Script.lazy_expr ->
   ('storage * context) tzresult Lwt.t
 
@@ -412,7 +415,7 @@ val unparse_script :
 val parse_contract :
   context ->
   Script.location ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   Destination.t ->
   entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
@@ -420,7 +423,7 @@ val parse_contract :
 val parse_contract_for_script :
   context ->
   Script.location ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   Destination.t ->
   entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
@@ -436,18 +439,18 @@ val parse_tx_rollup_deposit_parameters :
     existential. Typically, it will be used to go from the type of an
     entry-point to the full type of a contract. *)
 type 'a ex_ty_cstr =
-  | Ex_ty_cstr : 'b Script_typed_ir.ty * ('b -> 'a) -> 'a ex_ty_cstr
+  | Ex_ty_cstr : ('b, _) Script_typed_ir.ty * ('b -> 'a) -> 'a ex_ty_cstr
 
 val find_entrypoint :
   error_details:'error_trace error_details ->
-  't Script_typed_ir.ty ->
+  ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   Entrypoint.t ->
   ('t ex_ty_cstr, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
   context ->
-  't Script_typed_ir.ty ->
+  ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
@@ -455,7 +458,10 @@ val list_entrypoints :
   tzresult
 
 val pack_data :
-  context -> 'a Script_typed_ir.ty -> 'a -> (bytes * context) tzresult Lwt.t
+  context ->
+  ('a, _) Script_typed_ir.ty ->
+  'a ->
+  (bytes * context) tzresult Lwt.t
 
 val hash_comparable_data :
   context ->
@@ -465,7 +471,7 @@ val hash_comparable_data :
 
 val hash_data :
   context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   'a ->
   (Script_expr_hash.t * context) tzresult Lwt.t
 
@@ -478,7 +484,7 @@ val no_lazy_storage_id : lazy_storage_ids
  *)
 val collect_lazy_storage :
   context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   'a ->
   (lazy_storage_ids * context) tzresult
 
@@ -505,14 +511,14 @@ val extract_lazy_storage_diff :
   temporary:bool ->
   to_duplicate:lazy_storage_ids ->
   to_update:lazy_storage_ids ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   'a ->
   ('a * Lazy_storage.diffs option * context) tzresult Lwt.t
 
 (* return [None] if none or more than one found *)
 val get_single_sapling_state :
   context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   'a ->
   (Sapling.Id.t option * context) tzresult
 

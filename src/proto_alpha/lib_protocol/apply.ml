@@ -877,7 +877,9 @@ let apply_delegation ~ctxt ~source ~delegate ~since =
   (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
 
 type execution_arg =
-  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Typed_arg :
+      Script.location * ('a, _) Script_typed_ir.ty * 'a
+      -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
 let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint

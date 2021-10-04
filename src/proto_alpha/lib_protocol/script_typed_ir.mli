@@ -186,6 +186,8 @@ end
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
+type (_, _) eq = Eq : ('a, 'a) eq
+
 type _ comparable_ty =
   | Unit_key : unit comparable_ty
   | Never_key : never comparable_ty
@@ -594,7 +596,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
   | IEmpty_big_map :
       ('a, 's) kinfo
       * 'b comparable_ty
-      * 'c ty
+      * ('c, _) ty
       * (('b, 'c) big_map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IBig_map_mem :
@@ -800,7 +802,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
       ('a, ('a * 'b, 'c) lambda * 's) kinfo
-      * 'a ty
+      * ('a, _) ty
       * (('b, 'c) lambda, 's, 'r, 'f) kinstr
       -> ('a, ('a * 'b, 'c) lambda * 's, 'r, 'f) kinstr
   | ILambda :
@@ -809,7 +811,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty
+      ('a, 's) kinfo * Script.location * ('a, _) ty
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -849,7 +851,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a typed_contract, 's, 'r, 'f) kinstr
   | IContract :
       (address, 's) kinfo
-      * 'a ty
+      * ('a, _) ty
       * Entrypoint.t
       * ('a typed_contract option, 's, 'r, 'f) kinstr
       -> (address, 's, 'r, 'f) kinstr
@@ -867,8 +869,8 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (public_key_hash, 's, 'r, 'f) kinstr
   | ICreate_contract : {
       kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
-      storage_type : 'a ty;
-      arg_type : 'b ty;
+      storage_type : ('a, _) ty;
+      arg_type : ('b, _) ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
       views : view_map;
       entrypoints : 'b entrypoints;
@@ -897,10 +899,10 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       (public_key, 's) kinfo * (public_key_hash, 's, 'r, 'f) kinstr
       -> (public_key, 's, 'r, 'f) kinstr
   | IPack :
-      ('a, 's) kinfo * 'a ty * (bytes, 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('a, _) ty * (bytes, 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IUnpack :
-      (bytes, 's) kinfo * 'a ty * ('a option, 's, 'r, 'f) kinstr
+      (bytes, 's) kinfo * ('a, _) ty * ('a option, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
   | IBlake2b :
       (bytes, 's) kinfo * (bytes, 's, 'r, 'f) kinstr
@@ -919,7 +921,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | ISelf :
       ('a, 's) kinfo
-      * 'b ty
+      * ('b, _) ty
       * Entrypoint.t
       * ('b typed_contract, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
@@ -1151,7 +1153,7 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract =
   | Typed_contract : {
-      arg_ty : 'arg ty;
+      arg_ty : ('arg, _) ty;
       address : address;
     }
       -> 'arg typed_contract
@@ -1330,58 +1332,74 @@ and logger = {
 and to_be_replaced = unit
 
 (* ---- Auxiliary types -----------------------------------------------------*)
-and 'ty ty =
-  | Unit_t : unit ty
-  | Int_t : z num ty
-  | Nat_t : n num ty
-  | Signature_t : signature ty
-  | String_t : Script_string.t ty
-  | Bytes_t : bytes ty
-  | Mutez_t : Tez.t ty
-  | Key_hash_t : public_key_hash ty
-  | Key_t : public_key ty
-  | Timestamp_t : Script_timestamp.t ty
-  | Address_t : address ty
-  | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
-  | Bool_t : bool ty
+and ('ty, 'comparable) ty =
+  | Unit_t : (unit, to_be_replaced) ty
+  | Int_t : (z num, to_be_replaced) ty
+  | Nat_t : (n num, to_be_replaced) ty
+  | Signature_t : (signature, to_be_replaced) ty
+  | String_t : (Script_string.t, to_be_replaced) ty
+  | Bytes_t : (bytes, to_be_replaced) ty
+  | Mutez_t : (Tez.t, to_be_replaced) ty
+  | Key_hash_t : (public_key_hash, to_be_replaced) ty
+  | Key_t : (public_key, to_be_replaced) ty
+  | Timestamp_t : (Script_timestamp.t, to_be_replaced) ty
+  | Address_t : (address, to_be_replaced) ty
+  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, to_be_replaced) ty
+  | Bool_t : (bool, to_be_replaced) ty
   | Pair_t :
-      'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
-      -> ('a, 'b) pair ty
+      ('a, to_be_replaced) ty
+      * ('b, to_be_replaced) ty
+      * ('a, 'b) pair ty_metadata
+      * to_be_replaced
+      -> (('a, 'b) pair, to_be_replaced) ty
   | Union_t :
-      'a ty * 'b ty * ('a, 'b) union ty_metadata * to_be_replaced
-      -> ('a, 'b) union ty
+      ('a, to_be_replaced) ty
+      * ('b, to_be_replaced) ty
+      * ('a, 'b) union ty_metadata
+      * to_be_replaced
+      -> (('a, 'b) union, to_be_replaced) ty
   | Lambda_t :
-      'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
-      -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * 'v option ty_metadata * to_be_replaced -> 'v option ty
-  | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
-  | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
+      ('arg, _) ty * ('ret, _) ty * ('arg, 'ret) lambda ty_metadata
+      -> (('arg, 'ret) lambda, to_be_replaced) ty
+  | Option_t :
+      ('v, to_be_replaced) ty * 'v option ty_metadata * to_be_replaced
+      -> ('v option, to_be_replaced) ty
+  | List_t :
+      ('v, _) ty * 'v boxed_list ty_metadata
+      -> ('v boxed_list, to_be_replaced) ty
+  | Set_t : 'v comparable_ty * 'v set ty_metadata -> ('v set, to_be_replaced) ty
   | Map_t :
-      'k comparable_ty * 'v ty * ('k, 'v) map ty_metadata
-      -> ('k, 'v) map ty
+      'k comparable_ty * ('v, _) ty * ('k, 'v) map ty_metadata
+      -> (('k, 'v) map, to_be_replaced) ty
   | Big_map_t :
-      'k comparable_ty * 'v ty * ('k, 'v) big_map ty_metadata
-      -> ('k, 'v) big_map ty
+      'k comparable_ty * ('v, _) ty * ('k, 'v) big_map ty_metadata
+      -> (('k, 'v) big_map, to_be_replaced) ty
   | Contract_t :
-      'arg ty * 'arg typed_contract ty_metadata
-      -> 'arg typed_contract ty
-  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
+      ('arg, _) ty * 'arg typed_contract ty_metadata
+      -> ('arg typed_contract, to_be_replaced) ty
+  | Sapling_transaction_t :
+      Sapling.Memo_size.t
+      -> (Sapling.transaction, to_be_replaced) ty
   | Sapling_transaction_deprecated_t :
       Sapling.Memo_size.t
-      -> Sapling.Legacy.transaction ty
-  | Sapling_state_t : Sapling.Memo_size.t -> Sapling.state ty
-  | Operation_t : operation ty
-  | Chain_id_t : Script_chain_id.t ty
-  | Never_t : never ty
-  | Bls12_381_g1_t : Script_bls.G1.t ty
-  | Bls12_381_g2_t : Script_bls.G2.t ty
-  | Bls12_381_fr_t : Script_bls.Fr.t ty
-  | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t : Script_timelock.chest_key ty
-  | Chest_t : Script_timelock.chest ty
+      -> (Sapling.Legacy.transaction, to_be_replaced) ty
+  | Sapling_state_t : Sapling.Memo_size.t -> (Sapling.state, to_be_replaced) ty
+  | Operation_t : (operation, to_be_replaced) ty
+  | Chain_id_t : (Script_chain_id.t, to_be_replaced) ty
+  | Never_t : (never, to_be_replaced) ty
+  | Bls12_381_g1_t : (Script_bls.G1.t, to_be_replaced) ty
+  | Bls12_381_g2_t : (Script_bls.G2.t, to_be_replaced) ty
+  | Bls12_381_fr_t : (Script_bls.Fr.t, to_be_replaced) ty
+  | Ticket_t :
+      'a comparable_ty * 'a ticket ty_metadata
+      -> ('a ticket, to_be_replaced) ty
+  | Chest_key_t : (Script_timelock.chest_key, to_be_replaced) ty
+  | Chest_t : (Script_timelock.chest, to_be_replaced) ty
 
 and ('top_ty, 'resty) stack_ty =
-  | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
+  | Item_t :
+      ('ty, _) ty * ('ty2, 'rest) stack_ty
+      -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
 and ('key, 'value) big_map =
@@ -1389,7 +1407,7 @@ and ('key, 'value) big_map =
       id : Big_map.Id.t option;
       diff : ('key, 'value) big_map_overlay;
       key_type : 'key comparable_ty;
-      value_type : 'value ty;
+      value_type : ('value, _) ty;
     }
       -> ('key, 'value) big_map
 
@@ -1487,8 +1505,8 @@ and (_, _) dup_n_gadt_witness =
 and ('input, 'output) view_signature =
   | View_signature : {
       name : Script_string.t;
-      input_ty : 'input ty;
-      output_ty : 'output ty;
+      input_ty : ('input, _) ty;
+      output_ty : ('output, _) ty;
     }
       -> ('input, 'output) view_signature
 
@@ -1501,7 +1519,7 @@ and 'kind manager_operation =
          ([Apply_results.internal_manager_operation]). *)
       transaction : Alpha_context.transaction;
       location : Script.location;
-      parameters_ty : 'a ty;
+      parameters_ty : ('a, _) ty;
       parameters : 'a;
     }
       -> Kind.transaction manager_operation
@@ -1542,11 +1560,13 @@ type kinstr_rewritek = {
 val kinstr_rewritek :
   ('a, 's, 'r, 'f) kinstr -> kinstr_rewritek -> ('a, 's, 'r, 'f) kinstr
 
-val ty_size : 'a ty -> 'a Type_size.t
+val ty_size : ('a, _) ty -> 'a Type_size.t
 
 val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
 
-type 'v ty_ex_c = Ty_ex_c : 'v ty -> 'v ty_ex_c [@@ocaml.unboxed]
+val is_comparable : ('v, 'c) ty -> ('c, to_be_replaced) eq
+
+type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
 val unit_key : unit comparable_ty
 
@@ -1600,101 +1620,120 @@ val union_key :
 val option_key :
   Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
 
-val unit_t : unit ty
+val unit_t : (unit, to_be_replaced) ty
 
-val int_t : z num ty
+val int_t : (z num, to_be_replaced) ty
 
-val nat_t : n num ty
+val nat_t : (n num, to_be_replaced) ty
 
-val signature_t : signature ty
+val signature_t : (signature, to_be_replaced) ty
 
-val string_t : Script_string.t ty
+val string_t : (Script_string.t, to_be_replaced) ty
 
-val bytes_t : Bytes.t ty
+val bytes_t : (Bytes.t, to_be_replaced) ty
 
-val mutez_t : Tez.t ty
+val mutez_t : (Tez.t, to_be_replaced) ty
 
-val key_hash_t : public_key_hash ty
+val key_hash_t : (public_key_hash, to_be_replaced) ty
 
-val key_t : public_key ty
+val key_t : (public_key, to_be_replaced) ty
 
-val timestamp_t : Script_timestamp.t ty
+val timestamp_t : (Script_timestamp.t, to_be_replaced) ty
 
-val address_t : address ty
+val address_t : (address, to_be_replaced) ty
 
-val tx_rollup_l2_address_t : tx_rollup_l2_address ty
+val tx_rollup_l2_address_t : (tx_rollup_l2_address, to_be_replaced) ty
 
-val bool_t : bool ty
+val bool_t : (bool, to_be_replaced) ty
 
-val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty_ex_c tzresult
+val pair_t :
+  Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
 
 val union_t :
-  Script.location -> 'a ty -> 'b ty -> ('a, 'b) union ty_ex_c tzresult
+  Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) union ty_ex_c tzresult
 
-val union_bytes_bool_t : (Bytes.t, bool) union ty
+val union_bytes_bool_t : ((Bytes.t, bool) union, to_be_replaced) ty
 
 val lambda_t :
-  Script.location -> 'arg ty -> 'ret ty -> ('arg, 'ret) lambda ty tzresult
+  Script.location ->
+  ('arg, _) ty ->
+  ('ret, _) ty ->
+  (('arg, 'ret) lambda, to_be_replaced) ty tzresult
 
-val option_t : Script.location -> 'v ty -> 'v option ty tzresult
+val option_t :
+  Script.location -> ('v, 'c) ty -> ('v option, to_be_replaced) ty tzresult
 
-val option_mutez_t : Tez.t option ty
+val option_mutez_t : (Tez.t option, to_be_replaced) ty
 
-val option_string_t : Script_string.t option ty
+val option_string_t : (Script_string.t option, to_be_replaced) ty
 
-val option_bytes_t : Bytes.t option ty
+val option_bytes_t : (Bytes.t option, to_be_replaced) ty
 
-val option_nat_t : n num option ty
+val option_nat_t : (n num option, to_be_replaced) ty
 
-val option_pair_nat_nat_t : (n num, n num) pair option ty
+val option_pair_nat_nat_t : ((n num, n num) pair option, to_be_replaced) ty
 
-val option_pair_nat_mutez_t : (n num, Tez.t) pair option ty
+val option_pair_nat_mutez_t : ((n num, Tez.t) pair option, to_be_replaced) ty
 
-val option_pair_mutez_mutez_t : (Tez.t, Tez.t) pair option ty
+val option_pair_mutez_mutez_t : ((Tez.t, Tez.t) pair option, to_be_replaced) ty
 
-val option_pair_int_nat_t : (z num, n num) pair option ty
+val option_pair_int_nat_t : ((z num, n num) pair option, to_be_replaced) ty
 
-val list_t : Script.location -> 'v ty -> 'v boxed_list ty tzresult
+val list_t :
+  Script.location -> ('v, _) ty -> ('v boxed_list, to_be_replaced) ty tzresult
 
-val list_operation_t : operation boxed_list ty
+val list_operation_t : (operation boxed_list, to_be_replaced) ty
 
-val set_t : Script.location -> 'v comparable_ty -> 'v set ty tzresult
+val set_t :
+  Script.location -> 'v comparable_ty -> ('v set, to_be_replaced) ty tzresult
 
 val map_t :
-  Script.location -> 'k comparable_ty -> 'v ty -> ('k, 'v) map ty tzresult
+  Script.location ->
+  'k comparable_ty ->
+  ('v, _) ty ->
+  (('k, 'v) map, to_be_replaced) ty tzresult
 
 val big_map_t :
-  Script.location -> 'k comparable_ty -> 'v ty -> ('k, 'v) big_map ty tzresult
+  Script.location ->
+  'k comparable_ty ->
+  ('v, _) ty ->
+  (('k, 'v) big_map, to_be_replaced) ty tzresult
 
-val contract_t : Script.location -> 'arg ty -> 'arg typed_contract ty tzresult
+val contract_t :
+  Script.location ->
+  ('arg, _) ty ->
+  ('arg typed_contract, to_be_replaced) ty tzresult
 
-val contract_unit_t : unit typed_contract ty
+val contract_unit_t : (unit typed_contract, to_be_replaced) ty
 
 val sapling_transaction_t :
-  memo_size:Sapling.Memo_size.t -> Sapling.transaction ty
+  memo_size:Sapling.Memo_size.t -> (Sapling.transaction, to_be_replaced) ty
 
 val sapling_transaction_deprecated_t :
-  memo_size:Sapling.Memo_size.t -> Sapling.Legacy.transaction ty
+  memo_size:Sapling.Memo_size.t ->
+  (Sapling.Legacy.transaction, to_be_replaced) ty
 
-val sapling_state_t : memo_size:Sapling.Memo_size.t -> Sapling.state ty
+val sapling_state_t :
+  memo_size:Sapling.Memo_size.t -> (Sapling.state, to_be_replaced) ty
 
-val operation_t : operation ty
+val operation_t : (operation, to_be_replaced) ty
 
-val chain_id_t : Script_chain_id.t ty
+val chain_id_t : (Script_chain_id.t, to_be_replaced) ty
 
-val never_t : never ty
+val never_t : (never, to_be_replaced) ty
 
-val bls12_381_g1_t : Script_bls.G1.t ty
+val bls12_381_g1_t : (Script_bls.G1.t, to_be_replaced) ty
 
-val bls12_381_g2_t : Script_bls.G2.t ty
+val bls12_381_g2_t : (Script_bls.G2.t, to_be_replaced) ty
 
-val bls12_381_fr_t : Script_bls.Fr.t ty
+val bls12_381_fr_t : (Script_bls.Fr.t, to_be_replaced) ty
 
-val ticket_t : Script.location -> 'a comparable_ty -> 'a ticket ty tzresult
+val ticket_t :
+  Script.location -> 'a comparable_ty -> ('a ticket, to_be_replaced) ty tzresult
 
-val chest_key_t : Script_timelock.chest_key ty
+val chest_key_t : (Script_timelock.chest_key, to_be_replaced) ty
 
-val chest_t : Script_timelock.chest ty
+val chest_t : (Script_timelock.chest, to_be_replaced) ty
 
 (**
 
@@ -1723,13 +1762,13 @@ val kinstr_traverse :
   ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
 
 type 'a ty_traverse = {
-  apply : 't. 'a -> 't ty -> 'a;
+  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a;
   apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
 }
 
 val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
 
-val ty_traverse : 'a ty -> 'r -> 'r ty_traverse -> 'r
+val ty_traverse : ('a, _) ty -> 'r -> 'r ty_traverse -> 'r
 
 type 'accu stack_ty_traverse = {
   apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;
@@ -1738,11 +1777,11 @@ type 'accu stack_ty_traverse = {
 val stack_ty_traverse : ('a, 's) stack_ty -> 'r -> 'r stack_ty_traverse -> 'r
 
 type 'a value_traverse = {
-  apply : 't. 'a -> 't ty -> 't -> 'a;
+  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a;
   apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
 }
 
 val value_traverse :
-  ('t ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
+  (('t, _) ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
 
 val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c

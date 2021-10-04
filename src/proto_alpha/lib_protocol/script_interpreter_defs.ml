@@ -510,9 +510,9 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
      parameters submitted by the interpreter to prepare them for the
      [Transaction] operation. *)
   let craft_transfer_parameters :
-      type a.
+      type a ac.
       context ->
-      a ty ->
+      (a, ac) ty ->
       (location, prim) Micheline.node ->
       Destination.t ->
       ((location, prim) Micheline.node * context) tzresult =
@@ -886,12 +886,12 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
 
 type ifailwith_type = {
   ifailwith :
-    'a 'b.
+    'a 'ac 'b.
     logger option ->
     outdated_context * step_constants ->
     local_gas_counter ->
     Script.location ->
-    'a ty ->
+    ('a, 'ac) ty ->
     'a ->
     ('b, error trace) result Lwt.t;
 }

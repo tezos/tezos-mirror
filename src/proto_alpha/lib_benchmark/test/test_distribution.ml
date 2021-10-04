@@ -55,7 +55,7 @@ module Type_name_multiset =
   Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map (Type_name)
 
 let rec tnames_of_type :
-    type a. a Script_typed_ir.ty -> type_name list -> type_name list =
+    type a ac. (a, ac) Script_typed_ir.ty -> type_name list -> type_name list =
  fun t acc ->
   match t with
   | Script_typed_ir.Unit_t -> `TUnit :: acc

@@ -161,7 +161,8 @@ let check_kind kinds expr =
    (everything that cannot contain a lambda). The rest is located at
    the end of the file. *)
 
-let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
+let rec ty_of_comparable_ty : type a. a comparable_ty -> (a, to_be_replaced) ty
+    = function
   | Unit_key -> Unit_t
   | Never_key -> Never_t
   | Int_key -> Int_t
@@ -222,7 +223,8 @@ let unparse_memo_size ~loc memo_size =
   Int (loc, z)
 
 let rec unparse_ty_entrypoints_uncarbonated :
-    type a loc. loc:loc -> a ty -> a entrypoints -> loc Script.michelson_node =
+    type a ac loc.
+    loc:loc -> (a, ac) ty -> a entrypoints -> loc Script.michelson_node =
  fun ~loc ty {nested = nested_entrypoints; name = entrypoint_name} ->
   let (name, args) =
     match ty with
@@ -332,8 +334,11 @@ let serialize_ty_for_error ty =
   unparse_ty_uncarbonated ~loc:() ty |> Micheline.strip_locations
 
 let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
-    type a.
-    context -> Script.location -> a ty -> (a comparable_ty * context) tzresult =
+    type a ac.
+    context ->
+    Script.location ->
+    (a, ac) ty ->
+    (a comparable_ty * context) tzresult =
  fun ctxt loc ty ->
   Gas.consume ctxt Typecheck_costs.comparable_ty_of_ty_cycle >>? fun ctxt ->
   match ty with
@@ -675,7 +680,7 @@ let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
       ()
 
 let check_dupable_ty ctxt loc ty =
-  let rec aux : type a. location -> a ty -> (unit, error) Gas_monad.t =
+  let rec aux : type a ac. location -> (a, ac) ty -> (unit, error) Gas_monad.t =
    fun loc ty ->
     let open Gas_monad.Syntax in
     let* () = Gas_monad.consume_gas Typecheck_costs.check_dupable_cycle in
@@ -853,12 +858,12 @@ let memo_size_eq :
 
 (** Same as comparable_ty_eq but for any types. *)
 let ty_eq :
-    type a b error_trace.
+    type a ac b bc error_trace.
     error_details:error_trace error_details ->
     Script.location ->
-    a ty ->
-    b ty ->
-    ((a ty, b ty) eq, error_trace) Gas_monad.t =
+    (a, ac) ty ->
+    (b, bc) ty ->
+    (((a, ac) ty, (b, bc) ty) eq, error_trace) Gas_monad.t =
  fun ~error_details loc ty1 ty2 ->
   let type_metadata_eq meta1 meta2 =
     Gas_monad.of_result (type_metadata_eq ~error_details meta1 meta2)
@@ -871,15 +876,19 @@ let ty_eq :
     Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
   in
   let rec help :
-      type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq, error_trace) Gas_monad.t
-      =
+      type ta tac tb tbc.
+      (ta, tac) ty ->
+      (tb, tbc) ty ->
+      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
    fun ty1 ty2 ->
     help0 ty1 ty2
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
            default_ty_eq_error ty1 ty2)
   and help0 :
-      type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq, error_trace) Gas_monad.t
-      =
+      type ta tac tb tbc.
+      (ta, tac) ty ->
+      (tb, tbc) ty ->
+      (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
    fun ty1 ty2 ->
     let open Gas_monad.Syntax in
     let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
@@ -891,7 +900,7 @@ let ty_eq :
            | Informative -> trace_of_error @@ default_ty_eq_error ty1 ty2)
     in
     match (ty1, ty2) with
-    | (Unit_t, Unit_t) -> return (Eq : (ta ty, tb ty) eq)
+    | (Unit_t, Unit_t) -> return (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Unit_t, _) -> not_equal ()
     | (Int_t, Int_t) -> return Eq
     | (Int_t, _) -> not_equal ()
@@ -933,56 +942,56 @@ let ty_eq :
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
         let+ Eq = comparable_ty_eq ~error_details tal tbl in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Map_t _, _) -> not_equal ()
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
         let+ Eq = comparable_ty_eq ~error_details tal tbl in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Big_map_t _, _) -> not_equal ()
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let+ Eq = comparable_ty_eq ~error_details ea eb in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Set_t _, _) -> not_equal ()
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let+ Eq = comparable_ty_eq ~error_details ea eb in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Ticket_t _, _) -> not_equal ()
     | (Pair_t (tal, tar, meta1, _), Pair_t (tbl, tbr, meta2, _)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Pair_t _, _) -> not_equal ()
     | (Union_t (tal, tar, meta1, _), Union_t (tbl, tbr, meta2, _)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Union_t _, _) -> not_equal ()
     | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Lambda_t _, _) -> not_equal ()
     | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let+ Eq = help tal tbl in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Contract_t _, _) -> not_equal ()
     | (Option_t (tva, meta1, _), Option_t (tvb, meta2, _)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let+ Eq = help tva tvb in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Option_t _, _) -> not_equal ()
     | (List_t (tva, meta1), List_t (tvb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let+ Eq = help tva tvb in
-        (Eq : (ta ty, tb ty) eq)
+        (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (List_t _, _) -> not_equal ()
     | (Sapling_state_t ms1, Sapling_state_t ms2) ->
         let+ () = memo_size_eq ms1 ms2 in
@@ -1215,11 +1224,11 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
                T_key;
              ]
 
-type ex_ty = Ex_ty : 'a ty -> ex_ty
+type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
 
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {
-      arg_type : 'a ty;
+      arg_type : ('a, _) ty;
       entrypoints : 'a entrypoints;
     }
       -> ex_parameter_ty_and_entrypoints
@@ -1730,7 +1739,7 @@ let parse_storage_ty :
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 let check_packable ~legacy loc root =
-  let rec check : type t. t ty -> unit tzresult = function
+  let rec check : type t tc. (t, tc) ty -> unit tzresult = function
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
        Lazy storage should not be packable. *)
     | Big_map_t _ -> error (Unexpected_lazy_storage loc)
@@ -1782,8 +1791,8 @@ type ('arg, 'storage) code =
   | Code : {
       code :
         (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-      arg_type : 'arg ty;
-      storage_type : 'storage ty;
+      arg_type : ('arg, _) ty;
+      storage_type : ('storage, _) ty;
       views : view_map;
       entrypoints : 'arg entrypoints;
       code_size : Cache_memory_helpers.sint;
@@ -1794,9 +1803,9 @@ type ex_script =
   | Ex_script : {
       code :
         (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-      arg_type : 'arg ty;
+      arg_type : ('arg, _) ty;
       storage : 'storage;
-      storage_type : 'storage ty;
+      storage_type : ('storage, _) ty;
       views : view_map;
       entrypoints : 'arg entrypoints;
       code_size : Cache_memory_helpers.sint;
@@ -1818,7 +1827,7 @@ type 'storage ex_view =
 type (_, _) dig_proof_argument =
   | Dig_proof_argument :
       ('x, 'a * 's, 'a, 's, 'b, 't, 'c, 'u) stack_prefix_preservation_witness
-      * 'x ty
+      * ('x, _) ty
       * ('c, 'u) stack_ty
       -> ('b, 't) dig_proof_argument
 
@@ -1854,24 +1863,24 @@ type 'before uncomb_proof_argument =
 
 type 'before comb_get_proof_argument =
   | Comb_get_proof_argument :
-      ('before, 'after) comb_get_gadt_witness * 'after ty
+      ('before, 'after) comb_get_gadt_witness * ('after, _) ty
       -> 'before comb_get_proof_argument
 
 type ('rest, 'before) comb_set_proof_argument =
   | Comb_set_proof_argument :
-      ('rest, 'before, 'after) comb_set_gadt_witness * 'after ty
+      ('rest, 'before, 'after) comb_set_gadt_witness * ('after, _) ty
       -> ('rest, 'before) comb_set_proof_argument
 
 type 'before dup_n_proof_argument =
   | Dup_n_proof_argument :
-      ('before, 'a) dup_n_gadt_witness * 'a ty
+      ('before, 'a) dup_n_gadt_witness * ('a, _) ty
       -> 'before dup_n_proof_argument
 
 let rec make_dug_proof_argument :
-    type a s x.
+    type a s x xc.
     location ->
     int ->
-    x ty ->
+    (x, xc) ty ->
     (a, s) stack_ty ->
     (a, s, x) dug_proof_argument option =
  fun loc n x stk ->
@@ -1885,7 +1894,7 @@ let rec make_dug_proof_argument :
   | (_, _) -> None
 
 let rec make_comb_get_proof_argument :
-    type b. int -> b ty -> b comb_get_proof_argument option =
+    type b bc. int -> (b, bc) ty -> b comb_get_proof_argument option =
  fun n ty ->
   match (n, ty) with
   | (0, value_ty) -> Some (Comb_get_proof_argument (Comb_get_zero, value_ty))
@@ -1899,13 +1908,13 @@ let rec make_comb_get_proof_argument :
   | _ -> None
 
 let rec make_comb_set_proof_argument :
-    type value before a s.
+    type value valuec before beforec a s.
     context ->
     (a, s) stack_ty ->
     location ->
     int ->
-    value ty ->
-    before ty ->
+    (value, valuec) ty ->
+    (before, beforec) ty ->
     (value, before) comb_set_proof_argument tzresult =
  fun ctxt stack_ty loc n value_ty ty ->
   match (n, ty) with
@@ -1922,17 +1931,19 @@ let rec make_comb_set_proof_argument :
       let whole_stack = serialize_stack_for_error ctxt stack_ty in
       error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
 
-type 'a ex_ty_cstr = Ex_ty_cstr : 'b ty * ('b -> 'a) -> 'a ex_ty_cstr
+type 'a ex_ty_cstr = Ex_ty_cstr : ('b, _) ty * ('b -> 'a) -> 'a ex_ty_cstr
 
-let find_entrypoint (type full error_trace)
-    ~(error_details : error_trace error_details) (full : full ty)
+let find_entrypoint (type full fullc error_trace)
+    ~(error_details : error_trace error_details) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) entrypoint :
     (full ex_ty_cstr, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
   let rec find_entrypoint :
-      type t.
-      t ty -> t entrypoints -> Entrypoint.t -> (t ex_ty_cstr, unit) Gas_monad.t
-      =
+      type t tc.
+      (t, tc) ty ->
+      t entrypoints ->
+      Entrypoint.t ->
+      (t ex_ty_cstr, unit) Gas_monad.t =
    fun ty entrypoints entrypoint ->
     let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
@@ -1960,9 +1971,10 @@ let find_entrypoint (type full error_trace)
              | Fast -> (Inconsistent_types_fast : error_trace)
              | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
-let find_entrypoint_for_type (type full exp error_trace) ~error_details
-    ~(full : full ty) ~(expected : exp ty) entrypoints entrypoint loc :
-    (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
+let find_entrypoint_for_type (type full fullc exp expc error_trace)
+    ~error_details ~(full : (full, fullc) ty) ~(expected : (exp, expc) ty)
+    entrypoints entrypoint loc :
+    (Entrypoint.t * (exp, expc) ty, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
   let* res = find_entrypoint ~error_details full entrypoints entrypoint in
   match res with
@@ -1972,17 +1984,18 @@ let find_entrypoint_for_type (type full exp error_trace) ~error_details
           Gas_monad.bind_recover
             (ty_eq ~error_details:Fast loc ty expected)
             (function
-              | Ok Eq -> return (Entrypoint.default, (ty : exp ty))
+              | Ok Eq -> return (Entrypoint.default, (ty : (exp, expc) ty))
               | Error Inconsistent_types_fast ->
                   let+ Eq = ty_eq ~error_details loc full expected in
-                  (Entrypoint.root, (full : exp ty)))
+                  (Entrypoint.root, (full : (exp, expc) ty)))
       | _ ->
           let+ Eq = ty_eq ~error_details loc ty expected in
-          (entrypoint, (ty : exp ty)))
+          (entrypoint, (ty : (exp, expc) ty)))
 
-let well_formed_entrypoints (type full) (full : full ty) entrypoints =
-  let merge path (type t) (ty : t ty) (entrypoints : t entrypoints) reachable
-      ((first_unreachable, all) as acc) =
+let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
+    entrypoints =
+  let merge path (type t tc) (ty : (t, tc) ty) (entrypoints : t entrypoints)
+      reachable ((first_unreachable, all) as acc) =
     match entrypoints.name with
     | None ->
         ok
@@ -2000,8 +2013,8 @@ let well_formed_entrypoints (type full) (full : full ty) entrypoints =
         else ok ((first_unreachable, Entrypoint.Set.add name all), true)
   in
   let rec check :
-      type t.
-      t ty ->
+      type t tc.
+      (t, tc) ty ->
       t entrypoints ->
       prim list ->
       bool ->
@@ -2491,7 +2504,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
 
 (* -- parse data of any type -- *)
 
-let comb_witness1 : type t. t ty -> (t, unit -> unit) comb_witness = function
+let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
+  function
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -2509,13 +2523,13 @@ let comb_witness1 : type t. t ty -> (t, unit -> unit) comb_witness = function
 *)
 
 let[@coq_axiom_with_reason "gadt"] rec parse_data :
-    type a.
+    type a ac.
     ?type_logger:type_logger ->
     stack_depth:int ->
     context ->
     legacy:bool ->
     allow_forged:bool ->
-    a ty ->
+    (a, ac) ty ->
     Script.node ->
     (a * context) tzresult Lwt.t =
  fun ?type_logger ~stack_depth ctxt ~legacy ~allow_forged ty script_data ->
@@ -2953,11 +2967,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
 and parse_view_returning :
-    type storage.
+    type storage storagec.
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
-    storage ty ->
+    (storage, storagec) ty ->
     view ->
     (storage ex_view * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type {input_ty; output_ty; view_code} ->
@@ -3013,11 +3027,11 @@ and parse_view_returning :
       | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
-    type storage.
+    type storage storagec.
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
-    storage ty ->
+    (storage, storagec) ty ->
     view_map ->
     context tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type views ->
@@ -3028,14 +3042,14 @@ and typecheck_views :
   Script_map.fold_es aux views ctxt
 
 and[@coq_axiom_with_reason "gadt"] parse_returning :
-    type arg ret.
+    type arg argc ret retc.
     ?type_logger:type_logger ->
     stack_depth:int ->
     tc_context ->
     context ->
     legacy:bool ->
-    arg ty ->
-    ret ty ->
+    (arg, argc) ty ->
+    (ret, retc) ty ->
     Script.node ->
     ((arg, ret) lambda * context) tzresult Lwt.t =
  fun ?type_logger ~stack_depth tc_context ctxt ~legacy arg ret script_instr ->
@@ -3080,8 +3094,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     (a, s) stack_ty ->
     ((a, s) judgement * context) tzresult Lwt.t =
  fun ?type_logger ~stack_depth tc_context ctxt ~legacy script_instr stack_ty ->
-  let check_item_ty (type a b) ctxt (exp : a ty) (got : b ty) loc name n m :
-      ((a, b) eq * context) tzresult =
+  let check_item_ty (type a ac b bc) ctxt (exp : (a, ac) ty) (got : (b, bc) ty)
+      loc name n m : ((a, b) eq * context) tzresult =
     record_trace_eval (fun () ->
         let stack_ty = serialize_stack_for_error ctxt stack_ty in
         Bad_stack (loc, name, m, stack_ty))
@@ -5109,11 +5123,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            ]
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contract :
-    type arg.
+    type arg argc.
     stack_depth:int ->
     context ->
     Script.location ->
-    arg ty ->
+    (arg, argc) ty ->
     Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
@@ -5304,10 +5318,10 @@ and parse_toplevel :
    returned and some overapproximation of the typechecking gas is consumed.
    This can still fail on gas exhaustion. *)
 let parse_contract_for_script :
-    type arg.
+    type arg argc.
     context ->
     Script.location ->
-    arg ty ->
+    (arg, argc) ty ->
     Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
@@ -5468,7 +5482,7 @@ let parse_storage :
     context ->
     legacy:bool ->
     allow_forged:bool ->
-    'storage ty ->
+    ('storage, _) ty ->
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged storage_type ~storage ->
@@ -5569,10 +5583,10 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-let list_entrypoints ctxt (type full) (full : full ty)
+let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) =
-  let merge path (type t) (ty : t ty) (entrypoints : t entrypoints) reachable
-      ((unreachables, all) as acc) =
+  let merge path (type t tc) (ty : (t, tc) ty) (entrypoints : t entrypoints)
+      reachable ((unreachables, all) as acc) =
     match entrypoints.name with
     | None ->
         ok
@@ -5592,8 +5606,8 @@ let list_entrypoints ctxt (type full) (full : full ty)
         >|? fun unreachable_all -> (unreachable_all, true)
   in
   let rec fold_tree :
-      type t.
-      t ty ->
+      type t tc.
+      (t, tc) ty ->
       t entrypoints ->
       prim list ->
       bool ->
@@ -5626,18 +5640,18 @@ let list_entrypoints ctxt (type full) (full : full ty)
 
 (* -- Unparsing data of any type -- *)
 
-let comb_witness2 : type t. t ty -> (t, unit -> unit -> unit) comb_witness =
-  function
+let comb_witness2 :
+    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
   | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
 let[@coq_axiom_with_reason "gadt"] rec unparse_data :
-    type a.
+    type a ac.
     context ->
     stack_depth:int ->
     unparsing_mode ->
-    a ty ->
+    (a, ac) ty ->
     a ->
     (Script.node * context) tzresult Lwt.t =
  fun ctxt ~stack_depth mode ty a ->
@@ -5819,12 +5833,12 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         Script_timelock.chest_encoding
 
 and unparse_items :
-    type k v.
+    type k v vc.
     context ->
     stack_depth:int ->
     unparsing_mode ->
     k comparable_ty ->
-    v ty ->
+    (v, vc) ty ->
     (k * v) list ->
     (Script.node list * context) tzresult Lwt.t =
  fun ctxt ~stack_depth mode kt vt items ->
@@ -6130,7 +6144,7 @@ type 'ty has_lazy_storage =
     the types, which happen to be literally written types, so the gas for them
     has already been paid.
 *)
-let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
+let rec has_lazy_storage : type t tc. (t, tc) ty -> t has_lazy_storage =
  fun ty ->
   let aux1 cons t =
     match has_lazy_storage t with False_f -> False_f | h -> cons h
@@ -6187,13 +6201,13 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
 let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
     ~temporary ids_to_copy acc ty x =
   let rec aux :
-      type a.
+      type a ac.
       context ->
       unparsing_mode ->
       temporary:bool ->
       Lazy_storage.IdSet.t ->
       Lazy_storage.diffs ->
-      a ty ->
+      (a, ac) ty ->
       a ->
       has_lazy_storage:a has_lazy_storage ->
       (context * a * Lazy_storage.IdSet.t * Lazy_storage.diffs) tzresult Lwt.t =
@@ -6297,11 +6311,11 @@ end
     [unit] type for [error] if you are in a case where errors are impossible.
 *)
 let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
-    type a error.
+    type a ac error.
     f:('acc, error) Fold_lazy_storage.result Lazy_storage.IdSet.fold_f ->
     init:'acc ->
     context ->
-    a ty ->
+    (a, ac) ty ->
     a ->
     has_lazy_storage:a has_lazy_storage ->
     (('acc, error) Fold_lazy_storage.result * context) tzresult =

@@ -149,9 +149,10 @@ let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
       Script_cache.insert ctxt destination (script, ex_script) size
       >>?= fun ctxt -> return (ex_script, ctxt)
 
-let cast_transaction_parameter (type a b) ctxt location
-    (entry_arg_ty : a Script_typed_ir.ty) (parameters_ty : b Script_typed_ir.ty)
-    (parameters : b) : (a * context) tzresult Lwt.t =
+let cast_transaction_parameter (type a ac b bc) ctxt location
+    (entry_arg_ty : (a, ac) Script_typed_ir.ty)
+    (parameters_ty : (b, bc) Script_typed_ir.ty) (parameters : b) :
+    (a * context) tzresult Lwt.t =
   Gas_monad.run
     ctxt
     (Script_ir_translator.ty_eq

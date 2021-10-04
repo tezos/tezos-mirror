@@ -1714,10 +1714,12 @@ let step logger ctxt step_constants descr stack =
 
 *)
 type execution_arg =
-  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Typed_arg :
+      Script.location * ('a, _) Script_typed_ir.ty * 'a
+      -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
-let lift_execution_arg (type a) ctxt ~internal (entrypoint_ty : a ty)
+let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
     (box : a -> 'b) arg : ('b * context) tzresult Lwt.t =
   (match arg with
   | Untyped_arg arg ->

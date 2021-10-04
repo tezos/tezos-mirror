@@ -34,7 +34,7 @@
 (** [value_size ty v] returns an overapproximation of the size of the
    in-memory representation of [v] of type [ty]. *)
 val value_size :
-  'a Script_typed_ir.ty -> 'a -> Cache_memory_helpers.nodes_and_size
+  ('a, _) Script_typed_ir.ty -> 'a -> Cache_memory_helpers.nodes_and_size
 
 (** [lambda_size l] returns an overapproximation of the size of the
     internal IR for the Michelson lambda abstraction [l]. *)
@@ -61,7 +61,8 @@ val zero : Cache_memory_helpers.nodes_and_size
 module Internal_for_tests : sig
   (** [ty_size ty] returns an overapproximation of the size of the
    in-memory representation of type [ty]. *)
-  val ty_size : 'a Script_typed_ir.ty -> Cache_memory_helpers.nodes_and_size
+  val ty_size :
+    ('a, _) Script_typed_ir.ty -> Cache_memory_helpers.nodes_and_size
 
   (** [comparable_ty_size cty] returns an overapproximation of the size
    of the in-memory representation of comparable type [cty]. *)
