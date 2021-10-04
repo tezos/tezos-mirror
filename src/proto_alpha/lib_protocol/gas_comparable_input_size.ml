@@ -110,33 +110,33 @@ let rec size_of_comparable_value :
     type a. a Script_typed_ir.comparable_ty -> a -> t =
   fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
    match wit with
-   | Never_key -> ( match v with _ -> .)
-   | Unit_key -> unit
-   | Int_key -> integer v
-   | Nat_key -> integer v
-   | String_key -> script_string v
-   | Bytes_key -> bytes v
-   | Mutez_key -> mutez v
-   | Bool_key -> bool v
-   | Key_hash_key -> key_hash v
-   | Timestamp_key -> timestamp v
-   | Address_key -> address v
-   | Tx_rollup_l2_address_key -> tx_rollup_l2_address v
-   | Pair_key (leaf, node, _, YesYes) ->
+   | Never_t -> ( match v with _ -> .)
+   | Unit_t -> unit
+   | Int_t -> integer v
+   | Nat_t -> integer v
+   | String_t -> script_string v
+   | Bytes_t -> bytes v
+   | Mutez_t -> mutez v
+   | Bool_t -> bool v
+   | Key_hash_t -> key_hash v
+   | Timestamp_t -> timestamp v
+   | Address_t -> address v
+   | Tx_rollup_l2_address_t -> tx_rollup_l2_address v
+   | Pair_t (leaf, node, _, YesYes) ->
        let (lv, rv) = v in
        let size =
          size_of_comparable_value leaf lv + size_of_comparable_value node rv
        in
        size + 1
-   | Union_key (left, right, _, YesYes) ->
+   | Union_t (left, right, _, YesYes) ->
        let size =
          match v with
          | L v -> size_of_comparable_value left v
          | R v -> size_of_comparable_value right v
        in
        size + 1
-   | Option_key (ty, _, Yes) -> (
+   | Option_t (ty, _, Yes) -> (
        match v with None -> 1 | Some x -> size_of_comparable_value ty x + 1)
-   | Signature_key -> signature v
-   | Key_key -> public_key v
-   | Chain_id_key -> chain_id v
+   | Signature_t -> signature v
+   | Key_t -> public_key v
+   | Chain_id_t -> chain_id v
