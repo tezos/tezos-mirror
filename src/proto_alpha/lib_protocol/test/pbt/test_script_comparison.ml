@@ -50,38 +50,37 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
     =
  fun ty x y ->
   match (ty, x, y) with
-  | (Unit_key, (), ()) -> 0
-  | (Never_key, _, _) -> .
-  | (Signature_key, x, y) -> normalize_compare @@ Script_signature.compare x y
-  | (String_key, x, y) -> normalize_compare @@ Script_string.compare x y
-  | (Bool_key, x, y) -> normalize_compare @@ Compare.Bool.compare x y
-  | (Mutez_key, x, y) -> normalize_compare @@ Tez.compare x y
-  | (Key_hash_key, x, y) ->
+  | (Unit_t, (), ()) -> 0
+  | (Never_t, _, _) -> .
+  | (Signature_t, x, y) -> normalize_compare @@ Script_signature.compare x y
+  | (String_t, x, y) -> normalize_compare @@ Script_string.compare x y
+  | (Bool_t, x, y) -> normalize_compare @@ Compare.Bool.compare x y
+  | (Mutez_t, x, y) -> normalize_compare @@ Tez.compare x y
+  | (Key_hash_t, x, y) ->
       normalize_compare @@ Signature.Public_key_hash.compare x y
-  | (Key_key, x, y) -> normalize_compare @@ Signature.Public_key.compare x y
-  | (Int_key, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Nat_key, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Timestamp_key, x, y) -> normalize_compare @@ Script_timestamp.compare x y
-  | (Address_key, x, y) ->
+  | (Key_t, x, y) -> normalize_compare @@ Signature.Public_key.compare x y
+  | (Int_t, x, y) -> normalize_compare @@ Script_int.compare x y
+  | (Nat_t, x, y) -> normalize_compare @@ Script_int.compare x y
+  | (Timestamp_t, x, y) -> normalize_compare @@ Script_timestamp.compare x y
+  | (Address_t, x, y) ->
       normalize_compare @@ Script_comparable.compare_address x y
-  | (Tx_rollup_l2_address_key, x, y) ->
+  | (Tx_rollup_l2_address_t, x, y) ->
       normalize_compare @@ Script_comparable.compare_tx_rollup_l2_address x y
-  | (Bytes_key, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
-  | (Chain_id_key, x, y) -> normalize_compare @@ Script_chain_id.compare x y
-  | (Pair_key (tl, tr, _, YesYes), (lx, rx), (ly, ry)) ->
+  | (Bytes_t, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
+  | (Chain_id_t, x, y) -> normalize_compare @@ Script_chain_id.compare x y
+  | (Pair_t (tl, tr, _, YesYes), (lx, rx), (ly, ry)) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl
-  | (Union_key (tl, _, _, YesYes), L x, L y) ->
+  | (Union_t (tl, _, _, YesYes), L x, L y) ->
       reference_compare_comparable tl x y
-  | (Union_key _, L _, R _) -> -1
-  | (Union_key _, R _, L _) -> 1
-  | (Union_key (_, tr, _, YesYes), R x, R y) ->
+  | (Union_t _, L _, R _) -> -1
+  | (Union_t _, R _, L _) -> 1
+  | (Union_t (_, tr, _, YesYes), R x, R y) ->
       reference_compare_comparable tr x y
-  | (Option_key _, None, None) -> 0
-  | (Option_key _, None, Some _) -> -1
-  | (Option_key _, Some _, None) -> 1
-  | (Option_key (t, _, Yes), Some x, Some y) ->
-      reference_compare_comparable t x y
+  | (Option_t _, None, None) -> 0
+  | (Option_t _, None, Some _) -> -1
+  | (Option_t _, Some _, None) -> 1
+  | (Option_t (t, _, Yes), Some x, Some y) -> reference_compare_comparable t x y
 
 (* Generation of one to three values of the same comparable type. *)
 
