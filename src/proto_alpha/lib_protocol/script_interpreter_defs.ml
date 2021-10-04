@@ -873,14 +873,18 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   Script_int.n Script_int.num * 'b ->
   ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
 
-type ('a, 'b) ifailwith_type =
-  logger option ->
-  outdated_context * step_constants ->
-  local_gas_counter ->
-  Script.location ->
-  'a ty ->
-  'a ->
-  ('b, error trace) result Lwt.t
+type ifailwith_type = {
+  ifailwith :
+    'a 'b.
+    logger option ->
+    outdated_context * step_constants ->
+    local_gas_counter ->
+    Script.location ->
+    'a ty ->
+    'a ->
+    ('b, error trace) result Lwt.t;
+}
+[@@unboxed]
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
   logger option ->

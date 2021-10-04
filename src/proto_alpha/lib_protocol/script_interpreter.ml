@@ -447,14 +447,17 @@ and ilsr_nat : type a b c d e f. (a, b, c, d, e, f) ilsr_nat_type =
   | None -> get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
   | Some r -> (step [@ocaml.tailcall]) g gas k ks r stack
 
-and ifailwith : type a b. (a, b) ifailwith_type =
- fun logger (ctxt, _) gas kloc tv accu ->
-  let v = accu in
-  let ctxt = update_context gas ctxt in
-  trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
-  >>=? fun (v, _ctxt) ->
-  let v = Micheline.strip_locations v in
-  get_log logger >>=? fun log -> fail (Reject (kloc, v, log))
+and ifailwith : ifailwith_type =
+  {
+    ifailwith =
+      (fun logger (ctxt, _) gas kloc tv accu ->
+        let v = accu in
+        let ctxt = update_context gas ctxt in
+        trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
+        >>=? fun (v, _ctxt) ->
+        let v = Micheline.strip_locations v in
+        get_log logger >>=? fun log -> fail (Reject (kloc, v, log)));
+  }
 
 and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
  fun logger g gas k ks accu stack ->
@@ -927,7 +930,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks lam' stack
       | ILambda (_, lam, k) ->
           (step [@ocaml.tailcall]) g gas k ks lam (accu, stack)
-      | IFailwith (_, kloc, tv) -> ifailwith None g gas kloc tv accu
+      | IFailwith (_, kloc, tv) ->
+          let {ifailwith} = ifailwith in
+          ifailwith None g gas kloc tv accu
       (* comparison *)
       | ICompare (_, ty, k) ->
           let a = accu in
@@ -1560,6 +1565,7 @@ and log :
       let extra = (kinfo, k) in
       (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas extra ks accu stack
   | IFailwith (_, kloc, tv) ->
+      let {ifailwith} = ifailwith in
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
   | IExec (_, k) ->
       (iexec [@ocaml.tailcall]) (Some logger) g gas k ks accu stack
