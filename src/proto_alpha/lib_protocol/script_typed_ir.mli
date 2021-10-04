@@ -27,6 +27,7 @@
 
 open Alpha_context
 open Script_int
+open Dependent_bool
 
 type step_constants = {
   source : Contract.t;
@@ -185,8 +186,6 @@ module Type_size : sig
 end
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
-
-type (_, _) eq = Eq : ('a, 'a) eq
 
 type _ comparable_ty =
   | Unit_key : unit comparable_ty

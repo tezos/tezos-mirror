@@ -27,6 +27,7 @@
 
 open Alpha_context
 open Script_int
+open Dependent_bool
 
 (*
 
@@ -220,7 +221,7 @@ type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 module type TYPE_SIZE = sig
   (* A type size represents the size of its type parameter.
-     This constraint is enforced inside this module (Script_type_ir), hence there
+     This constraint is enforced inside this module (Script_typed_ir), hence there
      should be no way to construct a type size outside of it.
 
      It allows keeping type metadata and types non-private.
@@ -310,8 +311,6 @@ type empty_cell = EmptyCell
 type end_of_stack = empty_cell * empty_cell
 
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
-
-type (_, _) eq = Eq : ('a, 'a) eq
 
 type _ comparable_ty =
   | Unit_key : unit comparable_ty
