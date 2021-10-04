@@ -14,12 +14,6 @@ ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 all: accusations_simple_double_baking \
 	accusations_simple_double_endorsing \
 	voting_demo_noops \
-	user_activated_upgrade_alpha \
-	daemons_upgrade_alpha \
-	node_synchronization
-all: accusations_simple_double_baking \
-	accusations_simple_double_endorsing \
-	voting_demo_noops \
 	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
 	daemons_upgrade_next \
