@@ -13,12 +13,11 @@ manager `Poetry <https://python-poetry.org/>`_. For instructions on
 how to obtain Python and Poetry, see :doc:`the installation
 instructions for the python testing
 framework<developer/python_testing_framework>`.  Once this is done, you can
-install the needed dependencies locally:
+do:
 
 .. code-block:: bash
 
     # in the "docs" directory
-    poetry install
     make
 
 The output is generated and available in ``docs/_build``. It is built by

@@ -204,6 +204,7 @@ check-linting:
 
 check-python-linting:
 	@$(MAKE) -C tests_python lint
+	@$(MAKE) -C docs lint
 
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python

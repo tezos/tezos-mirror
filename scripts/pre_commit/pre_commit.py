@@ -267,7 +267,7 @@ def _call_tezt(files: List[str], staged_or_modified: bool) -> int:
             continue
         if not file_.endswith(".ml"):
             continue
-        with open(file_, 'r') as handle:
+        with open(file_, mode="r", encoding="utf-8") as handle:
             pattern = re.escape("let register () =")
             match = re.search(pattern, handle.read())
             if match is None:
@@ -317,7 +317,7 @@ def _main_py_files(staged_or_modified: bool, adjective: str,
                               _call_pytest(tests_python_path,
                                            relevant_pytest_files))
         else:
-            print("No %s *.py file relevant to pytest found" % adjective)
+            print(f"No {adjective} *.py file relevant to pytest found")
     else:
         print(f"{_LINT_ONLY} passed: not calling pytest")
 
@@ -328,7 +328,7 @@ def _main_py_files(staged_or_modified: bool, adjective: str,
             return_code,
             _call_py_linters(tests_python_path, relevant_pylint_files))
     else:
-        print("No %s *.py file to lint" % adjective)
+        print(f"No {adjective} *.py file to lint")
 
     return return_code
 
