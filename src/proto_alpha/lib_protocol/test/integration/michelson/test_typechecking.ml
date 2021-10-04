@@ -460,7 +460,16 @@ let test_parse_comb_data () =
       (a, ac1) Script_typed_ir.ty -> (a, ac2) Script_typed_ir.ty -> bool =
    fun ty1 ty2 ->
     match Script_typed_ir.(is_comparable ty1, is_comparable ty2) with
-    | (Eq, Eq) -> ty1 = ty2
+    | (Yes, Yes) -> ty1 = ty2
+    | (No, No) -> ty1 = ty2
+    | (Yes, No) -> assert false
+    | (No, Yes) -> assert false
+   (*
+      These last two cases can't happen because the comparable character of a
+      type is a function of its concrete type.
+      It is possible to write a function that proves it but it is not needed
+      in the protocol for the moment.
+   *)
   in
   let equal (nat1, Big_map big_map1) (nat2, Big_map big_map2) =
     (* Custom equal needed because big maps contain boxed maps containing functional values *)

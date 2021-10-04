@@ -1328,72 +1328,64 @@ and logger = {
           produced. *)
 }
 
-and to_be_replaced = unit
-
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =
-  | Unit_t : (unit, to_be_replaced) ty
-  | Int_t : (z num, to_be_replaced) ty
-  | Nat_t : (n num, to_be_replaced) ty
-  | Signature_t : (signature, to_be_replaced) ty
-  | String_t : (Script_string.t, to_be_replaced) ty
-  | Bytes_t : (bytes, to_be_replaced) ty
-  | Mutez_t : (Tez.t, to_be_replaced) ty
-  | Key_hash_t : (public_key_hash, to_be_replaced) ty
-  | Key_t : (public_key, to_be_replaced) ty
-  | Timestamp_t : (Script_timestamp.t, to_be_replaced) ty
-  | Address_t : (address, to_be_replaced) ty
-  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, to_be_replaced) ty
-  | Bool_t : (bool, to_be_replaced) ty
+  | Unit_t : (unit, yes) ty
+  | Int_t : (z num, yes) ty
+  | Nat_t : (n num, yes) ty
+  | Signature_t : (signature, yes) ty
+  | String_t : (Script_string.t, yes) ty
+  | Bytes_t : (bytes, yes) ty
+  | Mutez_t : (Tez.t, yes) ty
+  | Key_hash_t : (public_key_hash, yes) ty
+  | Key_t : (public_key, yes) ty
+  | Timestamp_t : (Script_timestamp.t, yes) ty
+  | Address_t : (address, yes) ty
+  | Tx_rollup_l2_address_t : (tx_rollup_l2_address, yes) ty
+  | Bool_t : (bool, yes) ty
   | Pair_t :
-      ('a, to_be_replaced) ty
-      * ('b, to_be_replaced) ty
+      ('a, 'ac) ty
+      * ('b, 'bc) ty
       * ('a, 'b) pair ty_metadata
-      * to_be_replaced
-      -> (('a, 'b) pair, to_be_replaced) ty
+      * ('ac, 'bc, 'rc) dand
+      -> (('a, 'b) pair, 'rc) ty
   | Union_t :
-      ('a, to_be_replaced) ty
-      * ('b, to_be_replaced) ty
+      ('a, 'ac) ty
+      * ('b, 'bc) ty
       * ('a, 'b) union ty_metadata
-      * to_be_replaced
-      -> (('a, 'b) union, to_be_replaced) ty
+      * ('ac, 'bc, 'rc) dand
+      -> (('a, 'b) union, 'rc) ty
   | Lambda_t :
       ('arg, _) ty * ('ret, _) ty * ('arg, 'ret) lambda ty_metadata
-      -> (('arg, 'ret) lambda, to_be_replaced) ty
+      -> (('arg, 'ret) lambda, no) ty
   | Option_t :
-      ('v, to_be_replaced) ty * 'v option ty_metadata * to_be_replaced
-      -> ('v option, to_be_replaced) ty
-  | List_t :
-      ('v, _) ty * 'v boxed_list ty_metadata
-      -> ('v boxed_list, to_be_replaced) ty
-  | Set_t : 'v comparable_ty * 'v set ty_metadata -> ('v set, to_be_replaced) ty
+      ('v, 'c) ty * 'v option ty_metadata * 'c dbool
+      -> ('v option, 'c) ty
+  | List_t : ('v, _) ty * 'v boxed_list ty_metadata -> ('v boxed_list, no) ty
+  | Set_t : 'v comparable_ty * 'v set ty_metadata -> ('v set, no) ty
   | Map_t :
       'k comparable_ty * ('v, _) ty * ('k, 'v) map ty_metadata
-      -> (('k, 'v) map, to_be_replaced) ty
+      -> (('k, 'v) map, no) ty
   | Big_map_t :
       'k comparable_ty * ('v, _) ty * ('k, 'v) big_map ty_metadata
-      -> (('k, 'v) big_map, to_be_replaced) ty
+      -> (('k, 'v) big_map, no) ty
   | Contract_t :
       ('arg, _) ty * 'arg typed_contract ty_metadata
-      -> ('arg typed_contract, to_be_replaced) ty
-  | Sapling_transaction_t :
-      Sapling.Memo_size.t
-      -> (Sapling.transaction, to_be_replaced) ty
+      -> ('arg typed_contract, no) ty
+  | Sapling_transaction_t : Sapling.Memo_size.t -> (Sapling.transaction, no) ty
   | Sapling_transaction_deprecated_t :
       Sapling.Memo_size.t
-      -> (Sapling.Legacy.transaction, to_be_replaced) ty
-  | Sapling_state_t : Sapling.Memo_size.t -> (Sapling.state, to_be_replaced) ty
-  | Operation_t : (operation, to_be_replaced) ty
-  | Chain_id_t : (Script_chain_id.t, to_be_replaced) ty
-  | Never_t : (never, to_be_replaced) ty
-  | Bls12_381_g1_t : (Script_bls.G1.t, to_be_replaced) ty
-  | Bls12_381_g2_t : (Script_bls.G2.t, to_be_replaced) ty
-  | Bls12_381_fr_t : (Script_bls.Fr.t, to_be_replaced) ty
-  | Ticket_t :
-      'a comparable_ty * 'a ticket ty_metadata
-      -> ('a ticket, to_be_replaced) ty
-  | Chest_key_t : (Script_timelock.chest_key, to_be_replaced) ty
-  | Chest_t : (Script_timelock.chest, to_be_replaced) ty
+      -> (Sapling.Legacy.transaction, no) ty
+  | Sapling_state_t : Sapling.Memo_size.t -> (Sapling.state, no) ty
+  | Operation_t : (operation, no) ty
+  | Chain_id_t : (Script_chain_id.t, yes) ty
+  | Never_t : (never, yes) ty
+  | Bls12_381_g1_t : (Script_bls.G1.t, no) ty
+  | Bls12_381_g2_t : (Script_bls.G2.t, no) ty
+  | Bls12_381_fr_t : (Script_bls.Fr.t, no) ty
+  | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> ('a ticket, no) ty
+  | Chest_key_t : (Script_timelock.chest_key, no) ty
+  | Chest_t : (Script_timelock.chest, no) ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
@@ -1563,7 +1555,7 @@ val ty_size : ('a, _) ty -> 'a Type_size.t
 
 val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
 
-val is_comparable : ('v, 'c) ty -> ('c, to_be_replaced) eq
+val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
@@ -1619,120 +1611,125 @@ val union_key :
 val option_key :
   Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
 
-val unit_t : (unit, to_be_replaced) ty
+val unit_t : (unit, yes) ty
 
-val int_t : (z num, to_be_replaced) ty
+val int_t : (z num, yes) ty
 
-val nat_t : (n num, to_be_replaced) ty
+val nat_t : (n num, yes) ty
 
-val signature_t : (signature, to_be_replaced) ty
+val signature_t : (signature, yes) ty
 
-val string_t : (Script_string.t, to_be_replaced) ty
+val string_t : (Script_string.t, yes) ty
 
-val bytes_t : (Bytes.t, to_be_replaced) ty
+val bytes_t : (Bytes.t, yes) ty
 
-val mutez_t : (Tez.t, to_be_replaced) ty
+val mutez_t : (Tez.t, yes) ty
 
-val key_hash_t : (public_key_hash, to_be_replaced) ty
+val key_hash_t : (public_key_hash, yes) ty
 
-val key_t : (public_key, to_be_replaced) ty
+val key_t : (public_key, yes) ty
 
-val timestamp_t : (Script_timestamp.t, to_be_replaced) ty
+val timestamp_t : (Script_timestamp.t, yes) ty
 
-val address_t : (address, to_be_replaced) ty
+val address_t : (address, yes) ty
 
-val tx_rollup_l2_address_t : (tx_rollup_l2_address, to_be_replaced) ty
+val tx_rollup_l2_address_t : (tx_rollup_l2_address, yes) ty
 
-val bool_t : (bool, to_be_replaced) ty
+val bool_t : (bool, yes) ty
 
 val pair_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
 
+val comparable_pair_t :
+  Script.location ->
+  ('a, yes) ty ->
+  ('b, yes) ty ->
+  (('a, 'b) pair, yes) ty tzresult
+
 val union_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) union ty_ex_c tzresult
 
-val union_bytes_bool_t : ((Bytes.t, bool) union, to_be_replaced) ty
+val comparable_union_t :
+  Script.location ->
+  ('a, yes) ty ->
+  ('b, yes) ty ->
+  (('a, 'b) union, yes) ty tzresult
+
+val union_bytes_bool_t : ((Bytes.t, bool) union, yes) ty
 
 val lambda_t :
   Script.location ->
   ('arg, _) ty ->
   ('ret, _) ty ->
-  (('arg, 'ret) lambda, to_be_replaced) ty tzresult
+  (('arg, 'ret) lambda, no) ty tzresult
 
-val option_t :
-  Script.location -> ('v, 'c) ty -> ('v option, to_be_replaced) ty tzresult
+val option_t : Script.location -> ('v, 'c) ty -> ('v option, 'c) ty tzresult
 
-val option_mutez_t : (Tez.t option, to_be_replaced) ty
+val option_mutez_t : (Tez.t option, yes) ty
 
-val option_string_t : (Script_string.t option, to_be_replaced) ty
+val option_string_t : (Script_string.t option, yes) ty
 
-val option_bytes_t : (Bytes.t option, to_be_replaced) ty
+val option_bytes_t : (Bytes.t option, yes) ty
 
-val option_nat_t : (n num option, to_be_replaced) ty
+val option_nat_t : (n num option, yes) ty
 
-val option_pair_nat_nat_t : ((n num, n num) pair option, to_be_replaced) ty
+val option_pair_nat_nat_t : ((n num, n num) pair option, yes) ty
 
-val option_pair_nat_mutez_t : ((n num, Tez.t) pair option, to_be_replaced) ty
+val option_pair_nat_mutez_t : ((n num, Tez.t) pair option, yes) ty
 
-val option_pair_mutez_mutez_t : ((Tez.t, Tez.t) pair option, to_be_replaced) ty
+val option_pair_mutez_mutez_t : ((Tez.t, Tez.t) pair option, yes) ty
 
-val option_pair_int_nat_t : ((z num, n num) pair option, to_be_replaced) ty
+val option_pair_int_nat_t : ((z num, n num) pair option, yes) ty
 
-val list_t :
-  Script.location -> ('v, _) ty -> ('v boxed_list, to_be_replaced) ty tzresult
+val list_t : Script.location -> ('v, _) ty -> ('v boxed_list, no) ty tzresult
 
-val list_operation_t : (operation boxed_list, to_be_replaced) ty
+val list_operation_t : (operation boxed_list, no) ty
 
-val set_t :
-  Script.location -> 'v comparable_ty -> ('v set, to_be_replaced) ty tzresult
+val set_t : Script.location -> 'v comparable_ty -> ('v set, no) ty tzresult
 
 val map_t :
   Script.location ->
   'k comparable_ty ->
   ('v, _) ty ->
-  (('k, 'v) map, to_be_replaced) ty tzresult
+  (('k, 'v) map, no) ty tzresult
 
 val big_map_t :
   Script.location ->
   'k comparable_ty ->
   ('v, _) ty ->
-  (('k, 'v) big_map, to_be_replaced) ty tzresult
+  (('k, 'v) big_map, no) ty tzresult
 
 val contract_t :
-  Script.location ->
-  ('arg, _) ty ->
-  ('arg typed_contract, to_be_replaced) ty tzresult
+  Script.location -> ('arg, _) ty -> ('arg typed_contract, no) ty tzresult
 
-val contract_unit_t : (unit typed_contract, to_be_replaced) ty
+val contract_unit_t : (unit typed_contract, no) ty
 
 val sapling_transaction_t :
-  memo_size:Sapling.Memo_size.t -> (Sapling.transaction, to_be_replaced) ty
+  memo_size:Sapling.Memo_size.t -> (Sapling.transaction, no) ty
 
 val sapling_transaction_deprecated_t :
-  memo_size:Sapling.Memo_size.t ->
-  (Sapling.Legacy.transaction, to_be_replaced) ty
+  memo_size:Sapling.Memo_size.t -> (Sapling.Legacy.transaction, no) ty
 
-val sapling_state_t :
-  memo_size:Sapling.Memo_size.t -> (Sapling.state, to_be_replaced) ty
+val sapling_state_t : memo_size:Sapling.Memo_size.t -> (Sapling.state, no) ty
 
-val operation_t : (operation, to_be_replaced) ty
+val operation_t : (operation, no) ty
 
-val chain_id_t : (Script_chain_id.t, to_be_replaced) ty
+val chain_id_t : (Script_chain_id.t, yes) ty
 
-val never_t : (never, to_be_replaced) ty
+val never_t : (never, yes) ty
 
-val bls12_381_g1_t : (Script_bls.G1.t, to_be_replaced) ty
+val bls12_381_g1_t : (Script_bls.G1.t, no) ty
 
-val bls12_381_g2_t : (Script_bls.G2.t, to_be_replaced) ty
+val bls12_381_g2_t : (Script_bls.G2.t, no) ty
 
-val bls12_381_fr_t : (Script_bls.Fr.t, to_be_replaced) ty
+val bls12_381_fr_t : (Script_bls.Fr.t, no) ty
 
 val ticket_t :
-  Script.location -> 'a comparable_ty -> ('a ticket, to_be_replaced) ty tzresult
+  Script.location -> 'a comparable_ty -> ('a ticket, no) ty tzresult
 
-val chest_key_t : (Script_timelock.chest_key, to_be_replaced) ty
+val chest_key_t : (Script_timelock.chest_key, no) ty
 
-val chest_t : (Script_timelock.chest, to_be_replaced) ty
+val chest_t : (Script_timelock.chest, no) ty
 
 (**
 

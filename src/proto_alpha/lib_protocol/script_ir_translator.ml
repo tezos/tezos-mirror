@@ -161,8 +161,8 @@ let check_kind kinds expr =
    (everything that cannot contain a lambda). The rest is located at
    the end of the file. *)
 
-let rec ty_of_comparable_ty : type a. a comparable_ty -> (a, to_be_replaced) ty
-    = function
+let rec ty_of_comparable_ty :
+    type a. a comparable_ty -> (a, Dependent_bool.yes) ty = function
   | Unit_key -> Unit_t
   | Never_key -> Never_t
   | Int_key -> Int_t
@@ -179,10 +179,10 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> (a, to_be_replaced) ty
   | Tx_rollup_l2_address_key -> Tx_rollup_l2_address_t
   | Chain_id_key -> Chain_id_t
   | Pair_key (l, r, meta) ->
-      Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, ())
+      Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
   | Union_key (l, r, meta) ->
-      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, ())
-  | Option_key (t, meta) -> Option_t (ty_of_comparable_ty t, meta, ())
+      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
+  | Option_key (t, meta) -> Option_t (ty_of_comparable_ty t, meta, Yes)
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
@@ -960,16 +960,18 @@ let ty_eq :
         let+ Eq = comparable_ty_eq ~error_details ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Ticket_t _, _) -> not_equal ()
-    | (Pair_t (tal, tar, meta1, _), Pair_t (tbl, tbr, meta2, _)) ->
+    | (Pair_t (tal, tar, meta1, cmp1), Pair_t (tbl, tbr, meta2, cmp2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
+        let Eq = Dependent_bool.merge_dand cmp1 cmp2 in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Pair_t _, _) -> not_equal ()
-    | (Union_t (tal, tar, meta1, _), Union_t (tbl, tbr, meta2, _)) ->
+    | (Union_t (tal, tar, meta1, cmp1), Union_t (tbl, tbr, meta2, cmp2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
+        let Eq = Dependent_bool.merge_dand cmp1 cmp2 in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Union_t _, _) -> not_equal ()
     | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->

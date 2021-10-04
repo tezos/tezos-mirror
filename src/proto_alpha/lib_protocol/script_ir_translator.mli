@@ -357,7 +357,7 @@ val unparse_comparable_ty :
 
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty ->
-  ('a, Script_typed_ir.to_be_replaced) Script_typed_ir.ty
+  ('a, Dependent_bool.yes) Script_typed_ir.ty
 
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
