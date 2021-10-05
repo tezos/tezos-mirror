@@ -25,6 +25,8 @@
 
 module Plugin = struct
   module Proto = Registerer.Registered
+  module Default_Filters = Prevalidator_filters.No_filter (Proto)
+  module Mempool = Default_Filters.Mempool
   include Plugin
 end
 
