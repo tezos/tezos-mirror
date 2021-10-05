@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Tezos_context_encoding.Context
+module Env = Env
 
 module type DB = Irmin.Generic_key.S with module Schema = Schema
 

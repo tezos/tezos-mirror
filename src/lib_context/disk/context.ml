@@ -155,99 +155,15 @@ let reporter () =
   in
   {Logs.report}
 
-(* Caps the number of entries stored in the Irmin's index. As a
-   trade-off, increasing this value will delay index merges, and thus,
-   make them more expensive in terms of disk usage, memory usage and
-   computation time.*)
-let index_log_size = ref 2_500_000
-
-(* Caps the number of entries stored in the Irmin's LRU cache. As a
-   trade-off, increasing this value will increase the memory
-   consumption.*)
-let lru_size = ref 5_000
-
-(* This limit ensures that no trees with more than [auto_flush]
-   mutations can exist in memory, bounding the memory usage of a
-   single commit performed by a read-write process. As a trade-off,
-   the intermediate flushed trees to the store might be unused and
-   will have to be garbage collected later on to save space. *)
-let auto_flush = ref 10_000
-
-module Indexing_strategy : sig
-  (* Determines the policy used to determine whether to add new
-     objects to Irmin's index whenever they are exported to the
-     data file. *)
-  type t :=
-    [ `Minimal  (** only newly-exported commit objects are added to the index *)
-    | `Always  (** all newly-exported objects are added to the index *) ]
-
-  val parse : string -> (t, string) result
-
-  val set : t -> unit
-
-  val get : unit -> t
-
-  type irmin_t := Irmin_pack.Indexing_strategy.t
-
-  val to_irmin : t -> irmin_t
-end = struct
-  module I = Irmin_pack.Indexing_strategy
-
-  let singleton = ref `Minimal
-
-  let set x = singleton := x
-
-  let get () = !singleton
-
-  let parse = function
-    | "always" -> Ok `Always
-    | "minimal" -> Ok `Minimal
-    | x ->
-        Error
-          (Fmt.str
-             "Unable to parse indexing strategy '%s'. Expected one of { \
-              'always', 'minimal' }."
-             x)
-
-  let to_irmin = function `Always -> I.always | `Minimal -> I.minimal
-end
-
 let () =
-  let verbose_info () =
-    Logs.set_level (Some Logs.Info) ;
-    Logs.set_reporter (reporter ())
-  in
-  let verbose_debug () =
-    Logs.set_level (Some Logs.Debug) ;
-    Logs.set_reporter (reporter ())
-  in
-  let index_log_size n = index_log_size := int_of_string n in
-  let auto_flush n = auto_flush := int_of_string n in
-  let lru_size n = lru_size := int_of_string n in
-  let indexing_strategy x =
-    match Indexing_strategy.parse x with
-    | Ok x -> Indexing_strategy.set x
-    | Error msg ->
-        Fmt.failwith
-          "Invalid value for TEZOS_CONTEXT environment variable: %s"
-          msg
-  in
-  match Unix.getenv "TEZOS_CONTEXT" with
-  | exception Not_found -> ()
-  | v ->
-      let args = String.split_no_empty ',' v in
-      List.iter
-        (function
-          | "v" | "verbose" -> verbose_info ()
-          | "vv" -> verbose_debug ()
-          | v -> (
-              match String.split_no_empty '=' v with
-              | ["index-log-size"; n] -> index_log_size n
-              | ["auto-flush"; n] -> auto_flush n
-              | ["lru-size"; n] -> lru_size n
-              | ["indexing-strategy"; x] -> indexing_strategy x
-              | _ -> ()))
-        args
+  match Tezos_context_helpers.Env.(v.verbosity) with
+  | `Info ->
+      Logs.set_level (Some Logs.Info) ;
+      Logs.set_reporter (reporter ())
+  | `Debug ->
+      Logs.set_level (Some Logs.Debug) ;
+      Logs.set_reporter (reporter ())
+  | `Default -> ()
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type error +=
@@ -457,8 +373,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     {context with ops = 0}
 
   let may_flush context =
-    if (not context.index.readonly) && context.ops >= !auto_flush then
-      flush context
+    if
+      (not context.index.readonly)
+      && context.ops >= Tezos_context_helpers.Env.(v.auto_flush)
+    then flush context
     else Lwt.return context
 
   let add_tree ctxt key tree =
@@ -716,21 +634,32 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false) ?indexing_strategy
+  let init ?patch_context ?(readonly = false)
+      ?(indexing_strategy : Tezos_context_helpers.Env.indexing_strategy option)
       ?index_log_size:tbl_log_size root =
     let open Lwt_syntax in
+    let module I = Irmin_pack.Indexing_strategy in
+    let indexing_strategy : I.t =
+      Option.value
+        indexing_strategy
+        ~default:Tezos_context_helpers.Env.(v.indexing_strategy)
+      |> function
+      | `Always -> I.always
+      | `Minimal -> I.minimal
+    in
     let+ repo =
-      let indexing_strategy =
-        Option.value_f indexing_strategy ~default:Indexing_strategy.get
-        |> Indexing_strategy.to_irmin
+      let index_log_size =
+        Option.value
+          tbl_log_size
+          ~default:Tezos_context_helpers.Env.(v.index_log_size)
       in
-      let index_log_size = Option.value tbl_log_size ~default:!index_log_size in
+      let lru_size = Tezos_context_helpers.Env.lru_size in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
            ~indexing_strategy
            ~index_log_size
-           ~lru_size:!lru_size
+           ~lru_size
            root)
     in
     {path = root; repo; patch_context; readonly}
@@ -996,7 +925,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     type import = Snapshot.Import.process
 
     let v_import ?(in_memory = false) idx =
-      let indexing_strategy = Indexing_strategy.get () in
+      let indexing_strategy = Tezos_context_helpers.Env.v.indexing_strategy in
       let on_disk =
         match indexing_strategy with
         | `Always ->
