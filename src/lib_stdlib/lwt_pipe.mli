@@ -294,8 +294,8 @@ module Unbounded : sig
   val is_closed : 'a t -> bool
 end
 
-module MaybeBounded : sig
-  (** [MaybeBounded] are pipes that may or may not be bounded. This is decided
+module Maybe_bounded : sig
+  (** [Maybe_bounded] are pipes that may or may not be bounded. This is decided
        when [create]ing the pipe and can be queried with the [bounded] function.
     *)
 

@@ -296,7 +296,7 @@ module Unbounded = struct
       notify_push q)
 end
 
-module MaybeBounded = struct
+module Maybe_bounded = struct
   include Bounded
 
   let null_compute_size _ = 0

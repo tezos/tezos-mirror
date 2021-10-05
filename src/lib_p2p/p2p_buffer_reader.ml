@@ -61,7 +61,7 @@ let () =
 
 type readable = {
   read_buffer : Circular_buffer.t;
-  read_queue : Circular_buffer.data tzresult Lwt_pipe.MaybeBounded.t;
+  read_queue : Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t;
   mutable partial_read : Circular_buffer.data option;
 }
 
@@ -138,7 +138,7 @@ let read ?canceler readable buffer =
       Lwt.return (read_from readable buffer (Ok msg))
   | None ->
       protect ?canceler (fun () ->
-          Lwt_pipe.MaybeBounded.pop readable.read_queue)
+          Lwt_pipe.Maybe_bounded.pop readable.read_queue)
       >|= read_from readable buffer
 
 let read_full ?canceler readable buffer =
