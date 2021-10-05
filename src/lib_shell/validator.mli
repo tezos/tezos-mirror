@@ -67,7 +67,14 @@ val watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
 val chains_watcher : t -> (Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
 
+(** [inject_operation t ?chain_id ~force op] notifies the prevalidator worker
+    associated with the [chain_id] of a new injected operation.
+    Fails if the branch in [op] is not known in the given [chain_id] or if no
+    prevalidator is associated with the [chain_id].
+    If no [chain_id] is provided, try to recover a chain_id from the branch
+    in the operation data. Fails if no chain_id can be recovered unless [force] is set.
+    If force is set, notify all the known prevalidator workers. *)
 val inject_operation :
-  t -> ?chain_id:Chain_id.t -> Operation.t -> unit tzresult Lwt.t
+  t -> ?chain_id:Chain_id.t -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
 val distributed_db : t -> Distributed_db.t

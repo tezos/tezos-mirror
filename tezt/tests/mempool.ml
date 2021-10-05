@@ -160,7 +160,7 @@ let operation_json_branch ~branch operations_json =
     branch
     operations_json
 
-let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
+let sign_operation_bytes ~watermark (signer : Constant.key) (msg : Bytes.t) =
   let open Tezos_crypto in
   let b58_secret_key =
     match String.split_on_char ':' signer.secret with
@@ -168,11 +168,14 @@ let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
     | _ -> Test.fail "Could not parse secret key"
   in
   let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
-  Signature.(sign ~watermark:Generic_operation sk msg)
+  Signature.(sign ~watermark sk msg)
 
 let sign_operation ~signer op_str_hex =
   let signature =
-    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
+    sign_operation_bytes
+      ~watermark:Generic_operation
+      signer
+      (Hex.to_bytes (`Hex op_str_hex))
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   signature
@@ -229,6 +232,29 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
         loop (oph_list, counter + 1) (pred n)
   in
   loop ([], counter + 1) n
+
+(** Bakes with an empty mempool to force synchronisation between nodes. *)
+let bake_empty_mempool ?endpoint client =
+  let mempool_str =
+    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+  in
+  let mempool = Temp.file "mempool.json" in
+  let* _ =
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
+        Lwt_io.write oc mempool_str)
+  in
+  Client.bake_for ?endpoint ~mempool client
+
+(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
+    with an empty mempool, then waits for a [flush] event on [node] (which
+    will usually be the node corresponding to [client], but could be any
+    node with a connection path to it). *)
+let bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
+  let waiter = wait_for_flush node in
+  let* () = bake_empty_mempool client in
+  if log then
+    Log.info "Baked for %s with an empty mempool." (Client.name client) ;
+  waiter
 
 (** This test tries to manually inject some operations
 
@@ -570,7 +596,10 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let op_str_hex = JSON.as_string op_hex in
   let signature =
-    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
+    sign_operation_bytes
+      ~watermark:Generic_operation
+      signer
+      (Hex.to_bytes (`Hex op_str_hex))
   in
   let* _run =
     let* chain_id = RPC.get_chain_id client in
@@ -674,107 +703,232 @@ let run_batched_operation =
     number_of_transactions ;
   unit
 
-let get_endorsement_hash ops =
+let check_if_op_is_in_mempool client ~classification oph =
+  let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
   let open JSON in
-  let ops_list = as_list (ops |-> "applied") in
-  match ops_list with
-  | [op] -> op |-> "hash" |> as_string
-  | _ -> Test.fail "Only one operation must be applied"
+  let search_in ops c =
+    List.exists
+      (fun op -> get "hash" op |> as_string = oph)
+      (ops |-> c |> as_list)
+  in
+  match classification with
+  | Some c ->
+      let res = search_in ops c in
+      if not res then Test.fail "%s not found in %s" oph c else unit
+  | None ->
+      let res =
+        List.exists
+          (fun c -> search_in ops c)
+          ["applied"; "branch_refused"; "branch_delayed"; "refused"]
+      in
+      if res then Test.fail "%s found in mempool" oph else unit
 
-let check_if_op_is_branch_refused ops oph =
+let get_endorsement_has_bytes client =
+  let* mempool = RPC.get_mempool_pending_operations client in
   let open JSON in
-  let ops_list = as_list (ops |-> "branch_refused") in
-  match ops_list with
-  | [br] -> (
-      match as_list br with
-      | br_oph :: _ ->
-          let br_oph = as_string br_oph in
-          let res = br_oph = oph in
-          if not res then
-            Test.fail "Found %s in branch_refused instead of %s" br_oph oph
-      | [] ->
-          (* Can't happen *)
-          assert false)
-  | _ -> Test.fail "Only one operation must be branch_refused"
+  let ops_list = as_list (mempool |-> "applied") in
+  let op =
+    match ops_list with
+    | [op] -> op
+    | _ ->
+        Test.fail
+          "Applied field of mempool should contain one and only one operation"
+  in
+  let shell =
+    let branch = JSON.as_string (JSON.get "branch" op) in
+    match Data_encoding.Json.from_string (sf {|{"branch":"%s"}|} branch) with
+    | Ok b ->
+        Data_encoding.Json.destruct Tezos_base.Operation.shell_header_encoding b
+    | Error e -> Test.fail "Data_encoding branch from %s error %s" branch e
+  in
+  let contents =
+    match JSON.as_list (JSON.get "contents" op) with
+    | [content] -> content
+    | _ -> Test.fail "Contents should countain only one element"
+  in
+  let endorsement = JSON.get "endorsement" contents in
+  let slot = JSON.get "slot" contents |> JSON.as_int in
+  let level =
+    Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
+      (Int32.of_int
+         (JSON.get "operations" endorsement |> JSON.get "level" |> JSON.as_int))
+  in
+  let signature =
+    let signature = JSON.get "signature" endorsement |> JSON.as_string in
+    match Data_encoding.Json.from_string (sf {|"%s"|} signature) with
+    | Ok s -> Data_encoding.Json.destruct Tezos_crypto.Signature.encoding s
+    | Error e ->
+        Test.fail
+          "Data_encoding signature from string %s : error %s"
+          signature
+          e
+  in
+  let wrapped =
+    Tezos_protocol_alpha.Protocol.Operation_repr.
+      {
+        shell;
+        protocol_data =
+          Operation_data
+            {
+              contents =
+                Single
+                  (Endorsement_with_slot
+                     {
+                       endorsement =
+                         {
+                           shell;
+                           protocol_data =
+                             {
+                               contents =
+                                 Single
+                                   (Tezos_protocol_alpha.Protocol.Operation_repr
+                                    .Endorsement
+                                      {level});
+                               signature = Some signature;
+                             };
+                         };
+                       slot;
+                     });
+              signature = None;
+            };
+      }
+  in
+  let wrapped_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Operation_repr.encoding
+      wrapped
+  in
+  let hash = JSON.get "hash" op |> as_string in
+  Lwt.return (wrapped_bytes, hash)
 
-(** This test checks that branch_refused endorsement are still propagated
+let wait_for_synch node =
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when s = "notify" -> Some s
+    | Some _ | None -> None
+  in
+  let* _ = Node.wait_for node "request_completed_debug.v0" filter in
+  return ()
 
-   Scenario:
+let mempool_synchronisation client node =
+  let waiter = wait_for_synch node in
+  let* _ = RPC.post_request_operations client in
+  waiter
 
-   + 3 Nodes are chained connected and activate a protocol
-
-   + Disconnect node_1 from node_2 and bake on both node.
-
-   + Reconnect node_1 and node_2
-
-   + Endorse on node_1
-
-   + Check that endorsement is applied on node_1 and refused on node_2 and node_3
-*)
-
-(* This test is no longer correct and cannot be adapated easily. *)
-(* let endorsement_flushed_branch_refused = *)
-(*   Protocol.register_test *)
-(*     ~__FILE__ *)
-(*     ~title:"Ensure that branch_refused endorsement are transmited" *)
-(*     ~tags:["endorsement"; "mempool"; "branch_refused"] *)
-(*   @@ fun protocol -> *)
-(*   (\* Step 1 *\) *)
-(*   (\* 3 Nodes are started and we activate the protocol and wait the nodes to be synced *\) *)
-(*   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode] *)
-(*   and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] *)
-(*   and* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in *)
-(*   let* client_1 = Client.init ~endpoint:(Node node_1) () *)
-(*   and* client_2 = Client.init ~endpoint:(Node node_2) () *)
-(*   and* client_3 = Client.init ~endpoint:(Node node_3) () in *)
-(*   let* () = Client.Admin.trust_address client_1 ~peer:node_2 *)
-(*   and* () = Client.Admin.trust_address client_2 ~peer:node_1 *)
-(*   and* () = Client.Admin.trust_address client_2 ~peer:node_3 *)
-(*   and* () = Client.Admin.trust_address client_3 ~peer:node_2 in *)
-(*   let* () = Client.Admin.connect_address client_1 ~peer:node_2 *)
-(*   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in *)
-(*   let* () = Client.activate_protocol ~protocol client_1 in *)
-(*   Log.info "Activated protocol." ; *)
-(*   let* _ = Node.wait_for_level node_1 1 *)
-(*   and* _ = Node.wait_for_level node_2 1 *)
-(*   and* _ = Node.wait_for_level node_3 1 in *)
-(*   Log.info "All nodes are at level %d." 1 ; *)
-(*   (\* Step 2 *\) *)
-(*   (\* Disconnect node_1 and node_2 and bake on both node. This will force different branches *\) *)
-(*   let* node_2_id = Node.wait_for_identity node_2 *)
-(*   and* node_1_id = Node.wait_for_identity node_1 in *)
-(*   let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id *)
-(*   and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in *)
-(*   let bake_waiter_1 = wait_for_flush node_1 *)
-(*   and bake_waiter_2 = wait_for_flush node_2 in *)
-(*   let* () = Client.bake_for client_1 *)
-(*   and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in *)
-(*   let* () = bake_waiter_1 and* () = bake_waiter_2 in *)
-(*   (\* Step3 *\) *)
-(*   (\* Reconnect node_1 and node_2 *\) *)
-(*   let* () = Client.Admin.trust_address client_1 ~peer:node_2 *)
-(*   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in *)
-(*   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in *)
-(*   (\* Step 4 *\) *)
-(*   (\* Endorse on node_1 *\) *)
-(*   let endorser_waiter = wait_for_injection node_1 in *)
-(*   let* () = Client.endorse_for client_1 in *)
-(*   let* () = endorser_waiter in *)
-(*   Log.info "Endorsement on node_1 done" ; *)
-(*   (\* Step 5 *\) *)
-(*   (\* Check that endorsement is applied on node_1 and refused on node_2 and node_3 *\) *)
-(*   let* pending_op_1 = RPC.get_mempool_pending_operations client_1 in *)
-(*   let oph = get_endorsement_hash pending_op_1 in *)
-(*   Log.info "Endorsement found in node_1 applied mempool" ; *)
-(*   let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in *)
-(*   let () = check_if_op_is_branch_refused pending_op_2 oph in *)
-(*   Log.info "Endorsement found in branch_refused of node_2 mempool" ; *)
-(*   (\* The only way node_3 gets the endorsement is that node_2 has *)
-(*      propagated the operation. *\) *)
-(*   let* pending_op_3 = RPC.get_mempool_pending_operations client_3 in *)
-(*   let () = check_if_op_is_branch_refused pending_op_3 oph in *)
-(*   Log.info "Endorsement found in branch_refused of node_3 mempool" ; *)
-(*   unit *)
+(** This test checks that futur endorsement are still propagated when
+    the head is  incremented *)
+let propagation_futur_endorsement =
+  let step1_msg =
+    "Step 1: 3 nodes are initialised, chain connected and the protocol is \
+     activated"
+  in
+  let step2_msg = "Step 2: disconnect the nodes" in
+  let step3_msg = "Step 3: bake one block on node_1" in
+  let step4_msg = "Step 4: Endorsement on node_1 injected" in
+  let step5_msg =
+    "Step 5: recover hash endorsement and bytes representing the endorsement"
+  in
+  let step6_msg =
+    "Step 6: ban the endorsement on node_1 to ensure it will not be propagated \
+     from this node"
+  in
+  let step7_msg = "Step 7: Endorsement has been inject on node_2" in
+  let step8_msg =
+    "Step 8: Reconnect node_2 and node_3 and synchronise their mempool"
+  in
+  let step9_msg =
+    "Step 9: ensure that endorsement is in node_2 mempool and classified as \
+     branch_delayed"
+  in
+  let step10_msg =
+    "Step 10: ensure that endorsement is not in node_3 mempool"
+  in
+  let step11_msg = "Step 11: Reconnect node_1 and node_2, new head on node_2" in
+  let step12_msg =
+    "Step 12: Synchronise mempool on node_2 and check that endorsement is now \
+     applied"
+  in
+  let step13_msg =
+    "Step 13: Synchronise mempool on node_3 and check that endorsement has \
+     been propagated"
+  in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Ensure that futur endorsement are propagated"
+    ~tags:["endorsement"; "mempool"; "branch_delayed"]
+  @@ fun protocol ->
+  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
+  and* node_2 =
+    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Private_mode]
+  and* node_3 =
+    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Private_mode]
+  in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) ()
+  and* client_3 = Client.init ~endpoint:(Node node_3) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1
+  and* () = Client.Admin.trust_address client_2 ~peer:node_3
+  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2
+  and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  let* _ = Node.wait_for_level node_1 1
+  and* _ = Node.wait_for_level node_2 1
+  and* _ = Node.wait_for_level node_3 1 in
+  Log.info "%s" step1_msg ;
+  let* node_1_id = Node.wait_for_identity node_1
+  and* node_2_id = Node.wait_for_identity node_2
+  and* node_3_id = Node.wait_for_identity node_3 in
+  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
+  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id
+  and* () = Client.Admin.kick_peer client_2 ~peer:node_3_id
+  and* () = Client.Admin.kick_peer client_3 ~peer:node_2_id in
+  Log.info "%s" step2_msg ;
+  let* () = Node_event_level.bake_wait_log node_1 client_1 in
+  Log.info "%s" step3_msg ;
+  let endorser_waiter = wait_for_injection node_1 in
+  let* () = Client.endorse_for client_1 in
+  let* () = endorser_waiter in
+  Log.info "%s" step4_msg ;
+  let* (bytes, hash) = get_endorsement_has_bytes client_1 in
+  Log.info "%s" step5_msg ;
+  let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
+  Log.info "%s" step6_msg ;
+  let (`Hex bytes) = Hex.of_bytes bytes in
+  let injection_waiter = wait_for_injection node_2 in
+  let* _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
+  let* () = injection_waiter in
+  Log.info "%s" step7_msg ;
+  let* () = Client.Admin.trust_address client_2 ~peer:node_3
+  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
+  let* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+  let* _ = mempool_synchronisation client_3 node_3 in
+  Log.info "%s" step8_msg ;
+  let* _ =
+    check_if_op_is_in_mempool
+      client_2
+      ~classification:(Some "branch_delayed")
+      hash
+  in
+  Log.info "%s" step9_msg ;
+  let* _ = check_if_op_is_in_mempool client_3 ~classification:None hash in
+  Log.info "%s" step10_msg ;
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  Log.info "%s" step11_msg ;
+  let* _ = mempool_synchronisation client_2 node_2 in
+  let* _ =
+    check_if_op_is_in_mempool client_2 ~classification:(Some "applied") hash
+  in
+  Log.info "%s" step12_msg ;
+  let* _ = mempool_synchronisation client_3 node_3 in
+  let* _ =
+    check_if_op_is_in_mempool client_3 ~classification:(Some "applied") hash
+  in
+  Log.info "%s" step13_msg ;
+  unit
 
 let check_empty_operation__ddb ddb =
   let open JSON in
@@ -1025,29 +1179,6 @@ let wait_for_banned_operation_injection node oph =
     | _ -> None
   in
   Node.wait_for node "banned_operation_encountered.v0" filter
-
-(** Bakes with an empty mempool to force synchronisation between nodes. *)
-let bake_empty_mempool ?endpoint client =
-  let mempool_str =
-    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
-  in
-  let mempool = Temp.file "mempool.json" in
-  let* _ =
-    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
-        Lwt_io.write oc mempool_str)
-  in
-  Client.bake_for ?endpoint ~mempool client
-
-(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
-    with an empty mempool, then waits for a [flush] event on [node] (which
-    will usually be the node corresponding to [client], but could be any
-    node with a connection path to it). *)
-let bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
-  let waiter = wait_for_flush node in
-  let* () = bake_empty_mempool client in
-  if log then
-    Log.info "Baked for %s with an empty mempool." (Client.name client) ;
-  waiter
 
 (** This test bans an operation and tests the ban.
 
@@ -1782,8 +1913,12 @@ let recycling_branch_refused =
   if pending > 1 then Test.fail "Branch_refused operation should not be pending" ;
   (* Step 11 *)
   (* Check that branch_refused operation is still branch_refused after head increment *)
-  let* pending_op = RPC.get_mempool_pending_operations client_1 in
-  let () = check_if_op_is_branch_refused pending_op oph_branch_refused in
+  let* () =
+    check_if_op_is_in_mempool
+      client_1
+      ~classification:(Some "branch_refused")
+      oph_branch_refused
+  in
   (* Step 12  *)
   (* Bake on node_2 to force higher fitness  *)
   let* () =
@@ -1822,7 +1957,7 @@ let set_filter_no_fee_requirement =
 
 (** Checks that arguments [applied] and [refused] are the number of operations
     in the mempool of [client] with the corresponding classification,
-    that both sets of operations are disjoint, and that there is no 
+    that both sets of operations are disjoint, and that there is no
     [branch_delayed], [branch_refused], or [unprocessed] operation.
     If [log] is [true], also logs the hash and fee of all applied
     and refused operations. *)
@@ -2134,9 +2269,123 @@ let test_pending_operation_version =
       (List.length ophs_refused_v0)
       (List.length ophs_refused_v1)
 
+(** This test tries to check that invalid operation can be injected on a local
+    node with private/injection/operation RPC *)
+let force_operation_injection =
+  let step1_msg =
+    "Step 1: Create one node with specific configuration that mimic a node \
+     with secure ACL policy"
+  in
+  let step2_msg =
+    "Step 2: Initialize a second node, connect both node and activate the \
+     protocol"
+  in
+  let step3_msg = "Step 3: Get the counter and the current branch" in
+  let step4_msg = "Step 4: Forge and sign operation with incorrect counter" in
+  let step5_msg =
+    "Step 5: Inject the operation on the secure node, and check for error \
+     because the operation was refused"
+  in
+  let step6_msg =
+    "Step 6: Force injection of operation on the secure node, and check for \
+     error because we don't have the right to use this rpc"
+  in
+  let step7_msg =
+    "Step 7: Inject operation on the local node, and check for error because \
+     the operation was refused"
+  in
+  let step8_msg = "Step 8: Force injection of operation on local node" in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"force invalid operation injection"
+    ~tags:["force"; "mempool"]
+  @@ fun protocol ->
+  Log.info "%s" step1_msg ;
+  let node1 = Node.create [] in
+  let* () = Node.config_init node1 [] in
+  let address =
+    Node.rpc_host node1 ^ ":" ^ string_of_int (Node.rpc_port node1)
+  in
+  let acl =
+    JSON.annotate ~origin:"whitelist"
+    @@ `A
+         [
+           `O
+             [
+               ("address", `String address);
+               ( "whitelist",
+                 `A
+                   [
+                     (* We do not add all RPC allowed in secure mode,
+                        only the ones that are useful for this test. *)
+                     `String "POST /injection/operation";
+                     `String "GET /chains/*/blocks/*/protocols";
+                     `String "GET /describe/**";
+                   ] );
+             ];
+         ]
+  in
+  Node.Config_file.update node1 (JSON.update "rpc" (JSON.put ("acl", acl))) ;
+  let* () = Node.identity_generate node1 in
+  let* () = Node.run node1 [Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node1 in
+  Log.info "%s" step2_msg ;
+  let* node2 = Node.init [Synchronisation_threshold 0] in
+  let* client1 = Client.init ~endpoint:Client.(Node node1) ()
+  and* client2 = Client.init ~endpoint:Client.(Node node2) () in
+  let* () = Client.Admin.connect_address client2 ~peer:node1
+  and* () = Client.activate_protocol ~protocol client2 in
+  let proto_activation_level = 1 in
+  let* _ = Node.wait_for_level node1 proto_activation_level
+  and* _ = Node.wait_for_level node2 proto_activation_level in
+  Log.info "Both nodes are at level %d." proto_activation_level ;
+  let open Lwt in
+  Log.info "%s" step3_msg ;
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client2
+    >|= JSON.as_int
+  in
+  let* branch = RPC.get_branch client2 >|= JSON.as_string in
+  Log.info "%s" step4_msg ;
+  let* op_str_hex =
+    forge_operation
+      ~branch
+      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
+      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~source:Constant.bootstrap2.identity
+      ~destination:Constant.bootstrap1.identity
+      ~counter (* Invalid counter *)
+      ~client:client2
+  in
+  let signature = sign_operation ~signer:Constant.bootstrap2 op_str_hex in
+  let signed_op = op_str_hex ^ signature in
+  Log.info "%s" step5_msg ;
+  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client1 in
+  let injection_error_rex =
+    rex
+      ~opts:[`Dotall]
+      "Fatal error:\n  Command failed: Error while applying operation.*:"
+  in
+  let* () = Process.check_error ~msg:injection_error_rex p in
+  Log.info "%s" step6_msg ;
+  let p =
+    RPC.spawn_private_inject_operation ~data:(`String signed_op) client1
+  in
+  let access_error_rex =
+    rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
+  in
+  let* () = Process.check_error ~msg:access_error_rex p in
+  Log.info "%s" step7_msg ;
+  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client2 in
+  let* () = Process.check_error ~msg:injection_error_rex p in
+  Log.info "%s" step8_msg ;
+  let* _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
+  propagation_futur_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
   refetch_failed_operation ~protocols ;
   ban_operation ~protocols ;
@@ -2146,4 +2395,5 @@ let register ~protocols =
   ban_operation_branch_refused_reevaluated ~protocols ;
   recycling_branch_refused ~protocols ;
   test_do_not_reclassify ~protocols ;
-  test_pending_operation_version ~protocols
+  test_pending_operation_version ~protocols ;
+  force_operation_injection ~protocols

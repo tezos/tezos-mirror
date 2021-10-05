@@ -98,6 +98,30 @@ val inject_operation :
   Client.t ->
   JSON.t Lwt.t
 
+(** Same as {!inject_operation}, but do not wait for the process to exit. *)
+val spawn_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  data:JSON.u ->
+  Client.t ->
+  Process.t
+
+(** Call RPC /private/injection/operation *)
+val private_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Same as {!private_inject_operation}, but do not wait for the process to exit. *)
+val spawn_private_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  data:JSON.u ->
+  Client.t ->
+  Process.t
+
 (** Call RPC /injection/block *)
 val inject_block :
   ?endpoint:Client.endpoint ->
@@ -139,6 +163,14 @@ val get_mempool_pending_operations :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?version:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chains/[chain]/mempool/request_operations *)
+val post_request_operations :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
   Client.t ->
   JSON.t Lwt.t
 

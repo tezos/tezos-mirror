@@ -88,6 +88,10 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     path
     client
 
+let post_request_operations ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "mempool"; "request_operations"] in
+  Client.rpc ?endpoint ?hooks POST path client
+
 let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "ban_operation"] in
   Client.rpc ?endpoint ~data POST path client
@@ -118,6 +122,18 @@ let inject_block ?endpoint ?hooks ~data client =
 let inject_operation ?endpoint ?hooks ~data client =
   let path = ["injection"; "operation"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
+
+let spawn_inject_operation ?endpoint ?hooks ~data client =
+  let path = ["injection"; "operation"] in
+  Client.spawn_rpc ?endpoint ?hooks ~data POST path client
+
+let private_inject_operation ?endpoint ?hooks ~data client =
+  let path = ["private"; "injection"; "operation"] in
+  Client.rpc ?endpoint ?hooks ~data POST path client
+
+let spawn_private_inject_operation ?endpoint ?hooks ~data client =
+  let path = ["private"; "injection"; "operation"] in
+  Client.spawn_rpc ?endpoint ?hooks ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in

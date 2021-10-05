@@ -950,13 +950,18 @@ module Make
               return_unit)
         | false -> return_unit
 
-    let on_inject (pv : state) op =
+    let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
       already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
       if already_handled then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
         return_unit
+      else if force then (
+        Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
+        >>= fun (_ : bool) ->
+        pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
+        return_unit)
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
@@ -1154,7 +1159,7 @@ module Make
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject op -> on_inject pv op
+      | Request.Inject {op; force} -> on_inject pv ~force op
       | Request.Arrived (oph, op) -> on_arrived w pv oph op
       | Request.Advertise ->
           on_advertise pv.shell ;
@@ -1337,10 +1342,10 @@ let notify_operations (t : t) peer mempool =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
 
-let inject_operation (t : t) op =
+let inject_operation (t : t) ~force op =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.Queue.push_request_and_wait w (Inject op)
+  Prevalidator.Worker.Queue.push_request_and_wait w (Inject {op; force})
 
 let status (t : t) =
   let module Prevalidator : T = (val t) in
