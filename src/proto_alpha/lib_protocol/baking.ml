@@ -323,7 +323,7 @@ let endorsement_rights ctxt level =
       in
       Signature.Public_key_hash.Map.add pkh right acc)
     Signature.Public_key_hash.Map.empty
-    (List.rev (0 --> (Constants.endorsers_per_block ctxt - 1)))
+    (0 <-- Constants.endorsers_per_block ctxt - 1)
 
 let[@coq_axiom_with_reason "gadt"] check_endorsement_right ctxt chain_id ~slot
     (op : Kind.endorsement Operation.t) =
