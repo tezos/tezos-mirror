@@ -43,7 +43,7 @@ type buffer
 *)
 val mk_readable :
   read_buffer:Circular_buffer.t ->
-  read_queue:Circular_buffer.data tzresult Lwt_pipe.t ->
+  read_queue:Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t ->
   readable
 
 (** [mk_buffer ?pos ?length_to_copy bytes] creates a {!buffer} for copying

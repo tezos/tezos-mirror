@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,7 +37,8 @@ type ('msg, 'peer, 'conn) config = {
 
 open P2p_answerer
 
-let message conn _request size msg = Lwt_pipe.push conn.messages (size, msg)
+let message conn _request size msg =
+  Lwt_pipe.Maybe_bounded.push conn.messages (size, msg)
 
 module Private_answerer = struct
   let advertise conn _request _points =

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -197,7 +198,7 @@ end = struct
   type t = {
     param : Request.param;
     pending : status Table.t;
-    queue : event Lwt_pipe.t;
+    queue : event Lwt_pipe.Unbounded.t;
     mutable events : event list Lwt.t;
     canceler : Lwt_canceler.t;
     mutable worker : unit Lwt.t;
@@ -217,11 +218,11 @@ end = struct
     | Notify_duplicate of P2p_peer.Id.t * key
     | Notify_unrequested of P2p_peer.Id.t * key
 
-  let request t p k = assert (Lwt_pipe.push_now t.queue (Request (p, k)))
+  let request t p k = Lwt_pipe.Unbounded.push t.queue (Request (p, k))
 
   let notify t p k =
     Events.(emit notify_push) (k, p) >>= fun () ->
-    assert (Lwt_pipe.push_now t.queue (Notify (p, k))) ;
+    Lwt_pipe.Unbounded.push t.queue (Notify (p, k)) ;
     Lwt.return ()
 
   (* [notify_cancellation] is used within non-Lwt context and needs to
@@ -230,21 +231,21 @@ end = struct
      within Lwt context so we use the recommended [emit] for them. *)
   let notify_cancellation t k =
     Events.(emit__dont_wait__use_with_care notify_push_cancellation) k ;
-    assert (Lwt_pipe.push_now t.queue (Notify_cancellation k))
+    Lwt_pipe.Unbounded.push t.queue (Notify_cancellation k)
 
   let notify_invalid t p k =
     Events.(emit notify_push_invalid) (k, p) >>= fun () ->
-    assert (Lwt_pipe.push_now t.queue (Notify_invalid (p, k))) ;
+    Lwt_pipe.Unbounded.push t.queue (Notify_invalid (p, k)) ;
     Lwt.return ()
 
   let notify_duplicate t p k =
     Events.(emit notify_push_duplicate) (k, p) >>= fun () ->
-    assert (Lwt_pipe.push_now t.queue (Notify_duplicate (p, k))) ;
+    Lwt_pipe.Unbounded.push t.queue (Notify_duplicate (p, k)) ;
     Lwt.return ()
 
   let notify_unrequested t p k =
     Events.(emit notify_push_unrequested) (k, p) >>= fun () ->
-    assert (Lwt_pipe.push_now t.queue (Notify_unrequested (p, k))) ;
+    Lwt_pipe.Unbounded.push t.queue (Notify_unrequested (p, k)) ;
     Lwt.return ()
 
   let compute_timeout state =
@@ -317,7 +318,7 @@ end = struct
       else if Lwt.state state.events <> Lwt.Sleep then (
         let now = Systime_os.now () in
         state.events >>= fun events ->
-        state.events <- Lwt_pipe.pop_all state.queue ;
+        state.events <- Lwt_pipe.Unbounded.pop_all state.queue ;
         List.iter_s (process_event state now) events >>= fun () -> loop state)
       else
         Events.(emit timeout) () >>= fun () ->
@@ -379,7 +380,7 @@ end = struct
     let state =
       {
         param;
-        queue = Lwt_pipe.create ();
+        queue = Lwt_pipe.Unbounded.create ();
         pending = Table.create ~random:true 17;
         events = Lwt.return_nil;
         canceler = Lwt_canceler.create ();

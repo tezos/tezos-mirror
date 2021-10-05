@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -103,7 +103,7 @@ let cancel_and_assert_success canceler =
 
 let easy_mk_readable ?maxlength ?fresh_buf_size ?size () =
   let read_buffer = Circular_buffer.create ?maxlength ?fresh_buf_size () in
-  let read_queue = Lwt_pipe.create ?size () in
+  let read_queue = Lwt_pipe.Maybe_bounded.create ?bound:size () in
   P2p_buffer_reader.mk_readable ~read_buffer ~read_queue
 
 let test_read_waits_for_data =
@@ -138,7 +138,7 @@ let test_read_less_than_length : QCheck.Test.t =
   Lwt_main.run
   @@
   let read_buffer = Circular_buffer.create () in
-  let read_queue = Lwt_pipe.create () in
+  let read_queue = Lwt_pipe.Maybe_bounded.create () in
   let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
   let buffer = Bytes.create buf_size in
   let reader_buffer = P2p_buffer_reader.mk_buffer_safe buffer in
@@ -153,7 +153,7 @@ let test_read_less_than_length : QCheck.Test.t =
         Lwt.return maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.push read_queue (Ok data) in
+  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
   let+ res = P2p_buffer_reader.read readable reader_buffer in
   qcheck_eq'
     ~expected:true
@@ -216,7 +216,7 @@ let test_read_partial : QCheck.Test.t =
   Lwt_main.run
   @@
   let read_buffer = Circular_buffer.create () in
-  let read_queue = Lwt_pipe.create () in
+  let read_queue = Lwt_pipe.Maybe_bounded.create () in
   let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
   let buffer1 = Bytes.create buf1_size in
   let buffer2 = Bytes.create buf2_size in
@@ -234,7 +234,7 @@ let test_read_partial : QCheck.Test.t =
         Lwt.return maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.push read_queue (Ok data) in
+  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
   (* [read] a first segment, which leaves partial data in the [readable] *)
   let* res1 = P2p_buffer_reader.read readable reader_buffer1 in
   (* [read] a second segment, which should start on the remaining partial data of the [readable] *)
@@ -257,7 +257,7 @@ let test_read_full_basic =
   Lwt_main.run
   @@
   let read_buffer = Circular_buffer.create () in
-  let read_queue = Lwt_pipe.create () in
+  let read_queue = Lwt_pipe.Maybe_bounded.create () in
   let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
   let buffer = Bytes.create (String.length data_to_write) in
   let reader_buffer = P2p_buffer_reader.mk_buffer_safe buffer in
@@ -272,7 +272,7 @@ let test_read_full_basic =
         Lwt.return maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.push read_queue (Ok data) in
+  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
   let+ res = P2p_buffer_reader.read_full readable reader_buffer in
   let _ = qcheck_eq' ~expected:true ~actual:(Result.is_ok res) () in
   qcheck_eq' ~expected:data_to_write ~actual:(Bytes.to_string buffer) ()
@@ -291,7 +291,7 @@ let test_read_full_waits =
   Lwt_main.run
   @@
   let read_buffer = Circular_buffer.create () in
-  let read_queue = Lwt_pipe.create () in
+  let read_queue = Lwt_pipe.Maybe_bounded.create () in
   let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
   let buffer = Bytes.create total_size in
   let reader_buffer = P2p_buffer_reader.mk_buffer_safe buffer in
@@ -312,7 +312,7 @@ let test_read_full_waits =
               Lwt.return maxlen)
             read_buffer
         in
-        let* () = Lwt_pipe.push read_queue (Ok data) in
+        let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
         (* Note: this cooperation point is necessary to allow [read_full] to read some data from the circular buffer before writing again; otherwise it can deadlock if [total_size > Circular_buffer.default_size] (one can also set the Circular_buffer size to [total_size] but putting a cooperation point is more representative of real-world scenarios). *)
         Lwt.pause ())
       data_to_write_list
