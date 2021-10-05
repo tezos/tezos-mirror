@@ -812,7 +812,7 @@ let wait_for_synch node =
 
 let mempool_synchronisation client node =
   let waiter = wait_for_synch node in
-  let* _ = RPC.post_request_operations client in
+  let* _ = RPC.mempool_request_operations client in
   waiter
 
 (** This test checks that futur endorsement are still propagated when
@@ -2977,6 +2977,63 @@ let test_mempool_filter_operation_arrival =
   let* () = waiterC in
   check_mempool_ops_fees ~applied:appliedC1 ~refused:refusedC1 client1
 
+let test_request_operations_peer =
+  let step1_msg = "Step 1: Connect and initialise two nodes " in
+  let step2_msg = "Step 2: Disconnect nodes " in
+  let step3_msg = "Step 3: Inject an operation " in
+  let step4_msg =
+    "Step 4: Reconnect nodes, request operations and witness arrival of \
+     operation previously injected "
+  in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Test request_operations rpc"
+    ~tags:["mempool"; "request_operations"]
+  @@ fun protocol ->
+  Log.info "%s" step1_msg ;
+  let init_node () =
+    Node.init
+      ?event_level:(Some "debug")
+      [Synchronisation_threshold 0; Private_mode]
+  in
+  let* node_1 = init_node () and* node_2 = init_node () in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  Log.info "%s" step2_msg ;
+  let* node2_identity = Node.wait_for_identity node_2 in
+  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
+  Log.info "%s" step3_msg ;
+  let transfer_1 = wait_for_injection node_1 in
+  let _ =
+    Client.transfer
+      ~wait:"0"
+      ~amount:(Tez.of_int 1)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~counter:1
+      client_1
+  in
+  let* _ = transfer_1 in
+  let* oph =
+    let* ophs = get_applied_operation_hash_list client_1 in
+    match ophs with
+    | [oph] -> return oph
+    | _ -> Test.fail "Applied mempool should contain exactly one operation"
+  in
+  Log.info "%s" step4_msg ;
+  let wait_mempool = wait_for_arrival_of_ophash oph node_2 in
+  let* () = Client.Admin.connect_address ~peer:node_1 client_2 in
+  let* node1_identity = Node.wait_for_identity node_1 in
+  let* _ = RPC.mempool_request_operations ~peer:node1_identity client_2 in
+  let* () = wait_mempool in
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
@@ -2994,4 +3051,5 @@ let register ~protocols =
   force_operation_injection ~protocols ;
   injecting_old_operation_fails ~protocols ;
   test_get_post_mempool_filter ~protocols ;
-  test_mempool_filter_operation_arrival ~protocols
+  test_mempool_filter_operation_arrival ~protocols ;
+  test_request_operations_peer ~protocols
