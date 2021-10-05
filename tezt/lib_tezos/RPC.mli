@@ -167,10 +167,10 @@ val get_mempool_pending_operations :
   JSON.t Lwt.t
 
 (** Call RPC /chains/[chain]/mempool/request_operations *)
-val post_request_operations :
+val mempool_request_operations :
   ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
   ?chain:string ->
+  ?peer:string ->
   Client.t ->
   JSON.t Lwt.t
 
