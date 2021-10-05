@@ -298,8 +298,8 @@ function Hacl_Ed25519_verify(pk, msg, signature) { // eslint-disable-line no-unu
   var bpk = MlBytes2buf(pk);
   var bmsg = MlBytes2buf(msg);
   var bsignature = MlBytes2buf(signature);
-  var r = _HACL.Ed25519.verify(bpk, bmsg, bsignature);
-  return r[0];
+  var bret = _HACL.Ed25519.verify(bpk, bmsg, bsignature);
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_ecdsa_sign_p256_without_hash
@@ -316,7 +316,7 @@ function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-
   var bsig_r = MlBytes2buf(sig_r);
   var bsig_s = MlBytes2buf(sig_s);
   var bret = _HACL.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_is_more_than_zero_less_than_order
@@ -324,7 +324,7 @@ function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-
 function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-line no-unused-vars
   var bsk = MlBytes2buf(sk);
   var bret = _HACL.P256.is_more_than_zero_less_than_order(bsk);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_verify_q
@@ -332,7 +332,7 @@ function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-li
 function Hacl_P256_verify_q (pk) { // eslint-disable-line no-unused-vars
   var bpk = MlBytes2buf(pk);
   var bret = _HACL.P256.verify_q(bpk);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_ecp256dh_i
@@ -341,7 +341,7 @@ function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
   var bsk = MlBytes2buf(sk);
   var bret = _HACL.P256.dh_initiator(bsk);
   blit_buf_onto_MlBytes(bret[1], pk);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_compression_compressed_form
@@ -368,7 +368,7 @@ function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-l
   var bpk = MlBytes2buf(pk);
   var bret = _HACL.P256.decompression_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[1], out);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_decompression_not_compressed_form
@@ -377,5 +377,5 @@ function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disab
   var bpk = MlBytes2buf(pk);
   var bret = _HACL.P256.decompression_not_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[1], out);
-  return bret[0];
+  return (bret[0] ? 1 : 0);
 }
