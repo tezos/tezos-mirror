@@ -10,7 +10,6 @@
  (public_name tezos-protocol-environment-structs)
  (libraries tezos-stdlib
             tezos-crypto
-            tezos-lwt-result-stdlib
             data-encoding
             bls12-381-legacy)
  (modules "V0" "V1" "V2" "V3" "V4"))
