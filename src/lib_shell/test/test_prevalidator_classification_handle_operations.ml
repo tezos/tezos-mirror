@@ -209,39 +209,36 @@ module Block = struct
     operations : (Operation_hash.t * Operation.t) list list;
   }
 
-  let equal : t -> t -> bool =
-    let lift_eqs (left_eq : 'a -> 'a -> bool) (right_eq : 'b -> 'b -> bool)
-        ((l1, l2), (r1, r2)) =
-      left_eq l1 r1 && right_eq l2 r2
-    in
-    let pair_eq = lift_eqs Operation_hash.equal Operation.equal in
-    fun block1 block2 ->
-      (* Note that we could use the assumption that block hash
-         uniquely identifies a block. We don't do that, so that
-         we don't have to be careful about honoring this property when
-         generating random data. *)
-      Block_hash.equal block1.hash block2.hash
-      &&
-      (* Note that we could use the assumption that an operation hash
-         uniquely identifies  the operation. We don't do that, so that
-         we don't have to be careful about honoring this property when
-         generating random data. *)
-      let left_ops = List.concat block1.operations in
-      let right_ops = List.concat block2.operations in
-      List.compare_lengths left_ops right_ops = 0
-      &&
-      let combined = List.combine_drop left_ops right_ops in
-      List.for_all pair_eq combined
+  (* Because we use hashes to implement equality, we must make sure
+     that for any pair of generated blocks [(b1, b2)], [b1.hash <> b2.hash]
+     implies [b1 <> b2] where [<>] is polymorphic inequality. Said
+     differently, hashes should not be faked. *)
+  let equal : t -> t -> bool = fun t1 t2 -> Block_hash.equal t1.hash t2.hash
 
-  let compare (t1 : t) (t2 : t) =
-    let hash_diff = Block_hash.compare t1.hash t2.hash in
-    if hash_diff <> 0 then hash_diff
-    else
-      let compare_pair (oph1, op1) (oph2, op2) =
-        let hash_diff = Operation_hash.compare oph1 oph2 in
-        if hash_diff <> 0 then hash_diff else Operation.compare op1 op2
-      in
-      List.compare (List.compare compare_pair) t1.operations t2.operations
+  let compare (t1 : t) (t2 : t) = Block_hash.compare t1.hash t2.hash
+
+  (** [hash_of_blocks ops_and_hashes] is used to compute the hash of a block whose
+      [operations] field contains [ops_and_hashes].
+
+      We want the hash to be sound, because it is used to implement equality
+      (see {!equal} above), like in the production implementation. Given
+      that {!t} above contains a single field besides the [hash], we hash
+      the content of this field to obtain the hash of a block. That
+      is why we hash the hashes of operations. *)
+  let hash_of_block ops_and_hashes =
+    let hash =
+      Operation_list_hash.compute (List.map fst @@ List.concat ops_and_hashes)
+    in
+    (* We forge a fake [block_header] hash by first hashing the operations
+       and change the [b58] signature into a signature that looks like
+       the one of a block header by prefixing it with the letter [B]. *)
+    let hash_string = Operation_list_hash.to_b58check hash in
+    let suffix = String.sub hash_string 2 31 in
+    match Block_hash.of_string @@ "B" ^ suffix with
+    | Error err ->
+        Format.printf "Unexpected error: %a" Error_monad.pp_print_trace err ;
+        assert false
+    | Ok hash -> hash
 
   let tools : t Classification.block_tools =
     let hash block = block.hash in
@@ -303,7 +300,6 @@ module Generators = struct
 
   let block_gen : Block.t QCheck.Gen.t =
     let open QCheck.Gen in
-    let* hash = Prevalidator_generators.block_hash_gen in
     let* ops =
       let ops_list_gen =
         (* Having super long list of operations isn't necessary.
@@ -313,9 +309,10 @@ module Generators = struct
       (* In production these lists are exactly of size 4, being more general *)
       ops_list_gen |> list_size (int_range 0 8)
     in
-    let ops_and_hashes =
+    let ops_and_hashes : (Operation_hash.t * Operation.t) list list =
       List.map (List.map (fun op -> (Operation.hash op, op))) ops
     in
+    let hash = Block.hash_of_block ops_and_hashes in
     return Block.{hash; operations = ops_and_hashes}
 
   (** A generator for passing the last argument of
