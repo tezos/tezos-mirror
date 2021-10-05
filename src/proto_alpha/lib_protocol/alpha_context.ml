@@ -112,6 +112,8 @@ type signature = Signature.t
 module Constants = struct
   include Constants_repr
   include Constants_storage
+
+  let all ctxt = all (parametric ctxt)
 end
 
 module Voting_period = struct

@@ -558,20 +558,9 @@ end
 
 module Constants : sig
   (** Fixed constants *)
-  type fixed = {
-    proof_of_work_nonce_size : int;
-    nonce_length : int;
-    max_anon_ops_per_block : int;
-    max_operation_data_length : int;
-    max_proposals_per_delegate : int;
-    max_micheline_node_count : int;
-    max_micheline_bytes_limit : int;
-    max_allowed_global_constant_depth : int;
-  }
+  type fixed
 
   val fixed_encoding : fixed Data_encoding.t
-
-  val fixed : fixed
 
   val proof_of_work_nonce_size : int
 
@@ -670,7 +659,9 @@ module Constants : sig
   val liquidity_baking_escape_ema_threshold : context -> int32
 
   (** All constants: fixed and parametric *)
-  type t = {fixed : fixed; parametric : parametric}
+  type t = private {fixed : fixed; parametric : parametric}
+
+  val all : context -> t
 
   val encoding : t Data_encoding.t
 end

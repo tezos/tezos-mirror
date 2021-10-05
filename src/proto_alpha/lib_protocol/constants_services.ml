@@ -52,8 +52,7 @@ let register () =
   register0_noctxt ~chunked:true S.errors (fun () () ->
       return Data_encoding.Json.(schema error_encoding)) ;
   register0 ~chunked:false S.all (fun ctxt () () ->
-      let open Constants in
-      return {fixed; parametric = parametric ctxt})
+      return @@ Constants.all ctxt)
 
 let errors ctxt block = RPC_context.make_call0 S.errors ctxt block () ()
 

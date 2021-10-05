@@ -56,48 +56,44 @@ let cache_layout = [100_000_000]
    types as big as 2001. *)
 let michelson_maximum_type_size = 2001
 
-type fixed = {
-  proof_of_work_nonce_size : int;
-  nonce_length : int;
-  max_anon_ops_per_block : int;
-  max_operation_data_length : int;
-  max_proposals_per_delegate : int;
-  max_micheline_node_count : int;
-  max_micheline_bytes_limit : int;
-  max_allowed_global_constant_depth : int;
-}
+type fixed = unit
 
 let fixed_encoding =
   let open Data_encoding in
+  let uint62 =
+    let max_int_int64 = Int64.of_int max_int in
+    conv_with_guard
+      (fun int -> Int64.of_int int)
+      (fun int64 ->
+        if Compare.Int64.(int64 < 0L) then Error "Negative integer"
+        else if Compare.Int64.(int64 > max_int_int64) then
+          Error "Integer does not fit in 62 bits"
+        else ok @@ Int64.to_int int64)
+      int64
+  in
   conv
-    (fun c ->
-      ( c.proof_of_work_nonce_size,
-        c.nonce_length,
-        c.max_anon_ops_per_block,
-        c.max_operation_data_length,
-        c.max_proposals_per_delegate,
-        c.max_micheline_node_count,
-        c.max_micheline_bytes_limit,
-        c.max_allowed_global_constant_depth ))
-    (fun ( proof_of_work_nonce_size,
-           nonce_length,
-           max_anon_ops_per_block,
-           max_operation_data_length,
-           max_proposals_per_delegate,
-           max_micheline_node_count,
-           max_micheline_bytes_limit,
-           max_allowed_global_constant_depth ) ->
-      {
-        proof_of_work_nonce_size;
-        nonce_length;
-        max_anon_ops_per_block;
-        max_operation_data_length;
-        max_proposals_per_delegate;
-        max_micheline_node_count;
-        max_micheline_bytes_limit;
-        max_allowed_global_constant_depth;
-      })
-    (obj8
+    (fun () ->
+      ( proof_of_work_nonce_size,
+        nonce_length,
+        max_anon_ops_per_block,
+        max_operation_data_length,
+        max_proposals_per_delegate,
+        max_micheline_node_count,
+        max_micheline_bytes_limit,
+        max_allowed_global_constant_depth,
+        cache_layout,
+        michelson_maximum_type_size ))
+    (fun ( _proof_of_work_nonce_size,
+           _nonce_length,
+           _max_anon_ops_per_block,
+           _max_operation_data_length,
+           _max_proposals_per_delegate,
+           _max_micheline_node_count,
+           _max_micheline_bytes_limit,
+           _max_allowed_global_constant_depth,
+           _cache_layout,
+           _michelson_maximum_type_size ) -> ())
+    (obj10
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
        (req "max_anon_ops_per_block" uint8)
@@ -105,19 +101,11 @@ let fixed_encoding =
        (req "max_proposals_per_delegate" uint8)
        (req "max_micheline_node_count" int31)
        (req "max_micheline_bytes_limit" int31)
-       (req "max_allowed_global_constants_depth" int31))
+       (req "max_allowed_global_constants_depth" int31)
+       (req "cache_layout" (list uint62))
+       (req "michelson_maximum_type_size" uint16))
 
-let fixed =
-  {
-    proof_of_work_nonce_size;
-    nonce_length;
-    max_anon_ops_per_block;
-    max_operation_data_length;
-    max_proposals_per_delegate;
-    max_micheline_node_count;
-    max_micheline_bytes_limit;
-    max_allowed_global_constant_depth;
-  }
+let fixed = ()
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
@@ -286,6 +274,8 @@ let parametric_encoding =
              (req "liquidity_baking_escape_ema_threshold" int32))))
 
 type t = {fixed : fixed; parametric : parametric}
+
+let all parametric = {fixed; parametric}
 
 let encoding =
   let open Data_encoding in
