@@ -33,9 +33,10 @@
  *)
 
 let protocols = [Protocol.Alpha; Protocol.Granada]
-let migrate_from = Protocol.Granada
-let migrate_to = Protocol.Alpha
 
+let migrate_from = Protocol.Granada
+
+let migrate_to = Protocol.Alpha
 
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
@@ -53,25 +54,18 @@ let () =
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols ;
-  Mockup.register_constant_migration
-    ~migrate_from
-    ~migrate_to ;
+  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
-  Protocol_migration.register
-    ~migrate_from
-    ~migrate_to ;
-  User_activated_upgrade.register
-    ~migrate_from
-    ~migrate_to ;
-  Protocol_table_update.register
-    ~migrate_from
-    ~migrate_to ;
-  (* TODO: the "Baking" test does not have a documentation.
+  Protocol_migration.register ~migrate_from ~migrate_to ;
+  User_activated_upgrade.register ~migrate_from ~migrate_to ;
+  Protocol_table_update.register ~migrate_from ~migrate_to ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
+     the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run
      on previous protocols, if not for a problem that was introduced in
