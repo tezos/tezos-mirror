@@ -216,18 +216,14 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
           ~user_activated_protocol_overrides
           block)
       >>=? fun metadata ->
-      aux
-        (Int32.succ level)
-        ((Store.Unsafe.repr_of_block block, metadata) :: acc)
+      let reconstructed_block =
+        {(Store.Unsafe.repr_of_block block) with metadata = Some metadata}
+      in
+      aux (Int32.succ level) (reconstructed_block :: acc)
   in
   aux start_level []
 
-let store_chunk cemented_store raw_chunk =
-  Lwt_list.map_s
-    (fun (block, metadata) ->
-      Lwt.return ({block with metadata = Some metadata} : Block_repr.t))
-    raw_chunk
-  >>= fun chunk ->
+let store_chunk cemented_store chunk =
   Cemented_block_store.cement_blocks_metadata cemented_store chunk
 
 let gather_available_metadata chain_store ~start_level ~end_level =
@@ -236,9 +232,10 @@ let gather_available_metadata chain_store ~start_level ~end_level =
     else
       Store.Block.read_block_by_level chain_store level >>=? fun block ->
       Store.Block.get_block_metadata chain_store block >>=? fun metadata ->
-      aux
-        (Int32.succ level)
-        ((Store.Unsafe.repr_of_block block, metadata) :: acc)
+      let block_with_metadata =
+        {(Store.Unsafe.repr_of_block block) with metadata = Some metadata}
+      in
+      aux (Int32.succ level) (block_with_metadata :: acc)
   in
   aux start_level []
 
