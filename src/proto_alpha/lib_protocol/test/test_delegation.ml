@@ -304,6 +304,25 @@ let delegate_to_bootstrap_by_origination ~fee () =
     Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun () ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance total_fee
 
+let undelegated_originated_bootstrap_contract () =
+  Context.init
+    1
+    ~bootstrap_contracts:
+      [
+        Parameters.{delegate = None; amount = Tez.zero; script = Op.dummy_script};
+      ]
+  >>=? fun (b, _) ->
+  Block.bake b >>=? fun b ->
+  (* We know the address of the first originated bootstrap contract because we know the bootstrap origination nonce. This address corresponds to the first TF vesting contract on mainnnet. *)
+  Lwt.return @@ Environment.wrap_tzresult
+  @@ Alpha_context.Contract.of_b58check "KT1WPEis2WhAc2FciM2tZVn8qe6pCBe9HkDp"
+  >>=? fun originated_bootstrap0 ->
+  Context.Contract.delegate_opt (B b) originated_bootstrap0
+  >>=? fun delegate0 ->
+  match delegate0 with
+  | None -> return_unit
+  | Some _ -> failwith "Bootstrap contract should be undelegated (%s)" __LOC__
+
 let tests_bootstrap_contracts =
   [
     Tztest.tztest
@@ -369,6 +388,10 @@ let tests_bootstrap_contracts =
       "bootstrap manager can be delegate (init origination, large fee)"
       `Quick
       (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000));
+    Tztest.tztest
+      "originated bootstrap contract can be undelegated"
+      `Quick
+      undelegated_originated_bootstrap_contract;
   ]
 
 (*****************************************************************************)
