@@ -174,17 +174,14 @@
    cleaned up in the [Distributed_db.Operation] requester.
 
    There is an [advertisement_delay] to postpone the next mempool
-   advertisement if we advertised our mempool not long ago. To ensure
-   that [consensus operations] (aka [endorsements]) are always
-   propagated, Consensus operations for which their branch is unknown
-   are handled by the plugin. Early consensus operations will be
-   propagated once the block is validated. Every time an operation is
-   [classified], it is recorded into the [operation_stream] (note that
-   this does not include [outdated] operations). Such stream can be
-   used by an external service to get the classification of an
-   operation (via the [monitor_operations] RPC). This also means an
-   operation can be notified several times if it is classified again
-   after a [flush]. *)
+   advertisement if we advertised our mempool not long ago. Early
+   consensus operations will be propagated once the block is validated.
+   Every time an operation is [classified], it is recorded into the
+   [operation_stream] (note that this does not include [outdated]
+   operations). Such stream can be used by an external service to get
+   the classification of an operation (via the [monitor_operations] RPC).
+   This also means an operation can be notified several times if it is
+   classified again after a [flush]. *)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1491
    This module should not use [Prevalidation.parse_unsafe] *)
@@ -198,8 +195,7 @@ type limits = {
   operations_batch_size : int;
 }
 
-(* Minimal delay between two mempool advertisements except for
-   endorsements for which the branch is unknown. *)
+(* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
 module Name = struct
