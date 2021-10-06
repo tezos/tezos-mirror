@@ -33,6 +33,10 @@ let[@coq_struct "i"] rec ( --> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int.(i > j) then [] else i :: (succ i --> j)
 
+let[@coq_struct "j"] rec ( <-- ) i j =
+  (* [j; j-1; ...; i] *)
+  if Compare.Int.(i > j) then [] else j :: (i <-- pred j)
+
 let[@coq_struct "i"] rec ( ---> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int32.(i > j) then [] else i :: (Int32.succ i ---> j)

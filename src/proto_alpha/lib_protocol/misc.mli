@@ -34,6 +34,8 @@ type 'a lazy_list = 'a lazy_list_t tzresult Lwt.t
 (** Include bounds *)
 val ( --> ) : int -> int -> int list
 
+val ( <-- ) : int -> int -> int list
+
 val ( ---> ) : Int32.t -> Int32.t -> Int32.t list
 
 val pp_print_paragraph : Format.formatter -> string -> unit
