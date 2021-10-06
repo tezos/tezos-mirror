@@ -33,19 +33,19 @@
  (copy %{lib:tezos-protocol-010-PtGRANAD-parameters:test-parameters.json}
        protocol_parameters.json))
 
-; runs only the `Quick tests
+; runs both `Quick and `Slow tests
 (rule
  (alias runtest_proto_010_PtGRANAD)
  (deps (glob_files contracts/*))
  (package tezos-protocol-010-PtGRANAD-tests)
- (action (run %{exe:main.exe} -q)))
+ (action (run %{exe:main.exe})))
 
-; runs both `Quick and `Slow tests
+; runs only the `Quick tests
 (rule
- (alias runtest_slow)
+ (alias runtest_quick)
  (deps (glob_files contracts/*))
  (package tezos-protocol-010-PtGRANAD-tests)
- (action (run %{exe:main.exe})))
+ (action (run %{exe:main.exe} -q)))
 
 (rule
  (alias runtest_saturation_fuzzing)

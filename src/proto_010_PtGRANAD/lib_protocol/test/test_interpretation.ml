@@ -116,10 +116,24 @@ let read_file filename =
   close_in ch ;
   s
 
-(* Confront the Michelson interpreter to deep recursions. *)
+(** The purpose of these two tests is to check that the Michelson interpreter is
+    stack-safe (because it is tail-recursive).
+
+    This requires to confront it to deep recursions, typically deeper than what
+    the gas limit allows. Unfortunately we cannot run the interpreter in
+    unaccounted gas mode because for efficiency it uses a custom gas management
+    that represents the gas counter as a mere integer. Instead we set the gas
+    counter to the highest possible value ([Saturation_repr.saturated]); with
+    the current gas costs and limits this enables more than a million recursive
+    calls which is larger than the stack size. *)
+
 let test_stack_overflow () =
   let open Script_typed_ir in
   test_context () >>=? fun ctxt ->
+  (* Set the gas counter to the maximum value *)
+  let ctxt =
+    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+  in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
@@ -140,9 +154,16 @@ let test_stack_overflow () =
       in
       Alcotest.failf "Unexpected error (%s) at %s" trace_string __LOC__
 
+(** The stack-safety of the interpreter relies a lot on the stack-safety of
+    Lwt.bind. This second test is similar to the previous one but uses an
+    instruction (IBig_map_mem) for which the interpreter calls Lwt.bind. *)
+
 let test_stack_overflow_in_lwt () =
   let open Script_typed_ir in
   test_context () >>=? fun ctxt ->
+  let ctxt =
+    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+  in
   let stack = Bot_t in
   let item ty s = Item_t (ty, s, None) in
   let unit_t = Unit_t None in
