@@ -882,7 +882,7 @@ module RPC = struct
              (dft "entrypoint" string "default"))
           (obj3
              (opt "unparsing_mode" unparsing_mode_encoding)
-             (opt "now" string)
+             (opt "now" Script_timestamp.encoding)
              (opt "level" n))
 
       let run_code_output_encoding =
@@ -944,7 +944,7 @@ module RPC = struct
           (opt "payer" Contract.encoding)
           (opt "gas" Gas.Arith.z_integral_encoding)
           (req "unparsing_mode" unparsing_mode_encoding)
-          (opt "now" string)
+          (opt "now" Script_timestamp.encoding)
           (opt "level" z)
 
       let run_code =
@@ -1607,12 +1607,7 @@ module RPC = struct
           in
           let ctxt = Gas.set_limit ctxt gas in
           let now =
-            match now with
-            | None -> Script_timestamp.now ctxt
-            | Some s -> (
-                match Script_timestamp.of_string s with
-                | Some v -> v
-                | None -> Script_timestamp.now ctxt)
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
             (match level with
@@ -1679,12 +1674,7 @@ module RPC = struct
           in
           let ctxt = Gas.set_limit ctxt gas in
           let now =
-            match now with
-            | None -> Script_timestamp.now ctxt
-            | Some s -> (
-                match Script_timestamp.of_string s with
-                | Some v -> v
-                | None -> Script_timestamp.now ctxt)
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
             (match level with
@@ -1763,12 +1753,7 @@ module RPC = struct
           in
           let ctxt = Gas.set_limit ctxt gas in
           let now =
-            match now with
-            | None -> Script_timestamp.now ctxt
-            | Some s -> (
-                match Script_timestamp.of_string s with
-                | Some v -> v
-                | None -> Script_timestamp.now ctxt)
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
             (match level with

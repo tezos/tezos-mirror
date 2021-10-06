@@ -36,7 +36,7 @@ module Program :
 type simulation_params = {
   input : Michelson_v1_parser.parsed;
   unparsing_mode : Script_ir_translator.unparsing_mode;
-  now : string option;
+  now : Script_timestamp.t option;
   level : Z.t option;
   source : Contract.t option;
   payer : Contract.t option;

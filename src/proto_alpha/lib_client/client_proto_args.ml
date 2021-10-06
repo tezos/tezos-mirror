@@ -277,14 +277,23 @@ let level_arg =
     ~doc:"Set the level to be returned by the LEVEL instruction"
     level_kind
 
+let timestamp_parameter =
+  parameter (fun _ s ->
+      match Script_timestamp.of_string s with
+      | Some time -> return time
+      | None ->
+          failwith
+            "invalid timestamp, must be either a RFC 3339 string or a number \
+             of seconds since epoch.")
+
 let now_arg =
   arg
     ~long:"now"
     ~placeholder:"timestamp"
     ~doc:
-      "Set the timestamp to be returned by the NOW instruction. The format \
-       must follow RFC 3339 (YYYY-MM-DDTHH:MM:SSZ)"
-    string_parameter
+      "Set the timestamp to be returned by the NOW instruction. Allowed format \
+       are RFC 3339 (YYYY-MM-DDTHH:MM:SSZ) or number of seconds since epoch."
+    timestamp_parameter
 
 let gas_limit_kind =
   parameter (fun _ s ->

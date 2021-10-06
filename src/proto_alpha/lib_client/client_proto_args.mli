@@ -138,4 +138,4 @@ val display_names_flag : (bool, full) Clic.arg
 
 val level_arg : (Z.t option, full) Clic.arg
 
-val now_arg : (string option, full) Clic.arg
+val now_arg : (Script_timestamp.t option, full) Clic.arg
