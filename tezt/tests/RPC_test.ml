@@ -320,7 +320,7 @@ let test_contracts ?endpoint client =
   in
   unit
 
-let test_delegates ~contracts ?endpoint client =
+let test_delegates_on_registered ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
   let bootstrap = List.hd contracts in
@@ -526,22 +526,17 @@ let get_contracts ?endpoint client =
 
   Lwt.return contracts
 
-(* Test the delegates RPC for protocol Alpha. *)
-let test_delegates_alpha ?endpoint client =
+(* Test the delegates RPC for the specified protocol. *)
+let test_delegates protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
+  let* () = test_delegates_on_registered ~contracts ?endpoint client in
 
-  let* () = test_delegates ~contracts ?endpoint client in
-  let* () = test_delegates_on_unregistered_alpha ~contracts ?endpoint client in
-
-  unit
-
-(* Test the delegates RPC for protocol Granada. *)
-let test_delegates_granada ?endpoint client =
-  let* contracts = get_contracts ?endpoint client in
-
-  let* () = test_delegates ~contracts ?endpoint client in
   let* () =
-    test_delegates_on_unregistered_granada ~contracts ?endpoint client
+    match protocol with
+    | Protocol.Alpha ->
+        test_delegates_on_unregistered_alpha ~contracts ?endpoint client
+    | Protocol.Granada ->
+        test_delegates_on_unregistered_granada ~contracts ?endpoint client
   in
 
   unit
@@ -819,12 +814,6 @@ let test_no_service_at_valid_prefix address () =
   unit
 
 let register_protocol protocol test_mode_tag =
-  let test_delegates =
-    match protocol with
-    | Protocol.Alpha -> test_delegates_alpha
-    | Protocol.Granada -> test_delegates_granada
-  in
-
   check_rpc
     ~group_name:(Protocol.tag protocol)
     ~protocols:[protocol]
@@ -832,7 +821,7 @@ let register_protocol protocol test_mode_tag =
     ~rpcs:
       ([
          ("contracts", test_contracts, None, None);
-         ("delegates", test_delegates, None, None);
+         ("delegates", test_delegates protocol, None, None);
          ( "votes",
            test_votes,
            Some
