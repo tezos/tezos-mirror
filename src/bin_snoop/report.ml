@@ -279,10 +279,8 @@ let overrides_table (overrides : float Free_variable.Map.t) =
 module Int_set = Set.Make (Int)
 
 let average_qty (qtyies : float list) =
-  StaTz.Stats.(
-    mean
-      (module StaTz.Structures.Float)
-      (empirical_of_raw_data (Array.of_list qtyies)))
+  let open Stats in
+  Emp.of_raw_data (Array.of_list qtyies) |> Emp.Float.empirical_mean
 
 let pp_vec =
   Sparse_vec.String.pp

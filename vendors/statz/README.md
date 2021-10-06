@@ -1,3 +1,0 @@
-# staTz
-
-Tezos stats package

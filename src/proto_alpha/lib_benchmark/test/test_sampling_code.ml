@@ -60,7 +60,7 @@ end)
 (* ------------------------------------------------------------------------- *)
 (* MCMC instantiation *)
 
-module Gen =
+module Code =
   Michelson_mcmc_samplers.Make_code_sampler
     (Michelson_base_samplers)
     (Crypto_samplers)
@@ -74,7 +74,7 @@ module Gen =
 
 let start = Unix.gettimeofday ()
 
-let generator = Gen.generator ~burn_in:(500 * 7)
+let generator = Code.generator ~burn_in:(500 * 7) state
 
 let stop = Unix.gettimeofday ()
 
@@ -83,7 +83,7 @@ let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
 let _ =
   for i = 1 to 1000 do
     let Michelson_mcmc_samplers.{term = michelson; bef; aft} =
-      StaTz.Stats.sample_gen generator
+      generator state
     in
     Test_helpers.typecheck_by_tezos bef michelson ;
     if verbose then (

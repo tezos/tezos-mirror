@@ -1,14 +1,7 @@
-open StaTz
 open Tezos_benchmark
 open Michelson_samplers
 open Protocol
 open Internal_for_tests
-
-module Comparable_type_name = struct
-  type t = type_name
-
-  let compare (x : t) (y : t) = Stdlib.compare x y
-end
 
 let pp_type_name fmtr (t : type_name) =
   Format.pp_print_string fmtr
@@ -43,6 +36,21 @@ let pp_type_name fmtr (t : type_name) =
   | `TSignature -> "signature"
   | `TUnit -> "unit"
   | `TInt -> "int"
+
+module Type_name = struct
+  type t = type_name
+
+  let compare (x : t) (y : t) = Stdlib.compare x y
+
+  let equal (x : t) (y : t) = x = y
+
+  let pp = pp_type_name
+
+  let hash = Stdlib.Hashtbl.hash
+end
+
+module Type_name_multiset =
+  Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map (Type_name)
 
 let rec tnames_of_type :
     type a. a Script_typed_ir.ty -> type_name list -> type_name list =
@@ -141,12 +149,13 @@ module Sampler =
     end)
     (Crypto_samplers)
 
-let pp_stats = Stats.pp_fin_fun pp_type_name
+open Stats
 
-let tnames_dist : type_name list -> type_name Stats.fin_prb =
+let tnames_dist : type_name list -> type_name Fin.Float.prb =
  fun tnames ->
-  Stats.empirical_of_raw_data (Array.of_list tnames)
-  |> Stats.fin_prb_of_empirical (module Comparable_type_name)
+  Emp.of_raw_data (Array.of_list tnames)
+  |> Fin.Float.counts_of_empirical (module Type_name_multiset)
+  |> Fin.Float.normalize
 
 let rec sample nsamples acc =
   let open Sampling_helpers.M in
@@ -169,5 +178,5 @@ let dist nsamples =
 let () =
   Format.printf
     "stats:@.%a@."
-    pp_stats
-    (Obj.magic (dist 500 (Random.State.make [|0x1337; 0x533D|])))
+    Fin.Float.pp_fin_mes
+    (Fin.as_measure (dist 500 (Random.State.make [|0x1337; 0x533D|])))

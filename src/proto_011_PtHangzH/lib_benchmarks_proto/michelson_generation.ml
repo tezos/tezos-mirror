@@ -76,7 +76,7 @@ let make_data_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen =
+  let module Data =
     Michelson_mcmc_samplers.Make_data_sampler
       (Michelson_base_samplers)
       (Crypto_samplers)
@@ -89,14 +89,14 @@ let make_data_sampler rng_state config =
       end)
   in
   let burn_in = target_size * config.burn_in_multiplier in
-  let generator = Gen.generator ~burn_in in
-  StaTz.Stats.sample_gen generator
+  let generator = Data.generator ~burn_in rng_state in
+  generator rng_state
 
 let make_code_sampler rng_state config =
   let target_size =
     Base_samplers.sample_in_interval rng_state ~range:config.target_size
   in
-  let module Gen =
+  let module Code =
     Michelson_mcmc_samplers.Make_code_sampler
       (Michelson_base_samplers)
       (Crypto_samplers)
@@ -109,5 +109,5 @@ let make_code_sampler rng_state config =
       end)
   in
   let burn_in = target_size * config.burn_in_multiplier in
-  let generator = Gen.generator ~burn_in in
-  StaTz.Stats.sample_gen generator
+  let generator = Code.generator ~burn_in rng_state in
+  generator rng_state

@@ -19,7 +19,8 @@
             str
             ocamlgraph
             pyml
-            pyml-plot)
+            pyml-plot
+            prbnmcn-stats)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_benchmark

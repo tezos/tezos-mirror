@@ -13,7 +13,7 @@ depends: [
   "tezos-micheline"
   "tezos-clic"
   "data-encoding" { >= "0.4" & < "0.5" }
-  "staTz"
+  "prbnmcn-stats" { = "0.0.2" }
   "benchmark-utils"
   "pyml-plot"
   "conf-autoconf"

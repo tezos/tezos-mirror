@@ -26,7 +26,7 @@
 (** MCMC-based Michelson data and code samplers. *)
 
 open Protocol
-open StaTz
+open Stats
 
 type michelson_code = {
   term : Script_repr.expr;
@@ -121,16 +121,67 @@ module type Sampler_parameters_sig = sig
   val verbosity : [`Silent | `Progress | `Trace]
 end
 
+(* The Markov chain in state [state] *)
+type mc_state = {
+  state : State_space.t;
+  jump : State_space.t Fin.Float.prb Lazy.t;
+}
+
+module State_multiset =
+  Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map
+    (State_space)
+
 (** Generic MCMC michelson sampler (can be used for code and data) *)
 module Make_generic (P : Sampler_parameters_sig) = struct
-  module MH_params : MH.MH_parameters with type t = State_space.t = struct
-    let uniform (l : State_space.t list) : State_space.t Stats.fin_prb =
-      match l with
-      | [] -> assert false
-      | _ ->
-          let arr = Array.of_list l in
-          let emp = Stats.empirical_of_raw_data arr in
-          Stats.fin_prb_of_empirical (module State_space) emp
+  let uniform (l : State_space.t list) : State_space.t Fin.Float.prb =
+    match l with
+    | [] ->
+        (* This can only happen is the MCMC was driven to a coffin state,
+           which means that it's not reversible (this is a bug) *)
+        assert false
+    | _ ->
+        let arr = Array.of_list l in
+        let emp = Emp.of_raw_data arr in
+        Fin.Float.counts_of_empirical (module State_multiset) emp
+        |> Fin.Float.normalize
+
+  let unrecoverable_failure err current result =
+    Format.eprintf "Error when typechecking term:@." ;
+    Format.eprintf "%a@." Inference.pp_inference_error err ;
+    Format.eprintf "Original state: @[%a@]@." State_space.pp current ;
+    Format.eprintf "Erroneous term: %a@." Mikhailsky.pp result ;
+    Stdlib.failwith "in sampler.ml: unrecoverable failure."
+
+  let of_state : State_space.t -> mc_state =
+   fun state ->
+    {
+      state;
+      jump =
+        Lazy.from_fun (fun () ->
+            let current = state in
+            let rewriting_options = Rules.rewriting current P.rules in
+            let term = current.term in
+            let rewritings =
+              List.fold_left
+                (fun rewritings (path, replacement) ->
+                  let result = Kernel.Rewriter.subst ~term ~path ~replacement in
+                  let typing =
+                    Lazy.from_fun (fun () ->
+                        try P.infer result
+                        with Inference.Ill_typed_script err ->
+                          unrecoverable_failure err current result)
+                  in
+                  {State_space.typing; term = result} :: rewritings)
+                []
+                rewriting_options
+            in
+            uniform rewritings);
+    }
+
+  module MH_params : Mh.MH_parameters with type t = mc_state = struct
+    type t = mc_state
+
+    let pp fmtr {state; jump = _} = State_space.pp fmtr state
 
     let trace state =
       match P.verbosity with
@@ -141,40 +192,23 @@ module Make_generic (P : Sampler_parameters_sig) = struct
           Format.eprintf "energy:@." ;
           Format.eprintf "%f:@." (P.energy state)
 
-    let unrecoverable_failure err current result =
-      Format.eprintf "Error when typechecking term:@." ;
-      Format.eprintf "%a@." Inference.pp_inference_error err ;
-      Format.eprintf "Original state: @[%a@]@." State_space.pp current ;
-      Format.eprintf "Erroneous term: %a@." Mikhailsky.pp result ;
-      Stdlib.failwith "in sampler.ml: unrecoverable failure."
+    let proposal_log_density s1 s2 =
+      let jump = Lazy.force s1.jump in
+      Log_space.of_float (Fin.Float.eval_prb jump s2.state)
 
-    let rec proposal ({State_space.term; _} as current) =
-      trace current ;
-      let rewriting_options = Rules.rewriting current P.rules in
-      let rewritings =
-        List.fold_left
-          (fun rewritings (path, replacement) ->
-            let result = Kernel.Rewriter.subst ~term ~path ~replacement in
-            let typing =
-              Lazy.from_fun (fun () ->
-                  try P.infer result
-                  with Inference.Ill_typed_script err ->
-                    unrecoverable_failure err current result)
-            in
-            {State_space.typing; term = result} :: rewritings)
-          []
-          rewriting_options
-      in
-      match rewritings with [] -> proposal current | _ -> uniform rewritings
+    let proposal mcmc_state rng_state =
+      trace mcmc_state.state ;
+      let dist = Lazy.force mcmc_state.jump in
+      let next = Fin.Float.sample (Fin.as_measure dist) rng_state in
+      of_state next
 
-    let log_weight state = -.P.energy state
-
-    include State_space
+    let log_weight state = Log_space.unsafe_cast (-.P.energy state.state)
   end
 
-  module Sampler = MH.Make (MH_params)
+  module Sampler = Mh.Make (MH_params)
 
-  let generator ~burn_in = P.(Sampler.mcmc ~verbosity ~initial ~burn_in)
+  let generator ~burn_in =
+    P.(Sampler.mcmc ~verbosity ~initial:(of_state initial) ~burn_in)
 end
 
 module Make_code_sampler
@@ -217,7 +251,7 @@ struct
     let verbosity = X.verbosity
   end)
 
-  let to_michelson ({typing; term} : State_space.t) =
+  let to_michelson {state = ({typing; term} : State_space.t); jump = _} =
     let typing = Lazy.force typing in
     let (node, (bef, aft), state) =
       Autocomp.complete_code typing term X.rng_state
@@ -232,8 +266,8 @@ struct
     }
 
   let generator ~burn_in =
-    let open StaTz in
-    Stats.map_gen to_michelson (MCMC.generator ~burn_in)
+    Gen.map (MCMC.generator ~burn_in) @@ fun after_burn_in ->
+    Gen.map after_burn_in to_michelson
 end
 
 module Make_data_sampler
@@ -285,7 +319,7 @@ struct
     let verbosity = X.verbosity
   end)
 
-  let to_michelson ({typing; term} : State_space.t) =
+  let to_michelson {state = ({typing; term} : State_space.t); jump = _} =
     let typing = Lazy.force typing in
     let (node, _) = Autocomp.complete_data typing term X.rng_state in
     let (typ, state) =
@@ -302,6 +336,6 @@ struct
     {term = node; typ = base_type_to_michelson_type typ}
 
   let generator ~burn_in =
-    let open StaTz in
-    Stats.map_gen to_michelson (MCMC.generator ~burn_in)
+    Gen.map (MCMC.generator ~burn_in) @@ fun after_burn_in ->
+    Gen.map after_burn_in to_michelson
 end

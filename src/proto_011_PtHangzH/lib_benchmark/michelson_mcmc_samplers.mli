@@ -88,7 +88,11 @@ module Make_code_sampler : functor
      val verbosity : [`Progress | `Silent | `Trace]
    end)
   -> sig
-  val generator : burn_in:int -> michelson_code StaTz.Stats.gen
+  (** [generator ~burn_in rng_state] performs a burn-in phase consisting of sampling [burn_in] times,
+      throwing the results away and returns a michelson term sampler. The goal of burn-in is
+      to drive the underlying Markov chain to its stationary distribution, ie to sample
+      terms around the specified [X.target_size]. *)
+  val generator : burn_in:int -> Random.State.t -> michelson_code Stats.Gen.t
 end
 
 (** See documentation for [Make_code_sampler] *)
@@ -103,5 +107,9 @@ module Make_data_sampler : functor
      val verbosity : [`Progress | `Silent | `Trace]
    end)
   -> sig
-  val generator : burn_in:int -> michelson_data StaTz.Stats.gen
+  (** [generator ~burn_in rng_state] performs a burn-in phase consisting of sampling [burn_in] times,
+      throwing the results away and returns a michelson term sampler. The goal of burn-in is
+      to drive the underlying Markov chain to its stationary distribution, ie to sample
+      terms around the specified [X.target_size]. *)
+  val generator : burn_in:int -> Random.State.t -> michelson_data Stats.Gen.t
 end

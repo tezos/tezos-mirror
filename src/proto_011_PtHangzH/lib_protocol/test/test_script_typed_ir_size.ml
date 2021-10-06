@@ -112,14 +112,15 @@ module Samplers = struct
         let verbosity = `Silent
       end)
 
-  let generator = Gen.generator ~burn_in:(500 * 7)
+  let generator =
+    Lazy.from_fun (fun () -> Gen.generator ~burn_in:(500 * 7) random_state)
 
   type exdescr =
     | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
 
   let sample_ir_code () =
     let Michelson_mcmc_samplers.{term = sample; bef = stack; aft = _} =
-      StaTz.Stats.sample_gen generator
+      (Lazy.force generator) random_state
     in
     let accounts = Account.generate_accounts 1 in
     Block.alpha_context accounts >>=? fun ctxt ->

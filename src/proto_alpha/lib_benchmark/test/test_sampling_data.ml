@@ -57,7 +57,7 @@ module Michelson_base_samplers = Michelson_samplers_base.Make (struct
     }
 end)
 
-module Gen =
+module Data =
   Michelson_mcmc_samplers.Make_data_sampler
     (Michelson_base_samplers)
     (Crypto_samplers)
@@ -71,7 +71,7 @@ module Gen =
 
 let start = Unix.gettimeofday ()
 
-let generator = Gen.generator ~burn_in:(200 * 7)
+let generator = Data.generator ~burn_in:(200 * 7) state
 
 let stop = Unix.gettimeofday ()
 
@@ -79,9 +79,7 @@ let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
 
 let _ =
   for _i = 0 to 1000 do
-    let Michelson_mcmc_samplers.{term = michelson; typ} =
-      StaTz.Stats.sample_gen generator
-    in
+    let Michelson_mcmc_samplers.{term = michelson; typ} = generator state in
     if verbose then (
       Format.eprintf "result:@." ;
       Format.eprintf "type: %a@." Test_helpers.print_script_expr typ ;
