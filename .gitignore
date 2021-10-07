@@ -16,6 +16,8 @@ __pycache__
 /docs/api/tezos-baker-alpha.html
 /docs/api/tezos-endorser-alpha.html
 
+/test_results
+
 /tezos-node
 /tezos-validator
 /tezos-protocol-compiler

@@ -99,11 +99,6 @@ val previous_protocol : t -> t option
       defined where the test is registered. *)
 val all : t list
 
-(** The protocol that is currently active on Mainnet.
-
-    Use this when registering tests that are not expected to break in future protocols. *)
-val current_mainnet : t
-
 (** Register a test that uses the protocol.
 
     This is the same as [Test.register] except that:
