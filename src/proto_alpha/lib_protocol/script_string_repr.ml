@@ -70,7 +70,7 @@ let compare = Compare.String.compare
 
 let length = String.length
 
-let concat_pair x y = String.concat "" [x; y]
+let concat_pair x y = x ^ y
 
 let concat l = String.concat "" l
 
