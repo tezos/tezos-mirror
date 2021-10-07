@@ -48,16 +48,28 @@ let empty : type a b. a comparable_ty -> (a, b) map =
       type value = b
 
       include OPS
+
+      type nonrec t = value t
     end
 
-    let boxed = (OPS.empty, 0)
+    let boxed = OPS.empty
+
+    let size = 0
   end)
 
 let get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
+ fun k (module Box) -> Box.OPS.find k Box.boxed
 
 let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
  fun k v (module Box) ->
+  let (boxed, size) =
+    let contains =
+      match Box.OPS.find k Box.boxed with None -> false | _ -> true
+    in
+    match v with
+    | Some v -> (Box.OPS.add k v Box.boxed, Box.size + if contains then 0 else 1)
+    | None -> (Box.OPS.remove k Box.boxed, Box.size - if contains then 1 else 0)
+  in
   (module struct
     type key = a
 
@@ -67,24 +79,19 @@ let update : type a b. a -> b option -> (a, b) map -> (a, b) map =
 
     module OPS = Box.OPS
 
-    let boxed =
-      let (map, size) = Box.boxed in
-      let contains =
-        match Box.OPS.find k map with None -> false | _ -> true
-      in
-      match v with
-      | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
-      | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
+    let boxed = boxed
+
+    let size = size
   end)
 
 let mem : type key value. key -> (key, value) map -> bool =
  fun k (module Box) ->
-  match Box.OPS.find k (fst Box.boxed) with None -> false | _ -> true
+  match Box.OPS.find k Box.boxed with None -> false | _ -> true
 
 let fold :
     type key value acc.
     (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
+ fun f (module Box) -> Box.OPS.fold f Box.boxed
 
 let size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))
+ fun (module Box) -> Script_int.(abs (of_int Box.size))

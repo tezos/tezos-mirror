@@ -257,21 +257,21 @@ type 'elt set = (module Boxed_set with type elt = 'elt)
 
 *)
 module type Boxed_map_OPS = sig
+  type t
+
   type key
 
   type value
 
-  type 'a t
+  val empty : t
 
-  val empty : value t
+  val add : key -> value -> t -> t
 
-  val add : key -> value -> value t -> value t
+  val remove : key -> t -> t
 
-  val remove : key -> value t -> value t
+  val find : key -> t -> value option
 
-  val find : key -> value t -> value option
-
-  val fold : (key -> value -> 'a -> 'a) -> value t -> 'a -> 'a
+  val fold : (key -> value -> 'a -> 'a) -> t -> 'a -> 'a
 end
 
 module type Boxed_map = sig
@@ -283,7 +283,9 @@ module type Boxed_map = sig
 
   module OPS : Boxed_map_OPS with type key = key and type value = value
 
-  val boxed : value OPS.t * int
+  val boxed : OPS.t
+
+  val size : int
 end
 
 type ('key, 'value) map =
@@ -2113,9 +2115,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | List_t (ty', _) -> on_list ty' accu x.elements
     | Map_t (kty, ty', _) ->
         let module M = (val x) in
-        let bindings =
-          M.OPS.fold (fun k v bs -> (k, v) :: bs) (fst M.boxed) []
-        in
+        let bindings = M.OPS.fold (fun k v bs -> (k, v) :: bs) M.boxed [] in
         on_bindings accu kty ty' continue bindings
     | Set_t (ty', _) ->
         let module M = (val x) in
