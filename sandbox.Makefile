@@ -11,8 +11,7 @@ ALPHA_PROTO=alpha
 ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 .PHONY: all
-all: accusations_simple_double_baking \
-	accusations_simple_double_endorsing \
+all: accusations_simple_double_endorsing \
 	voting_demo_noops \
 	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
@@ -58,15 +57,6 @@ tezos-sandbox:
 # (with make -j).
 #
 # Those rules are directly translated from src/bin_sandbox/dune rules.
-
-.PHONY: accusations_simple_double_baking
-accusations_simple_double_baking: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox accusations simple-double-baking \
-	  --root-path ${TMP}/flextesa-acc-sdb/ \
-	  --with-timestamp \
-	  --base-port 10_000 \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node
 
 .PHONY: accusations_simple_double_endorsing
 accusations_simple_double_endorsing: tezos-sandbox tezos-client tezos-node

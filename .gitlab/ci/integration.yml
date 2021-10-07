@@ -59,16 +59,6 @@ integration:sandboxes:voting:
     expire_in: 1 day
     when: on_failure
 
-integration:sandboxes:acc-baking:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_baking
-  artifacts:
-    paths:
-      - flextesa-acc-sdb
-    expire_in: 1 day
-    when: on_failure
-
 integration:sandboxes:acc-endorsement:
   extends: .integration_template
   script:
