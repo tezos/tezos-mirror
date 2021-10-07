@@ -332,13 +332,10 @@ module All_sinks = struct
     active := next_active ;
     (* We don't want one failure to prevent the attempt at closing as many
        sinks as possible, so we record all errors and combine them: *)
-    List.fold_left_s
-      (fun current -> function
-        | Active {sink; definition; _} ->
-            close_one sink definition >>= fun close_result ->
-            Lwt.return (Error_monad.join_e [current; close_result]))
-      (Ok ())
+    List.map_s
+      (fun (Active {sink; definition; _}) -> close_one sink definition)
       to_close_list
+    >|= fun close_results -> Tzresult_syntax.join close_results
 
   let handle def section v =
     let handle (type a) sink definition =
