@@ -264,11 +264,9 @@ let default_fee_arg =
 
 let level_kind =
   parameter (fun _ s ->
-      try
-        let v = Z.of_string s in
-        assert (Compare.Z.(v >= Z.zero)) ;
-        return v
-      with _ -> failwith "invalid level (must be a positive number)")
+      match Option.bind (Script_int.of_string s) Script_int.is_nat with
+      | Some n -> return n
+      | None -> failwith "invalid level (must be a positive number)")
 
 let level_arg =
   arg

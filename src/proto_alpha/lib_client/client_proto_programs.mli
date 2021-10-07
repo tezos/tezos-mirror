@@ -37,7 +37,7 @@ type simulation_params = {
   input : Michelson_v1_parser.parsed;
   unparsing_mode : Script_ir_translator.unparsing_mode;
   now : Script_timestamp.t option;
-  level : Z.t option;
+  level : Script_int.n Script_int.num option;
   source : Contract.t option;
   payer : Contract.t option;
   gas : Gas.Arith.integral option;

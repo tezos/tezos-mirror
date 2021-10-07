@@ -883,7 +883,7 @@ module RPC = struct
           (obj3
              (opt "unparsing_mode" unparsing_mode_encoding)
              (opt "now" Script_timestamp.encoding)
-             (opt "level" n))
+             (opt "level" Script_int.n_encoding))
 
       let run_code_output_encoding =
         conv
@@ -945,7 +945,7 @@ module RPC = struct
           (opt "gas" Gas.Arith.z_integral_encoding)
           (req "unparsing_mode" unparsing_mode_encoding)
           (opt "now" Script_timestamp.encoding)
-          (opt "level" z)
+          (opt "level" Script_int.n_encoding)
 
       let run_code =
         RPC_service.post_service
@@ -1610,12 +1610,11 @@ module RPC = struct
             match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
-            (match level with
+            match level with
             | None ->
                 (Level.current ctxt).level |> Raw_level.to_int32
-                |> Script_int.of_int32
-            | Some z -> z |> Script_int.of_zint)
-            |> Script_int.abs
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
           in
           let step_constants =
             let open Script_interpreter in
@@ -1677,12 +1676,11 @@ module RPC = struct
             match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
-            (match level with
+            match level with
             | None ->
                 (Level.current ctxt).level |> Raw_level.to_int32
-                |> Script_int.of_int32
-            | Some z -> z |> Script_int.of_zint)
-            |> Script_int.abs
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
           in
           let step_constants =
             let open Script_interpreter in
@@ -1756,12 +1754,11 @@ module RPC = struct
             match now with None -> Script_timestamp.now ctxt | Some t -> t
           in
           let level =
-            (match level with
+            match level with
             | None ->
                 (Level.current ctxt).level |> Raw_level.to_int32
-                |> Script_int.of_int32
-            | Some z -> z |> Script_int.of_zint)
-            |> Script_int.abs
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
           in
           let step_constants =
             let open Script_interpreter in
