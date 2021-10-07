@@ -16,8 +16,7 @@ all: accusations_simple_double_endorsing \
 	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
 	daemons_upgrade_next \
-	daemons_upgrade_alpha \
-	node_synchronization
+	daemons_upgrade_alpha
 
 # The following rules define how to build Tezos binaries if they are
 # missing.
@@ -182,76 +181,3 @@ daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node 
 	  --second-baker ./tezos-baker-${ALPHA_PROTO} \
 	  --second-endorser ./tezos-endorser-${ALPHA_PROTO} \
 	  --second-accuser ./tezos-accuser-${ALPHA_PROTO}
-
-# The following tests (node synchronization) cannot be run in parallel
-# because they don't support --base-port.
-# They are also not run in the CI, probably because an equivalent Tezt test exists.
-
-.PHONY: node_synchronization_archive_full
-node_synchronization_archive_full: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-archive-full/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode archive \
-	  --secondary-history-mode full \
-	  --should-synch true
-
-.PHONY: node_synchronization_archive_rolling
-node_synchronization_archive_rolling: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-archive-rolling/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode archive \
-	  --secondary-history-mode rolling \
-	  --should-synch true
-
-.PHONY: node_synchronization_full_archive
-node_synchronization_full_archive: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-full-archive/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode full \
-	  --secondary-history-mode archive \
-	  --should-synch true
-
-.PHONY: node_synchronization_full_rolling
-node_synchronization_full_rolling: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-full-rolling/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode full \
-	  --secondary-history-mode rolling \
-	  --should-synch true
-
-.PHONY: node_synchronization_rolling_archive
-node_synchronization_rolling_archive: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-rolling-archive/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode rolling \
-	  --secondary-history-mode archive \
-	  --should-synch false
-
-.PHONY: node_synchronization_rolling_full
-node_synchronization_rolling_full: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-rolling-full/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode rolling \
-	  --secondary-history-mode full \
-	  --should-synch false
-
-# The full "node synchronization" collection.
-.PHONY: node_synchronization
-node_synchronization: node_synchronization_archive_full \
-	node_synchronization_archive_rolling \
-	node_synchronization_full_archive \
-	node_synchronization_full_rolling \
-	node_synchronization_rolling_archive \
-	node_synchronization_rolling_full
