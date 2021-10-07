@@ -1202,10 +1202,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let set_filter path =
         RPC_service.post_service
           ~description:
-            {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
+            {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
           ~query:RPC_query.empty
           ~input:json
-          ~output:unit
+          ~output:json
           RPC_path.(path / "filter")
 
       let request_operations path =

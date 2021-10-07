@@ -664,17 +664,6 @@ module Make
       Filter.Mempool.config_encoding
       pv.filter_config
 
-  let set_filter pv obj =
-    try
-      let config =
-        Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
-      in
-      pv.filter_config <- config ;
-      return_unit
-    with _ ->
-      Event.(emit invalid_mempool_filter_configuration) () >>= fun () ->
-      return_unit
-
   let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
@@ -692,7 +681,15 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.set_filter RPC_path.open_root)
-           (fun pv () obj -> set_filter pv obj) ;
+           (fun pv () obj ->
+             (try
+                let config =
+                  Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
+                in
+                pv.filter_config <- config ;
+                Lwt.return_unit
+              with _ -> Event.(emit invalid_mempool_filter_configuration) ())
+             >>= fun () -> return (get_filter_config_json pv)) ;
        (* Ban an operation (from its given hash): remove it from the
           mempool if present. Add it to the set pv.banned_operations
           to prevent it from being fetched/processed/injected in the
