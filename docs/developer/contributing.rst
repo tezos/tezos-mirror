@@ -254,6 +254,10 @@ Therefore, when creating your MR, observe the following rules:
     Even better put them in a separate MR which can be merged easily.
   - Split your commits so that each step is convincing on its own, like
     the proof of a big theorem which is split into several lemmas.
+  - Avoid merge requests that are too large. They are harder to rebase and
+    request a longer continuous time for reviewing, making them overall slower
+    to merge. See :ref:`favoring small merge requests <favoring_small_mrs>`
+    below for more details.
 
 - *Anticipate questions*: explain anything which may look surprising, as comments in the code itself if it has value to future readers, or in the MR description.
 
@@ -306,6 +310,43 @@ any subitems represent the longer description of that commit)::
 
 **Beware**: For MRs touching
 ``src/proto_alpha/lib_protocol``, see :ref:`protocol MRs <protocol_mr>`.
+
+.. _favoring_small_mrs:
+
+Favoring Small Merge Requests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Small merge requests are encouraged for multiple reasons:
+
+- They are faster to review, which encourage reviewers to pick them.
+- They are easier to rebase, hereby saving developers time.
+- They are reviewed more thoroughly.
+- If the merge request is not accepted, less work is lost; in particular
+  less review time has been spent.
+
+However, small merge requests also come with drawbacks:
+
+- They make it more difficult for reviewers to get the global picture of the intended change.
+- They may introduce intermediate states, during which a feature
+  is not yet finished; or dead code is temporarily introduced.
+- They have to be reverted if the entire feature is ultimately cancelled.
+
+For ``tezos/tezos`` to evolve fast, however, we are convinced that the advantages
+of small merge requests outweigh the drawbacks. If possible, drawbacks
+must be mitigated as follows:
+
+- Have the entire piece of work described or done somewhere. For example in
+  an issue, or a branch containing the entire change, or a
+  large (unsplit) work as a draft merge request.
+- Include a link to the entire piece of work in the description of each
+  small merge requests created by splitting the large piece of work.
+  This will help reviewers get the big picture.
+- Explain why the intermediate state is harmless, if applicable.
+- To mitigate loss of work if the whole piece is not accepted,
+  we advice to split the work so that improvements that are desirable on their own
+  are the first ones to be merged in the sequence of small merge requests.
+  A desirable standalone improvement is for example a refactoring that
+  improves the quality of the code, or adds new tests, or fixes typos.
 
 Merge Request "Assignees" Field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
