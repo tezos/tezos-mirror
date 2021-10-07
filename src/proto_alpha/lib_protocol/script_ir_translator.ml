@@ -676,9 +676,9 @@ let pack_node unparsed ctxt =
       expr_encoding
       (Micheline.strip_locations unparsed)
   in
-  Gas.consume ctxt (Script.serialized_cost bytes) >>? fun ctxt ->
+  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt ->
   let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
-  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt -> (bytes, ctxt)
+  (bytes, ctxt)
 
 let pack_comparable_data ctxt typ data ~mode =
   unparse_comparable_data ctxt mode typ data >>=? fun (unparsed, ctxt) ->
