@@ -8,12 +8,11 @@
  (libraries
   tezos-crypto
   tezos-stdlib
-  alcotest-glue
   zarith
   tezos-hacl-glue-unix
   data-encoding
-  alcotest-glue-unix
   alcotest-lwt
+  lwt.unix
   qcheck-alcotest
   tezos-test-helpers)
  (flags

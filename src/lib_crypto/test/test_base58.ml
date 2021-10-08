@@ -31,8 +31,6 @@
     Subject:      Encoding in Base58
 *)
 
-module Alcotest = Alcotest_glue
-
 let test_roundtrip_safe input =
   Roundtrips.test_rt_opt
     "safe base58"
