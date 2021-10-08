@@ -32,8 +32,6 @@
 
 (** Deterministic nonce generation using HMAC-SHA256 *)
 
-module Alcotest = Alcotest_glue
-
 let test_hash_matches (module X : S.SIGNATURE) () =
   let (_, _, sk) = X.generate_key () in
   let data = Bytes.of_string "ce input sa pun eu aici oare?" in
