@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +27,7 @@
 
 open Tezos_base.TzPervasives
 
-type protocol = Florence | Granada | Alpha
+type protocol = Florence | Granada | Hangzhou | Alpha
 
 (*
    dune exec scripts/yes-wallet/yes-wallet.exe
@@ -112,7 +113,7 @@ let alias_pkh_pk_list =
   ]
 
 let get_delegates (proto : protocol) context
-    (header : Block_header.shell_header) =
+    (header : Block_header.shell_header) active_bakers_only =
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
   let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
@@ -132,7 +133,25 @@ let get_delegates (proto : protocol) context
           Alpha_context.Roll.delegate_pubkey ctxt pkh
           >|= Environment.wrap_tzresult
           >>=? fun pk ->
-          acc >>?= fun acc -> return ((pkh, pk) :: acc))
+          acc >>?= fun acc ->
+          Alpha_context.Delegate.staking_balance ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun staking_balance ->
+          (* Filter deactivated bakers if required *)
+          if active_bakers_only then
+            Alpha_context.Delegate.deactivated ctxt pkh
+            >|= Environment.wrap_tzresult
+            >>=? function
+            | true -> return acc
+            | false -> return ((pkh, pk, staking_balance) :: acc)
+          else return ((pkh, pk, staking_balance) :: acc))
+      >>=? fun delegates ->
+      return
+      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
   | Granada ->
       let open Tezos_protocol_010_PtGRANAD.Protocol in
       Alpha_context.prepare
@@ -147,7 +166,58 @@ let get_delegates (proto : protocol) context
           Alpha_context.Roll.delegate_pubkey ctxt pkh
           >|= Environment.wrap_tzresult
           >>=? fun pk ->
-          acc >>?= fun acc -> return ((pkh, pk) :: acc))
+          acc >>?= fun acc ->
+          Alpha_context.Delegate.staking_balance ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun staking_balance ->
+          (* Filter deactivated bakers if required *)
+          if active_bakers_only then
+            Alpha_context.Delegate.deactivated ctxt pkh
+            >|= Environment.wrap_tzresult
+            >>=? function
+            | true -> return acc
+            | false -> return ((pkh, pk, staking_balance) :: acc)
+          else return ((pkh, pk, staking_balance) :: acc))
+      >>=? fun delegates ->
+      return
+      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
+  | Hangzhou ->
+      let open Tezos_protocol_011_PtHangz2.Protocol in
+      Alpha_context.prepare
+        context
+        ~level
+        ~predecessor_timestamp
+        ~timestamp
+        ~fitness
+      >|= Environment.wrap_tzresult
+      >>=? fun (ctxt, _, _) ->
+      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+          Alpha_context.Roll.delegate_pubkey ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun pk ->
+          acc >>?= fun acc ->
+          Alpha_context.Delegate.staking_balance ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun staking_balance ->
+          (* Filter deactivated bakers if required *)
+          if active_bakers_only then
+            Alpha_context.Delegate.deactivated ctxt pkh
+            >|= Environment.wrap_tzresult
+            >>=? function
+            | true -> return acc
+            | false -> return ((pkh, pk, staking_balance) :: acc)
+          else return ((pkh, pk, staking_balance) :: acc))
+      >>=? fun delegates ->
+      return
+      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
   | Alpha ->
       let open Tezos_protocol_alpha.Protocol in
       Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
@@ -156,7 +226,25 @@ let get_delegates (proto : protocol) context
       Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
           Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
           >>=? fun pk ->
-          acc >>?= fun acc -> return ((pkh, pk) :: acc))
+          acc >>?= fun acc ->
+          Alpha_context.Delegate.staking_balance ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun staking_balance ->
+          (* Filter deactivated bakers if required *)
+          if active_bakers_only then
+            Alpha_context.Delegate.deactivated ctxt pkh
+            >|= Environment.wrap_tzresult
+            >>=? function
+            | true -> return acc
+            | false -> return ((pkh, pk, staking_balance) :: acc)
+          else return ((pkh, pk, staking_balance) :: acc))
+      >>=? fun delegates ->
+      return
+      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
 
 let protocol_of_hash protocol_hash =
   if Protocol_hash.equal protocol_hash Tezos_protocol_009_PsFLoren.Protocol.hash
@@ -164,16 +252,23 @@ let protocol_of_hash protocol_hash =
   else if
     Protocol_hash.equal protocol_hash Tezos_protocol_010_PtGRANAD.Protocol.hash
   then Some Granada
+  else if
+    Protocol_hash.equal protocol_hash Tezos_protocol_011_PtHangz2.Protocol.hash
+  then Some Hangzhou
   else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash
   then Some Alpha
   else None
 
-(** [load_mainnet_bakers_public_keys base_dir] checkouts the head context at the given
-    [base_dir] and computes a list of triples [(alias, pkh, pk)] corresponding to all
-    delegates in that context. The [alias] is either procedurally generated for
-    non-foundation bakers, or of the form ["foundationN"] for foundation bakers
-    (see [alias_pkh_pk_list]). *)
-let load_mainnet_bakers_public_keys base_dir =
+(** [load_mainnet_bakers_public_keys base_dir active_backers_only] checkouts
+    the head context at the given [base_dir] and computes a list of triples
+    [(alias, pkh, pk)] corresponding to all delegates in that context. The
+    [alias] is either procedurally generated for non-foundation bakers, or of
+    the form ["foundationN"] for foundation bakers (see [alias_pkh_pk_list]).
+
+    if [active_bakers_only] then the deactivated delegates are filtered out of
+    the list.
+*)
+let load_mainnet_bakers_public_keys base_dir active_bakers_only =
   let open Tezos_store in
   let mainnet_genesis =
     {
@@ -207,7 +302,7 @@ let load_mainnet_bakers_public_keys base_dir =
   let header = header.shell in
   (match protocol_of_hash protocol_hash with
   | None -> Error_monad.failwith "unknown protocol hash"
-  | Some protocol -> get_delegates protocol context header)
+  | Some protocol -> get_delegates protocol context header active_bakers_only)
   >>=? fun delegates ->
   Tezos_store.Store.close_store store >>= fun () ->
   return
@@ -227,8 +322,10 @@ let load_mainnet_bakers_public_keys base_dir =
          (alias, pkh, pk))
        delegates
 
-let load_mainnet_bakers_public_keys base_dir =
-  match Lwt_main.run (load_mainnet_bakers_public_keys base_dir) with
+let load_mainnet_bakers_public_keys base_dir active_bakers_only =
+  match
+    Lwt_main.run (load_mainnet_bakers_public_keys base_dir active_bakers_only)
+  with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->
       Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
