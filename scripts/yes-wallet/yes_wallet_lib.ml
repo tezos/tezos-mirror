@@ -26,10 +26,7 @@
 
 open Tezos_base.TzPervasives
 
-type protocol =
-  | Florence
-  | Granada
-  | Alpha
+type protocol = Florence | Granada | Alpha
 
 (*
    dune exec scripts/yes-wallet/yes-wallet.exe
@@ -46,10 +43,12 @@ let pkh_json (alias, pkh, _pk) =
 let pk_json (alias, _pkh, pk) =
   Ezjsonm.(
     dict
-      [ ("name", string alias);
+      [
+        ("name", string alias);
         ( "value",
           dict [("locator", string @@ "unencrypted:" ^ pk); ("key", string pk)]
-        ) ])
+        );
+      ])
 
 (* P-256 pk : 33+1 bytes
    ed25519 pk sk : 32+1 bytes
@@ -67,8 +66,9 @@ let sk_of_pk (pk_s : string) : string =
 let sk_json (alias, _pkh, pk) =
   Ezjsonm.(
     dict
-      [ ("name", string alias);
-        ("value", string @@ "unencrypted:" ^ sk_of_pk pk) ])
+      [
+        ("name", string alias); ("value", string @@ "unencrypted:" ^ sk_of_pk pk);
+      ])
 
 let map_bind_to_json f list = Ezjsonm.list f list
 
@@ -84,7 +84,8 @@ let json_to_file json file =
   close_out chan
 
 let alias_pkh_pk_list =
-  [ ( "foundation1",
+  [
+    ( "foundation1",
       "tz3RDC3Jdn4j15J7bBHZd29EUee9gVB1CxD9",
       "p2pk67wVncLFS1DQDm2gVR45sYCzQSXTtqn3bviNYXVCq6WRoqtxHXL" );
     ( "foundation2",
@@ -107,71 +108,65 @@ let alias_pkh_pk_list =
       "p2pk67Cwb5Ke6oSmqeUbJxURXMe3coVnH9tqPiB2xD84CYhHbBKs4oM" );
     ( "foundation8",
       "tz3VEZ4k6a4Wx42iyev6i2aVAptTRLEAivNN",
-      "p2pk67uapBxwkM1JNasGJ6J3rozzYELgrtcqxKZwZLjvsr4XcAr4FqC" ) ]
+      "p2pk67uapBxwkM1JNasGJ6J3rozzYELgrtcqxKZwZLjvsr4XcAr4FqC" );
+  ]
 
-let get_delegates (proto : protocol) context (header : Block_header.shell_header) =
+let get_delegates (proto : protocol) context
+    (header : Block_header.shell_header) =
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
   let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
   let fitness = header.fitness in
   match proto with
   | Florence ->
-    let open Tezos_protocol_009_PsFLoren.Protocol in
-    Alpha_context.prepare
-      context
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-      ~fitness
-    >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, _) ->
-    Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-        Alpha_context.Roll.delegate_pubkey ctxt pkh
-        >|= Environment.wrap_tzresult >>=? fun pk ->
-        acc >>?= fun acc ->
-        return ((pkh, pk) :: acc)
-      )
+      let open Tezos_protocol_009_PsFLoren.Protocol in
+      Alpha_context.prepare
+        context
+        ~level
+        ~predecessor_timestamp
+        ~timestamp
+        ~fitness
+      >|= Environment.wrap_tzresult
+      >>=? fun (ctxt, _) ->
+      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+          Alpha_context.Roll.delegate_pubkey ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun pk ->
+          acc >>?= fun acc -> return ((pkh, pk) :: acc))
   | Granada ->
-    let open Tezos_protocol_010_PtGRANAD.Protocol in
-    Alpha_context.prepare
-      context
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-      ~fitness
-    >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, _, _) ->
-    Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-        Alpha_context.Roll.delegate_pubkey ctxt pkh
-        >|= Environment.wrap_tzresult >>=? fun pk ->
-        acc >>?= fun acc ->
-        return ((pkh, pk) :: acc)
-      )
+      let open Tezos_protocol_010_PtGRANAD.Protocol in
+      Alpha_context.prepare
+        context
+        ~level
+        ~predecessor_timestamp
+        ~timestamp
+        ~fitness
+      >|= Environment.wrap_tzresult
+      >>=? fun (ctxt, _, _) ->
+      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+          Alpha_context.Roll.delegate_pubkey ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun pk ->
+          acc >>?= fun acc -> return ((pkh, pk) :: acc))
   | Alpha ->
-    let open Tezos_protocol_alpha.Protocol in
-    Alpha_context.prepare
-      context
-      ~level
-      ~predecessor_timestamp
-      ~timestamp
-    >|= Environment.wrap_tzresult
-    >>=? fun (ctxt, _, _) ->
-    Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-        Alpha_context.Delegate.pubkey ctxt pkh
-        >|= Environment.wrap_tzresult >>=? fun pk ->
-        acc >>?= fun acc ->
-        return ((pkh, pk) :: acc)
-      )
+      let open Tezos_protocol_alpha.Protocol in
+      Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+      >|= Environment.wrap_tzresult
+      >>=? fun (ctxt, _, _) ->
+      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+          Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
+          >>=? fun pk ->
+          acc >>?= fun acc -> return ((pkh, pk) :: acc))
 
 let protocol_of_hash protocol_hash =
-  if Protocol_hash.equal protocol_hash Tezos_protocol_009_PsFLoren.Protocol.hash then
-    Some Florence
-  else if Protocol_hash.equal protocol_hash Tezos_protocol_010_PtGRANAD.Protocol.hash then
-    Some Granada
-  else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash then
-    Some Alpha
-  else
-    None
+  if Protocol_hash.equal protocol_hash Tezos_protocol_009_PsFLoren.Protocol.hash
+  then Some Florence
+  else if
+    Protocol_hash.equal protocol_hash Tezos_protocol_010_PtGRANAD.Protocol.hash
+  then Some Granada
+  else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash
+  then Some Alpha
+  else None
 
 (** [load_mainnet_bakers_public_keys base_dir] checkouts the head context at the given
     [base_dir] and computes a list of triples [(alias, pkh, pk)] corresponding to all
@@ -208,33 +203,33 @@ let load_mainnet_bakers_public_keys base_dir =
   Store.Block.context_exn main_chain_store block
   >|= Tezos_shell_context.Shell_context.wrap_disk_context
   >>= fun context ->
-  Store.Block.protocol_hash_exn main_chain_store block
-  >>= fun protocol_hash ->
+  Store.Block.protocol_hash_exn main_chain_store block >>= fun protocol_hash ->
   let header = header.shell in
   (match protocol_of_hash protocol_hash with
-   | None -> Error_monad.failwith "unknown protocol hash"
-   | Some protocol -> get_delegates protocol context header)
+  | None -> Error_monad.failwith "unknown protocol hash"
+  | Some protocol -> get_delegates protocol context header)
   >>=? fun delegates ->
   Tezos_store.Store.close_store store >>= fun () ->
-  return @@
-  List.mapi (fun i (pkh, pk) ->
-      let pkh = Signature.Public_key_hash.to_b58check pkh in
-      let pk = Signature.Public_key.to_b58check pk in
-      let alias =
-        List.find_map (fun (alias, pkh', _) ->
-            if String.equal pkh' pkh then
-              Some alias
-            else
-              None
-          ) alias_pkh_pk_list
-      in
-      let alias = Option.value ~default:(Format.asprintf "baker_%d" i) alias in
-      (alias, pkh, pk)
-    ) delegates
+  return
+  @@ List.mapi
+       (fun i (pkh, pk) ->
+         let pkh = Signature.Public_key_hash.to_b58check pkh in
+         let pk = Signature.Public_key.to_b58check pk in
+         let alias =
+           List.find_map
+             (fun (alias, pkh', _) ->
+               if String.equal pkh' pkh then Some alias else None)
+             alias_pkh_pk_list
+         in
+         let alias =
+           Option.value ~default:(Format.asprintf "baker_%d" i) alias
+         in
+         (alias, pkh, pk))
+       delegates
 
 let load_mainnet_bakers_public_keys base_dir =
-  match Lwt_main.run ( load_mainnet_bakers_public_keys base_dir ) with
+  match Lwt_main.run (load_mainnet_bakers_public_keys base_dir) with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->
-    Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
-    exit 1
+      Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
+      exit 1
