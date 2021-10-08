@@ -1586,7 +1586,7 @@ module Cost_of = struct
     let unpack_failed bytes =
       (* We cannot instrument failed deserialization,
          so we take worst case fees: a set of size 1 bytes values. *)
-      let blen = Bytes.length bytes in
+      let blen = String.length bytes in
       let len = S.safe_int blen in
       let d = Z.numbits (Z.of_int blen) in
       (len *@ alloc_mbytes_cost 1)

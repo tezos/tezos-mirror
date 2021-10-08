@@ -723,11 +723,11 @@ let unpack ctxt ~ty ~bytes =
     Compare.Int.(Bytes.length bytes >= 1)
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
   then
-    let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
-    match Data_encoding.Binary.of_bytes_opt Script.expr_encoding bytes with
+    let str = Bytes.sub_string bytes 1 (Bytes.length bytes - 1) in
+    match Data_encoding.Binary.of_string_opt Script.expr_encoding str with
     | None ->
         Lwt.return
-          ( Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->
+          ( Gas.consume ctxt (Interp_costs.unpack_failed str) >|? fun ctxt ->
             (None, ctxt) )
     | Some expr -> (
         parse_data
@@ -739,7 +739,7 @@ let unpack ctxt ~ty ~bytes =
         >|= function
         | Ok (value, ctxt) -> ok (Some value, ctxt)
         | Error _ignored ->
-            Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->
+            Gas.consume ctxt (Interp_costs.unpack_failed str) >|? fun ctxt ->
             (None, ctxt))
   else return (None, ctxt)
 

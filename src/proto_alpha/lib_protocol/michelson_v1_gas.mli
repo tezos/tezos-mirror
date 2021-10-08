@@ -383,7 +383,7 @@ module Cost_of : sig
 
     val unpack : bytes -> Gas.cost
 
-    val unpack_failed : bytes -> Gas.cost
+    val unpack_failed : string -> Gas.cost
 
     val sapling_empty_state : Gas.cost
 

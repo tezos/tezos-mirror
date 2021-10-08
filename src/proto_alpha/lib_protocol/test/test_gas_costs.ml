@@ -175,7 +175,7 @@ let all_interpreter_costs =
     ("self_address", self_address);
     ("amount", amount);
     ("chain_id", chain_id);
-    ("unpack_failed", unpack_failed (Bytes.of_string "dummy"));
+    ("unpack_failed", unpack_failed "dummy");
   ]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
