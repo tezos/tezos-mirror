@@ -186,7 +186,9 @@ Examples
 In this case the RPC is only available for requests coming from ``localhost``
 (i.e. ``127.0.0.1``). There's no need configure the ACL, as an allow-all policy
 is applied to the local host by default.
+
 ::
+
   $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
 
 In this example the RPC is available to both ``localhost`` and to the local
@@ -285,6 +287,19 @@ Listening ports
 By default, the node listens to incoming connections from peers on port ``9732``, on any of the available network interfaces on the node's host.
 This behavior can be changed by passing an IP address and optionally a port number (``addr:port``), using either the ``--net-addr`` configuration option or the P2P ``listen-addr`` configuration parameter.
 Note that the IP address is only used for selecting an active network interface (technically, it is only passed to the ``bind()`` function of the socket API). Thus, it is currently not possible to advertise to peers a different port than the binding port.
+
+.. note::
+
+    If the node is run on a machine ``M`` not disposing of a public IP address,
+    subject to NAT (network address translation), a port forwarding rule has
+    to be added on the NAT server ``S`` on the listening port ``p`` towards
+    machine ``M``: ``S:p -> M:p``.
+    As a consequence, if a second node has to be run behind the
+    same server on a machine ``M'`` (possibly the same as ``M``),
+    it should be configured to listen on a different port ``p'``, to
+    allow defining another forwarding rule for it: ``S:p' -> M':p'``.
+
+    Many routers can be configured with UPnP to open ports dynamically, so the port forwarding can be initiated by the internal host without any manual modification on the router. This is not possible for corporate networks with UPnP disabled, but is typically handy for home routers, or other networks where this option is available.
 
 Private node
 ~~~~~~~~~~~~
