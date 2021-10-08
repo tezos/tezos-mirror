@@ -131,7 +131,7 @@ module Encoding_micheline : Benchmark.S = struct
   let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
       =
     match
-      Data_encoding.Binary.to_bytes
+      Data_encoding.Binary.to_string
         Protocol.Script_repr.expr_encoding
         (Micheline.strip_locations micheline_node)
     with
@@ -141,9 +141,9 @@ module Encoding_micheline : Benchmark.S = struct
           Data_encoding.Binary.pp_write_error
           err ;
         None
-    | Ok bytes ->
+    | Ok str ->
         let micheline_size = Size.of_micheline micheline_node in
-        Some {size = micheline_size; bytes = Size.bytes bytes}
+        Some {size = micheline_size; bytes = Size.string str}
 
   let encoding_micheline_benchmark (node : Protocol.Script_repr.expr) =
     let node = Micheline.root node in
@@ -155,7 +155,7 @@ module Encoding_micheline : Benchmark.S = struct
     let closure () =
       try
         ignore
-          (Data_encoding.Binary.to_bytes_exn
+          (Data_encoding.Binary.to_string_exn
              Protocol.Script_repr.expr_encoding
              (Micheline.strip_locations node))
       with _ -> Micheline_common.bad_micheline name node In_protocol
@@ -194,11 +194,11 @@ module Decoding_micheline : Benchmark.S = struct
 
   let info = "Decoding of bytes to Micheline"
 
-  let micheline_deserialization_trace (micheline_bytes : Bytes.t) =
+  let micheline_deserialization_trace (micheline_str : string) =
     match
-      Data_encoding.Binary.of_bytes
+      Data_encoding.Binary.of_string
         Protocol.Script_repr.expr_encoding
-        micheline_bytes
+        micheline_str
     with
     | Error err ->
         Format.eprintf
@@ -210,11 +210,11 @@ module Decoding_micheline : Benchmark.S = struct
         let micheline_size =
           Size.of_micheline (Micheline.root micheline_node)
         in
-        Some {size = micheline_size; bytes = Size.bytes micheline_bytes}
+        Some {size = micheline_size; bytes = Size.string micheline_str}
 
   let decoding_micheline_benchmark (node : Protocol.Script_repr.expr) =
     let encoded =
-      Data_encoding.Binary.to_bytes_exn Protocol.Script_repr.expr_encoding node
+      Data_encoding.Binary.to_string_exn Protocol.Script_repr.expr_encoding node
     in
     let node = Micheline.root node in
     let workload =
@@ -225,7 +225,7 @@ module Decoding_micheline : Benchmark.S = struct
     let closure () =
       try
         ignore
-          (Data_encoding.Binary.of_bytes_exn
+          (Data_encoding.Binary.of_string_exn
              Protocol.Script_repr.expr_encoding
              encoded)
       with _ -> bad_micheline name node In_protocol
@@ -393,19 +393,19 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_variable_size_to_bytes
+    @@ make_encode_variable_size_to_string
          ~name:"ENCODING_Chest"
-         ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
+         ~to_string:(Data_encoding.Binary.to_string_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
            let ((chest, _), plaintext_size) = generator rng_state in
            (chest, {bytes = plaintext_size}))
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ make_encode_fixed_size_to_string
          ~name:"ENCODING_Chest_key"
-         ~to_bytes:
-           (Data_encoding.Binary.to_bytes_exn Timelock.chest_key_encoding)
+         ~to_string:
+           (Data_encoding.Binary.to_string_exn Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
            let ((_, chest_key), _w) = generator rng_state in
            chest_key)

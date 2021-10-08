@@ -116,6 +116,8 @@ let unit : t = 1
 let integer (i : 'a Alpha_context.Script_int.num) : t =
   Z.numbits (Alpha_context.Script_int.to_zint i) / 8
 
+let string = String.length
+
 let script_string = Alpha_context.Script_string.length
 
 let bytes (b : Bytes.t) : t = Bytes.length b
