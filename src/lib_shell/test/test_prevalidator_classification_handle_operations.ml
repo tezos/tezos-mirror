@@ -58,6 +58,14 @@ module List_extra = struct
         match take_until_if_found ~pred rest_l with
         | None -> None
         | Some tail -> Some (fst :: tail))
+
+  (** [split_n l n] returns two lists, the first one containing the first
+      [n] elements of [l] and the second one containing the remaining elements.
+      For example:
+      [split_n [] _] is [([], [])]
+      [split_n ["a"] 1] is [(["a"], [])]
+      [split_n ["a"; "b"; "c"] 1] is [(["a"], ["b"; "c"])] *)
+  let split_n l n = (List.take_n n l, List.drop_n n l)
 end
 
 module Tree = struct
@@ -118,8 +126,7 @@ module Tree = struct
 
   (** Predicate to check that all values are different. We want
       this property for trees of blocks. If generation of block
-      were to repeat a block, this property could get broken. I have
-      not witnessed it, but being safe. *)
+      were to repeat a block, this property could get broken. *)
   let well_formed (type a) (compare : a -> a -> int) (t : a tree) =
     let module Ord = struct
       type t = a
@@ -263,34 +270,18 @@ module Block = struct
   (** Pretty prints a list of {!t}, using [sep] as the separator *)
   let pp_list ~(sep : string) (ts : t list) =
     String.concat sep @@ List.map to_string ts
+
+  module Ord = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  module Set = Set.Make (Ord)
 end
 
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  let tree_gen gen =
-    let open QCheck.Gen in
-    (* Factor used to limit the depth of the tree. *)
-    let max_depth_factor = 25 in
-    let open Tree in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            (max_depth_factor, map (fun elem -> Leaf elem) gen);
-            ( current_depth_factor,
-              map
-                (fun (elem, tree) -> Node1 (elem, tree))
-                (pair gen (self (current_depth_factor - 1))) );
-            ( current_depth_factor,
-              map
-                (fun (elem, tree1, tree2) -> Node2 (elem, tree1, tree2))
-                (triple
-                   gen
-                   (self (current_depth_factor - 1))
-                   (self (current_depth_factor - 1))) );
-          ])
-      max_depth_factor
-
   let op_map_gen : Operation.t Operation_hash.Map.t QCheck.Gen.t =
     let open QCheck.Gen in
     let* ops = small_list Prevalidator_generators.operation_gen in
@@ -314,6 +305,48 @@ module Generators = struct
     in
     let hash = Block.hash_of_block ops_and_hashes in
     return Block.{hash; operations = ops_and_hashes}
+
+  (** A tree generator. Written in a slightly unusual style because it
+      generates all values beforehand, to make sure they are all different.
+      This is a property we want for trees of blocks. To do so,
+      this generator first generates a list of elements [e1; e2; e3; e4; e5; e6]
+      and then progressively splits this list to build the subtrees.
+
+      For example it takes [e1] for the root value and then splits
+      the rest into [e2; e3] and [e4; e5; e6]. Then it recurses, sending
+      [e2; e3] as values to create the left subtree and [e4; e5; e6] to
+      create the right subtree. *)
+  let tree_gen =
+    let open QCheck.Gen in
+    let* (elems : Block.t list) =
+      small_list block_gen >|= Block.Set.of_list >|= Block.Set.to_seq
+      >|= List.of_seq
+    in
+    let ret x = return (Some x) in
+    let rec go = function
+      | [] -> return None
+      | [x] -> ret (Tree.Leaf x)
+      | x :: xs -> (
+          let* one_child = QCheck.Gen.bool in
+          if one_child then
+            let* sub = go xs in
+            match sub with
+            | None -> ret (Tree.Leaf x)
+            | Some sub -> ret (Tree.Node1 (x, sub))
+          else
+            let* (left, right) =
+              QCheck.Gen.int_bound (List.length xs - 1)
+              >|= List_extra.split_n xs
+            in
+            let* left = go left and* right = go right in
+            match (left, right) with
+            | (None, None) -> ret (Tree.Leaf x)
+            | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
+            | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
+    in
+    go elems
+
+  let tree_gen = of_option_gen tree_gen
 
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
@@ -348,7 +381,7 @@ module Generators = struct
       * Operation.t Operation_hash.Map.t)
       QCheck.Gen.t =
     let open QCheck.Gen in
-    let* tree = tree_gen block_gen in
+    let* tree = tree_gen in
     assert (Tree.well_formed Block.compare tree) ;
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in
