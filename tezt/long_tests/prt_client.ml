@@ -33,12 +33,13 @@
 let grafana_panels : Grafana.panel list =
   [Row "Test: client"; Grafana.simple_graph "client load time" "duration"]
 
-let register () =
+let register ~executors () =
   Long_test.register
     ~__FILE__
     ~title:"client load time"
     ~tags:["client"; "load"]
     ~timeout:(Minutes 2)
+    ~executors
   @@ fun () ->
   let client = Client.create () in
   Long_test.time_lwt ~repeat:5 "client load time" @@ fun () ->

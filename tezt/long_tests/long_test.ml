@@ -684,8 +684,23 @@ let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
       measurement
       "duration"
 
-let make_tags team tags =
-  match team with None -> "long" :: tags | Some team -> "long" :: team :: tags
+(* Executors are just test tags. But the type is abstract so that users of this module
+   cannot use an inexistent executor by mistake. And inside this module we use
+   a type constructor to avoid mistakes too. *)
+type executor = Executor of string [@@unboxed]
+
+let x86_executor1 = Executor "x86_executor1"
+
+let x86_executor2 = Executor "x86_executor2"
+
+let make_tags team executors tags =
+  let misc_tags =
+    match team with
+    | None -> "long" :: tags
+    | Some team -> "long" :: team :: tags
+  in
+  let executor_tags = List.map (fun (Executor x) -> x) executors in
+  executor_tags @ misc_tags
 
 (* Warning: [argument] must not be applied at registration. *)
 let wrap_body title filename team timeout body argument =
@@ -705,23 +720,24 @@ let wrap_body title filename team timeout body argument =
       current_test := None ;
       unit)
 
-let register ~__FILE__ ~title ~tags ?team ~timeout body =
+let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
-  let tags = make_tags team tags in
+  let tags = make_tags team executors tags in
   Test.register
     ~__FILE__
     ~title
     ~tags
     (wrap_body title __FILE__ team timeout body)
 
-let register_with_protocol ~__FILE__ ~title ~tags ?team ~timeout body =
+let register_with_protocol ~__FILE__ ~title ~tags ?team ~executors ~timeout body
+    =
   if String.contains title '\n' then
     invalid_arg
       "Long_test.register_with_protocol: long test titles cannot contain \
        newline characters" ;
-  let tags = make_tags team tags in
+  let tags = make_tags team executors tags in
   Protocol.register_test
     ~__FILE__
     ~title
