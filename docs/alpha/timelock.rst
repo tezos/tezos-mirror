@@ -40,14 +40,14 @@ Either the author of the ciphertext produces a plaintext
 (and a proof of correct decryption)
 by providing a secret trapdoor (the factorization of an RSA modulus in our case).
 Otherwise a sequential computation can decrypt the ciphertext after a computation
-requiring $T$ sequential operations (modular squaring in our case),
-for some pre-determined constant :math:`T`.
+requiring ``T`` sequential operations (modular squaring in our case),
+for some pre-determined constant ``T``.
 
-In addition, a proof of the correctness of the decryption can also be produced and checked in sub linear time ($\log T$ in our case).
+In addition, a proof of the correctness of the decryption can also be produced and checked in sub linear time (``log T`` in our case).
 
 By experimentally measuring the time the sequential operation takes
 on available hardware using optimized implementation, we can estimate
-a rough conversion (or a bound in our case) between the constant $T$ and
+a rough conversion (or a bound in our case) between the constant ``T`` and
 wall clock time.
 We also note that the `VDF alliance <https://www.vdfalliance.org/>`_ has been working on producing an ASIC for squaring in an RSA group to
 ensure a level playing field in terms of computational speed.
@@ -83,7 +83,7 @@ Cryptographic principles
 Users first generate a RSA modulus and a symmetric encryption key.
 They use authenticated encryption to encrypt a packed Michelson value (an array of bytes computed with ``PACK``)
 and encrypt that encryption key using a timelock puzzle.
-They then combine the RSA modulus, the timelocked symmetric key, the constant T
+They then combine the RSA modulus, the timelocked symmetric key, the constant ``T``
 and the encrypted value as a single value as well (called chest in our library in :src:`src/lib_crypto`).
 
 A proof of decryption can be the symmetric key itself.
