@@ -53,6 +53,10 @@ Node
   It can be used by calling the RPC with the parameter ``?version=1``
   (default version is still ``0``).
 
+- Added an RPC ``/config/logging`` to reconfigure the logging framework
+  without having to restart the node. See also the new documentation pages
+  related to logging.
+
 -  Better handling of mempool cache in the `distributed_db` which
    should make the `distributed_db` RAM consumption strongly
    correlated to the one of the mempool.
@@ -77,6 +81,14 @@ Docker Images
 
 Miscellaneous
 -------------
+
+-  Made the ``file-descriptor-{path,stdout,stderr}://`` event-logging
+   sink more configurable (e.g. filtering per level and per section). The 
+   environment variable ``TEZOS_NODE_HOSTNAME`` used for the output of events
+   was renamed to the more appropriate ``TEZOS_EVENT_HOSTNAME``.
+
+-  Added specific documentation pages about logging for users and
+   developers.
 
 Version 11.0~rc1
 ================
@@ -411,7 +423,7 @@ Node
    ``"hostname"``. This field can be used to identify the node when
    aggregating events from multiple nodes. Its default value is the
    hostname of the device the node is running on, and it can be
-   customized with environment variable ``TEZOS_EVENT_HOSTNAME``.
+   customized with environment variable ``TEZOS_NODE_HOSTNAME``.
 
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.
