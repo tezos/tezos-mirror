@@ -8,5 +8,5 @@
  (flags (:standard -open Tezos_micheline)))
 
 (rule
-  (alias runtest-js)
+  (alias runtest_js)
   (action (run node %{dep:./test_parser.bc.js})))

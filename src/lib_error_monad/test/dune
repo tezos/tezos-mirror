@@ -10,5 +10,5 @@
 
 
 (rule
-  (alias runtest-js)
+  (alias runtest_js)
   (action (run node %{dep:./test_registration.bc.js})))
