@@ -258,6 +258,15 @@ Therefore, when creating your MR, observe the following rules:
 - *Anticipate questions*: explain anything which may look surprising, as comments in the code itself if it has value to future readers, or in the MR description.
 
 - *MR Labels*: Add GitLab labels to the MR, like ``doc`` or ``protocol``.
+
+  * The following special labels can be used to trigger different parts of the CI pipeline. To take effect, the label must
+    be added before any push action is made on the MR.
+
+    + ``ci--opam`` is for triggering the opam packaging tests pipeline.
+    + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
+    + ``ci--docker`` is for publishing the docker image of the MR.
+    + ``ci--arm64`` is for building on the ARM64 architecture.
+
 - *MR Options*: When opening an MR you should probably tick the following
   options:
 

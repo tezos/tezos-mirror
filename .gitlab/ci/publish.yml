@@ -33,6 +33,9 @@ publish:docker_manual:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
       when: on_success
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docker(?:$|[,])/'
+      when: on_success
     - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
       when: manual
       allow_failure: true
