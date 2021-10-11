@@ -957,11 +957,11 @@ type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
 let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
-  Gas_monad.return @@ Inconsistent_types (None, ty1, ty2)
+  Inconsistent_types (None, ty1, ty2)
 
 type error += Inconsistent_types_fast
 
-let fast_merge_type_error _ty1 _ty2 = Gas_monad.return Inconsistent_types_fast
+let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
 
 let merge_type_error ~merge_type_error_flag =
   match merge_type_error_flag with
@@ -1107,8 +1107,8 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          merge_type_error ~merge_type_error_flag ty1 ty2 >?$ fun err ->
-          error err
+          from_tzresult @@ error
+          @@ merge_type_error ~merge_type_error_flag ty1 ty2
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
