@@ -771,7 +771,7 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent_types _ctxt loc ta tb =
+let record_inconsistent_types loc ta tb =
   record_trace_eval (fun () ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
@@ -794,15 +794,11 @@ module type GAS_MONAD = sig
 
   val from_tzresult : 'a tzresult -> 'a t
 
-  val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
-
   val gas_consume : Gas.cost -> unit t
 
   val run : context -> 'a t -> ('a tzresult * context) tzresult
 
   val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
-
-  val get_context : context t
 end
 
 module Gas_monad : GAS_MONAD = struct
@@ -827,13 +823,9 @@ module Gas_monad : GAS_MONAD = struct
 
   let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
 
-  let unsafe_embed f ctxt = f ctxt >>? fun (x, ctxt) -> return x ctxt
-
   let gas_consume cost ctxt = Gas.consume ctxt cost >>? return ()
 
   let run ctxt x = x ctxt
-
-  let get_context ctxt = return ctxt ctxt
 
   let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
 end
@@ -980,7 +972,7 @@ let merge_type_error ~merge_type_error_flag =
   | Default_merge_type_error -> default_merge_type_error
   | Fast_merge_type_error -> fast_merge_type_error
 
-let record_inconsistent_carbonated _ctxt ta tb =
+let record_inconsistent_carbonated ta tb =
   Gas_monad.record_trace_eval (fun () ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
@@ -997,11 +989,10 @@ let merge_types :
     ((a ty, b ty) eq * a ty) Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
-    get_context >>$ fun initial_ctxt ->
     let merge_type_metadata tn1 tn2 =
       from_tzresult
         (merge_type_metadata ~legacy tn1 tn2
-        |> record_inconsistent_types initial_ctxt loc ty1 ty2)
+        |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
       from_tzresult (merge_field_annot ~legacy tn1 tn2)
@@ -1009,8 +1000,7 @@ let merge_types :
     let merge_memo_sizes ms1 ms2 = from_tzresult (merge_memo_sizes ms1 ms2) in
     let rec help :
         type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
-     fun ty1 ty2 ->
-      help0 ty1 ty2 |> record_inconsistent_carbonated initial_ctxt ty1 ty2
+     fun ty1 ty2 -> help0 ty1 ty2 |> record_inconsistent_carbonated ty1 ty2
     and help0 :
         type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
      fun ty1 ty2 ->

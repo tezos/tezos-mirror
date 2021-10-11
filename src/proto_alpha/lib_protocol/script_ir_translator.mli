@@ -144,11 +144,6 @@ module Gas_monad : sig
   (** gas-free embedding of tzresult values. [from_tzresult x] is equivalent to [return () >?$ fun () -> x] *)
   val from_tzresult : 'a tzresult -> 'a t
 
-  (** Open the abstraction barrier to construct an 'a t from a function.
-     This must only be used on functions that can only fail because of gas
-     such as unparse_ty *)
-  val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
-
   (** Gas consumption *)
   val gas_consume : Gas.cost -> unit t
 
@@ -157,9 +152,6 @@ module Gas_monad : sig
 
   (** re-export of [Error_monad.record_trace_eval] *)
   val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
-
-  (** read the state of the state monad *)
-  val get_context : context t
 end
 
 type type_logger =
