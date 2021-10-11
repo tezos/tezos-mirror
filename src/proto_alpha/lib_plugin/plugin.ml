@@ -2242,7 +2242,7 @@ module RPC = struct
           let (Misc.LCons (pk, next)) = l in
           let delegate = Signature.Public_key.hash pk in
           (match pred_timestamp with
-          | None -> ok_none
+          | None -> Result.return_none
           | Some pred_timestamp ->
               Baking.minimal_time
                 (Constants.parametric ctxt)
@@ -2276,7 +2276,7 @@ module RPC = struct
               | ([], _) -> loop l acc (priority + 1) delegates
               | ((_, delegate) :: _, delegates') ->
                   (match pred_timestamp with
-                  | None -> ok_none
+                  | None -> Result.return_none
                   | Some pred_timestamp ->
                       Baking.minimal_time
                         (Constants.parametric ctxt)

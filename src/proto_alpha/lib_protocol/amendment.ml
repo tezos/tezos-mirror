@@ -220,7 +220,9 @@ let () =
     (fun () -> Empty_proposal)
 
 let record_proposals ctxt delegate proposals =
-  (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
+  (match proposals with
+  | [] -> error Empty_proposal
+  | _ :: _ -> Result.return_unit)
   >>?= fun () ->
   Voting_period.get_current_kind ctxt >>=? function
   | Proposal ->

@@ -135,7 +135,7 @@ let merge_type_annot :
     type_annot option tzresult =
  fun ~legacy annot1 annot2 ->
   match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> ok_none
+  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Type_annot a1), Some (Type_annot a2)) ->
       if legacy || String.equal a1 a2 then ok annot1
       else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
@@ -147,7 +147,7 @@ let merge_field_annot :
     field_annot option tzresult =
  fun ~legacy annot1 annot2 ->
   match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> ok_none
+  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Field_annot a1), Some (Field_annot a2)) ->
       if legacy || String.equal a1 a2 then ok annot1
       else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
@@ -160,13 +160,16 @@ let merge_var_annot : var_annot option -> var_annot option -> var_annot option =
       if String.equal a1 a2 then annot1 else None
 
 let error_unexpected_annot loc annot =
-  match annot with [] -> ok_unit | _ :: _ -> error (Unexpected_annotation loc)
+  match annot with
+  | [] -> Result.return_unit
+  | _ :: _ -> error (Unexpected_annotation loc)
 
 (* Check that the predicate p holds on all s.[k] for k >= i *)
 let string_iter p s i =
   let len = String.length s in
   let rec aux i =
-    if Compare.Int.(i >= len) then ok_unit else p s.[i] >>? fun () -> aux (i + 1)
+    if Compare.Int.(i >= len) then Result.return_unit
+    else p s.[i] >>? fun () -> aux (i + 1)
   in
   aux i
 
@@ -176,7 +179,8 @@ let is_allowed_char = function
 
 (* Valid annotation characters as defined by the allowed_annot_char function from lib_micheline/micheline_parser *)
 let check_char loc c =
-  if is_allowed_char c then ok_unit else error (Unexpected_annotation loc)
+  if is_allowed_char c then Result.return_unit
+  else error (Unexpected_annotation loc)
 
 (* This constant is defined in lib_micheline/micheline_parser which is not available in the environment. *)
 let max_annot_length = 255
@@ -195,7 +199,7 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     let len = String.length s in
     (if Compare.Int.(len > max_annot_length) then
      error (Unexpected_annotation loc)
-    else ok_unit)
+    else Result.return_unit)
     >>? fun () ->
     if Compare.Int.(len = 1) then ok @@ wrap None :: acc
     else
@@ -272,7 +276,7 @@ let classify_annot loc l :
   with Exit -> error (Ungrouped_annotations loc)
 
 let get_one_annot loc = function
-  | [] -> ok_none
+  | [] -> Result.return_none
   | [a] -> ok a
   | _ -> error (Unexpected_annotation loc)
 
@@ -324,7 +328,7 @@ let extract_field_annot :
       in
       let (field_annot, annot) = extract_first [] annot in
       (match field_annot with
-      | None -> ok_none
+      | None -> Result.return_none
       | Some field_annot -> parse_field_annot loc [field_annot])
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
@@ -333,9 +337,9 @@ let check_correct_field :
     field_annot option -> field_annot option -> unit tzresult =
  fun f1 f2 ->
   match (f1, f2) with
-  | (None, _) | (_, None) -> ok_unit
+  | (None, _) | (_, None) -> Result.return_unit
   | (Some (Field_annot s1), Some (Field_annot s2)) ->
-      if String.equal s1 s2 then ok_unit
+      if String.equal s1 s2 then Result.return_unit
       else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
 
 let parse_var_annot :

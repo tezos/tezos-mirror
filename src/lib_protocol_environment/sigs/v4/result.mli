@@ -33,6 +33,20 @@ val error : 'e -> ('a, 'e) result
 
 val error_s : 'e -> ('a, 'e) result Lwt.t
 
+val return : 'a -> ('a, 'e) result
+
+val return_unit : (unit, 'e) result
+
+val return_none : ('a option, 'e) result
+
+val return_some : 'a -> ('a option, 'e) result
+
+val return_nil : ('a list, 'e) result
+
+val return_true : (bool, 'e) result
+
+val return_false : (bool, 'e) result
+
 val value : ('a, 'e) result -> default:'a -> 'a
 
 val value_f : ('a, 'e) result -> default:(unit -> 'a) -> 'a

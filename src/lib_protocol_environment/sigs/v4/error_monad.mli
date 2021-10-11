@@ -82,18 +82,6 @@ val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
 val ok : 'a -> ('a, 'trace) result
 
-val ok_unit : (unit, 'trace) result
-
-val ok_none : ('a option, 'trace) result
-
-val ok_some : 'a -> ('a option, 'trace) result
-
-val ok_nil : ('a list, 'trace) result
-
-val ok_true : (bool, 'trace) result
-
-val ok_false : (bool, 'trace) result
-
 val return : 'a -> ('a, 'trace) result Lwt.t
 
 val return_unit : (unit, 'trace) result Lwt.t

@@ -155,7 +155,7 @@ struct
 
   let find t =
     C.find t N.name >|= function
-    | None -> ok_none
+    | None -> Result.return_none
     | Some b ->
         let key () = C.absolute_key t N.name in
         of_bytes ~key b >|? fun v -> Some v
@@ -279,7 +279,7 @@ struct
 
   let find s i =
     C.find s (I.to_path i []) >|= function
-    | None -> ok_none
+    | None -> Result.return_none
     | Some b ->
         let key () = C.absolute_key s (I.to_path i []) in
         of_bytes ~key b >|? fun v -> Some v
@@ -840,7 +840,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let find s i =
       Raw_context.find (pack s i) N.name >|= function
-      | None -> ok_none
+      | None -> Result.return_none
       | Some b ->
           let key () = Raw_context.absolute_key (pack s i) N.name in
           of_bytes ~key b >|? fun v -> Some v

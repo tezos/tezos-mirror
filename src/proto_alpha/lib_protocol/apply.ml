@@ -578,7 +578,7 @@ let apply_manager_operation_content :
       | None ->
           Lwt.return
             ( ( (match entrypoint with
-                | "default" -> ok_unit
+                | "default" -> Result.return_unit
                 | entrypoint ->
                     error (Script_tc_errors.No_such_entrypoint entrypoint))
               >>? fun () ->

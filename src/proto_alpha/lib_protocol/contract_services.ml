@@ -370,7 +370,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
               | Ok (_f, Ex_ty ty) ->
                   unparse_ty ctxt ty >|? fun (ty_node, _) ->
                   Some (Micheline.strip_locations ty_node)
-              | Error _ -> ok_none )) ;
+              | Error _ -> Result.return_none )) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
