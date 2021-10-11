@@ -826,7 +826,8 @@ module Gas_monad : GAS_MONAD = struct
 
   let run ctxt x = x ctxt
 
-  let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
+  let record_trace_eval f m ctxt =
+    m ctxt >>? fun (x, ctxt) -> from_tzresult (x |> record_trace_eval f) ctxt
 end
 
 let merge_type_metadata :

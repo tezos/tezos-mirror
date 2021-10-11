@@ -149,7 +149,8 @@ module Gas_monad : sig
   (** Escaping the gas monad *)
   val run : context -> 'a t -> ('a tzresult * context) tzresult
 
-  (** re-export of [Error_monad.record_trace_eval] *)
+  (** re-export of [Error_monad.record_trace_eval]. This function has no
+      effect in the case of a gas-exhaustion error. *)
   val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
 end
 
