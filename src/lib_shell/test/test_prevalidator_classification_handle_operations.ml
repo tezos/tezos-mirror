@@ -294,12 +294,12 @@ module Generators = struct
           ])
       max_depth_factor
 
-  module OpMapArb = MakeMapArb (Operation_hash.Map.Legacy)
-
   let op_map_gen : Operation.t Operation_hash.Map.t QCheck.Gen.t =
-    OpMapArb.gen
-      Prevalidator_generators.operation_hash_gen
-      Prevalidator_generators.operation_gen
+    let open QCheck.Gen in
+    let* ops = small_list Prevalidator_generators.operation_gen in
+    (* Op_map.of_seq eliminates duplicate keys (if any) *)
+    List.map (fun op -> (Operation.hash op, op)) ops
+    |> List.to_seq |> Op_map.of_seq |> return
 
   let block_gen : Block.t QCheck.Gen.t =
     let open QCheck.Gen in
