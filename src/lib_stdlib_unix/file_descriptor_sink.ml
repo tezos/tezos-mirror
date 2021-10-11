@@ -116,7 +116,7 @@ end) : Internal_event.SINK with type t = t = struct
                 let chopped =
                   if ext = "" then path else Filename.chop_extension path
                 in
-                Fmt.strf "%s-%d%s" chopped (Unix.getpid ()) ext
+                Fmt.str "%s-%d%s" chopped (Unix.getpid ()) ext
               else path
             in
             protect (fun () ->
