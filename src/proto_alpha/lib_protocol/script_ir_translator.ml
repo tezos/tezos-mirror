@@ -926,12 +926,6 @@ let merge_type_error ~merge_type_error_flag =
   | Default_merge_type_error -> default_merge_type_error
   | Fast_merge_type_error -> fast_merge_type_error
 
-let record_inconsistent_carbonated ta tb =
-  Gas_monad.record_trace_eval (fun () ->
-      let ta = serialize_ty_for_error ta in
-      let tb = serialize_ty_for_error tb in
-      Inconsistent_types (None, ta, tb))
-
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
     type a b.
@@ -944,9 +938,13 @@ let merge_types :
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
-      of_result
-        (merge_type_metadata ~legacy tn1 tn2
-        |> record_inconsistent_types loc ty1 ty2)
+      match merge_type_error_flag with
+      | Fast_merge_type_error ->
+          of_result @@ merge_type_metadata ~legacy tn1 tn2
+      | Default_merge_type_error ->
+          of_result
+            (merge_type_metadata ~legacy tn1 tn2
+            |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
       of_result (merge_field_annot ~legacy tn1 tn2)
@@ -955,7 +953,13 @@ let merge_types :
     let rec help :
         type ta tb.
         ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
-     fun ty1 ty2 -> help0 ty1 ty2 |> record_inconsistent_carbonated ty1 ty2
+     fun ty1 ty2 ->
+      match merge_type_error_flag with
+      | Fast_merge_type_error -> help0 ty1 ty2 (* do not record trace element *)
+      | Default_merge_type_error ->
+          help0 ty1 ty2
+          |> Gas_monad.record_trace_eval (fun () ->
+                 default_merge_type_error ty1 ty2)
     and help0 :
         type ta tb.
         ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
