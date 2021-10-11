@@ -68,68 +68,68 @@ trace
       (Some "bar")  	
       {}  	
       { Pair "gaz" "baz" }  	 ]
-  - location: 89 (remaining gas: 1039932.084 units remaining)
+  - location: 89 (remaining gas: 1039932.316 units remaining)
     [ { Elt "foo" "bar" }  	
       { Pair "gaz" "baz" }  	 ]
-  - location: 83 (remaining gas: 1039932.069 units remaining)
+  - location: 83 (remaining gas: 1039932.301 units remaining)
     [ { Elt "foo" "bar" }  	
       { Pair "gaz" "baz" }  	 ]
-  - location: 90 (remaining gas: 1039932.059 units remaining)
+  - location: 90 (remaining gas: 1039932.291 units remaining)
     [ { Pair "gaz" "baz" }  	
       { Elt "foo" "bar" }  	 ]
-  - location: 91 (remaining gas: 1039932.044 units remaining)
+  - location: 91 (remaining gas: 1039932.276 units remaining)
     [ { Elt "foo" "bar" }  	 ]
-  - location: 93 (remaining gas: 1039932.029 units remaining)
+  - location: 93 (remaining gas: 1039932.261 units remaining)
     [ {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 91 (remaining gas: 1039931.999 units remaining)
+  - location: 91 (remaining gas: 1039932.231 units remaining)
     [ { Pair "gaz" "baz" }  	
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 96 (remaining gas: 1039931.999 units remaining)
+  - location: 96 (remaining gas: 1039932.231 units remaining)
     [ (Pair "gaz" "baz")  	@elt
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 98 (remaining gas: 1039931.989 units remaining)
+  - location: 98 (remaining gas: 1039932.221 units remaining)
     [ "gaz"  	
       "baz"  	
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 99 (remaining gas: 1039931.974 units remaining)
+  - location: 99 (remaining gas: 1039932.206 units remaining)
     [ "baz"  	
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 101 (remaining gas: 1039931.959 units remaining)
+  - location: 101 (remaining gas: 1039932.191 units remaining)
     [ (Some "baz")  	
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 99 (remaining gas: 1039931.929 units remaining)
+  - location: 99 (remaining gas: 1039932.161 units remaining)
     [ "gaz"  	
       (Some "baz")  	
       {}  	
       { Elt "foo" "bar" }  	 ]
-  - location: 102 (remaining gas: 1039930.554 units remaining)
+  - location: 102 (remaining gas: 1039931.018 units remaining)
     [ { Elt "gaz" "baz" }  	
       { Elt "foo" "bar" }  	 ]
-  - location: 96 (remaining gas: 1039930.539 units remaining)
+  - location: 96 (remaining gas: 1039931.003 units remaining)
     [ { Elt "gaz" "baz" }  	
       { Elt "foo" "bar" }  	 ]
-  - location: 103 (remaining gas: 1039930.529 units remaining)
+  - location: 103 (remaining gas: 1039930.993 units remaining)
     [ { Elt "foo" "bar" }  	
       { Elt "gaz" "baz" }  	 ]
-  - location: 104 (remaining gas: 1039930.514 units remaining)
+  - location: 104 (remaining gas: 1039930.978 units remaining)
     [ (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })  	 ]
-  - location: 105 (remaining gas: 1039930.499 units remaining)
+  - location: 105 (remaining gas: 1039930.963 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))  	 ]
-  - location: 65 (remaining gas: 1039930.484 units remaining)
+  - location: 65 (remaining gas: 1039930.948 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))  	 ]
-  - location: 60 (remaining gas: 1039930.469 units remaining)
+  - location: 60 (remaining gas: 1039930.933 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))  	 ]
-  - location: 44 (remaining gas: 1039930.454 units remaining)
+  - location: 44 (remaining gas: 1039930.918 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))  	 ]
-  - location: 151 (remaining gas: 1039930.439 units remaining)
+  - location: 151 (remaining gas: 1039930.903 units remaining)
     [ {}  	
       (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))  	 ]
-  - location: 153 (remaining gas: 1039930.424 units remaining)
+  - location: 153 (remaining gas: 1039930.888 units remaining)
     [ (Pair {} (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })))  	 ]
 
