@@ -830,9 +830,6 @@ module Gas_monad : GAS_MONAD = struct
   let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
 end
 
-let serialize_ty_for_error_carbonated t =
-  Gas_monad.return (serialize_ty_for_error t)
-
 let merge_type_metadata :
     legacy:bool -> 'a ty_metadata -> 'b ty_metadata -> 'a ty_metadata tzresult =
  fun ~legacy {size = size_a; annot = annot_a} {size = size_b; annot = annot_b} ->
@@ -932,9 +929,9 @@ let rec merge_comparable_types :
         merge_comparable_types ~legacy ta tb >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
-        serialize_ty_for_error_carbonated (ty_of_comparable_ty ta) >>$ fun ta ->
-        serialize_ty_for_error_carbonated (ty_of_comparable_ty tb) >?$ fun tb ->
-        error (Inconsistent_types (None, ta, tb))
+        let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
+        let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
+        from_tzresult @@ error (Inconsistent_types (None, ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -958,10 +955,9 @@ let merge_memo_sizes ms1 ms2 =
 type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
 
 let default_merge_type_error ty1 ty2 =
-  let open Gas_monad in
-  serialize_ty_for_error_carbonated ty1 >>$ fun ty1 ->
-  serialize_ty_for_error_carbonated ty2 >?$ fun ty2 ->
-  ok (Inconsistent_types (None, ty1, ty2))
+  let ty1 = serialize_ty_for_error ty1 in
+  let ty2 = serialize_ty_for_error ty2 in
+  Gas_monad.return @@ Inconsistent_types (None, ty1, ty2)
 
 type error += Inconsistent_types_fast
 
