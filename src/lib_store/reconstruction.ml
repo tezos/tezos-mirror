@@ -26,7 +26,8 @@
 type failure_kind =
   | Nothing_to_reconstruct
   | Context_hash_mismatch of Block_header.t * Context_hash.t * Context_hash.t
-  | Missing_block of Block_hash.t
+  | Cannot_read_block_hash of Block_hash.t
+  | Cannot_read_block_level of Int32.t
 
 let failure_kind_encoding =
   let open Data_encoding in
@@ -50,10 +51,16 @@ let failure_kind_encoding =
         (fun (h, e, g) -> Context_hash_mismatch (h, e, g));
       case
         (Tag 2)
-        ~title:"missing_block"
+        ~title:"cannot_read_block_hash"
         Block_hash.encoding
-        (function Missing_block h -> Some h | _ -> None)
-        (fun h -> Missing_block h);
+        (function Cannot_read_block_hash h -> Some h | _ -> None)
+        (fun h -> Cannot_read_block_hash h);
+      case
+        (Tag 3)
+        ~title:"cannot_read_block_level"
+        int32
+        (function Cannot_read_block_level l -> Some l | _ -> None)
+        (fun l -> Cannot_read_block_level l);
     ]
 
 let failure_kind_pp ppf = function
@@ -70,8 +77,10 @@ let failure_kind_pp ppf = function
         e
         Context_hash.pp
         g
-  | Missing_block h ->
+  | Cannot_read_block_hash h ->
       Format.fprintf ppf "Unexpected missing block in store: %a" Block_hash.pp h
+  | Cannot_read_block_level l ->
+      Format.fprintf ppf "Unexpected missing block in store at level %ld" l
 
 type error += Reconstruction_failure of failure_kind
 
