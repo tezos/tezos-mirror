@@ -146,42 +146,46 @@ let gen_access_annot :
       Some (Var_annot (Non_empty_string.cat2 v ~sep:"." f))
 
 let merge_type_annot :
+    type error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    merge_type_error_flag:error_trace merge_type_error_flag ->
     type_annot option ->
     type_annot option ->
-    type_annot option tzresult =
+    (type_annot option, error_trace) result =
  fun ~legacy ~merge_type_error_flag annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Type_annot a1), Some (Type_annot a2)) ->
       if legacy || Non_empty_string.(a1 = a2) then ok annot1
       else
-        error
+        Error
           (match merge_type_error_flag with
           | Fast_merge_type_error -> Inconsistent_types_fast
           | Default_merge_type_error ->
-              Inconsistent_annotations
-                (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
+              trace_of_error
+              @@ Inconsistent_annotations
+                   (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
 
 let merge_field_annot :
+    type error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    merge_type_error_flag:error_trace merge_type_error_flag ->
     field_annot option ->
     field_annot option ->
-    field_annot option tzresult =
+    (field_annot option, error_trace) result =
  fun ~legacy ~merge_type_error_flag annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Field_annot a1), Some (Field_annot a2)) ->
       if legacy || Non_empty_string.(a1 = a2) then ok annot1
       else
-        error
+        Error
           (match merge_type_error_flag with
           | Fast_merge_type_error -> Inconsistent_types_fast
           | Default_merge_type_error ->
-              Inconsistent_annotations
-                ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
+              trace_of_error
+              @@ Inconsistent_annotations
+                   ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
 
 let merge_var_annot : var_annot option -> var_annot option -> var_annot option =
  fun annot1 annot2 ->

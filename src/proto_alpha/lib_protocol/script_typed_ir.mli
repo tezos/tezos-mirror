@@ -60,10 +60,10 @@ module Type_size : sig
   type 'a t
 
   val merge :
-    merge_type_error_flag:Script_tc_errors.merge_type_error_flag ->
+    merge_type_error_flag:'error_trace Script_tc_errors.merge_type_error_flag ->
     'a t ->
     'b t ->
-    'a t tzresult
+    ('a t, 'error_trace) result
 
   val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
 end

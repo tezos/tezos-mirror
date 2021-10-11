@@ -785,11 +785,12 @@ let record_inconsistent_types loc ta tb =
       Inconsistent_types (Some loc, ta, tb))
 
 let merge_type_metadata :
+    type error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    merge_type_error_flag:error_trace merge_type_error_flag ->
     'a ty_metadata ->
     'b ty_metadata ->
-    'a ty_metadata tzresult =
+    ('a ty_metadata, error_trace) result =
  fun ~legacy
      ~merge_type_error_flag
      {size = size_a; annot = annot_a}
@@ -802,13 +803,6 @@ let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (None, ty1, ty2)
-
-let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
-
-let merge_type_error ~merge_type_error_flag =
-  match merge_type_error_flag with
-  | Default_merge_type_error -> default_merge_type_error
-  | Fast_merge_type_error -> fast_merge_type_error
 
 (* Takes two comparable types and simultaneously merge their annotations and
    check that they represent the same type.
@@ -826,13 +820,13 @@ let merge_type_error ~merge_type_error_flag =
    reverting the gas consumption.
  *)
 let rec merge_comparable_types :
-    type ta tb.
+    type ta tb error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    merge_type_error_flag:error_trace merge_type_error_flag ->
     ta comparable_ty ->
     tb comparable_ty ->
     ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-      error trace )
+      error_trace )
     Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag ta tb ->
@@ -847,7 +841,7 @@ let rec merge_comparable_types :
     in
     let return f eq annot_a annot_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-          error trace )
+          error_trace )
         gas_monad =
       merge_type_metadata ~legacy annot_a annot_b >>$ fun annot ->
       return (eq, f annot)
@@ -915,11 +909,15 @@ let rec merge_comparable_types :
         >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
-        of_result @@ error
-        @@ merge_type_error
-             ~merge_type_error_flag
-             (ty_of_comparable_ty ta)
-             (ty_of_comparable_ty tb)
+        of_result
+        @@ Error
+             (match merge_type_error_flag with
+             | Fast_merge_type_error -> (Inconsistent_types_fast : error_trace)
+             | Default_merge_type_error ->
+                 trace_of_error
+                 @@ default_merge_type_error
+                      (ty_of_comparable_ty ta)
+                      (ty_of_comparable_ty tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -942,23 +940,30 @@ let comparable_ty_eq :
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
-let merge_memo_sizes ~merge_type_error_flag ms1 ms2 =
+let merge_memo_sizes :
+    type error_trace.
+    merge_type_error_flag:error_trace merge_type_error_flag ->
+    Sapling.Memo_size.t ->
+    Sapling.Memo_size.t ->
+    (Sapling.Memo_size.t, error_trace) result =
+ fun ~merge_type_error_flag ms1 ms2 ->
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
   else
-    error
+    Error
       (match merge_type_error_flag with
       | Fast_merge_type_error -> Inconsistent_types_fast
-      | Default_merge_type_error -> Inconsistent_memo_sizes (ms1, ms2))
+      | Default_merge_type_error ->
+          trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
-    type a b.
+    type a b error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    merge_type_error_flag:error_trace merge_type_error_flag ->
     Script.location ->
     a ty ->
     b ty ->
-    ((a ty, b ty) eq * a ty, error trace) Gas_monad.t =
+    ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
@@ -979,7 +984,7 @@ let merge_types :
     in
     let rec help :
         type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
      fun ty1 ty2 ->
       match merge_type_error_flag with
       | Fast_merge_type_error -> help0 ty1 ty2 (* do not record trace element *)
@@ -989,11 +994,11 @@ let merge_types :
                  default_merge_type_error ty1 ty2)
     and help0 :
         type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
      fun ty1 ty2 ->
       consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
       let return f eq annot_a annot_b :
-          ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
+          ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
         merge_type_metadata annot_a annot_b >>$ fun annot -> return (eq, f annot)
       in
       match (ty1, ty2) with
@@ -1101,7 +1106,13 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          of_result @@ error @@ merge_type_error ~merge_type_error_flag ty1 ty2
+          of_result
+          @@ Error
+               (match merge_type_error_flag with
+               | Fast_merge_type_error ->
+                   (Inconsistent_types_fast : error_trace)
+               | Default_merge_type_error ->
+                   trace_of_error @@ default_merge_type_error ty1 ty2)
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -1954,8 +1965,10 @@ type 'before dup_n_proof_argument =
       ('before, 'a) dup_n_gadt_witness * 'a ty
       -> 'before dup_n_proof_argument
 
-let find_entrypoint (type full) ~merge_type_error_flag (full : full ty)
-    ~root_name entrypoint =
+let find_entrypoint (type full error_trace)
+    ~(merge_type_error_flag : error_trace merge_type_error_flag)
+    (full : full ty) ~root_name entrypoint :
+    ((Script.node -> Script.node) * ex_ty, error_trace) result =
   let annot_is_entrypoint entrypoint = function
     | None -> false
     | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
@@ -1984,10 +1997,11 @@ let find_entrypoint (type full) ~merge_type_error_flag (full : full ty)
     if Compare.String.(entrypoint = "") then "default" else entrypoint
   in
   if Compare.Int.(String.length entrypoint > 31) then
-    error
+    Error
       (match merge_type_error_flag with
-      | Fast_merge_type_error -> Inconsistent_types_fast
-      | Default_merge_type_error -> Entrypoint_name_too_long entrypoint)
+      | Fast_merge_type_error -> (Inconsistent_types_fast : error_trace)
+      | Default_merge_type_error ->
+          trace_of_error @@ Entrypoint_name_too_long entrypoint)
   else
     match root_name with
     | Some (Field_annot root_name)
@@ -1999,11 +2013,17 @@ let find_entrypoint (type full) ~merge_type_error_flag (full : full ty)
         | None -> (
             match entrypoint with
             | "default" -> ok ((fun e -> e), Ex_ty full)
-            | _ -> error (No_such_entrypoint entrypoint)))
+            | _ ->
+                Error
+                  (match merge_type_error_flag with
+                  | Fast_merge_type_error ->
+                      (Inconsistent_types_fast : error_trace)
+                  | Default_merge_type_error ->
+                      trace_of_error @@ No_such_entrypoint entrypoint)))
 
-let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
-    ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
-    (string * exp ty, error trace) Gas_monad.t =
+let find_entrypoint_for_type (type full exp error_trace) ~legacy
+    ~merge_type_error_flag ~(full : full ty) ~(expected : exp ty) ~root_name
+    entrypoint loc : (string * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
   match find_entrypoint ~merge_type_error_flag full ~root_name entrypoint with
   | Error _ as err -> of_result err

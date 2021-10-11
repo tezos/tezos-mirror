@@ -200,12 +200,12 @@ val ty_eq :
 
 val merge_types :
   legacy:bool ->
-  merge_type_error_flag:merge_type_error_flag ->
+  merge_type_error_flag:'error_trace merge_type_error_flag ->
   Script.location ->
   'a Script_typed_ir.ty ->
   'b Script_typed_ir.ty ->
   ( ('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq * 'a Script_typed_ir.ty,
-    error trace )
+    'error_trace )
   Gas_monad.t
 
 (** {3 Parsing and Typechecking Michelson} *)
@@ -408,11 +408,11 @@ val parse_contract_for_script :
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 
 val find_entrypoint :
-  merge_type_error_flag:merge_type_error_flag ->
+  merge_type_error_flag:'error_trace merge_type_error_flag ->
   't Script_typed_ir.ty ->
   root_name:Script_ir_annot.field_annot option ->
   string ->
-  ((Script.node -> Script.node) * ex_ty) tzresult
+  ((Script.node -> Script.node) * ex_ty, 'error_trace) result
 
 module Entrypoints_map : Map.S with type key = string
 
