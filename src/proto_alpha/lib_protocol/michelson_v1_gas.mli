@@ -520,7 +520,7 @@ module Cost_of : sig
 
     val bls12_381_fr : Gas.cost
 
-    val unparse_type_cycle : Gas.cost
+    val unparse_type : 'a Script_typed_ir.ty -> Gas.cost
 
     val unparse_instr_cycle : Gas.cost
 

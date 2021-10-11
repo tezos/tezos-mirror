@@ -68,6 +68,8 @@ module type TYPE_SIZE = sig
 
   val merge : 'a t -> 'b t -> 'a t tzresult
 
+  val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
+
   (* Unsafe constructors, to be used only safely and inside this module *)
 
   val one : _ t
@@ -85,6 +87,15 @@ end
 
 module Type_size : TYPE_SIZE = struct
   type 'a t = int
+
+  let () =
+    (* static-like check that all [t] values fit in a [mul_safe] *)
+    let (_ : Saturation_repr.mul_safe Saturation_repr.t) =
+      Saturation_repr.mul_safe_of_int_exn Constants.michelson_maximum_type_size
+    in
+    ()
+
+  let to_int = Saturation_repr.mul_safe_of_int_exn
 
   let one = 1
 

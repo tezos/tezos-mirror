@@ -944,7 +944,7 @@ module Cost_of = struct
     (* model UNPARSE_TYPE
        This is the cost of one iteration of unparse_ty, extracted by hand from the
        parameter fit for the UNPARSE_TYPE benchmark. *)
-    let cost_UNPARSE_TYPE = S.safe_int 20
+    let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
@@ -1788,7 +1788,9 @@ module Cost_of = struct
 
     let bls12_381_fr = atomic_step_cost cost_ENCODING_BLS_FR
 
-    let unparse_type_cycle = atomic_step_cost cost_UNPARSE_TYPE
+    let unparse_type ty =
+      atomic_step_cost
+      @@ cost_UNPARSE_TYPE Script_typed_ir.(ty_size ty |> Type_size.to_int)
 
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 

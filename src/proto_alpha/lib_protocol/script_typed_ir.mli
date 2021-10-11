@@ -55,6 +55,8 @@ module Type_size : sig
   type 'a t
 
   val merge : 'a t -> 'b t -> 'a t tzresult
+
+  val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
 end
 
 type 'a ty_metadata = {annot : type_annot option; size : 'a Type_size.t}
@@ -1392,6 +1394,8 @@ type kinstr_rewritek = {
 
 val kinstr_rewritek :
   ('a, 's, 'r, 'f) kinstr -> kinstr_rewritek -> ('a, 's, 'r, 'f) kinstr
+
+val ty_size : 'a ty -> 'a Type_size.t
 
 val unit_t : annot:type_annot option -> unit ty
 

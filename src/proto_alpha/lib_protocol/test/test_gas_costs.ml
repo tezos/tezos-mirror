@@ -65,6 +65,8 @@ let dummy_string =
   | Ok s -> s
   | Error _ -> assert false
 
+let dummy_ty = Script_typed_ir.never_t ~annot:None
+
 let free = ["balance"; "bool"; "parsing_unit"; "unparsing_unit"]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
@@ -222,7 +224,7 @@ let all_unparsing_costs =
     ("address_optimized", address_optimized);
     ("contract_optimized", contract_optimized);
     ("contract_readable", contract_readable);
-    ("unparse_type_cycle", unparse_type_cycle);
+    ("unparse_type", unparse_type dummy_ty);
     ("unparse_instr_cycle", unparse_instr_cycle);
     ("unparse_data_cycle", unparse_data_cycle);
     ("unparsing_unit", unit);
