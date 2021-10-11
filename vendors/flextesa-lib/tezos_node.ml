@@ -274,13 +274,13 @@ module History_modes = struct
                    with
                    | [_] -> {node with history_mode= Some (snd one)}
                    | a_bunch_maybe_zero ->
-                       Fmt.kstrf failwith
+                       Fmt.kstr failwith
                          "Prefix %S does not match exactly one node: [%s]"
                          (fst one)
                          (String.concat ~sep:", "
                             (List.map a_bunch_maybe_zero ~f:id) ) )
                  | more ->
-                     Fmt.kstrf failwith "Prefixes %s match the same node: %s"
+                     Fmt.kstr failwith "Prefixes %s match the same node: %s"
                        (String.concat ~sep:", " (List.map more ~f:fst))
                        node.id ) )
         with Failure s ->
