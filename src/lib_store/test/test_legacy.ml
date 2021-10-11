@@ -443,6 +443,101 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
       >>=? fun _ -> return_unit)
     (fun () -> Store.close_store upgraded_store)
 
+(* This test aims to create a v1 snapshot (from the legacy store)
+   which does not contains the block and operations metadata hash and
+   check that the reconstruction procedure of the new store manages to
+   restore the missing data. *)
+let test_legacy_reconstruct legacy_snapshot_history_mode store
+    (legacy_dir, (legacy_state : Legacy_state.t)) _blocks =
+  let patch_context ctxt = Legacy_utils.patch_context ctxt in
+  let chain_store = Store.main_chain_store store in
+  let genesis = Store.Chain.genesis chain_store in
+  Lwt_utils_unix.create_dir legacy_dir >>= fun () ->
+  let chain_name = Distributed_db_version.Name.of_string "TEZOS" in
+  Legacy_state.Chain.get_exn legacy_state (Store.Chain.chain_id chain_store)
+  >>= fun legacy_chain ->
+  Legacy_chain.head legacy_chain >>= fun legacy_head ->
+  let open Filename.Infix in
+  let snapshot_file = legacy_dir // "legacy_snapshot" in
+  let head_hash = Legacy_state.Block.hash legacy_head in
+  Legacy_snapshots.export
+    ~export_rolling:(legacy_snapshot_history_mode = History_mode.Legacy.Rolling)
+    ~store_root:(legacy_dir // "store")
+    ~context_root:(legacy_dir // "context")
+    ~genesis
+    snapshot_file
+    head_hash
+  >>=? fun () ->
+  let open Filename.Infix in
+  let root_dir =
+    Naming.dir_path (Store.directory store) // ".." // "imported_store"
+  in
+  let dst_store_dir = root_dir // "store" in
+  let dst_context_dir = legacy_dir // "context" in
+  Snapshots.import_legacy
+    ~patch_context
+    ~block:head_hash
+    ~dst_store_dir
+    ~dst_context_dir
+    ~chain_name
+    ~user_activated_upgrades:[]
+    ~user_activated_protocol_overrides:[]
+    ~snapshot_file
+    genesis
+  >>=? fun () ->
+  Store.init
+    ~patch_context
+    ~history_mode:(History_mode.convert legacy_snapshot_history_mode)
+    ~readonly:false
+    ~store_dir:dst_store_dir
+    ~context_dir:dst_context_dir
+    ~allow_testchains:true
+    genesis
+  >>=? fun imported_store ->
+  let imported_chain_store = Store.main_chain_store imported_store in
+  (* Make sure that the imported blocks are missing the block metadata
+     hash. Here, we target 2 blocks below the head as the head and its
+     predecessor aims to be complete (as the head was applied thakns
+     to it's complete predecessor).*)
+  (Store.Block.read_block_opt imported_chain_store ~distance:2 head_hash
+   >>= function
+   | None ->
+       Alcotest.fail "A block is unexpectidely missing from the imported store"
+   | Some block ->
+       if Option.is_some (Store.Block.block_metadata_hash block) then
+         Alcotest.fail "Block metadata hash is available but should not."
+       else (* Block metadata hash is missing, as expected *) return_unit)
+  >>=? fun () ->
+  Store.close_store imported_store >>= fun () ->
+  Reconstruction.reconstruct
+    ~patch_context
+    ~store_dir:dst_store_dir
+    ~context_dir:dst_context_dir
+    genesis
+    ~user_activated_upgrades:[]
+    ~user_activated_protocol_overrides:[]
+  >>=? fun () ->
+  (* Restart the store, after the reconstruction, in archive mode. *)
+  Store.init
+    ~patch_context
+    ~history_mode:History_mode.Archive
+    ~readonly:false
+    ~store_dir:dst_store_dir
+    ~context_dir:dst_context_dir
+    ~allow_testchains:true
+    genesis
+  >>=? fun reconstructed_store ->
+  let reconstructed_chain_store = Store.main_chain_store reconstructed_store in
+  (Store.Block.read_block_opt reconstructed_chain_store ~distance:2 head_hash
+   >>= function
+   | None ->
+       Alcotest.fail "A block is unexpectidely missing from the imported store"
+   | Some block ->
+       if Option.is_none (Store.Block.block_metadata_hash block) then
+         Alcotest.fail "Block metadata hash is missing but should not."
+       else (* Block metadata hash is available, as expected *) return_unit)
+  >>=? fun () -> return_unit
+
 let make_upgrade_test_cases ?(keep_dir = false) speed :
     string Alcotest_lwt.test_case list =
   let history_modes =
@@ -541,6 +636,32 @@ let make_upgrade_after_snapshot_import_test_cases ?(keep_dir = false) speed :
       wrap_test_legacy ~keep_dir test)
     permutations
 
+let make_legacy_reconstruct_test_cases ?(keep_dir = false) speed :
+    string Alcotest_lwt.test_case list =
+  (* Make sure that we also reconstruct through both cemented and
+     floating stores. *)
+  let nb_blocks_to_bake = [8 * 2; 8 * 5; 8 * 8] in
+  let legacy_history_mode = History_mode.Legacy.Full in
+  List.map
+    (fun nb_blocks ->
+      let name =
+        Format.asprintf
+          "Storage reconstruction after a legacy snapshot import with %d blocks"
+          nb_blocks
+      in
+      let nb_blocks = `Blocks nb_blocks in
+      let test =
+        {
+          name;
+          speed;
+          legacy_history_mode;
+          nb_blocks;
+          test = test_legacy_reconstruct legacy_history_mode;
+        }
+      in
+      wrap_test_legacy ~keep_dir test)
+    nb_blocks_to_bake
+
 let upgrade_tests : string Alcotest_lwt.test list =
   let speed =
     try
@@ -555,10 +676,14 @@ let upgrade_tests : string Alcotest_lwt.test list =
   let upgrade_snapshots_cases =
     make_upgrade_after_snapshot_import_test_cases ~keep_dir:false speed
   in
+  let legacy_reconstruct_cases =
+    make_legacy_reconstruct_test_cases ~keep_dir:false speed
+  in
   [
     ("legacy store upgrade", upgrade_cases);
     ("legacy snapshot import", snapshots_cases);
     ("legacy store upgrade after snapshot import", upgrade_snapshots_cases);
+    ("storage reconstruction after a legacy import", legacy_reconstruct_cases);
   ]
 
 let () =
