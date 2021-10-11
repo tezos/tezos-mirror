@@ -174,17 +174,14 @@
    cleaned up in the [Distributed_db.Operation] requester.
 
    There is an [advertisement_delay] to postpone the next mempool
-   advertisement if we advertised our mempool not long ago. To ensure
-   that [consensus operations] (aka [endorsements]) are always
-   propagated, Consensus operations for which their branch is unknown
-   are handled by the plugin. Early consensus operations will be
-   propagated once the block is validated. Every time an operation is
-   [classified], it is recorded into the [operation_stream] (note that
-   this does not include [outdated] operations). Such stream can be
-   used by an external service to get the classification of an
-   operation (via the [monitor_operations] RPC). This also means an
-   operation can be notified several times if it is classified again
-   after a [flush]. *)
+   advertisement if we advertised our mempool not long ago. Early
+   consensus operations will be propagated once the block is validated.
+   Every time an operation is [classified], it is recorded into the
+   [operation_stream] (note that this does not include [outdated]
+   operations). Such stream can be used by an external service to get
+   the classification of an operation (via the [monitor_operations] RPC).
+   This also means an operation can be notified several times if it is
+   classified again after a [flush]. *)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1491
    This module should not use [Prevalidation.parse_unsafe] *)
@@ -198,8 +195,7 @@ type limits = {
   operations_batch_size : int;
 }
 
-(* Minimal delay between two mempool advertisements except for
-   endorsements for which the branch is unknown. *)
+(* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
 module Name = struct
@@ -430,11 +426,6 @@ module Make
             Lwt.return_unit)
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-
-  let is_endorsement (op : Proto.operation_data operation) =
-    Proto.acceptable_passes
-      {shell = op.raw.shell; protocol_data = op.protocol_data}
-    = [0]
 
   let filter_config pv =
     try
@@ -896,27 +887,7 @@ module Make
   module Handlers = struct
     type self = worker
 
-    (* This piece of code is encompassed by the plugin and could be removed. *)
-    (* For every consensus operation which arrived before the block
-       they are branched on, we try to propagate them if the protocol
-       manages to apply the operation on the current validation state
-       or if the operation can be applied later on ([branch_delayed]
-       classification). *)
-    let may_propagate_unknown_branch_operation validation_state op =
-      ( Prevalidation.parse op >>?= fun op ->
-        let is_alternative_endorsement () =
-          Lwt.return validation_state >>=? fun validation_state ->
-          Prevalidation.apply_operation validation_state op >>= function
-          | Applied _ | Branch_delayed _ -> return_some op
-          | _ -> return_none
-        in
-        if is_endorsement op then is_alternative_endorsement () else return_none
-      )
-      >|= function
-      | Ok b -> b
-      | Error _ -> None
-
-    let on_arrived w (pv : state) oph op =
+    let on_arrived (pv : state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
       else
@@ -928,20 +899,10 @@ module Make
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then (
-              may_propagate_unknown_branch_operation pv.validation_state op
-              >>= function
-              | Some op ->
-                  let error = [Exn (Failure "Unknown branch operation")] in
-                  let notifier = mk_notifier pv.operation_stream in
-                  handle ~notifier pv.shell (`Parsed op) (`Branch_refused error) ;
-                  let pending = Operation_hash.Set.singleton oph in
-                  advertise w pv.shell {Mempool.empty with pending} ;
-                  return_unit
-              | None ->
-                  Distributed_db.Operation.clear_or_cancel
-                    pv.shell.parameters.chain_db
-                    oph ;
-                  return_unit)
+              Distributed_db.Operation.clear_or_cancel
+                pv.shell.parameters.chain_db
+                oph ;
+              return_unit)
             else (
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                  Should this have an influence on the peer's score ? *)
@@ -1159,7 +1120,7 @@ module Make
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject {op; force} -> on_inject pv ~force op
-      | Request.Arrived (oph, op) -> on_arrived w pv oph op
+      | Request.Arrived (oph, op) -> on_arrived pv oph op
       | Request.Advertise ->
           on_advertise pv.shell ;
           return_unit
