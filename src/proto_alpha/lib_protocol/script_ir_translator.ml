@@ -342,11 +342,16 @@ let[@coq_struct "function_parameter"] rec strip_var_annots = function
       Prim (loc, name, List.map strip_var_annots args, annots)
 
 let serialize_ty_for_error ctxt ty =
-  unparse_ty ctxt ty
-  >>? (fun (ty, ctxt) ->
-        Gas.consume ctxt (Script.strip_locations_cost ty) >|? fun ctxt ->
-        (Micheline.strip_locations (strip_var_annots ty), ctxt))
-  |> record_trace Cannot_serialize_error
+  (*
+    Types are bounded by [Constants.michelson_maximum_type_size], so
+    [unparse_ty_uncarbonated], [strip_var_annots], and [strip_locations] are
+    bounded in time.
+
+    It is hence OK to use them in errors that are not caught in the validation
+    (only once in apply).
+  *)
+  let ty = unparse_ty_uncarbonated ty in
+  ok @@ (Micheline.strip_locations (strip_var_annots ty), ctxt)
 
 let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
     type a.
