@@ -343,8 +343,7 @@ val add_field_annot :
 val typecheck_code :
   legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
 
-val serialize_ty_for_error :
-  context -> 'a Script_typed_ir.ty -> (Script.expr * context) tzresult
+val serialize_ty_for_error : 'a Script_typed_ir.ty -> Script.expr
 
 val parse_code :
   ?type_logger:type_logger ->
