@@ -375,6 +375,7 @@ struct
 
     (* below is for backward compatibility *)
     include Error_monad_traversors
+    include Error_monad_trace_eval
 
     let classify_errors = classify_trace
 

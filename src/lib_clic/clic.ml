@@ -758,7 +758,9 @@ let parse_arg :
       match TzString.Map.find_opt long args_dict with
       | None | Some [] -> return_none
       | Some [s] ->
-          trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
+          converter ctx s
+          >|= record_trace_eval (fun () ->
+                  Bad_option_argument ("--" ^ long, command))
           >|=? fun x -> Some x
       | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (

@@ -96,13 +96,15 @@ end)
     | ok -> Lwt.return ok
 
   let record_trace_eval mk_err = function
-    | Error trace -> mk_err () >>? fun err -> Error (Trace.cons err trace)
+    | Error trace ->
+        let err = mk_err () in
+        Error (Trace.cons err trace)
     | ok -> ok
 
   let trace_eval mk_err f =
     f >>= function
     | Error trace ->
-        mk_err () >>=? fun err -> Lwt.return_error (Trace.cons err trace)
+        mk_err () >>= fun err -> Lwt.return_error (Trace.cons err trace)
     | ok -> Lwt.return ok
 
   let error_unless cond exn = if cond then Result.return_unit else error exn
