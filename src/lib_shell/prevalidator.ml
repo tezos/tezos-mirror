@@ -195,7 +195,6 @@ module Event = Prevalidator_event
 type limits = {
   max_refused_operations : int;
   operation_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
   operations_batch_size : int;
 }
 
@@ -1261,12 +1260,7 @@ module Make
    * Whilst this is somewhat abusing the intended purpose of worker, it is part
    * of a transition plan to a one-worker-per-peer architecture. *)
   let worker_promise =
-    Worker.launch
-      table
-      Arg.limits.worker_limits
-      name
-      (Arg.limits, Arg.chain_db)
-      (module Handlers)
+    Worker.launch table name (Arg.limits, Arg.chain_db) (module Handlers)
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
 
@@ -1367,10 +1361,6 @@ let current_request (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.current_request w
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
-   This function is legacy and should be removed.  *)
-let last_events (_t : t) = []
 
 let protocol_hash (t : t) =
   let module Prevalidator : T = (val t) in

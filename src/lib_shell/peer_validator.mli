@@ -31,7 +31,6 @@ type limits = {
   block_header_timeout : Time.System.Span.t;
   block_operations_timeout : Time.System.Span.t;
   protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
 }
 
 val peer_id : t -> P2p_peer.Id.t
@@ -61,8 +60,5 @@ val current_request :
   t ->
   (Time.System.t * Time.System.t * Peer_validator_worker_state.Request.view)
   option
-
-val last_events :
-  t -> (Internal_event.level * Peer_validator_worker_state.Event.t list) list
 
 val pipeline_length : t -> Peer_validator_worker_state.pipeline_length

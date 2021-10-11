@@ -133,7 +133,6 @@ module type T = sig
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
-    Worker_types.limits ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
@@ -197,9 +196,6 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
-
-  (** Access the event backlog. *)
-  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
@@ -279,13 +275,11 @@ struct
     | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
 
   and 'kind t = {
-    limits : Worker_types.limits;
     timeout : Time.System.Span.t option;
     parameters : Types.parameters;
     mutable (* only for init *) worker : unit Lwt.t;
     mutable (* only for init *) state : Types.state option;
     buffer : 'kind buffer;
-    event_log : (Internal_event.level * Event.t Ringo.Ring.t) list;
     canceler : Lwt_canceler.t;
     name : Name.t;
     id : int;
@@ -497,12 +491,7 @@ struct
     | Error el ->
         Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_trace el
 
-  let log_event w evt =
-    lwt_emit w (Logger.WorkerEvent (evt, Event.level evt)) >>= fun () ->
-    if Event.level evt >= w.limits.backlog_level then
-      List.assoc ~equal:Internal_event.Level.equal (Event.level evt) w.event_log
-      |> Option.iter (fun ring -> Ringo.Ring.add ring evt) ;
-    Lwt.return_unit
+  let log_event w evt = lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)
 
@@ -547,9 +536,6 @@ struct
       Handlers.on_close w >>= fun () ->
       Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
-      Lwt.ignore_result
-        (List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
-         Lwt.return_unit) ;
       Lwt.return_unit
     in
     let rec loop () =
@@ -627,12 +613,11 @@ struct
       type kind.
       kind table ->
       ?timeout:Time.System.Span.t ->
-      Worker_types.limits ->
       Name.t ->
       Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t tzresult Lwt.t =
-   fun table ?timeout limits name parameters (module Handlers) ->
+   fun table ?timeout name parameters (module Handlers) ->
     let name_s = Format.asprintf "%a" Name.pp name in
     let full_name =
       if name_s = "" then base_name
@@ -661,15 +646,8 @@ struct
                  ())
         | Dropbox _ -> Dropbox_buffer (Lwt_dropbox.create ())
       in
-      let event_log =
-        let levels =
-          Internal_event.[Debug; Info; Notice; Warning; Error; Fatal]
-        in
-        List.map (fun l -> (l, Ringo.Ring.create limits.backlog_size)) levels
-      in
       let w =
         {
-          limits;
           parameters;
           name;
           canceler;
@@ -678,7 +656,6 @@ struct
           state = None;
           id;
           worker = Lwt.return_unit;
-          event_log;
           timeout;
           current_request = None;
           logEvent = (module Logger.LogEvent);
@@ -728,11 +705,6 @@ struct
     | (Some state, _) -> state
 
   let pending_requests q = Queue.pending_requests q
-
-  let last_events w =
-    List.map
-      (fun (level, ring) -> (level, Ringo.Ring.elements ring))
-      w.event_log
 
   let status {status; _} = status
 

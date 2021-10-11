@@ -841,33 +841,18 @@ let rpc : rpc Data_encoding.t =
           RPC_server.Acl.policy_encoding
           RPC_server.Acl.empty_policy))
 
-let worker_limits_encoding default_size default_level =
-  let open Data_encoding in
-  conv
-    (fun {Worker_types.backlog_size; backlog_level} ->
-      (backlog_size, backlog_level))
-    (fun (backlog_size, backlog_level) -> {backlog_size; backlog_level})
-    (obj2
-       (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" Internal_event.Level.encoding default_level))
-
 let timeout_encoding = Time.System.Span.encoding
 
 let block_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Block_validator.protocol_timeout; worker_limits} ->
-      (protocol_timeout, worker_limits))
-    (fun (protocol_timeout, worker_limits) -> {protocol_timeout; worker_limits})
-    (merge_objs
-       (obj1
-          (dft
-             "protocol_request_timeout"
-             timeout_encoding
-             default_shell.block_validator_limits.protocol_timeout))
-       (worker_limits_encoding
-          default_shell.block_validator_limits.worker_limits.backlog_size
-          default_shell.block_validator_limits.worker_limits.backlog_level))
+    (fun {Block_validator.protocol_timeout} -> protocol_timeout)
+    (fun protocol_timeout -> {protocol_timeout})
+    (obj1
+       (dft
+          "protocol_request_timeout"
+          timeout_encoding
+          default_shell.block_validator_limits.protocol_timeout))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -876,35 +861,23 @@ let prevalidator_limits_encoding =
            Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
-           worker_limits;
          } ->
-      ( (operation_timeout, max_refused_operations, operations_batch_size),
-        worker_limits ))
-    (fun ( (operation_timeout, max_refused_operations, operations_batch_size),
-           worker_limits ) ->
-      {
-        operation_timeout;
-        max_refused_operations;
-        operations_batch_size;
-        worker_limits;
-      })
-    (merge_objs
-       (obj3
-          (dft
-             "operations_request_timeout"
-             timeout_encoding
-             default_shell.prevalidator_limits.operation_timeout)
-          (dft
-             "max_refused_operations"
-             uint16
-             default_shell.prevalidator_limits.max_refused_operations)
-          (dft
-             "operations_batch_size"
-             int31
-             default_shell.prevalidator_limits.operations_batch_size))
-       (worker_limits_encoding
-          default_shell.prevalidator_limits.worker_limits.backlog_size
-          default_shell.prevalidator_limits.worker_limits.backlog_level))
+      (operation_timeout, max_refused_operations, operations_batch_size))
+    (fun (operation_timeout, max_refused_operations, operations_batch_size) ->
+      {operation_timeout; max_refused_operations; operations_batch_size})
+    (obj3
+       (dft
+          "operations_request_timeout"
+          timeout_encoding
+          default_shell.prevalidator_limits.operation_timeout)
+       (dft
+          "max_refused_operations"
+          uint16
+          default_shell.prevalidator_limits.max_refused_operations)
+       (dft
+          "operations_batch_size"
+          int31
+          default_shell.prevalidator_limits.operations_batch_size))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -915,46 +888,38 @@ let peer_validator_limits_encoding =
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
-           worker_limits;
          } ->
-      ( ( block_header_timeout,
-          block_operations_timeout,
-          protocol_timeout,
-          new_head_request_timeout ),
-        worker_limits ))
-    (fun ( ( block_header_timeout,
-             block_operations_timeout,
-             protocol_timeout,
-             new_head_request_timeout ),
-           worker_limits ) ->
+      ( block_header_timeout,
+        block_operations_timeout,
+        protocol_timeout,
+        new_head_request_timeout ))
+    (fun ( block_header_timeout,
+           block_operations_timeout,
+           protocol_timeout,
+           new_head_request_timeout ) ->
       {
         block_header_timeout;
         block_operations_timeout;
         protocol_timeout;
         new_head_request_timeout;
-        worker_limits;
       })
-    (merge_objs
-       (obj4
-          (dft
-             "block_header_request_timeout"
-             timeout_encoding
-             default_limits.block_header_timeout)
-          (dft
-             "block_operations_request_timeout"
-             timeout_encoding
-             default_limits.block_operations_timeout)
-          (dft
-             "protocol_request_timeout"
-             timeout_encoding
-             default_limits.protocol_timeout)
-          (dft
-             "new_head_request_timeout"
-             timeout_encoding
-             default_limits.new_head_request_timeout))
-       (worker_limits_encoding
-          default_limits.worker_limits.backlog_size
-          default_limits.worker_limits.backlog_level))
+    (obj4
+       (dft
+          "block_header_request_timeout"
+          timeout_encoding
+          default_limits.block_header_timeout)
+       (dft
+          "block_operations_request_timeout"
+          timeout_encoding
+          default_limits.block_operations_timeout)
+       (dft
+          "protocol_request_timeout"
+          timeout_encoding
+          default_limits.protocol_timeout)
+       (dft
+          "new_head_request_timeout"
+          timeout_encoding
+          default_limits.new_head_request_timeout))
 
 let synchronisation_heuristic_encoding default_latency default_threshold =
   let open Data_encoding in
@@ -983,49 +948,42 @@ let synchronisation_heuristic_encoding default_latency default_threshold =
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Chain_validator.synchronisation; worker_limits} ->
-      (synchronisation, worker_limits))
-    (fun (synchronisation, worker_limits) -> {synchronisation; worker_limits})
-    (merge_objs
-       (* Use a union to support both the deprecated
-          bootstrap_threshold and the new synchronisation_threshold
-          options when parsing.  When printing, use the new
-          synchronisation_threshold option. *)
-       (union
-          [
-            case
-              ~title:"synchronisation_heuristic_encoding"
-              Json_only
-              (synchronisation_heuristic_encoding
-                 default_shell.chain_validator_limits.synchronisation.latency
-                 default_shell.chain_validator_limits.synchronisation.threshold)
-              (fun x -> Some x)
-              (fun x -> x);
-            case
-              ~title:"legacy_bootstrap_threshold_encoding"
-              Json_only
-              (obj1
-                 (dft
-                    "bootstrap_threshold"
-                    ~description:
-                      "[DEPRECATED] Set the number of peers with whom a chain \
-                       synchronisation must be completed to bootstrap the \
-                       node."
-                    uint8
-                    4))
-              (fun _ -> None) (* This is used for legacy *)
-              (fun x ->
-                Chain_validator.
-                  {
-                    threshold = x;
-                    latency =
-                      default_shell.chain_validator_limits.synchronisation
-                        .latency;
-                  });
-          ])
-       (worker_limits_encoding
-          default_shell.chain_validator_limits.worker_limits.backlog_size
-          default_shell.chain_validator_limits.worker_limits.backlog_level))
+    (fun {Chain_validator.synchronisation} -> synchronisation)
+    (fun synchronisation -> {synchronisation})
+    (* Use a union to support both the deprecated
+       bootstrap_threshold and the new synchronisation_threshold
+       options when parsing.  When printing, use the new
+       synchronisation_threshold option. *)
+    (union
+       [
+         case
+           ~title:"synchronisation_heuristic_encoding"
+           Json_only
+           (synchronisation_heuristic_encoding
+              default_shell.chain_validator_limits.synchronisation.latency
+              default_shell.chain_validator_limits.synchronisation.threshold)
+           (fun x -> Some x)
+           (fun x -> x);
+         case
+           ~title:"legacy_bootstrap_threshold_encoding"
+           Json_only
+           (obj1
+              (dft
+                 "bootstrap_threshold"
+                 ~description:
+                   "[DEPRECATED] Set the number of peers with whom a chain \
+                    synchronisation must be completed to bootstrap the node."
+                 uint8
+                 4))
+           (fun _ -> None) (* This is used for legacy *)
+           (fun x ->
+             Chain_validator.
+               {
+                 threshold = x;
+                 latency =
+                   default_shell.chain_validator_limits.synchronisation.latency;
+               });
+       ])
 
 let shell =
   let open Data_encoding in
@@ -1329,7 +1287,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
                  synchronisation_threshold;
            }
          in
-         {cfg.shell.chain_validator_limits with synchronisation});
+         {synchronisation});
       history_mode = Option.either history_mode cfg.shell.history_mode;
     }
   in

@@ -52,7 +52,6 @@ type t
 type limits = {
   max_refused_operations : int;
   operation_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
   operations_batch_size : int;
 }
 
@@ -111,13 +110,6 @@ val current_request :
   t ->
   (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view)
   option
-
-(** [DEPRECATED] This function is legacy and should be removed. Currently, it
-   always answers `[]`.
-
-    See https://gitlab.com/tezos/tezos/-/issues/1714 *)
-val last_events :
-  t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 
 val information : t -> Worker_types.worker_information
 

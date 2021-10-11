@@ -40,10 +40,7 @@ type synchronisation_limits = {
      not.  *)
 }
 
-type limits = {
-  synchronisation : synchronisation_limits;
-  worker_limits : Worker_types.limits;
-}
+type limits = {synchronisation : synchronisation_limits}
 
 val create :
   start_prevalidator:bool ->
@@ -111,9 +108,6 @@ val current_request :
   t ->
   (Time.System.t * Time.System.t * Chain_validator_worker_state.Request.view)
   option
-
-val last_events :
-  t -> (Internal_event.level * Chain_validator_worker_state.Event.t list) list
 
 val ddb_information :
   t -> Chain_validator_worker_state.Distributed_db_state.view
