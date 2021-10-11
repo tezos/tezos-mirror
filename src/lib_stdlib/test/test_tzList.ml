@@ -77,6 +77,13 @@ let test_take_n _ =
     ~f:(fun xs ->
       Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4; 5; 5; 5; 6])
 
+let test_drop_n _ =
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 [1; 2; 3; 4; 5]) [4; 5] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 [1; 2]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 []) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n (-1) [1; 2]) [1; 2] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 0 [1; 2]) [1; 2]
+
 let list_size = QCheck.Gen.int_range 2 1000
 
 let pp_int_list =
@@ -84,10 +91,12 @@ let pp_int_list =
     ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
     Format.pp_print_int
 
+let count = 1000
+
 let test_shuffle_preserves_values =
   QCheck.Test.make
     ~name:"shuffle preserves value sets"
-    ~count:1000
+    ~count
     QCheck.(list_of_size list_size int)
     (fun l ->
       let l1 = List.sort Int.compare l in
@@ -99,6 +108,19 @@ let test_shuffle_preserves_values =
         ~expected:l1
         ())
 
+let test_take_drop =
+  QCheck.Test.make
+    ~name:"(take_n n l @@ drop_n n l) = l"
+    ~count
+    QCheck.(pair (list_of_size list_size int) small_int)
+    (fun (l, n) ->
+      Lib_test.Qcheck_helpers.qcheck_eq'
+        ~pp:pp_int_list
+        ~eq:( = )
+        ~actual:TzList.(take_n n l @ TzList.drop_n n l)
+        ~expected:l
+        ())
+
 let () =
   Alcotest.run
     "stdlib"
@@ -106,6 +128,8 @@ let () =
       ( "tzList",
         [
           ("take_n", `Quick, test_take_n);
+          ("drop_n", `Quick, test_drop_n);
           QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+          QCheck_alcotest.to_alcotest test_take_drop;
         ] );
     ]
