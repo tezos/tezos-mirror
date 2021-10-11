@@ -151,7 +151,7 @@ module Gas_monad : sig
 
   (** re-export of [Error_monad.record_trace_eval]. This function has no
       effect in the case of a gas-exhaustion error. *)
-  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+  val record_trace_eval : (unit -> error) -> 'a t -> 'a t
 end
 
 type type_logger =

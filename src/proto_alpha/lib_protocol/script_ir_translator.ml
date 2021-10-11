@@ -797,7 +797,7 @@ module type GAS_MONAD = sig
 
   val run : context -> 'a t -> ('a tzresult * context) tzresult
 
-  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+  val record_trace_eval : (unit -> error) -> 'a t -> 'a t
 end
 
 module Gas_monad : GAS_MONAD = struct
@@ -827,7 +827,8 @@ module Gas_monad : GAS_MONAD = struct
   let run ctxt x = x ctxt
 
   let record_trace_eval f m ctxt =
-    m ctxt >>? fun (x, ctxt) -> from_tzresult (x |> record_trace_eval f) ctxt
+    m ctxt >>? fun (x, ctxt) ->
+    from_tzresult (x |> record_trace_eval @@ fun () -> ok @@ f ()) ctxt
 end
 
 let merge_type_metadata :
@@ -972,7 +973,7 @@ let record_inconsistent_carbonated ta tb =
   Gas_monad.record_trace_eval (fun () ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
-      ok @@ Inconsistent_types (None, ta, tb))
+      Inconsistent_types (None, ta, tb))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
