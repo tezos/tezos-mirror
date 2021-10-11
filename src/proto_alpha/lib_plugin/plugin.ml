@@ -1788,6 +1788,7 @@ module RPC = struct
           ( ( parse_parameter_ty ctxt ~legacy arg_type
             >>? fun (Ex_ty arg_type, _) ->
               Script_ir_translator.find_entrypoint
+                ~merge_type_error_flag:Default_merge_type_error
                 ~root_name
                 arg_type
                 entrypoint )

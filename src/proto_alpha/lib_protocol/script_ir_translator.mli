@@ -408,6 +408,7 @@ val parse_contract_for_script :
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 
 val find_entrypoint :
+  merge_type_error_flag:merge_type_error_flag ->
   't Script_typed_ir.ty ->
   root_name:Script_ir_annot.field_annot option ->
   string ->

@@ -1954,7 +1954,8 @@ type 'before dup_n_proof_argument =
       ('before, 'a) dup_n_gadt_witness * 'a ty
       -> 'before dup_n_proof_argument
 
-let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
+let find_entrypoint (type full) ~merge_type_error_flag (full : full ty)
+    ~root_name entrypoint =
   let annot_is_entrypoint entrypoint = function
     | None -> false
     | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
@@ -1983,7 +1984,10 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     if Compare.String.(entrypoint = "") then "default" else entrypoint
   in
   if Compare.Int.(String.length entrypoint > 31) then
-    error (Entrypoint_name_too_long entrypoint)
+    error
+      (match merge_type_error_flag with
+      | Fast_merge_type_error -> Inconsistent_types_fast
+      | Default_merge_type_error -> Entrypoint_name_too_long entrypoint)
   else
     match root_name with
     | Some (Field_annot root_name)
@@ -2001,7 +2005,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
     (string * exp ty, error trace) Gas_monad.t =
   let open Gas_monad in
-  match find_entrypoint full ~root_name entrypoint with
+  match find_entrypoint ~merge_type_error_flag full ~root_name entrypoint with
   | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
       merge_types ~legacy ~merge_type_error_flag loc ty expected
@@ -5119,7 +5123,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               error
                 (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
           | Toplevel {param_type; root_name; storage_type = _} ->
-              find_entrypoint param_type ~root_name entrypoint
+              find_entrypoint
+                ~merge_type_error_flag:Default_merge_type_error
+                param_type
+                ~root_name
+                entrypoint
               >>? fun (_, Ex_ty param_type) ->
               contract_t loc param_type ~annot:None >>? fun res_ty ->
               let instr =

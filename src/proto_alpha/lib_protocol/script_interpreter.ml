@@ -1683,7 +1683,11 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
-    (find_entrypoint arg_type ~root_name entrypoint)
+    (find_entrypoint
+       ~merge_type_error_flag:Default_merge_type_error
+       arg_type
+       ~root_name
+       entrypoint)
   >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)
