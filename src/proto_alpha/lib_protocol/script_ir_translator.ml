@@ -790,6 +790,18 @@ let merge_type_metadata :
   Type_size.merge size_a size_b >>? fun size ->
   merge_type_annot ~legacy annot_a annot_b >|? fun annot -> {annot; size}
 
+let default_merge_type_error ty1 ty2 =
+  let ty1 = serialize_ty_for_error ty1 in
+  let ty2 = serialize_ty_for_error ty2 in
+  Inconsistent_types (None, ty1, ty2)
+
+let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
+
+let merge_type_error ~merge_type_error_flag =
+  match merge_type_error_flag with
+  | Default_merge_type_error -> default_merge_type_error
+  | Fast_merge_type_error -> fast_merge_type_error
+
 (* Takes two comparable types and simultaneously merge their annotations and
    check that they represent the same type.
 
@@ -808,13 +820,14 @@ let merge_type_metadata :
 let rec merge_comparable_types :
     type ta tb.
     legacy:bool ->
+    merge_type_error_flag:merge_type_error_flag ->
     ta comparable_ty ->
     tb comparable_ty ->
     ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
       error trace )
     Gas_monad.t =
   let open Gas_monad in
-  fun ~legacy ta tb ->
+  fun ~legacy ~merge_type_error_flag ta tb ->
     consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata ~legacy meta_a meta_b =
       of_result @@ merge_type_metadata ~legacy meta_a meta_b
@@ -866,8 +879,10 @@ let rec merge_comparable_types :
         >>$ fun annot_left ->
         merge_field_annot ~legacy annot_right_a annot_right_b
         >>$ fun annot_right ->
-        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        merge_comparable_types ~legacy ~merge_type_error_flag left_a left_b
+        >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy ~merge_type_error_flag right_a right_b
+        >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Pair_key ((left, annot_left), (right, annot_right), annot) )
     | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
@@ -878,18 +893,23 @@ let rec merge_comparable_types :
         >>$ fun annot_left ->
         merge_field_annot ~legacy annot_right_a annot_right_b
         >>$ fun annot_right ->
-        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        merge_comparable_types ~legacy ~merge_type_error_flag left_a left_b
+        >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy ~merge_type_error_flag right_a right_b
+        >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Union_key ((left, annot_left), (right, annot_right), annot) )
     | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
         merge_type_metadata ~legacy annot_a annot_b >>$ fun annot ->
-        merge_comparable_types ~legacy ta tb >|$ fun (Eq, t) ->
+        merge_comparable_types ~legacy ~merge_type_error_flag ta tb
+        >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
-        let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
-        let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
-        of_result @@ error (Inconsistent_types (None, ta, tb))
+        of_result @@ error
+        @@ merge_type_error
+             ~merge_type_error_flag
+             (ty_of_comparable_ty ta)
+             (ty_of_comparable_ty tb)
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -902,25 +922,19 @@ let comparable_ty_eq :
     tb comparable_ty ->
     ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
  fun ctxt ta tb ->
-  Gas_monad.run ctxt (merge_comparable_types ~legacy:true ta tb)
+  Gas_monad.run
+    ctxt
+    (merge_comparable_types
+       ~legacy:true
+       ~merge_type_error_flag:Default_merge_type_error
+       ta
+       tb)
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
 let merge_memo_sizes ms1 ms2 =
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
   else error (Inconsistent_memo_sizes (ms1, ms2))
-
-let default_merge_type_error ty1 ty2 =
-  let ty1 = serialize_ty_for_error ty1 in
-  let ty2 = serialize_ty_for_error ty2 in
-  Inconsistent_types (None, ty1, ty2)
-
-let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
-
-let merge_type_error ~merge_type_error_flag =
-  match merge_type_error_flag with
-  | Default_merge_type_error -> default_merge_type_error
-  | Fast_merge_type_error -> fast_merge_type_error
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
@@ -1002,21 +1016,23 @@ let merge_types :
       | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          merge_comparable_types ~legacy ~merge_type_error_flag tal tbl
+          >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname))
       | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          merge_comparable_types ~legacy ~merge_type_error_flag tal tbl
+          >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname))
       | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
+          merge_comparable_types ~legacy ~merge_type_error_flag ea eb
+          >|$ fun (Eq, e) -> ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
       | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
+          merge_comparable_types ~legacy ~merge_type_error_flag ea eb
+          >|$ fun (Eq, e) -> ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
       | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
           Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->

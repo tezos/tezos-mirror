@@ -144,8 +144,6 @@ val close_descr :
 *)
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
-
-
 (* ---- Lists, Sets and Maps ----------------------------------------------- *)
 
 (** {2 High-level Michelson Data Types} *)
