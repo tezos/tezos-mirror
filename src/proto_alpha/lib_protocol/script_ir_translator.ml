@@ -2028,17 +2028,23 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy
   match find_entrypoint ~merge_type_error_flag full ~root_name entrypoint with
   | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
-      merge_types ~legacy ~merge_type_error_flag loc ty expected
-      >??$ fun eq_ty ->
       match (entrypoint, root_name) with
       | ("default", Some (Field_annot fa))
         when Compare.String.((fa :> string) = "root") -> (
-          match eq_ty with
+          merge_types
+            ~legacy
+            ~merge_type_error_flag:Fast_merge_type_error
+            loc
+            ty
+            expected
+          >??$ function
           | Ok (Eq, ty) -> return ("default", (ty : exp ty))
-          | Error (_ : error_trace) ->
+          | Error Inconsistent_types_fast ->
               merge_types ~legacy ~merge_type_error_flag loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
-      | _ -> of_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
+      | _ ->
+          merge_types ~legacy ~merge_type_error_flag loc ty expected
+          >|$ fun (Eq, ty) -> (entrypoint, (ty : exp ty)))
 
 module Entrypoints = Set.Make (String)
 
