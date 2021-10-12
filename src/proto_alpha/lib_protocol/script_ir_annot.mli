@@ -126,6 +126,7 @@ val gen_access_annot :
     and different, unless [legacy] *)
 val merge_type_annot :
   legacy:bool ->
+  merge_type_error_flag:Script_tc_errors.merge_type_error_flag ->
   type_annot option ->
   type_annot option ->
   type_annot option tzresult
@@ -135,6 +136,7 @@ val merge_type_annot :
     and different, unless [legacy] *)
 val merge_field_annot :
   legacy:bool ->
+  merge_type_error_flag:Script_tc_errors.merge_type_error_flag ->
   field_annot option ->
   field_annot option ->
   field_annot option tzresult

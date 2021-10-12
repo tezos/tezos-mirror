@@ -785,10 +785,18 @@ let record_inconsistent_types loc ta tb =
       Inconsistent_types (Some loc, ta, tb))
 
 let merge_type_metadata :
-    legacy:bool -> 'a ty_metadata -> 'b ty_metadata -> 'a ty_metadata tzresult =
- fun ~legacy {size = size_a; annot = annot_a} {size = size_b; annot = annot_b} ->
+    legacy:bool ->
+    merge_type_error_flag:merge_type_error_flag ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    'a ty_metadata tzresult =
+ fun ~legacy
+     ~merge_type_error_flag
+     {size = size_a; annot = annot_a}
+     {size = size_b; annot = annot_b} ->
   Type_size.merge size_a size_b >>? fun size ->
-  merge_type_annot ~legacy annot_a annot_b >|? fun annot -> {annot; size}
+  merge_type_annot ~legacy ~merge_type_error_flag annot_a annot_b
+  >|? fun annot -> {annot; size}
 
 let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
@@ -830,10 +838,12 @@ let rec merge_comparable_types :
   fun ~legacy ~merge_type_error_flag ta tb ->
     consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata ~legacy meta_a meta_b =
-      of_result @@ merge_type_metadata ~legacy meta_a meta_b
+      of_result
+      @@ merge_type_metadata ~legacy ~merge_type_error_flag meta_a meta_b
     in
     let merge_field_annot ~legacy annot_a annot_b =
-      of_result @@ merge_field_annot ~legacy annot_a annot_b
+      of_result
+      @@ merge_field_annot ~legacy ~merge_type_error_flag annot_a annot_b
     in
     let return f eq annot_a annot_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
@@ -950,14 +960,15 @@ let merge_types :
     let merge_type_metadata tn1 tn2 =
       match merge_type_error_flag with
       | Fast_merge_type_error ->
-          of_result @@ merge_type_metadata ~legacy tn1 tn2
+          of_result
+          @@ merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
       | Default_merge_type_error ->
           of_result
-            (merge_type_metadata ~legacy tn1 tn2
+            (merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
             |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
-      of_result (merge_field_annot ~legacy tn1 tn2)
+      of_result (merge_field_annot ~legacy ~merge_type_error_flag tn1 tn2)
     in
     let merge_memo_sizes ms1 ms2 = of_result (merge_memo_sizes ms1 ms2) in
     let rec help :
@@ -4324,7 +4335,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t (Timestamp_t {annot = tn2; size = _}, rest, _),
           _ ) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_annot ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_annot
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IDiff_timestamps (kinfo, k))} in
       let stack = Item_t (int_t ~annot:tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4332,7 +4348,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_string_pair (kinfo, k))} in
       typed ctxt loc instr (Item_t (String_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
@@ -4362,7 +4383,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes_pair (kinfo, k))} in
       let stack = Item_t (Bytes_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4394,7 +4420,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_tez (kinfo, k))} in
       let stack = Item_t (Mutez_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4402,7 +4433,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       if legacy then
         parse_var_annot loc annot >>?= fun annot ->
-        merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+        merge_type_metadata
+          ~legacy
+          ~merge_type_error_flag:Default_merge_type_error
+          tn1
+          tn2
+        >>?= fun tname ->
         let instr = {apply = (fun kinfo k -> ISub_tez_legacy (kinfo, k))} in
         let stack = Item_t (Mutez_t tname, rest, annot) in
         typed ctxt loc instr stack
@@ -4410,7 +4446,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB_MUTEZ, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
       let stack = Item_t (option_mutez'_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4432,21 +4473,36 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4484,7 +4540,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4503,14 +4564,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4529,14 +4600,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun _tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4555,7 +4636,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4568,14 +4654,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_tez (kinfo, k))} in
       let stack = Item_t (option_pair_nat_mutez'_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
       let stack = Item_t (option_pair_int'_nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4594,35 +4690,60 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_nat'_nat'_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_LSL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsl_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_LSR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsr_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4635,7 +4756,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -5034,21 +5160,36 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g1_t tn1, Item_t (Bls12_381_g1_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g1 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g1_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g2_t tn1, Item_t (Bls12_381_g2_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g2 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g2_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_fr_t tn1, Item_t (Bls12_381_fr_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        tn1
+        tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest, annot) in
       typed ctxt loc instr stack
