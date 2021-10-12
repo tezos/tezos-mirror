@@ -202,3 +202,9 @@ type error += Non_dupable_type of Script.location * Script.expr
 
 (* Impossible errors *)
 type error += Unparsing_invariant_violated
+
+(* Merge type errors *)
+
+type error += Inconsistent_types_fast
+
+type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error

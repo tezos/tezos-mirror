@@ -144,7 +144,7 @@ val close_descr :
 *)
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
-type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
+
 
 (* ---- Lists, Sets and Maps ----------------------------------------------- *)
 

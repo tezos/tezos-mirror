@@ -910,14 +910,10 @@ let merge_memo_sizes ms1 ms2 =
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
   else error (Inconsistent_memo_sizes (ms1, ms2))
 
-type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
-
 let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (None, ty1, ty2)
-
-type error += Inconsistent_types_fast
 
 let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
 
