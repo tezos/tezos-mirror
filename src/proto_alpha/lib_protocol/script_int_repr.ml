@@ -27,6 +27,11 @@ type n = Natural_tag
 
 type z = Integer_tag
 
+(* We could define `num` as a GADT with constructors for `n` and `z`.
+  This would enable factorizing the code a bit in the Michelson interpreter and
+  also make formal the claim that `num` is only instantiated with `n` and `z`,
+  but it would result in space and time overheads when manipulating `num`s, by
+  having to deconstruct to and reconstruct from `Z.t`. *)
 type 't num = Z.t
 
 let compare x y = Z.compare x y

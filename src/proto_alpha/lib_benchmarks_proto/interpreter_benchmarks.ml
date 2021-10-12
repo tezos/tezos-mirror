@@ -1757,16 +1757,9 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_INeg_nat
-        ~intercept_stack:(zero_n, eos)
-        ~kinstr:(INeg_nat (kinfo (nat @$ bot), halt (int @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_INeg_int
+        ~name:Interpreter_workload.N_INeg
         ~intercept_stack:(zero, eos)
-        ~kinstr:(INeg_int (kinfo (int @$ bot), halt (int @$ bot)))
+        ~kinstr:(INeg (kinfo (int @$ bot), halt (int @$ bot)))
         ()
 
     let () =
@@ -1791,30 +1784,16 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IAdd_intint
+        ~name:Interpreter_workload.N_IAdd_int
         ~intercept_stack:(zero, (zero, eos))
-        ~kinstr:(IAdd_intint (kinfo (int @$ int @$ bot), halt (int @$ bot)))
+        ~kinstr:(IAdd_int (kinfo (int @$ int @$ bot), halt (int @$ bot)))
         ()
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IAdd_natint
-        ~intercept_stack:(zero_n, (zero, eos))
-        ~kinstr:(IAdd_natint (kinfo (nat @$ int @$ bot), halt (int @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IAdd_intnat
-        ~intercept_stack:(zero, (zero_n, eos))
-        ~kinstr:(IAdd_intnat (kinfo (int @$ nat @$ bot), halt (int @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IAdd_natnat
+        ~name:Interpreter_workload.N_IAdd_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
-        ~kinstr:(IAdd_natnat (kinfo (nat @$ nat @$ bot), halt (nat @$ bot)))
+        ~kinstr:(IAdd_nat (kinfo (nat @$ nat @$ bot), halt (nat @$ bot)))
         ()
 
     let () =
@@ -1826,66 +1805,34 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IMul_intint
+        ~name:Interpreter_workload.N_IMul_int
         ~intercept_stack:(zero, (zero, eos))
-        ~kinstr:(IMul_intint (kinfo (int @$ int @$ bot), halt (int @$ bot)))
+        ~kinstr:(IMul_int (kinfo (int @$ int @$ bot), halt (int @$ bot)))
         ()
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IMul_intnat
-        ~intercept_stack:(zero, (zero_n, eos))
-        ~kinstr:(IMul_intnat (kinfo (int @$ nat @$ bot), halt (int @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IMul_natint
+        ~name:Interpreter_workload.N_IMul_nat
         ~intercept_stack:(zero_n, (zero, eos))
-        ~kinstr:(IMul_natint (kinfo (nat @$ int @$ bot), halt (int @$ bot)))
+        ~kinstr:(IMul_nat (kinfo (nat @$ int @$ bot), halt (int @$ bot)))
         ()
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IMul_natnat
-        ~intercept_stack:(zero_n, (zero_n, eos))
-        ~kinstr:(IMul_natnat (kinfo (nat @$ nat @$ bot), halt (nat @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IEdiv_intint
+        ~name:Interpreter_workload.N_IEdiv_int
         ~intercept_stack:(zero, (zero, eos))
         ~kinstr:
-          (IEdiv_intint
+          (IEdiv_int
              (kinfo (int @$ int @$ bot), halt (option (pair int nat) @$ bot)))
         ()
 
     let () =
       simple_benchmark
-        ~name:Interpreter_workload.N_IEdiv_intnat
-        ~intercept_stack:(zero, (zero_n, eos))
-        ~kinstr:
-          (IEdiv_intnat
-             (kinfo (int @$ nat @$ bot), halt (option (pair int nat) @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IEdiv_natint
+        ~name:Interpreter_workload.N_IEdiv_nat
         ~intercept_stack:(zero_n, (zero, eos))
         ~kinstr:
-          (IEdiv_natint
+          (IEdiv_nat
              (kinfo (nat @$ int @$ bot), halt (option (pair int nat) @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_IEdiv_natnat
-        ~intercept_stack:(zero_n, (zero_n, eos))
-        ~kinstr:
-          (IEdiv_natnat
-             (kinfo (nat @$ nat @$ bot), halt (option (pair nat nat) @$ bot)))
         ()
 
     let () =
@@ -1946,13 +1893,6 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IXor_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~kinstr:(IXor_nat (kinfo (nat @$ nat @$ bot), halt (nat @$ bot)))
-        ()
-
-    let () =
-      simple_benchmark
-        ~name:Interpreter_workload.N_INot_nat
-        ~intercept_stack:(zero_n, eos)
-        ~kinstr:(INot_nat (kinfo (nat @$ bot), halt (int @$ bot)))
         ()
 
     let () =

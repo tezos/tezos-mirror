@@ -114,30 +114,22 @@ type instruction_name =
   | N_INot
   (* integer operations *)
   | N_IIs_nat
-  | N_INeg_nat
-  | N_INeg_int
+  | N_INeg
   | N_IAbs_int
   | N_IInt_nat
-  | N_IAdd_intint
-  | N_IAdd_intnat
-  | N_IAdd_natint
-  | N_IAdd_natnat
+  | N_IAdd_int
+  | N_IAdd_nat
   | N_ISub_int
-  | N_IMul_intint
-  | N_IMul_intnat
-  | N_IMul_natint
-  | N_IMul_natnat
-  | N_IEdiv_intint
-  | N_IEdiv_intnat
-  | N_IEdiv_natint
-  | N_IEdiv_natnat
+  | N_IMul_int
+  | N_IMul_nat
+  | N_IEdiv_int
+  | N_IEdiv_nat
   | N_ILsl_nat
   | N_ILsr_nat
   | N_IOr_nat
   | N_IAnd_nat
   | N_IAnd_int_nat
   | N_IXor_nat
-  | N_INot_nat
   | N_INot_int
   (* control *)
   | N_IIf
@@ -309,30 +301,22 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IXor -> "N_IXor"
   | N_INot -> "N_INot"
   | N_IIs_nat -> "N_IIs_nat"
-  | N_INeg_nat -> "N_INeg_nat"
-  | N_INeg_int -> "N_INeg_int"
+  | N_INeg -> "N_INeg"
   | N_IAbs_int -> "N_IAbs_int"
   | N_IInt_nat -> "N_IInt_nat"
-  | N_IAdd_intint -> "N_IAdd_intint"
-  | N_IAdd_intnat -> "N_IAdd_intnat"
-  | N_IAdd_natint -> "N_IAdd_natint"
-  | N_IAdd_natnat -> "N_IAdd_natnat"
+  | N_IAdd_int -> "N_IAdd_int"
+  | N_IAdd_nat -> "N_IAdd_nat"
   | N_ISub_int -> "N_ISub_int"
-  | N_IMul_intint -> "N_IMul_intint"
-  | N_IMul_intnat -> "N_IMul_intnat"
-  | N_IMul_natint -> "N_IMul_natint"
-  | N_IMul_natnat -> "N_IMul_natnat"
-  | N_IEdiv_intint -> "N_IEdiv_intint"
-  | N_IEdiv_intnat -> "N_IEdiv_intnat"
-  | N_IEdiv_natint -> "N_IEdiv_natint"
-  | N_IEdiv_natnat -> "N_IEdiv_natnat"
+  | N_IMul_int -> "N_IMul_int"
+  | N_IMul_nat -> "N_IMul_nat"
+  | N_IEdiv_int -> "N_IEdiv_int"
+  | N_IEdiv_nat -> "N_IEdiv_nat"
   | N_ILsl_nat -> "N_ILsl_nat"
   | N_ILsr_nat -> "N_ILsr_nat"
   | N_IOr_nat -> "N_IOr_nat"
   | N_IAnd_nat -> "N_IAnd_nat"
   | N_IAnd_int_nat -> "N_IAnd_int_nat"
   | N_IXor_nat -> "N_IXor_nat"
-  | N_INot_nat -> "N_INot_nat"
   | N_INot_int -> "N_INot_int"
   | N_IIf -> "N_IIf"
   | N_ILoop -> "N_ILoop"
@@ -532,30 +516,22 @@ let all_instructions =
     N_IXor;
     N_INot;
     N_IIs_nat;
-    N_INeg_nat;
-    N_INeg_int;
+    N_INeg;
     N_IAbs_int;
     N_IInt_nat;
-    N_IAdd_intint;
-    N_IAdd_intnat;
-    N_IAdd_natint;
-    N_IAdd_natnat;
+    N_IAdd_int;
+    N_IAdd_nat;
     N_ISub_int;
-    N_IMul_intint;
-    N_IMul_intnat;
-    N_IMul_natint;
-    N_IMul_natnat;
-    N_IEdiv_intint;
-    N_IEdiv_intnat;
-    N_IEdiv_natint;
-    N_IEdiv_natnat;
+    N_IMul_int;
+    N_IMul_nat;
+    N_IEdiv_int;
+    N_IEdiv_nat;
     N_ILsl_nat;
     N_ILsr_nat;
     N_IOr_nat;
     N_IAnd_nat;
     N_IAnd_int_nat;
     N_IXor_nat;
-    N_INot_nat;
     N_INot_int;
     N_IIf;
     N_ILoop;
@@ -860,52 +836,30 @@ module Instructions = struct
 
   let is_nat _int = ir_sized_step N_IIs_nat nullary
 
-  let neg_nat nat = ir_sized_step N_INeg_nat (unary "nat" nat)
-
-  let neg_int int = ir_sized_step N_INeg_int (unary "int" int)
+  let neg int = ir_sized_step N_INeg (unary "int" int)
 
   let abs_int int = ir_sized_step N_IAbs_int (unary "int" int)
 
   let int_nat _nat = ir_sized_step N_IInt_nat nullary
 
-  let add_intint int1 int2 =
-    ir_sized_step N_IAdd_intint (binary "int1" int1 "int2" int2)
+  let add_int int1 int2 =
+    ir_sized_step N_IAdd_int (binary "int1" int1 "int2" int2)
 
-  let add_intnat int nat =
-    ir_sized_step N_IAdd_intnat (binary "int" int "nat" nat)
-
-  let add_natint nat int =
-    ir_sized_step N_IAdd_natint (binary "nat" nat "int" int)
-
-  let add_natnat nat1 nat2 =
-    ir_sized_step N_IAdd_natnat (binary "nat1" nat1 "nat2" nat2)
+  let add_nat nat1 nat2 =
+    ir_sized_step N_IAdd_nat (binary "nat1" nat1 "nat2" nat2)
 
   let sub_int int1 int2 =
     ir_sized_step N_ISub_int (binary "int1" int1 "int2" int2)
 
-  let mul_intint int1 int2 =
-    ir_sized_step N_IMul_intint (binary "int1" int1 "int2" int2)
+  let mul_int int1 int2 =
+    ir_sized_step N_IMul_int (binary "int1" int1 "int2" int2)
 
-  let mul_intnat int nat =
-    ir_sized_step N_IMul_intnat (binary "int" int "nat" nat)
+  let mul_nat nat int = ir_sized_step N_IMul_nat (binary "nat" nat "int" int)
 
-  let mul_natint nat int =
-    ir_sized_step N_IMul_natint (binary "nat" nat "int" int)
+  let ediv_int int1 int2 =
+    ir_sized_step N_IEdiv_int (binary "int1" int1 "int2" int2)
 
-  let mul_natnat nat1 nat2 =
-    ir_sized_step N_IMul_natnat (binary "nat1" nat1 "nat2" nat2)
-
-  let ediv_intint int1 int2 =
-    ir_sized_step N_IEdiv_intint (binary "int1" int1 "int2" int2)
-
-  let ediv_intnat int nat =
-    ir_sized_step N_IEdiv_intnat (binary "int" int "nat" nat)
-
-  let ediv_natint nat int =
-    ir_sized_step N_IEdiv_natint (binary "nat" nat "int" int)
-
-  let ediv_natnat nat1 nat2 =
-    ir_sized_step N_IEdiv_natnat (binary "nat1" nat1 "nat2" nat2)
+  let ediv_nat nat int = ir_sized_step N_IEdiv_nat (binary "nat" nat "int" int)
 
   let lsl_nat nat1 _shift = ir_sized_step N_ILsl_nat (unary "nat" nat1)
 
@@ -922,8 +876,6 @@ module Instructions = struct
 
   let xor_nat nat1 nat2 =
     ir_sized_step N_IXor_nat (binary "nat1" nat1 "nat2" nat2)
-
-  let not_nat nat = ir_sized_step N_INot_nat (unary "nat" nat)
 
   let not_int int = ir_sized_step N_INot_int (unary "int" int)
 
@@ -1321,36 +1273,23 @@ let extract_ir_sized_step :
   | (IXor (_, _), _) -> Instructions.xor_
   | (INot (_, _), _) -> Instructions.not_
   | (IIs_nat (_, _), (x, _)) -> Instructions.is_nat (Size.integer x)
-  | (INeg_nat (_, _), (x, _)) -> Instructions.neg_nat (Size.integer x)
-  | (INeg_int (_, _), (x, _)) -> Instructions.neg_int (Size.integer x)
+  | (INeg (_, _), (x, _)) -> Instructions.neg (Size.integer x)
   | (IAbs_int (_, _), (x, _)) -> Instructions.abs_int (Size.integer x)
   | (IInt_nat (_, _), (x, _)) -> Instructions.int_nat (Size.integer x)
-  | (IAdd_intint (_, _), (x, (y, _))) ->
-      Instructions.add_intint (Size.integer x) (Size.integer y)
-  | (IAdd_intnat (_, _), (x, (y, _))) ->
-      Instructions.add_intnat (Size.integer x) (Size.integer y)
-  | (IAdd_natint (_, _), (x, (y, _))) ->
-      Instructions.add_natint (Size.integer x) (Size.integer y)
-  | (IAdd_natnat (_, _), (x, (y, _))) ->
-      Instructions.add_natnat (Size.integer x) (Size.integer y)
+  | (IAdd_int (_, _), (x, (y, _))) ->
+      Instructions.add_int (Size.integer x) (Size.integer y)
+  | (IAdd_nat (_, _), (x, (y, _))) ->
+      Instructions.add_nat (Size.integer x) (Size.integer y)
   | (ISub_int (_, _), (x, (y, _))) ->
       Instructions.sub_int (Size.integer x) (Size.integer y)
-  | (IMul_intint (_, _), (x, (y, _))) ->
-      Instructions.mul_intint (Size.integer x) (Size.integer y)
-  | (IMul_intnat (_, _), (x, (y, _))) ->
-      Instructions.mul_intnat (Size.integer x) (Size.integer y)
-  | (IMul_natint (_, _), (x, (y, _))) ->
-      Instructions.mul_natint (Size.integer x) (Size.integer y)
-  | (IMul_natnat (_, _), (x, (y, _))) ->
-      Instructions.mul_natnat (Size.integer x) (Size.integer y)
-  | (IEdiv_intint (_, _), (x, (y, _))) ->
-      Instructions.ediv_intint (Size.integer x) (Size.integer y)
-  | (IEdiv_intnat (_, _), (x, (y, _))) ->
-      Instructions.ediv_intnat (Size.integer x) (Size.integer y)
-  | (IEdiv_natint (_, _), (x, (y, _))) ->
-      Instructions.ediv_natint (Size.integer x) (Size.integer y)
-  | (IEdiv_natnat (_, _), (x, (y, _))) ->
-      Instructions.ediv_natnat (Size.integer x) (Size.integer y)
+  | (IMul_int (_, _), (x, (y, _))) ->
+      Instructions.mul_int (Size.integer x) (Size.integer y)
+  | (IMul_nat (_, _), (x, (y, _))) ->
+      Instructions.mul_nat (Size.integer x) (Size.integer y)
+  | (IEdiv_int (_, _), (x, (y, _))) ->
+      Instructions.ediv_int (Size.integer x) (Size.integer y)
+  | (IEdiv_nat (_, _), (x, (y, _))) ->
+      Instructions.ediv_nat (Size.integer x) (Size.integer y)
   | (ILsl_nat (_, _), (x, (y, _))) ->
       Instructions.lsl_nat (Size.integer x) (Size.integer y)
   | (ILsr_nat (_, _), (x, (y, _))) ->
@@ -1363,7 +1302,6 @@ let extract_ir_sized_step :
       Instructions.and_int_nat (Size.integer x) (Size.integer y)
   | (IXor_nat (_, _), (x, (y, _))) ->
       Instructions.xor_nat (Size.integer x) (Size.integer y)
-  | (INot_nat (_, _), (x, _)) -> Instructions.not_nat (Size.integer x)
   | (INot_int (_, _), (x, _)) -> Instructions.not_int (Size.integer x)
   | (IIf _, _) -> Instructions.if_
   | (ILoop (_, _, _), _) -> Instructions.loop
