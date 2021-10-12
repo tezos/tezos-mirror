@@ -144,7 +144,7 @@ let check_err fmt = raise (Test_error fmt)
 
 let fail ?here:_ ?pos:_ msg = check_err (fun ppf () -> Fmt.pf ppf "%s" msg)
 
-let failf ?here ?pos fmt = Fmt.kstrf (fun msg -> fail ?here ?pos msg) fmt
+let failf ?here ?pos fmt = Fmt.kstr (fun msg -> fail ?here ?pos msg) fmt
 
 let check ?here:_ ?pos:_ (type a) (t : a testable) msg (expected : a)
     (actual : a) =

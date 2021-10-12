@@ -175,7 +175,7 @@ let sign state ~client ~bytes () =
 let originate_account_from state ~client ~account =
   let orig_account_name = "-originated-account" in
   let id_script parameter =
-    Fmt.strf
+    Fmt.str
       "parameter %s;\n\
        storage %s;\n\
        code\n\

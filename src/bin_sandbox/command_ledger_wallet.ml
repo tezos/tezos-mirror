@@ -252,7 +252,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
       Console.say state EF.(haf "EXPECTING THE NEXT COMMAND TO FAIL")
       >>= fun _ ->
       test_reject_and_accept
-        (Fmt.strf "vote-%s" vote)
+        (Fmt.str "vote-%s" vote)
         ~messages:
           MFmt.
             [
@@ -386,7 +386,7 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
     ~ledger_account
   >>= fun origination ->
   Tezos_client.successful_client_cmd state ~client origination >>= fun _ ->
-  Fmt.kstrf bake "baking `%s` in" name
+  Fmt.kstr bake "baking `%s` in" name
 
 let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
     ~with_rejections ~protocol_kind ~delegate_pkh ~random_contract_pkh ~bake ()
@@ -867,7 +867,7 @@ let prepare_origination_of_id_script ?(spendable = false) ?(delegatable = false)
     ?delegate ?(push_drops = 0) ?(amount = "2") state ~client:_ ~name ~from
     ~protocol_kind ~parameter ~init_storage =
   let id_script parameter =
-    Fmt.strf
+    Fmt.str
       "parameter %s;\n\
        storage %s;\n\
        code\n\
@@ -880,14 +880,14 @@ let prepare_origination_of_id_script ?(spendable = false) ?(delegatable = false)
       (match push_drops with
       | 0 -> "# No push-drops"
       | n ->
-          Fmt.strf
+          Fmt.str
             "# %d push-drop%s\n    %s"
             n
             (if n > 1 then "s" else "")
             (List.init push_drops ~f:(fun ith ->
-                 Fmt.strf
+                 Fmt.str
                    "{ PUSH string %S ; DROP } ;"
-                   (Fmt.strf
+                   (Fmt.str
                       "push-dropping %d adds stupid bytes to the contract"
                       ith))
             |> String.concat ~sep:"\n    "))
@@ -940,7 +940,7 @@ let originate_id_script ?push_drops state ~client ~name ~from ~bake
     ~init_storage
   >>= fun origination ->
   Tezos_client.successful_client_cmd state ~client origination >>= fun _ ->
-  Fmt.kstrf bake "baking `%s` in" name
+  Fmt.kstr bake "baking `%s` in" name
 
 let pp_warning_ledger_takes_a_while ~adjective =
   let open MFmt in
@@ -948,7 +948,7 @@ let pp_warning_ledger_takes_a_while ~adjective =
     cut ppf () ;
     let prompt = "WARNING: " in
     let warning1 = "The ledger will take a few seconds to show" in
-    let warning2 = strf "the hash for such a %s operation." adjective in
+    let warning2 = str "the hash for such a %s operation." adjective in
     let wl = String.length prompt + String.length warning1 in
     tag "shout" ppf (fun ppf -> string ppf ("/" ^ String.make wl '=' ^ "\\")) ;
     cut ppf () ;
@@ -1142,7 +1142,7 @@ module Wallet_scenario = struct
              (info
                 ["only-test"]
                 ~doc:
-                  (Fmt.strf
+                  (Fmt.str
                      "Limit to a family of tests (one of: %s)."
                      (List.map enum_assoc ~f:(fun (n, _) -> sprintf "`%s`" n)
                      |> String.concat ~sep:", ")))))
