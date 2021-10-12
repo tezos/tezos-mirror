@@ -47,6 +47,9 @@ val one : t
 (** Convert [t] to a string. *)
 val to_string : t -> string
 
+(** Convert [t] to a mutez integer. *)
+val mutez_int64 : t -> int64
+
 (** Convert [t] to a float of tez. *)
 val to_float : t -> float
 
@@ -55,6 +58,9 @@ val to_mutez : t -> int
 
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t
+
+(** Subtraction. This doesn't perform any bound checks. *)
+val ( - ) : t -> t -> t
 
 (** Parsing. Parse a floating point number of tez.
 

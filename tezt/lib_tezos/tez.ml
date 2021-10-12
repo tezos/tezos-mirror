@@ -33,6 +33,8 @@ let zero = 0L
 
 let one = of_int 1
 
+let mutez_int64 t = t
+
 let to_string amount =
   let mult_int = 1_000_000L in
   let rec left amount =
@@ -61,6 +63,8 @@ let to_float amount = Float.mul (Int64.to_float amount) 0.000_001
 let to_mutez amount = Int64.to_int amount
 
 let ( + ) = Int64.add
+
+let ( - ) = Int64.sub
 
 let parse_floating tez_string =
   let re = rex "(\\d+)\\.?(\\d*)" in

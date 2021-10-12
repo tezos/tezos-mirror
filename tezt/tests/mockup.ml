@@ -66,12 +66,7 @@ let transfer_data =
 let test_balances_after_transfer giver amount receiver =
   let (giver_balance_before, giver_balance_after) = giver in
   let (receiver_balance_before, receiver_balance_after) = receiver in
-  if
-    not
-      Tez.(
-        to_mutez giver_balance_after
-        < to_mutez giver_balance_before - to_mutez amount)
-  then
+  if not Tez.(giver_balance_after < giver_balance_before - amount) then
     Test.fail
       "Invalid balance of giver after transfer: %s (before it was %s)"
       (Tez.to_string giver_balance_after)
