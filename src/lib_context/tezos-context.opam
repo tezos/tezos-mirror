@@ -8,8 +8,8 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
-  "irmin" { >= "2.7.2" }
-  "irmin-pack" { >= "2.7.2" }
+  "irmin" { >= "2.7.2" & < "2.8.0" }
+  "irmin-pack" { >= "2.7.2" & < "2.8.0"}
   "tezos-shell-services"
   "logs"
   "digestif" { >= "0.7.3" }
