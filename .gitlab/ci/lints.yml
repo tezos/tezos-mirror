@@ -18,6 +18,11 @@ misc_checks:
     - git apply devtools/protocol-print/add-hack-module.patch
     - dune runtest -p tezos-test-helpers ||
       echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
+  artifacts:
+    when: always
+    paths:
+      - opam_repo.patch
+    expire_in: 1 days
 
 check_precommit_hook:
   extends: .build_template
