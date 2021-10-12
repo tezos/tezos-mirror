@@ -90,7 +90,11 @@ module type TYPE_SIZE = sig
   *)
   type 'a t
 
-  val merge : 'a t -> 'b t -> 'a t tzresult
+  val merge :
+    merge_type_error_flag:Script_tc_errors.merge_type_error_flag ->
+    'a t ->
+    'b t ->
+    'a t tzresult
 
   val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
 
@@ -129,9 +133,15 @@ module Type_size : TYPE_SIZE = struct
 
   let four = 4
 
-  let merge x y =
+  let merge ~merge_type_error_flag x y =
     if Compare.Int.(x = y) then ok x
-    else error @@ Script_tc_errors.Inconsistent_type_sizes (x, y)
+    else
+      error
+      @@
+      let open Script_tc_errors in
+      match merge_type_error_flag with
+      | Fast_merge_type_error -> Inconsistent_types_fast
+      | Default_merge_type_error -> Inconsistent_type_sizes (x, y)
 
   let of_int loc size =
     let max_size = Constants.michelson_maximum_type_size in

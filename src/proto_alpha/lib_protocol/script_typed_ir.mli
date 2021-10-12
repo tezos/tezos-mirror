@@ -59,7 +59,11 @@ type end_of_stack = empty_cell * empty_cell
 module Type_size : sig
   type 'a t
 
-  val merge : 'a t -> 'b t -> 'a t tzresult
+  val merge :
+    merge_type_error_flag:Script_tc_errors.merge_type_error_flag ->
+    'a t ->
+    'b t ->
+    'a t tzresult
 
   val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
 end

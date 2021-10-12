@@ -794,7 +794,7 @@ let merge_type_metadata :
      ~merge_type_error_flag
      {size = size_a; annot = annot_a}
      {size = size_b; annot = annot_b} ->
-  Type_size.merge size_a size_b >>? fun size ->
+  Type_size.merge ~merge_type_error_flag size_a size_b >>? fun size ->
   merge_type_annot ~legacy ~merge_type_error_flag annot_a annot_b
   >|? fun annot -> {annot; size}
 
