@@ -1128,7 +1128,7 @@ let baking_commands group =
     water level). *)
 let high_water_mark_commands group watermark_spelling =
   let make_desc desc =
-    if List.length watermark_spelling = 1 then
+    if Compare.List_length_with.(watermark_spelling = 1) then
       desc ^ " (legacy/deprecated spelling)"
     else desc
   in

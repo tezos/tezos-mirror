@@ -315,7 +315,7 @@ let test_trees {idx; genesis; _} =
   | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       Tree.fold ~depth:(`Eq 1) ~init:() (Tree.empty ctxt) [] ~f:(fun k _ () ->
-          assert (List.length k = 1) ;
+          assert (Compare.List_length_with.(k = 1)) ;
           Assert.fail_msg "empty")
       >>= fun () ->
       let foo1 = Bytes.of_string "foo1" in

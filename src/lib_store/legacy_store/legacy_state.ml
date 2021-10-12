@@ -1035,11 +1035,13 @@ module Block = struct
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless
-      (block_header.shell.validation_passes = List.length operations)
+      Compare.List_length_with.(
+        operations = block_header.shell.validation_passes)
       (error_of_fmt "State.Block.store: invalid operations length")
     >>=? fun () ->
     fail_unless
-      (block_header.shell.validation_passes = List.length operations_metadata)
+      Compare.List_length_with.(
+        operations_metadata = block_header.shell.validation_passes)
       (error_of_fmt "State.Block.store: invalid operations_data length")
     >>=? fun () ->
     let inconsistent_failure =
@@ -1048,7 +1050,7 @@ module Block = struct
     in
     (List.for_all2
        ~when_different_lengths:inconsistent_failure
-       (fun l1 l2 -> List.length l1 = List.length l2)
+       (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
        operations
        operations_metadata
      |> function

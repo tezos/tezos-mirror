@@ -85,7 +85,8 @@ let test_non_normalized_slot () =
   List.find_map
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if List.length slots > 1 then Some (delegate, slots) else None)
+          if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+          else None)
     endorsers_list
   |> function
   | None -> assert false

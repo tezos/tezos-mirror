@@ -135,7 +135,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     type value = Bytes.t
 
     let to_key i k =
-      assert (List.length (I.to_path i []) = I.path_length) ;
+      assert (Compare.List_length_with.(I.to_path i [] = I.path_length)) ;
       I.to_path i k
 
     let of_key k = List.remove I.path_length k

@@ -913,10 +913,9 @@ let multisig_bytes ~counter ~action ~contract ~chain_id ~descr () =
   return @@ Bytes.cat (Bytes.of_string "\005") bytes
 
 let check_threshold ~threshold ~keys () =
-  let nkeys = List.length keys in
   let threshold = Z.to_int threshold in
-  if Compare.Int.(List.length keys < threshold) then
-    fail (Threshold_too_high (threshold, nkeys))
+  if Compare.List_length_with.(keys < threshold) then
+    fail (Threshold_too_high (threshold, List.length keys))
   else if Compare.Int.(threshold <= 0) then
     fail (Non_positive_threshold threshold)
   else return_unit

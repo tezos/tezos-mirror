@@ -264,19 +264,19 @@ module List_length_with = struct
 end
 
 module List_lengths = struct
-  let ( = ) l ll = Stdlib.List.compare_lengths l ll = 0
+  let ( = ) l1 l2 = Stdlib.List.compare_lengths l1 l2 = 0
 
-  let ( <> ) l ll = Stdlib.List.compare_lengths l ll <> 0
+  let ( <> ) l1 l2 = Stdlib.List.compare_lengths l1 l2 <> 0
 
-  let ( < ) l ll = Stdlib.List.compare_lengths l ll < 0
+  let ( < ) l1 l2 = Stdlib.List.compare_lengths l1 l2 < 0
 
-  let ( <= ) l ll = Stdlib.List.compare_lengths l ll <= 0
+  let ( <= ) l1 l2 = Stdlib.List.compare_lengths l1 l2 <= 0
 
-  let ( >= ) l ll = Stdlib.List.compare_lengths l ll >= 0
+  let ( >= ) l1 l2 = Stdlib.List.compare_lengths l1 l2 >= 0
 
-  let ( > ) l ll = Stdlib.List.compare_lengths l ll > 0
+  let ( > ) l1 l2 = Stdlib.List.compare_lengths l1 l2 > 0
 
-  let compare l ll = Stdlib.List.compare_lengths l ll
+  let compare l1 l2 = Stdlib.List.compare_lengths l1 l2
 
   let equal = ( = )
 end

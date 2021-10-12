@@ -105,7 +105,7 @@ module Raw_context_tests = struct
     in
     let state = nullifiers_add state nf in
     let state = nullifiers_add state nf in
-    assert (List.length state.diff.nullifiers = 2) ;
+    assert (Compare.List_length_with.(state.diff.nullifiers = 2)) ;
     Sapling_storage.Nullifiers.size ctx id >>= wrap >>=? fun disk_size ->
     assert (disk_size = 0L) ;
     Sapling_storage.apply_diff ctx id state.diff |> assert_error

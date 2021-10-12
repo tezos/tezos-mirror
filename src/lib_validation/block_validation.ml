@@ -239,7 +239,6 @@ module Make (Proto : Registered_protocol.T) = struct
   let check_block_header ~(predecessor_block_header : Block_header.t) hash
       (block_header : Block_header.t) =
     let open Lwt_tzresult_syntax in
-    let validation_passes = List.length Proto.validation_passes in
     let* () =
       fail_unless
         (Int32.succ predecessor_block_header.shell.level
@@ -266,7 +265,8 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     let* () =
       fail_unless
-        (block_header.shell.validation_passes = validation_passes)
+        Compare.List_length_with.(
+          Proto.validation_passes = block_header.shell.validation_passes)
         (invalid_block
            hash
            (Unexpected_number_of_validation_passes
@@ -291,7 +291,7 @@ module Make (Proto : Registered_protocol.T) = struct
       fail_unless
         (match quota.Tezos_protocol_environment.max_op with
         | None -> true
-        | Some max -> List.length ops <= max)
+        | Some max -> Compare.List_length_with.(ops <= max))
         (let max = Option.value ~default:~-1 quota.max_op in
          invalid_block
            block_hash

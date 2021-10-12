@@ -104,7 +104,7 @@ module Reference : S = struct
     else if threshold = 0 then Synchronised {is_chain_stuck = false}
     else
       let now = Time.System.to_protocol @@ Systime_os.now () in
-      if List.length candidates < threshold then Not_synchronised
+      if Compare.List_length_with.(candidates < threshold) then Not_synchronised
       else
         match (best_of candidates, least_of candidates) with
         | ((best, _), (least, _)) ->

@@ -442,10 +442,9 @@ module Bounded = struct
 
   let check_map_is_full ~expected_size ~bounded_map =
     if
-      not
-        (List.length
-           (Operation_hash.Map.bindings (Classification.map bounded_map))
-        = expected_size)
+      Compare.List_length_with.(
+        Operation_hash.Map.bindings (Classification.map bounded_map)
+        <> expected_size)
     then
       QCheck.Test.fail_reportf
         "Expected bounded_map to be full (size = %i) but its actual size is \
@@ -470,7 +469,8 @@ module Bounded = struct
     in
     let unique_hashes = Operation_hash.Set.of_list hashes in
     QCheck.assume
-      (Operation_hash.Set.cardinal unique_hashes = List.length hashes) ;
+      Compare.List_length_with.(
+        hashes = Operation_hash.Set.cardinal unique_hashes) ;
     (* Remove all operations for the tested classification *)
     let bounded_map =
       match error_classification with

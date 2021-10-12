@@ -464,7 +464,7 @@ let test_protocol_locator base_dir =
        let (block_header, hash_list) =
          (locator :> Block_header.t * Block_hash.t list)
        in
-       Assert.is_true ~msg:"no block in locator" (List.length hash_list = 0) ;
+       Assert.is_true ~msg:"no block in locator" (hash_list = []) ;
        Store.Block.read_block chain_store genesis_hash >>=? fun b ->
        Assert.is_true
          ~msg:"single header is genesis"

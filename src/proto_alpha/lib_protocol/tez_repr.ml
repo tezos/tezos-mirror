@@ -62,7 +62,7 @@ let of_string s =
   let integers s = triplets (String.split_on_char ',' s) in
   let decimals s =
     let l = String.split_on_char ',' s in
-    if Compare.Int.(List.length l > 2) then false else triplets (List.rev l)
+    if Compare.List_length_with.(l > 2) then false else triplets (List.rev l)
   in
   let parse left right =
     let remove_commas s = String.concat "" (String.split_on_char ',' s) in

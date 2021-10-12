@@ -59,7 +59,7 @@ let rec equal_json (a : JSON.u) (b : JSON.u) =
       let sort_object =
         List.sort (fun (key_a, _) (key_b, _) -> compare key_a key_b)
       in
-      List.length object_a = List.length object_b
+      List.compare_lengths object_a object_b = 0
       && List.for_all2
            (fun (key_a, val_a) (key_b, val_b) ->
              key_a = key_b && equal_json val_a val_b)

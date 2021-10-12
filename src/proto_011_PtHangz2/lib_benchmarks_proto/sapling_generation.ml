@@ -394,8 +394,8 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
       in
       return transaction)
   >>=? fun transaction ->
-  assert (List.length transaction.inputs = nb_input) ;
-  assert (List.length transaction.outputs = nb_output) ;
+  assert (Compare.List_length_with.(transaction.inputs = nb_input)) ;
+  assert (Compare.List_length_with.(transaction.outputs = nb_output)) ;
   return (transaction, (ctxt, id))
 
 (* ------------------------------------------------------------------------- *)

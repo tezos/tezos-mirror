@@ -333,7 +333,7 @@ let test_randomness_commitment_protocol () =
       commitments
       ~proof
       ~public_keys:endorsers_public_keys) ;
-  assert (List.length commitments = threshold) ;
+  assert (Compare.List_length_with.(commitments = threshold)) ;
   (* 2nd step: first half of cycle `n - 1` *)
   (* Protocol: The revealed nonce, if any, is checked by converting it to public
      key and comparing it with the secret nonce. *)
@@ -341,7 +341,7 @@ let test_randomness_commitment_protocol () =
   assert (Pvss.Public_key.(public_nonce = revealed_nonce)) ;
   (* 3rd step: second half of cycle `n - 1` *)
   let revealed_shares = [1; 4; 8] in
-  assert (List.length revealed_shares >= threshold) ;
+  assert (Compare.List_length_with.(revealed_shares >= threshold)) ;
   let clear_shares =
     List.map
       (fun index ->

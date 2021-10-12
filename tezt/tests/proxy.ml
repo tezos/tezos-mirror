@@ -213,7 +213,7 @@ let test_context_suffix_no_rpc ?query_string path =
           queries_before ;
         test_no_overlap_rpc queries_before
   in
-  assert (List.length context_queries >= 2) ;
+  assert (List.compare_length_with context_queries 2 >= 0) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
 let paths =

@@ -44,8 +44,7 @@ open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 (** [list1_arb arb] generates non-empty lists using [arb]. *)
 let list1_arb arb =
   QCheck.(
-    list_of_size Gen.(1 -- 100) arb
-    |> add_shrink_invariant (fun l -> List.length l > 0))
+    list_of_size Gen.(1 -- 100) arb |> add_shrink_invariant (fun l -> l <> []))
 
 let irmin_tree_arb =
   let module StringList = struct
