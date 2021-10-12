@@ -942,9 +942,13 @@ let comparable_ty_eq :
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
-let merge_memo_sizes ms1 ms2 =
+let merge_memo_sizes ~merge_type_error_flag ms1 ms2 =
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
-  else error (Inconsistent_memo_sizes (ms1, ms2))
+  else
+    error
+      (match merge_type_error_flag with
+      | Fast_merge_type_error -> Inconsistent_types_fast
+      | Default_merge_type_error -> Inconsistent_memo_sizes (ms1, ms2))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
@@ -970,7 +974,9 @@ let merge_types :
     let merge_field_annot ~legacy tn1 tn2 =
       of_result (merge_field_annot ~legacy ~merge_type_error_flag tn1 tn2)
     in
-    let merge_memo_sizes ms1 ms2 = of_result (merge_memo_sizes ms1 ms2) in
+    let merge_memo_sizes ms1 ms2 =
+      of_result (merge_memo_sizes ~merge_type_error_flag ms1 ms2)
+    in
     let rec help :
         type ta tb.
         ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
@@ -2830,8 +2836,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | None -> return (transaction, ctxt)
           | Some transac_memo_size ->
               Lwt.return
-                ( merge_memo_sizes memo_size transac_memo_size >|? fun _ms ->
-                  (transaction, ctxt) ))
+                ( merge_memo_sizes
+                    ~merge_type_error_flag:Default_merge_type_error
+                    memo_size
+                    transac_memo_size
+                >|? fun _ms -> (transaction, ctxt) ))
       | None -> fail_parse_data ())
   | (Sapling_transaction_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
@@ -2840,7 +2849,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         let id = Sapling.Id.parse_z id in
         Sapling.state_from_id ctxt id >>=? fun (state, ctxt) ->
         Lwt.return
-          ( traced_no_lwt @@ merge_memo_sizes memo_size state.Sapling.memo_size
+          ( traced_no_lwt
+          @@ merge_memo_sizes
+               ~merge_type_error_flag:Default_merge_type_error
+               memo_size
+               state.Sapling.memo_size
           >|? fun _memo_size -> (state, ctxt) )
       else traced_fail (Unexpected_forged_value loc)
   | (Sapling_state_t (memo_size, _), Seq (_, [])) ->
@@ -4005,7 +4018,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               rest,
               stack_annot ),
           _ ) ) ->
-      merge_memo_sizes state_memo_size transaction_memo_size
+      merge_memo_sizes
+        ~merge_type_error_flag:Default_merge_type_error
+        state_memo_size
+        transaction_memo_size
       >>?= fun _memo_size ->
       let instr =
         {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
