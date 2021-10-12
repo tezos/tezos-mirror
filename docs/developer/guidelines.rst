@@ -405,6 +405,7 @@ Notice that we use only one version number for both input and output
 of an RPC.
 
 .. _RPC-versioning-dev-adding-an-rpc:
+
 How to Add a New Version to an RPC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -452,7 +453,7 @@ like the two examples below.
 
 .. code-block:: json
 
-    {     
+    {
       "bar": {
         "baz": 10
       }

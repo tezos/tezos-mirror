@@ -192,7 +192,7 @@ is applied to the local host by default.
 
 ::
 
-  $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
+    $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
 
 In this example the RPC is available to both ``localhost`` and to the local
 network (assuming the node does have address ``192.168.0.3`` in that network).
