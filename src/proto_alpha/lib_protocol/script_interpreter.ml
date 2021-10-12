@@ -1090,7 +1090,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       in
                       Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->
                       match eq with
-                      | Error _ -> (return_none [@ocaml.tailcall]) ctxt
+                      | Error (_ : error trace) ->
+                          (return_none [@ocaml.tailcall]) ctxt
                       | Ok (Eq, Eq) -> (
                           let kkinfo = kinfo_of_kinstr k in
                           match kkinfo.kstack_ty with

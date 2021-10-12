@@ -2035,7 +2035,7 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy
         when Compare.String.((fa :> string) = "root") -> (
           match eq_ty with
           | Ok (Eq, ty) -> return ("default", (ty : exp ty))
-          | Error _ ->
+          | Error (_ : error_trace) ->
               merge_types ~legacy ~merge_type_error_flag loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
       | _ -> of_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
@@ -5791,7 +5791,7 @@ let parse_contract_for_script :
                     (arg, (contract, entrypoint))
                   in
                   (ctxt, Some contract)
-              | Error _ -> (ctxt, None) )
+              | Error Inconsistent_types_fast -> (ctxt, None) )
       | _ ->
           Lwt.return
             ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
@@ -5837,7 +5837,7 @@ let parse_contract_for_script :
                             (arg, (contract, entrypoint))
                           in
                           (ctxt, Some contract)
-                      | Error _ -> (ctxt, None))) ))
+                      | Error Inconsistent_types_fast -> (ctxt, None))) ))
 
 let parse_code :
     ?type_logger:type_logger ->
