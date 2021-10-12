@@ -1,9 +1,11 @@
 (executable
  (name rustzcash_ctypes_gen)
- (modules rustzcash_ctypes_gen rustzcash_ctypes_bindings)
- (libraries ctypes.stubs ctypes))
+ (libraries
+  ctypes.stubs
+  ctypes)
+ (modules rustzcash_ctypes_gen rustzcash_ctypes_bindings))
 
 (rule
  (targets rustzcash_ctypes_stubs.ml rustzcash_ctypes_c_stubs.c)
- (deps    (:gen ./rustzcash_ctypes_gen.exe))
- (action  (run %{gen} %{targets})))
+ (deps (:gen ./rustzcash_ctypes_gen.exe))
+ (action (run %{gen} %{targets})))
