@@ -26,9 +26,10 @@ for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' |
     cat >> "$tmp" <<EOF
 integration:${PROTO_DIR_BASE}_batch:
   extends: .integration_python_template
-  script:
-    - poetry run pytest "${PROTO_DIR##tests_python/}" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_batch.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_batch.out" | tail
-  stage: test
+  variables:
+    PYTEST_SUITE: "${PROTO_DIR##tests_python/}"
+    PYTEST_SUITE_MARKER: "not slow"
+    PYTEST_SUITE_NAME: ${PROTO_DIR_BASE}_batch
 
 EOF
 
@@ -45,9 +46,10 @@ EOF
         cat >> "$tmp" <<EOF
 integration:${PROTO_DIR_BASE}_${testname}:
   extends: .integration_python_template
-  script:
-    - poetry run pytest "${test}" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_${testname}.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_${testname}.out" | tail
-  stage: test
+  variables:
+    PYTEST_SUITE: "${test}"
+    PYTEST_SUITE_MARKER: "slow"
+    PYTEST_SUITE_NAME: ${PROTO_DIR_BASE}_${testname}
 
 EOF
     done
@@ -62,7 +64,6 @@ integration:examples:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
     - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
-  stage: test
 EOF
 
 # 3: Extract the end of the CI configuration file. Everything after the line
