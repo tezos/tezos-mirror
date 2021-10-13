@@ -153,13 +153,13 @@ In order to create the opam repository MR:
 - Create the opam repository MR from this branch.
 
 Fourth, back in your local copy of Tezos, **update the variables in the**
-``.gitlab/ci/templates.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
+:src:`.gitlab/ci/templates.yml` **and** :src:`scripts/version.sh` **files**. Specifically, set
 the ``build_deps_image_version`` and the ``opam_repository_tag`` variables
 to the hash of the ``HEAD`` commit of the opam repository MR. Commit
 this change with a title along the lines of “CI: use dependency
 ``foo``”.
 
-Fifth, still in your local copy of Tezos, **update the variables in the**
+Fifth, still in your local copy of Tezos, **temporarily patch some variables in the**
 ``.gitlab/ci/templates.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
 the variables ``build_deps_image_name`` to
 ``registry.gitlab.com/<your-organisation>/opam-repository`` and
