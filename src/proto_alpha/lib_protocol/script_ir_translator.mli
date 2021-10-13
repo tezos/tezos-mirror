@@ -289,11 +289,12 @@ val unparse_data :
   (Script.node * context) tzresult Lwt.t
 
 val unparse_comparable_data :
+  loc:'loc ->
   context ->
   unparsing_mode ->
   'a Script_typed_ir.comparable_ty ->
   'a ->
-  (Script.node * context) tzresult Lwt.t
+  (('loc, Script.prim) Micheline.node * context) tzresult Lwt.t
 
 val unparse_code :
   context ->

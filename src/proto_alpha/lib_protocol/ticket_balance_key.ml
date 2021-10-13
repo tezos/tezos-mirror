@@ -53,6 +53,7 @@ let ticket_balance_key_and_amount ctxt ~owner
     ticketer_address
   >>=? fun (ticketer, ctxt) ->
   Script_ir_translator.unparse_comparable_data
+    ~loc:(-1)
     ctxt
     Script_ir_translator.Optimized_legacy
     comp_ty
