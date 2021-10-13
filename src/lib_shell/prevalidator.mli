@@ -55,8 +55,6 @@ type limits = {
   operations_batch_size : int;
 }
 
-type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
-
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->
