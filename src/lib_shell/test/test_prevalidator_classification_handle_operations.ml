@@ -58,6 +58,14 @@ module List_extra = struct
         match take_until_if_found ~pred rest_l with
         | None -> None
         | Some tail -> Some (fst :: tail))
+
+  (** [split_n l n] returns two lists, the first one containing the first
+      [n] elements of [l] and the second one containing the remaining elements.
+      For example:
+      [split_n [] _] is [([], [])]
+      [split_n ["a"] 1] is [(["a"], [])]
+      [split_n ["a"; "b"; "c"] 1] is [(["a"], ["b"; "c"])] *)
+  let split_n l n = (List.take_n n l, List.drop_n n l)
 end
 
 module Tree = struct
@@ -118,8 +126,7 @@ module Tree = struct
 
   (** Predicate to check that all values are different. We want
       this property for trees of blocks. If generation of block
-      were to repeat a block, this property could get broken. I have
-      not witnessed it, but being safe. *)
+      were to repeat a block, this property could get broken. *)
   let well_formed (type a) (compare : a -> a -> int) (t : a tree) =
     let module Ord = struct
       type t = a
@@ -209,39 +216,36 @@ module Block = struct
     operations : (Operation_hash.t * Operation.t) list list;
   }
 
-  let equal : t -> t -> bool =
-    let lift_eqs (left_eq : 'a -> 'a -> bool) (right_eq : 'b -> 'b -> bool)
-        ((l1, l2), (r1, r2)) =
-      left_eq l1 r1 && right_eq l2 r2
-    in
-    let pair_eq = lift_eqs Operation_hash.equal Operation.equal in
-    fun block1 block2 ->
-      (* Note that we could use the assumption that block hash
-         uniquely identifies a block. We don't do that, so that
-         we don't have to be careful about honoring this property when
-         generating random data. *)
-      Block_hash.equal block1.hash block2.hash
-      &&
-      (* Note that we could use the assumption that an operation hash
-         uniquely identifies  the operation. We don't do that, so that
-         we don't have to be careful about honoring this property when
-         generating random data. *)
-      let left_ops = List.concat block1.operations in
-      let right_ops = List.concat block2.operations in
-      List.compare_lengths left_ops right_ops = 0
-      &&
-      let combined = List.combine_drop left_ops right_ops in
-      List.for_all pair_eq combined
+  (* Because we use hashes to implement equality, we must make sure
+     that for any pair of generated blocks [(b1, b2)], [b1.hash <> b2.hash]
+     implies [b1 <> b2] where [<>] is polymorphic inequality. Said
+     differently, hashes should not be faked. *)
+  let equal : t -> t -> bool = fun t1 t2 -> Block_hash.equal t1.hash t2.hash
 
-  let compare (t1 : t) (t2 : t) =
-    let hash_diff = Block_hash.compare t1.hash t2.hash in
-    if hash_diff <> 0 then hash_diff
-    else
-      let compare_pair (oph1, op1) (oph2, op2) =
-        let hash_diff = Operation_hash.compare oph1 oph2 in
-        if hash_diff <> 0 then hash_diff else Operation.compare op1 op2
-      in
-      List.compare (List.compare compare_pair) t1.operations t2.operations
+  let compare (t1 : t) (t2 : t) = Block_hash.compare t1.hash t2.hash
+
+  (** [hash_of_blocks ops_and_hashes] is used to compute the hash of a block whose
+      [operations] field contains [ops_and_hashes].
+
+      We want the hash to be sound, because it is used to implement equality
+      (see {!equal} above), like in the production implementation. Given
+      that {!t} above contains a single field besides the [hash], we hash
+      the content of this field to obtain the hash of a block. That
+      is why we hash the hashes of operations. *)
+  let hash_of_block ops_and_hashes =
+    let hash =
+      Operation_list_hash.compute (List.map fst @@ List.concat ops_and_hashes)
+    in
+    (* We forge a fake [block_header] hash by first hashing the operations
+       and change the [b58] signature into a signature that looks like
+       the one of a block header by prefixing it with the letter [B]. *)
+    let hash_string = Operation_list_hash.to_b58check hash in
+    let suffix = String.sub hash_string 2 31 in
+    match Block_hash.of_string @@ "B" ^ suffix with
+    | Error err ->
+        Format.printf "Unexpected error: %a" Error_monad.pp_print_trace err ;
+        assert false
+    | Ok hash -> hash
 
   let tools : t Classification.block_tools =
     let hash block = block.hash in
@@ -266,44 +270,27 @@ module Block = struct
   (** Pretty prints a list of {!t}, using [sep] as the separator *)
   let pp_list ~(sep : string) (ts : t list) =
     String.concat sep @@ List.map to_string ts
+
+  module Ord = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  module Set = Set.Make (Ord)
 end
 
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  let tree_gen gen =
-    let open QCheck.Gen in
-    (* Factor used to limit the depth of the tree. *)
-    let max_depth_factor = 25 in
-    let open Tree in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            (max_depth_factor, map (fun elem -> Leaf elem) gen);
-            ( current_depth_factor,
-              map
-                (fun (elem, tree) -> Node1 (elem, tree))
-                (pair gen (self (current_depth_factor - 1))) );
-            ( current_depth_factor,
-              map
-                (fun (elem, tree1, tree2) -> Node2 (elem, tree1, tree2))
-                (triple
-                   gen
-                   (self (current_depth_factor - 1))
-                   (self (current_depth_factor - 1))) );
-          ])
-      max_depth_factor
-
-  module OpMapArb = MakeMapArb (Operation_hash.Map.Legacy)
-
   let op_map_gen : Operation.t Operation_hash.Map.t QCheck.Gen.t =
-    OpMapArb.gen
-      Prevalidator_generators.operation_hash_gen
-      Prevalidator_generators.operation_gen
+    let open QCheck.Gen in
+    let* ops = small_list Prevalidator_generators.operation_gen in
+    (* Op_map.of_seq eliminates duplicate keys (if any) *)
+    List.map (fun op -> (Operation.hash op, op)) ops
+    |> List.to_seq |> Op_map.of_seq |> return
 
   let block_gen : Block.t QCheck.Gen.t =
     let open QCheck.Gen in
-    let* hash = Prevalidator_generators.block_hash_gen in
     let* ops =
       let ops_list_gen =
         (* Having super long list of operations isn't necessary.
@@ -313,10 +300,53 @@ module Generators = struct
       (* In production these lists are exactly of size 4, being more general *)
       ops_list_gen |> list_size (int_range 0 8)
     in
-    let ops_and_hashes =
+    let ops_and_hashes : (Operation_hash.t * Operation.t) list list =
       List.map (List.map (fun op -> (Operation.hash op, op))) ops
     in
+    let hash = Block.hash_of_block ops_and_hashes in
     return Block.{hash; operations = ops_and_hashes}
+
+  (** A tree generator. Written in a slightly unusual style because it
+      generates all values beforehand, to make sure they are all different.
+      This is a property we want for trees of blocks. To do so,
+      this generator first generates a list of elements [e1; e2; e3; e4; e5; e6]
+      and then progressively splits this list to build the subtrees.
+
+      For example it takes [e1] for the root value and then splits
+      the rest into [e2; e3] and [e4; e5; e6]. Then it recurses, sending
+      [e2; e3] as values to create the left subtree and [e4; e5; e6] to
+      create the right subtree. *)
+  let tree_gen =
+    let open QCheck.Gen in
+    let* (elems : Block.t list) =
+      small_list block_gen >|= Block.Set.of_list >|= Block.Set.to_seq
+      >|= List.of_seq
+    in
+    let ret x = return (Some x) in
+    let rec go = function
+      | [] -> return None
+      | [x] -> ret (Tree.Leaf x)
+      | x :: xs -> (
+          let* one_child = QCheck.Gen.bool in
+          if one_child then
+            let* sub = go xs in
+            match sub with
+            | None -> ret (Tree.Leaf x)
+            | Some sub -> ret (Tree.Node1 (x, sub))
+          else
+            let* (left, right) =
+              QCheck.Gen.int_bound (List.length xs - 1)
+              >|= List_extra.split_n xs
+            in
+            let* left = go left and* right = go right in
+            match (left, right) with
+            | (None, None) -> ret (Tree.Leaf x)
+            | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
+            | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
+    in
+    go elems
+
+  let tree_gen = of_option_gen tree_gen
 
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
@@ -351,7 +381,7 @@ module Generators = struct
       * Operation.t Operation_hash.Map.t)
       QCheck.Gen.t =
     let open QCheck.Gen in
-    let* tree = tree_gen block_gen in
+    let* tree = tree_gen in
     assert (Tree.well_formed Block.compare tree) ;
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in

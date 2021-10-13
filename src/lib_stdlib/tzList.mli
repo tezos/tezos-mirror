@@ -40,6 +40,10 @@ val product : 'a list -> 'b list -> ('a * 'b) list
     is provided, it returns the [n] greatest element of [l]. *)
 val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
 
+(** [drop_n n l] returns the suffix of [l] after the first [n] elements,
+    or [] if [n > length l]. *)
+val drop_n : int -> 'a list -> 'a list
+
 (** [split_n n l] is a pair of lists [(j, k)] where [j] contains the [n] first
     elements of [l] and [k] the remainder elements. If [l] has less than or
     exactly [n] elements, [j] is [l] and [k] is [[]]. *)
