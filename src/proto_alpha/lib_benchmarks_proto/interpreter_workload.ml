@@ -1161,7 +1161,7 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
    | Unit_key _ -> Size.unit
    | Int_key _ -> Size.integer v
    | Nat_key _ -> Size.integer v
-   | String_key _ -> Size.string v
+   | String_key _ -> Size.script_string v
    | Bytes_key _ -> Size.bytes v
    | Mutez_key _ -> Size.mutez v
    | Bool_key _ -> Size.bool v
@@ -1272,16 +1272,19 @@ let extract_ir_sized_step :
       let list_size = Size.list ss in
       let total_bytes =
         List.fold_left
-          (fun x s -> Size.(add x (string s)))
+          (fun x s -> Size.(add x (script_string s)))
           Size.zero
           ss.elements
       in
       Instructions.concat_string list_size total_bytes
   | (IConcat_string_pair (_, _), (s1, (s2, _))) ->
-      Instructions.concat_string_pair (Size.string s1) (Size.string s2)
+      Instructions.concat_string_pair
+        (Size.script_string s1)
+        (Size.script_string s2)
   | (ISlice_string (_, _), (_off, (_len, (s, _)))) ->
-      Instructions.slice_string (Size.string s)
-  | (IString_size (_, _), (s, _)) -> Instructions.string_size (Size.string s)
+      Instructions.slice_string (Size.script_string s)
+  | (IString_size (_, _), (s, _)) ->
+      Instructions.string_size (Size.script_string s)
   | (IConcat_bytes (_, _), (ss, _)) ->
       let list_size = Size.list ss in
       let total_bytes =
