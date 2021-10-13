@@ -81,7 +81,12 @@ let create_echo () =
           (* Caller requested more bytes than available in this item of the queue:
              return the item in full and remove it from the queue. *)
           (* use [Lwt_bytes.blit_from_string] once available *)
-          Lwt_bytes.blit_from_bytes (Bytes.of_string !str_ref) 0 bytes ofs str_len ;
+          Lwt_bytes.blit_from_bytes
+            (Bytes.of_string !str_ref)
+            0
+            bytes
+            ofs
+            str_len ;
           let (_ : string ref option) = Queue.take_opt echo.queue in
           return str_len)
         else (

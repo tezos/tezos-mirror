@@ -60,9 +60,9 @@ let michelson_sample_list_encoding =
        ]
 
 let save ~filename ~terms =
-  let bytes =
+  let str =
     match
-      Data_encoding.Binary.to_bytes michelson_sample_list_encoding terms
+      Data_encoding.Binary.to_string michelson_sample_list_encoding terms
     with
     | Error err ->
         Format.eprintf
@@ -72,11 +72,7 @@ let save ~filename ~terms =
         exit 1
     | Ok res -> res
   in
-  try
-    Lwt_main.run
-    @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file
-         filename
-         (Bytes.unsafe_to_string bytes)
+  try Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
   with exn ->
     Format.eprintf
       "Michelson_mcmc_samplers.save: create_file failed (%s); exiting"
