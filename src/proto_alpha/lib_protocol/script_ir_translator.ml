@@ -5950,41 +5950,42 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       fail Unparsing_too_many_recursive_calls
     else unparse_data ctxt ~stack_depth:(stack_depth + 1) mode ty a
   in
+  let loc = -1 in
   match (ty, a) with
-  | (Unit_t _, v) -> Lwt.return @@ unparse_unit ~loc:(-1) ctxt v
-  | (Int_t _, v) -> Lwt.return @@ unparse_int ~loc:(-1) ctxt v
-  | (Nat_t _, v) -> Lwt.return @@ unparse_nat ~loc:(-1) ctxt v
-  | (String_t _, s) -> Lwt.return @@ unparse_string ~loc:(-1) ctxt s
-  | (Bytes_t _, s) -> Lwt.return @@ unparse_bytes ~loc:(-1) ctxt s
-  | (Bool_t _, b) -> Lwt.return @@ unparse_bool ~loc:(-1) ctxt b
-  | (Timestamp_t _, t) -> Lwt.return @@ unparse_timestamp ~loc:(-1) ctxt mode t
+  | (Unit_t _, v) -> Lwt.return @@ unparse_unit ~loc ctxt v
+  | (Int_t _, v) -> Lwt.return @@ unparse_int ~loc ctxt v
+  | (Nat_t _, v) -> Lwt.return @@ unparse_nat ~loc ctxt v
+  | (String_t _, s) -> Lwt.return @@ unparse_string ~loc ctxt s
+  | (Bytes_t _, s) -> Lwt.return @@ unparse_bytes ~loc ctxt s
+  | (Bool_t _, b) -> Lwt.return @@ unparse_bool ~loc ctxt b
+  | (Timestamp_t _, t) -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
   | (Address_t _, address) ->
-      Lwt.return @@ unparse_address ~loc:(-1) ctxt mode address
+      Lwt.return @@ unparse_address ~loc ctxt mode address
   | (Contract_t _, contract) ->
-      Lwt.return @@ unparse_contract ~loc:(-1) ctxt mode contract
-  | (Signature_t _, s) -> Lwt.return @@ unparse_signature ~loc:(-1) ctxt mode s
-  | (Mutez_t _, v) -> Lwt.return @@ unparse_mutez ~loc:(-1) ctxt v
-  | (Key_t _, k) -> Lwt.return @@ unparse_key ~loc:(-1) ctxt mode k
-  | (Key_hash_t _, k) -> Lwt.return @@ unparse_key_hash ~loc:(-1) ctxt mode k
+      Lwt.return @@ unparse_contract ~loc ctxt mode contract
+  | (Signature_t _, s) -> Lwt.return @@ unparse_signature ~loc ctxt mode s
+  | (Mutez_t _, v) -> Lwt.return @@ unparse_mutez ~loc ctxt v
+  | (Key_t _, k) -> Lwt.return @@ unparse_key ~loc ctxt mode k
+  | (Key_hash_t _, k) -> Lwt.return @@ unparse_key_hash ~loc ctxt mode k
   | (Operation_t _, operation) ->
-      Lwt.return @@ unparse_operation ~loc:(-1) ctxt operation
+      Lwt.return @@ unparse_operation ~loc ctxt operation
   | (Chain_id_t _, chain_id) ->
-      Lwt.return @@ unparse_chain_id ~loc:(-1) ctxt mode chain_id
-  | (Bls12_381_g1_t _, x) -> Lwt.return @@ unparse_bls12_381_g1 ~loc:(-1) ctxt x
-  | (Bls12_381_g2_t _, x) -> Lwt.return @@ unparse_bls12_381_g2 ~loc:(-1) ctxt x
-  | (Bls12_381_fr_t _, x) -> Lwt.return @@ unparse_bls12_381_fr ~loc:(-1) ctxt x
+      Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
+  | (Bls12_381_g1_t _, x) -> Lwt.return @@ unparse_bls12_381_g1 ~loc ctxt x
+  | (Bls12_381_g2_t _, x) -> Lwt.return @@ unparse_bls12_381_g2 ~loc ctxt x
+  | (Bls12_381_fr_t _, x) -> Lwt.return @@ unparse_bls12_381_fr ~loc ctxt x
   | (Pair_t ((tl, _, _), (tr, _, _), _), pair) ->
       let r_witness = comb_witness2 tr in
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
-      unparse_pair ~loc:(-1) unparse_l unparse_r ctxt mode r_witness pair
+      unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
   | (Union_t ((tl, _), (tr, _), _), v) ->
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
-      unparse_union ~loc:(-1) unparse_l unparse_r ctxt v
+      unparse_union ~loc unparse_l unparse_r ctxt v
   | (Option_t (t, _), v) ->
       let unparse_v ctxt v = non_terminal_recursion ctxt mode t v in
-      unparse_option ~loc:(-1) unparse_v ctxt v
+      unparse_option ~loc unparse_v ctxt v
   | (List_t (t, _), items) ->
       List.fold_left_es
         (fun (l, ctxt) element ->
@@ -5992,12 +5993,10 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
           >|=? fun (unparsed, ctxt) -> (unparsed :: l, ctxt))
         ([], ctxt)
         items.elements
-      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (loc, List.rev items), ctxt)
   | (Ticket_t (t, _), {ticketer; contents; amount}) ->
-      (let fake_loc = -1 in
-       (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
-       opened_ticket_type fake_loc t)
-      >>?= fun opened_ticket_ty ->
+      (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
+      opened_ticket_type loc t >>?= fun opened_ticket_ty ->
       let t = ty_of_comparable_ty opened_ticket_ty in
       (unparse_data [@tailcall])
         ctxt
@@ -6008,18 +6007,18 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->
-          unparse_comparable_data ~loc:(-1) ctxt mode t item
-          >|=? fun (item, ctxt) -> (item :: l, ctxt))
+          unparse_comparable_data ~loc ctxt mode t item >|=? fun (item, ctxt) ->
+          (item :: l, ctxt))
         ([], ctxt)
         (Script_set.fold (fun e acc -> e :: acc) set [])
-      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
       let items = Script_map.fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
-      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
     when Compare.Int.( = ) size 0 ->
-      return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
+      return (Micheline.Int (loc, Big_map.Id.unparse_to_z id), ctxt)
   | (Big_map_t (kt, vt, _), {id = Some id; diff = {map; _}; _}) ->
       let items =
         Big_map_overlay.fold (fun _ (k, v) acc -> (k, v) :: acc) map []
@@ -6036,13 +6035,13 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       in
       (* this can't fail if the original type is well-formed
          because [option vt] is always strictly smaller than [big_map kt vt] *)
-      option_t (-1) vt ~annot:None >>?= fun vt ->
+      option_t loc vt ~annot:None >>?= fun vt ->
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) ->
       ( Micheline.Prim
-          ( -1,
+          ( loc,
             D_Pair,
-            [Int (-1, Big_map.Id.unparse_to_z id); Seq (-1, items)],
+            [Int (loc, Big_map.Id.unparse_to_z id); Seq (loc, items)],
             [] ),
         ctxt )
   | (Big_map_t (kt, vt, _), {id = None; diff = {map; _}; _}) ->
@@ -6060,7 +6059,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
           items
       in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
-      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
   | (Never_t _, _) -> .
@@ -6070,39 +6069,39 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
           let bytes =
             Data_encoding.Binary.to_bytes_exn Sapling.transaction_encoding s
           in
-          (Bytes (-1, bytes), ctxt) )
+          (Bytes (loc, bytes), ctxt) )
   | (Sapling_state_t _, {id; diff; _}) ->
       Lwt.return
         ( Gas.consume ctxt (Unparse_costs.sapling_diff diff) >|? fun ctxt ->
           ( (match diff with
             | {commitments_and_ciphertexts = []; nullifiers = []} -> (
                 match id with
-                | None -> Micheline.Seq (-1, [])
+                | None -> Micheline.Seq (loc, [])
                 | Some id ->
                     let id = Sapling.Id.unparse_to_z id in
-                    Micheline.Int (-1, id))
+                    Micheline.Int (loc, id))
             | diff -> (
                 let diff_bytes =
                   Data_encoding.Binary.to_bytes_exn Sapling.diff_encoding diff
                 in
-                let unparsed_diff = Bytes (-1, diff_bytes) in
+                let unparsed_diff = Bytes (loc, diff_bytes) in
                 match id with
                 | None -> unparsed_diff
                 | Some id ->
                     let id = Sapling.Id.unparse_to_z id in
                     Micheline.Prim
-                      (-1, D_Pair, [Int (-1, id); unparsed_diff], []))),
+                      (loc, D_Pair, [Int (loc, id); unparsed_diff], []))),
             ctxt ) )
   | (Chest_key_t _, s) ->
       unparse_with_data_encoding
-        ~loc:(-1)
+        ~loc
         ctxt
         s
         Unparse_costs.chest_key
         Timelock.chest_key_encoding
   | (Chest_t _, s) ->
       unparse_with_data_encoding
-        ~loc:(-1)
+        ~loc
         ctxt
         s
         (Unparse_costs.chest ~plaintext_size:(Timelock.get_plaintext_size s))
@@ -6120,9 +6119,10 @@ and unparse_items :
  fun ctxt ~stack_depth mode kt vt items ->
   List.fold_left_es
     (fun (l, ctxt) (k, v) ->
-      unparse_comparable_data ~loc:(-1) ctxt mode kt k >>=? fun (key, ctxt) ->
+      let loc = -1 in
+      unparse_comparable_data ~loc ctxt mode kt k >>=? fun (key, ctxt) ->
       unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
-      >|=? fun (value, ctxt) -> (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
+      >|=? fun (value, ctxt) -> (Prim (loc, D_Elt, [key; value], []) :: l, ctxt))
     ([], ctxt)
     items
 
@@ -6186,45 +6186,46 @@ let unparse_script ctxt mode
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
-    ( unparse_ty ~loc:(-1) ctxt arg_type >>? fun (arg_type, ctxt) ->
-      unparse_ty ~loc:(-1) ctxt storage_type >>? fun (storage_type, ctxt) ->
-      let arg_type = add_field_annot root_name None arg_type in
-      let open Micheline in
-      let view name {input_ty; output_ty; view_code} views =
-        Prim
-          ( -1,
-            K_view,
-            [
-              String (-1, Script_string.to_string name);
-              input_ty;
-              output_ty;
-              view_code;
-            ],
-            [] )
-        :: views
-      in
-      let views = SMap.fold view views [] |> List.rev in
-      let code =
-        Seq
-          ( -1,
-            [
-              Prim (-1, K_parameter, [arg_type], []);
-              Prim (-1, K_storage, [storage_type], []);
-              Prim (-1, K_code, [code], []);
-            ]
-            @ views )
-      in
-      Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
-      Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
-      Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
-      Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
-      Gas.consume ctxt (Script.strip_locations_cost code) >>? fun ctxt ->
-      Gas.consume ctxt (Script.strip_locations_cost storage) >|? fun ctxt ->
-      ( {
-          code = lazy_expr (strip_locations code);
-          storage = lazy_expr (strip_locations storage);
-        },
-        ctxt ) )
+    (let loc = -1 in
+     unparse_ty ~loc ctxt arg_type >>? fun (arg_type, ctxt) ->
+     unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
+     let arg_type = add_field_annot root_name None arg_type in
+     let open Micheline in
+     let view name {input_ty; output_ty; view_code} views =
+       Prim
+         ( loc,
+           K_view,
+           [
+             String (loc, Script_string.to_string name);
+             input_ty;
+             output_ty;
+             view_code;
+           ],
+           [] )
+       :: views
+     in
+     let views = SMap.fold view views [] |> List.rev in
+     let code =
+       Seq
+         ( loc,
+           [
+             Prim (loc, K_parameter, [arg_type], []);
+             Prim (loc, K_storage, [storage_type], []);
+             Prim (loc, K_code, [code], []);
+           ]
+           @ views )
+     in
+     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
+     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
+     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
+     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
+     Gas.consume ctxt (Script.strip_locations_cost code) >>? fun ctxt ->
+     Gas.consume ctxt (Script.strip_locations_cost storage) >|? fun ctxt ->
+     ( {
+         code = lazy_expr (strip_locations code);
+         storage = lazy_expr (strip_locations storage);
+       },
+       ctxt ))
 
 let pack_data_with_mode ctxt typ data ~mode =
   unparse_data ~stack_depth:0 ctxt mode typ data >>=? fun (unparsed, ctxt) ->
