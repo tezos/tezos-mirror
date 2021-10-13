@@ -1323,15 +1323,6 @@ let current_request (t : t) =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.current_request w
 
-let protocol_hash (t : t) =
-  let module Prevalidator : T = (val t) in
-  Prevalidator.Proto.hash
-
-let parameters (t : t) =
-  let module Prevalidator : T = (val t) in
-  let w = Lazy.force Prevalidator.worker in
-  (Prevalidator.Worker.state w).shell.parameters
-
 let information (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
