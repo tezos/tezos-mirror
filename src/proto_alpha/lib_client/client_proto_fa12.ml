@@ -225,9 +225,7 @@ let () =
         expr)
     Data_encoding.(
       obj2
-        (req
-           "location"
-           Tezos_micheline.Micheline_encoding.canonical_location_encoding)
+        (req "location" Script.location_encoding)
         (req "value" Script.expr_encoding))
     (function Unexpected_error (loc, expr) -> Some (loc, expr) | _ -> None)
     (fun (loc, expr) -> Unexpected_error (loc, expr))
@@ -262,11 +260,7 @@ let callback ~loc ?entrypoint addr =
 (** Michelson type combinators: produce a Michelson node of the
    expected type, and a function to check another node is
    syntactically equivalent. *)
-
-type node =
-  (Micheline.canonical_location, Michelson_v1_primitives.prim) Micheline.node
-
-type type_eq_combinator = node * (node -> bool)
+type type_eq_combinator = Script.node * (Script.node -> bool)
 
 (** [t_pair ~loc l] takes a list of types and respective equivalence
    check functions, and returns a type of n-ary pair of such types and
