@@ -102,7 +102,7 @@ let bytes =
 
 let bool = testable Fmt.bool ( = )
 
-let unit = testable (Fmt.unit "()") ( = )
+let unit = testable (Fmt.any "()") ( = )
 
 let option e =
   let eq x y =
