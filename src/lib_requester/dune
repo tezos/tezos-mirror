@@ -1,9 +1,9 @@
 (library
  (name tezos_requester)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-requester)
- (libraries tezos-base
-            tezos-stdlib-unix
-            lwt-watcher)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  lwt-watcher)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix)))

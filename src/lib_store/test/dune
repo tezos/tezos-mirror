@@ -1,38 +1,36 @@
 (executables
  (names test test_legacy legacy_store_maker)
- (libraries tezos-base
-            tezos-store
-            tezos-legacy-store
-            tezos-stdlib-unix
-            tezos-embedded-protocol-demo-noops
-            tezos-embedded-protocol-genesis
-            tezos-embedded-protocol-alpha
-            tezos-protocol-alpha-parameters
-            tezos-protocol-plugin-alpha
-            tezos-validation
-            alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives
-          -open Tezos_store
-          -open Tezos_legacy_store
-          -open Tezos_shell_services
-          -open Tezos_stdlib_unix
-          -open Tezos_validation
-          -open Tezos_protocol_alpha_parameters
-          -open Tezos_protocol_plugin_alpha)))
+ (libraries
+  tezos-base
+  tezos-store
+  tezos-legacy-store
+  tezos-stdlib-unix
+  tezos-embedded-protocol-demo-noops
+  tezos-embedded-protocol-genesis
+  tezos-embedded-protocol-alpha
+  tezos-protocol-alpha-parameters
+  tezos-protocol-plugin-alpha
+  tezos-validation
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_store
+   -open Tezos_legacy_store
+   -open Tezos_shell_services
+   -open Tezos_stdlib_unix
+   -open Tezos_validation
+   -open Tezos_protocol_alpha_parameters
+   -open Tezos_protocol_plugin_alpha)))
 
 (rule
  (alias buildtest)
- (deps
-   ../legacy_store/legacy_store_builder.exe
-   test.exe
-   test_legacy.exe)
+ (deps ../legacy_store/legacy_store_builder.exe test.exe test_legacy.exe)
  (action (progn)))
 
 (rule
  (alias runtest_store)
- (action
-  (setenv SLOW_TEST false
-   (run %{exe:test.exe}))))
+ (action (setenv SLOW_TEST false (run %{exe:test.exe}))))
 
 (rule
  (alias runtest_store_legacy)
@@ -49,7 +47,5 @@
 (rule
  (alias runtest)
  (package tezos-store)
- (deps
-  (alias runtest_store)
-  (alias runtest_store_legacy))
+ (deps (alias runtest_store) (alias runtest_store_legacy))
  (action (progn)))
