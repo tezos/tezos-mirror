@@ -79,7 +79,7 @@ update_all_dot_ocamlformats () {
                 ;;
             src/proto_00{0..6}_*/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
-                ( cd "$d" ; ls -1 *.mli *.ml | LC_COLLATE=C sort > .ocamlformat-ignore ; )
+                ( find "$d" -maxdepth 1 -name "*.ml*"  | LC_COLLATE=C sort > "$d/.ocamlformat-ignore" ; )
                 git add "$d/.ocamlformat-ignore"
                 ;;
             * )
@@ -158,7 +158,7 @@ check_redirects () {
     fi
 
     exit_code=0
-    while read old new code; do
+    while read -r old new code; do
         re='^[0-9]+$'
         if ! [[ $code =~ $re && $code -ge 300 ]] ; then
             say "in docs/_redirects: redirect $old -> $new has erroneous status code \"$code\""

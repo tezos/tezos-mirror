@@ -25,10 +25,8 @@ scripts/update_hashes.sh
 scripts/update_integration_test.sh
 scripts/update_opam_repo.sh
 scripts/user_activated_upgrade.sh
-scripts/version.sh
 src/bin_client/bash-completion.sh
 src/bin_client/tezos-init-sandboxed-client.sh
 src/bin_node/tezos-sandboxed-node.sh
 src/lib_shell/test/generate_locator_plot.sh
-src/tooling/lint.sh
 tests_python/scripts/repeat_test.sh
