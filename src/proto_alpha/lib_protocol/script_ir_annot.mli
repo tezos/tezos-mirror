@@ -128,18 +128,20 @@ val merge_field_annot :
 val merge_var_annot : var_annot option -> var_annot option -> var_annot option
 
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
-val error_unexpected_annot : int -> 'a list -> unit tzresult
+val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
 (** Parse a type annotation only. *)
-val parse_type_annot : int -> string list -> type_annot option tzresult
+val parse_type_annot :
+  Script.location -> string list -> type_annot option tzresult
 
 (** Parse a field annotation only. *)
-val parse_field_annot : int -> string list -> field_annot option tzresult
+val parse_field_annot :
+  Script.location -> string list -> field_annot option tzresult
 
 (** Parse an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
 val parse_composed_type_annot :
-  int ->
+  Script.location ->
   string list ->
   (type_annot option * field_annot option * field_annot option) tzresult
 
@@ -155,12 +157,15 @@ val check_correct_field :
 
 (** Parse a variable annotation, replaced by a default value if [None]. *)
 val parse_var_annot :
-  int -> ?default:var_annot option -> string list -> var_annot option tzresult
+  Script.location ->
+  ?default:var_annot option ->
+  string list ->
+  var_annot option tzresult
 
 val is_allowed_char : char -> bool
 
 val parse_constr_annot :
-  int ->
+  Script.location ->
   ?if_special_first:field_annot option ->
   ?if_special_second:field_annot option ->
   string list ->
@@ -171,10 +176,12 @@ val parse_constr_annot :
   tzresult
 
 val parse_two_var_annot :
-  int -> string list -> (var_annot option * var_annot option) tzresult
+  Script.location ->
+  string list ->
+  (var_annot option * var_annot option) tzresult
 
 val parse_destr_annot :
-  int ->
+  Script.location ->
   string list ->
   default_accessor:field_annot option ->
   field_name:field_annot option ->
@@ -183,7 +190,7 @@ val parse_destr_annot :
   (var_annot option * field_annot option) tzresult
 
 val parse_unpair_annot :
-  int ->
+  Script.location ->
   string list ->
   field_name_car:field_annot option ->
   field_name_cdr:field_annot option ->
@@ -197,10 +204,12 @@ val parse_unpair_annot :
   tzresult
 
 val parse_entrypoint_annot :
-  int ->
+  Script.location ->
   ?default:var_annot option ->
   string list ->
   (var_annot option * field_annot option) tzresult
 
 val parse_var_type_annot :
-  int -> string list -> (var_annot option * type_annot option) tzresult
+  Script.location ->
+  string list ->
+  (var_annot option * type_annot option) tzresult

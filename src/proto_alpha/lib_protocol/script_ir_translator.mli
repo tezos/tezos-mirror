@@ -204,7 +204,7 @@ end
 
 (** {2 High-level Michelson Data Types} *)
 type type_logger =
-  int ->
+  Script.location ->
   (Script.expr * Script.annot) list ->
   (Script.expr * Script.annot) list ->
   unit

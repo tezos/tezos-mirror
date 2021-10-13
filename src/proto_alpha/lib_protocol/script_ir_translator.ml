@@ -106,7 +106,7 @@ type tc_context =
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type type_logger =
-  int ->
+  Script.location ->
   (Script.expr * Script.annot) list ->
   (Script.expr * Script.annot) list ->
   unit
@@ -1219,7 +1219,7 @@ let merge_branches :
     type a s b u c v.
     legacy:bool ->
     context ->
-    int ->
+    Script.location ->
     (a, s) judgement ->
     (b, u) judgement ->
     (a, s, b, u, c, v) branch ->
