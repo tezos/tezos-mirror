@@ -5882,7 +5882,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
         else if Entrypoints_map.mem name all then
           ok (List.rev path :: unreachables, all)
         else
-          unparse_ty ~loc:(-1) ctxt ty >>? fun (unparsed_ty, _) ->
+          unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
           ok
             ( unreachables,
               Entrypoints_map.add name (List.rev path, unparsed_ty) all )
@@ -5892,8 +5892,11 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       t ty ->
       prim list ->
       bool ->
-      prim list list * (prim list * Script.node) Entrypoints_map.t ->
-      (prim list list * (prim list * Script.node) Entrypoints_map.t) tzresult =
+      prim list list
+      * (prim list * (unit, Script.prim) Micheline.node) Entrypoints_map.t ->
+      (prim list list
+      * (prim list * (unit, Script.prim) Micheline.node) Entrypoints_map.t)
+      tzresult =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
@@ -5912,7 +5915,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
           acc
     | _ -> ok acc
   in
-  unparse_ty ~loc:(-1) ctxt full >>? fun (unparsed_full, _) ->
+  unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
     | None | Some (Field_annot "") -> (Entrypoints_map.empty, false)

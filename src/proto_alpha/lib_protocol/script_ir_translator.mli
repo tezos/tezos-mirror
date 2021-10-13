@@ -467,7 +467,8 @@ val list_entrypoints :
   context ->
   root_name:Script_typed_ir.field_annot option ->
   (Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t)
+  * (Michelson_v1_primitives.prim list * (unit, Script.prim) Micheline.node)
+    Entrypoints_map.t)
   tzresult
 
 val pack_data :
