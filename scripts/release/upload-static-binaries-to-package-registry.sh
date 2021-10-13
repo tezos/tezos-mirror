@@ -1,12 +1,13 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
-set -euo pipefail
+set -eu
 
 ARCH_PREFIX=$1
+binaries=
 
-. scripts/release/binaries.sh
+. scripts/release/binaries.sh || exit 1
 
-for binary in "${binaries[@]}"; do
+for binary in $binaries; do
     curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
          --upload-file "tezos-binaries/$binary" \
          "$PACKAGE_REGISTRY_URL/${ARCH_PREFIX}$binary"
