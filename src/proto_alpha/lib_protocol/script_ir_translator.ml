@@ -203,51 +203,64 @@ let add_field_annot a var = function
   | expr -> expr
 
 let rec unparse_comparable_ty_uncarbonated :
-    type a. a comparable_ty -> Script.node = function
-  | Unit_key meta -> Prim (-1, T_unit, [], unparse_type_annot meta.annot)
-  | Never_key meta -> Prim (-1, T_never, [], unparse_type_annot meta.annot)
-  | Int_key meta -> Prim (-1, T_int, [], unparse_type_annot meta.annot)
-  | Nat_key meta -> Prim (-1, T_nat, [], unparse_type_annot meta.annot)
+    type a loc. loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node
+    =
+ fun ~loc -> function
+  | Unit_key meta -> Prim (loc, T_unit, [], unparse_type_annot meta.annot)
+  | Never_key meta -> Prim (loc, T_never, [], unparse_type_annot meta.annot)
+  | Int_key meta -> Prim (loc, T_int, [], unparse_type_annot meta.annot)
+  | Nat_key meta -> Prim (loc, T_nat, [], unparse_type_annot meta.annot)
   | Signature_key meta ->
-      Prim (-1, T_signature, [], unparse_type_annot meta.annot)
-  | String_key meta -> Prim (-1, T_string, [], unparse_type_annot meta.annot)
-  | Bytes_key meta -> Prim (-1, T_bytes, [], unparse_type_annot meta.annot)
-  | Mutez_key meta -> Prim (-1, T_mutez, [], unparse_type_annot meta.annot)
-  | Bool_key meta -> Prim (-1, T_bool, [], unparse_type_annot meta.annot)
-  | Key_hash_key meta -> Prim (-1, T_key_hash, [], unparse_type_annot meta.annot)
-  | Key_key meta -> Prim (-1, T_key, [], unparse_type_annot meta.annot)
+      Prim (loc, T_signature, [], unparse_type_annot meta.annot)
+  | String_key meta -> Prim (loc, T_string, [], unparse_type_annot meta.annot)
+  | Bytes_key meta -> Prim (loc, T_bytes, [], unparse_type_annot meta.annot)
+  | Mutez_key meta -> Prim (loc, T_mutez, [], unparse_type_annot meta.annot)
+  | Bool_key meta -> Prim (loc, T_bool, [], unparse_type_annot meta.annot)
+  | Key_hash_key meta ->
+      Prim (loc, T_key_hash, [], unparse_type_annot meta.annot)
+  | Key_key meta -> Prim (loc, T_key, [], unparse_type_annot meta.annot)
   | Timestamp_key meta ->
-      Prim (-1, T_timestamp, [], unparse_type_annot meta.annot)
-  | Address_key meta -> Prim (-1, T_address, [], unparse_type_annot meta.annot)
-  | Chain_id_key meta -> Prim (-1, T_chain_id, [], unparse_type_annot meta.annot)
+      Prim (loc, T_timestamp, [], unparse_type_annot meta.annot)
+  | Address_key meta -> Prim (loc, T_address, [], unparse_type_annot meta.annot)
+  | Chain_id_key meta ->
+      Prim (loc, T_chain_id, [], unparse_type_annot meta.annot)
   | Pair_key ((l, al), (r, ar), meta) -> (
-      let tl = add_field_annot al None (unparse_comparable_ty_uncarbonated l) in
-      let tr = add_field_annot ar None (unparse_comparable_ty_uncarbonated r) in
+      let tl =
+        add_field_annot al None (unparse_comparable_ty_uncarbonated ~loc l)
+      in
+      let tr =
+        add_field_annot ar None (unparse_comparable_ty_uncarbonated ~loc r)
+      in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
       match tr with
       | Prim (_, T_pair, ts, []) ->
-          Prim (-1, T_pair, tl :: ts, unparse_type_annot meta.annot)
-      | _ -> Prim (-1, T_pair, [tl; tr], unparse_type_annot meta.annot))
+          Prim (loc, T_pair, tl :: ts, unparse_type_annot meta.annot)
+      | _ -> Prim (loc, T_pair, [tl; tr], unparse_type_annot meta.annot))
   | Union_key ((l, al), (r, ar), meta) ->
-      let tl = add_field_annot al None (unparse_comparable_ty_uncarbonated l) in
-      let tr = add_field_annot ar None (unparse_comparable_ty_uncarbonated r) in
-      Prim (-1, T_or, [tl; tr], unparse_type_annot meta.annot)
+      let tl =
+        add_field_annot al None (unparse_comparable_ty_uncarbonated ~loc l)
+      in
+      let tr =
+        add_field_annot ar None (unparse_comparable_ty_uncarbonated ~loc r)
+      in
+      Prim (loc, T_or, [tl; tr], unparse_type_annot meta.annot)
   | Option_key (t, meta) ->
       Prim
-        ( -1,
+        ( loc,
           T_option,
-          [unparse_comparable_ty_uncarbonated t],
+          [unparse_comparable_ty_uncarbonated ~loc t],
           unparse_type_annot meta.annot )
 
-let unparse_memo_size memo_size =
+let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
-  Int (-1, z)
+  Int (loc, z)
 
-let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
- fun ty ->
-  let prim (name, args, annot) = Prim (-1, name, args, annot) in
+let rec unparse_ty_uncarbonated :
+    type a loc. loc:loc -> a ty -> (loc, Script.prim) Micheline.node =
+ fun ~loc ty ->
+  let prim (name, args, annot) = Prim (loc, name, args, annot) in
   match ty with
   | Unit_t meta -> prim (T_unit, [], unparse_type_annot meta.annot)
   | Int_t meta -> prim (T_int, [], unparse_type_annot meta.annot)
@@ -271,13 +284,13 @@ let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
   | Bls12_381_fr_t meta ->
       prim (T_bls12_381_fr, [], unparse_type_annot meta.annot)
   | Contract_t (ut, meta) ->
-      let t = unparse_ty_uncarbonated ut in
+      let t = unparse_ty_uncarbonated ~loc ut in
       prim (T_contract, [t], unparse_type_annot meta.annot)
   | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), meta) ->
       let annot = unparse_type_annot meta.annot in
-      let utl = unparse_ty_uncarbonated utl in
+      let utl = unparse_ty_uncarbonated ~loc utl in
       let tl = add_field_annot l_field l_var utl in
-      let utr = unparse_ty_uncarbonated utr in
+      let utr = unparse_ty_uncarbonated ~loc utr in
       let tr = add_field_annot r_field r_var utr in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has an
@@ -288,56 +301,56 @@ let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
         | _ -> (T_pair, [tl; tr], annot))
   | Union_t ((utl, l_field), (utr, r_field), meta) ->
       let annot = unparse_type_annot meta.annot in
-      let utl = unparse_ty_uncarbonated utl in
+      let utl = unparse_ty_uncarbonated ~loc utl in
       let tl = add_field_annot l_field None utl in
-      let utr = unparse_ty_uncarbonated utr in
+      let utr = unparse_ty_uncarbonated ~loc utr in
       let tr = add_field_annot r_field None utr in
       prim (T_or, [tl; tr], annot)
   | Lambda_t (uta, utr, meta) ->
-      let ta = unparse_ty_uncarbonated uta in
-      let tr = unparse_ty_uncarbonated utr in
+      let ta = unparse_ty_uncarbonated ~loc uta in
+      let tr = unparse_ty_uncarbonated ~loc utr in
       prim (T_lambda, [ta; tr], unparse_type_annot meta.annot)
   | Option_t (ut, meta) ->
       let annot = unparse_type_annot meta.annot in
-      let ut = unparse_ty_uncarbonated ut in
+      let ut = unparse_ty_uncarbonated ~loc ut in
       prim (T_option, [ut], annot)
   | List_t (ut, meta) ->
-      let t = unparse_ty_uncarbonated ut in
+      let t = unparse_ty_uncarbonated ~loc ut in
       prim (T_list, [t], unparse_type_annot meta.annot)
   | Ticket_t (ut, meta) ->
-      let t = unparse_comparable_ty_uncarbonated ut in
+      let t = unparse_comparable_ty_uncarbonated ~loc ut in
       prim (T_ticket, [t], unparse_type_annot meta.annot)
   | Set_t (ut, meta) ->
-      let t = unparse_comparable_ty_uncarbonated ut in
+      let t = unparse_comparable_ty_uncarbonated ~loc ut in
       prim (T_set, [t], unparse_type_annot meta.annot)
   | Map_t (uta, utr, meta) ->
-      let ta = unparse_comparable_ty_uncarbonated uta in
-      let tr = unparse_ty_uncarbonated utr in
+      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+      let tr = unparse_ty_uncarbonated ~loc utr in
       prim (T_map, [ta; tr], unparse_type_annot meta.annot)
   | Big_map_t (uta, utr, meta) ->
-      let ta = unparse_comparable_ty_uncarbonated uta in
-      let tr = unparse_ty_uncarbonated utr in
+      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+      let tr = unparse_ty_uncarbonated ~loc utr in
       prim (T_big_map, [ta; tr], unparse_type_annot meta.annot)
   | Sapling_transaction_t (memo_size, meta) ->
       prim
         ( T_sapling_transaction,
-          [unparse_memo_size memo_size],
+          [unparse_memo_size ~loc memo_size],
           unparse_type_annot meta.annot )
   | Sapling_state_t (memo_size, meta) ->
       prim
         ( T_sapling_state,
-          [unparse_memo_size memo_size],
+          [unparse_memo_size ~loc memo_size],
           unparse_type_annot meta.annot )
   | Chest_key_t meta -> prim (T_chest_key, [], unparse_type_annot meta.annot)
   | Chest_t meta -> prim (T_chest, [], unparse_type_annot meta.annot)
 
-let unparse_ty ctxt ty =
+let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
-  (unparse_ty_uncarbonated ty, ctxt)
+  (unparse_ty_uncarbonated ~loc ty, ctxt)
 
-let unparse_comparable_ty ctxt comp_ty =
+let unparse_comparable_ty ~loc ctxt comp_ty =
   Gas.consume ctxt (Unparse_costs.unparse_comparable_type comp_ty)
-  >|? fun ctxt -> (unparse_comparable_ty_uncarbonated comp_ty, ctxt)
+  >|? fun ctxt -> (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
 
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
@@ -356,7 +369,7 @@ let serialize_ty_for_error ty =
     It is hence OK to use them in errors that are not caught in the validation
     (only once in apply).
   *)
-  let ty = unparse_ty_uncarbonated ty in
+  let ty = unparse_ty_uncarbonated ~loc:() ty in
   Micheline.strip_locations (strip_var_annots ty)
 
 let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
@@ -401,7 +414,7 @@ let rec unparse_stack_uncarbonated :
     type a s. (a, s) stack_ty -> (Script.expr * Script.annot) list = function
   | Bot_t -> []
   | Item_t (ty, rest, annot) ->
-      let uty = unparse_ty_uncarbonated ty in
+      let uty = unparse_ty_uncarbonated ~loc:() ty in
       let urest = unparse_stack_uncarbonated rest in
       (strip_locations uty, unparse_var_annot annot) :: urest
 
@@ -5865,7 +5878,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
         else if Entrypoints_map.mem name all then
           ok (List.rev path :: unreachables, all)
         else
-          unparse_ty ctxt ty >>? fun (unparsed_ty, _) ->
+          unparse_ty ~loc:(-1) ctxt ty >>? fun (unparsed_ty, _) ->
           ok
             ( unreachables,
               Entrypoints_map.add name (List.rev path, unparsed_ty) all )
@@ -5895,7 +5908,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
           acc
     | _ -> ok acc
   in
-  unparse_ty ctxt full >>? fun (unparsed_full, _) ->
+  unparse_ty ~loc:(-1) ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
     | None | Some (Field_annot "") -> (Entrypoints_map.empty, false)
@@ -6162,8 +6175,8 @@ let unparse_script ctxt mode
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
-    ( unparse_ty ctxt arg_type >>? fun (arg_type, ctxt) ->
-      unparse_ty ctxt storage_type >>? fun (storage_type, ctxt) ->
+    ( unparse_ty ~loc:(-1) ctxt arg_type >>? fun (arg_type, ctxt) ->
+      unparse_ty ~loc:(-1) ctxt storage_type >>? fun (storage_type, ctxt) ->
       let arg_type = add_field_annot root_name None arg_type in
       let open Micheline in
       let view name {input_ty; output_ty; view_code} views =
@@ -6302,9 +6315,9 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
   | None ->
       Big_map.fresh ~temporary ctxt >>=? fun (ctxt, id) ->
       Lwt.return
-        (let kt = unparse_comparable_ty_uncarbonated key_type in
+        (let kt = unparse_comparable_ty_uncarbonated ~loc:() key_type in
          Gas.consume ctxt (Script.strip_locations_cost kt) >>? fun ctxt ->
-         unparse_ty ctxt value_type >>? fun (kv, ctxt) ->
+         unparse_ty ~loc:() ctxt value_type >>? fun (kv, ctxt) ->
          Gas.consume ctxt (Script.strip_locations_cost kv) >|? fun ctxt ->
          let key_type = Micheline.strip_locations kt in
          let value_type = Micheline.strip_locations kv in

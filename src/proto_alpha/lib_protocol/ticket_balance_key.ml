@@ -35,7 +35,7 @@ open Alpha_context
 let ticket_balance_key_and_amount ctxt ~owner
     (Ticket_scanner.Ex_ticket
       (comp_ty, Script_typed_ir.{ticketer; contents; amount})) =
-  Script_ir_translator.unparse_comparable_ty ctxt comp_ty
+  Script_ir_translator.unparse_comparable_ty ~loc:(-1) ctxt comp_ty
   >>?= fun (cont_ty_unstripped, ctxt) ->
   (* We strip the annotations from the content type in order to map
      tickets with the same content type, but with different annotations, to the

@@ -168,7 +168,7 @@ module Printers = struct
     string_of_something @@ fun ctxt ->
     Lwt.return
     @@ Script_ir_translator.(
-         unparse_ty ctxt ty >>? fun (node, _) ->
+         unparse_ty ~loc:() ctxt ty >>? fun (node, _) ->
          Ok (Micheline.strip_locations node))
 
   let string_of_code code = string_of_something @@ fun _ -> return code

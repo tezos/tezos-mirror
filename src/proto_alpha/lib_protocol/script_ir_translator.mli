@@ -376,12 +376,16 @@ val parse_ty :
   (ex_ty * context) tzresult
 
 val unparse_ty :
-  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
+  loc:'loc ->
+  context ->
+  'a Script_typed_ir.ty ->
+  (('loc, Script.prim) Micheline.node * context) tzresult
 
 val unparse_comparable_ty :
+  loc:'loc ->
   context ->
   'a Script_typed_ir.comparable_ty ->
-  (Script.node * context) tzresult
+  (('loc, Script.prim) Micheline.node * context) tzresult
 
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
@@ -392,8 +396,8 @@ val parse_toplevel :
 val add_field_annot :
   Script_typed_ir.field_annot option ->
   Script_typed_ir.var_annot option ->
-  Script.node ->
-  Script.node
+  ('loc, 'prim) Micheline.node ->
+  ('loc, 'prim) Micheline.node
 
 val typecheck_code :
   legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t

@@ -88,7 +88,8 @@ val is_unit_parameter : lazy_expr -> bool
 
 val strip_annotations : node -> node
 
-val strip_locations_cost : node -> Gas_limit_repr.cost
+val strip_locations_cost :
+  (_, Michelson_v1_primitives.prim) Micheline.node -> Gas_limit_repr.cost
 
 val strip_annotations_cost : node -> Gas_limit_repr.cost
 

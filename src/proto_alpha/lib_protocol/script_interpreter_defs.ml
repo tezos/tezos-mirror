@@ -457,7 +457,7 @@ let apply ctxt gas capture_ty capture lam =
   let (Item_t (full_arg_ty, _, _)) = descr.kbef in
   let ctxt = update_context gas ctxt in
   unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
-  unparse_ty ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
+  unparse_ty ~loc:(-1) ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
   | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t, None) in
@@ -538,11 +538,12 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
 let create_contract (ctxt, sc) gas storage_type param_type code views root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
-  unparse_ty ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
+  unparse_ty ~loc:(-1) ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
   let unparsed_param_type =
     Script_ir_translator.add_field_annot root_name None unparsed_param_type
   in
-  unparse_ty ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
+  unparse_ty ~loc:(-1) ctxt storage_type
+  >>?= fun (unparsed_storage_type, ctxt) ->
   let open Micheline in
   let view name {input_ty; output_ty; view_code} views =
     Prim
