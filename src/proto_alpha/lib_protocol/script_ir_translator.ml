@@ -1999,21 +1999,23 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     | None -> false
     | Some (Field_annot l) -> Compare.String.(l = entrypoint)
   in
+  let loc = -1 in
   let rec find_entrypoint :
       type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
         if annot_is_entrypoint entrypoint al then
-          Some ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
+          Some ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
         else if annot_is_entrypoint entrypoint ar then
-          Some ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
+          Some ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
         else
           match find_entrypoint tl entrypoint with
-          | Some (f, t) -> Some ((fun e -> Prim (0, D_Left, [f e], [])), t)
+          | Some (f, t) -> Some ((fun e -> Prim (loc, D_Left, [f e], [])), t)
           | None -> (
               match find_entrypoint tr entrypoint with
-              | Some (f, t) -> Some ((fun e -> Prim (0, D_Right, [f e], [])), t)
+              | Some (f, t) ->
+                  Some ((fun e -> Prim (loc, D_Right, [f e], [])), t)
               | None -> None))
     | _ -> None
   in
