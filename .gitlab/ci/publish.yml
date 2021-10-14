@@ -139,6 +139,8 @@ release-on-gitlab:
     - scripts/release/create-release-with-static-binaries.sh
 
 merge-manifest:
+  extends:
+    - .rules_template__master_and_releases
   image: docker:latest
   services:
     - name: "docker:dind"
@@ -146,10 +148,6 @@ merge-manifest:
   variables:
     DOCKER_DRIVER: overlay2
   stage: publish_release
-  only:
-    - master@tezos/tezos
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   before_script:
     - apk add git binutils
     - mkdir ~/.docker || true
