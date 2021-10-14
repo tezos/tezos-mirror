@@ -838,13 +838,13 @@ module Onthefly : sig
      it as bytes.
      Warning, this function loads the whole data in
      memory. *)
-  val load_file : i -> file -> bytes Lwt.t
+  val load_file : i -> file -> string Lwt.t
 
   (* [load_from_filename tar ~filename] loads the file with the name
      [filename] from the given [tar] and returns it as
      bytes.
      Warning, this function loads the whole data in memory *)
-  val load_from_filename : i -> filename:string -> bytes option Lwt.t
+  val load_from_filename : i -> filename:string -> string option Lwt.t
 
   (* [copy_to_file tar file ~dst] copies the [file] from the [tar]
      into new file designated by [dst]. *)
@@ -1136,7 +1136,8 @@ end = struct
     Lwt_unix.LargeFile.lseek t.fd data_ofs SEEK_SET >>= fun _ ->
     let data_size = Int64.to_int header.file_size in
     let buf = Bytes.create data_size in
-    Lwt_unix.read t.fd buf 0 data_size >>= fun _ -> Lwt.return buf
+    Lwt_unix.read t.fd buf 0 data_size >>= fun _ ->
+    Lwt.return (Bytes.unsafe_to_string buf)
 
   let get_raw_input_fd {fd; _} = fd
 
@@ -1193,7 +1194,7 @@ end = struct
 
   let load_from_filename t ~filename =
     get_file t ~filename >>= function
-    | Some hd -> get_raw t hd >>= fun bytes -> Lwt.return_some bytes
+    | Some hd -> get_raw t hd >>= fun str -> Lwt.return_some str
     | None -> Lwt.return_none
 
   let copy_to_file tar {header; data_ofs} ~dst =
@@ -2485,8 +2486,8 @@ module Tar_loader : LOADER = struct
     let filename = Naming.(snapshot_version_file t.snapshot_tar |> file_path) in
     (Onthefly.find_file t.tar ~filename >>= function
      | Some file -> (
-         Onthefly.load_file t.tar file >>= fun bytes ->
-         match Data_encoding.Json.from_string (Bytes.to_string bytes) with
+         Onthefly.load_file t.tar file >>= fun str ->
+         match Data_encoding.Json.from_string str with
          | Ok json ->
              Lwt.return_some
                (Data_encoding.Json.destruct Version.version_encoding json)
@@ -2502,8 +2503,8 @@ module Tar_loader : LOADER = struct
     in
     (Onthefly.find_file t.tar ~filename >>= function
      | Some file -> (
-         Onthefly.load_file t.tar file >>= fun bytes ->
-         match Data_encoding.Json.from_string (Bytes.to_string bytes) with
+         Onthefly.load_file t.tar file >>= fun str ->
+         match Data_encoding.Json.from_string str with
          | Ok json ->
              Lwt.return_some
                (Data_encoding.Json.destruct metadata_encoding json)
@@ -2665,9 +2666,7 @@ module Raw_importer : IMPORTER = struct
     in
     Lwt_utils_unix.read_file protocol_tbl_filename >>= fun table_bytes ->
     match
-      Data_encoding.Binary.of_bytes_opt
-        Protocol_levels.encoding
-        (Bytes.unsafe_of_string table_bytes)
+      Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
     with
     | Some table -> return table
     | None ->
@@ -2717,7 +2716,7 @@ module Raw_importer : IMPORTER = struct
     in
     Lwt_utils_unix.copy_file ~src ~dst >>= fun () ->
     Lwt_utils_unix.read_file dst >>= fun protocol_sources ->
-    match Protocol.of_bytes (Bytes.unsafe_of_string protocol_sources) with
+    match Protocol.of_string protocol_sources with
     | None -> fail (Cannot_decode_protocol protocol_hash)
     | Some p ->
         let hash = Protocol.hash p in
@@ -2871,8 +2870,8 @@ module Tar_importer : IMPORTER = struct
       Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
     in
     (Onthefly.load_from_filename t.tar ~filename >>= function
-     | Some bytes -> (
-         match Data_encoding.Binary.of_bytes_opt block_data_encoding bytes with
+     | Some str -> (
+         match Data_encoding.Binary.of_string_opt block_data_encoding str with
          | Some metadata -> return_some metadata
          | None -> return_none)
      | None -> return_none)
@@ -2900,13 +2899,13 @@ module Tar_importer : IMPORTER = struct
     in
     Onthefly.load_from_filename t.tar ~filename:protocol_tbl_filename
     >>= function
-    | Some bytes ->
+    | Some str ->
         let (_ofs, res) =
           Data_encoding.Binary.read_exn
             Protocol_levels.encoding
-            (Bytes.unsafe_to_string bytes)
+            str
             0
-            (Bytes.length bytes)
+            (String.length str)
         in
         return res
     | None ->
@@ -2955,7 +2954,7 @@ module Tar_importer : IMPORTER = struct
     in
     Onthefly.copy_to_file t.tar file ~dst >>= fun () ->
     Lwt_utils_unix.read_file dst >>= fun protocol_sources ->
-    match Protocol.of_bytes (Bytes.unsafe_of_string protocol_sources) with
+    match Protocol.of_string protocol_sources with
     | None -> fail (Cannot_decode_protocol protocol_hash)
     | Some p ->
         let hash = Protocol.hash p in

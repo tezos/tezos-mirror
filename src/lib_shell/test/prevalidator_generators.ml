@@ -47,8 +47,7 @@ let block_hash_gen : Block_hash.t QCheck.Gen.t =
    *  as far as [Prevalidator_classification] is concerned. *)
 let operation_gen : Operation.t QCheck.Gen.t =
   let open QCheck.Gen in
-  let+ branch = block_hash_gen
-  and+ proto = string_gen >|= Bytes.unsafe_of_string in
+  let+ branch = block_hash_gen and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
 
 (** Do we need richer errors? If so, how to generate those? *)

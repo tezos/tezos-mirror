@@ -37,9 +37,9 @@ let encoded_size = 4
 
 let encode v =
   let b = Bytes.create encoded_size in
-  Bytes.set_int32_be b 0 v ;
+  TzEndian.set_int32 b 0 v ;
   Bytes.unsafe_to_string b
 
-let decode str i = Bytes.get_int32_be (Bytes.unsafe_of_string str) i
+let decode str i = TzEndian.get_int32_string str i
 
 let pp fmt i = Format.fprintf fmt "%ld" i

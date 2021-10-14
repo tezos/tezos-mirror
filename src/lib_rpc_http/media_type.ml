@@ -69,9 +69,8 @@ let json =
   }
 
 let bson =
-  let construct enc v =
-    Bytes.unsafe_to_string @@ Json_repr_bson.bson_to_bytes
-    @@ Data_encoding.Bson.construct enc v
+  let construct_bytes enc v =
+    Json_repr_bson.bson_to_bytes @@ Data_encoding.Bson.construct enc v
   in
   {
     name = Cohttp.Accept.MediaType ("application", "bson");
@@ -82,7 +81,7 @@ let bson =
           Json_repr_bson.bytes_to_bson
             ~laziness:false
             ~copy:false
-            (Bytes.unsafe_of_string raw)
+            (Bytes.of_string raw)
         with
         | exception Json_repr_bson.Bson_decoding_error (msg, _, _) ->
             Format.fprintf ppf "@[Invalid BSON:@ %s@]" msg
@@ -94,18 +93,18 @@ let bson =
                 bson
             in
             Data_encoding.Json.pp ppf json);
-    construct;
+    construct = (fun env v -> Bytes.unsafe_to_string (construct_bytes env v));
     construct_seq =
       (fun enc v ->
-        let s = construct enc v in
-        Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
+        let b = construct_bytes enc v in
+        Seq.return (b, 0, Bytes.length b));
     destruct =
       (fun enc body ->
         match
           Json_repr_bson.bytes_to_bson
             ~laziness:false
             ~copy:false
-            (Bytes.unsafe_of_string body)
+            (Bytes.of_string body)
         with
         | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
             Error (Format.asprintf "(at offset: %d) %s" pos msg)
@@ -120,7 +119,8 @@ let bson =
   }
 
 let octet_stream =
-  let construct enc v = Data_encoding.Binary.to_string_exn enc v in
+  let construct_bytes enc v = Data_encoding.Binary.to_bytes_exn enc v in
+  let construct_string enc v = Data_encoding.Binary.to_string_exn enc v in
   {
     name = Cohttp.Accept.MediaType ("application", "octet-stream");
     q = Some 200;
@@ -139,11 +139,11 @@ let octet_stream =
               ";; binary equivalent of the following json@.%a"
               Data_encoding.Json.pp
               (Data_encoding.Json.construct enc v));
-    construct;
+    construct = construct_string;
     construct_seq =
       (fun enc v ->
-        let s = construct enc v in
-        Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
+        let b = construct_bytes enc v in
+        Seq.return (b, 0, Bytes.length b));
     destruct =
       (fun enc s ->
         match Data_encoding.Binary.of_string enc s with

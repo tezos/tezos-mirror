@@ -34,7 +34,7 @@ let t =
     (fun b -> Block_hash.of_bytes_exn b)
     (fun bh -> Block_hash.to_bytes bh)
 
-let encode bh = Block_hash.to_bytes bh |> Bytes.unsafe_to_string
+let encode bh = Block_hash.to_string bh
 
 let encoded_size = Block_hash.size (* in bytes *)
 

@@ -76,15 +76,13 @@ let create_echo () =
           read bytes ofs len
     | Some str_ref ->
         (* Note: we rely on the invariant that strings in the queue are never empty. *)
-        (* Note: we assume that [Lwt_bytes.blit_from_bytes] will not modify [!str_ref]
-           and thus that using [Bytes.unsafe_from_string] is safe.
-           Otherwise, the [String.sub !str_ref] below would be wrong. *)
         let str_len = String.length !str_ref in
         if str_len <= len then (
           (* Caller requested more bytes than available in this item of the queue:
              return the item in full and remove it from the queue. *)
+          (* use [Lwt_bytes.blit_from_string] once available *)
           Lwt_bytes.blit_from_bytes
-            (Bytes.unsafe_of_string !str_ref)
+            (Bytes.of_string !str_ref)
             0
             bytes
             ofs
@@ -94,12 +92,8 @@ let create_echo () =
         else (
           (* Caller requested strictly less bytes than available in this item of the queue:
              return what caller requested, and only keep the remainder. *)
-          Lwt_bytes.blit_from_bytes
-            (Bytes.unsafe_of_string !str_ref)
-            0
-            bytes
-            ofs
-            len ;
+          (* use [Lwt_bytes.blit_from_string] once available *)
+          Lwt_bytes.blit_from_bytes (Bytes.of_string !str_ref) 0 bytes ofs len ;
           str_ref := String.sub !str_ref len (str_len - len) ;
           return len)
   in
