@@ -46,8 +46,8 @@ include:
   - .gitlab/ci/packaging.yml
   - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
-  - .gitlab/ci/lints.yml
   - .gitlab/ci/unittest.yml
+  - .gitlab/ci/test/lints.yml
   - .gitlab/ci/integration.yml
   - .gitlab/ci/liquidity-baking-scripts-integrity.yml
   - .gitlab/ci/coq.yml
