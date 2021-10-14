@@ -1,30 +1,9 @@
-(executable
- (name bip39_tests)
- (modules bip39_tests)
- (libraries
-   tezos-base
-   tezos-base.unix
-   tezos-client-base
-   alcotest)
- (flags (:standard -open Tezos_client_base)))
-
-(rule
- (alias    runtest)
+(tests
+ (names bip39_tests pbkdf_tests)
  (package tezos-client-base)
- (deps    (:exe bip39_tests.exe))
- (action  (run %{exe})))
-
-(executable
- (name pbkdf_tests)
- (modules pbkdf_tests)
  (libraries
-   tezos-base
-   tezos-base.unix
-   tezos-client-base
-   alcotest)
+  tezos-base
+  tezos-base.unix
+  tezos-client-base
+  alcotest)
  (flags (:standard -open Tezos_client_base)))
-
-(rule
- (alias    runtest)
- (package tezos-client-base)
- (action  (run %{exe:pbkdf_tests.exe})))

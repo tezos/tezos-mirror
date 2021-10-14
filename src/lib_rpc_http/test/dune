@@ -1,16 +1,19 @@
-(tests
- (names test_rpc_http)
+(test
+ (name test_rpc_http)
  (package tezos-rpc-http-server)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-stdlib-unix
-            tezos-rpc-http-server
-            tezos-base-test-helpers
-            tezos-test-helpers
-            qcheck-alcotest
-            alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives
-          -open Tezos_stdlib
-          -open Lib_test
-          -open Tezos_base_test_helpers
-          -open Tezos_rpc_http_server)))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-rpc-http-server
+  tezos-base-test-helpers
+  tezos-test-helpers
+  qcheck-alcotest
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib
+   -open Lib_test
+   -open Tezos_base_test_helpers
+   -open Tezos_rpc_http_server)))
