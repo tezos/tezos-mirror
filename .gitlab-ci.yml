@@ -50,9 +50,9 @@ include:
   - .gitlab/ci/test/lints.yml
   - .gitlab/ci/test/unit.yml
   - .gitlab/ci/test/integration.yml
-  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/coq.yml
-  - .gitlab/ci/tezt.yml
+  - .gitlab/ci/test/liquidity-baking-scripts-integrity.yml
+  - .gitlab/ci/test/coq.yml
+  - .gitlab/ci/test/tezt.yml
   - .gitlab/ci/doc.yml
   - .gitlab/ci/publish.yml
   - .gitlab/ci/coverage.yml

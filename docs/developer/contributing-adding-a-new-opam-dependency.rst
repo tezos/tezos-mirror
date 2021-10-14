@@ -93,15 +93,15 @@ this chunk into may change with the CI. At the time of writing, you must insert 
 into the following places:
 
 -  the ``before_script`` section of the ``.build_template`` rule of
-   ``.gitlab/ci/build.yml``,
+   :src:`.gitlab/ci/build.yml`,
 -  the ``script`` section of the ``build_arm64`` rule of
-   ``.gitlab/ci/build.yml``,
+   :src:`.gitlab/ci/build.yml`,
 -  the ``script`` section of the ``documentation:build`` rule of
-   ``.gitlab/ci/doc.yml``,
+   :src:`.gitlab/ci/doc.yml`,
 -  the ``before_script`` section of the ``.integration_template`` rule of
-   ``.gitlab/ci/test/integration.yml``,
+   :src:`.gitlab/ci/test/integration.yml`,
 -  the ``before_script`` section of the ``tezt:main`` rule of
-   ``.gitlab/ci/tezt.yml``,
+   :src:`.gitlab/ci/test/tezt.yml`,
 -  the ``before_script`` section of the ``tezt:manual:migration`` rule
    of ``.gitlab/ci/tezt.yml``, and
 -  the ``before_script`` section of the ``script:test-gen-genesis`` rule
