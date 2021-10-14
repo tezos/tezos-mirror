@@ -38,6 +38,18 @@ stages:
   - test_coverage
   - manual
 
+# All the jobs belonging to a stage X should be in
+# .gitlab/ci/X.yml. The stage "manual" is an exception to this rule,
+# as jobs of that stage are not logically related.
+
+# If the configuration for stage X is long, it can be broken up in
+# subfiles .gitlab/ci/X/a.yml, .gitlab/ci/X/b.yml, etc (see e.g. the
+# stage test).
+
+# Finally, templates shall not be defined in one stage file and used
+# in another. That is, a template defined in test.yml shall not be
+# used in doc.yml (but it's fine to use it in a subfile test/X.yml).
+
 include:
   - .gitlab/ci/templates.yml
 
