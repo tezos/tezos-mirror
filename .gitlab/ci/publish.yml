@@ -110,7 +110,7 @@ build_release:static-arm64-linux-binaries:
   variables:
     ARCH_PREFIX: ""
   rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
   variables:
@@ -137,7 +137,7 @@ release-static-arm64-binaries:
 release-on-gitlab:
   image: registry.gitlab.com/gitlab-org/release-cli
   rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
+    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
   variables:
