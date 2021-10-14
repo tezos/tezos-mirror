@@ -57,4 +57,4 @@ include:
   - .gitlab/ci/doc/test-scripts.yml
   - .gitlab/ci/build_release.yml
   - .gitlab/ci/publish_release.yml
-  - .gitlab/ci/coverage.yml
+  - .gitlab/ci/test_coverage.yml
