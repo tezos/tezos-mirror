@@ -23,20 +23,20 @@ trace
     [ "bar"  	@parameter
       {}  	
       {}  	 ]
-  - location: 17 (remaining gas: 1039988.332 units remaining)
+  - location: 17 (remaining gas: 1039988.564 units remaining)
     [ False  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039988.317 units remaining)
+  - location: 18 (remaining gas: 1039988.549 units remaining)
     [ (Some False)  	
       {}  	 ]
-  - location: 19 (remaining gas: 1039988.307 units remaining)
+  - location: 19 (remaining gas: 1039988.539 units remaining)
     [ {}  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039988.292 units remaining)
+  - location: 20 (remaining gas: 1039988.524 units remaining)
     [ (Pair {} (Some False))  	 ]
-  - location: 21 (remaining gas: 1039988.277 units remaining)
+  - location: 21 (remaining gas: 1039988.509 units remaining)
     [ {}  	
       (Pair {} (Some False))  	 ]
-  - location: 23 (remaining gas: 1039988.262 units remaining)
+  - location: 23 (remaining gas: 1039988.494 units remaining)
     [ (Pair {} {} (Some False))  	 ]
 

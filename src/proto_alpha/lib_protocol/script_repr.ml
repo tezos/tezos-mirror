@@ -224,8 +224,13 @@ let deserialized_cost expr =
   Gas_limit_repr.atomic_step_cost @@ deserialization_cost (expr_size expr)
 
 let serialized_cost bytes =
-  Gas_limit_repr.atomic_step_cost
-  @@ serialization_cost_estimated_from_bytes (Bytes.length bytes)
+  let cost =
+    let size = Bytes.length bytes in
+    S.add (serialization_cost_estimated_from_bytes size)
+    @@ (* N_IConcat_bytes_pair inlined here *)
+    S.add (S.safe_int 65) (S.shift_right (S.safe_int size) 4)
+  in
+  Gas_limit_repr.atomic_step_cost cost
 
 let force_decode_cost lexpr =
   Data_encoding.apply_lazy
