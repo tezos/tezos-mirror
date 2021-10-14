@@ -54,6 +54,6 @@ include:
   - .gitlab/ci/test/coq.yml
   - .gitlab/ci/test/tezt.yml
   - .gitlab/ci/doc.yml
+  - .gitlab/ci/doc/test-scripts.yml
   - .gitlab/ci/publish.yml
   - .gitlab/ci/coverage.yml
-  - .gitlab/ci/test-doc-scripts.yml
