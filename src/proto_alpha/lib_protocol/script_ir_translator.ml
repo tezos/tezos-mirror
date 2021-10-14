@@ -243,105 +243,95 @@ let unparse_memo_size memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
   Int (-1, z)
 
-let rec unparse_ty : type a. context -> a ty -> (Script.node * context) tzresult
-    =
- fun ctxt ty ->
-  Gas.consume ctxt Unparse_costs.unparse_type_cycle >>? fun ctxt ->
-  let return ctxt (name, args, annot) =
-    let result = Prim (-1, name, args, annot) in
-    ok (result, ctxt)
-  in
+let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
+ fun ty ->
+  let prim (name, args, annot) = Prim (-1, name, args, annot) in
   match ty with
-  | Unit_t meta -> return ctxt (T_unit, [], unparse_type_annot meta.annot)
-  | Int_t meta -> return ctxt (T_int, [], unparse_type_annot meta.annot)
-  | Nat_t meta -> return ctxt (T_nat, [], unparse_type_annot meta.annot)
-  | Signature_t meta ->
-      return ctxt (T_signature, [], unparse_type_annot meta.annot)
-  | String_t meta -> return ctxt (T_string, [], unparse_type_annot meta.annot)
-  | Bytes_t meta -> return ctxt (T_bytes, [], unparse_type_annot meta.annot)
-  | Mutez_t meta -> return ctxt (T_mutez, [], unparse_type_annot meta.annot)
-  | Bool_t meta -> return ctxt (T_bool, [], unparse_type_annot meta.annot)
-  | Key_hash_t meta ->
-      return ctxt (T_key_hash, [], unparse_type_annot meta.annot)
-  | Key_t meta -> return ctxt (T_key, [], unparse_type_annot meta.annot)
-  | Timestamp_t meta ->
-      return ctxt (T_timestamp, [], unparse_type_annot meta.annot)
-  | Address_t meta -> return ctxt (T_address, [], unparse_type_annot meta.annot)
-  | Operation_t meta ->
-      return ctxt (T_operation, [], unparse_type_annot meta.annot)
-  | Chain_id_t meta ->
-      return ctxt (T_chain_id, [], unparse_type_annot meta.annot)
-  | Never_t meta -> return ctxt (T_never, [], unparse_type_annot meta.annot)
+  | Unit_t meta -> prim (T_unit, [], unparse_type_annot meta.annot)
+  | Int_t meta -> prim (T_int, [], unparse_type_annot meta.annot)
+  | Nat_t meta -> prim (T_nat, [], unparse_type_annot meta.annot)
+  | Signature_t meta -> prim (T_signature, [], unparse_type_annot meta.annot)
+  | String_t meta -> prim (T_string, [], unparse_type_annot meta.annot)
+  | Bytes_t meta -> prim (T_bytes, [], unparse_type_annot meta.annot)
+  | Mutez_t meta -> prim (T_mutez, [], unparse_type_annot meta.annot)
+  | Bool_t meta -> prim (T_bool, [], unparse_type_annot meta.annot)
+  | Key_hash_t meta -> prim (T_key_hash, [], unparse_type_annot meta.annot)
+  | Key_t meta -> prim (T_key, [], unparse_type_annot meta.annot)
+  | Timestamp_t meta -> prim (T_timestamp, [], unparse_type_annot meta.annot)
+  | Address_t meta -> prim (T_address, [], unparse_type_annot meta.annot)
+  | Operation_t meta -> prim (T_operation, [], unparse_type_annot meta.annot)
+  | Chain_id_t meta -> prim (T_chain_id, [], unparse_type_annot meta.annot)
+  | Never_t meta -> prim (T_never, [], unparse_type_annot meta.annot)
   | Bls12_381_g1_t meta ->
-      return ctxt (T_bls12_381_g1, [], unparse_type_annot meta.annot)
+      prim (T_bls12_381_g1, [], unparse_type_annot meta.annot)
   | Bls12_381_g2_t meta ->
-      return ctxt (T_bls12_381_g2, [], unparse_type_annot meta.annot)
+      prim (T_bls12_381_g2, [], unparse_type_annot meta.annot)
   | Bls12_381_fr_t meta ->
-      return ctxt (T_bls12_381_fr, [], unparse_type_annot meta.annot)
+      prim (T_bls12_381_fr, [], unparse_type_annot meta.annot)
   | Contract_t (ut, meta) ->
-      unparse_ty ctxt ut >>? fun (t, ctxt) ->
-      return ctxt (T_contract, [t], unparse_type_annot meta.annot)
+      let t = unparse_ty_uncarbonated ut in
+      prim (T_contract, [t], unparse_type_annot meta.annot)
   | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), meta) ->
       let annot = unparse_type_annot meta.annot in
-      unparse_ty ctxt utl >>? fun (utl, ctxt) ->
+      let utl = unparse_ty_uncarbonated utl in
       let tl = add_field_annot l_field l_var utl in
-      unparse_ty ctxt utr >>? fun (utr, ctxt) ->
+      let utr = unparse_ty_uncarbonated utr in
       let tr = add_field_annot r_field r_var utr in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has an
          annotation because this annotation would be lost *)
-      return
-        ctxt
+      prim
         (match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts, annot)
         | _ -> (T_pair, [tl; tr], annot))
   | Union_t ((utl, l_field), (utr, r_field), meta) ->
       let annot = unparse_type_annot meta.annot in
-      unparse_ty ctxt utl >>? fun (utl, ctxt) ->
+      let utl = unparse_ty_uncarbonated utl in
       let tl = add_field_annot l_field None utl in
-      unparse_ty ctxt utr >>? fun (utr, ctxt) ->
+      let utr = unparse_ty_uncarbonated utr in
       let tr = add_field_annot r_field None utr in
-      return ctxt (T_or, [tl; tr], annot)
+      prim (T_or, [tl; tr], annot)
   | Lambda_t (uta, utr, meta) ->
-      unparse_ty ctxt uta >>? fun (ta, ctxt) ->
-      unparse_ty ctxt utr >>? fun (tr, ctxt) ->
-      return ctxt (T_lambda, [ta; tr], unparse_type_annot meta.annot)
+      let ta = unparse_ty_uncarbonated uta in
+      let tr = unparse_ty_uncarbonated utr in
+      prim (T_lambda, [ta; tr], unparse_type_annot meta.annot)
   | Option_t (ut, meta) ->
       let annot = unparse_type_annot meta.annot in
-      unparse_ty ctxt ut >>? fun (ut, ctxt) ->
-      return ctxt (T_option, [ut], annot)
+      let ut = unparse_ty_uncarbonated ut in
+      prim (T_option, [ut], annot)
   | List_t (ut, meta) ->
-      unparse_ty ctxt ut >>? fun (t, ctxt) ->
-      return ctxt (T_list, [t], unparse_type_annot meta.annot)
+      let t = unparse_ty_uncarbonated ut in
+      prim (T_list, [t], unparse_type_annot meta.annot)
   | Ticket_t (ut, meta) ->
       let t = unparse_comparable_ty ut in
-      return ctxt (T_ticket, [t], unparse_type_annot meta.annot)
+      prim (T_ticket, [t], unparse_type_annot meta.annot)
   | Set_t (ut, meta) ->
       let t = unparse_comparable_ty ut in
-      return ctxt (T_set, [t], unparse_type_annot meta.annot)
+      prim (T_set, [t], unparse_type_annot meta.annot)
   | Map_t (uta, utr, meta) ->
       let ta = unparse_comparable_ty uta in
-      unparse_ty ctxt utr >>? fun (tr, ctxt) ->
-      return ctxt (T_map, [ta; tr], unparse_type_annot meta.annot)
+      let tr = unparse_ty_uncarbonated utr in
+      prim (T_map, [ta; tr], unparse_type_annot meta.annot)
   | Big_map_t (uta, utr, meta) ->
       let ta = unparse_comparable_ty uta in
-      unparse_ty ctxt utr >>? fun (tr, ctxt) ->
-      return ctxt (T_big_map, [ta; tr], unparse_type_annot meta.annot)
+      let tr = unparse_ty_uncarbonated utr in
+      prim (T_big_map, [ta; tr], unparse_type_annot meta.annot)
   | Sapling_transaction_t (memo_size, meta) ->
-      return
-        ctxt
+      prim
         ( T_sapling_transaction,
           [unparse_memo_size memo_size],
           unparse_type_annot meta.annot )
   | Sapling_state_t (memo_size, meta) ->
-      return
-        ctxt
+      prim
         ( T_sapling_state,
           [unparse_memo_size memo_size],
           unparse_type_annot meta.annot )
-  | Chest_key_t meta ->
-      return ctxt (T_chest_key, [], unparse_type_annot meta.annot)
-  | Chest_t meta -> return ctxt (T_chest, [], unparse_type_annot meta.annot)
+  | Chest_key_t meta -> prim (T_chest_key, [], unparse_type_annot meta.annot)
+  | Chest_t meta -> prim (T_chest, [], unparse_type_annot meta.annot)
+
+let unparse_ty ctxt ty =
+  Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
+  (unparse_ty_uncarbonated ty, ctxt)
 
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
