@@ -101,7 +101,7 @@ let test_register_fails_with_unregistered_references_pbt =
       >>= assert_proto_error_id __LOC__ "Nonexistent_global")
 
 let rec grow n node =
-  match n with n when n <= 0 -> node | n -> grow (n - 1) (Seq (-1, [node]))
+  match n with n when n <= 0 -> node | n -> grow (n - 1) (Seq ((), [node]))
 
 (* Any expression with a depth that exceeds
    [Global_constants_storage.max_allowed_global_constant_depth]
@@ -111,7 +111,7 @@ let test_register_fails_if_too_deep =
       let vdeep_expr =
         grow
           (Constants_repr.max_allowed_global_constant_depth + 1)
-          (Int (-1, Z.of_int 1))
+          (Int ((), Z.of_int 1))
         |> Micheline.strip_locations
       in
       create_context () >>=? fun context ->
@@ -383,7 +383,7 @@ let test_expand_is_idempotent =
     given large values. *)
 let test_fold_does_not_stack_overflow =
   tztest "bottom_up_fold_cps: does not stack overflow" `Quick (fun () ->
-      let node = grow 1_000_000 @@ Int (-1, Z.zero) in
+      let node = grow 1_000_000 @@ Int ((), Z.zero) in
       return @@ ignore
       @@ Global_constants_storage.Internal_for_tests.bottom_up_fold_cps
            ()
