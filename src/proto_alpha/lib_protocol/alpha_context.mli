@@ -912,11 +912,11 @@ module Global_constants_storage : sig
         continuation in `f`. *)
     val bottom_up_fold_cps :
       'accumulator ->
-      Script.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      ('loc, Script.prim) Micheline.node ->
+      ('accumulator -> ('loc, Script.prim) Micheline.node -> 'return) ->
       ('accumulator ->
-      Script_repr.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      ('loc, Script.prim) Micheline.node ->
+      ('accumulator -> ('loc, Script.prim) Micheline.node -> 'return) ->
       'return) ->
       'return
 
