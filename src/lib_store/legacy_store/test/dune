@@ -1,16 +1,17 @@
-(executables
- (names test)
- (libraries tezos-base
-            tezos-legacy-store
-            tezos-stdlib-unix
-            alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_legacy_store
-                   -open Tezos_stdlib_unix)))
+(executable
+ (name test)
+ (libraries
+  tezos-base
+  tezos-legacy-store
+  tezos-stdlib-unix
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_legacy_store
+   -open Tezos_stdlib_unix)))
 
-(alias
- (name buildtest)
- (deps test.exe))
+(alias (name buildtest) (deps test.exe))
 
 (rule
  (alias runtest)

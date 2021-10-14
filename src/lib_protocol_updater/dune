@@ -1,20 +1,23 @@
 (library
  (name tezos_protocol_updater)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-updater)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-micheline
-            tezos-shell-services
-            tezos-protocol-environment
-            tezos-shell-context
-            tezos-protocol-compiler.registerer
-            tezos-protocol-compiler.native
-            tezos-context
-            lwt-exit
-            dynlink)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_micheline
-                   -open Tezos_shell_services
-                   -open Tezos_context)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-shell-services
+  tezos-protocol-environment
+  tezos-shell-context
+  tezos-protocol-compiler.registerer
+  tezos-protocol-compiler.native
+  tezos-context
+  lwt-exit
+  dynlink)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_micheline
+   -open Tezos_shell_services
+   -open Tezos_context)))
