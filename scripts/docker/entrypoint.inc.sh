@@ -93,20 +93,40 @@ launch_node() {
 
     check_image_version
 
+    config_args=""
+    node_args=""
+
+    # Remove arguments incompatible with the config command and
+    # retains them to pass them to the run command
+
+    for i in "$@" ; do
+        case "$i" in
+            "--force-history-mode-switch")
+                node_args="$node_args $i ";;
+            *)
+                config_args="$config_args $i ";;
+        esac;
+    done
+
+    # We do not quote $config_args to make sure that it is a list of
+    # arguments and not a string. Thus, we must disable a shellcheck
+    # warning
+
+    #shellcheck disable=SC2086
     if [ ! -f "$node_data_dir/config.json" ]; then
         echo "Configuring the node..."
         "$node" config init \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
                 --allow-all-rpc ":$NODE_RPC_PORT" \
-                "$@"
+                $config_args
     else
         echo "Updating the node configuration..."
         "$node" config update \
                 --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
                 --allow-all-rpc ":$NODE_RPC_PORT" \
-                "$@"
+                $config_args
     fi
 
     for i in "$@"; do
@@ -125,7 +145,8 @@ launch_node() {
 
     # Launching the node
 
-    exec "$node" run --data-dir "$node_data_dir"
+    #shellcheck disable=SC2086
+    exec "$node" run --data-dir "$node_data_dir" $node_args
 
 }
 
