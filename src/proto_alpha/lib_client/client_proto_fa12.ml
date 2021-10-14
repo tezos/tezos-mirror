@@ -243,7 +243,7 @@ let pair ~loc a b = Micheline.Prim (loc, Script.D_Pair, [a; b], [])
 
 let nat ~loc i = Micheline.Int (loc, i)
 
-let unit ~loc () = Micheline.Prim (loc, Script.D_Unit, [], [])
+let unit ~loc = Micheline.Prim (loc, Script.D_Unit, [], [])
 
 let bytes ~loc b = Micheline.Bytes (loc, b)
 
@@ -265,7 +265,7 @@ type type_eq_combinator = Script.node * (Script.node -> bool)
 (** [t_pair ~loc l] takes a list of types and respective equivalence
    check functions, and returns a type of n-ary pair of such types and
    a function checking syntactical equivalence with another node. *)
-let t_pair ?(loc = 0) l : type_eq_combinator =
+let t_pair ~loc l : type_eq_combinator =
   let (values, are_ty) = List.split l in
   let is_pair p =
     match p with
@@ -282,26 +282,26 @@ let t_pair ?(loc = 0) l : type_eq_combinator =
   in
   (Micheline.Prim (loc, Script.T_pair, values, []), is_pair)
 
-(** [t_unit ~loc ()] returns a Micheline node for the `unit` type, and
+(** [t_unit ~loc] returns a Micheline node for the `unit` type, and
    a function checking another node is syntactically equivalent. *)
-let t_unit ?(loc = 0) () : type_eq_combinator =
+let t_unit ~loc : type_eq_combinator =
   let is_unit p =
     match p with Micheline.Prim (_, Script.T_unit, [], _) -> true | _ -> false
   in
   (Micheline.Prim (loc, Script.T_unit, [], []), is_unit)
 
-(** [t_nat ~loc ()] returns a Micheline node for the `nat` type, and
+(** [t_nat ~loc] returns a Micheline node for the `nat` type, and
    a function checking another node is syntactically equivalent. *)
-let t_nat ?(loc = 0) () : type_eq_combinator =
+let t_nat ~loc : type_eq_combinator =
   let is_nat p =
     match p with Micheline.Prim (_, Script.T_nat, [], _) -> true | _ -> false
   in
   (Micheline.Prim (loc, Script.T_nat, [], []), is_nat)
 
-(** [t_address ~loc ()] returns a Micheline node for the `address`
+(** [t_address ~loc] returns a Micheline node for the `address`
    type, and a function checking another node is syntactically
    equivalent. *)
-let t_address ?(loc = 0) () : type_eq_combinator =
+let t_address ~loc : type_eq_combinator =
   let is_address p =
     match p with
     | Micheline.Prim (_, Script.T_address, [], _) -> true
@@ -313,7 +313,7 @@ let t_address ?(loc = 0) () : type_eq_combinator =
    type and its own syntactical equivalence checker, and returns a
    Micheline node for the type `contract c`, and a function checking
    another node is syntactically equivalent. *)
-let t_contract ?(loc = 0) (a, is_a) : type_eq_combinator =
+let t_contract ~loc (a, is_a) : type_eq_combinator =
   let is_contract c =
     match c with
     | Micheline.Prim (_, Script.T_contract, [a], _) -> is_a a
@@ -327,7 +327,7 @@ let t_contract ?(loc = 0) (a, is_a) : type_eq_combinator =
    syntactically equivalent. The view type is defined by
    [TZIP4](https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md).
    *)
-let t_view ?loc a b : type_eq_combinator = t_pair ?loc [a; t_contract ?loc b]
+let t_view ~loc a b : type_eq_combinator = t_pair ~loc [a; t_contract ~loc b]
 
 (** * Actions *)
 
@@ -459,34 +459,37 @@ let action_encoding =
       getTotalSupply_encoding;
     ]
 
-let transfer_type = t_pair [t_address (); t_address (); t_nat ()]
+let transfer_type ~loc =
+  t_pair ~loc [t_address ~loc; t_address ~loc; t_nat ~loc]
 
-let approve_type = t_pair [t_address (); t_nat ()]
+let approve_type ~loc = t_pair ~loc [t_address ~loc; t_nat ~loc]
 
-let getAllowance_type = t_view (t_pair [t_address (); t_address ()]) (t_nat ())
+let getAllowance_type ~loc =
+  t_view ~loc (t_pair ~loc [t_address ~loc; t_address ~loc]) (t_nat ~loc)
 
-let getBalance_type = t_view (t_address ()) (t_nat ())
+let getBalance_type ~loc = t_view ~loc (t_address ~loc) (t_nat ~loc)
 
-let getTotalSupply_type = t_view (t_unit ()) (t_nat ())
+let getTotalSupply_type ~loc = t_view ~loc (t_unit ~loc) (t_nat ~loc)
 
 let standard_entrypoints =
+  let loc = -1 in
   [
-    ("transfer", transfer_type);
-    ("approve", approve_type);
-    ("getAllowance", getAllowance_type);
-    ("getBalance", getBalance_type);
-    ("getTotalSupply", getTotalSupply_type);
+    ("transfer", transfer_type ~loc);
+    ("approve", approve_type ~loc);
+    ("getAllowance", getAllowance_type ~loc);
+    ("getBalance", getBalance_type ~loc);
+    ("getTotalSupply", getTotalSupply_type ~loc);
   ]
 
-let view_input ?(loc = 0) action =
+let view_input ~loc action =
   match action with
   | Get_allowance (source, destination, _) ->
       pair ~loc (address ~loc source) (address ~loc destination)
   | Get_balance (addr, _) -> address ~loc addr
-  | Get_total_supply _ -> unit ~loc ()
-  | _ -> unit ~loc ()
+  | Get_total_supply _ -> unit ~loc
+  | _ -> unit ~loc
 
-let action_to_expr ?(loc = 0) action =
+let action_to_expr ~loc action =
   match action with
   | Transfer (source, destination, amount) ->
       pair
@@ -495,13 +498,13 @@ let action_to_expr ?(loc = 0) action =
         (pair ~loc (address ~loc destination) (nat ~loc amount))
   | Approve (addr, amount) -> pair ~loc (address ~loc addr) (nat ~loc amount)
   | Get_allowance (_, _, (cb, entrypoint)) ->
-      let input = view_input action in
+      let input = view_input ~loc action in
       pair ~loc input (callback ~loc ?entrypoint cb)
   | Get_balance (_, (cb, entrypoint)) ->
-      let input = view_input action in
+      let input = view_input ~loc action in
       pair ~loc input (callback ~loc ?entrypoint cb)
   | Get_total_supply (cb, entrypoint) ->
-      let input = view_input action in
+      let input = view_input ~loc action in
       pair ~loc input (callback ~loc ?entrypoint cb)
 
 let parse_address error = function
@@ -717,7 +720,7 @@ let contract_has_fa12_interface :
 
 let translate_action_to_argument action =
   let entrypoint = action_to_entrypoint action in
-  let expr = Micheline.strip_locations (action_to_expr action) in
+  let expr = Micheline.strip_locations (action_to_expr ~loc:() action) in
   (entrypoint, Format.asprintf "%a" Michelson_v1_printer.print_expr expr)
 
 let parse_error =
@@ -854,7 +857,7 @@ let build_transaction_operation ?(tez_amount = Tez.zero) ?fee ?gas_limit
     ?storage_limit token action =
   let entrypoint = action_to_entrypoint action in
   let parameters =
-    Script.lazy_expr (Micheline.strip_locations (action_to_expr action))
+    Script.lazy_expr (Micheline.strip_locations (action_to_expr ~loc:() action))
   in
   let operation =
     Transaction
@@ -950,7 +953,7 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
   is_viewable_action action >>=? fun () ->
   contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
   let entrypoint = action_to_entrypoint action in
-  let input = Micheline.strip_locations (view_input action) in
+  let input = Micheline.strip_locations (view_input ~loc:() action) in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.run_view
     cctxt

@@ -54,9 +54,13 @@ val print_action : Format.formatter -> action -> unit
 
 val action_encoding : action Data_encoding.encoding
 
-val action_to_expr : ?loc:Script.location -> action -> Script.node
+val action_to_expr :
+  loc:'loc -> action -> ('loc, Script.prim) Tezos_micheline.Micheline.node
 
-val action_of_expr : entrypoint:string -> Script.node -> action tzresult
+val action_of_expr :
+  entrypoint:string ->
+  (_, Script.prim) Tezos_micheline.Micheline.node ->
+  action tzresult
 
 (** [convert_wrapped_parameter_into_action ccctx ~chain ~block
    ~contract parameter] converts a wrapped FA1.2 contract [parameter]
