@@ -75,7 +75,8 @@ let play_event event t =
   | Add_if_not_present (classification, oph, op) ->
       Generators.add_if_not_present classification oph op t
   | Remove oph -> remove oph t
-  | Flush handle_branch_refused -> flush ~handle_branch_refused t
+  | Flush handle_branch_refused ->
+      Internal_for_tests.flush ~handle_branch_refused t
 
 module Extra_generators = struct
   open Classification
@@ -240,7 +241,7 @@ let test_flush_empties_all_except_refused =
     (make (Generators.t_gen ()))
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
-  Classification.flush ~handle_branch_refused:true t ;
+  Classification.Internal_for_tests.flush ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
@@ -262,7 +263,7 @@ let test_flush_empties_all_except_refused_and_branch_refused =
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
   let branch_refused_before = t.branch_refused |> Classification.map in
-  Classification.flush ~handle_branch_refused:false t ;
+  Classification.Internal_for_tests.flush ~handle_branch_refused:false t ;
   let refused_after = t.refused |> Classification.map in
   let branch_refused_after = t.branch_refused |> Classification.map in
   let _ =
@@ -675,7 +676,7 @@ module To_map = struct
         ~refused:true
         t
     in
-    Classification.flush ~handle_branch_refused t ;
+    Classification.Internal_for_tests.flush ~handle_branch_refused t ;
     let flushed = to_map_all t in
     qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:flushed ()
 

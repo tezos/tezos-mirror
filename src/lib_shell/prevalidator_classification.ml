@@ -375,5 +375,7 @@ module Internal_for_tests = struct
 
   let to_map = to_map
 
+  let flush = flush
+
   let handle_live_operations = handle_live_operations
 end
