@@ -27,6 +27,14 @@
 open Alpha_context
 open Script_int
 
+type step_constants = {
+  source : Contract.t;
+  payer : Contract.t;
+  self : Contract.t;
+  amount : Tez.t;
+  chain_id : Chain_id.t;
+}
+
 (* Preliminary definitions. *)
 
 type var_annot = Var_annot of string [@@ocaml.unboxed]
@@ -1045,6 +1053,9 @@ and (_, _, _, _) continuation =
       * 'a
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('c, 'd * 's, 'r, 'f) continuation
+  | KView_exit :
+      step_constants * ('a, 's, 'r, 'f) continuation
+      -> ('a, 's, 'r, 'f) continuation
   | KLog :
       ('a, 's, 'r, 'f) continuation * logger
       -> ('a, 's, 'r, 'f) continuation

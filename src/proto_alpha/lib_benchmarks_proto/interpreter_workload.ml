@@ -1433,6 +1433,9 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KMap_exit_body (_, _, ((module Map) as map), k, _) ->
       let key_size = size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
+  | KView_exit _ ->
+      (* FIXME: TODO! *)
+      assert false
   | KLog _ -> Control.log
 
 (** [Stop_bench] gets raised when a [IFailwith] would be the next instruction.
