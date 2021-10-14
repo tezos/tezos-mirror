@@ -184,6 +184,7 @@ in the :ref:`introduction <howtoget>`.
    alpha/rpc
    alpha/liquidity_baking
    alpha/timelock
+   alpha/global_constants
 
 .. toctree::
    :maxdepth: 2

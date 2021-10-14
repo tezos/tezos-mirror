@@ -2678,6 +2678,10 @@ language can only be one of the five following constructs.
 
 This simple five cases notation is called :doc:`../shell/micheline`.
 
+In the Tezos protocol, the primitive ``constant`` with a single
+character string applied has special meaning. See
+:doc:`global_constants`.
+
 Constants
 ~~~~~~~~~
 
