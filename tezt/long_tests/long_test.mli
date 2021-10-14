@@ -53,6 +53,23 @@
     detect failures early. *)
 type timeout = Seconds of int | Minutes of int | Hours of int | Days of int
 
+(** Machines on which to run a given test.
+
+    Tests that are very long (days) should run on their own executor,
+    otherwise shorter tests will not be run very often.
+
+    Values of type [executor] are just tags that are added to tests.
+    Executors will execute tests which have the tag that correspond to themselves
+    (e.g. the x86 executor 1 will execute tests tagged with [x86_executor1]).
+    If you specify an empty list of executors, the test will not run on any executor. *)
+type executor
+
+(** AMD64 executor number 1. *)
+val x86_executor1 : executor
+
+(** AMD64 executor number 2. *)
+val x86_executor2 : executor
+
 (** Wrapper over [Test.register] to register a performance regression test.
 
     Differences with [Test.register] are:
@@ -60,6 +77,7 @@ type timeout = Seconds of int | Minutes of int | Hours of int | Days of int
     - if the test fails, an alert is emitted;
     - tag ["long"] is added;
     - [team] is added to tags and is used to decide where to send alerts;
+    - [executors] specifies which machines shall run the test;
     - data points created with [add_data_point] and [measure] are pushed
       at the end of the test (whether it succeeds or not).
 
@@ -79,6 +97,7 @@ val register :
   title:string ->
   tags:string list ->
   ?team:string ->
+  executors:executor list ->
   timeout:timeout ->
   (unit -> unit Lwt.t) ->
   unit
@@ -91,6 +110,7 @@ val register_with_protocol :
   title:string ->
   tags:string list ->
   ?team:string ->
+  executors:executor list ->
   timeout:timeout ->
   (Protocol.t -> unit Lwt.t) ->
   protocols:Protocol.t list ->

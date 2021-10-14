@@ -482,11 +482,12 @@ module Test = struct
     Lwt_list.iter_s test_rpc filtered
 end
 
-let property_test_rpc_server =
+let property_test_rpc_server ~executors =
   Long_test.register
     ~__FILE__
     ~title:"property_test_rpc_server"
     ~tags:["node"; "pbt"; "fuzz"; "rpc"]
+    ~executors
     ~timeout:(Hours 1)
     Test.test_rpc_server
 
