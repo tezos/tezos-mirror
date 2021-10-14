@@ -33,12 +33,12 @@ type 'operation_data operation = private {
   hash : Operation_hash.t;  (** Hash of an operation. *)
   raw : Operation.t;
       (** Raw representation of an operation (from the point view of the
-     shell). *)
+          shell). *)
   protocol_data : 'operation_data;
       (** Economic protocol specific data of an operation. It is the
-     unserialized representation of [raw.protocol_data]. For
-     convenience, the type associated to this type may be [unit] if we
-     do not have deserialized the operation yet. *)
+          unserialized representation of [raw.protocol_data]. For
+          convenience, the type associated to this type may be [unit] if we
+          do not have deserialized the operation yet. *)
 }
 
 module type T = sig
@@ -49,11 +49,11 @@ module type T = sig
   val parse : Operation.t -> Proto.operation_data operation tzresult
 
   (** [parse_unsafe bytes] parses [bytes] as operation data. Any error
-     happening during parsing becomes {!Parse_error}.
+      happening during parsing becomes {!Parse_error}.
 
       [unsafe] because there are no length checks, unlike {!parse}.
 
-     @deprecated You should use [parse] instead. *)
+      @deprecated You should use [parse] instead. *)
   val parse_unsafe : bytes -> Proto.operation_data tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
