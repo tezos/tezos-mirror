@@ -66,7 +66,7 @@ This is done by adding and removing the respective protocols to
 :src:`.gitlab/ci/build.yml` to ``rm`` the appropriate older protocol.
 
 Additionally, the ``unit:NNN_PROTONAME`` unit test jobs in
-:src:`.gitlab/ci/unittest.yml` must be updated to test the new protocols and stop
+:src:`.gitlab/ci/test/unit.yml` must be updated to test the new protocols and stop
 testing the old ones, in the same manner as above.
 
 **Final Tests and sign-off:**

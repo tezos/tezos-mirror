@@ -105,7 +105,7 @@ into the following places:
 -  the ``before_script`` section of the ``tezt:manual:migration`` rule
    of ``.gitlab/ci/tezt.yml``, and
 -  the ``before_script`` section of the ``test-script-gen-genesis`` rule
-   of ``.gitlab/ci/unittest.yml``.
+   of ``.gitlab/ci/test.yml``.
 
 With this ``opam pin`` hack, it can be tested but it cannot be merged
 onto master. You can push you branch to Gitlab and open an MR.
