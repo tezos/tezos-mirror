@@ -32,6 +32,7 @@
 
 open Lib_test.Qcheck_helpers
 module Generators = Prevalidator_generators
+module Classification = Prevalidator_classification
 
 module Operation_map = struct
   let pp_with_trace ppf map =
@@ -64,14 +65,12 @@ end
 
 type classification_event =
   | Add_if_not_present of
-      Prevalidator_classification.classification
-      * Operation_hash.t
-      * Operation.t
+      Classification.classification * Operation_hash.t * Operation.t
   | Remove of Operation_hash.t
   | Flush of bool
 
 let play_event event t =
-  let open Prevalidator_classification in
+  let open Classification in
   match event with
   | Add_if_not_present (classification, oph, op) ->
       Generators.add_if_not_present classification oph op t
@@ -79,7 +78,7 @@ let play_event event t =
   | Flush handle_branch_refused -> flush ~handle_branch_refused t
 
 module Extra_generators = struct
-  open Prevalidator_classification
+  open Classification
 
   (** Generates an [event].
       The operation hash for [Remove] events is generated using
@@ -143,29 +142,25 @@ let qcheck_eq_false ~actual =
 
 let qcheck_bounded_map_is_empty bounded_map =
   let actual =
-    bounded_map |> Prevalidator_classification.map
-    |> Operation_hash.Map.is_empty
+    bounded_map |> Classification.map |> Operation_hash.Map.is_empty
   in
   qcheck_eq_true ~actual
 
 (** Computes the set of operation hashes present in fields [refused;
     branch_refused; branch_delayed; applied_rev] of [t]. Also checks
     that these fields are disjoint. *)
-let disjoint_union_classified_fields ?fail_msg
-    (t : Prevalidator_classification.t) =
+let disjoint_union_classified_fields ?fail_msg (t : Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
       QCheck.Test.fail_reportf
         "Invariant 'The fields: [refused; branch_refused; branch_delayed; \
          applied] are disjoint' broken by t =@.%a@.%s"
-        Prevalidator_classification.Internal_for_tests.pp
+        Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
     Operation_hash.Set.union acc next_set
   in
-  let to_set =
-    Prevalidator_classification.Internal_for_tests.set_of_bounded_map
-  in
+  let to_set = Classification.Internal_for_tests.set_of_bounded_map in
   to_set t.refused +> to_set t.branch_refused +> to_set t.branch_delayed
   +> (Operation_hash.Set.of_list @@ List.rev_map fst t.applied_rev)
 
@@ -182,7 +177,7 @@ let disjoint_union_classified_fields ?fail_msg
     the [prevalidator] module, which we cannot do at the moment (September
     2021). Instead, we run scenarios which might carry particular risks
     of breaking this using [Tezt]. *)
-let check_invariants ?fail_msg (t : Prevalidator_classification.t) =
+let check_invariants ?fail_msg (t : Classification.t) =
   let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
   if not (Operation_hash.Set.equal expected_in_mempool t.in_mempool) then
     let set_pp ppf set =
@@ -206,10 +201,10 @@ let check_invariants ?fail_msg (t : Prevalidator_classification.t) =
        present in fields: [refused; branch_refused; branch_delayed; applied]' \
        broken by t =@.%a\n\
        @.%s@.%a@.%s"
-      Prevalidator_classification.Internal_for_tests.pp
+      Classification.Internal_for_tests.pp
       t
       sets_report
-      Prevalidator_classification.Internal_for_tests.pp_t_sizes
+      Classification.Internal_for_tests.pp_t_sizes
       t
       (match fail_msg with
       | None -> ""
@@ -244,9 +239,9 @@ let test_flush_empties_all_except_refused =
       "[flush ~handle_branch_refused:true] empties everything except [refused]"
     (make (Generators.t_gen ()))
   @@ fun t ->
-  let refused_before = t.refused |> Prevalidator_classification.map in
-  Prevalidator_classification.flush ~handle_branch_refused:true t ;
-  let refused_after = t.refused |> Prevalidator_classification.map in
+  let refused_before = t.refused |> Classification.map in
+  Classification.flush ~handle_branch_refused:true t ;
+  let refused_after = t.refused |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
@@ -265,15 +260,11 @@ let test_flush_empties_all_except_refused_and_branch_refused =
        [refused] and [branch_refused]"
     (make (Generators.t_gen ()))
   @@ fun t ->
-  let refused_before = t.refused |> Prevalidator_classification.map in
-  let branch_refused_before =
-    t.branch_refused |> Prevalidator_classification.map
-  in
-  Prevalidator_classification.flush ~handle_branch_refused:false t ;
-  let refused_after = t.refused |> Prevalidator_classification.map in
-  let branch_refused_after =
-    t.branch_refused |> Prevalidator_classification.map
-  in
+  let refused_before = t.refused |> Classification.map in
+  let branch_refused_before = t.branch_refused |> Classification.map in
+  Classification.flush ~handle_branch_refused:false t ;
+  let refused_after = t.refused |> Classification.map in
+  let branch_refused_after = t.branch_refused |> Classification.map in
   let _ =
     qcheck_eq'
       ~pp:Operation_map.pp_with_trace
@@ -299,10 +290,10 @@ let test_is_in_mempool_remove =
     @@ Generators.(
          Gen.pair (t_with_operation_gen ()) unrefused_classification_gen))
   @@ fun ((t, (oph, op)), unrefused_classification) ->
-  Prevalidator_classification.add unrefused_classification oph op t ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  Prevalidator_classification.remove oph t ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
+  Classification.add unrefused_classification oph op t ;
+  qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
+  Classification.remove oph t ;
+  qcheck_eq_false ~actual:(Classification.is_in_mempool oph t) ;
   true
 
 let test_is_applied =
@@ -311,12 +302,12 @@ let test_is_applied =
     ~name:"[is_applied] is well-behaved"
     (make @@ Generators.(Gen.triple (t_gen ()) operation_hash_gen operation_gen))
   @@ fun (t, oph, op) ->
-  Prevalidator_classification.add `Applied oph op t ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_applied oph t) ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  Prevalidator_classification.remove oph t ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_applied oph t) ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
+  Classification.add `Applied oph op t ;
+  qcheck_eq_true ~actual:(Classification.is_applied oph t) ;
+  qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
+  Classification.remove oph t ;
+  qcheck_eq_false ~actual:(Classification.is_applied oph t) ;
+  qcheck_eq_false ~actual:(Classification.is_in_mempool oph t) ;
   true
 
 let test_invariants =
@@ -344,7 +335,7 @@ module Bounded = struct
   type binding = Operation_hash.t * Operation.t
 
   type custom =
-    Prevalidator_classification.t
+    Classification.t
     * [ `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace ]
@@ -367,7 +358,7 @@ module Bounded = struct
     Format.asprintf
       "Prevalidator_classification.t:@.%a@.Classification:@.%s@.First \
        bindings:@.%a@.Other bindings:@.%a"
-      Prevalidator_classification.Internal_for_tests.pp
+      Classification.Internal_for_tests.pp
       t
       classification_string
       binding_pp
@@ -382,22 +373,16 @@ module Bounded = struct
     let on_discarded_operation oph =
       discarded_operations_rev := oph :: !discarded_operations_rev
     in
-    let parameters =
-      Prevalidator_classification.{map_size_limit; on_discarded_operation}
-    in
+    let parameters = Classification.{map_size_limit; on_discarded_operation} in
     let* inputs =
       list_size
         (0 -- map_size_limit)
         Generators.(triple classification_gen operation_hash_gen operation_gen)
     in
-    let t = Prevalidator_classification.create parameters in
+    let t = Classification.create parameters in
     List.iter
       (fun (classification, operation_hash, operation) ->
-        Prevalidator_classification.add
-          classification
-          operation_hash
-          operation
-          t)
+        Classification.add classification operation_hash operation t)
       inputs ;
     let+ error_classification =
       oneofl [`Branch_delayed []; `Branch_refused []; `Refused []]
@@ -412,7 +397,7 @@ module Bounded = struct
 
   let add_bindings bindings classification t =
     List.iter
-      (fun (oph, op) -> Prevalidator_classification.add classification oph op t)
+      (fun (oph, op) -> Classification.add classification oph op t)
       bindings
 
   let check_discarded_contains_bindings ~discarded_hashes ~bindings =
@@ -437,8 +422,7 @@ module Bounded = struct
     if
       not
         (List.length
-           (Operation_hash.Map.bindings
-              (Prevalidator_classification.map bounded_map))
+           (Operation_hash.Map.bindings (Classification.map bounded_map))
         = expected_size)
     then
       QCheck.Test.fail_reportf
@@ -446,9 +430,8 @@ module Bounded = struct
          %i.@.Bounded_map content:@.%a"
         expected_size
         (List.length
-           (Operation_hash.Map.bindings
-              (Prevalidator_classification.map bounded_map)))
-        Prevalidator_classification.Internal_for_tests.bounded_map_pp
+           (Operation_hash.Map.bindings (Classification.map bounded_map)))
+        Classification.Internal_for_tests.bounded_map_pp
         bounded_map
 
   let test_bounded =
@@ -475,19 +458,19 @@ module Bounded = struct
     in
     let () =
       Operation_hash.Map.iter
-        (fun oph _op -> Prevalidator_classification.remove oph t)
-        (Prevalidator_classification.map bounded_map)
+        (fun oph _op -> Classification.remove oph t)
+        (Classification.map bounded_map)
     in
     discarded_operations_rev := [] ;
     (* Add the first bindings (the ones that will get discarded once the other bindings are added) *)
     add_bindings
       first_bindings
-      (error_classification :> Prevalidator_classification.classification)
+      (error_classification :> Classification.classification)
       t ;
     (* Now add the other bindings that should cause the first ones to get discarded *)
     add_bindings
       other_bindings
-      (error_classification :> Prevalidator_classification.classification)
+      (error_classification :> Classification.classification)
       t ;
     (* [add] calls [on_discarded_operation] when adding any [Refused] operation,
      * so the recorded discarded operations is a superset of the [first_bindings] ones. *)
@@ -500,8 +483,6 @@ end
 
 (** Tests of [Prevalidator_classification.to_map] *)
 module To_map = struct
-  module Classification = Prevalidator_classification
-
   let map_pp fmt x =
     let map_to_list m = Operation_hash.Map.to_seq m |> List.of_seq in
     let pp_pair fmt (oph, op) =
