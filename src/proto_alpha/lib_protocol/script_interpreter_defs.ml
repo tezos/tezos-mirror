@@ -457,7 +457,8 @@ let apply ctxt gas capture_ty capture lam =
   let (Item_t (full_arg_ty, _, _)) = descr.kbef in
   let ctxt = update_context gas ctxt in
   unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
-  unparse_ty ~loc:(-1) ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
+  let loc = -1 in
+  unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
   | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t, None) in
@@ -479,10 +480,10 @@ let apply ctxt gas capture_ty capture lam =
       in
       let full_expr =
         Micheline.Seq
-          ( 0,
+          ( loc,
             [
-              Prim (0, I_PUSH, [ty_expr; const_expr], []);
-              Prim (0, I_PAIR, [], []);
+              Prim (loc, I_PUSH, [ty_expr; const_expr], []);
+              Prim (loc, I_PAIR, [], []);
               expr;
             ] )
       in
@@ -538,19 +539,19 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
 let create_contract (ctxt, sc) gas storage_type param_type code views root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
-  unparse_ty ~loc:(-1) ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
+  let loc = -1 in
+  unparse_ty ~loc ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
   let unparsed_param_type =
     Script_ir_translator.add_field_annot root_name None unparsed_param_type
   in
-  unparse_ty ~loc:(-1) ctxt storage_type
-  >>?= fun (unparsed_storage_type, ctxt) ->
+  unparse_ty ~loc ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
   let open Micheline in
   let view name {input_ty; output_ty; view_code} views =
     Prim
-      ( 0,
+      ( loc,
         K_view,
         [
-          String (0, Script_string.to_string name);
+          String (loc, Script_string.to_string name);
           input_ty;
           output_ty;
           view_code;
@@ -562,11 +563,11 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
   let code =
     strip_locations
       (Seq
-         ( 0,
+         ( loc,
            [
-             Prim (0, K_parameter, [unparsed_param_type], []);
-             Prim (0, K_storage, [unparsed_storage_type], []);
-             Prim (0, K_code, [code], []);
+             Prim (loc, K_parameter, [unparsed_param_type], []);
+             Prim (loc, K_storage, [unparsed_storage_type], []);
+             Prim (loc, K_code, [code], []);
            ]
            @ views ))
   in
