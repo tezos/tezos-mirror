@@ -101,13 +101,11 @@ build_release:static-arm64-linux-binaries:
     - arm64
 
 .release_static_binaries_template:
+  extends:
+    - .rules_template__release_tag
   image: registry.gitlab.com/gitlab-org/release-cli
   variables:
     ARCH_PREFIX: ""
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: on_success
-    - when: never
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
@@ -130,11 +128,9 @@ release-static-arm64-binaries:
     - build_release:static-arm64-linux-binaries
 
 release-on-gitlab:
+  extends:
+    - .rules_template__release_tag
   image: registry.gitlab.com/gitlab-org/release-cli
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: on_success
-    - when: never
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
