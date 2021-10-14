@@ -209,7 +209,7 @@ variables:
 # Job templates
 
 # This template is used by the opam test jobs in the child pipeline
-# triggered by `bootstrap-opam-pipeline.yml`.
+# triggered by `packaging.yml`.
 .opam_template:
   extends:
     - .default_settings_template

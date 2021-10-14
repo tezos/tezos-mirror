@@ -28,12 +28,11 @@ workflow:
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
-  - bootstrap
+  - packaging
   - sanity
   - build
   - test
   - doc
-  - packaging
   - build_release
   - publish_release
   - test_coverage
@@ -44,7 +43,7 @@ include:
 
 # Actual jobs are defined in these included files
 
-  - .gitlab/ci/bootstrap-opam-pipeline.yml
+  - .gitlab/ci/packaging.yml
   - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
   - .gitlab/ci/lints.yml
