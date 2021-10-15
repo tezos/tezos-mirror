@@ -1,11 +1,13 @@
-(tests
- (names test_crouching)
- (libraries tezos-signer-backends.unix
-            alcotest-lwt)
+(test
+ (name test_crouching)
  (package tezos-signer-backends)
- (flags (:standard -open Tezos_error_monad
-                   -open Tezos_stdlib
-                   -open Tezos_crypto
-                   -open Tezos_client_base
-                   -open Tezos_signer_backends_unix)))
-
+ (libraries
+  tezos-signer-backends.unix
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_error_monad
+   -open Tezos_stdlib
+   -open Tezos_crypto
+   -open Tezos_client_base
+   -open Tezos_signer_backends_unix)))

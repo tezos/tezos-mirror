@@ -1,21 +1,24 @@
 (library
  (name tezos_client_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-commands)
- (libraries tezos-base
-            tezos-client-base
-            tezos-clic.unix
-            tezos-rpc
-            tezos-shell-services
-            tezos-p2p-services
-            tezos-stdlib-unix
-            tezos-signer-backends
-            data-encoding)
- (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc
-                   -open Tezos_clic_unix
-                   -open Tezos_client_base
-                   -open Tezos_shell_services
-                   -open Tezos_p2p_services
-                   -open Data_encoding)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-clic.unix
+  tezos-rpc
+  tezos-shell-services
+  tezos-p2p-services
+  tezos-stdlib-unix
+  tezos-signer-backends
+  data-encoding)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_rpc
+   -open Tezos_clic_unix
+   -open Tezos_client_base
+   -open Tezos_shell_services
+   -open Tezos_p2p_services
+   -open Data_encoding)))
