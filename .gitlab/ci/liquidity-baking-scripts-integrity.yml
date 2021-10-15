@@ -1,5 +1,5 @@
 test-liquidity-baking-scripts:
-  extends: .test_template
+  extends: .integration_template
   stage: test
   script:
     # The first argument of the script is the commit hash used to
