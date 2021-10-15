@@ -2382,6 +2382,63 @@ let force_operation_injection =
   let* _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
   unit
 
+(** This test tries to inject an operation with an old known branch *)
+let injecting_old_operation_fails =
+  let step1 = "Initialize node and activate protocol" in
+  let step2 = "Recover counter and branch" in
+  let step3 = "Bake max_op_ttl block" in
+  let step4 = "Forge an operation with the old branch" in
+  let step5 = "Inject the operation and wait for failure" in
+  let log_step = Log.info "Step %d: %s" in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Injecting old operation fails"
+    ~tags:["mempool"; "injection"]
+  @@ fun protocol ->
+  let open Lwt in
+  log_step 1 step1 ;
+  let* node =
+    Node.init [Synchronisation_threshold 0; Private_mode; Connections 0]
+  in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol ~protocol client in
+  let* _ = Node.wait_for_level node 1 in
+  log_step 2 step2 ;
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client
+    >|= JSON.as_int
+  in
+  let* branch = RPC.get_branch client >|= JSON.as_string in
+  log_step 3 step3 ;
+  (* To avoid off-by-one mistakes *)
+  let max_op_ttl = Constant.max_op_ttl + 2 in
+  let* () = repeat max_op_ttl (fun () -> Client.bake_for client) in
+  let* _ = Node.wait_for_level node (max_op_ttl + 1) in
+  log_step 4 step4 ;
+  let* op_str_hex =
+    forge_operation
+      ~branch
+      ~fee:1000
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap3.identity
+      ~counter:(counter + 1)
+      ~client
+  in
+  let signature = sign_operation ~signer:Constant.bootstrap1 op_str_hex in
+  log_step 5 step5 ;
+  let process =
+    RPC.spawn_inject_operation ~data:(`String (op_str_hex ^ signature)) client
+  in
+  let injection_error_rex =
+    rex
+      ~opts:[`Dotall]
+      "Fatal error:\n\
+      \  Command failed: Operation .* is branched on a block .* which is too \
+       old"
+  in
+  Process.check_error ~msg:injection_error_rex process
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
@@ -2396,4 +2453,5 @@ let register ~protocols =
   recycling_branch_refused ~protocols ;
   test_do_not_reclassify ~protocols ;
   test_pending_operation_version ~protocols ;
-  force_operation_injection ~protocols
+  force_operation_injection ~protocols ;
+  injecting_old_operation_fails ~protocols

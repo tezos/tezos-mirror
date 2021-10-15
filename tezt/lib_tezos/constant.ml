@@ -92,3 +92,6 @@ let all_secret_keys =
 let implicit_account_burn =
   (* as per the "origination_size" constant *)
   Tez.of_mutez_int 257_000
+
+(** The default time to live of an operation (in block) *)
+let max_op_ttl = 120

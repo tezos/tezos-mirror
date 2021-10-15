@@ -167,12 +167,6 @@ let inject_operation v ?chain_id ~force op =
     | Some pv -> Prevalidator.inject_operation pv ~force op
     | None -> handle_missing_prevalidator
   in
-  let failwith_unknown_branch branch =
-    failwith
-      "Unknown branch (%a), cannot inject the operation."
-      Block_hash.pp_short
-      branch
-  in
   let handle_missing_prevalidator =
     failwith "Prevalidator is not running, cannot inject the operation."
   in
@@ -187,17 +181,16 @@ let inject_operation v ?chain_id ~force op =
                   chain
                   ~handle_missing_prevalidator:return_unit)
               v.active_chains
-          else failwith_unknown_branch op.shell.branch
+          else
+            failwith
+              "Unknown branch (%a), cannot inject the operation."
+              Block_hash.pp_short
+              op.shell.branch
       | Some (chain_id, _bh) ->
           get v chain_id >>?= fun nv ->
           inject_operation_on nv ~handle_missing_prevalidator)
-  | Some chain_id -> (
+  | Some chain_id ->
       get v chain_id >>?= fun nv ->
-      Distributed_db.Block_header.known
-        (Chain_validator.chain_db nv)
-        op.shell.branch
-      >>= function
-      | true -> inject_operation_on nv ~handle_missing_prevalidator
-      | false -> failwith_unknown_branch op.shell.branch)
+      inject_operation_on nv ~handle_missing_prevalidator
 
 let distributed_db {db; _} = db
