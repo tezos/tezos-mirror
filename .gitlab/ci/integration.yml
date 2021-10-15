@@ -10,13 +10,17 @@
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
 
+# integration:proto:sandbox and integration:compiler-rejections do not
+# require access to the binaries like the "true" integration tests
+# below. Therefore, they do not extend the .integration_template.
+
 integration:proto:sandbox:
-  extends: .integration_template
+  extends: .test_template
   script:
     - dune build @runtest_sandbox
 
 integration:compiler-rejections:
-  extends: .integration_template
+  extends: .test_template
   script:
     - dune build @runtest_rejections
 
