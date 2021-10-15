@@ -67,12 +67,14 @@ module Make_tree (Store : DB) = struct
     | Some t ->
         Store.Tree.fold
           ?depth
-          ~force:`And_clear
+          ~force:`True
+          ~cache:false
           ~uniq:`False
-          ~node:(fun k v acc -> f k (Store.Tree.of_node v) acc)
-          ~contents:(fun k v acc ->
-            if k = [] then Lwt.return acc
-            else f k (Store.Tree.of_contents v) acc)
+          ~order:`Sorted
+          ~tree:(fun k t acc ->
+            match kind t with
+            | `Value -> if k = [] then Lwt.return acc else f k t acc
+            | `Tree -> f k t acc)
           t
           init
 
@@ -157,6 +159,9 @@ module Make_tree (Store : DB) = struct
       (match kinded_hash with
       | `Node hash -> `Node (Hash.of_context_hash hash)
       | `Contents hash -> `Contents (Hash.of_context_hash hash, ()))
+
+  let list tree ?offset ?length key =
+    Store.Tree.list ~cache:true tree ?offset ?length key
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t
