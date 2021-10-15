@@ -222,6 +222,7 @@ type continuation_name =
   | N_KNil
   | N_KCons
   | N_KReturn
+  | N_KView_exit
   | N_KUndip
   | N_KLoop_in
   | N_KLoop_in_left
@@ -404,6 +405,7 @@ let string_of_continuation_name : continuation_name -> string =
   | N_KNil -> "N_KNil"
   | N_KCons -> "N_KCons"
   | N_KReturn -> "N_KReturn"
+  | N_KView_exit -> "N_KView_exit"
   | N_KUndip -> "N_KUndip"
   | N_KLoop_in -> "N_KLoop_in"
   | N_KLoop_in_left -> "N_KLoop_in_left"
@@ -619,6 +621,7 @@ let all_continuations =
     N_KNil;
     N_KCons;
     N_KReturn;
+    N_KView_exit;
     N_KUndip;
     N_KLoop_in;
     N_KLoop_in_left;
@@ -1078,6 +1081,8 @@ module Control = struct
 
   let return = cont_sized_step N_KReturn nullary
 
+  let view_exit = cont_sized_step N_KView_exit nullary
+
   let undip = cont_sized_step N_KUndip nullary
 
   let loop_in = cont_sized_step N_KLoop_in nullary
@@ -1433,9 +1438,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KMap_exit_body (_, _, ((module Map) as map), k, _) ->
       let key_size = size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
-  | KView_exit _ ->
-      (* FIXME: TODO! *)
-      assert false
+  | KView_exit _ -> Control.view_exit
   | KLog _ -> Control.log
 
 (** [Stop_bench] gets raised when a [IFailwith] would be the next instruction.
