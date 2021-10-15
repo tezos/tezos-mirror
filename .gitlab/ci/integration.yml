@@ -103,6 +103,8 @@ integration:sandboxes:daemons-upgrade:
   extends: .test_template
   needs:
     - build_x86_64
+  dependencies:
+    - build_x86_64
   variables:
     PYTEST_SUITE: ""
     PYTEST_SUITE_MARKER: ""
