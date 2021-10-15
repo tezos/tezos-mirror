@@ -119,7 +119,17 @@ let check_invariant ~genesis ~caboose ~savepoint ~cementing_highwatermark
     | Some ch -> Compare.Int32.(ch <= snd checkpoint)
     | None -> true
   in
-  fail_unless invariant_holds Bad_ordering_invariant
+  fail_unless
+    invariant_holds
+    (Bad_ordering_invariant
+       {
+         genesis = snd genesis;
+         caboose = snd caboose;
+         savepoint = snd savepoint;
+         cementing_highwatermark;
+         checkpoint = snd checkpoint;
+         head = snd current_head;
+       })
 
 (* [check_consistency ~store_dir genesis] aims to provide a quick
    check (in terms of execution time) which checks that files may be

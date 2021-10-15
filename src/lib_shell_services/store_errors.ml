@@ -987,7 +987,14 @@ type error +=
       cementing_highwatermark : Int32.t;
     }
   | Inconsistent_history_mode of History_mode.t
-  | Bad_ordering_invariant
+  | Bad_ordering_invariant of {
+      genesis : Int32.t;
+      caboose : Int32.t;
+      savepoint : Int32.t;
+      cementing_highwatermark : Int32.t option;
+      checkpoint : Int32.t;
+      head : Int32.t;
+    }
 
 let () =
   register_error_kind
@@ -1105,15 +1112,59 @@ let () =
     ~id:"store.bad_ordering_invariant"
     ~title:"Bad ordering invariant"
     ~description:"The ordering invariant does not hold"
-    ~pp:(fun ppf () ->
+    ~pp:
+      (fun ppf
+           ( genesis,
+             caboose,
+             savepoint,
+             cementing_highwatermark,
+             checkpoint,
+             head ) ->
       Format.fprintf
         ppf
-        "Invariant 'genesis ≤ caboose ≤ savepoint ≤ \
+        "Invariant '%ld (genesis) ≤ %ld (caboose) ≤ %ld (savepoint) ≤ %a \
          [cementing_highwatermark] ≤\n\
-        \ checkpoint ≤ all(alternate_heads ∪ current_head)' does not hold")
-    Data_encoding.empty
-    (function Bad_ordering_invariant -> Some () | _ -> None)
-    (fun () -> Bad_ordering_invariant)
+        \ %ld (checkpoint) ≤ all(alternate_heads ∪ (%ld) current_head)' \
+         does not hold"
+        genesis
+        caboose
+        savepoint
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.fprintf ppf "(n/a)")
+           (fun ppf -> Format.fprintf ppf "%ld"))
+        cementing_highwatermark
+        checkpoint
+        head)
+    Data_encoding.(
+      obj6
+        (req "genesis" int32)
+        (req "caboose" int32)
+        (req "savepoint" int32)
+        (req "cementing_highwatermark" (option int32))
+        (req "checkpoint" int32)
+        (req "head" int32))
+    (function
+      | Bad_ordering_invariant
+          {
+            genesis;
+            caboose;
+            savepoint;
+            cementing_highwatermark;
+            checkpoint;
+            head;
+          } ->
+          Some
+            ( genesis,
+              caboose,
+              savepoint,
+              cementing_highwatermark,
+              checkpoint,
+              head )
+      | _ -> None)
+    (fun (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head)
+         ->
+      Bad_ordering_invariant
+        {genesis; caboose; savepoint; cementing_highwatermark; checkpoint; head})
 
 (* FIXME: proper thing*)
 type error += Corrupted_store of string
