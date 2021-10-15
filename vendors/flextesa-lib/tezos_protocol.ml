@@ -62,7 +62,7 @@ end
 
 module Protocol_kind = struct
   type t =
-    [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha]
+    [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Alpha]
 
   let names =
     [ ("Athens", `Athens)
@@ -72,6 +72,7 @@ module Protocol_kind = struct
     ; ("Edo", `Edo)
     ; ("Florence", `Florence)
     ; ("Granada", `Granada)
+    ; ("Hangzhou", `Hangzhou)
     ; ("Alpha", `Alpha) ]
 
   let ( < ) k1 k2 =
@@ -157,7 +158,7 @@ let protocol_parameters_json t : Ezjsonm.t =
        `src/proto_007_PsDELPH1/lib_parameters/default_parameters.ml` *)
     let alpha_specific_parameters =
       match subkind with
-      | `Granada | `Alpha ->
+      | `Granada | `Hangzhou | `Alpha ->
          [ ( "minimal_block_delay"
            , string (Int.to_string t.minimal_block_delay) );
            ( "liquidity_baking_subsidy"
@@ -171,19 +172,19 @@ let protocol_parameters_json t : Ezjsonm.t =
       match subkind with
       | `Babylon | `Carthage | `Delphi | `Edo | `Florence ->
          [ ("test_chain_duration", string (Int.to_string 1_966_080)) ]
-      | `Florence | `Granada | `Alpha -> []
+      | `Florence | `Granada | `Hangzhou | `Alpha -> []
     in
     let michelson_max_type_size =
       match subkind with
       | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada ->
          [ ("michelson_maximum_type_size", int 1_000) ]
-      | `Alpha -> []
+      | `Hangzhou | `Alpha -> []
     in
     let op_gas_limit, block_gas_limit =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
       | `Carthage | `Delphi | `Edo | `Florence -> (1_040_000, 10_400_000)
-      | `Granada | `Alpha -> (1_040_000, 5_200_000) in
+      | `Granada | `Hangzhou | `Alpha -> (1_040_000, 5_200_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     alpha_specific_parameters
@@ -202,7 +203,7 @@ let protocol_parameters_json t : Ezjsonm.t =
         | `Babylon -> ("block_reward", string (Int.to_string 16_000_000))
         | `Carthage | `Delphi | `Edo | `Florence ->
             ("baking_reward_per_endorsement", list_of_zs [1_250_000; 187_500])
-        | `Granada | `Alpha ->
+        | `Granada | `Hangzhou | `Alpha ->
             ( "baking_reward_per_endorsement"
             , list_of_zs t.baking_reward_per_endorsement ) )
       ; ( "endorsement_reward"
@@ -210,12 +211,12 @@ let protocol_parameters_json t : Ezjsonm.t =
           | `Babylon -> string (Int.to_string 2_000_000)
           | `Carthage | `Delphi | `Edo | `Florence ->
               list_of_zs [1_250_000; 833_333]
-          | `Granada | `Alpha -> list_of_zs t.endorsement_reward )
+          | `Granada | `Hangzhou | `Alpha -> list_of_zs t.endorsement_reward )
       ; ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
       ; ( "cost_per_byte"
         , match subkind with
           | `Babylon | `Carthage -> string (Int.to_string 1_000)
-          | `Delphi | `Edo | `Florence | `Granada | `Alpha -> string (Int.to_string 250)
+          | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Alpha -> string (Int.to_string 250)
         )
       ; ("quorum_min", int 3_000)
       ; ("quorum_max", int 7_000)
@@ -239,7 +240,7 @@ let protocol_parameters_json t : Ezjsonm.t =
   | None ->
       dict
         ( match t.kind with
-        | (`Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha) as sk ->
+        | (`Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Alpha) as sk ->
             common @ extra_post_babylon_stuff sk
         | `Athens -> common )
 
