@@ -1999,7 +1999,7 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     | None -> false
     | Some (Field_annot l) -> Compare.String.(l = entrypoint)
   in
-  let loc = -1 in
+  let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
@@ -4050,7 +4050,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             tc_context
             ctxt
             ~legacy
-            (Seq (-1, tl))
+            (Seq (Micheline.dummy_location, tl))
             middle
           >|=? fun (judgement, ctxt) ->
           let judgement =
@@ -5952,7 +5952,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       fail Unparsing_too_many_recursive_calls
     else unparse_data ctxt ~stack_depth:(stack_depth + 1) mode ty a
   in
-  let loc = -1 in
+  let loc = Micheline.dummy_location in
   match (ty, a) with
   | (Unit_t _, v) -> Lwt.return @@ unparse_unit ~loc ctxt v
   | (Int_t _, v) -> Lwt.return @@ unparse_int ~loc ctxt v
@@ -6121,7 +6121,7 @@ and unparse_items :
  fun ctxt ~stack_depth mode kt vt items ->
   List.fold_left_es
     (fun (l, ctxt) (k, v) ->
-      let loc = -1 in
+      let loc = Micheline.dummy_location in
       unparse_comparable_data ~loc ctxt mode kt k >>=? fun (key, ctxt) ->
       unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
       >|=? fun (value, ctxt) -> (Prim (loc, D_Elt, [key; value], []) :: l, ctxt))
@@ -6188,7 +6188,7 @@ let unparse_script ctxt mode
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
-    (let loc = -1 in
+    (let loc = Micheline.dummy_location in
      unparse_ty ~loc ctxt arg_type >>? fun (arg_type, ctxt) ->
      unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
      let arg_type = add_field_annot root_name None arg_type in
