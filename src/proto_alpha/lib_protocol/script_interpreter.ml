@@ -694,7 +694,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               S.zero
               ss.elements
           in
-          consume' ctxt gas (Interp_costs.concat_string total_length)
+          consume ctxt gas (Interp_costs.concat_string total_length)
           >>?= fun gas ->
           let s = Script_string.concat ss.elements in
           (step [@ocaml.tailcall]) g gas k ks s stack
@@ -727,7 +727,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               S.zero
               ss.elements
           in
-          consume' ctxt gas (Interp_costs.concat_string total_length)
+          consume ctxt gas (Interp_costs.concat_string total_length)
           >>?= fun gas ->
           let s = Bytes.concat Bytes.empty ss.elements in
           (step [@ocaml.tailcall]) g gas k ks s stack
