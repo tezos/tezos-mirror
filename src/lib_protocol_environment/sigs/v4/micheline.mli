@@ -55,9 +55,3 @@ val location : ('l, 'p) node -> 'l
 val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
-
-val extract_locations :
-  ('l, 'p) node -> 'p canonical * (canonical_location * 'l) list
-
-val inject_locations :
-  (canonical_location -> 'l) -> 'p canonical -> ('l, 'p) node
