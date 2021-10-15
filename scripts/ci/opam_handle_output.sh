@@ -23,7 +23,9 @@ rsync --recursive --prune-empty-dirs \
       "$OPAM_LOGS/output"
 
 rsync --recursive "$OPAM_DIR"/log \
-      "$OPAM_LOGS"
+      --include "*/" \
+      --include '*.info' \
+      --exclude '*' "$OPAM_LOGS"
 
  # for ease of readability, produce a merged log
 merged=$(mktemp);
