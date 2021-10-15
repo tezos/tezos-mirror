@@ -788,6 +788,151 @@ class TestView:
 
         assert client.get_storage(contract) == expected
 
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'self_after_view',
+            'self_after_fib_view',
+            'self_after_nonexistent_view',
+        ],
+    )
+    def test_self(self, client, session, contract):
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        lib_address = session['lib']
+        originate(client, session, path, f'"{lib_address}"', 1000)
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        self_address = session['contract']
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                '--arg',
+                f'"{lib_address}"',
+                '--burn-cap',
+                '0.1',
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        assert client.get_storage(contract) == f'"{self_address}"'
+
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'self_address_after_view',
+            'self_address_after_fib_view',
+            'self_address_after_nonexistent_view',
+        ],
+    )
+    def test_self_address(self, client, session, contract):
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        lib_address = session['lib']
+        originate(client, session, path, f'"{lib_address}"', 1000)
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        self_address = session['contract']
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                '--arg',
+                f'"{lib_address}"',
+                '--burn-cap',
+                '0.1',
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        assert client.get_storage(contract) == f'"{self_address}"'
+
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'sender_after_view',
+            'sender_after_fib_view',
+            'sender_after_nonexistent_view',
+        ],
+    )
+    def test_sender(self, client, session, contract):
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        lib_address = session['lib']
+        originate(client, session, path, f'"{lib_address}"', 1000)
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        sender = IDENTITIES['bootstrap1']['identity']
+        client.transfer(
+            0,
+            'bootstrap1',
+            contract,
+            [
+                '--arg',
+                f'"{lib_address}"',
+                '--burn-cap',
+                '0.1',
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        assert client.get_storage(contract) == f'"{sender}"'
+
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'balance_after_view',
+            'balance_after_fib_view',
+            'balance_after_nonexistent_view',
+        ],
+    )
+    def test_balance_after_view(self, client, session, contract):
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        lib_address = session['lib']
+        initial_balance = 1000
+        originate(client, session, path, '0', initial_balance)
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        amount = 10
+        client.transfer(
+            amount,
+            'bootstrap1',
+            contract,
+            [
+                '--arg',
+                f'"{lib_address}"',
+                '--burn-cap',
+                '0.1',
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        expected_balance = initial_balance + amount
+        assert (
+            client.get_storage(contract)
+            == f'{utils.mutez_of_tez(expected_balance)}'
+        )
+
+    @pytest.mark.parametrize(
+        "contract",
+        [
+            'amount_after_view',
+            'amount_after_fib_view',
+            'amount_after_nonexistent_view',
+        ],
+    )
+    def test_amount_after_view(self, client, session, contract):
+        path = f'{CONTRACT_PATH}/opcodes/{contract}.tz'
+        lib_address = session['lib']
+        originate(client, session, path, '0', 1000)
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        amount = 3
+        client.transfer(
+            amount,
+            'bootstrap1',
+            contract,
+            [
+                '--arg',
+                f'"{lib_address}"',
+                '--burn-cap',
+                '0.1',
+            ],
+        )
+        client.bake('bootstrap2', ["--minimal-timestamp"])
+        assert client.get_storage(contract) == f'{utils.mutez_of_tez(amount)}'
+
     def test_recursion(self, client, session):
         contract = 'view_rec'
         path = f'{CONTRACT_PATH}/opcodes/' + contract + '.tz'
