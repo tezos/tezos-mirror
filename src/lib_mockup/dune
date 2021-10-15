@@ -1,50 +1,56 @@
 (library
  (name tezos_mockup_registration)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-registration)
- (modules registration registration_intf mockup_args)
+ (instrumentation (backend bisect_ppx))
  (libraries
-   tezos-base
-   tezos-client-base
-   tezos-shell-services
-   tezos-protocol-environment)
- (flags (:standard -open Tezos_base__TzPervasives)))
+  tezos-base
+  tezos-client-base
+  tezos-shell-services
+  tezos-protocol-environment)
+ (flags (:standard -open Tezos_base__TzPervasives))
+ (modules registration registration_intf mockup_args))
 
 (library
  (name tezos_mockup)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup)
- (modules files local_services persistence persistence_intf RPC_client migration)
+ (instrumentation (backend bisect_ppx))
  (libraries
-   tezos-base
-   tezos-base.unix
-   tezos-client-base
-   tezos-mockup-proxy
-   resto-cohttp-self-serving-client
-   tezos-rpc
-   tezos-p2p-services
-   tezos-p2p ; for registering the relevant RPCs
-   tezos-protocol-environment
-   tezos-stdlib-unix
-   tezos-rpc-http
-   tezos-rpc-http-client
-   tezos-mockup-registration)
- (flags (:standard
-  -open Tezos_base__TzPervasives
-  -open Tezos_mockup_registration)))
+  tezos-base
+  tezos-base.unix
+  tezos-client-base
+  tezos-mockup-proxy
+  resto-cohttp-self-serving-client
+  tezos-rpc
+  tezos-p2p-services
+  tezos-p2p ; for registering the relevant RPCs
+  tezos-protocol-environment
+  tezos-stdlib-unix
+  tezos-rpc-http
+  tezos-rpc-http-client
+  tezos-mockup-registration)
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_mockup_registration))
+ (modules
+  files
+  local_services
+  persistence
+  persistence_intf
+  RPC_client
+  migration))
 
 (library
  (name tezos_mockup_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-commands)
- (modules mockup_wallet mockup_commands)
+ (instrumentation (backend bisect_ppx))
  (libraries
-   tezos-base
-   tezos-client-commands
-   tezos-client-base
-   tezos-mockup
-   tezos-mockup-registration)
- (flags (:standard
-  -open Tezos_base__TzPervasives
-  -open Tezos_mockup
-  -open Tezos_mockup_registration)))
+  tezos-base
+  tezos-client-commands
+  tezos-client-base
+  tezos-mockup
+  tezos-mockup-registration)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_mockup
+   -open Tezos_mockup_registration))
+ (modules mockup_wallet mockup_commands))
