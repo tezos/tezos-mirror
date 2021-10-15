@@ -257,7 +257,7 @@ let handle_live_operations ~(block_store : 'block block_tools)
   chain.new_blocks ~from_block:from_branch ~to_block:to_branch
   >>= fun (ancestor, path) ->
   pop_block (block_store.hash ancestor) from_branch old_mempool
-  >>= fun mempool ->
+  >|= fun mempool ->
   let new_mempool = List.fold_left push_block mempool path in
   let (new_mempool, outdated) =
     Operation_hash.Map.partition
@@ -265,7 +265,7 @@ let handle_live_operations ~(block_store : 'block block_tools)
       new_mempool
   in
   Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
-  Lwt.return new_mempool
+  new_mempool
 
 let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
     ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
@@ -285,9 +285,9 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
           ~refused:false
           classification)
        pending)
-  >>= fun pending ->
+  >|= fun pending ->
   flush classification ~handle_branch_refused ;
-  Lwt.return pending
+  pending
 
 module Internal_for_tests = struct
   (** [copy_bounded_map bm] returns a deep copy of [bm] *)
@@ -374,6 +374,8 @@ module Internal_for_tests = struct
       (Operation_hash.Set.cardinal t.in_mempool)
 
   let to_map = to_map
+
+  let flush = flush
 
   let handle_live_operations = handle_live_operations
 end
