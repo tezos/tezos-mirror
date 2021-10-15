@@ -702,6 +702,9 @@ module Cost_of = struct
     (* model N_KReturn *)
     let cost_N_KReturn = S.safe_int 15
 
+    (* model N_KView_exit *)
+    let cost_N_KView_exit = S.safe_int 15
+
     (* model N_KUndip *)
     let cost_N_KUndip = S.safe_int 15
 
@@ -1468,6 +1471,8 @@ module Cost_of = struct
       let cons = atomic_step_cost cost_N_KCons
 
       let return = atomic_step_cost cost_N_KReturn
+
+      let view_exit = atomic_step_cost cost_N_KView_exit
 
       let undip = atomic_step_cost cost_N_KUndip
 

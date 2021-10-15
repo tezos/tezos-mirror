@@ -348,9 +348,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KMap_enter_body (_, _, _, _) -> Interp_costs.Control.map_enter_body
   | KMap_exit_body (_, _, map, key, _) ->
       Interp_costs.Control.map_exit_body key map
-  | KView_exit (_, _) ->
-      (* FIXME: TODO! *)
-      Gas.free
+  | KView_exit (_, _) -> Interp_costs.Control.view_exit
 
 (*
 

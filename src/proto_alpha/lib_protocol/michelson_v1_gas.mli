@@ -364,6 +364,8 @@ module Cost_of : sig
 
       val return : Gas.cost
 
+      val view_exit : Gas.cost
+
       val undip : Gas.cost
 
       val loop_in : Gas.cost
