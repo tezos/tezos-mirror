@@ -608,14 +608,23 @@ let check_history_mode_compatibility chain_store savepoint genesis_block =
         (Reconstruction_failure Nothing_to_reconstruct)
   | _ as history_mode -> fail (Cannot_reconstruct history_mode)
 
-let restore_constants chain_store genesis_block head_lafl_block =
+let restore_constants chain_store genesis_block head_lafl_block
+    ~cementing_highwatermark =
   (* The checkpoint is updated to the last allowed fork level of the
-     current head to be more consistent with the expected structure of
-     the store. *)
-  Store.Unsafe.set_checkpoint
-    chain_store
-    (Store.Block.descriptor head_lafl_block)
-  >>=? fun () ->
+     current head if higher than the cementing
+     highwatermark. Otherwise, the checkpoint is assumed to be the
+     cementing highwatermark (this may occur after a snapshot
+     import). Thus, we ensure that the store invariant
+     `cementing_highwatermark <= checkpoint` is maintained. *)
+  let head_lafl_descr = Store.Block.descriptor head_lafl_block in
+  let checkpoint =
+    match cementing_highwatermark with
+    | None -> head_lafl_descr
+    | Some chw ->
+        if snd chw > Store.Block.level head_lafl_block then chw
+        else head_lafl_descr
+  in
+  Store.Unsafe.set_checkpoint chain_store checkpoint >>=? fun () ->
   Store.Unsafe.set_history_mode chain_store History_mode.Archive >>=? fun () ->
   let genesis = Store.Block.descriptor genesis_block in
   Store.Unsafe.set_savepoint chain_store genesis >>=? fun () ->
@@ -707,6 +716,16 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
         chain_store
         (Store.Block.last_allowed_fork_level head_metadata)
       >>=? fun head_lafl_block ->
+      Stored_data.load
+        (Naming.cementing_highwatermark_file
+           (Store.Chain.chain_dir chain_store))
+      >>=? fun cementing_highwatermark_data ->
+      (Stored_data.get cementing_highwatermark_data >>= function
+       | None -> return_none
+       | Some chw ->
+           Store.Block.read_block_by_level chain_store chw
+           >|=? Store.Block.descriptor >>=? return_some)
+      >>=? fun cementing_highwatermark ->
       let chain_dir = Store.Chain.chain_dir chain_store in
       locked chain_dir (fun () ->
           reconstruct_cemented
@@ -722,7 +741,11 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
             ~user_activated_upgrades
             ~user_activated_protocol_overrides
           >>=? fun () ->
-          restore_constants chain_store genesis_block head_lafl_block)
+          restore_constants
+            chain_store
+            genesis_block
+            head_lafl_block
+            ~cementing_highwatermark)
       >>=? fun () ->
       (* TODO? add a global check *)
       Event.(emit reconstruct_success ()) >>= fun () ->
