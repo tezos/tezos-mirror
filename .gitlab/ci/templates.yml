@@ -18,6 +18,10 @@ variables:
 # Some settings we want by default on all jobs
 .default_settings_template:
   interruptible: true
+  # `dependencies` are empty be default. Each individual job or
+  # template requiring artifacts from preceeding jobs should declare
+  # their dependencies locally.
+  dependencies: []
 
 # Image templates
 .image_template__runtime_build_test_dependencies_template:
