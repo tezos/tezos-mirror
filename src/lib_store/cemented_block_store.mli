@@ -130,7 +130,9 @@ val init :
 val close : t -> unit
 
 (** [cemented_blocks_files cemented_store] returns the {b current}
-    list of cemented blocks chunks files. *)
+   array of cemented blocks chunks files. The returned array is sorted
+   in ascending order such that the first element of the array is the
+   lowest know cycle of the store. *)
 val cemented_blocks_files : t -> cemented_blocks_file array option
 
 (** [cemented_block_level_index block_store] returns the hash to level
