@@ -1,7 +1,11 @@
-(tests
- (names test_mockup_wallet)
- (libraries tezos-mockup-commands tezos-client-base-unix tezos-base-test-helpers
-   alcotest alcotest-lwt)
+(test
+ (name test_mockup_wallet)
  (package tezos-client-base-unix)
+ (libraries
+  tezos-mockup-commands
+  tezos-client-base-unix
+  tezos-base-test-helpers
+  alcotest
+  alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_base_test_helpers)))
