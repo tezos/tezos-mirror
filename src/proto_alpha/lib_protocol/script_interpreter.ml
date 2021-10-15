@@ -467,7 +467,7 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
 
 and step : type a s b t r f. (a, s, b, t, r, f) step_type =
  fun ((ctxt, sc) as g) gas i ks accu stack ->
-  match consume gas i accu stack with
+  match consume_instr gas i accu stack with
   | None -> Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
   | Some gas -> (
       match i with

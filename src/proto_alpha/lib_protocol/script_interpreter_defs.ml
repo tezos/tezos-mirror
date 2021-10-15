@@ -375,7 +375,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
 
 (*
 
-   [step] calls [consume] at the beginning of each execution step.
+   [step] calls [consume_instr] at the beginning of each execution step.
 
    [Local_gas_counter.consume'] is used in the implementation of
    [IConcat_string] and [IConcat_bytes] because in that special cases, the
@@ -384,7 +384,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
 
 *)
 
-let consume local_gas_counter k accu stack =
+let consume_instr local_gas_counter k accu stack =
   let cost = cost_of_instr k accu stack in
   update_and_check local_gas_counter cost
   [@@ocaml.inline always]
