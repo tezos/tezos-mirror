@@ -7,6 +7,7 @@
 # exist (some tests use them) but their actual name depend on the protocol.
 .integration_template:
   extends: .test_template
+  dependencies: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
 
