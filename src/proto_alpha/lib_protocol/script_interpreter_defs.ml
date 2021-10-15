@@ -377,10 +377,10 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
 
    [step] calls [consume] at the beginning of each execution step.
 
-   [consume'] is used in the implementation of [IConcat_string]
-   and [IConcat_bytes] because in that special cases, the cost
-   is expressed with respect to a non-constant-time computation
-   on the inputs.
+   [Local_gas_counter.consume'] is used in the implementation of
+   [IConcat_string] and [IConcat_bytes] because in that special cases, the
+   cost is expressed with respect to a non-constant-time computation on the
+   inputs.
 
 *)
 
