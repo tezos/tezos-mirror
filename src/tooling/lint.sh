@@ -176,7 +176,10 @@ check_redirects () {
 update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
-    repeated=$(grep '^[^ #]' .gitlab-ci.yml .gitlab/ci/*.yml | sort | uniq --repeated)
+
+    repeated=$(find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml -exec grep '^[^ #-]' \{\} \;  \
+                   | sort \
+                   | uniq --repeated)
     if [ -n "$repeated" ]; then
         echo ".gitlab-ci.yml contains repeated rules:"
         echo "$repeated"
