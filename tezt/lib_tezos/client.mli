@@ -292,6 +292,10 @@ val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
     [tezos-client show address] to get the generated key. *)
 val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 
+(** Same as [gen_and_show_keys] but returns a [Constant.key] instead of an
+    [Account.key]. *)
+val gen_and_show_secret_keys : alias:string -> t -> Constant.key Lwt.t
+
 (** Run [tezos-client endorse for].
 
     Default [key] is {!Constant.bootstrap2.alias}. *)
@@ -625,7 +629,10 @@ val init :
 
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
-    - Activate the given protocol
+    - Create [additional_account_count] accounts with
+      [default_accounts_balance]
+    - Activate the given protocol with [additional_account_count]
+      additional bootstrap accounts
     - Bake (unless [~bake:false] is passed)
 
     In addition to the client, returns the first created node
@@ -638,6 +645,8 @@ val init_activate_bake :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?nodes_args:Node.argument list ->
+  ?additional_bootstrap_account_count:int ->
+  ?default_accounts_balance:int ->
   ?parameter_file:string ->
   ?bake:bool ->
   [`Client | `Light | `Proxy] ->

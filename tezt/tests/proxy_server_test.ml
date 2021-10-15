@@ -103,7 +103,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   Log.info "Test advanced originated contract" ;
   let* parameter_file =
     Protocol.write_parameter_file
-      ~protocol
+      ~base:(Either.right protocol)
       [
         (["hard_storage_limit_per_operation"], Some "\"99999999\"");
         (["time_between_blocks"], Some "[\"60\"]");

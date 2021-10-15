@@ -64,12 +64,17 @@ let encoding_prefix = daemon_name
 
 type parameter_overrides = (string list * string option) list
 
-let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
- fun ~protocol parameter_overrides ->
+let write_parameter_file :
+    ?additional_bootstrap_accounts:(Constant.key * int option) list ->
+    base:(string, t) Either.t ->
+    parameter_overrides ->
+    string Lwt.t =
+ fun ?(additional_bootstrap_accounts = []) ~base parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
   let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
-    JSON.parse_file @@ parameter_file protocol |> JSON.unannotate
+    let file = Either.fold ~left:Fun.id ~right:parameter_file base in
+    JSON.parse_file file |> JSON.unannotate
   in
   let parameters =
     List.fold_left
@@ -78,6 +83,31 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
         Ezjsonm.update acc path parsed_value)
       original_parameters
       parameter_overrides
+  in
+  let parameters =
+    let bootstrap_accounts = ["bootstrap_accounts"] in
+    let existing_accounts =
+      Ezjsonm.get_list Fun.id (Ezjsonm.find parameters bootstrap_accounts)
+    in
+    let additional_bootstrap_accounts =
+      List.map
+        (fun ((account : Constant.key), default_balance) ->
+          `A
+            [
+              `String account.identity;
+              `String
+                (string_of_int
+                   (Option.fold
+                      ~none:4000000000000
+                      ~some:Fun.id
+                      default_balance));
+            ])
+        additional_bootstrap_accounts
+    in
+    Ezjsonm.update
+      parameters
+      bootstrap_accounts
+      (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
   let* overriden_parameters_out =
     Lwt_io.open_file ~mode:Output overriden_parameters

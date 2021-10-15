@@ -395,6 +395,23 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
+let gen_and_show_secret_keys ~alias client =
+  let* () = gen_keys ~alias client in
+  let* key = show_address ~show_secret:true ~alias client in
+  match key.secret_key with
+  | None ->
+      failwith
+        (sf
+           "Client.gen_and_show_keys should have created a secret key for %s"
+           alias)
+  | Some sk ->
+      return
+        {
+          Constant.identity = key.public_key_hash;
+          alias;
+          secret = sf "unencrypted:%s" sk;
+        }
+
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
   spawn_command
@@ -867,9 +884,43 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
+let get_parameter_file ?additional_bootstrap_account_count
+    ?default_accounts_balance ?parameter_file ~protocol client =
+  match additional_bootstrap_account_count with
+  | None -> return parameter_file
+  | Some n ->
+      let* additional_bootstrap_accounts =
+        Lwt_list.map_s
+          (fun i ->
+            let alias = sf "bootstrap%d" i in
+            let* key = gen_and_show_secret_keys ~alias client in
+            return (key, default_accounts_balance))
+          (range 6 (5 + n))
+      in
+      let* parameter_file =
+        Protocol.write_parameter_file
+          ~additional_bootstrap_accounts
+          ~base:
+            (Option.fold
+               ~none:(Either.right protocol)
+               ~some:Either.left
+               parameter_file)
+          []
+      in
+      return (Some parameter_file)
+
 let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
+    ?additional_bootstrap_account_count ?default_accounts_balance
     ?parameter_file ?(bake = true) tag ~protocol () =
+  let get_parameter_file client =
+    get_parameter_file
+      ?additional_bootstrap_account_count
+      ?default_accounts_balance
+      ?parameter_file
+      ~protocol
+      client
+  in
   match tag with
   | (`Client | `Proxy) as mode ->
       let* node = Node.init nodes_args in
@@ -885,6 +936,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       let* () =
         Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
       in
+      let* parameter_file = get_parameter_file client in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
       return (node, client)
@@ -892,6 +944,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       let* (client, node1, _) =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
+      let* parameter_file = get_parameter_file client in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
       return (node1, client)
