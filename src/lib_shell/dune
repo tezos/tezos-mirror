@@ -1,34 +1,37 @@
 (library
  (name tezos_shell)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-shell)
- (libraries lwt-watcher
-            lwt-canceler
-            tezos-base
-            tezos-version
-            tezos-context
-            tezos-store
-            tezos-shell-context
-            tezos-p2p
-            tezos-stdlib-unix
-            tezos-shell-services
-            tezos-p2p-services
-            tezos-protocol-updater
-            tezos-requester
-            tezos-workers
-            tezos-validation
-            lwt-exit)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base
-                   -open Tezos_context
-                   -open Tezos_store
-                   -open Tezos_shell_context
-                   -open Tezos_p2p
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services
-                   -open Tezos_p2p_services
-                   -open Tezos_protocol_updater
-                   -open Tezos_requester
-                   -open Tezos_workers
-                   -open Tezos_validation
-		   -open Tezos_version)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  lwt-watcher
+  lwt-canceler
+  tezos-base
+  tezos-version
+  tezos-context
+  tezos-store
+  tezos-shell-context
+  tezos-p2p
+  tezos-stdlib-unix
+  tezos-shell-services
+  tezos-p2p-services
+  tezos-protocol-updater
+  tezos-requester
+  tezos-workers
+  tezos-validation
+  lwt-exit)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_base
+   -open Tezos_context
+   -open Tezos_store
+   -open Tezos_shell_context
+   -open Tezos_p2p
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_p2p_services
+   -open Tezos_protocol_updater
+   -open Tezos_requester
+   -open Tezos_workers
+   -open Tezos_validation
+   -open Tezos_version)))

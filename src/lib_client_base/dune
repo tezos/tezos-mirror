@@ -1,19 +1,21 @@
 (library
  (name tezos_client_base)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-base)
- (libraries tezos-base
-            tezos-shell-services
-            tezos-sapling
-            tezos-rpc)
- (modules (:standard bip39_english))
- (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc
-                   -open Tezos_shell_services)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-sapling
+  tezos-rpc)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_rpc
+   -open Tezos_shell_services))
+ (modules :standard bip39_english))
 
 (rule
  (targets bip39_english.ml)
- (deps    (:exe gen/bip39_generator.exe)
-          gen/bip39_english.txt)
- (action  (run %{exe} %{targets})))
+ (deps (:exe gen/bip39_generator.exe) gen/bip39_english.txt)
+ (action (run %{exe} %{targets})))
