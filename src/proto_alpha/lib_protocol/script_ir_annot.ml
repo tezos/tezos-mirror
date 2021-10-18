@@ -26,7 +26,12 @@
 open Alpha_context
 open Micheline
 open Script_tc_errors
-open Script_typed_ir
+
+type var_annot = Var_annot of string [@@ocaml.unboxed]
+
+type type_annot = Type_annot of string [@@ocaml.unboxed]
+
+type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 let default_now_annot = Some (Var_annot "now")
 

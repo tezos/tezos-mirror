@@ -80,7 +80,7 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_typed_ir.field_annot option;
+  root_name : Script_ir_annot.field_annot option;
 }
 
 type ('arg, 'storage) code = {
@@ -93,7 +93,7 @@ type ('arg, 'storage) code = {
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_typed_ir.field_annot option;
+  root_name : Script_ir_annot.field_annot option;
   code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
@@ -130,7 +130,7 @@ type tc_context =
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
-      root_name : Script_typed_ir.field_annot option;
+      root_name : Script_ir_annot.field_annot option;
     }
       -> tc_context
 
@@ -395,8 +395,8 @@ val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
 
 val add_field_annot :
-  Script_typed_ir.field_annot option ->
-  Script_typed_ir.var_annot option ->
+  Script_ir_annot.field_annot option ->
+  Script_ir_annot.var_annot option ->
   ('loc, 'prim) Micheline.node ->
   ('loc, 'prim) Micheline.node
 
@@ -456,7 +456,7 @@ val parse_contract_for_script :
 
 val find_entrypoint :
   't Script_typed_ir.ty ->
-  root_name:Script_typed_ir.field_annot option ->
+  root_name:Script_ir_annot.field_annot option ->
   string ->
   ((Script.node -> Script.node) * ex_ty) tzresult
 
@@ -465,7 +465,7 @@ module Entrypoints_map : Map.S with type key = string
 val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
-  root_name:Script_typed_ir.field_annot option ->
+  root_name:Script_ir_annot.field_annot option ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
     Entrypoints_map.t)

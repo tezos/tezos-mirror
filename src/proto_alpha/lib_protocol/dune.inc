@@ -111,11 +111,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
+   script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
-   script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
    script_comparable.mli script_comparable.ml
    script_set.mli script_set.ml
@@ -231,11 +231,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
+   script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
-   script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
    script_comparable.mli script_comparable.ml
    script_set.mli script_set.ml
@@ -351,11 +351,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
+   script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
-   script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
    script_comparable.mli script_comparable.ml
    script_set.mli script_set.ml
@@ -493,11 +493,11 @@ include Tezos_raw_protocol_alpha.Main
    Alpha_context
    Local_gas_counter
    Script_tc_errors
+   Script_ir_annot
    Script_typed_ir
    Script_typed_ir_size
    Script_typed_ir_size_costs
    Michelson_v1_gas
-   Script_ir_annot
    Script_list
    Script_comparable
    Script_set
@@ -654,11 +654,11 @@ include Tezos_raw_protocol_alpha.Main
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    script_tc_errors.ml
+   script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
-   script_ir_annot.mli script_ir_annot.ml
    script_list.mli script_list.ml
    script_comparable.mli script_comparable.ml
    script_set.mli script_set.ml

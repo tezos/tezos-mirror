@@ -24,7 +24,12 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Script_typed_ir
+
+type var_annot = Var_annot of string [@@ocaml.unboxed]
+
+type type_annot = Type_annot of string [@@ocaml.unboxed]
+
+type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 (** Default annotations *)
 
