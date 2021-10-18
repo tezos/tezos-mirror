@@ -285,7 +285,7 @@ end
 (** [QCheck] generators used in tests below *)
 module Generators = struct
   (** A generator of maps of operations and their hashes. [?block_hash_t]
-      is an optional generator for the branch of operation. *)
+      is an optional generator for the branch of operations. *)
   let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
     let open QCheck.Gen in
     let* ops =
@@ -487,6 +487,13 @@ module Generators = struct
       }
     in
     return (res, tree, chosen_pair, old_mempool)
+
+  (** [split_in_two l] is a generator producing [(l1, l2)] such that [l1 @ l2 = l] *)
+  let split_in_two (l : 'a list) : ('a list * 'a list) QCheck.Gen.t =
+    let open QCheck.Gen in
+    let length = List.length l in
+    let+ i = 0 -- length in
+    List_extra.split_n l i
 end
 
 module Arbitraries = struct
@@ -547,7 +554,7 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           e2
 
 module Handle_operations = struct
-  (** Test that [handle_live_operations] returns an empty list
+  (** Test that [handle_live_operations] returns an empty map
       of operations when [is_branch_alive] rules
       out all operations *)
   let test_handle_live_operations_live_blocks_all_outdated =
@@ -683,10 +690,236 @@ module Handle_operations = struct
       ()
 end
 
+module Recyle_operations = struct
+  (** A generator of {!Classification.t} that uses
+      the given operations and hashes. It is used in place
+      of {!Prevalidator_generators.t_gen} because we need to
+      control the operations and hashes used (because we want them
+      to be distinct from the one in the tree of blocks). This
+      generator generates classifications that contains all the
+      given operations and hashes, spreading them among the different
+      classes of {!Prevalidator_classification.t}. This generator is NOT
+      a fully random generator like {!Prevalidator_generators.t_gen}. *)
+  let classification_of_ops_gen (ops : Operation.t Op_map.t) :
+      Classification.t QCheck.Gen.t =
+    let open QCheck.Gen in
+    let bindings = Operation_hash.Map.bindings ops in
+    let length = List.length bindings in
+    let* empty_space = 0 -- 100 in
+    (* To avoid throwing part of [ops], we want the capacity of the classification
+       to be equal or larger than [length], hence: *)
+    let map_size_limit = length + empty_space in
+    (* Because capacity must be > 0 in Ring.create: *)
+    let map_size_limit = max 1 map_size_limit in
+    let parameters : Classification.parameters =
+      {map_size_limit; on_discarded_operation = Fun.const ()}
+    in
+    let* classes =
+      list_size (pure length) Prevalidator_generators.classification_gen
+    in
+    assert (List.length classes == length) ;
+    let t = Prevalidator_classification.create parameters in
+    List.iter
+      (fun (classification, (oph, op)) ->
+        Prevalidator_generators.add_if_not_present classification oph op t)
+      (List.combine_drop classes bindings) ;
+    return t
+
+  (** Returns data to test {!Classification.recyle_operations}:
+      - an instance of [block chain_tools]
+      - the tree of blocks
+      - a pair of blocks (that belong to the tree) and is
+        fine for being passed as [(~from_branch, ~to_branch)]; i.e.
+        the two blocks have a common ancestor.
+      - a classification
+      - a list of pending operations
+
+      As in production, the following lists of operations are disjoint:
+      operations in the blocks, classification, and pending list. Note
+      that this is not a precondition of [recycle_operations], it's
+      to test the typical use case. *)
+  let gen =
+    let open QCheck.Gen in
+    let* blocks = Generators.unique_nonempty_block_gen >|= Block.set_to_list in
+    assert (blocks <> []) ;
+    let to_ops (blk : Block.t) = List.concat blk.operations in
+    let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
+    let blocks_ops =
+      List.map to_ops blocks |> List.concat |> oph_op_list_to_map
+    in
+    let both f (a, b) = (f a, f b) in
+    let blocks_hashes = List.map (fun (blk : Block.t) -> blk.hash) blocks in
+    let block_hash_t =
+      (* For classification and pending, put 50% of them in live_blocks.
+         For the remaining 50%, generate branch randomly, so likely outside
+         live_blocks. *)
+      frequency
+        [(1, Prevalidator_generators.block_hash_gen); (1, oneofl blocks_hashes)]
+    in
+    let* classification_pendings_ops =
+      (* For classification and pending, we want operations that are NOT in
+         the blocks already. Hence: *)
+      Generators.op_map_gen ~block_hash_t
+      >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
+    in
+    let* (classification_ops, pending_ops) =
+      Op_map.bindings classification_pendings_ops
+      |> Generators.split_in_two >|= both oph_op_list_to_map
+    in
+    let* (chain_tools, tree, from_to, _) = Generators.chain_tools_gen ~blocks in
+    let+ classification = classification_of_ops_gen classification_ops in
+    (chain_tools, tree, from_to, classification, pending_ops)
+
+  let arb = QCheck.make gen
+
+  (** Test that {!Classification.recycle_operations} returns an empty map when
+      live blocks are empty. This test lifts
+      {!Handle_operations.test_handle_live_operations_live_blocks_all_outdated}
+      to [recycle_operations]. *)
+  let test_recycle_operations_empty_live_blocks =
+    QCheck.Test.make
+      ~name:"[recycle_operations ~live_blocks:empty] is empty"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, _tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let actual : Operation.t Op_map.t =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks:Block_hash.Set.empty
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run
+    in
+    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
+
+  (** Test that the value returned by {!Classification.recycle_operations}
+      can be approximated by unioning the sets of values:
+      - returned by {!Classification.Internal_for_tests.handle_live_operations}
+      - classified in the classification data structure
+      - sent as [pending]. *)
+  let test_recycle_operations_returned_value_spec =
+    QCheck.Test.make
+      ~name:"[recycle_operations] returned value can be approximated"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+    in
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree
+      |> List.map (fun (blk : Block.t) -> blk.hash)
+      |> Block_hash.Set.of_list
+    in
+    (* This is inherited from the behavior of [handle_live_operations] *)
+    let expected_from_tree : Operation_hash.Set.t =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+    in
+    (* This is coming from [recycle_operations] itself *)
+    let op_map_to_hash_list (m : 'a Operation_hash.Map.t) =
+      Op_map.bindings m |> List.map fst |> Operation_hash.Set.of_list
+    in
+    let expected_from_classification =
+      Classification.Internal_for_tests.to_map
+        ~applied:true
+        ~branch_delayed:true
+        ~branch_refused:handle_branch_refused
+        ~refused:false
+        classification
+      |> op_map_to_hash_list
+    in
+    let expected_from_pending = op_map_to_hash_list pending in
+    let expected_superset : Operation_hash.Set.t =
+      Operation_hash.Set.union
+        (Operation_hash.Set.union
+           expected_from_tree
+           expected_from_classification)
+        expected_from_pending
+    in
+    let actual : Operation_hash.Set.t =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run |> Op_map.bindings |> List.map fst
+      |> Operation_hash.Set.of_list
+    in
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      actual
+      expected_superset
+      ()
+
+  (** Test that the classification is appropriately trimmed
+      by {!Classification.recycle_operations} *)
+  let test_recycle_operations_classification =
+    QCheck.Test.make
+      ~name:"[recycle_operations] correctly trims its input classification"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree
+      |> List.map (fun (blk : Block.t) -> blk.hash)
+      |> Block_hash.Set.of_list
+    in
+    let expected : Operation.t Op_map.t =
+      Classification.Internal_for_tests.to_map
+        ~applied:false
+        ~branch_delayed:false
+        ~branch_refused:(not handle_branch_refused)
+        ~refused:true
+        classification
+    in
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let () =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run |> ignore
+    in
+    let actual =
+      Classification.Internal_for_tests.to_map
+        ~applied:true
+        ~branch_delayed:true
+        ~branch_refused:true
+        ~refused:true
+        classification
+    in
+    qcheck_eq' ~pp:op_map_pp ~expected ~actual ()
+end
+
 let () =
   Alcotest.run
     "Prevalidator"
     [
+      (* Run only those tests with:
+         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'handle_operations' *)
       ( "handle_operations",
         qcheck_wrap
           Handle_operations.
@@ -695,5 +928,15 @@ let () =
               test_handle_live_operations_path_spec;
               test_handle_live_operations_clear;
               test_handle_live_operations_inject;
+            ] );
+      (* Run only first two tests (for example) with:
+         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'recycle_operations' '0..2'*)
+      ( "recycle_operations",
+        qcheck_wrap
+          Recyle_operations.
+            [
+              test_recycle_operations_empty_live_blocks;
+              test_recycle_operations_returned_value_spec;
+              test_recycle_operations_classification;
             ] );
     ]
