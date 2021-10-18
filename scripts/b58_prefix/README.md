@@ -100,8 +100,8 @@ poetry install
 ```
 # A tz1 address is generated from a fixed size hash of 20 characters.
 poetry run python b58_prefix.py --prefix tz1 --length 20
-# A block is generated from a fixed size hash of 20 characters.
 # Output: Base58 size: 36. Version bytes: [6, 161, 159]
+# A block is generated from a fixed size hash of 32 characters.
 poetry run python b58_prefix.py --prefix B --length 32
 # Output: Base58 size: 51. Version bytes: [1, 43]
 ```
