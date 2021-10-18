@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-hacl-glue"
-  "hacl-star" { >= "0.4.0" & < "0.5" }
+  "hacl-star" { >= "0.4.2" & < "0.5" }
   "hacl-star-raw"
 ]
 conflicts: [
