@@ -208,11 +208,11 @@ let test_parse_ty ctxt node expected =
       Script_ir_translator.ty_eq ctxt (location node) actual expected
       >|? fun (_, ctxt) -> ctxt )
 
-let var_annot s = Script_ir_annot.Var_annot s
+let var_annot = Script_ir_annot.FOR_TESTS.unsafe_var_annot_of_string
 
-let type_annot s = Script_ir_annot.Type_annot s
+let type_annot = Script_ir_annot.FOR_TESTS.unsafe_type_annot_of_string
 
-let field_annot s = Script_ir_annot.Field_annot s
+let field_annot = Script_ir_annot.FOR_TESTS.unsafe_field_annot_of_string
 
 let test_parse_comb_type () =
   let open Script in
