@@ -138,7 +138,15 @@ type 'block chain_tools = {
 }
 
 (** [recycle_operations] returns the new pending operations when
-    a reorganisation or a head update occurs.
+    a reorganisation or a head update occurs. Returned operations come from:
+
+    1. operations in [from_branch] that are NOT in [to_branch],
+    2. operations in the relevant classes of [classification]
+    3. operations the [pending] map
+
+    This function guarantees that the branch of all returned operations
+    is in [live_blocks] ([live_blocks] acts as a filter).
+
     See also {!Internal_for_tests.handle_live_operations}. *)
 val recycle_operations :
   from_branch:'block ->

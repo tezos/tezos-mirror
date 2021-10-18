@@ -423,8 +423,6 @@ module Generators = struct
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in
     let not_equal x y = not @@ equal x y in
-    (* Blocks that are leaves are blocks which aren't the predecessor
-       of any other block *)
     let read_predecessor_opt (block : Block.t) : Block.t option Lwt.t =
       List.assoc ~equal block predecessor_pairs |> Lwt.return
     in
@@ -508,6 +506,7 @@ let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
   |> force_opt
   |> fun preds -> start :: preds
 
+(** Pretty print values of type [Operation_hash.Set.t] *)
 let op_set_pp fmt x =
   let set_to_list m = Operation_hash.Set.to_seq m |> List.of_seq in
   Format.fprintf
@@ -572,8 +571,9 @@ module Handle_operations = struct
       ()
 
   (** Test that operations returned by [handle_live_operations] is
-      the union of operations in its last argument and operations on
-      the "path" between [from_branch] and [to_branch] *)
+      the union of 1/ operations from its last argument (a map) and 2/
+      operations on the "path" between [from_branch] and [to_branch] (when
+      all blocks are considered live). *)
   let test_handle_live_operations_path_spec =
     QCheck.Test.make
       ~name:"[handle_live_operations] path specification"
