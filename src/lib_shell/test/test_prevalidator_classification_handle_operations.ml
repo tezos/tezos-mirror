@@ -278,13 +278,19 @@ module Block = struct
   end
 
   module Set = Set.Make (Ord)
+
+  let set_to_list s = Set.to_seq s |> List.of_seq
 end
 
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  let op_map_gen : Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  (** A generator of maps of operations and their hashes. [?block_hash_t]
+      is an optional generator for the branch of operation. *)
+  let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
     let open QCheck.Gen in
-    let* ops = small_list Prevalidator_generators.operation_gen in
+    let* ops =
+      small_list (Prevalidator_generators.operation_gen ?block_hash_t)
+    in
     (* Op_map.of_seq eliminates duplicate keys (if any) *)
     List.map (fun op -> (Operation.hash op, op)) ops
     |> List.to_seq |> Op_map.of_seq |> return
@@ -306,6 +312,21 @@ module Generators = struct
     let hash = Block.hash_of_block ops_and_hashes in
     return Block.{hash; operations = ops_and_hashes}
 
+  (* A generator of lists of {!Block.t} where all elements are guaranteed
+     to be different. *)
+  let unique_block_gen : Block.Set.t QCheck.Gen.t =
+    QCheck.Gen.(small_list block_gen >|= Block.Set.of_list)
+
+  (* A generator of lists of {!Block.t} where all elements are guaranteed
+     to be different and returned lists are guaranteed to be non empty. *)
+  let unique_nonempty_block_gen =
+    let open QCheck.Gen in
+    let opt_gen =
+      let+ l = unique_block_gen in
+      if Block.Set.is_empty l then None else Some l
+    in
+    of_option_gen opt_gen
+
   (** A tree generator. Written in a slightly unusual style because it
       generates all values beforehand, to make sure they are all different.
       This is a property we want for trees of blocks. To do so,
@@ -315,13 +336,27 @@ module Generators = struct
       For example it takes [e1] for the root value and then splits
       the rest into [e2; e3] and [e4; e5; e6]. Then it recurses, sending
       [e2; e3] as values to create the left subtree and [e4; e5; e6] to
-      create the right subtree. *)
-  let tree_gen =
+      create the right subtree.
+
+      This generator takes as parameter an optional list of blocks. If
+      they are given, they are used to build the tree; otherwise fresh
+      ones are generated. *)
+  let tree_gen ?blocks =
     let open QCheck.Gen in
-    let* (elems : Block.t list) =
-      list_size (1 -- 100) block_gen
-      >|= Block.Set.of_list >|= Block.Set.to_seq >|= List.of_seq
+    let* (blocks : Block.t list) =
+      match blocks with
+      | None ->
+          (* no blocks received: generate them, use the [nonempty] flavor
+             of the generator, to guarantee [blocks <> []] below. *)
+          unique_nonempty_block_gen >|= Block.set_to_list
+      | Some [] ->
+          QCheck.Test.fail_report
+            "tree_gen should not be called with an empty list of blocks"
+      | Some blocks ->
+          (* take blocks passed as parameters *)
+          return blocks
     in
+    assert (blocks <> []) ;
     let ret x = return (Some x) in
     let rec go = function
       | [] -> return None
@@ -344,14 +379,9 @@ module Generators = struct
             | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
             | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
     in
-    let tree = go elems in
-    map
-      (function
-        | None ->
-            raise (Invalid_argument "tree should not be None")
-            (* the tree is None iff the list is empty, however, we restrict its length between 1 and 100 *)
-        | Some x -> x)
-      tree
+    (* The assertion cannot break, because we made sure that [blocks] is
+       not empty. *)
+    go blocks >|= Option.value_f ~default:(fun () -> assert false)
 
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
@@ -378,15 +408,17 @@ module Generators = struct
         the two blocks have a common ancestor.
       - a map of operations that is fine for being passed as the
         last argument of [handle_live_operations].
-    *)
-  let chain_tools_gen :
+
+      If given, the specified [?blocks] are used. Otherwise they are
+      generated. *)
+  let chain_tools_gen ?blocks :
       (Block.t Classification.chain_tools
       * Block.t Tree.tree
       * (Block.t * Block.t) option
       * Operation.t Operation_hash.Map.t)
       QCheck.Gen.t =
     let open QCheck.Gen in
-    let* tree = tree_gen in
+    let* tree = tree_gen ?blocks in
     assert (Tree.well_formed Block.compare tree) ;
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in
