@@ -275,6 +275,35 @@ module Context = struct
 
     type index = Environment_cache.index
 
+    module Events = struct
+      open Internal_event.Simple
+
+      let section = ["protocol_cache"]
+
+      let start_loading_cache =
+        declare_0
+          ~section
+          ~level:Notice
+          ~name:"start_loading_cache"
+          ~msg:"start loading cache now"
+          ()
+
+      let stop_loading_cache =
+        declare_0
+          ~section
+          ~level:Notice
+          ~name:"stop_loading_cache"
+          ~msg:"stop loading cache now"
+          ()
+
+      let emit = Internal_event.Simple.emit
+
+      let observe start_event stop_event f =
+        emit start_event () >>= fun () ->
+        f () >>=? fun ret ->
+        emit stop_event () >>= fun () -> return ret
+    end
+
     let key_of_identifier = Environment_cache.key_of_identifier
 
     let identifier_of_key = Environment_cache.identifier_of_key
@@ -288,20 +317,22 @@ module Context = struct
     let cache_limit_path cache = cache_path cache @ ["limit"]
 
     let get_cache_number ctxt =
+      let open Data_encoding in
       find ctxt cache_number_path
       >>= Option.fold_s ~none:0 ~some:(fun v ->
-              Lwt.return (Data_encoding.(Binary.of_bytes_exn int31) v))
+              Lwt.return (Binary.of_bytes_exn int31 v))
 
     let set_cache_number ctxt cache_number =
+      let open Data_encoding in
       if cache_number = 0 then Lwt.return ctxt
       else
-        let bytes = Data_encoding.(Binary.to_bytes_exn int31) cache_number in
+        let bytes = (Binary.to_bytes_exn int31) cache_number in
         add ctxt cache_number_path bytes
 
     let get_cache_limit ctxt cache_handle =
+      let open Data_encoding in
       find ctxt (cache_limit_path cache_handle)
-      >>= Option.map_s @@ fun v ->
-          Lwt.return (Data_encoding.(Binary.of_bytes_exn int31) v)
+      >>= Option.map_s @@ fun v -> Lwt.return ((Binary.of_bytes_exn int31) v)
 
     let set_cache_limit ctxt cache_handle limit =
       let path = cache_limit_path cache_handle in
@@ -313,10 +344,7 @@ module Context = struct
       let ctxt = Context {ctxt with cache} in
       let cache_number = List.length layout in
       set_cache_number ctxt cache_number >>= fun ctxt ->
-      List.fold_left_i_s
-        (fun i ctxt limit -> set_cache_limit ctxt i limit)
-        ctxt
-        layout
+      List.fold_left_i_s (fun i ctxt -> set_cache_limit ctxt i) ctxt layout
 
     let get_cache_layout ctxt =
       get_cache_number ctxt >>= fun n ->
@@ -347,11 +375,10 @@ module Context = struct
     let cache_domain_path = ["domain"]
 
     let sync (Context ctxt) ~cache_nonce =
-      let (cache, domain) = Environment_cache.sync ctxt.cache ~cache_nonce in
-      let bytes =
-        Data_encoding.(
-          Binary.to_bytes_exn Environment_cache.domain_encoding domain)
-      in
+      let open Environment_cache in
+      let open Data_encoding in
+      let (cache, domain) = sync ctxt.cache ~cache_nonce in
+      let bytes = Binary.to_bytes_exn domain_encoding domain in
       let ctxt = Context {ctxt with cache} in
       add ctxt cache_domain_path bytes
 
@@ -361,17 +388,9 @@ module Context = struct
     let list_keys (Context {cache; _}) = Environment_cache.list_keys cache
 
     let future_cache_expectation (Context ctxt) ~time_in_blocks =
-      let cache =
-        Environment_cache.future_cache_expectation ctxt.cache ~time_in_blocks
-      in
+      let open Environment_cache in
+      let cache = future_cache_expectation ctxt.cache ~time_in_blocks in
       Context {ctxt with cache}
-
-    let fold_cache_keys cache ~init ~f =
-      let init = ok init in
-      Environment_cache.KeyMap.fold_s
-        (fun key entry acc -> acc >>?= fun acc -> f acc key entry)
-        cache
-        init
 
     let find_domain ctxt =
       Data_encoding.(
@@ -380,36 +399,20 @@ module Context = struct
             Lwt.return
             @@ (Binary.of_bytes_exn Environment_cache.domain_encoding) v)
 
-    let fold_keys ctxt ~init ~f =
-      find_domain ctxt >>= function
-      | None -> return init
-      | Some domain ->
-          List.fold_left_es
-            (fun acc cache -> fold_cache_keys cache ~init:acc ~f)
-            init
-            domain
-
     let find (Context {cache; _}) key =
       match Environment_cache.find cache key with
       | None -> Lwt.return_none
       | Some value -> value () >|= Option.some
 
-    let load ctxt initial ~value_of_key =
-      let init = Environment_cache.clear initial in
-      fold_keys ctxt ~init ~f:(fun cache key entry ->
-          match Environment_cache.lookup initial key with
-          | None -> value_of_key key entry cache
-          | Some (value, entry') ->
-              if Bytes.equal entry.cache_nonce entry'.cache_nonce then
-                return
-                @@ Environment_cache.update_cache_key cache key value entry
-              else value_of_key key entry cache)
+    let load ctxt inherited ~value_of_key =
+      Environment_cache.(
+        find_domain ctxt >>= function
+        | None -> return @@ clear inherited
+        | Some domain -> from_cache inherited domain ~value_of_key)
 
     let load_now ctxt cache builder =
-      load ctxt cache ~value_of_key:(fun key entry cache ->
-          let open Environment_cache in
-          builder key >>=? fun value ->
-          return (update_cache_key cache key (delay value) entry))
+      load ctxt cache ~value_of_key:(fun key ->
+          builder key >>=? fun value -> return (delay value))
 
     let load_on_demand ctxt cache builder =
       let builder key =
@@ -428,8 +431,7 @@ module Context = struct
               "Environment_context.load_on_demand: Unable to load value"
         | Ok value -> Lwt.return value
       in
-      load ctxt cache ~value_of_key:(fun key entry cache ->
-          let open Environment_cache in
+      load ctxt cache ~value_of_key:(fun key ->
           let lazy_value =
             let cache = ref None in
             fun () ->
@@ -440,12 +442,15 @@ module Context = struct
                   cache := Some r ;
                   Lwt.return r
           in
-          Lwt.return (update_cache_key cache key lazy_value entry) >|= ok)
+          return lazy_value)
 
     let load_cache ctxt cache mode builder =
-      match mode with
-      | `Load -> load_now ctxt cache builder
-      | `Lazy -> load_on_demand ctxt cache builder
+      Events.(
+        match mode with
+        | `Load ->
+            observe start_loading_cache stop_loading_cache @@ fun () ->
+            load_now ctxt cache builder
+        | `Lazy -> load_on_demand ctxt cache builder)
 
     let ensure_valid_recycling (Context ctxt) cache =
       get_cache_layout (Context ctxt) >>= fun layout ->
