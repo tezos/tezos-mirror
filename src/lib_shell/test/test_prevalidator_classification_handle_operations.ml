@@ -504,150 +504,152 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           pp
           e2
 
-(** Test that operations returned by [handle_live_operations] is
-    a subset of the input mempool when [is_branch_alive] rules
-    out all operations *)
-let test_handle_live_operations_live_blocks_all_outdated =
-  QCheck.Test.make
-    ~name:
-      "[handle_live_operations ~is_branch_alive:(Fun.const false)] is a subset \
-       of its last argument"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  (* List of operation hashes coming from [old_mempool] *)
-  let expected_superset : Operation_hash.Set.t =
-    Op_map.bindings old_mempool |> List.map fst |> Operation_hash.Set.of_list
-  in
-  let actual : Operation_hash.Set.t =
-    Classification.Internal_for_tests.handle_live_operations
-      ~block_store:Block.tools
-      ~chain
-      ~from_branch
-      ~to_branch
-      ~is_branch_alive:(Fun.const false)
-      old_mempool
-    |> Lwt_main.run |> Op_map.bindings |> List.map fst
-    |> Operation_hash.Set.of_list
-  in
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    actual
-    expected_superset
-    ()
+module Handle_operations = struct
+  (** Test that operations returned by [handle_live_operations] is
+      a subset of the input mempool when [is_branch_alive] rules
+      out all operations *)
+  let test_handle_live_operations_live_blocks_all_outdated =
+    QCheck.Test.make
+      ~name:
+        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is a \
+         subset of its last argument"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    (* List of operation hashes coming from [old_mempool] *)
+    let expected_superset : Operation_hash.Set.t =
+      Op_map.bindings old_mempool |> List.map fst |> Operation_hash.Set.of_list
+    in
+    let actual : Operation_hash.Set.t =
+      Classification.Internal_for_tests.handle_live_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~is_branch_alive:(Fun.const false)
+        old_mempool
+      |> Lwt_main.run |> Op_map.bindings |> List.map fst
+      |> Operation_hash.Set.of_list
+    in
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      actual
+      expected_superset
+      ()
 
-(** Test that operations returned by [handle_live_operations] is
-    the union of operations in its last argument and operations on
-    the "path" between [from_branch] and [to_branch] *)
-let test_handle_live_operations_path_spec =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] path specification"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, _) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree from_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  let actual =
+  (** Test that operations returned by [handle_live_operations] is
+      the union of operations in its last argument and operations on
+      the "path" between [from_branch] and [to_branch] *)
+  let test_handle_live_operations_path_spec =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] path specification"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, _) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+    in
+    let expected =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+    in
+    let actual =
+      Classification.Internal_for_tests.handle_live_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~is_branch_alive:(Fun.const true)
+        Operation_hash.Map.empty
+      |> Lwt_main.run |> Op_map.bindings |> List.map fst
+      |> Operation_hash.Set.of_list
+    in
+    qcheck_eq' ~pp:op_set_pp ~eq:Operation_hash.Set.equal ~expected ~actual ()
+
+  (** Test that operations cleared by [handle_live_operations]
+      are operations on the path from [ancestor] to [to_branch] (when all
+      operations are deemed up-to-date). *)
+  let test_handle_live_operations_clear =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] clear approximation"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let cleared = ref Operation_hash.Set.empty in
+    let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
+    let chain = {chain with clear_or_cancel = clearer} in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+    in
+    let expected_superset =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree to_branch ancestor)
+      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+    in
     Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
       ~chain
       ~from_branch
       ~to_branch
       ~is_branch_alive:(Fun.const true)
-      Operation_hash.Map.empty
-    |> Lwt_main.run |> Op_map.bindings |> List.map fst
-    |> Operation_hash.Set.of_list
-  in
-  qcheck_eq' ~pp:op_set_pp ~eq:Operation_hash.Set.equal ~expected ~actual ()
+      old_mempool
+    |> Lwt_main.run |> ignore ;
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      !cleared
+      expected_superset
+      ()
 
-(** Test that operations cleared by [handle_live_operations]
-    are operations on the path from [ancestor] to [to_branch] (when all
-    operations are deemed up-to-date). *)
-let test_handle_live_operations_clear =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] clear approximation"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let cleared = ref Operation_hash.Set.empty in
-  let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
-  let chain = {chain with clear_or_cancel = clearer} in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected_superset =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree to_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  Classification.Internal_for_tests.handle_live_operations
-    ~block_store:Block.tools
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(Fun.const true)
-    old_mempool
-  |> Lwt_main.run |> ignore ;
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    !cleared
-    expected_superset
-    ()
-
-(** Test that operations injected by [handle_live_operations]
-    are operations on the path from [ancestor] to [from_branch]. *)
-let test_handle_live_operations_inject =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] inject approximation"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let injected = ref Operation_hash.Set.empty in
-  let inject_operation oph _op =
-    injected := Operation_hash.Set.add oph !injected ;
-    Lwt.return_unit
-  in
-  let chain = {chain with inject_operation} in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected_superset =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree from_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  Classification.Internal_for_tests.handle_live_operations
-    ~block_store:Block.tools
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(Fun.const true)
-    old_mempool
-  |> Lwt_main.run |> ignore ;
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    !injected
-    expected_superset
-    ()
+  (** Test that operations injected by [handle_live_operations]
+      are operations on the path from [ancestor] to [from_branch]. *)
+  let test_handle_live_operations_inject =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] inject approximation"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let injected = ref Operation_hash.Set.empty in
+    let inject_operation oph _op =
+      injected := Operation_hash.Set.add oph !injected ;
+      Lwt.return_unit
+    in
+    let chain = {chain with inject_operation} in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+    in
+    let expected_superset =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+    in
+    Classification.Internal_for_tests.handle_live_operations
+      ~block_store:Block.tools
+      ~chain
+      ~from_branch
+      ~to_branch
+      ~is_branch_alive:(Fun.const true)
+      old_mempool
+    |> Lwt_main.run |> ignore ;
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      !injected
+      expected_superset
+      ()
+end
 
 let () =
   Alcotest.run
@@ -655,10 +657,11 @@ let () =
     [
       ( "handle_operations",
         qcheck_wrap
-          [
-            test_handle_live_operations_live_blocks_all_outdated;
-            test_handle_live_operations_path_spec;
-            test_handle_live_operations_clear;
-            test_handle_live_operations_inject;
-          ] );
+          Handle_operations.
+            [
+              test_handle_live_operations_live_blocks_all_outdated;
+              test_handle_live_operations_path_spec;
+              test_handle_live_operations_clear;
+              test_handle_live_operations_inject;
+            ] );
     ]
