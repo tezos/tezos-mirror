@@ -46,6 +46,7 @@ test_coverage:
   # to the user as a badge.
   coverage: '/Coverage: \d+\/\d+ \(([^%]+%)\)/'
   artifacts:
+    expose_as: 'Coverage report'
     when: always
     paths:
       - _coverage_report/
