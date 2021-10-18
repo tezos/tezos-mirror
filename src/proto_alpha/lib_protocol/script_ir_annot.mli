@@ -49,6 +49,8 @@ val default_self_annot : var_annot option
 
 val default_arg_annot : var_annot option
 
+val lambda_arg_annot : var_annot option
+
 val default_param_annot : var_annot option
 
 val default_storage_annot : var_annot option

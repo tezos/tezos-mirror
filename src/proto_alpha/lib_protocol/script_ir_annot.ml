@@ -49,6 +49,8 @@ let default_self_annot = Some (Var_annot "self")
 
 let default_arg_annot = Some (Var_annot "arg")
 
+let lambda_arg_annot = Some (Var_annot "@arg")
+
 let default_param_annot = Some (Var_annot "parameter")
 
 let default_storage_annot = Some (Var_annot "storage")
