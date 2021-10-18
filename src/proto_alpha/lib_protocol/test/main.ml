@@ -81,5 +81,6 @@ let () =
       ("tx rollup", Test_tx_rollup.tests);
       ("gas monad", Test_gas_monad.tests);
       ("sc rollup", Test_sc_rollup.tests);
+      ("script cache", Test_script_cache.tests);
     ]
   |> Lwt_main.run

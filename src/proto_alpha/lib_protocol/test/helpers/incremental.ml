@@ -63,6 +63,8 @@ let rpc_ctxt =
 
 let alpha_ctxt st = st.state.ctxt
 
+let set_alpha_ctxt st ctxt = {st with state = {st.state with ctxt}}
+
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ?(policy = Block.By_round 0) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
