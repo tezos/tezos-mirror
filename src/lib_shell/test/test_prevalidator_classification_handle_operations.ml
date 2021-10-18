@@ -515,6 +515,17 @@ let op_set_pp fmt x =
     (Format.pp_print_list Operation_hash.pp)
     (set_to_list x)
 
+(** Pretty print values of type [Operation.t Operation_hash.Map] *)
+let op_map_pp fmt x =
+  let pp_pair fmt (oph, op) =
+    Format.fprintf fmt "%a:%a" Operation_hash.pp oph Operation.pp op
+  in
+  Format.fprintf
+    fmt
+    "%a"
+    (Format.pp_print_list pp_pair)
+    (Operation_hash.Map.bindings x)
+
 let qcheck_cond ?pp ~cond e1 e2 () =
   if cond e1 e2 then true
   else
@@ -536,23 +547,18 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           e2
 
 module Handle_operations = struct
-  (** Test that operations returned by [handle_live_operations] is
-      a subset of the input mempool when [is_branch_alive] rules
+  (** Test that [handle_live_operations] returns an empty list
+      of operations when [is_branch_alive] rules
       out all operations *)
   let test_handle_live_operations_live_blocks_all_outdated =
     QCheck.Test.make
       ~name:
-        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is a \
-         subset of its last argument"
+        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is empty"
       Arbitraries.chain_tools_arb
     @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt pair_blocks_opt in
-    (* List of operation hashes coming from [old_mempool] *)
-    let expected_superset : Operation_hash.Set.t =
-      Op_map.bindings old_mempool |> List.map fst |> Operation_hash.Set.of_list
-    in
-    let actual : Operation_hash.Set.t =
+    let actual : Operation.t Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
         ~block_store:Block.tools
         ~chain
@@ -560,15 +566,9 @@ module Handle_operations = struct
         ~to_branch
         ~is_branch_alive:(Fun.const false)
         old_mempool
-      |> Lwt_main.run |> Op_map.bindings |> List.map fst
-      |> Operation_hash.Set.of_list
+      |> Lwt_main.run
     in
-    qcheck_cond
-      ~pp:op_set_pp
-      ~cond:Operation_hash.Set.subset
-      actual
-      expected_superset
-      ()
+    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
 
   (** Test that operations returned by [handle_live_operations] is
       the union of 1/ operations from its last argument (a map) and 2/
