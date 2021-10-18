@@ -319,8 +319,8 @@ module Generators = struct
   let tree_gen =
     let open QCheck.Gen in
     let* (elems : Block.t list) =
-      small_list block_gen >|= Block.Set.of_list >|= Block.Set.to_seq
-      >|= List.of_seq
+      list_size (1 -- 100) block_gen
+      >|= Block.Set.of_list >|= Block.Set.to_seq >|= List.of_seq
     in
     let ret x = return (Some x) in
     let rec go = function
@@ -344,9 +344,14 @@ module Generators = struct
             | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
             | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
     in
-    go elems
-
-  let tree_gen = of_option_gen tree_gen
+    let tree = go elems in
+    map
+      (function
+        | None ->
+            raise (Invalid_argument "tree should not be None")
+            (* the tree is None iff the list is empty, however, we restrict its length between 1 and 100 *)
+        | Some x -> x)
+      tree
 
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
