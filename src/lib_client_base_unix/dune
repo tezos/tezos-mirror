@@ -1,25 +1,28 @@
 (library
  (name tezos_client_base_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-base-unix)
- (libraries tezos-base
-            tezos-client-base
-            tezos-client-commands
-            tezos-stdlib-unix
-            tezos-rpc-http-client-unix
-            tezos-mockup
-            tezos-mockup-registration
-            tezos-mockup-commands
-            tezos-proxy
-            tezos-signer-backends.unix
-            tezos-shell-services
-            lwt-exit)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc_http
-                   -open Tezos_rpc_http_client_unix
-                   -open Tezos_shell_services
-                   -open Tezos_stdlib_unix
-                   -open Tezos_client_base
-                   -open Tezos_client_commands
-                   -open Tezos_mockup_commands
-                   -linkall)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-client-commands
+  tezos-stdlib-unix
+  tezos-rpc-http-client-unix
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-proxy
+  tezos-signer-backends.unix
+  tezos-shell-services
+  lwt-exit)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_rpc_http
+   -open Tezos_rpc_http_client_unix
+   -open Tezos_shell_services
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base
+   -open Tezos_client_commands
+   -open Tezos_mockup_commands)))
