@@ -82,6 +82,10 @@ val list_find_map : ('a -> 'b option) -> 'a list -> 'b option
     else [l] itself. *)
 val take : int -> 'a list -> 'a list
 
+(** [drop n l] removes the first [n] elements of [l] if longer than [n],
+    else the empty list. Raise [invalid_arg] if [n] is negative. *)
+val drop : int -> 'a list -> 'a list
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)
@@ -128,6 +132,9 @@ val replace_string :
 
 (** Repeat something a given amount of times. *)
 val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
+
+(** Fold n times a given function. *)
+val fold : int -> 'a -> (int -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Input/Output} *)
 

@@ -404,6 +404,8 @@ let kill (process : t) =
   kill_remote_if_needed process ;
   process.lwt_process#terminate
 
+let pid (process : t) = process.lwt_process#pid
+
 let check ?(expect_failure = false) process =
   let* status = wait process in
   match status with
@@ -508,3 +510,9 @@ let check_error ?exit_code ?msg process =
         msg ;
       unit
   | _ -> raise (Failed error)
+
+let program_path program =
+  try
+    let* path = run_and_read_stdout "sh" ["-c"; "command -v " ^ program] in
+    return (Some (String.trim path))
+  with Failed _ -> return None
