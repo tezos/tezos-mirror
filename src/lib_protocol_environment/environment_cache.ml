@@ -329,23 +329,36 @@ let finalize_cache ({map; _} as cache) nonce =
   let metamap = KeyMap.map snd map in
   ({cache with map}, metamap)
 
-type domain = value_metadata KeyMap.t list
+type subcache_domain = {keys : value_metadata KeyMap.t; counter : int64}
+
+type domain = subcache_domain list
 
 let sync_cache cache ~cache_nonce =
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
   let (cache, new_entries) = finalize_cache cache cache_nonce in
-  (cache, new_entries)
+  (cache, {keys = new_entries; counter = cache.counter})
 
-let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
+let subcache_keys_encoding : value_metadata KeyMap.t Data_encoding.t =
   Data_encoding.(
     conv
       KeyMap.bindings
       (fun b -> KeyMap.of_seq (List.to_seq b))
       (list (dynamic_size (tup2 key_encoding value_metadata_encoding))))
 
+let subcache_domain_encoding : subcache_domain Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun {keys; counter} -> (keys, counter))
+      (fun (keys, counter) -> {keys; counter})
+      (obj2
+         (req "keys" (dynamic_size subcache_keys_encoding))
+         (req "counter" int64)))
+
 let domain_encoding : domain Data_encoding.t =
-  Data_encoding.(list (dynamic_size subcache_domain_encoding))
+  Data_encoding.(list subcache_domain_encoding)
+
+let empty_domain = function [] -> true | _ -> false
 
 let sync t ~cache_nonce =
   with_caches t @@ fun caches ->
@@ -363,6 +376,37 @@ let update_cache_key t key value meta =
   let cache = FunctionalArray.get caches key.cache_index in
   let cache = insert_cache_entry cache key (value, meta) in
   update_cache_with t key.cache_index cache
+
+let from_cache initial domain ~value_of_key =
+  let cache =
+    with_caches (clear initial) @@ fun caches ->
+    FunctionalArray.mapi
+      (fun i (cache : 'a cache) ->
+        if i = -1 then cache
+        else
+          match List.nth domain i with
+          | None -> assert false
+          | Some subdomain -> {cache with counter = subdomain.counter})
+      caches
+  in
+
+  let fold_cache_keys subdomain cache =
+    KeyMap.fold_es
+      (fun key entry cache ->
+        (match lookup initial key with
+        | None -> value_of_key key
+        | Some (value, entry') ->
+            if Bytes.equal entry.cache_nonce entry'.cache_nonce then
+              return value
+            else value_of_key key)
+        >>=? fun value -> return (update_cache_key cache key value entry))
+      subdomain.keys
+      cache
+  in
+  List.fold_left_es
+    (fun cache subdomain -> fold_cache_keys subdomain cache)
+    (Some cache)
+    domain
 
 let number_of_caches t = with_caches t FunctionalArray.length
 
