@@ -1,5 +1,3 @@
-(env (static (flags (:standard -ccopt -static))))
-
 (library
  (name tezos_validator)
  (public_name tezos-validator)
