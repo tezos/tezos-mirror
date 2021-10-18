@@ -2,7 +2,7 @@ Tezt: Long Tests
 ================
 
 :doc:`Tezt <tezt>` can also be used for long tests.
-The differences with regular Tezt tests are:
+Here are the differences with regular Tezt tests:
 
 - long tests are not run in the CI but on dedicated machines with
   stable, predictable performance, and with no global timeout like in
