@@ -1,7 +1,7 @@
 (library
  (name tezos_tooling)
- (instrumentation (backend bisect_ppx))
- (public_name tezos-tooling))
+ (public_name tezos-tooling)
+ (instrumentation (backend bisect_ppx)))
 
 (install
  (package tezos-tooling)
