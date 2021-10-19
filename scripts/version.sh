@@ -9,21 +9,24 @@
 
 ## `ocaml-version` should be in sync with `README.rst` and
 ## `lib.protocol-compiler/tezos-protocol-compiler.opam`
+##
+## This script is also sourced in the Makefile, as such it should be compatible
+## with both the make and sh syntax
 
-ocaml_version=4.12.0
-opam_version=2.0
-recommended_rust_version=1.52.1
+export ocaml_version=4.12.1
+export opam_version=2.0
+export recommended_rust_version=1.52.1
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-full_opam_repository_tag=e5c714fcd4a7f6f1262c4b06702c073b2a6751d5
+export full_opam_repository_tag=754c005bee4b198787ffc01f82e6c1f9c6356c2c
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
-opam_repository_url=https://gitlab.com/tezos/opam-repository
-opam_repository_tag=25f9d287058434f1b9940bc8c734e486b59b42b9
-opam_repository_git=$opam_repository_url.git
-opam_repository=$opam_repository_git\#$opam_repository_tag
+export opam_repository_url=https://gitlab.com/tezos/opam-repository
+export opam_repository_tag=eccbeb032b99f56d63d29dd088572ed4d7d67fdd
+export opam_repository_git=$opam_repository_url.git
+export opam_repository=$opam_repository_git\#$opam_repository_tag
 
 ## Other variables, used both in Makefile and scripts
-COVERAGE_OUTPUT=_coverage_output
+export COVERAGE_OUTPUT=_coverage_output
