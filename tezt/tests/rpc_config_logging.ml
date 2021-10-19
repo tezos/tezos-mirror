@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Base
-open Lwt.Infix
 
 let change_logging_configuration =
   Protocol.register_test
@@ -39,76 +38,83 @@ let change_logging_configuration =
   in
   let* () = repeat 2 (fun () -> Client.bake_for client) in
   let should_fail msg f =
-    Lwt.catch
-      (fun () ->
-        let* _ = f () in
-        return false)
-      (fun _ -> return true)
-    >>= function
-    | true -> return ()
-    | false -> Test.fail "Expecting failure: %s" msg
+    let* actually_failed =
+      Lwt.catch
+        (fun () ->
+          let* _ = f () in
+          return false)
+        (fun _ -> return true)
+    in
+    if actually_failed then return () else Test.fail "Expecting failure: %s" msg
   in
   let call_config data =
     let* _ = Client.rpc ~data Client.PUT ["config"; "logging"] client in
     Lwt.return_unit
   in
-  should_fail "wrong-json" (fun () ->
-      call_config Ezjsonm.(dict [("wrong", `Null)]))
-  >>= fun () ->
+  let* () =
+    should_fail "wrong-json" (fun () ->
+        call_config Ezjsonm.(dict [("wrong", `Null)]))
+  in
   (* Empty just works: *)
-  call_config Ezjsonm.(dict []) >>= fun () ->
+  let* () = call_config Ezjsonm.(dict []) in
   let call_config_activate ?(use_deprecated_key = false) l =
     let key_name = if use_deprecated_key then "activate" else "active_sinks" in
     call_config Ezjsonm.(dict [(key_name, strings l)])
   in
   let tmp0 = Temp.file "tezt-rpc-logging0.log" in
   let tmp1 = Temp.file "tezt-rpc-logging1.log" in
-  call_config_activate
-    ~use_deprecated_key:true
-    [sf "file-descriptor-path://%s?level-at-least=debug" tmp0]
-  >>= fun () ->
+  let* () =
+    call_config_activate
+      ~use_deprecated_key:true
+      [sf "file-descriptor-path://%s?level-at-least=debug" tmp0]
+  in
   (* Let's make some noise: *)
-  Client.bake_for client >>= fun () ->
-  read_file tmp0 >>= fun tmp0_content ->
+  let* () = Client.bake_for client in
+  let* tmp0_content = read_file tmp0 in
   if String.length tmp0_content < 100 then
     Test.fail "File %s should have more data" tmp0 ;
   (* We reopen the same one plus another one with the same configuration: *)
-  call_config_activate
-    [
-      sf "file-descriptor-path://%s?level-at-least=debug" tmp1;
-      sf "file-descriptor-path://%s?level-at-least=debug" tmp0;
-    ]
-  >>= fun () ->
+  let* () =
+    call_config_activate
+      [
+        sf "file-descriptor-path://%s?level-at-least=debug" tmp1;
+        sf "file-descriptor-path://%s?level-at-least=debug" tmp0;
+      ]
+  in
   (* More noise *)
-  Client.bake_for client >>= fun () ->
-  read_file tmp1 >>= fun tmp1_content_1 ->
-  read_file tmp0 >>= fun tmp0_content_2 ->
+  let* () = Client.bake_for client in
+  let* tmp1_content_1 = read_file tmp1 in
+  let* tmp0_content_2 = read_file tmp0 in
   let lines s = String.split_on_char '\n' s in
   if lines tmp0_content_2 > lines tmp1_content_1 then
     Test.fail "%s is not smaller than %s" tmp1 tmp0 ;
-  (* Now just the second one *)
-  call_config_activate
-    [sf "file-descriptor-path://%s?level-at-least=debug" tmp1]
-  >>= fun () ->
-  read_file tmp0 >>= fun tmp0_content_3 ->
-  (* More noise *)
-  Client.bake_for client >>= fun () ->
-  read_file tmp0 >>= fun tmp0_content_4 ->
+  let* () =
+    (* Now just the second one *)
+    call_config_activate
+      [sf "file-descriptor-path://%s?level-at-least=debug" tmp1]
+  in
+  let* tmp0_content_3 = read_file tmp0 in
+  let* () =
+    (* More noise *)
+    Client.bake_for client
+  in
+  let* tmp0_content_4 = read_file tmp0 in
   if tmp0_content_3 <> tmp0_content_4 then
     Test.fail "Sink %s has not stopped growing." tmp0 ;
   (* We now configure the sink to output only consume events in the `rpc`
      and `validator` top-level sections, and then we check that only those events
      can be found in the resulting file: *)
-  call_config_activate
-    [
-      sf
-        "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&fresh=true"
-        tmp1;
-    ]
-  >>= fun () ->
+  let* () =
+    call_config_activate
+      [
+        sf
+          "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&fresh=true"
+          tmp1;
+      ]
+  in
   (* More noise *)
-  Client.bake_for client >>= fun () ->
-  read_file tmp1 >>= fun tmp1_content ->
+  let* () = Client.bake_for client in
+  let* tmp1_content = read_file tmp1 in
   (* Let's check they are all from the RPC or validator sections: *)
   let () =
     let check_line ith line =
@@ -133,17 +139,18 @@ let change_logging_configuration =
        validator: *)
     let tmpdir = Temp.dir "tezt-rpc-logging-pid" in
     let interesting_prefix = "log-file-prefix" in
-    call_config_activate
-      [
-        sf
-          "file-descriptor-path://%s/%s.log?section-prefix=:debug&with-pid=true&fresh=true"
-          tmpdir
-          interesting_prefix;
-      ]
-    >>= fun () ->
+    let* () =
+      call_config_activate
+        [
+          sf
+            "file-descriptor-path://%s/%s.log?section-prefix=:debug&with-pid=true&fresh=true"
+            tmpdir
+            interesting_prefix;
+        ]
+    in
     (* More noise *)
-    Client.bake_for client >>= fun () ->
-    Lwt_unix.files_of_directory tmpdir |> Lwt_stream.to_list >>= fun files ->
+    let* () = Client.bake_for client in
+    let* files = Lwt_unix.files_of_directory tmpdir |> Lwt_stream.to_list in
     let should_be_two =
       List.fold_left
         (fun count f ->
