@@ -14,8 +14,10 @@ documentation:build:
   script:
     - make -C docs html
   artifacts:
+    expose_as: 'Documentation - excluding odoc and CLI manuals'
     paths:
-      - docs
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
     expire_in: 1 week
 
 documentation:build_all:
@@ -28,8 +30,10 @@ documentation:build_all:
   script:
     - make -C docs all
   artifacts:
+    expose_as: 'Full documentation - including odoc and CLI manuals'
     paths:
-      - docs
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
     expire_in: 1 week
   allow_failure: true
 
