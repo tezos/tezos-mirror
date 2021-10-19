@@ -244,6 +244,9 @@ module Config_file : sig
     ?operations_batch_size:int ->
     JSON.t ->
     JSON.t
+
+  (** Set the peer_validator configuration in the given configuration. *)
+  val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)

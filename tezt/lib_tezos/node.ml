@@ -206,6 +206,18 @@ module Config_file = struct
       (fun config -> JSON.put ("prevalidator", prevalidator) config)
       old_config
 
+  let set_peer_validator ?(new_head_request_timeout = 60.) old_config =
+    let peer_validator =
+      `O
+        [
+          ( "peer_validator",
+            `O [("new_head_request_timeout", `Float new_head_request_timeout)]
+          );
+        ]
+      |> JSON.annotate ~origin:"set_peer_validator"
+    in
+    JSON.put ("shell", peer_validator) old_config
+
   let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
     let network_json =
       `O
