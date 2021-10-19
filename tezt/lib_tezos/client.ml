@@ -351,6 +351,19 @@ let spawn_endorse_for ?endpoint ?(key = Constant.bootstrap2.alias) client =
 let endorse_for ?endpoint ?key client =
   spawn_endorse_for ?endpoint ?key client |> Process.check
 
+let empty_mempool_file ?(filename = "mempool.json") () =
+  let mempool_str =
+    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1928
+     a write_file function should be added to the tezt base module *)
+  let mempool = Temp.file filename in
+  let* _ =
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
+        Lwt_io.write oc mempool_str)
+  in
+  Lwt.return mempool
+
 let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
   spawn_command
