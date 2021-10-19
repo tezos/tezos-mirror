@@ -106,7 +106,6 @@ build_release:static-arm64-linux-binaries:
   image: registry.gitlab.com/gitlab-org/release-cli
   variables:
     ARCH_PREFIX: ""
-  variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
   script:
