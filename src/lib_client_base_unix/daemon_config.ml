@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,15 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Client_commands.register Protocol.hash @@ fun _network ->
-  List.map (Clic.map_command (new Protocol_client_context.wrap_full))
-  @@ Delegate_commands.delegate_commands ()
+(* Tezos Daemon configuration *)
 
-let select_commands _ _ =
-  return
-    (List.map
-       (Clic.map_command (new Protocol_client_context.wrap_full))
-       (Delegate_commands.endorser_commands ()))
+include Client_config
 
-let () = Client_main_run.run (module Daemon_config) ~select_commands
+(* The daemons RPC communications defaults to binary. This may be
+   overriden using the --media-type command-line argument. *)
+let default_media_type = Media_type.[octet_stream]

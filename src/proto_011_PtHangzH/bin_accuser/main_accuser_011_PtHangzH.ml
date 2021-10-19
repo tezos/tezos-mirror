@@ -35,4 +35,4 @@ let select_commands _ _ =
        (Clic.map_command (new Protocol_client_context.wrap_full))
        (Delegate_commands.accuser_commands ()))
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () = Client_main_run.run (module Daemon_config) ~select_commands

@@ -106,8 +106,18 @@ Node
 Client
 ------
 
+- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
+  The media accept header indicates to the node which format of data serialisation is supported.
+  The value can be  ``json``, ``binary`` or ``any``.
+
+
 Baker / Endorser / Accuser
 --------------------------
+
+- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
+  The default ``media_type`` is ``binary`` for bakers.
+  The media accept header indicates to the node which format of data serialisation is supported.
+  The value can be ``json``, ``binary`` or ``any``.
 
 Proxy server
 ------------
