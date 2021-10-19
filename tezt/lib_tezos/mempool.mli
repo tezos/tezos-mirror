@@ -30,3 +30,6 @@ type t = {
   refused : string list;
   unprocessed : string list;
 }
+
+(** The mempool type description. *)
+val typ : t Check.typ

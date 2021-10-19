@@ -30,3 +30,15 @@ type t = {
   refused : string list;
   unprocessed : string list;
 }
+
+(* A comparable type for mempool where classification and ordering
+   does not matter. *)
+let typ : t Check.typ =
+  let open Check in
+  let sort = List.sort compare in
+  convert
+    (fun mempool ->
+      sort
+        (mempool.applied @ mempool.branch_delayed @ mempool.branch_refused
+       @ mempool.refused @ mempool.unprocessed))
+    (list string)
