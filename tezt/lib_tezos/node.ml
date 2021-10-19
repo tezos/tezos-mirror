@@ -218,8 +218,9 @@ module Config_file = struct
     in
     JSON.put ("shell", peer_validator) old_config
 
-  let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
-    let network_json =
+  let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
+      =
+    let network =
       `O
         [
           ( "genesis",
@@ -258,15 +259,10 @@ module Config_file = struct
                      ])
                  upgrade_points) );
         ]
+      |> JSON.annotate
+           ~origin:"set_sandbox_network_with_user_activated_upgrades"
     in
-    update node @@ fun json ->
-    JSON.update
-      "network"
-      (fun _ ->
-        JSON.annotate
-          ~origin:"set_sandbox_network_with_user_activated_upgrades"
-          network_json)
-      json
+    JSON.put ("network", network) old_config
 end
 
 let trigger_ready node value =

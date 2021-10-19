@@ -38,9 +38,10 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
   @@ fun () ->
   let node = Node.create [] in
   let* () = Node.config_init node [] in
-  Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-    node
-    [(3, migrate_to)] ;
+  Node.Config_file.(
+    update
+      node
+      (set_sandbox_network_with_user_activated_upgrades [(3, migrate_to)])) ;
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
   let* client = Client.(init ~endpoint:(Node node) ()) in

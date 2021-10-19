@@ -235,7 +235,7 @@ module Config_file : sig
   (** Set the network config to a sandbox with the given user
       activated upgrades. *)
   val set_sandbox_network_with_user_activated_upgrades :
-    t -> (int * Protocol.t) list -> unit
+    (int * Protocol.t) list -> JSON.t -> JSON.t
 
   (** Set the prevalidator configuration in the given configuration. *)
   val set_prevalidator :
