@@ -43,6 +43,7 @@
         "Roll_repr_legacy",
         "Vote_repr",
         "Block_header_repr",
+        "Entrypoint_repr",
         "Operation_repr",
         "Manager_repr",
         "Commitment_repr",
