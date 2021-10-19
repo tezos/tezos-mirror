@@ -22,3 +22,107 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+let get_next_counter ~source client =
+  let open Lwt.Infix in
+  RPC.Contracts.get_counter ~contract_id:source.Constant.identity client
+  >|= JSON.as_int >|= succ
+
+let get_branch client =
+  let open Lwt.Infix in
+  RPC.get_branch client >|= JSON.as_string
+
+let json_of_transfer_operation_content ~amount ~fee ~gas_limit ~counter ~source
+    ~destination =
+  `O
+    [
+      ("kind", `String "transaction");
+      ("source", `String source.Constant.identity);
+      ("fee", `String (string_of_int fee));
+      ("counter", `String (string_of_int counter));
+      ("gas_limit", `String (string_of_int gas_limit));
+      ("storage_limit", `String "0");
+      ("amount", `String (string_of_int amount));
+      ("destination", `String destination.Constant.identity);
+    ]
+
+let json_of_operation ~branch operation_content_json =
+  `O [("branch", `String branch); ("contents", `A [operation_content_json])]
+
+let json_of_transfer_operation ~amount ~fee ~gas_limit ~branch ~counter ~source
+    ~destination =
+  json_of_transfer_operation_content
+    ~amount
+    ~fee
+    ~gas_limit
+    ~counter
+    ~source
+    ~destination
+  |> json_of_operation ~branch
+
+let forge_transfer ?(amount = 1) ?(fee = 1000) ?(gas_limit = 1040)
+    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?branch
+    ?counter client =
+  let open Lwt.Infix in
+  let* branch =
+    match branch with None -> get_branch client | Some b -> return b
+  in
+  let* counter =
+    match counter with
+    | None -> get_next_counter ~source client
+    | Some c -> return c
+  in
+  let op_json =
+    json_of_transfer_operation
+      ~amount
+      ~fee
+      ~gas_limit
+      ~branch
+      ~counter
+      ~source
+      ~destination
+  in
+  RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
+
+let bytes_of_hex hex = Hex.to_bytes (`Hex hex)
+
+let sign_operation ~watermark ~signer op_hex =
+  let open Tezos_crypto in
+  let sk =
+    match String.split_on_char ':' signer.Constant.secret with
+    | ["unencrypted"; b58_secret_key] ->
+        Signature.Secret_key.of_b58check_exn b58_secret_key
+    | _ -> Test.fail "Could not parse secret key: '%s'" signer.Constant.secret
+  in
+  let bytes = bytes_of_hex op_hex in
+  let signature = Signature.(sign ~watermark sk bytes) in
+  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
+  signature
+
+let inject_operation ~signature op_str_hex client =
+  let signed_op = op_str_hex ^ signature in
+  let* res = RPC.inject_operation ~data:(`String signed_op) client in
+  return res
+
+let inject_transfer ?branch ?counter ?amount ?fee ?gas_limit
+    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) client
+    =
+  let* op_str_hex =
+    forge_transfer
+      ?branch
+      ?counter
+      ?amount
+      ?fee
+      ?gas_limit
+      ~source
+      ~destination
+      client
+  in
+  let signature =
+    sign_operation
+      ~watermark:Tezos_crypto.Signature.Generic_operation
+      ~signer:source
+      op_str_hex
+  in
+  let* oph = inject_operation ~signature op_str_hex client in
+  return (JSON.as_string oph)

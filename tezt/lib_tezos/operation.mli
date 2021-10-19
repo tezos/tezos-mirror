@@ -22,3 +22,31 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** [inject_transfer] is a high-level wrapper around
+   [inject_operation] RPC for injecting a transfer operation.
+
+    Default [branch] is the current branch.
+
+    Default [counter] is the successor of the counter of [source].
+
+    Default [amount] is [1] tez.
+
+    Default [fee] is [1000] mutez.
+
+    Default [gas_limit] is [1040] gas.
+
+    Default [source] is [Constant.bootstrap1].
+
+    Default [destination] is [Constant.bootstrap2].
+ *)
+val inject_transfer :
+  ?branch:string ->
+  ?counter:int ->
+  ?amount:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?source:Constant.key ->
+  ?destination:Constant.key ->
+  Client.t ->
+  string Lwt.t
