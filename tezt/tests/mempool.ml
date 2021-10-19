@@ -30,9 +30,112 @@
    Subject:      .
 *)
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/1657
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 
-   Some refactorisation is needed. *)
+   Some refactorisation is needed. All new tests should be in the Revamped
+   module (which will be erased once we have rewrote all the Legacy tests. *)
+
+module Mempool = Tezt_tezos.Mempool
+
+module Revamped = struct
+  let log_step counter msg =
+    let color = Log.Color.(bold ++ FG.blue) in
+    let prefix = "step" ^ string_of_int counter in
+    Log.info ~color ~prefix msg
+
+  (* We override the default [bake_for] comment to wait on a [flush]
+     event from the mempool because the [set_head] event used by the
+     default [bake_for] functions happens before a flush of the
+     mempool. For mempool tests, we generally prefer to ensure that a
+     [flush] did happen than a [set_head].
+
+     Optionnaly, we can decide whether the block should be baked
+     without taking the operations of the mempool. *)
+  let bake_for ~empty node client =
+    let mempool_flush_waiter = Node.wait_for_request ~request:`Flush node in
+    let* () =
+      if empty then
+        let* empty_mempool_file = Client.empty_mempool_file () in
+        Client.bake_for ~mempool:empty_mempool_file client
+      else Client.bake_for client
+    in
+    mempool_flush_waiter
+
+  (** {2 Tests } *)
+
+  (** This test manually injects some operations and checks that the mempool does
+    not lose any operation after a flush even if it contains more than
+    operations_batch_size operations. *)
+  let flush_mempool =
+    let operations_batch_size = 5 in
+    let number_of_operations = operations_batch_size * 2 in
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Flush mempool"
+      ~tags:["mempool"; "flush"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize a node with 'operations_batch_size=%d'."
+      operations_batch_size ;
+    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
+    let* () = Node.config_init node [] in
+    Node.Config_file.(update node (set_prevalidator ~operations_batch_size)) ;
+    let* () = Node.run node [] in
+    let* () = Node.wait_for_ready node in
+    let* client = Client.init ~endpoint:(Node node) () in
+    let* () = Client.activate_protocol ~protocol client in
+
+    log_step 2 "Forge and inject %d operations." number_of_operations ;
+    let* _ = Operation.inject_transfers ~node ~number_of_operations client in
+
+    log_step 3 "Check operations are all classified as 'Applied'." ;
+    let* mempool = RPC.get_mempool client in
+    let error_msg =
+      "some operations not classfied as 'applied: expected length %R, got %L"
+    in
+    Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
+
+    log_step 4 "Bake a block with an empty mempool." ;
+    let* () = bake_for ~empty:true node client in
+    let* mempool_after_empty_block = RPC.get_mempool client in
+
+    log_step 5 "Check that we did not lose any operation." ;
+    let error_msg =
+      "operations were lost after the flush: expected %L, got %R"
+    in
+    Check.((mempool = mempool_after_empty_block) Mempool.typ ~error_msg) ;
+
+    log_step 6 "Inject endorsement operation." ;
+    let* () = Client.endorse_for client in
+    let* mempool_with_endorsement = RPC.get_mempool client in
+
+    log_step 7 "Check endorsement is applied." ;
+    let mempool_diff =
+      Mempool.symmetric_diff mempool_after_empty_block mempool_with_endorsement
+    in
+    (* [mempool_diff] should contain only the applied endorsement. *)
+    let mempool_expected =
+      let open Mempool in
+      try {empty with applied = [List.hd mempool_diff.applied]}
+      with Not_found -> {empty with applied = ["<applied field was empty>"]}
+    in
+    let error_msg = "endorsement is not applied: expected %L, got %R" in
+    Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
+
+    log_step 8 "Bake with an empty mempool twice." ;
+    let* () = repeat 2 (fun () -> bake_for ~empty:true node client) in
+    let* last_mempool = RPC.get_mempool client in
+
+    log_step 9 "Check endorsement is classified 'Refused'." ;
+    let error_msg = "one applied operation was lost: expected %L, got %R" in
+    Check.((mempool_with_endorsement = last_mempool) Mempool.typ ~error_msg) ;
+    let error_msg =
+      "endorsement is not classified as 'refused': length expected %L, got %R"
+    in
+    Check.((1 = List.length last_mempool.refused) int ~error_msg) ;
+    unit
+end
 
 let check_operation_is_in_applied_mempool ops oph =
   let open JSON in
@@ -255,190 +358,6 @@ let bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
   if log then
     Log.info "Baked for %s with an empty mempool." (Client.name client) ;
   waiter
-
-(** This test tries to manually inject some operations
-
-   Scenario:
-
-   + Node 1 activates a protocol
-
-   + Retrieve the counter and the branch for bootstrap1
-
-   + Forge and inject <n> operations in the node
-
-   + Check that the operations are in the mempool
-
-   + Bake an empty block
-
-   + Check that we did not lose any operations in the flush
-
-   + Inject an endorsement
-
-   + Check that we have one more operation in the mempool and that
-      the endorsement is applied
-
-   + Bake an empty block
-
-   + Check that we did not lose any operations in the flush
- *)
-
-let flush_mempool =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Flush mempool"
-    ~tags:["flush"; "mempool"]
-  @@ fun protocol ->
-  (* Step 1 *)
-  (* A Node is started and we activate the protocol and wait the node to be synced *)
-  let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let endpoint_1 = Client.(Node node_1) in
-  let* client_1 = Client.init ~endpoint:endpoint_1 () in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 in
-  Log.info "Node is at level %d." 1 ;
-  (* Step 2 *)
-  (* Get the counter and the current branch *)
-  let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
-  in
-  let counter = JSON.as_int counter in
-  let* branch = RPC.get_branch client_1 in
-  let branch = JSON.as_string branch in
-  (* Step 3 *)
-  (* Forge operation, inject them and check injection *)
-  let number_of_transactions =
-    (* the batch of operation that a flush handles is 50 by default,
-       we choose a value that by-pass this limit *)
-    (* TODO: pass a lower limit to the node config init so we may inject less operations *)
-    60
-  in
-  let* (ophs, _counter) =
-    forge_and_inject_n_operations
-      ~branch
-      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
-      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
-      ~counter
-      ~signer:Constant.bootstrap1
-      ~client:client_1
-      ~node:node_1
-      number_of_transactions
-  in
-  (* Step 4 *)
-  (* Check that forged operation are in the mempool *)
-  let* mempool_after_injections = RPC.get_mempool_pending_operations client_1 in
-  let mempool_count_after_injections = count_mempool mempool_after_injections in
-  Format.kasprintf
-    (Log.info "%s")
-    "Mempool count after injections: %a"
-    pp_mempool_count
-    mempool_count_after_injections ;
-  List.iter
-    (fun oph ->
-      check_operation_is_in_applied_mempool mempool_after_injections oph)
-    ophs ;
-  Log.info "Every forged operation are applied in the mempool" ;
-  (* Step 5 *)
-  (* Bake with an empty mempool to force synchronisation *)
-  let empty_mempool_file = Temp.file "mempool.json" in
-  let* _ =
-    let empty_mempool =
-      {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
-    in
-    Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
-        Lwt_io.write oc empty_mempool)
-  in
-  let flush_waiter = wait_for_flush node_1 in
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
-  let* () = flush_waiter in
-  (* Step 6 *)
-  (* Inject endorsement operation *)
-  let* mempool_before_endorsement =
-    RPC.get_mempool_pending_operations client_1
-  in
-  let mempool_count_before_endorsement =
-    count_mempool mempool_before_endorsement
-  in
-  Format.kasprintf
-    (Log.info "%s")
-    "Mempool count before endorsement: %a"
-    pp_mempool_count
-    mempool_count_before_endorsement ;
-  (* Check that we did not lost any operation during the flush *)
-  if
-    mempool_count_after_injections.total
-    <> mempool_count_before_endorsement.total
-  then
-    Test.fail
-      "Operations were lost after the flush: expected %d, got %d"
-      mempool_count_after_injections.total
-      mempool_count_before_endorsement.total ;
-  let* () = Client.endorse_for client_1 in
-  Log.info "Endorsement injected" ;
-  let* mempool_after_endorsement =
-    RPC.get_mempool_pending_operations client_1
-  in
-  let mempool_count_after_endorsement =
-    count_mempool mempool_after_endorsement
-  in
-  Format.kasprintf
-    (Log.info "%s")
-    "Mempool count after endorsement: %a"
-    pp_mempool_count
-    mempool_count_after_endorsement ;
-  (* Check that we have one more operation and that it was correctly applied *)
-  if
-    succ mempool_count_before_endorsement.total
-    <> mempool_count_after_endorsement.total
-  then
-    Test.fail
-      "Operations were lost after injecting the endorsement: expected %d, got \
-       %d"
-      (succ mempool_count_before_endorsement.total)
-      mempool_count_after_endorsement.total ;
-  if
-    succ mempool_count_before_endorsement.applied
-    <> mempool_count_after_endorsement.applied
-  then Test.fail "Endorsement was not applied" ;
-  (* Step 7 *)
-  (* Bake twice with an empty mempool to force synchronisation *)
-  let flush_waiter = wait_for_flush node_1 in
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
-  let* () = flush_waiter in
-  let flush_waiter = wait_for_flush node_1 in
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
-  let* () = flush_waiter in
-  Log.info "Baking done and mempool flushed" ;
-  let* mempool_after_third_flush =
-    RPC.get_mempool_pending_operations client_1
-  in
-  let mempool_count_after_third_flush =
-    count_mempool mempool_after_third_flush
-  in
-  Format.kasprintf
-    (Log.info "%s")
-    "Mempool count after third flush: %a"
-    pp_mempool_count
-    mempool_count_after_third_flush ;
-  let error_msg =
-    "An operation in the mempool was lost after the third flush: expected %L, \
-     got %R"
-  in
-  Check.(
-    (mempool_count_after_endorsement.total
-   = mempool_count_after_third_flush.total)
-      int
-      ~error_msg) ;
-  (* Check that we did not lost the endorsement after the third flush
-     because it was classified as refused. *)
-  let error_msg =
-    "the endorsement was declared as outdated (classified as refused) after \
-     the third flush: expected %L, got %R"
-  in
-  Check.((mempool_count_after_third_flush.refused = 1) int ~error_msg) ;
-  unit
 
 (** This test tries to ban an operation and check that a branch
    refused operation is classified again.
@@ -3048,7 +2967,7 @@ let test_request_operations_peer =
   unit
 
 let register ~protocols =
-  flush_mempool ~protocols ;
+  Revamped.flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
   propagation_futur_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
