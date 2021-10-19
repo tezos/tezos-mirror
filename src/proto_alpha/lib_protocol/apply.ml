@@ -904,10 +904,8 @@ let apply_manager_operation_content :
       match script with
       | None ->
           Lwt.return
-            ( ( (match entrypoint with
-                | "default" -> Result.return_unit
-                | entrypoint ->
-                    error (Script_tc_errors.No_such_entrypoint entrypoint))
+            ( ( (if Entrypoint.is_default entrypoint then Result.return_unit
+                else error (Script_tc_errors.No_such_entrypoint entrypoint))
               >>? fun () ->
                 match Micheline.root parameter with
                 | Prim (_, D_Unit, [], _) ->
@@ -2381,7 +2379,7 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
        Script_cache.find ctxt liquidity_baking_cpmm_contract
        >>=? fun (ctxt, cache_key, script) ->
        match script with
-       | None -> fail (Script_tc_errors.No_such_entrypoint "default")
+       | None -> fail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
        | Some (script, script_ir) -> (
            let now = Script_timestamp.now ctxt in
            let level =
@@ -2425,7 +2423,7 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
              ~script
              ~parameter
              ~cached_script:(Some script_ir)
-             ~entrypoint:"default"
+             ~entrypoint:Entrypoint.default
              ~internal:false
            >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
                       (updated_cached_script, updated_size) ) ->

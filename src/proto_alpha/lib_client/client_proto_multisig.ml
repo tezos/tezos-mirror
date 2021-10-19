@@ -738,7 +738,7 @@ let action_of_expr_not_generic e =
                  amount;
                  destination =
                    Data_encoding.Binary.of_bytes_exn Contract.encoding s;
-                 entrypoint = "default";
+                 entrypoint = Entrypoint.default;
                  parameter_type =
                    Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:();
                  parameter =

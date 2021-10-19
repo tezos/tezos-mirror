@@ -94,8 +94,9 @@ let parse_arg_transfer arg =
   return
     (Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters)
 
-let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
-    ?fee ?gas_limit ?storage_limit destination =
+let build_transaction_operation ~amount ~parameters
+    ?(entrypoint = Entrypoint.default) ?fee ?gas_limit ?storage_limit
+    destination =
   let operation = Transaction {amount; parameters; destination; entrypoint} in
   Injection.prepare_manager_operation
     ~fee:(Limit.of_option fee)
@@ -105,8 +106,8 @@ let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
-    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter ?replace_by_fees () =
+    ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
+    ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
   parse_arg_transfer arg >>=? fun parameters ->
   let contents =
     build_transaction_operation

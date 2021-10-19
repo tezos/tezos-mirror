@@ -25,3 +25,9 @@
 
 (** An entrypoint is a string of at most 31 characters *)
 type t = string
+
+(** Default entrypoint "default" *)
+val default : t
+
+(** Checks whether an entrypoint is the default entrypoint *)
+val is_default : t -> bool

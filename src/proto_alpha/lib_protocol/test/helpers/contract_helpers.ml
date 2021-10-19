@@ -82,7 +82,7 @@ let default_step_constants =
    parameters from strings. It then executes the typed script with the storage
    and parameter and returns the result. *)
 let run_script ctx ?(step_constants = default_step_constants) contract
-    ?(entrypoint = "default") ~storage ~parameter () =
+    ?(entrypoint = Entrypoint.default) ~storage ~parameter () =
   let contract_expr = Expr.from_string contract in
   let storage_expr = Expr.from_string storage in
   let parameter_expr = Expr.from_string parameter in

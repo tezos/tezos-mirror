@@ -355,8 +355,8 @@ let miss_signed_endorsement ?level ~endorsed_block ctxt =
   endorsement ~delegate:(delegate.pkh, slots) ~level ~endorsed_block ctxt ()
 
 let transaction ?counter ?fee ?gas_limit ?storage_limit
-    ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
-    (src : Contract.t) (dst : Contract.t) (amount : Tez.t) =
+    ?(parameters = Script.unit_parameter) ?(entrypoint = Entrypoint.default)
+    ctxt (src : Contract.t) (dst : Contract.t) (amount : Tez.t) =
   let top = Transaction {amount; parameters; destination = dst; entrypoint} in
   manager_operation ?counter ?fee ?gas_limit ?storage_limit ~source:src ctxt top
   >>=? fun sop ->

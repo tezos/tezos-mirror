@@ -1977,15 +1977,15 @@ let find_entrypoint (type full error_trace)
     | _ -> (
         match find_entrypoint full entrypoint with
         | Some result -> ok result
-        | None -> (
-            match entrypoint with
-            | "default" -> ok ((fun e -> e), Ex_ty full)
-            | _ ->
-                Error
-                  (match error_details with
-                  | Fast -> (Inconsistent_types_fast : error_trace)
-                  | Informative ->
-                      trace_of_error @@ No_such_entrypoint entrypoint)))
+        | None ->
+            if Entrypoint.is_default entrypoint then
+              ok ((fun e -> e), Ex_ty full)
+            else
+              Error
+                (match error_details with
+                | Fast -> (Inconsistent_types_fast : error_trace)
+                | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
+        )
 
 let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
@@ -1994,11 +1994,12 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
   match find_entrypoint ~error_details full ~root_name entrypoint with
   | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
-      match (entrypoint, root_name) with
-      | ("default", Some (Field_annot fa))
-        when Compare.String.((fa :> string) = "root") -> (
+      match root_name with
+      | Some (Field_annot fa)
+        when Compare.String.((fa :> string) = "root")
+             && Entrypoint.is_default entrypoint -> (
           merge_types ~legacy ~error_details:Fast loc ty expected >??$ function
-          | Ok (Eq, ty) -> return ("default", (ty : exp ty))
+          | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
           | Error Inconsistent_types_fast ->
               merge_types ~legacy ~error_details loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
@@ -2060,7 +2061,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
     | Some (Field_annot name) -> (Entrypoints.singleton (name :> string), true)
   in
   check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
-  if not (Entrypoints.mem "default" all) then Result.return_unit
+  if not (Entrypoints.mem Entrypoint.default all) then Result.return_unit
   else
     match first_unreachable with
     | None -> Result.return_unit
@@ -2297,7 +2298,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
   | String (loc, s) (* As unparsed with [Readable]. *) ->
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       (match String.index_opt s '%' with
-      | None -> ok (s, "default")
+      | None -> ok (s, Entrypoint.default)
       | Some pos -> (
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
@@ -4790,7 +4791,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ~default:(gen_access_annot addr_annot default_contract_annot)
       >>?= fun (annot, entrypoint) ->
       (match entrypoint with
-      | None -> Ok "default"
+      | None -> Ok Entrypoint.default
       | Some (Field_annot entrypoint) ->
           let entrypoint = (entrypoint :> string) in
           if Compare.String.(entrypoint = "default") then
@@ -4996,7 +4997,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let entrypoint =
             Option.fold
               ~some:(fun (Field_annot annot) -> (annot :> string))
-              ~none:"default"
+              ~none:Entrypoint.default
               entrypoint
           in
           let open Tc_context in
@@ -5441,18 +5442,15 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
   match Contract.is_implicit contract with
-  | Some _ -> (
-      match entrypoint with
-      | "default" ->
-          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-          Lwt.return
-            ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
-            >|? fun (Eq, ctxt) ->
-              let contract : arg typed_contract =
-                (arg, (contract, entrypoint))
-              in
-              (ctxt, contract) )
-      | _ -> fail (No_such_entrypoint entrypoint))
+  | Some _ ->
+      if Entrypoint.is_default entrypoint then
+        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+        Lwt.return
+          ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
+          >|? fun (Eq, ctxt) ->
+            let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+            (ctxt, contract) )
+      else fail (No_such_entrypoint entrypoint)
   | None -> (
       (* Originated account *)
       trace (Invalid_contract (loc, contract))
@@ -5624,31 +5622,30 @@ let parse_contract_for_script :
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
   match Contract.is_implicit contract with
-  | Some _ -> (
-      match entrypoint with
-      | "default" ->
-          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-          Lwt.return
-            ( Gas_monad.run ctxt
-            @@ merge_types
-                 ~legacy:true
-                 ~error_details:Fast
-                 loc
-                 arg
-                 (unit_t ~annot:None)
-            >|? fun (eq_ty, ctxt) ->
-              match eq_ty with
-              | Ok (Eq, _ty) ->
-                  let contract : arg typed_contract =
-                    (arg, (contract, entrypoint))
-                  in
-                  (ctxt, Some contract)
-              | Error Inconsistent_types_fast -> (ctxt, None) )
-      | _ ->
-          Lwt.return
-            ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
-              (* An implicit account on any other entrypoint is not a valid contract. *)
-              (ctxt, None) ))
+  | Some _ ->
+      if Entrypoint.is_default entrypoint then
+        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+        Lwt.return
+          ( Gas_monad.run ctxt
+          @@ merge_types
+               ~legacy:true
+               ~error_details:Fast
+               loc
+               arg
+               (unit_t ~annot:None)
+          >|? fun (eq_ty, ctxt) ->
+            match eq_ty with
+            | Ok (Eq, _ty) ->
+                let contract : arg typed_contract =
+                  (arg, (contract, entrypoint))
+                in
+                (ctxt, Some contract)
+            | Error Inconsistent_types_fast -> (ctxt, None) )
+      else
+        Lwt.return
+          ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
+            (* An implicit account on any other entrypoint is not a valid contract. *)
+            (ctxt, None) )
   | None -> (
       (* Originated account *)
       trace (Invalid_contract (loc, contract))
@@ -6039,7 +6036,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ~stack_depth
         mode
         t
-        ((ticketer, "default"), (contents, amount))
+        ((ticketer, Entrypoint.default), (contents, amount))
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->

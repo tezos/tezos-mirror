@@ -490,7 +490,7 @@ end)
       if Base_samplers.uniform_bool rng_state then
         ( Alpha_context.Contract.implicit_contract
             (Crypto_samplers.pkh rng_state),
-          "default" )
+          Alpha_context.Entrypoint.default )
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)

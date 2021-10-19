@@ -220,10 +220,10 @@ let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
       parameter
 
 let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
-    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
     ?storage_limit () =
   (match Alpha_context.Contract.is_implicit destination with
-  | Some destination when entrypoint = "default" ->
+  | Some destination when Entrypoint.is_default entrypoint ->
       return @@ build_lambda_for_transfer_to_implicit ~destination ~amount
   | Some _ ->
       cctxt#error
@@ -278,7 +278,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~contract
-    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () :
     (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
     Lwt.t =

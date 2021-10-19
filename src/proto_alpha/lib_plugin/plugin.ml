@@ -1187,7 +1187,7 @@ module RPC = struct
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (dft "entrypoint" string "default"))
+             (dft "entrypoint" string Entrypoint.default))
           (obj3
              (opt "unparsing_mode" unparsing_mode_encoding)
              (opt "now" Script_timestamp.encoding)
@@ -1406,7 +1406,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "script" Script.expr_encoding)
-               (dft "entrypoint" string "default"))
+               (dft "entrypoint" string Entrypoint.default))
           ~output:(obj1 (req "entrypoint_type" Script.expr_encoding))
           RPC_path.(path / "entrypoint")
 
@@ -2176,9 +2176,9 @@ module RPC = struct
                   map
                   [] ) ))
 
-    let run_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script ~storage
-        ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level ctxt block
-        =
+    let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ~script
+        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
+        ctxt block =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -2196,9 +2196,9 @@ module RPC = struct
             entrypoint ),
           (unparsing_mode, now, level) )
 
-    let trace_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script
-        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
-        ctxt block =
+    let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
+        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now
+        ~level ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -2574,7 +2574,7 @@ module RPC = struct
           []
 
       let transaction ctxt block ~branch ~source ?sourcePubKey ~counter ~amount
-          ~destination ?(entrypoint = "default") ?parameters ~gas_limit
+          ~destination ?(entrypoint = Entrypoint.default) ?parameters ~gas_limit
           ~storage_limit ~fee () =
         let parameters =
           Option.fold
