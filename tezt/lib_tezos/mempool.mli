@@ -22,3 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type t = {
+  applied : string list;
+  branch_delayed : string list;
+  branch_refused : string list;
+  refused : string list;
+  unprocessed : string list;
+}
