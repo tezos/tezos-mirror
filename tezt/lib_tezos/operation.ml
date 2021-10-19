@@ -126,3 +126,33 @@ let inject_transfer ?branch ?counter ?amount ?fee ?gas_limit
   in
   let* oph = inject_operation ~signature op_str_hex client in
   return (JSON.as_string oph)
+
+let inject_transfers ?amount ?fee ?gas_limit ?(source = Constant.bootstrap1)
+    ?(destination = Constant.bootstrap2) ~node ~number_of_operations client =
+  let* branch = get_branch client in
+  (* Counter needs to be computed manually to ensure several
+     operations of the same manager can be included in the same block.
+  *)
+  let* counter = get_next_counter ~source client in
+  let counter = ref counter in
+  let rec loop oph_list = function
+    | 0 -> return oph_list
+    | n ->
+        let transfer_1 = Node.wait_for_request ~request:`Inject node in
+        let* oph =
+          inject_transfer
+            ?fee
+            ?gas_limit
+            ?amount
+            ~branch
+            ~counter:!counter
+            ~source
+            ~destination
+            client
+        in
+        let* () = transfer_1 in
+        let oph_list = oph :: oph_list in
+        incr counter ;
+        loop oph_list (pred n)
+  in
+  loop [] number_of_operations

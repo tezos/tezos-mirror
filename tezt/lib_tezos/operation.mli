@@ -50,3 +50,16 @@ val inject_transfer :
   ?destination:Constant.key ->
   Client.t ->
   string Lwt.t
+
+(** [inject_transfers] is a wrapper around [inject_transfer] to inject
+   [number_of_operations] transfers with the same parameters. *)
+val inject_transfers :
+  ?amount:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?source:Constant.key ->
+  ?destination:Constant.key ->
+  node:Node.t ->
+  number_of_operations:int ->
+  Client.t ->
+  string list Lwt.t
