@@ -51,5 +51,15 @@ let history_mode =
     ~output:history_mode_encoding
     RPC_path.(path / "history_mode")
 
+module Logging = struct
+  let configure =
+    RPC_service.put_service
+      ~description:"Replace the logging configuration of the node."
+      ~query:RPC_query.empty
+      ~input:Tezos_stdlib_unix.Internal_event_unix.Configuration.encoding
+      ~output:Data_encoding.empty
+      RPC_path.(root / "config" / "logging")
+end
+
 let user_activated_upgrades cctxt =
   RPC_context.make_call Network.user_activated_upgrades cctxt () () ()

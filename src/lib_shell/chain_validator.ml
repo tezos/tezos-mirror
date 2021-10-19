@@ -772,6 +772,11 @@ let bootstrapped w =
 
 let is_bootstrapped w = Types.is_bootstrapped (Worker.state w)
 
+let reconfigure_event_logging w config =
+  Block_validator_process.reconfigure_event_logging
+    (Worker.state w).parameters.block_validator_process
+    config
+
 let force_bootstrapped w b =
   let state = Worker.state w in
   Synchronisation_heuristic.Bootstrapping.force_bootstrapped

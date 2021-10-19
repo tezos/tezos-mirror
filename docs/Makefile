@@ -53,7 +53,6 @@ manuals: main
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
-	../tezos-node run --help | sed "s#\(.\)$$(echo "\010")\1#\1#g; s#_$$(echo "\010")##g" > api/tezos-node-run.txt
 
 .PHONY: odoc
 odoc: main

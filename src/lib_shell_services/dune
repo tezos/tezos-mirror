@@ -5,6 +5,7 @@
  (libraries
   tezos-base
   tezos-workers
+  tezos-stdlib-unix ;; for Tezos_stdlib_unix.Internal_event_unix
   tezos-p2p-services
   tezos-version)
  (flags

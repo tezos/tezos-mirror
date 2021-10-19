@@ -295,6 +295,13 @@ let run input output =
         fork_test_chain >>= fun () -> loop cache
     | External_validation.Terminate ->
         Lwt_io.flush_all () >>= fun () -> Events.(emit termination_request ())
+    | External_validation.Reconfigure_event_logging config ->
+        Internal_event_unix.Configuration.reapply config >>= fun res ->
+        External_validation.send
+          output
+          (Error_monad.result_encoding Data_encoding.empty)
+          res
+        >>= fun () -> loop cache
   in
   loop None >>= fun () -> return_unit
 

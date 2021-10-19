@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides store =
+    ~user_activated_protocol_overrides ~mainchain_validator store =
   let register endpoint f directory =
     RPC_directory.register directory endpoint f
   in
@@ -37,3 +37,9 @@ let build_rpc_directory ~user_activated_upgrades
   |> register Config_services.history_mode (fun () () () ->
          let chain_store = Store.main_chain_store store in
          return (Store.Chain.history_mode chain_store))
+  |> register Config_services.Logging.configure (fun () () configuration ->
+         Internal_event_unix.Configuration.reapply configuration >>=? fun () ->
+         Chain_validator.reconfigure_event_logging
+           mainchain_validator
+           configuration
+         >>=? fun () -> return_unit)

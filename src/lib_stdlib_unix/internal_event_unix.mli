@@ -46,6 +46,9 @@ module Configuration : sig
   (** Run {!Tezos_base.Internal_event.All_sinks.activate} for every
       URI in the configuration. *)
   val apply : t -> unit tzresult Lwt.t
+
+  (** Close all the sinks except ["lwt-log://"] and call {!apply}. *)
+  val reapply : t -> unit tzresult Lwt.t
 end
 
 (** Initialize the internal-event sinks by looking at the

@@ -26,28 +26,56 @@
 open Error_monad
 
 module Configuration = struct
-  type t = {activate : Uri.t list}
+  type t = {active_sinks : Uri.t list}
 
   let default =
-    {activate = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
+    {
+      active_sinks = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()];
+    }
 
   let encoding =
     let open Data_encoding in
-    conv
-      (fun {activate} -> List.map Uri.to_string activate)
-      (fun activate -> {activate = List.map Uri.of_string activate})
-      (obj1
-         (dft
-            "activate"
-            ~description:"List of URIs to activate/configure sinks."
-            (list string)
-            []))
+    let object_1 key_name =
+      obj1
+        (dft
+           key_name
+           ~description:"List of URIs to activate/configure sinks."
+           (list string)
+           [])
+    in
+    union
+      [
+        case
+          ~title:"Active-Sinks"
+          ~description:"List of sinks to make sure are activated."
+          (Tag 0)
+          (object_1 "active_sinks")
+          (fun {active_sinks} -> Some (List.map Uri.to_string active_sinks))
+          (fun active_sinks ->
+            {active_sinks = List.map Uri.of_string active_sinks});
+        case
+          ~title:"Active-Sinks-Deprecated"
+          ~description:
+            "List of sinks to make sure are activated, deprecated \
+             backwards-compatibility encoding."
+          (Tag 1)
+          (object_1 "activate")
+          (fun {active_sinks = _} -> None)
+          (* (fun {active_sinks} -> Some (List.map Uri.to_string active_sinks)) *)
+            (fun active_sinks ->
+            {active_sinks = List.map Uri.of_string active_sinks});
+      ]
 
   let of_file path =
     Lwt_utils_unix.Json.read_file path >>=? fun json ->
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 
-  let apply {activate} = List.iter_es Internal_event.All_sinks.activate activate
+  let apply {active_sinks} =
+    List.iter_es Internal_event.All_sinks.activate active_sinks
+
+  let reapply config =
+    let except u = Uri.scheme u = Some "lwt-log" in
+    Internal_event.All_sinks.close ~except () >>=? fun () -> apply config
 end
 
 let env_var_name = "TEZOS_EVENTS_CONFIG"

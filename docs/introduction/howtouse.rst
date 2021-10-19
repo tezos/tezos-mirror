@@ -193,7 +193,7 @@ Many options of the node can be configured when running the node:
 - The directory where the node stores local data (using option ``--data-dir``)
 - Network parameters (e.g. the number of connections to peers, using option ``--connections``)
 - Validator and mempool parameters
-- :ref:`Logging options <configure_logging>`.
+- :ref:`Logging options <configure_node_logging>`.
 
 The list of configurable options can be obtained using the following command::
 
