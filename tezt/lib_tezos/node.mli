@@ -226,7 +226,8 @@ module Config_file : sig
   (** Write the configuration file of a node, replacing the existing one. *)
   val write : t -> JSON.t -> unit
 
-  (** Update the configuration file of a node.
+  (** Update the configuration file of a node. If the node is already
+     running, it needs to be restarted manually.
 
       Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
@@ -235,6 +236,14 @@ module Config_file : sig
       activated upgrades. *)
   val set_sandbox_network_with_user_activated_upgrades :
     t -> (int * Protocol.t) list -> unit
+
+  (** Set the prevalidator configuration in the given configuration. *)
+  val set_prevalidator :
+    ?operations_request_timeout:float ->
+    ?max_refused_operations:int ->
+    ?operations_batch_size:int ->
+    JSON.t ->
+    JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)

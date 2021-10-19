@@ -188,6 +188,24 @@ module Config_file = struct
 
   let update node update = read node |> update |> write node
 
+  let set_prevalidator ?(operations_request_timeout = 10.)
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
+      =
+    let prevalidator =
+      `O
+        [
+          ("operations_request_timeout", `Float operations_request_timeout);
+          ( "max_refused_operations",
+            `Float (float_of_int max_refused_operations) );
+          ("operations_batch_size", `Float (float_of_int operations_batch_size));
+        ]
+      |> JSON.annotate ~origin:"set_prevalidator"
+    in
+    JSON.update
+      "shell"
+      (fun config -> JSON.put ("prevalidator", prevalidator) config)
+      old_config
+
   let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
     let network_json =
       `O
