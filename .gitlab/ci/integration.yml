@@ -128,6 +128,7 @@ integration:sandboxes:daemons-upgrade:
   artifacts:
     paths:
       - tests_python/tmp/
+      - tests_python/reports/*.xml
     reports:
       junit: tests_python/reports/*.xml
     expire_in: 7 day
