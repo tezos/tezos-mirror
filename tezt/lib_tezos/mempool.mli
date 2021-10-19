@@ -33,3 +33,5 @@ type t = {
 
 (** The mempool type description. *)
 val typ : t Check.typ
+
+val empty : t

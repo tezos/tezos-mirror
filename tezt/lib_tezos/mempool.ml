@@ -42,3 +42,12 @@ let typ : t Check.typ =
         (mempool.applied @ mempool.branch_delayed @ mempool.branch_refused
        @ mempool.refused @ mempool.unprocessed))
     (list string)
+
+let empty =
+  {
+    applied = [];
+    branch_delayed = [];
+    branch_refused = [];
+    refused = [];
+    unprocessed = [];
+  }
