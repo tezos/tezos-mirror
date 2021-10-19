@@ -51,3 +51,17 @@ let empty =
     refused = [];
     unprocessed = [];
   }
+
+let symmetric_diff left right =
+  let diff left right =
+    List.(
+      filter (fun op -> not (mem op right)) left
+      @ filter (fun op -> not (mem op left)) right)
+  in
+  {
+    applied = diff left.applied right.applied;
+    branch_delayed = diff left.branch_delayed right.branch_delayed;
+    branch_refused = diff left.branch_refused right.branch_refused;
+    refused = diff left.refused right.refused;
+    unprocessed = diff left.unprocessed right.unprocessed;
+  }

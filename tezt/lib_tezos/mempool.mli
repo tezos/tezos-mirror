@@ -35,3 +35,6 @@ type t = {
 val typ : t Check.typ
 
 val empty : t
+
+(** Symetric difference (union(a, b) - intersection(a, b)) *)
+val symmetric_diff : t -> t -> t
