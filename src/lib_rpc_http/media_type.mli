@@ -45,3 +45,5 @@ val all_media_types : t list
 val accept_header : t list -> string
 
 val first_complete_media : t list -> ((string * string) * t) option
+
+val encoding : t RPC_encoding.t

@@ -157,3 +157,11 @@ let octet_stream =
   }
 
 let all_media_types = [json; bson; octet_stream]
+
+let encoding : t RPC_encoding.t =
+  Data_encoding.string_enum
+    [
+      ("application/json", json);
+      ("application/bson", bson);
+      ("application/octet-stream", octet_stream);
+    ]
