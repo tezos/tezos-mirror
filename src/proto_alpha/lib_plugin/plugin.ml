@@ -912,13 +912,13 @@ module View_helpers = struct
   type Environment.Error_monad.error += View_callback_origination_failed
 
   type Environment.Error_monad.error +=
-    | Illformed_view_type of string * Script.expr
+    | Illformed_view_type of Entrypoint.t * Script.expr
 
   type Environment.Error_monad.error +=
-    | View_never_returns of string * Contract.t
+    | View_never_returns of Entrypoint.t * Contract.t
 
   type Environment.Error_monad.error +=
-    | View_unexpected_return of string * Contract.t
+    | View_unexpected_return of Entrypoint.t * Contract.t
 
   let () =
     Environment.Error_monad.register_error_kind

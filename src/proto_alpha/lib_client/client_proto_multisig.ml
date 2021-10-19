@@ -59,7 +59,7 @@ type error += Unsupported_feature_generic_call_ty of Script.expr
 type error += Unsupported_feature_lambda of string
 
 type error +=
-  | Ill_typed_argument of Contract.t * string * Script.expr * Script.expr
+  | Ill_typed_argument of Contract.t * Entrypoint.t * Script.expr * Script.expr
 
 type error += Ill_typed_lambda of Script.expr * Script.expr
 
@@ -472,7 +472,7 @@ type multisig_contract_description = {
   (* The hash of the contract script *)
   requires_chain_id : bool;
   (* The signatures should contain the chain identifier *)
-  main_entrypoint : string option;
+  main_entrypoint : Entrypoint.t option;
   (* name of the main entrypoint of the multisig contract, None means use the default entrypoint *)
   generic : bool;
       (* False means that the contract uses a custom action type, true
@@ -582,7 +582,8 @@ let optimized_key_hash ~loc (key_hash : Signature.Public_key_hash.t) =
        Signature.Public_key_hash.encoding
        key_hash)
 
-let optimized_address ~loc ~(address : Contract.t) ~(entrypoint : string) =
+let optimized_address ~loc ~(address : Contract.t) ~(entrypoint : Entrypoint.t)
+    =
   let entrypoint = match entrypoint with "default" -> "" | name -> name in
   bytes
     ~loc
@@ -601,7 +602,7 @@ type multisig_action =
   | Transfer of {
       amount : Tez.t;
       destination : Contract.t;
-      entrypoint : string;
+      entrypoint : Entrypoint.t;
       parameter_type : Script.expr;
       parameter : Script.expr;
     }
@@ -953,7 +954,7 @@ type multisig_prepared_action = {
   threshold : Z.t;
   keys : public_key list;
   counter : Z.t;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
   generic : bool;
 }
 

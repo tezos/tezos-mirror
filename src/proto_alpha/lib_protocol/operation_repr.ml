@@ -240,7 +240,7 @@ and _ manager_operation =
   | Transaction : {
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
-      entrypoint : string;
+      entrypoint : Entrypoint_repr.t;
       destination : Contract_repr.contract;
     }
       -> Kind.transaction manager_operation

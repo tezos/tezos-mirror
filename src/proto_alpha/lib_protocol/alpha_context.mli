@@ -2076,7 +2076,7 @@ and _ manager_operation =
   | Transaction : {
       amount : Tez.tez;
       parameters : Script.lazy_expr;
-      entrypoint : string;
+      entrypoint : Entrypoint.t;
       destination : Contract.contract;
     }
       -> Kind.transaction manager_operation

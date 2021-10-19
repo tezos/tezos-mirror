@@ -36,7 +36,7 @@ type error += Entrypoint_mismatch of string * (Script.expr * Script.expr) option
 
 type error += Action_unwrapping_error of string * Script.expr
 
-type error += Not_a_viewable_entrypoint of string
+type error += Not_a_viewable_entrypoint of Entrypoint.t
 
 type error += Not_an_entrypoint of Script.expr
 

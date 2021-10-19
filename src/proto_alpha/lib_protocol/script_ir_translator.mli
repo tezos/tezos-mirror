@@ -396,7 +396,7 @@ val parse_contract :
   Script.location ->
   'a Script_typed_ir.ty ->
   Contract.t ->
-  entrypoint:string ->
+  entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
 val parse_contract_for_script :
@@ -404,14 +404,14 @@ val parse_contract_for_script :
   Script.location ->
   'a Script_typed_ir.ty ->
   Contract.t ->
-  entrypoint:string ->
+  entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 
 val find_entrypoint :
   error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
   root_name:Script_ir_annot.field_annot option ->
-  string ->
+  Entrypoint.t ->
   ((Script.node -> Script.node) * ex_ty, 'error_trace) result
 
 module Entrypoints_map : Map.S with type key = string

@@ -278,7 +278,7 @@ module Parameter = struct
     | XtzToToken p ->
         Format.asprintf "XtzToToken (%s)" (xtz_to_token_to_string p)
 
-  let entrypoint_of_parameter : t -> string = function
+  let entrypoint_of_parameter : t -> Entrypoint.t = function
     | AddLiquidity _ -> "addLiquidity"
     | Default _ -> "default"
     | RemoveLiquidity _ -> "removeLiquidity"

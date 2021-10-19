@@ -125,7 +125,7 @@ type simulation_params = {
 type run_view_params = {
   shared_params : simulation_params;
   contract : Contract.t;
-  entrypoint : string;
+  entrypoint : Entrypoint.t;
 }
 
 type run_params = {
@@ -134,7 +134,7 @@ type run_params = {
   balance : Tez.t;
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
 }
 
 let run_view (cctxt : #Protocol_client_context.rpc_context)

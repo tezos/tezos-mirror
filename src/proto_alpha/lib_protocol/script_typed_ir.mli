@@ -42,7 +42,7 @@ type step_constants = {
 
 type never = |
 
-type address = Contract.t * string
+type address = Contract.t * Entrypoint.t
 
 type ('a, 'b) pair = 'a * 'b
 
@@ -770,7 +770,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IContract :
       (address, 's) kinfo
       * 'a ty
-      * string
+      * Entrypoint.t
       * ('a typed_contract option, 's, 'r, 'f) kinstr
       -> (address, 's, 'r, 'f) kinstr
   | IView :
@@ -837,7 +837,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ISelf :
       ('a, 's) kinfo
       * 'b ty
-      * string
+      * Entrypoint.t
       * ('b typed_contract, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | ISelf_address :

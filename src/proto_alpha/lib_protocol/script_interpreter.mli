@@ -104,7 +104,7 @@ val execute :
   Script_ir_translator.unparsing_mode ->
   step_constants ->
   script:Script.t ->
-  entrypoint:string ->
+  entrypoint:Entrypoint.t ->
   parameter:Script.expr ->
   internal:bool ->
   (execution_result * (Script_ir_translator.ex_script * int)) tzresult Lwt.t

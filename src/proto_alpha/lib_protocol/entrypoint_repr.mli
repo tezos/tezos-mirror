@@ -22,3 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** An entrypoint is a string of at most 31 characters *)
+type t = string

@@ -83,7 +83,7 @@ val entrypoint_type :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  string ->
+  Entrypoint.t ->
   Script.expr shell_tzresult Lwt.t
 
 val list_entrypoints :

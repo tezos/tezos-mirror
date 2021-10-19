@@ -62,9 +62,9 @@ type error += Unexpected_operation of Script.location
 
 type error += Unexpected_contract of Script.location
 
-type error += No_such_entrypoint of string
+type error += No_such_entrypoint of Entrypoint.t
 
-type error += Duplicate_entrypoint of string
+type error += Duplicate_entrypoint of Entrypoint.t
 
 type error += Unreachable_entrypoint of prim list
 

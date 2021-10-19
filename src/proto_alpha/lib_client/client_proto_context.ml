@@ -485,7 +485,7 @@ type batch_transfer_operation = {
   storage_limit : Z.t option;
   amount : string;
   arg : string option;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
 }
 
 let batch_transfer_operation_encoding =

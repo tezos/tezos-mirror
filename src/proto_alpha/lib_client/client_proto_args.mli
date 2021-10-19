@@ -54,9 +54,9 @@ val default_arg_arg : (string option, full) Clic.arg
 
 val source_arg : (string option, full) Clic.arg
 
-val entrypoint_arg : (string option, full) Clic.arg
+val entrypoint_arg : (Entrypoint.t option, full) Clic.arg
 
-val default_entrypoint_arg : (string option, full) Clic.arg
+val default_entrypoint_arg : (Entrypoint.t option, full) Clic.arg
 
 val delegate_arg : (Signature.Public_key_hash.t option, full) Clic.arg
 
