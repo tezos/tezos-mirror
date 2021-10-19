@@ -881,7 +881,7 @@ let write_sources_file ~min_agreement ~uris client =
       Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
-    ?(nodes_args = []) () =
+    ?event_level ?(nodes_args = []) () =
   let filter_node_arg = function
     | Node.Connections _ | Synchronisation_threshold _ -> None
     | x -> Some x
@@ -890,8 +890,8 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     List.filter_map filter_node_arg nodes_args
     @ Node.[Connections 1; Synchronisation_threshold 0]
   in
-  let* node1 = Node.init ~name:"node1" nodes_args
-  and* node2 = Node.init ~name:"node2" nodes_args in
+  let* node1 = Node.init ?event_level ~name:"node1" nodes_args
+  and* node2 = Node.init ?event_level ~name:"node2" nodes_args in
   let nodes = [node1; node2] in
   let client =
     create_with_mode
@@ -954,11 +954,34 @@ let get_parameter_file ?additional_bootstrap_account_count
       in
       return (Some parameter_file)
 
-let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
+let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
     ?additional_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file ?(bake = true) tag ~protocol () =
-  let get_parameter_file client =
+    ?parameter_file tag ~protocol () =
+  let* (node, client) =
+    match tag with
+    | (`Client | `Proxy) as mode ->
+        let* node = Node.init ?event_level nodes_args in
+        let endpoint = Node node in
+        let mode =
+          match mode with
+          | `Client -> Client (Some endpoint, None)
+          | `Proxy -> Proxy endpoint
+        in
+        let client =
+          create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
+        in
+        let* () =
+          Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
+        in
+        return (node, client)
+    | `Light ->
+        let* (client, node1, _) =
+          init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
+        in
+        return (node1, client)
+  in
+  let* parameter_file =
     get_parameter_file
       ?additional_bootstrap_account_count
       ?default_accounts_balance
@@ -966,31 +989,6 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       ~protocol
       client
   in
-  match tag with
-  | (`Client | `Proxy) as mode ->
-      let* node = Node.init nodes_args in
-      let endpoint = Node node in
-      let mode =
-        match mode with
-        | `Client -> Client (Some endpoint, None)
-        | `Proxy -> Proxy endpoint
-      in
-      let client =
-        create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
-      in
-      let* () =
-        Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
-      in
-      let* parameter_file = get_parameter_file client in
-      let* () = activate_protocol ?parameter_file ~protocol client in
-      let* _ = Node.wait_for_level node 1 in
-      let* () = if bake then bake_for client else Lwt.return_unit in
-      return (node, client)
-  | `Light ->
-      let* (client, node1, _) =
-        init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
-      in
-      let* parameter_file = get_parameter_file client in
-      let* () = activate_protocol ?parameter_file ~protocol client in
-      let* () = if bake then bake_for client else Lwt.return_unit in
-      return (node1, client)
+  let* () = activate_protocol ?parameter_file ~protocol client in
+  let* _ = Node.wait_for_level node 1 in
+  return (node, client)

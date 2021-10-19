@@ -117,14 +117,14 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
         | `Client | `Light | `Proxy -> false
       in
       let* (node, client) =
-        Client.init_activate_bake
+        Client.init_with_protocol
           ?parameter_file
           ?nodes_args:node_parameters
-          ~bake
           ~protocol
           client_mode_tag
           ()
       in
+      let* () = if bake then Client.bake_for client else Lwt.return_unit in
       let* endpoint =
         match test_mode_tag with
         | `Client | `Light | `Proxy -> return Client.(Node node)

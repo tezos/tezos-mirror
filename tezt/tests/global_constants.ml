@@ -33,7 +33,7 @@ let test_large_flat_contract =
     ~title:"Originate a large, flat contract"
     ~tags:["global_constant"]
   @@ fun protocol ->
-  let* (_, client) = Client.init_activate_bake ~protocol `Client () in
+  let* (_, client) = Client.init_with_protocol ~protocol `Client () in
   let* _ =
     Client.originate_contract
       ~alias:"large_flat_contract"
@@ -50,7 +50,7 @@ let test_large_flat_contract =
 (* To ensure a billion-laughs style attack is not possible,
    we construct a giant contract and try to originate it,
    expecting the size limit to reject it.
-   
+
    We achieve this by registering a large initial value,
    then a constant with 10 of these values, then a constant
    with 10 of the first constant. We could quickly get to
@@ -62,7 +62,7 @@ let test_billion_laughs_contract =
     ~title:"Global constants billion laughs attack"
     ~tags:["billion_laughs"; "global_constant"]
   @@ fun protocol ->
-  let* (_, client) = Client.init_activate_bake ~protocol `Client () in
+  let* (_, client) = Client.init_with_protocol ~protocol `Client () in
   let repeat_n_times n str start finish =
     start ^ (List.init n (fun _ -> str) |> String.concat " ") ^ finish
   in
@@ -130,7 +130,7 @@ let test_entrypoint_expansion =
     ~title:"Global constants are expanded on entrypoints RPC"
     ~tags:["global_constant"; "rpc"]
   @@ fun protocol ->
-  let* (_, client) = Client.init_activate_bake ~protocol `Client () in
+  let* (_, client) = Client.init_with_protocol ~protocol `Client () in
   (* Register the expression *)
   let* _ =
     Client.register_global_constant

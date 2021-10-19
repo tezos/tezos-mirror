@@ -659,23 +659,21 @@ val init :
       [default_accounts_balance]
     - Activate the given protocol with [additional_account_count]
       additional bootstrap accounts
-    - Wait for the protocol to be activated (i.e. chain level 1)
-    - Bake (unless [~bake:false] is passed)
 
     In addition to the client, returns the first created node
     (if [`Light] is passed, a second node has been created, but it is
     not exposed). *)
-val init_activate_bake :
+val init_with_protocol :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
+  ?event_level:string ->
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
   ?parameter_file:string ->
-  ?bake:bool ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
@@ -712,6 +710,7 @@ val init_light :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?min_agreement:float ->
+  ?event_level:string ->
   ?nodes_args:Node.argument list ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
