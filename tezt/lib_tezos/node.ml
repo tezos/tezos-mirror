@@ -372,6 +372,20 @@ let wait_for_identity node =
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
 
+let wait_for_request ~request node =
+  let event_name =
+    match request with `Flush | `Inject -> "request_completed_notice.v0"
+  in
+  let request_str =
+    match request with `Flush -> "flush" | `Inject -> "inject"
+  in
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when String.equal s request_str -> Some ()
+    | Some _ | None -> None
+  in
+  wait_for node event_name filter
+
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
