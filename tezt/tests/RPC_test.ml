@@ -653,7 +653,6 @@ let get_client_port client =
    - POST unban_operation
    - POST unban_all_operations *)
 let test_mempool ?endpoint client =
-  let open Lwt in
   let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
   let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
@@ -675,7 +674,7 @@ let test_mempool ?endpoint client =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
   (* Refused operation after the reclassification following the flush. *)
-  let* branch = RPC.get_branch client >|= JSON.as_string in
+  let* branch = Lwt.Infix.(RPC.get_branch client >|= JSON.as_string) in
   let* _ =
     Mempool.forge_and_inject_operation
       ~branch
