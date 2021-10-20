@@ -18,6 +18,7 @@ DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
 DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
+COBERTURA_REPORT := _coverage_report/cobertura.xml
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -121,6 +122,11 @@ coverage-report:
 .PHONY: coverage-report-summary
 coverage-report-summary:
 	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
+
+.PHONY: coverage-report-cobertura
+coverage-report-cobertura:
+	@bisect-ppx-report cobertura --ignore-missing-file --coverage-path ${COVERAGE_OUTPUT} ${COBERTURA_REPORT}
+	@echo "Cobertura report should be available in ${COBERTURA_REPORT}"
 
 .PHONY: enable-time-measurement
 enable-time-measurement:
