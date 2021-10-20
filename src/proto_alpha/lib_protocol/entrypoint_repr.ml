@@ -36,3 +36,6 @@ let do_ = "do"
 let set_delegate = "set_delegate"
 
 let remove_delegate = "remove_delegate"
+
+module Set = Set.Make (String)
+module Map = Map.Make (String)

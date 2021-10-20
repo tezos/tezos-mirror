@@ -2007,8 +2007,6 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
           merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
           (entrypoint, (ty : exp ty)))
 
-module Entrypoints = Set.Make (String)
-
 let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((first_unreachable, all) as acc) =
@@ -2027,16 +2025,17 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
         let name = (name :> string) in
         if Compare.Int.(String.length name > 31) then
           error (Entrypoint_name_too_long name)
-        else if Entrypoints.mem name all then error (Duplicate_entrypoint name)
-        else ok (first_unreachable, Entrypoints.add name all)
+        else if Entrypoint.Set.mem name all then
+          error (Duplicate_entrypoint name)
+        else ok (first_unreachable, Entrypoint.Set.add name all)
   in
   let rec check :
       type t.
       t ty ->
       prim list ->
       bool ->
-      prim list option * Entrypoints.t ->
-      (prim list option * Entrypoints.t) tzresult =
+      prim list option * Entrypoint.Set.t ->
+      (prim list option * Entrypoint.Set.t) tzresult =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
@@ -2057,11 +2056,12 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   in
   let (init, reachable) =
     match root_name with
-    | None -> (Entrypoints.empty, false)
-    | Some (Field_annot name) -> (Entrypoints.singleton (name :> string), true)
+    | None -> (Entrypoint.Set.empty, false)
+    | Some (Field_annot name) ->
+        (Entrypoint.Set.singleton (name :> string), true)
   in
   check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
-  if not (Entrypoints.mem Entrypoint.default all) then Result.return_unit
+  if not (Entrypoint.Set.mem Entrypoint.default all) then Result.return_unit
   else
     match first_unreachable with
     | None -> Result.return_unit
@@ -5894,8 +5894,6 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-module Entrypoints_map = Map.Make (String)
-
 let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((unreachables, all) as acc) =
@@ -5912,13 +5910,13 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
         let name = (name :> string) in
         if Compare.Int.(String.length name > 31) then
           ok (List.rev path :: unreachables, all)
-        else if Entrypoints_map.mem name all then
+        else if Entrypoint.Map.mem name all then
           ok (List.rev path :: unreachables, all)
         else
           unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
           ok
             ( unreachables,
-              Entrypoints_map.add name (List.rev path, unparsed_ty) all )
+              Entrypoint.Map.add name (List.rev path, unparsed_ty) all )
   in
   let rec fold_tree :
       type t.
@@ -5926,9 +5924,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       prim list ->
       bool ->
       prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t ->
+      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t ->
       (prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t)
+      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t)
       tzresult =
    fun t path reachable acc ->
     match t with
@@ -5951,9 +5949,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
-    | None -> (Entrypoints_map.empty, false)
+    | None -> (Entrypoint.Map.empty, false)
     | Some (Field_annot name) ->
-        (Entrypoints_map.singleton (name :> string) ([], unparsed_full), true)
+        (Entrypoint.Map.singleton (name :> string) ([], unparsed_full), true)
   in
   fold_tree full [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]

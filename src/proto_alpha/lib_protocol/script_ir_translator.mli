@@ -414,15 +414,13 @@ val find_entrypoint :
   Entrypoint.t ->
   ((Script.node -> Script.node) * ex_ty, 'error_trace) result
 
-module Entrypoints_map : Map.S with type key = string
-
 val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
   root_name:Script_ir_annot.field_annot option ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
-    Entrypoints_map.t)
+    Entrypoint.Map.t)
   tzresult
 
 val pack_data :

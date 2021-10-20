@@ -2170,7 +2170,7 @@ module RPC = struct
               Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
               >|? fun (unreachable_entrypoint, map) ->
               ( unreachable_entrypoint,
-                Entrypoints_map.fold
+                Entrypoint.Map.fold
                   (fun entry (_, ty) acc ->
                     (entry, Micheline.strip_locations ty) :: acc)
                   map
