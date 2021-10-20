@@ -50,18 +50,8 @@ val canonical_encoding_v1 :
   'l Data_encoding.encoding ->
   'l canonical Data_encoding.encoding
 
-(*
-val erased_encoding : variant:string -> 'l -> 'p Data_encoding.encoding -> ('l, 'p) node Data_encoding.encoding
-val table_encoding : variant:string -> 'l Data_encoding.encoding -> 'p Data_encoding.encoding -> ('l, 'p) node Data_encoding.encoding
-*)
 val location : ('l, 'p) node -> 'l
 
 val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
-
-val extract_locations :
-  ('l, 'p) node -> 'p canonical * (canonical_location * 'l) list
-
-val inject_locations :
-  (canonical_location -> 'l) -> 'p canonical -> ('l, 'p) node

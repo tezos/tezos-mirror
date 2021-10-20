@@ -4836,7 +4836,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
       parse_two_var_annot loc annot >>?= fun (op_annot, addr_annot) ->
-      let canonical_code = fst @@ Micheline.extract_locations code in
+      let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
       >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
       record_trace
