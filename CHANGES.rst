@@ -23,6 +23,14 @@ be documented here either.
 Node
 ----
 
+-  Fixed wrong behaviour when updating the additional cycles of the
+   node's history mode.
+
+-  Removed redundant event while setting a new head.
+
+-  Fixed wrong behaviour when merging the store after a rolling
+   snapshot import.
+
 Client
 ------
 
