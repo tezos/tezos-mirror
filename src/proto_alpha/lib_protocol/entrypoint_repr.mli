@@ -31,3 +31,6 @@ val default : t
 
 (** Checks whether an entrypoint is the default entrypoint *)
 val is_default : t -> bool
+
+(** Root entrypoint "root" *)
+val root : t

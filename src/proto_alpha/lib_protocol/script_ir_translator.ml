@@ -2002,7 +2002,7 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
           | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
           | Error Inconsistent_types_fast ->
               merge_types ~legacy ~error_details loc full expected
-              >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
+              >?$ fun (Eq, full) -> ok (Entrypoint.root, (full : exp ty)))
       | _ ->
           merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
           (entrypoint, (ty : exp ty)))

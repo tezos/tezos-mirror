@@ -28,3 +28,5 @@ include Compare.String
 let default = "default"
 
 let is_default name = name = default
+
+let root = "root"
