@@ -47,6 +47,9 @@ val set_delegate : t
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
 
+(** In-memory size of an entrypoint *)
+val in_memory_size : t -> Saturation_repr.may_saturate Saturation_repr.t
+
 (** Set of entrypoints *)
 module Set : Set.S with type elt = t
 

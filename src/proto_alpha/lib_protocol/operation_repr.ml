@@ -1179,7 +1179,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
       ret_adding
         (script_lazy_expr_size parameters)
         (h4w +! int64_size
-        +! string_size_gen (String.length entrypoint)
+        +! Entrypoint_repr.in_memory_size entrypoint
         +! Contract_repr.in_memory_size destination)
   | Origination {delegate; script; credit = _; preorigination} ->
       ret_adding

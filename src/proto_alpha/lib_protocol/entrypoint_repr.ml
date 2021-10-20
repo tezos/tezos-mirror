@@ -37,5 +37,8 @@ let set_delegate = "set_delegate"
 
 let remove_delegate = "remove_delegate"
 
+let in_memory_size name =
+  Cache_memory_helpers.string_size_gen (String.length name)
+
 module Set = Set.Make (String)
 module Map = Map.Make (String)
