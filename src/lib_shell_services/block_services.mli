@@ -683,12 +683,24 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       (** Define RPC GET /chains/[chain]/mempool/filter *)
       val get_filter :
         ('a, 'b) RPC_path.t ->
-        ([`GET], 'a, 'b, unit, unit, Data_encoding.json) RPC_service.t
+        ( [`GET],
+          'a,
+          'b,
+          < include_default : bool >,
+          unit,
+          Data_encoding.json )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/filter *)
       val set_filter :
         ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
+        ( [`POST],
+          'a,
+          'b,
+          unit,
+          Data_encoding.json,
+          Data_encoding.json )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :

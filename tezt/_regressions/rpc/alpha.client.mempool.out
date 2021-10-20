@@ -74,6 +74,77 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
 [{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.alpha.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.alpha.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.alpha.prefilter.outdated_endorsement"}]}]
 
+./tezos-client rpc get /chains/main/mempool/filter
+{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
+{}
+
+./tezos-client rpc post /chains/main/mempool/filter with '{
+  "minimal_fees": "50",
+  "minimal_nanotez_per_gas_unit": [
+    "201",
+    "5"
+  ],
+  "minimal_nanotez_per_byte": [
+    "56",
+    "3"
+  ],
+  "allow_script_failure": false
+}'
+{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
+  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }
+
+./tezos-client rpc get /chains/main/mempool/filter
+{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
+  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
+  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
+{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
+  "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }
+
+./tezos-client rpc post /chains/main/mempool/filter with '{
+  "minimal_fees": "200",
+  "allow_script_failure": true
+}'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get /chains/main/mempool/filter
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
+{ "minimal_fees": "200" }
+
+./tezos-client rpc post /chains/main/mempool/filter with '{}'
+{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get /chains/main/mempool/filter
+{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
+{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true }
+
+./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
+{}
+
 curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
 {
   "static": {
@@ -213,8 +284,19 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "path": [
                   "filter"
                 ],
-                "description": "Get the configuration of the mempool filter.",
-                "query": [],
+                "description": "Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. \"minimal_nanotez_per_gas_unit\": [ \"100\", \"1\" ].",
+                "query": [
+                  {
+                    "name": "include_default",
+                    "description": "Show fields equal to their default value (set by default)",
+                    "kind": {
+                      "single": {
+                        "id": "single",
+                        "name": "bool"
+                      }
+                    }
+                  }
+                ],
                 "output": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#"
@@ -279,7 +361,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "path": [
                   "filter"
                 ],
-                "description": "Set the configuration of the mempool filter.",
+                "description": "Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.",
                 "query": [],
                 "input": {
                   "json_schema": {
@@ -315,13 +397,17 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "toplevel": {
                       "fields": [
                         {
+                          "kind": "dyn",
+                          "num_fields": 1,
+                          "size": "Uint30"
+                        },
+                        {
                           "layout": {
-                            "kind": "Zero_width"
+                            "kind": "String"
                           },
                           "kind": "anon",
                           "data_kind": {
-                            "size": 0,
-                            "kind": "Float"
+                            "kind": "Variable"
                           }
                         }
                       ]

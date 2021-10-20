@@ -619,11 +619,20 @@ let get_client_port client =
          proxy server only. Both have an endpoint and hence a RPC port so this \
          should not happen."
 
-(* Test the mempool RPCs *)
-(* In this test, we create an applied operation and three operations that fails
-   to be applied. Each one of this failed operation has a different
-   classification to test every possibilities of the monitor_operations and
-   pending_operations RPCs. The errors classification are the following :
+(* Test the mempool RPCs: /chains/<chain>/mempool/...
+
+   Tested RPCs:
+   - GET pending_operations
+   - GET monitor_operations
+   - GET filter
+   - POST filter
+
+   Testing RPCs monitor_operations and pending_operations:
+
+   We create an applied operation and three operations that fail
+   to be applied. Each one of these failed operations has a different
+   classification to test every possibility of the monitor_operations and
+   pending_operations RPCs. The error classifications are the following :
    - Branch_refused (Branch error classification in protocol)
    - Branch_delayed (Temporary)
    - Refused (Permanent)
@@ -631,6 +640,12 @@ let get_client_port client =
    The main goal is to have a record of the encoding of the different
    operations returned by the RPC calls. This allows
    us to detect undesired changes. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1900
+   Test the following RPCs:
+   - POST request_operations
+   - POST ban_operation
+   - POST unban_operation
+   - POST unban_all_operations *)
 let test_mempool ?endpoint client =
   let open Lwt in
   let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
@@ -707,6 +722,34 @@ let test_mempool ?endpoint client =
   in
   let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
+  let get_filter_variations () =
+    let get_filter = RPC.get_mempool_filter ?endpoint ~hooks:mempool_hooks in
+    let* _ = get_filter client in
+    let* _ = get_filter ~include_default:true client in
+    let* _ = get_filter ~include_default:false client in
+    unit
+  in
+  let post_and_get_filter config_str =
+    let* _ =
+      RPC.post_mempool_filter
+        ?endpoint
+        ~hooks:mempool_hooks
+        ~data:(Ezjsonm.from_string config_str)
+        client
+    in
+    get_filter_variations ()
+  in
+  let* _ = get_filter_variations () in
+  let* _ =
+    post_and_get_filter
+      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ], "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false }|}
+  in
+  let* _ =
+    post_and_get_filter
+      {|{ "minimal_fees": "200", "allow_script_failure": true }|}
+  in
+  let* _ = post_and_get_filter "{}" in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1765
 
      Once openapi-diff is integrated, this test could be removed. *)

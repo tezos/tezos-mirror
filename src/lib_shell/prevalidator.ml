@@ -253,7 +253,6 @@ type types_state_shell = {
   mutable pending : Operation.t Operation_hash.Map.t;
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
-  mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   mutable banned_operations : Operation_hash.Set.t;
 }
 
@@ -306,6 +305,7 @@ module type T = sig
       * Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable filter_config : Filter.Mempool.config;
   }
 
   module Types : Worker_intf.TYPES with type state = types_state
@@ -374,6 +374,7 @@ module Make
       * Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable filter_config : Filter.Mempool.config;
   }
 
   module Types = struct
@@ -427,17 +428,6 @@ module Make
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
-  let filter_config pv =
-    try
-      match Protocol_hash.Map.find Proto.hash pv.filter_config with
-      | Some config ->
-          Lwt.return
-            (Data_encoding.Json.destruct Filter.Mempool.config_encoding config)
-      | None -> Lwt.return Filter.Mempool.default_config
-    with _ ->
-      Event.(emit invalid_mempool_filter_configuration) () >|= fun () ->
-      Filter.Mempool.default_config
-
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
   let handle
@@ -478,7 +468,6 @@ module Make
             protocol_data = parsed_op.protocol_data;
           }
         in
-        filter_config pv.shell >|= fun config ->
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
@@ -487,7 +476,7 @@ module Make
         match
           Filter.Mempool.pre_filter
             ?validation_state_before
-            config
+            pv.filter_config
             op.Filter.Proto.protocol_data
         with
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _) as errs ->
@@ -496,14 +485,13 @@ module Make
               pv.shell
               (`Parsed parsed_op)
               errs ;
-            false
-        | `Undecided -> true)
+            Lwt.return_false
+        | `Undecided -> Lwt.return_true)
 
   let post_filter pv ~validation_state_before ~validation_state_after op receipt
       =
-    filter_config pv >>= fun config ->
     Filter.Mempool.post_filter
-      config
+      pv.filter_config
       ~validation_state_before
       ~validation_state_after
       (op, receipt)
@@ -516,16 +504,16 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let classify_operation ~notifier shell validation_state mempool op oph =
+  let classify_operation ~notifier pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle ~notifier shell (`Unparsed (oph, op)) (`Refused errors) ;
+        handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
         | Applied (new_validation_state, receipt) ->
             post_filter
-              shell
+              pv
               ~validation_state_before:
                 (Prevalidation.validation_state validation_state)
               ~validation_state_after:
@@ -534,7 +522,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle ~notifier shell (`Parsed op) `Applied ;
+              handle ~notifier pv.shell (`Parsed op) `Applied ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -542,21 +530,21 @@ module Make
               Lwt.return (new_validation_state, new_mempool))
             else (
               Distributed_db.Operation.clear_or_cancel
-                shell.parameters.chain_db
+                pv.shell.parameters.chain_db
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            handle ~notifier shell (`Parsed op) (`Branch_delayed errors) ;
+            handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            handle ~notifier shell (`Parsed op) (`Branch_refused errors) ;
+            handle ~notifier pv.shell (`Parsed op) (`Branch_refused errors) ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            handle ~notifier shell (`Parsed op) (`Refused errors) ;
+            handle ~notifier pv.shell (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
-              shell.parameters.chain_db
+              pv.shell.parameters.chain_db
               oph ;
             Lwt.return (validation_state, mempool))
 
@@ -580,26 +568,25 @@ module Make
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
 
-  let classify_pending_operations ~notifier w (shell : types_state_shell) state
-      =
+  let classify_pending_operations ~notifier w pv state =
     Operation_hash.Map.fold_es
       (fun oph op (acc_validation_state, acc_mempool, limit) ->
         if limit <= 0 then
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
-          shell.pending <- Operation_hash.Map.remove oph shell.pending ;
+          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
           classify_operation
             ~notifier
-            shell
+            pv
             acc_validation_state
             acc_mempool
             op
             oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
-      shell.pending
-      (state, Mempool.empty, shell.parameters.limits.operations_batch_size)
+      pv.shell.pending
+      (state, Mempool.empty, pv.shell.parameters.limits.operations_batch_size)
     >>= function
     | Error (state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
@@ -628,7 +615,7 @@ module Make
         | 0 -> Lwt.return_unit
         | n ->
             Event.(emit processing_n_operations) n >>= fun () ->
-            classify_pending_operations ~notifier w pv.shell state
+            classify_pending_operations ~notifier w pv state
             >>= fun (state, advertised_mempool) ->
             let remaining_pendings =
               Operation_hash.Map.fold
@@ -656,6 +643,27 @@ module Make
             in
             set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
 
+  (** Mimics [Data_encoding.Json.construct] but accepts argument
+      [?include_default_fields] to pass on to [Json_encoding.construct]. *)
+  let data_encoding_json_construct ?include_default_fields e v =
+    Json_encoding.construct
+      ?include_default_fields
+      (Data_encoding.Json.convert e)
+      v
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1876
+     Remove this function upon the next release of [data-encoding]. *)
+
+  (** Returns a json describing the prevalidator's [filter_config].
+      The boolean [include_default] ([true] by default) indicates
+      whether the json should include the fields which have a value
+      equal to their default value. *)
+  let get_filter_config_json ?(include_default = true) pv =
+    let include_default_fields = if include_default then `Always else `Never in
+    data_encoding_json_construct
+      ~include_default_fields
+      Filter.Mempool.config_encoding
+      pv.filter_config
+
   let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
@@ -664,27 +672,24 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.get_filter RPC_path.open_root)
-           (fun pv () () ->
-             match Protocol_hash.Map.find Proto.hash pv.shell.filter_config with
-             | Some obj -> return obj
-             | None -> (
-                 match Prevalidator_filters.find Proto.hash with
-                 | None -> return (`O [])
-                 | Some (module Filter) ->
-                     let default =
-                       Data_encoding.Json.construct
-                         Filter.Mempool.config_encoding
-                         Filter.Mempool.default_config
-                     in
-                     return default)) ;
+           (fun pv params () ->
+             return
+               (get_filter_config_json
+                  ~include_default:params#include_default
+                  pv)) ;
        dir :=
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.set_filter RPC_path.open_root)
            (fun pv () obj ->
-             pv.shell.filter_config <-
-               Protocol_hash.Map.add Proto.hash obj pv.shell.filter_config ;
-             return ()) ;
+             (try
+                let config =
+                  Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
+                in
+                pv.filter_config <- config ;
+                Lwt.return_unit
+              with _ -> Event.(emit invalid_mempool_filter_configuration) ())
+             >>= fun () -> return (get_filter_config_json pv)) ;
        (* Ban an operation (from its given hash): remove it from the
           mempool if present. Add it to the set pv.banned_operations
           to prevent it from being fetched/processed/injected in the
@@ -1187,10 +1192,6 @@ module Make
           fetching;
           pending = Operation_hash.Map.empty;
           advertisement = `None;
-          filter_config =
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
-               initialize from config file *)
-            Protocol_hash.Map.empty;
           banned_operations = Operation_hash.Set.empty;
         }
       in
@@ -1200,6 +1201,10 @@ module Make
           validation_state;
           operation_stream = Lwt_watcher.create_input ();
           rpc_directory = build_rpc_directory w;
+          filter_config =
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
+               initialize from config file *)
+            Filter.Mempool.default_config;
         }
       in
       Seq.iter_s

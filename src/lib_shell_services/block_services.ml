@@ -1177,19 +1177,35 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:(list processed_operation_encoding)
           RPC_path.(path / "monitor_operations")
 
+      let get_filter_query =
+        let open RPC_query in
+        query (fun include_default ->
+            object
+              method include_default = include_default
+            end)
+        |+ field
+             ~descr:"Show fields equal to their default value (set by default)"
+             "include_default"
+             RPC_arg.bool
+             true
+             (fun t -> t#include_default)
+        |> seal
+
       let get_filter path =
         RPC_service.get_service
-          ~description:"Get the configuration of the mempool filter."
-          ~query:RPC_query.empty
+          ~description:
+            {|Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. "minimal_nanotez_per_gas_unit": [ "100", "1" ].|}
+          ~query:get_filter_query
           ~output:json
           RPC_path.(path / "filter")
 
       let set_filter path =
         RPC_service.post_service
-          ~description:"Set the configuration of the mempool filter."
+          ~description:
+            {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
           ~query:RPC_query.empty
           ~input:json
-          ~output:unit
+          ~output:json
           RPC_path.(path / "filter")
 
       let request_operations path =
