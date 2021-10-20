@@ -92,6 +92,9 @@ Node
 -  Fixed wrong behaviour when merging the store after a rolling
    snapshot import.
 
+-  Fixed an issue when reconstructing a storage with missing block or
+   operations metadata hashes.
+
 Client
 ------
 
