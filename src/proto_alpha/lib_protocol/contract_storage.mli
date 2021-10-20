@@ -24,24 +24,24 @@
 (*****************************************************************************)
 
 type error +=
-  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
+  | (* `Temporary *)
+      Balance_too_low of
+      Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
       Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.contract
-  | (* `Temporary *)
+  | (* `Branch *)
       Empty_implicit_contract of Signature.Public_key_hash.t
-  | (* `Temporary *)
+  | (* `Branch *)
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
-  | (* `Temporary *)
-      Empty_transaction of Contract_repr.t (* `Temporary *)
-  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Failure of string
-(* `Permanent *)
+      Inconsistent_public_key of
+      Signature.Public_key.t * Signature.Public_key.t
+  | (* `Permanent *) Failure of string
 
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 

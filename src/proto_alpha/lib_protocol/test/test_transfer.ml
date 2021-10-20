@@ -165,8 +165,7 @@ let test_block_with_a_single_transfer_with_fee () =
 let test_transfer_zero_tez () =
   single_transfer
     ~expect_failure:(function
-      | Environment.Ecoproto_error (Contract_storage.Empty_transaction _ as e)
-        :: _ ->
+      | Environment.Ecoproto_error (Apply.Empty_transaction _ as e) :: _ ->
           Assert.test_error_encodings e ;
           return_unit
       | _ -> failwith "Empty transaction should fail")

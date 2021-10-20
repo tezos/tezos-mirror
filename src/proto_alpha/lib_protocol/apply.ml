@@ -28,12 +28,12 @@
 open Alpha_context
 
 type error +=
-  | (* `Temporary *)
+  | (* `Permanent *)
       Not_enough_endorsements of {
       required : int;
       endorsements : int;
     }
-  | (* `Permanent *)
+  | (* `Temporary *)
       Wrong_consensus_operation_branch of
       Block_hash.t * Block_hash.t
   | (* `Permanent *)
@@ -105,6 +105,7 @@ type error +=
       limit : Tez.t;
       max_limit : Tez.t;
     }
+  | (* `Branch *) Empty_transaction of Contract.t
 
 let () =
   register_error_kind
@@ -461,13 +462,27 @@ let () =
     (function
       | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
       | _ -> None)
-    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit})
+    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.empty_transaction"
+    ~title:"Empty transaction"
+    ~description:"Forbidden to credit 0ꜩ to a contract without code."
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "Transaction of 0ꜩ towards a contract without code are forbidden \
+         (%a)."
+        Contract.pp
+        contract)
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function Empty_transaction c -> Some c | _ -> None)
+    (fun c -> Empty_transaction c)
 
-type error += Wrong_voting_period of int32 * int32
+type error += (* `Temporary *) Wrong_voting_period of int32 * int32
 
-(* `Temporary *)
-
-type error += Internal_operation_replay of packed_internal_operation
+type error +=
+  | (* `Permanent *) Internal_operation_replay of packed_internal_operation
 
 type denunciation_kind = Preendorsement | Endorsement | Block
 
@@ -485,7 +500,8 @@ let pp_denunciation_kind fmt : denunciation_kind -> unit = function
   | Endorsement -> Format.fprintf fmt "endorsement"
   | Block -> Format.fprintf fmt "baking"
 
-type error += Invalid_denunciation of denunciation_kind
+type error += (* `Permanent *)
+              Invalid_denunciation of denunciation_kind
 
 type error +=
   | (* `Permanent *)
@@ -495,7 +511,7 @@ type error +=
       delegate2 : Signature.Public_key_hash.t;
     }
 
-type error += (* `Permanent *) Unrequired_denunciation
+type error += (* `Branch *) Unrequired_denunciation
 
 type error +=
   | (* `Temporary *)
@@ -506,20 +522,19 @@ type error +=
     }
 
 type error +=
-  | (* `Branch *)
+  | (* `Permanent *)
       Outdated_denunciation of {
       kind : denunciation_kind;
       level : Raw_level.t;
       last_cycle : Cycle.t;
     }
 
-(* `Permanent *)
+type error +=
+  | (* Permanent *) Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
-type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+type error += (* Permanent *) Multiple_revelation
 
-type error += Multiple_revelation
-
-type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
+type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
 
 type error += (* `Permanent *) Inconsistent_sources
 
@@ -804,6 +819,11 @@ let apply_manager_operation_content :
         ~none:return_false
         ~some:(fun _ -> Contract.allocated ctxt destination >|=? not)
       >>=? fun allocated_destination_contract ->
+      error_when
+        (Tez.(amount = zero)
+        && Option.is_some (Contract.is_implicit destination))
+        (Empty_transaction destination)
+      >>?= fun () ->
       Token.transfer ctxt (`Contract source) (`Contract destination) amount
       >>=? fun (ctxt, balance_updates) ->
       Script_cache.find ctxt destination >>=? fun (ctxt, cache_key, script) ->
