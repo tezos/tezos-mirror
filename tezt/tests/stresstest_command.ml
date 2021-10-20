@@ -25,21 +25,50 @@
 
 (* Testing
    -------
-   Component:    Baker
-   Invocation:   dune exec tezt/tests/main.exe -- --file baker_test.ml
-   Subject:      Run the baker while performing a lot of transfers
+   Component:    Client
+   Invocation:   dune exec tezt/tests/main.exe -- --file stresstest_command.ml
+   Subject:      Test the [stresstest] client command
 *)
 
-let test_baker =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"baker stresstest"
-    ~tags:["node"; "baker"]
+(** Tests the [stresstest] client command with explicit values for
+    optional arguments [transfers] and [tps]. *)
+let test_stresstest_explicit =
+  Protocol.register_test ~__FILE__ ~title:"stresstest explicit" ~tags:["client"]
   @@ fun protocol ->
-  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
-  let* _ = Baker.init ~protocol node client in
-  (* Use a large tps, to have failing operations too *)
-  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
-  Lwt.return_unit
+  let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
+  let* client = Client.init ~endpoint:Client.(Node node) () in
+  let* () = Client.activate_protocol ~protocol client in
+  let* _ = Node.wait_for_level node 1 in
+  Client.stresstest ~transfers:30 ~tps:25 client
 
-let register ~protocols = test_baker ~protocols
+(** Waits for [n] injection request events. *)
+let wait_for_n_injections n node =
+  let seen = ref 0 in
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when s = "inject" ->
+        incr seen ;
+        if !seen >= n then Some () else None
+    | Some _ | None -> None
+  in
+  Node.wait_for node "request_completed_notice.v0" filter
+
+(** Tests the [stresstest] client command without providing optional
+    arguments [transfers] and [tps]. This means the command won't
+    stop (it only stops after [transfers] operations when the argument
+    is given), so instead we use {!wait_for_n_injections} to finish
+    the test. *)
+let test_stresstest_implicit =
+  Protocol.register_test ~__FILE__ ~title:"stresstest implicit" ~tags:["client"]
+  @@ fun protocol ->
+  let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
+  let* client = Client.init ~endpoint:Client.(Node node) () in
+  let* () = Client.activate_protocol ~protocol client in
+  let* _ = Node.wait_for_level node 1 in
+  let waiter = wait_for_n_injections 50 node in
+  let _ = Client.stresstest client in
+  waiter
+
+let register ~protocols =
+  test_stresstest_explicit ~protocols ;
+  test_stresstest_implicit ~protocols

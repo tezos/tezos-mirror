@@ -30,3 +30,28 @@ type key = {
   public_key : string option;
   secret_key : string option;
 }
+
+let write_stresstest_sources_file (accounts : key list) =
+  let account_to_json (account : key) =
+    let mandatory name = function
+      | None ->
+          Test.fail
+            "Cannot convert account to JSON for the stresstest command: field \
+             %s is None"
+            name
+      | Some value -> value
+    in
+    `O
+      [
+        ("pkh", `String account.public_key_hash);
+        ("pk", `String (account.public_key |> mandatory "public_key"));
+        ("sk", `String (account.secret_key |> mandatory "secret_key"));
+      ]
+  in
+  let accounts_json_obj = `A (List.map account_to_json accounts) in
+  let sources = Temp.file "sources.json" in
+  let* () =
+    Lwt_io.with_file ~mode:Lwt_io.Output sources (fun oc ->
+        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string accounts_json_obj)
+  in
+  return sources

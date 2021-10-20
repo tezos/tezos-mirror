@@ -628,24 +628,33 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash -> return hash
 
-let spawn_stresstest ?endpoint ?tps ~sources ~transfers client =
-  let tps_arg =
-    Option.map (fun (tps : int) -> ["--tps"; Int.to_string tps]) tps
-    |> Option.value ~default:[]
+let write_bootstrap_stresstest_sources_file client =
+  let keys : Constant.key list =
+    List.filter
+      (fun {Constant.alias; _} -> alias <> "activator")
+      Constant.all_secret_keys
+  in
+  let* (accounts : Account.key list) =
+    Lwt_list.map_s
+      (fun (account : Constant.key) ->
+        show_address ~show_secret:true ~alias:account.alias client)
+      keys
+  in
+  Account.write_stresstest_sources_file accounts
+
+let spawn_stresstest ?endpoint ?transfers ?tps ~sources client =
+  let make_int_arg (name : string) = function
+    | Some (arg : int) -> [name; Int.to_string arg]
+    | None -> []
   in
   spawn_command ?endpoint client
-  @@ [
-       "stresstest";
-       "transfer";
-       "using";
-       sources;
-       "--transfers";
-       Int.to_string transfers;
-     ]
-  @ tps_arg
+  @@ ["stresstest"; "transfer"; "using"; sources]
+  @ make_int_arg "--transfers" transfers
+  @ make_int_arg "--tps" tps
 
-let stresstest ?endpoint ?tps ~sources ~transfers client =
-  spawn_stresstest ?endpoint ?tps ~sources ~transfers client |> Process.check
+let stresstest ?endpoint ?transfers ?tps client =
+  let* sources = write_bootstrap_stresstest_sources_file client in
+  spawn_stresstest ?endpoint ?transfers ?tps ~sources client |> Process.check
 
 let spawn_run_script ~src ~storage ~input client =
   spawn_command
