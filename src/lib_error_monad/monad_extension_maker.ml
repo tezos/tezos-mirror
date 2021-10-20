@@ -81,8 +81,8 @@ end)
 
   let classify_trace trace =
     Trace.fold
-      (fun c e -> Sig.combine_category c (Error.classify_error e))
-      `Temporary
+      (fun c e -> Error_classification.combine c (Error.classify_error e))
+      Error_classification.default
       trace
 
   let record_trace err result =

@@ -30,7 +30,9 @@
 
 type error_category = [`Branch | `Temporary | `Permanent]
 
-include TzCore
+include (
+  TzCore : module type of TzCore with type error_category := error_category)
+
 include TzMonad
 module TzTrace = TzTrace
 

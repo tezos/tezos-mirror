@@ -185,9 +185,10 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
           )
       | Error trace -> (
           match classify_trace trace with
-          | `Branch -> Branch_refused trace
-          | `Permanent -> Refused trace
-          | `Temporary -> Branch_delayed trace)
+          | Branch -> Branch_refused trace
+          | Permanent -> Refused trace
+          | Temporary -> Branch_delayed trace
+          | Outdated -> Outdated)
 
   let validation_state {state; _} = state
 

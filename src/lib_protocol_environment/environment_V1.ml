@@ -526,10 +526,15 @@ struct
   end
 
   module Error_core = struct
-    include Tezos_error_monad.Core_maker.Make (struct
-      let id = Format.asprintf "proto.%s." Param.name
-    end)
+    include
+      Tezos_error_monad.Core_maker.Make
+        (struct
+          let id = Format.asprintf "proto.%s." Param.name
+        end)
+        (Tezos_protocol_environment_structs.V1.M.Error_monad_classification)
   end
+
+  type error_category = Error_core.error_category
 
   type error += Ecoproto_error of Error_core.error
 
@@ -539,7 +544,10 @@ struct
     include (
       Error_core :
         sig
-          include Tezos_error_monad.Sig.CORE with type error := unwrapped
+          include
+            Tezos_error_monad.Sig.CORE
+              with type error := unwrapped
+               and type error_category = error_category
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -551,8 +559,6 @@ struct
     type 'a shell_tzresult = 'a Error_monad.tzresult
 
     type shell_error = Error_monad.error = ..
-
-    type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
@@ -568,6 +574,9 @@ struct
     let dont_wait ex er f = dont_wait f er ex
 
     type 'err trace = 'err TzTrace.trace
+
+    (* Shouldn't be used, only to keep the same environment interface *)
+    let classify_error error = (find_info_of_error error).category
   end
 
   let () =

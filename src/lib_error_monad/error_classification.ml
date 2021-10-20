@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,36 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tezos Protocol Implementation - Error Monad *)
+type t = Branch | Temporary | Permanent | Outdated
 
-(*-- Error classification ----------------------------------------------------*)
+let default = Temporary
 
-module Core_category = struct
-  (* The categories for core errors are not used. This is kept to
-     avoid a large diff, but this should be replaced by 'unit' at some point *)
-
-  (** Categories of error *)
-  type t =
-    [ `Branch  (** Errors that may not happen in another context *)
-    | `Temporary  (** Errors that may not happen in a later context *)
-    | `Permanent  (** Errors that will happen no matter the context *) ]
-
-  let default_category = `Temporary
-
-  let string_of_category = function
-    | `Permanent -> "permanent"
-    | `Temporary -> "temporary"
-    | `Branch -> "branch"
-
-  let classify = function
-    | `Permanent -> Error_classification.Permanent
-    | `Temporary -> Temporary
-    | `Branch -> Branch
-end
-
-include
-  Core_maker.Make
-    (struct
-      let id = ""
-    end)
-    (Core_category)
+let combine c1 c2 =
+  match (c1, c2) with
+  | (Permanent, _) | (_, Permanent) -> Permanent
+  | (Outdated, _) | (_, Outdated) -> Outdated
+  | (Branch, _) | (_, Branch) -> Branch
+  | (Temporary, Temporary) -> Temporary

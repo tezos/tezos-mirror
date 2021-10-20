@@ -25,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Shell_error_monad = Error_monad
+
+type shell_error = error = ..
+
 open Environment_context
 open Environment_protocol_T
 
@@ -610,12 +614,38 @@ struct
   end
 
   module Error_core = struct
-    include Tezos_error_monad.Core_maker.Make (struct
-      let id = Format.asprintf "proto.%s." Param.name
-    end)
+    include
+      Tezos_error_monad.Core_maker.Make
+        (struct
+          let id = Format.asprintf "proto.%s." Param.name
+        end)
+        (struct
+          type t =
+            [ `Branch  (** Errors that may not happen in another context *)
+            | `Temporary  (** Errors that may not happen in a later context *)
+            | `Permanent  (** Errors that will happen no matter the context *)
+            | `Outdated  (** Errors that happen when the context is too old *)
+            ]
+
+          let default_category = `Temporary
+
+          let string_of_category = function
+            | `Permanent -> "permanent"
+            | `Outdated -> "outdated"
+            | `Branch -> "branch"
+            | `Temporary -> "temporary"
+
+          let classify = function
+            | `Permanent -> Tezos_error_monad.Error_classification.Permanent
+            | `Branch -> Branch
+            | `Temporary -> Temporary
+            | `Outdated -> Outdated
+        end)
   end
 
-  type error += Ecoproto_error of Error_core.error
+  type error_category = Error_core.error_category
+
+  type shell_error += Ecoproto_error of Error_core.error
 
   module Wrapped_error_monad = struct
     type unwrapped = Error_core.error = ..
@@ -623,7 +653,10 @@ struct
     include (
       Error_core :
         sig
-          include Tezos_error_monad.Sig.CORE with type error := unwrapped
+          include
+            Tezos_error_monad.Sig.CORE
+              with type error := unwrapped
+               and type error_category = error_category
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -635,8 +668,6 @@ struct
     type shell_tztrace = Error_monad.tztrace
 
     type 'a shell_tzresult = ('a, Error_monad.tztrace) result
-
-    type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
@@ -691,7 +722,7 @@ struct
 
   let () =
     let id = Format.asprintf "proto.%s.wrapper" Param.name in
-    register_wrapped_error_kind
+    Shell_error_monad.register_wrapped_error_kind
       (module Wrapped_error_monad)
       ~id
       ~title:("Error returned by protocol " ^ Param.name)
