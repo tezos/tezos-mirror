@@ -45,7 +45,7 @@ retrieved easily yet.
 New Version
 ~~~~~~~~~~~
 
-Whenever a new version of an RPC is added, there is a corresponding
+Whenever a new version of an RPC is added (see :ref:`RPC-versioning-dev-adding-an-rpc`), there is a corresponding
 entry in the file :src:`CHANGES.rst` in the release of Octez which
 includes the new version.
 

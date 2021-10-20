@@ -406,8 +406,8 @@ of an RPC.
 
 .. _RPC-versioning-dev-adding-an-rpc:
 
-How to Add a New Version to an RPC
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When to Add a New Version to an RPC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you modify the input or the output of an RPC, it is not always
 necessary to create a new version for the RPC. A new version should be
