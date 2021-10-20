@@ -1117,7 +1117,7 @@ struct
         ~predecessor
         ~timestamp
       >>=? fun value_of_key ->
-      Context.load_cache predecessor_context cache value_of_key
+      Context.load_cache predecessor predecessor_context cache value_of_key
 
     let begin_partial_application ~chain_id ~ancestor_context
         ~(predecessor : Block_header.t) ~predecessor_hash ~cache

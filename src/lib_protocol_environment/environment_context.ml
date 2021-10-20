@@ -502,7 +502,7 @@ module Context = struct
   end
 
   let load_cache (Context ctxt) mode builder =
-    (match mode with
+    match mode with
     | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
         if Context_hash.equal context_hash predecessor_context_hash then
           (*
@@ -526,7 +526,37 @@ module Context = struct
     | (`Load | `Lazy) as mode ->
         Cache.get_cache_layout (Context ctxt) >>= fun layout ->
         let cache = Environment_cache.from_layout layout in
-        Cache.load_cache (Context ctxt) cache mode builder)
+        Cache.load_cache (Context ctxt) cache mode builder
+
+  (**
+
+     The following reference contains a cache for the cache to avoid
+     reloading the cache from the context when it has been used in the
+     last cache-related operations.
+
+     The cache is indexed by the block hash that has produced it.
+
+     Notice that there is no guarantee that, after the execution of
+     [load_cache b], [cache_cache] contains the cache of the block
+     [b]. Indeed, a concurrent evaluation of [load_cache] may assign
+     [cache_cache] before we reach the [return] instruction. This
+     cannot endanger safety since the assignment to [cache_cache] is
+     atomic and maintains the invariant that the pair [(block_hash,
+     cache)] is consistent.
+
+  *)
+  let cache_cache : (Block_hash.t * cache) option ref = ref None
+
+  let load_cache block_hash (Context ctxt) mode builder =
+    (match !cache_cache with
+    | Some (block_hash', cached_cache)
+      when Block_hash.equal block_hash block_hash' ->
+        return cached_cache
+    | _ ->
+        cache_cache := None ;
+        load_cache (Context ctxt) mode builder >>=? fun cache ->
+        cache_cache := Some (block_hash, cache) ;
+        return cache)
     >>=? fun cache -> return (Context {ctxt with cache})
 
   (* misc *)

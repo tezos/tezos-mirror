@@ -438,6 +438,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     ~timestamp:shell.timestamp
   >>=? fun element_of_key ->
   Environment_context.Context.load_cache
+    (Store.Block.hash pred)
     predecessor_context
     `Lazy
     element_of_key

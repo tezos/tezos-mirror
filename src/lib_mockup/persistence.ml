@@ -202,6 +202,7 @@ module Make (Registration : Registration.S) = struct
             ~timestamp
           >>=? fun value_of_key ->
           Tezos_protocol_environment.Context.load_cache
+            predecessor
             persisted_mockup.rpc_context.context
             `Lazy
             value_of_key
