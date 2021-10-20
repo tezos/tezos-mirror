@@ -20,7 +20,7 @@ depends: [
   "alcotest-glue" {with-test}
   "tezos-hacl-glue-unix" {with-test}
   "alcotest-glue-unix" {with-test}
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.1.0" & <= "1.4.0" }
   "qcheck-alcotest" {with-test}
   "tezos-test-helpers" {with-test}
 ]
