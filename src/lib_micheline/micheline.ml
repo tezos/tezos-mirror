@@ -402,7 +402,7 @@ let%test_module "semantics_preservation" =
         match Sys.backend_type with
         | Other _ ->
             (* e.g. js_of_ocaml *)
-            (* choosen expiementaly to avoid stack_overflow *)
+            (* chosen experimentally to avoid stack_overflow *)
             sample_in_interval 0 (19 / (Bits.numbits depth + 1)) rng_state
         | Native | Bytecode ->
             (* Entirely ad-hoc *)
