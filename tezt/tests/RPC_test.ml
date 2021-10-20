@@ -102,7 +102,11 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
         match parameter_overrides with
         | None -> Lwt.return_none
         | Some overrides ->
-            let* file = Protocol.write_parameter_file ~protocol overrides in
+            let* file =
+              Protocol.write_parameter_file
+                ~base:(Either.right protocol)
+                overrides
+            in
             Lwt.return_some file
       in
       let bake =
