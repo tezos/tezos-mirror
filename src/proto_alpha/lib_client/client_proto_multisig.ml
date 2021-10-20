@@ -481,6 +481,8 @@ type multisig_contract_description = {
                        (list operation)). *)
 }
 
+let entrypoint_main = Entrypoint.of_string_strict_exn "main"
+
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
   [
@@ -492,7 +494,7 @@ let known_multisig_contracts : multisig_contract_description list =
          See docs/user/multisig.rst for more details. *)
       hash = multisig_script_hash;
       requires_chain_id = true;
-      main_entrypoint = Some "main";
+      main_entrypoint = Some entrypoint_main;
       generic = true;
     };
     {

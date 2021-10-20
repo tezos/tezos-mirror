@@ -695,12 +695,18 @@ let check_entrypoint entrypoints (name, (expected_ty, check)) =
              (name, Some (ty, Micheline.strip_locations expected_ty)))
       else Ok ()
 
-let action_to_entrypoint = function
-  | Transfer (_, _, _) -> "transfer"
-  | Approve (_, _) -> "approve"
-  | Get_allowance (_, _, _) -> "getAllowance"
-  | Get_balance (_, _) -> "getBalance"
-  | Get_total_supply _ -> "getTotalSupply"
+let action_to_entrypoint =
+  let transfer = Entrypoint.of_string_strict_exn "transfer" in
+  let approve = Entrypoint.of_string_strict_exn "approve" in
+  let get_allowance = Entrypoint.of_string_strict_exn "getAllowance" in
+  let get_balance = Entrypoint.of_string_strict_exn "getBalance" in
+  let get_total_supply = Entrypoint.of_string_strict_exn "getTotalSupply" in
+  function
+  | Transfer (_, _, _) -> transfer
+  | Approve (_, _) -> approve
+  | Get_allowance (_, _, _) -> get_allowance
+  | Get_balance (_, _) -> get_balance
+  | Get_total_supply _ -> get_total_supply
 
 let contract_has_fa12_interface :
     #Protocol_client_context.rpc_context ->

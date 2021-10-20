@@ -273,7 +273,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
            ~parameter)
   >>=? fun lambda ->
   parse lambda >>=? fun parameters ->
-  let entrypoint = "do" in
+  let entrypoint = entrypoint_do in
   return
     (Client_proto_context.build_transaction_operation
        ~amount:Tez.zero

@@ -53,7 +53,8 @@ let arb_batch_transfer_operation_encoding :
     let* storage_limit = opt gen_z in
     let* amount = string ?gen:None in
     let* arg = opt string in
-    let* entrypoint = opt string in
+    let* entrypoint = opt (string_size (1 -- 31)) in
+    let entrypoint = Option.map Entrypoint.of_string_strict_exn entrypoint in
     return
       Client_proto_context.
         {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint}

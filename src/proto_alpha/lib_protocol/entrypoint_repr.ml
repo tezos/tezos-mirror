@@ -23,11 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Invariants on the string: 1 <= length <= 31 *)
 include Compare.String
 
 let default = "default"
 
 let is_default name = name = default
+
+type of_string_result =
+  | Ok of t
+  | Too_long  (** length > 31 *)
+  | Got_default
+      (** Got exactly "default", which can be an error in some cases or OK in others *)
+
+let of_string str =
+  if str = "" then
+    (* The empty string always means the default entrypoint *)
+    Ok default
+  else if Compare.Int.(String.length str > 31) then Too_long
+  else if is_default str then Got_default
+  else Ok str
+
+let of_string_strict' str =
+  match of_string str with
+  | Too_long -> Error "Entrypoint name too long"
+  | Got_default -> Error "Unexpected annotation: default"
+  | Ok name -> Ok name
+
+let of_string_strict_exn str =
+  match of_string_strict' str with Ok v -> v | Error err -> invalid_arg err
 
 let root = "root"
 

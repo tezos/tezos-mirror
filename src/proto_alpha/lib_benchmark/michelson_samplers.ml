@@ -502,7 +502,10 @@ end)
             Alpha_context.Contract.encoding
             string
         in
-        let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
+        let ep =
+          Alpha_context.Entrypoint.of_string_strict_exn
+          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+        in
         (contract, ep)
 
     let chain_id rng_state =
