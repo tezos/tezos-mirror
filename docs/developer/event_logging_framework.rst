@@ -2,7 +2,7 @@ Using The Event Logging Framework
 ---------------------------------
 
 Developers of most modules should consider generating useful information
-for the :doc:`Logging subsystem <./user/logging>`.
+for the :doc:`Logging subsystem <../user/logging>`.
 
 In the Octez code base, logging is instrumented using an asynchronous event
 system, where log events are emitted in various part of the code and consumed by
@@ -28,7 +28,7 @@ fields of the events are still evaluated every time, which is usually not an
 issue since they are evaluated anyway by the application code itself).
 
 See for instance
-:src:`bin_node/node_config_file.ml` (search for the string "declare_"):
+:src:`src/bin_node/node_config_file.ml` (search for the string `declare_`):
 
 -  one declares typed-record events with
    ``Internal_event.Simple.declare_<number-of-fields>``,
@@ -45,7 +45,7 @@ The most generic API for defining events ``Internal_event.Make`` gives full
 expressive power and structure while being 100% lazy.
 
 See for instance:
-:src:`proto_alpha/lib_delegate/client_baking_blocks.ml` (module
+:src:`src/proto_alpha/lib_delegate/client_baking_blocks.ml` (module
 ``Block_seen_event``):
 
 -  one needs to call the functor
@@ -65,6 +65,6 @@ chosen URI-scheme should be unique.
 See for instance:
 
 -  The (simplest) module ``Lwt_log_sink``:
-   :src:`lib_event_logging/internal_event.ml`,
+   :src:`src/lib_event_logging/internal_event.ml`,
 -  or, the much more complex,
-   :src:`lib_stdlib_unix/file_descriptor_sink.ml`.
+   :src:`src/lib_stdlib_unix/file_descriptor_sink.ml`.
