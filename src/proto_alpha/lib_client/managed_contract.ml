@@ -233,8 +233,9 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
       return @@ build_lambda_for_transfer_to_implicit ~destination ~amount
   | Some _ ->
       cctxt#error
-        "Implicit accounts have no entrypoints. (targeted entrypoint %%%s on \
+        "Implicit accounts have no entrypoints. (targeted entrypoint %%%a on \
          contract %a)"
+        Entrypoint.pp
         entrypoint
         Contract.pp
         destination
@@ -248,9 +249,10 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        >>=? function
        | None ->
            cctxt#error
-             "Contract %a has no entrypoint named %s"
+             "Contract %a has no entrypoint named %a"
              Contract.pp
              destination
+             Entrypoint.pp
              entrypoint
        | Some parameter_type -> return parameter_type)
       >>=? fun parameter_type ->

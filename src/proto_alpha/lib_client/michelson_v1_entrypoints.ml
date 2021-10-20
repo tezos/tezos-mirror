@@ -79,20 +79,23 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
   | Ok (Some ty) ->
       (if emacs then
        cctxt#message
-         "@[<v 2>((entrypoint . %s) (type . %a))@]@."
+         "@[<v 2>((entrypoint . %a) (type . %a))@]@."
+         Entrypoint.pp
          entrypoint
          Michelson_v1_emacs.print_expr
          ty
       else
         cctxt#message
-          "@[<v 2>Entrypoint %s: %a@]@."
+          "@[<v 2>Entrypoint %a: %a@]@."
+          Entrypoint.pp
           entrypoint
           Michelson_v1_printer.print_expr
           ty)
       >>= fun () -> return_unit
   | Ok None ->
       cctxt#message
-        "@[<v 2>No entrypoint named %s%a%a@]@."
+        "@[<v 2>No entrypoint named %a%a%a@]@."
+        Entrypoint.pp
         entrypoint
         (Format.pp_print_option (fun ppf ->
              Format.fprintf ppf " for contract %a" Contract.pp))

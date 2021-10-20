@@ -156,9 +156,10 @@ let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
       >>=? function
       | None ->
           cctxt#error
-            "Contract %a has no entrypoint named %s"
+            "Contract %a has no entrypoint named %a"
             Contract.pp
             destination
+            Entrypoint.pp
             entrypoint
       | Some parameter_type -> return parameter_type)
 

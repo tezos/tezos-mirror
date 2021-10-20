@@ -135,7 +135,11 @@ let () =
       "A transaction made a call on an entrypoint expecting it to implement \
        the 'view' type."
     ~pp:(fun ppf entrypoint ->
-      Format.fprintf ppf "Entrypoint %s is not viewable." entrypoint)
+      Format.fprintf
+        ppf
+        "Entrypoint %a is not viewable."
+        Entrypoint.pp
+        entrypoint)
     Data_encoding.(obj1 (req "entrypoint" string))
     (function Not_a_viewable_entrypoint e -> Some e | _ -> None)
     (fun e -> Not_a_viewable_entrypoint e) ;

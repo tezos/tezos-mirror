@@ -47,6 +47,9 @@ val set_delegate : t
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
 
+(** Pretty-print an entrypoint *)
+val pp : Format.formatter -> t -> unit
+
 (** In-memory size of an entrypoint *)
 val in_memory_size : t -> Saturation_repr.may_saturate Saturation_repr.t
 

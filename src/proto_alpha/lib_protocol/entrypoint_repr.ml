@@ -37,6 +37,8 @@ let set_delegate = "set_delegate"
 
 let remove_delegate = "remove_delegate"
 
+let pp = Format.pp_print_string
+
 let in_memory_size name =
   Cache_memory_helpers.string_size_gen (String.length name)
 

@@ -307,8 +307,9 @@ let () =
     ~pp:(fun ppf (destination, entrypoint, parameter_ty, parameter) ->
       Format.fprintf
         ppf
-        "The entrypoint %s of contract %a called from a multisig contract is \
+        "The entrypoint %a of contract %a called from a multisig contract is \
          of type %a; the provided parameter %a is ill-typed."
+        Entrypoint.pp
         entrypoint
         Contract.pp
         destination

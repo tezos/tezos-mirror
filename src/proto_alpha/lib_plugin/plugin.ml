@@ -949,8 +949,9 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, typ) ->
         Format.fprintf
           ppf
-          "The view %s has type %a, it is not compatible with a TZIP-4 view \
+          "The view %a has type %a, it is not compatible with a TZIP-4 view \
            type."
+          Entrypoint.pp
           entrypoint
           Micheline_printer.print_expr
           (Micheline_printer.printable
@@ -970,8 +971,9 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, callback) ->
         Format.fprintf
           ppf
-          "The view %s never initiated a transaction to the given callback \
+          "The view %a never initiated a transaction to the given callback \
            contract %a."
+          Entrypoint.pp
           entrypoint
           Contract.pp
           callback)
@@ -989,9 +991,10 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, callback) ->
         Format.fprintf
           ppf
-          "The view %s initiated a list of operations while the TZIP-4 \
+          "The view %a initiated a list of operations while the TZIP-4 \
            standard expects only a transaction to the given callback contract \
            %a."
+          Entrypoint.pp
           entrypoint
           Contract.pp
           callback)
