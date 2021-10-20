@@ -479,7 +479,8 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
         (optional, default value is 20).
 
     - [test_data_path] configures the folder in which large data are stored
-      (optional, default value is "/s3data" which is the folder used by default executor).
+      (optional, default value is "/s3data" which is the folder used by
+      the default executor).
 
     Note that for Grafana dashboards to be updated, InfluxDB also needs to be configured,
     because measurements in Grafana queries are prefixed with the measurement prefix

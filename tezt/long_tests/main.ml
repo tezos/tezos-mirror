@@ -56,5 +56,6 @@ let () =
   Qcheck_rpc.register ~executors:default_executors () ;
   Prt_client.register ~executors:default_executors () ;
   Script_cache.register ~executors:default_executors () ;
+  Block_validation.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()
