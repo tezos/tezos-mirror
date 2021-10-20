@@ -40,7 +40,8 @@ type error_category =
 
 type error = TzCore.error = ..
 
-include Sig.CORE with type error := error
+include
+  Sig.CORE with type error := error and type error_category := error_category
 
 include Sig.WITH_WRAPPED with type error := error
 

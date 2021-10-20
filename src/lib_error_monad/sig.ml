@@ -24,22 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Categories of error *)
-type error_category =
-  [ `Branch  (** Errors that may not happen in another context *)
-  | `Temporary  (** Errors that may not happen in a later context *)
-  | `Permanent  (** Errors that will happen no matter the context *) ]
+module type ERROR_CATEGORY = sig
+  type t
 
-let string_of_category = function
-  | `Permanent -> "permanent"
-  | `Temporary -> "temporary"
-  | `Branch -> "branch"
+  val default_category : t
 
-let combine_category c1 c2 =
-  match (c1, c2) with
-  | (`Permanent, _) | (_, `Permanent) -> `Permanent
-  | (`Branch, _) | (_, `Branch) -> `Branch
-  | (`Temporary, `Temporary) -> `Temporary
+  val string_of_category : t -> string
+
+  val classify : t -> Error_classification.t
+end
 
 module type PREFIX = sig
   (** The identifier for parts of the code that need their own error monad. It
@@ -50,7 +43,11 @@ module type PREFIX = sig
 end
 
 module type CORE = sig
+  type error_category
+
   type error = ..
+
+  val string_of_category : error_category -> string
 
   val error_encoding : error Data_encoding.t
 
@@ -93,7 +90,7 @@ module type CORE = sig
     unit
 
   (** Classify an error using the registered kinds *)
-  val classify_error : error -> error_category
+  val classify_error : error -> Error_classification.t
 
   (** Catch all error when 'serializing' an error. *)
   type error +=
@@ -161,8 +158,8 @@ module type WITH_WRAPPED = sig
         and [None] otherwise *)
     val unwrap : error -> unwrapped option
 
-    (** [wrap e] returns a general [error] from a specific [unwrapped] error
-    [e] *)
+    (** [wrap e] returns a general [error] from a specific [unwrapped]
+        error [e] *)
     val wrap : unwrapped -> error
   end
 
@@ -223,7 +220,7 @@ module type MONAD_EXTENSION = sig
 
   type 'a tzresult = ('a, tztrace) result
 
-  val classify_trace : tztrace -> error_category
+  val classify_trace : tztrace -> Error_classification.t
 
   val return : 'a -> ('a, 'e) result Lwt.t
 

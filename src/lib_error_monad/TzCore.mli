@@ -24,8 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error_category =
+  [ `Branch  (** Errors that may not happen in another context *)
+  | `Temporary  (** Errors that may not happen in a later context *)
+  | `Permanent  (** Errors that will happen no matter the context *) ]
+
 type error = ..
 
-include Sig.CORE with type error := error
+include
+  Sig.CORE with type error := error and type error_category := error_category
 
 include Sig.WITH_WRAPPED with type error := error

@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error_category = [`Branch | `Temporary | `Permanent]
+type error_category = [`Branch | `Temporary | `Permanent | `Outdated]
 
 (** CORE : errors *)
 
@@ -46,8 +46,6 @@ val register_error_kind :
   (error -> 'err option) ->
   ('err -> error) ->
   unit
-
-val classify_error : error -> error_category
 
 val json_of_error : error -> Data_encoding.json
 

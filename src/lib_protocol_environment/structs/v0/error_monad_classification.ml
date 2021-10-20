@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,36 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tezos Protocol Implementation - Error Monad *)
+type t =
+  [ `Branch  (** Errors that may not happen in another context *)
+  | `Temporary  (** Errors that may not happen in a later context *)
+  | `Permanent  (** Errors that will happen no matter the context *) ]
 
-(*-- Error classification ----------------------------------------------------*)
+let default_category = `Temporary
 
-module Core_category = struct
-  (* The categories for core errors are not used. This is kept to
-     avoid a large diff, but this should be replaced by 'unit' at some point *)
+let string_of_category = function
+  | `Permanent -> "permanent"
+  | `Temporary -> "temporary"
+  | `Branch -> "branch"
 
-  (** Categories of error *)
-  type t =
-    [ `Branch  (** Errors that may not happen in another context *)
-    | `Temporary  (** Errors that may not happen in a later context *)
-    | `Permanent  (** Errors that will happen no matter the context *) ]
-
-  let default_category = `Temporary
-
-  let string_of_category = function
-    | `Permanent -> "permanent"
-    | `Temporary -> "temporary"
-    | `Branch -> "branch"
-
-  let classify = function
-    | `Permanent -> Error_classification.Permanent
-    | `Temporary -> Temporary
-    | `Branch -> Branch
-end
-
-include
-  Core_maker.Make
-    (struct
-      let id = ""
-    end)
-    (Core_category)
+let classify = function
+  | `Permanent -> Tezos_error_monad.Error_classification.Permanent
+  | `Temporary -> Temporary
+  | `Branch -> Branch
