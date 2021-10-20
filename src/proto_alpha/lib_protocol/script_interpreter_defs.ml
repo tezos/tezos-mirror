@@ -36,6 +36,7 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
+open Local_gas_counter
 
 (*
 
@@ -374,94 +375,18 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
 
 (*
 
-   Gas update and check for gas exhaustion
-   =======================================
+   [step] calls [consume_instr] at the beginning of each execution step.
 
-   Each instruction has a cost. The runtime subtracts this cost
-   from an amount of gas made available for the script execution.
-
-   Updating the gas counter is a critical aspect to Michelson
-   execution because it is done at each execution step.
-
-   For this reason, the interpreter must read and update the
-   gas counter as quickly as possible. Hence, the gas counter
-   should be stored in a machine register. To motivate the
-   OCaml compiler to make that choice, we represent the gas
-   counter as a local parameter of the execution [step]
-   function.
+   [Local_gas_counter.consume] is used in the implementation of
+   [IConcat_string] and [IConcat_bytes] because in that special cases, the
+   cost is expressed with respect to a non-constant-time computation on the
+   inputs.
 
 *)
 
-type local_gas_counter = int
-
-(*
-
-   The gas counter stored in the context is desynchronized with the
-   [local_gas_counter] used in the interpretation loop. When we have
-   to call a gas-consuming function which lives outside the
-   interpreter, we must update the context so that it carries an
-   up-to-date gas counter. Similarly, when we return from such a
-   function, the [local_gas_counter] must be updated as well.
-
-   To statically track these points where the context's gas counter
-   must be updated, we introduce a type for outdated contexts. The
-   [step] function carries an [outdated_context]. When an external
-   function needs a [context], the typechecker points out the need for
-   a conversion: this forces us to either call [update_context], or
-   better, when this is possible, the function
-   [use_gas_counter_in_ctxt].
-
-*)
-type outdated_context = OutDatedContext of context [@@unboxed]
-
-let update_context local_gas_counter = function
-  | OutDatedContext ctxt ->
-      Gas.update_remaining_operation_gas
-        ctxt
-        (Saturation_repr.safe_int local_gas_counter)
-  [@@ocaml.inline always]
-
-let update_local_gas_counter ctxt =
-  (Gas.remaining_operation_gas ctxt :> int)
-  [@@ocaml.inline always]
-
-let outdated ctxt = OutDatedContext ctxt [@@ocaml.inline always]
-
-let context_from_outdated_context (OutDatedContext ctxt) =
-  ctxt
-  [@@ocaml.inline always]
-
-let use_gas_counter_in_ctxt ctxt local_gas_counter f =
-  let ctxt = update_context local_gas_counter ctxt in
-  f ctxt >>=? fun (y, ctxt) ->
-  return (y, outdated ctxt, update_local_gas_counter ctxt)
-  [@@ocaml.inline always]
-
-(*
-
-   [step] calls [consume] at the beginning of each execution step.
-
-   [consume'] is used in the implementation of [IConcat_string]
-   and [IConcat_bytes] because in that special cases, the cost
-   is expressed with respect to a non-constant-time computation
-   on the inputs.
-
-*)
-
-let update_and_check gas_counter (cost : Gas.cost) =
-  let gas_counter = gas_counter - (cost :> int) in
-  if Compare.Int.(gas_counter < 0) then None else Some gas_counter
-  [@@ocaml.inline always]
-
-let consume local_gas_counter k accu stack =
+let consume_instr local_gas_counter k accu stack =
   let cost = cost_of_instr k accu stack in
   update_and_check local_gas_counter cost
-  [@@ocaml.inline always]
-
-let consume' ctxt local_gas_counter cost =
-  match update_and_check local_gas_counter cost with
-  | None -> Gas.gas_exhausted_error (update_context local_gas_counter ctxt)
-  | Some local_gas_counter -> Ok local_gas_counter
   [@@ocaml.inline always]
 
 let consume_control local_gas_counter ks =
