@@ -68,8 +68,6 @@ type error += Duplicate_entrypoint of Entrypoint.t
 
 type error += Unreachable_entrypoint of prim list
 
-type error += Entrypoint_name_too_long of string
-
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
 

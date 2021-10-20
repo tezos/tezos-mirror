@@ -241,17 +241,6 @@ let () =
     (obj1 (req "path" string))
     (function Duplicate_entrypoint entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> Duplicate_entrypoint entrypoint) ;
-  (* Entrypoint name too long *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.entrypoint_name_too_long"
-    ~title:"Entrypoint name too long (type error)"
-    ~description:
-      "An entrypoint name exceeds the maximum length of 31 characters."
-    (obj1 (req "name" string))
-    (function
-      | Entrypoint_name_too_long entrypoint -> Some entrypoint | _ -> None)
-    (fun entrypoint -> Entrypoint_name_too_long entrypoint) ;
   (* Unexpected contract *)
   register_error_kind
     `Permanent

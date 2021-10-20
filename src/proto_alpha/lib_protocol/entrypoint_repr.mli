@@ -47,6 +47,8 @@ val set_delegate : t
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
 
+type error += Name_too_long of string
+
 (** Converts a string to an entrypoint.
     Fails with [Invalid_arg] if the string is too long or is "default".
     Converts "" to "default". *)

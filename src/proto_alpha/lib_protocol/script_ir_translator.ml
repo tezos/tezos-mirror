@@ -1966,7 +1966,7 @@ let find_entrypoint (type full error_trace)
     Error
       (match error_details with
       | Fast -> (Inconsistent_types_fast : error_trace)
-      | Informative -> trace_of_error @@ Entrypoint_name_too_long entrypoint)
+      | Informative -> trace_of_error @@ Entrypoint.Name_too_long entrypoint)
   else
     match root_name with
     | Some (Field_annot root_name)
@@ -2022,7 +2022,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
     | Some (Field_annot name) ->
         let name = (name :> string) in
         if Compare.Int.(String.length name > 31) then
-          error (Entrypoint_name_too_long name)
+          error (Entrypoint.Name_too_long name)
         else if Entrypoint.Set.mem name all then
           error (Duplicate_entrypoint name)
         else ok (first_unreachable, Entrypoint.Set.add name all)
@@ -2283,7 +2283,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       with
       | Some (c, entrypoint) -> (
           if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
+            error (Entrypoint.Name_too_long entrypoint)
           else
             match entrypoint with
             | "" -> ok ((c, "default"), ctxt)
@@ -2300,7 +2300,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       | Some pos -> (
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
+          if Compare.Int.(len > 31) then error (Entrypoint.Name_too_long name)
           else
             match (String.sub s 0 pos, name) with
             | (addr, "") -> ok (addr, "default")
@@ -4795,7 +4795,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           if Compare.String.(entrypoint = "default") then
             error (Unexpected_annotation loc)
           else if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
+            error (Entrypoint.Name_too_long entrypoint)
           else Ok entrypoint)
       >>?= fun entrypoint ->
       let instr =
