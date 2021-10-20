@@ -34,6 +34,10 @@ Node
 -  Fixed an issue when reconstructing a storage with missing block or
    operations metadata hashes.
 
+-  Fixed an issue in the store were the table in charge of maintaining
+   the associations between a protocol and its activation block was
+   not well updated.
+
 Client
 ------
 
