@@ -29,7 +29,7 @@ Node
   3. ``/workers/chain_validators/<chain_id>``,
   4. ``/workers/chain_validator/<chain_id>/peer_validators``,
   5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
-  6. ``/workers/prevalidators``. 
+  6. ``/workers/prevalidators``.
   The field ``backlog`` is removed. Those logs can be obtained via the
   node itself. Logging can be redirected to a file via the option
   ``--log-file``. External tools such as ``logrotate`` can be used to
@@ -61,6 +61,37 @@ Node
    should make the `distributed_db` RAM consumption strongly
    correlated to the one of the mempool.
 
+-  Improved the snapshot export mechanism by reducing both the export
+   time and the memory footprint.
+
+-  Added new RPCs to inspect the storage status:
+
+   -  GET ``chains/main/levels/checkpoint``: checkpoint block hash and
+      level.
+   -  GET ``chains/main/levels/savepoint``: savepoint block hash and
+      level.
+   -  GET ``chains/main/levels/caboose``: caboose block hash and
+      level.
+   -  GET ``config/history_mode``: history mode of the node.
+
+-  Deprecated the ``chains/main/checkpoint`` RPC.
+
+-  The ``tezos-admin-client show current checkpoint`` command now only
+   outputs the current checkpoint. It no longer outputs the savepoint,
+   caboose and history mode.
+
+-  Fixed an issue in the store were the table in charge of maintaining
+   the associations between a protocol and its activation block was not
+   well updated.
+
+-  Fixed wrong behaviour when updating the additional cycles of the
+   node's history mode.
+
+-  Removed redundant event while setting a new head.
+
+-  Fixed wrong behaviour when merging the store after a rolling
+   snapshot import.
+
 Client
 ------
 
@@ -83,7 +114,7 @@ Miscellaneous
 -------------
 
 -  Made the ``file-descriptor-{path,stdout,stderr}://`` event-logging
-   sink more configurable (e.g. filtering per level and per section). The 
+   sink more configurable (e.g. filtering per level and per section). The
    environment variable ``TEZOS_NODE_HOSTNAME`` used for the output of events
    was renamed to the more appropriate ``TEZOS_EVENT_HOSTNAME``.
 
@@ -157,37 +188,6 @@ Node
    since Edo and Florence have been replaced by Granada.
 
 -  Added a built-in network alias for Hangzhounet.
-
--  Improved the snapshot export mechanism by reducing both the export
-   time and the memory footprint.
-
--  Added new RPCs to inspect the storage status:
-
-   -  GET ``chains/main/levels/checkpoint``: checkpoint block hash and
-      level.
-   -  GET ``chains/main/levels/savepoint``: savepoint block hash and
-      level.
-   -  GET ``chains/main/levels/caboose``: caboose block hash and
-      level.
-   -  GET ``config/history_mode``: history mode of the node.
-
--  Deprecated the ``chains/main/checkpoint`` RPC.
-
--  The ``tezos-admin-client show current checkpoint`` command now
-   only outputs the current checkpoint. It no longer outputs the savepoint,
-   caboose and history mode.
-
--  Fixed an issue in the store were the table in charge of maintaining
-   the associations between a protocol and its activation block was
-   not well updated.
-
--  Fixed wrong behaviour when updating the additional cycles of the
-   node's history mode.
-
--  Removed redundant event while setting a new head.
-
--  Fixed wrong behaviour when merging the store after a rolling
-   snapshot import.
 
 Client
 ------
