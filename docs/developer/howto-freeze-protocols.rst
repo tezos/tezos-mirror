@@ -51,7 +51,7 @@ Remove Testnets From ``tezos-docker-manager.sh``
 ------------------------------------------------
 
 Mentions of the protocol's testnests should be removed from the script
-:src:`script/ci/tezos-docker-manager.sh`.
+:src:`scripts/tezos-docker-manager.sh`.
 
 Remove Testnet From ``bin_node``
 --------------------------------
@@ -64,7 +64,7 @@ The protocol plugin registration module should be removed from
 :src:`src/bin_node/dune` and :src:`src/bin_node/tezos-node.opam`.
 
 Remove Protocol From Python Tests of Current Protocol
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------------------
 
 Tests ``test_voting_full.py`` and ``test_migration.py`` from the current
 protocol should be removed. Any mention of the protocol in
@@ -102,4 +102,3 @@ In particular it should mention:
 
 - that the protocol's daemons were removed;
 - that the corresponding ``--network`` alias was removed.
-

@@ -356,7 +356,7 @@ to call it over a public network. If the answer is yes, you should probably
 consider adding the new endpoint to the ACL. If there are also risks related to
 calling the endpoint by a potentially malicious user, they should be weighed
 when making the decision too. There are no simple answers here. Remember that
-all new endpoints are **blocked be default** unless explicitly added to the ACL.
+all new endpoints are **blocked by default** unless explicitly added to the ACL.
 
 When changing an existing public RPC endpoint it is also important to consider,
 how does the change impact possible risks related to calling the endpoint.
@@ -405,6 +405,7 @@ Notice that we use only one version number for both input and output
 of an RPC.
 
 .. _RPC-versioning-dev-adding-an-rpc:
+
 How to Add a New Version to an RPC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -452,7 +453,7 @@ like the two examples below.
 
 .. code-block:: json
 
-    {     
+    {
       "bar": {
         "baz": 10
       }

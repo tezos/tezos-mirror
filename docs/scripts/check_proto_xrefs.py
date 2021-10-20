@@ -76,7 +76,7 @@ for file in glob.glob(f"{directory}/*.rst"):
 ref_pat = re.compile(r':ref:`([^`]+)`', flags=re.DOTALL)
 ref_lbl_desc_pat = re.compile(r'<(.+)>$')
 ref_file_pat = re.compile(r'[.](rst|html)$')
-sphinx_id_pat = re.compile(r'[\w-]+')
+sphinx_id_pat = re.compile(r'[\w.-]+')
 for file in glob.glob(f"{directory}/*.rst"):
     with open(file, mode="r", encoding="utf-8") as f:
         txt = f.read()  # read all file contents

@@ -198,6 +198,7 @@ in the :ref:`introduction <howtoget>`.
    developer/error_monad
    developer/michelson_anti_patterns
    developer/entering_alpha
+   developer/howto-freeze-protocols
    developer/protocol_environment
    developer/protocol_environment_upgrade
    developer/event_logging_framework
