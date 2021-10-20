@@ -548,3 +548,7 @@ module Cache = struct
       let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
     end)
 end
+
+module Ticket_balance = struct
+  include Ticket_storage
+end

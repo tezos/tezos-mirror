@@ -1327,3 +1327,14 @@ module Liquidity_baking = struct
       end)
       (Contract_repr)
 end
+
+module Ticket_balance = struct
+  module Name = struct
+    let name = ["ticket_balance"]
+  end
+
+  module Sub_context = Make_subcontext (Registered) (Raw_context) (Name)
+  module Index = Make_index (Script_expr_hash)
+  module Table =
+    Make_indexed_carbonated_data_storage (Sub_context) (Index) (Encoding.Z)
+end

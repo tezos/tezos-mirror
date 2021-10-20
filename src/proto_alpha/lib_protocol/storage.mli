@@ -530,3 +530,19 @@ module Global_constants : sig
        and type key = Script_expr_hash.t
        and type value = Script_repr.expr
 end
+
+(** This module exposes a balance table for tracking ticket ownership.
+    The table is a mapping from keys to values where the keys consist of a
+    hashed representation of:
+      - A ticketer, i.e. the creator of the ticket
+      - The content of a the ticket
+      - The contract that owns some amount of the ticket
+    The values of the table are the amounts owned by each key.
+ *)
+module Ticket_balance : sig
+  module Table :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Z.t
+end

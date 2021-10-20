@@ -68,5 +68,6 @@ let () =
       ("temp big maps", Test_temp_big_maps.tests);
       ("timelock", Test_timelock.tests);
       ("script typed ir size", Test_script_typed_ir_size.tests);
+      ("ticket storage", Test_ticket_storage.tests);
     ]
   |> Lwt_main.run

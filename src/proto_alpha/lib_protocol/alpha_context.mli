@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -2083,4 +2084,26 @@ module Liquidity_baking : sig
     escape_vote:bool ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list * escape_ema) tzresult Lwt.t
+end
+
+(** This module re-exports functions from [Ticket_storage]. See
+    documentation of the functions there.
+ *)
+module Ticket_balance : sig
+  type key_hash
+
+  val script_expr_hash_of_key_hash : key_hash -> Script_expr_hash.t
+
+  val make_key_hash :
+    context ->
+    ticketer:Script.node ->
+    typ:Script.node ->
+    contents:Script.node ->
+    owner:Script.node ->
+    (key_hash * context) tzresult
+
+  val adjust_balance :
+    context -> key_hash -> delta:Z.t -> (Z.t * context) tzresult Lwt.t
+
+  val get_balance : context -> key_hash -> (Z.t option * context) tzresult Lwt.t
 end
