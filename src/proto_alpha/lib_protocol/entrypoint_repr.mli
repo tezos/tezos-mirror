@@ -26,6 +26,9 @@
 (** An entrypoint is a string of at most 31 characters *)
 type t = string
 
+(** Total ordering of entrypoints *)
+val compare : t -> t -> int
+
 (** Default entrypoint "default" *)
 val default : t
 
