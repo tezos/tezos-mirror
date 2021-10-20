@@ -182,11 +182,6 @@ update_gitlab_ci_yml () {
         echo "$repeated"
         exit 1
     fi
-    # Update generated test sections
-    for script in scripts/update_*_test.sh; do
-        echo "Running $script..."
-        $script
-    done
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
