@@ -51,7 +51,7 @@ let init_light ~protocol =
   let mode_received = Client.get_mode client in
   let is_light_mode = function Client.Light _ -> true | _ -> false in
   assert (is_light_mode mode_received) ;
-  Client.set_mode (Client.Client (Some (Node node0))) client ;
+  Client.set_mode (Client.Client (Some (Node node0), None)) client ;
   let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap1.alias client in
   let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap2.alias client in
   let* level_json = get_current_level ~endpoint client in

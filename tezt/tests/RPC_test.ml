@@ -53,7 +53,7 @@ let node_wait_for_level level client =
           | _ -> Lwt.return_unit)
         nodes
   | Mockup -> assert false (* This file does not use Mockup mode *)
-  | Client (Some (Client.Node node)) | Proxy (Client.Node node) ->
+  | Client (Some (Client.Node node), _) | Proxy (Client.Node node) ->
       let* _ = Node.wait_for_level node level in
       Lwt.return_unit
   | Client _ | Proxy _ -> Lwt.return_unit
@@ -841,6 +841,20 @@ let test_blacklist address () =
   let* _success_resp = Client.rpc GET ["network"; "connections"] client in
   unit
 
+(* Test RPC with binary mode. *)
+let start_binary address =
+  let node = Node.create ~rpc_host:address [] in
+  let endpoint = Client.(Node node) in
+  let* () = Node.config_init node [] in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  Client.init ~endpoint ~media_type:Binary ()
+
+let test_client_binary_mode address () =
+  let* client = start_binary address in
+  let* _success_resp = Client.rpc GET ["network"; "connections"] client in
+  unit
+
 let test_no_service_at_valid_prefix address () =
   let node = Node.create ~rpc_host:address [] in
   let endpoint = Client.(Node node) in
@@ -917,6 +931,11 @@ let register ~protocols =
         ~title:(mk_title "blacklist" addr)
         ~tags:["rpc"; "acl"]
         (test_blacklist addr) ;
+      Test.register
+        ~__FILE__
+        ~title:(mk_title "client binary mode" addr)
+        ~tags:["rpc"; "client"; "binary"]
+        (test_client_binary_mode addr) ;
       Test.register
         ~__FILE__
         ~title:(mk_title "no_service_at_valid_prefix" addr)

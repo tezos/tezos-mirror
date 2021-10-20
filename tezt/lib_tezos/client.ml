@@ -25,12 +25,14 @@
 
 type endpoint = Node of Node.t | Proxy_server of Proxy_server.t
 
+type media_type = Json | Binary | Any
+
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Proxy_server ps -> Proxy_server.rpc_port ps
 
 type mode =
-  | Client of endpoint option
+  | Client of endpoint option * media_type option
   | Mockup
   | Light of float * endpoint list
   | Proxy of endpoint
@@ -85,8 +87,14 @@ let create_with_mode ?(path = Constant.tezos_client)
   in
   {path; admin_path; name; color; base_dir; mode}
 
-let create ?path ?admin_path ?name ?color ?base_dir ?endpoint () =
-  create_with_mode ?path ?admin_path ?name ?color ?base_dir (Client endpoint)
+let create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
+  create_with_mode
+    ?path
+    ?admin_path
+    ?name
+    ?color
+    ?base_dir
+    (Client (endpoint, media_type))
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
 
@@ -99,8 +107,8 @@ let sources_file client =
   | Light _ -> client.base_dir // "sources.json"
 
 let mode_to_endpoint = function
-  | Client None | Mockup | Light (_, []) -> None
-  | Client (Some endpoint) | Light (_, endpoint :: _) | Proxy endpoint ->
+  | Client (None, _) | Mockup | Light (_, []) -> None
+  | Client (Some endpoint, _) | Light (_, endpoint :: _) | Proxy endpoint ->
       Some endpoint
 
 (* [?endpoint] can be used to override the default node stored in the client.
@@ -115,6 +123,15 @@ let endpoint_arg ?(endpoint : endpoint option) client =
   | None -> []
   | Some e ->
       ["--endpoint"; sf "http://%s:%d" (address ~hostname:true e) (rpc_port e)]
+
+let media_type_arg client =
+  match client with
+  | Client (_, Some media_type) -> (
+      match media_type with
+      | Json -> ["--media-type"; "json"]
+      | Binary -> ["--media-type"; "binary"]
+      | Any -> ["--media-type"; "any"])
+  | _ -> []
 
 let mode_arg client =
   match client.mode with
@@ -139,7 +156,7 @@ let spawn_command ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false)
     ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
-  @ mode_arg client @ base_dir_arg client @ command
+  @ media_type_arg client.mode @ mode_arg client @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -811,8 +828,10 @@ let spawn_migrate_mockup ~next_protocol client =
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
 
-let init ?path ?admin_path ?name ?color ?base_dir ?endpoint () =
-  let client = create ?path ?admin_path ?name ?color ?base_dir ?endpoint () in
+let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
+  let client =
+    create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()
+  in
   let* () =
     Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
   in
@@ -824,7 +843,13 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
      for `create mockup` (as it is not required). We wanna do the same here.
      Hence `Client None` here: *)
   let client =
-    create_with_mode ?path ?admin_path ?name ?color ?base_dir (Client None)
+    create_with_mode
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      (Client (None, None))
   in
   let* () = create_mockup ?sync_mode ?constants ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
@@ -936,7 +961,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       let endpoint = Node node in
       let mode =
         match mode with
-        | `Client -> Client (Some endpoint)
+        | `Client -> Client (Some endpoint, None)
         | `Proxy -> Proxy endpoint
       in
       let client =
