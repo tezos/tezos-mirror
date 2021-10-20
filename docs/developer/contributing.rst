@@ -580,6 +580,8 @@ pitfalls a code reviewer should avoid.
   have a different reaction to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
+When reviewing MRs involving documentation, you may check the built documentation directly within the Gitlab interface, see :ref:`build_doc_ci`.
+
 .. _merge_bot:
 
 The Merge-Request Bot
