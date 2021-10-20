@@ -65,6 +65,7 @@
         "Vote_storage",
         "Commitment_storage",
         "Fees_storage",
+        "Ticket_storage",
         "Liquidity_baking_repr",
         "Liquidity_baking_cpmm",
         "Liquidity_baking_lqt",
