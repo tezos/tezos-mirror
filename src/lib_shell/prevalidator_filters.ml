@@ -33,22 +33,43 @@ module type FILTER = sig
 
     val default_config : config
 
+    type state
+
+    val init :
+      config ->
+      ?validation_state:Proto.validation_state ->
+      predecessor:Tezos_base.Block_header.t ->
+      unit ->
+      state tzresult Lwt.t
+
+    val on_flush :
+      config ->
+      state ->
+      ?validation_state:Proto.validation_state ->
+      predecessor:Tezos_base.Block_header.t ->
+      unit ->
+      state tzresult Lwt.t
+
     val pre_filter :
       config ->
+      filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      [ `Undecided
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace ]
+      ([ `Undecided
+       | `Branch_delayed of tztrace
+       | `Branch_refused of tztrace
+       | `Refused of tztrace
+       | `Outdated of tztrace ]
+      * state)
+      Lwt.t
 
     val post_filter :
       config ->
+      filter_state:state ->
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
       Proto.operation_data * Proto.operation_receipt ->
-      bool Lwt.t
+      (bool * state) Lwt.t
   end
 
   module RPC : sig
@@ -66,10 +87,18 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let default_config = ()
 
-    let pre_filter _ ?validation_state_before:_ _ = `Undecided
+    type state = unit
 
-    let post_filter _ ~validation_state_before:_ ~validation_state_after:_ _ =
-      Lwt.return_true
+    let init _ ?validation_state:_ ~predecessor:_ () = return_unit
+
+    let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
+
+    let pre_filter _ ~filter_state ?validation_state_before:_ _ =
+      Lwt.return (`Undecided, filter_state)
+
+    let post_filter _ ~filter_state ~validation_state_before:_
+        ~validation_state_after:_ _ =
+      Lwt.return (true, filter_state)
   end
 
   module RPC = struct

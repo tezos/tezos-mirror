@@ -34,22 +34,43 @@ module type FILTER = sig
 
     val default_config : config
 
+    type state
+
+    val init :
+      config ->
+      ?validation_state:Proto.validation_state ->
+      predecessor:Tezos_base.Block_header.t ->
+      unit ->
+      state tzresult Lwt.t
+
+    val on_flush :
+      config ->
+      state ->
+      ?validation_state:Proto.validation_state ->
+      predecessor:Tezos_base.Block_header.t ->
+      unit ->
+      state tzresult Lwt.t
+
     val pre_filter :
       config ->
+      filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      [ `Undecided
-      | `Branch_delayed of tztrace
-      | `Branch_refused of Error_monad.tztrace
-      | `Refused of Error_monad.tztrace
-      | `Outdated of tztrace ]
+      ([ `Undecided
+       | `Branch_delayed of tztrace
+       | `Branch_refused of tztrace
+       | `Refused of tztrace
+       | `Outdated of tztrace ]
+      * state)
+      Lwt.t
 
     val post_filter :
       config ->
+      filter_state:state ->
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
       Proto.operation_data * Proto.operation_receipt ->
-      bool Lwt.t
+      (bool * state) Lwt.t
   end
 
   module RPC : sig
