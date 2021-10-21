@@ -27,27 +27,28 @@ let cleanup model_name =
   let open Files in
   let inference_root = Files.(working_dir // inference_results_dir) in
   let files =
-    [ inference_root // solution_csv model_name;
+    [
+      inference_root // solution_csv model_name;
       inference_root // solution_bin model_name;
       inference_root // report_tex model_name;
-      inference_root // dep_graph model_name ]
+      inference_root // dep_graph model_name;
+    ]
   in
   List.iter Files.unlink_if_present files
 
 let rec retry ?max_tries closure =
   Lwt.catch closure (fun e ->
       match max_tries with
-      | None ->
-          retry closure
-      | Some k ->
-          if k <= 0 then raise e else retry ~max_tries:(k - 1) closure)
+      | None -> retry closure
+      | Some k -> if k <= 0 then raise e else retry ~max_tries:(k - 1) closure)
 
 let main () =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
   let inference_root = Files.(working_dir // inference_results_dir) in
   let models =
-    [ "interpreter";
+    [
+      "interpreter";
       "gas_translator_model";
       "size_translator_model";
       "micheline";
@@ -60,7 +61,8 @@ let main () =
       "Global_constants_storage_expand_constant_branch";
       "Global_constants_storage_expand_no_constant_branch";
       "cache_model";
-      "ir_size_model"; ]
+      "ir_size_model";
+    ]
   in
   Lwt_list.iter_s
     (fun model_name ->

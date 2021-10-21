@@ -57,15 +57,14 @@ let spawn_command snoop command =
 (* Benchmark command *)
 
 let string_of_determinizer = function
-  | Mean ->
-      "mean"
-  | Percentile i ->
-      Printf.sprintf "percentile@%d" i
+  | Mean -> "mean"
+  | Percentile i -> Printf.sprintf "percentile@%d" i
 
 let benchmark_command ~bench_name ~bench_num ~save_to ~nsamples ~determinizer
     ?seed ?config_dir ?csv_dump () =
   let command =
-    [ "benchmark";
+    [
+      "benchmark";
       bench_name;
       "and";
       "save";
@@ -76,17 +75,16 @@ let benchmark_command ~bench_name ~bench_num ~save_to ~nsamples ~determinizer
       "--bench-num";
       string_of_int bench_num;
       "--nsamples";
-      string_of_int nsamples ]
+      string_of_int nsamples;
+    ]
   in
   let seed =
     match seed with None -> [] | Some seed -> ["--seed"; string_of_int seed]
   in
   let config_dir =
     match config_dir with
-    | None ->
-        []
-    | Some config_dir ->
-        ["--config-dir"; config_dir]
+    | None -> []
+    | Some config_dir -> ["--config-dir"; config_dir]
   in
   let csv_dump =
     match csv_dump with None -> [] | Some csv -> ["--dump-csv"; csv]
@@ -132,24 +130,20 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
         if positive then ["lasso"; "--lasso-positive"] else ["lasso"]
     | Ridge {positive} ->
         if positive then ["ridge"; "--ridge-positive"] else ["ridge"]
-    | NNLS ->
-        ["nnls"]
+    | NNLS -> ["nnls"]
   in
   let report =
     match report with
-    | None ->
-        []
-    | Some report_file ->
-        ["--report"; report_file]
+    | None -> []
+    | Some report_file -> ["--report"; report_file]
   in
   let graph =
     match graph with
-    | None ->
-        []
-    | Some graph_file ->
-        ["--dot-file"; graph_file]
+    | None -> []
+    | Some graph_file -> ["--dot-file"; graph_file]
   in
-  [ "infer";
+  [
+    "infer";
     "parameters";
     "for";
     "model";
@@ -157,7 +151,8 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
     "on";
     "data";
     workload_data;
-    "using" ]
+    "using";
+  ]
   @ regression_method
   @ ["--dump-csv"; dump_csv; "--save-solution"; solution]
   @ report @ graph
@@ -196,23 +191,20 @@ let sapling_generate_command ~tx_count ~max_inputs ~max_outputs ~file
     ?seed () =
   let max_nullifiers =
     match max_nullifiers with
-    | None ->
-        []
-    | Some max_nf ->
-        ["--max-nullifiers"; string_of_int max_nf]
+    | None -> []
+    | Some max_nf -> ["--max-nullifiers"; string_of_int max_nf]
   in
   let max_additional_commitments =
     match max_additional_commitments with
-    | None ->
-        []
-    | Some max_ac ->
-        ["--max-additional-commitments"; string_of_int max_ac]
+    | None -> []
+    | Some max_ac -> ["--max-additional-commitments"; string_of_int max_ac]
   in
   let seed =
     match seed with None -> [] | Some seed -> ["--seed"; string_of_int seed]
   in
   let proto_tag = Protocol.tag protocol in
-  [ proto_tag;
+  [
+    proto_tag;
     "sapling";
     "generate";
     string_of_int tx_count;
@@ -222,7 +214,8 @@ let sapling_generate_command ~tx_count ~max_inputs ~max_outputs ~file
     "--max-inputs";
     string_of_int max_inputs;
     "--max-outputs";
-    string_of_int max_outputs ]
+    string_of_int max_outputs;
+  ]
   @ max_nullifiers @ max_additional_commitments @ seed
 
 let spawn_sapling_generate ?protocol ~tx_count ~max_inputs ~max_outputs ~file
@@ -265,27 +258,22 @@ let michelson_generate_command ?(protocol = Protocol.Alpha) ~terms_count ~kind
   in
   let min_size =
     match min_size with
-    | None ->
-        []
-    | Some sz ->
-        ["--min-size"; string_of_int sz]
+    | None -> []
+    | Some sz -> ["--min-size"; string_of_int sz]
   in
   let max_size =
     match max_size with
-    | None ->
-        []
-    | Some sz ->
-        ["--max-size"; string_of_int sz]
+    | None -> []
+    | Some sz -> ["--max-size"; string_of_int sz]
   in
   let burn_in =
     match burn_in with
-    | None ->
-        []
-    | Some burn_in ->
-        ["--burn-in"; string_of_int burn_in]
+    | None -> []
+    | Some burn_in -> ["--burn-in"; string_of_int burn_in]
   in
   let proto_tag = Protocol.tag protocol in
-  [ proto_tag;
+  [
+    proto_tag;
     "michelson";
     "generate";
     string_of_int terms_count;
@@ -294,7 +282,8 @@ let michelson_generate_command ?(protocol = Protocol.Alpha) ~terms_count ~kind
     "kind";
     string_of_kind kind;
     "in";
-    file ]
+    file;
+  ]
   @ seed @ min_size @ max_size @ burn_in
 
 let spawn_michelson_generate ?protocol ~terms_count ~kind ~file ?min_size
@@ -331,7 +320,8 @@ let michelson_generate ?protocol ~terms_count ~kind ~file ?min_size ?max_size
 let michelson_concat_command ?(protocol = Protocol.Alpha) ~file1 ~file2 ~target
     () =
   let proto_tag = Protocol.tag protocol in
-  [ proto_tag;
+  [
+    proto_tag;
     "michelson";
     "concat";
     "files";
@@ -339,7 +329,8 @@ let michelson_concat_command ?(protocol = Protocol.Alpha) ~file1 ~file2 ~target
     "and";
     file2;
     "into";
-    target ]
+    target;
+  ]
 
 let spawn_michelson_concat ?protocol ~file1 ~file2 ~target snoop =
   spawn_command
@@ -367,12 +358,9 @@ let string_of_tag (tag : tag) =
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
   match mode with
-  | All ->
-      ["list"; "benchmarks"; "with"; "tags"; "all"; "of"] @ tags
-  | Any ->
-      ["list"; "benchmarks"; "with"; "tags"; "any"; "of"] @ tags
-  | Exactly ->
-      ["list"; "benchmarks"; "with"; "tags"; "exactly"] @ tags
+  | All -> ["list"; "benchmarks"; "with"; "tags"; "all"; "of"] @ tags
+  | Any -> ["list"; "benchmarks"; "with"; "tags"; "any"; "of"] @ tags
+  | Exactly -> ["list"; "benchmarks"; "with"; "tags"; "exactly"] @ tags
 
 let spawn_list_benchmarks ~mode ~tags snoop =
   spawn_command snoop (list_benchmarks_command mode tags)
@@ -383,12 +371,9 @@ let list_benchmarks ~mode ~tags snoop =
   let lines = String.split_on_char '\n' output in
   Lwt_list.filter_map_s
     (function
-      | "" ->
-          return None
+      | "" -> return None
       | line -> (
-        match line =~* rex "(.*):.*" with
-        | None ->
-            Test.fail "Can't parse benchmark out of \"%s\"" line
-        | Some s ->
-            return (Some s) ))
+          match line =~* rex "(.*):.*" with
+          | None -> Test.fail "Can't parse benchmark out of \"%s\"" line
+          | Some s -> return (Some s)))
     lines

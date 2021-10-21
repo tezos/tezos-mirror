@@ -56,24 +56,24 @@ let pp_cfg fmtr cfg =
 let cfg_to_json cfg =
   let open Ezjsonm in
   dict
-    [ ("sapling_tx_count", int cfg.sapling_tx_count);
+    [
+      ("sapling_tx_count", int cfg.sapling_tx_count);
       ("micheline_jobs", int cfg.micheline_jobs);
       ("micheline_code_count_per_process", int cfg.micheline_code_count);
-      ("micheline_data_count_per_process", int cfg.micheline_code_count) ]
+      ("micheline_data_count_per_process", int cfg.micheline_code_count);
+    ]
 
 let get_field json field =
   match Ezjsonm.find_opt json field with
-  | None ->
-      0
+  | None -> 0
   | Some value -> (
-    match Ezjsonm.get_int value with
-    | exception Ezjsonm.Parse_error _ ->
-        let pp_sep fmtr () = Format.fprintf fmtr "/" in
-        let fmtr = Format.pp_print_list ~pp_sep Format.pp_print_string in
-        let field = Format.asprintf "%a" fmtr field in
-        Test.fail "Expected integer value for field %s" field
-    | i ->
-        i )
+      match Ezjsonm.get_int value with
+      | exception Ezjsonm.Parse_error _ ->
+          let pp_sep fmtr () = Format.fprintf fmtr "/" in
+          let fmtr = Format.pp_print_list ~pp_sep Format.pp_print_string in
+          let field = Format.asprintf "%a" fmtr field in
+          Test.fail "Expected integer value for field %s" field
+      | i -> i)
 
 let bound_check var bound name =
   if var < bound then Test.fail "Prepare_data: %s < %d" name bound
@@ -91,12 +91,7 @@ let cfg_of_json json =
   bound_check micheline_jobs 1 "micheline_jobs" ;
   bound_check micheline_code_count 0 "micheline_code_count_per_process" ;
   bound_check micheline_data_count 0 "micheline_data_count_per_process" ;
-  {
-    sapling_tx_count;
-    micheline_jobs;
-    micheline_code_count;
-    micheline_data_count;
-  }
+  {sapling_tx_count; micheline_jobs; micheline_code_count; micheline_data_count}
 
 (* ------------------------------------------------------------------------- *)
 
@@ -116,14 +111,13 @@ let prepare_workdir () =
             (Unix.error_message code)
             fname
             prm
-      | e ->
-          raise e)
+      | e -> raise e)
 
 let call_if_no_file ~file ~if_present ~if_absent =
   let* exists = Lwt_unix.file_exists file in
   if exists then (
     Log.info "%s exists, skipping" file ;
-    if_present )
+    if_present)
   else if_absent ()
 
 let prepare_sapling_data snoop cfg protocol =
@@ -168,16 +162,12 @@ let prepare_michelson kind snoop cfg protocol =
         ( Files.(working_dir // michelson_data_dir // michelson_data_file),
           cfg.micheline_data_count )
   in
-  call_if_no_file
-    ~file:target
-    ~if_present:Lwt.return_unit
-    ~if_absent:(fun () ->
+  call_if_no_file ~file:target ~if_present:Lwt.return_unit ~if_absent:(fun () ->
       let indices = range 0 (cfg.micheline_jobs - 1) in
       let tmp_files =
         List.map
           (fun n ->
-            Files.(
-              working_dir // michelson_data_dir // sf "generated.tmp.%d" n))
+            Files.(working_dir // michelson_data_dir // sf "generated.tmp.%d" n))
           indices
       in
       Lwt.finalize
@@ -213,10 +203,10 @@ let load_cfg () =
     let json = Files.read_json file in
     let cfg = cfg_of_json json in
     Log.info "Loaded data generation parameters" ;
-    return cfg )
+    return cfg)
   else (
     Log.info "Using default data generation parameters" ;
-    return default_cfg )
+    return default_cfg)
 
 let main protocol =
   Log.info "Entering Prepare_data.main" ;

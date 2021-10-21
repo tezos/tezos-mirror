@@ -79,17 +79,14 @@ type dirclass = Does_not_exist | Exists_and_is_not_a_dir | Exists
 
 let classify_dirname dir =
   match Unix.stat dir with
-  | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-      Does_not_exist
+  | exception Unix.Unix_error (Unix.ENOENT, _, _) -> Does_not_exist
   | {Unix.st_kind; _} ->
       if st_kind = Unix.S_DIR then Exists else Exists_and_is_not_a_dir
 
 let create_dir dir =
   match classify_dirname dir with
-  | Does_not_exist ->
-      Lwt_unix.mkdir dir 0o700
-  | Exists ->
-      Lwt.return_unit
+  | Does_not_exist -> Lwt_unix.mkdir dir 0o700
+  | Exists -> Lwt.return_unit
   | Exists_and_is_not_a_dir ->
       Test.fail "Can't create directory: file %s exists, aborting" dir
 
@@ -103,8 +100,7 @@ let copy =
     let rec copy_loop () =
       let* nread = read fd_in buffer 0 buffer_size in
       match nread with
-      | 0 ->
-          return ()
+      | 0 -> return ()
       | r ->
           let* _nwritten = write fd_out buffer 0 r in
           copy_loop ()
@@ -118,10 +114,10 @@ let fold_dir f dirname =
   let d = opendir dirname in
   let rec loop acc =
     match readdir d with
-    | entry ->
-        loop (f entry acc)
+    | entry -> loop (f entry acc)
     | exception End_of_file ->
-        closedir d ; List.rev acc
+        closedir d ;
+        List.rev acc
   in
   loop []
 
@@ -133,14 +129,15 @@ let is_directory_nonempty dir =
       let entries =
         List.filter (fun entry -> entry <> "." && entry <> "..") entries
       in
-      match entries with [] -> return false | _ -> return true )
+      match entries with [] -> return false | _ -> return true)
   | S_REG | S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK ->
       Test.fail "Expected %s to be a directory" dir
 
 let read_json name =
   let ic = Stdlib.open_in name in
   let json = Ezjsonm.from_channel ic in
-  Stdlib.close_in ic ; json
+  Stdlib.close_in ic ;
+  json
 
 let write_json json file =
   Base.with_open_out file (fun oc ->
@@ -149,12 +146,10 @@ let write_json json file =
 
 let unlink_if_present file =
   match Unix.stat file with
-  | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-      ()
+  | exception Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   | {Unix.st_kind; _} -> (
-    match st_kind with
-    | Unix.S_REG ->
-        Log.info "Removing existing %s" file ;
-        Unix.unlink file
-    | _ ->
-        Test.fail "%s is not a regular file" file )
+      match st_kind with
+      | Unix.S_REG ->
+          Log.info "Removing existing %s" file ;
+          Unix.unlink file
+      | _ -> Test.fail "%s is not a regular file" file)

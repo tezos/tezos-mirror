@@ -53,31 +53,38 @@ let interpreter_benchmark_config =
   let open Ezjsonm in
   let sampler_parameters =
     dict
-      [ ("int_size", range 8 100000);
+      [
+        ("int_size", range 8 100000);
         ("string_size", range 1024 131072);
         ("bytes_size", range 1024 131072);
         ("stack_size", range 3 3);
         ("michelson_type_depth", range 3 3);
         ("list_size", range 10 1000);
         ("set_size", range 10 1000);
-        ("map_size", range 10 1000) ]
+        ("map_size", range 10 1000);
+      ]
   in
+
   let sapling_parameters =
     let dir = Files.(working_dir // sapling_data_dir) in
     dict [("sapling_txs_file", string dir); ("seed", `Null)]
   in
   let comb_parameters = dict [("max_depth", int 500)] in
   dict
-    [ ("sampler", sampler_parameters);
+    [
+      ("sampler", sampler_parameters);
       ("sapling", sapling_parameters);
-      ("comb", comb_parameters) ]
+      ("comb", comb_parameters);
+    ]
 
 let typecheck_benchmark_config dir =
   let open Ezjsonm in
   dict
-    [ ( "generator_config",
+    [
+      ( "generator_config",
         dict [("target_size", range 10 1000); ("burn_in_multiplier", int 5)] );
-      ("michelson_terms_file", string dir) ]
+      ("michelson_terms_file", string dir);
+    ]
 
 (* ------------------------------------------------------------------------- *)
 (* Config patching *)
@@ -98,15 +105,12 @@ let patch_benchmark_config ~patches ~bench_name =
     List.find_opt (fun (regex, _) -> bench_name =~ regex) patches
   in
   match patch_opt with
-  | None ->
-      return (No_patch, No_parameter_override)
-  | Some (_regex, callback) ->
-      callback ()
+  | None -> return (No_patch, No_parameter_override)
+  | Some (_regex, callback) -> callback ()
 
 let with_config_dir bench_name json_opt f =
   match json_opt with
-  | None ->
-      f None
+  | None -> f None
   | Some json ->
       Log.info "Benchmark %s: using patched configuration" bench_name ;
       let config_file = bench_config bench_name in
@@ -127,7 +131,7 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           "Benchmark %s: target %s already exists, skipping"
           bench_name
           save_to ;
-        return () )
+        return ())
       else
         let* (bench_num, nsamples, config) =
           let* (patch, override) =
@@ -135,10 +139,8 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           in
           let* config =
             match patch with
-            | No_patch ->
-                return None
-            | Patched_config json ->
-                return (Some json)
+            | No_patch -> return None
+            | Patched_config json -> return (Some json)
           in
           match override with
           | No_parameter_override ->
@@ -164,17 +166,18 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
 
 let perform_interpreter_benchmarks snoop proto =
   let patches =
-    [ ( rex "Concat_(bytes|string).*",
+    [
+      ( rex "Concat_(bytes|string).*",
         fun () ->
           let json = interpreter_benchmark_config in
           let json =
-            json.%{["sampler"; "list_size"; "max"]} <- (Ezjsonm.int 100)
+            json.%{["sampler"; "list_size"; "max"]} <- Ezjsonm.int 100
           in
           let json =
-            json.%{["sampler"; "bytes_size"; "max"]} <- (Ezjsonm.int 1024)
+            json.%{["sampler"; "bytes_size"; "max"]} <- Ezjsonm.int 1024
           in
           let json =
-            json.%{["sampler"; "string_size"; "max"]} <- (Ezjsonm.int 1024)
+            json.%{["sampler"; "string_size"; "max"]} <- Ezjsonm.int 1024
           in
           return (Patched_config json, No_parameter_override) );
       ( rex "Pairing_check_bls12_381.*",
@@ -188,7 +191,8 @@ let perform_interpreter_benchmarks snoop proto =
           let nsamples = 500 in
           return
             ( Patched_config interpreter_benchmark_config,
-              Overriden_parameters {nsamples; bench_num} ) ) ]
+              Overriden_parameters {nsamples; bench_num} ) );
+    ]
   in
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Interpreter; Proto proto] snoop)
@@ -209,14 +213,14 @@ let create_config file =
 
 let perform_typechecker_benchmarks snoop proto =
   let patches =
-    [ ( rex "(TYPECHECKING|UNPARSING)_CODE.*",
+    [
+      ( rex "(TYPECHECKING|UNPARSING)_CODE.*",
         fun () -> create_config Files.michelson_code_file );
       ( rex "(TYPECHECKING|UNPARSING)_DATA.*",
         fun () -> create_config Files.michelson_data_file );
-      ( rex "VALUE_SIZE.*",
-        fun () -> create_config Files.michelson_data_file );
-      ( rex "KINSTR_SIZE.*",
-        fun () -> create_config Files.michelson_code_file ); ]
+      (rex "VALUE_SIZE.*", fun () -> create_config Files.michelson_data_file);
+      (rex "KINSTR_SIZE.*", fun () -> create_config Files.michelson_code_file);
+    ]
   in
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Translator; Proto proto] snoop)
@@ -225,8 +229,10 @@ let perform_typechecker_benchmarks snoop proto =
 
 let perform_encoding_benchmarks snoop proto =
   let patches =
-    [ ( rex "(ENCODING|DECODING)_MICHELINE.*",
-        fun () -> create_config Files.michelson_data_file ) ]
+    [
+      ( rex "(ENCODING|DECODING)_MICHELINE.*",
+        fun () -> create_config Files.michelson_data_file );
+    ]
   in
   let* proto_indepenent =
     Snoop.(list_benchmarks ~mode:Exactly ~tags:[Encoding] snoop)

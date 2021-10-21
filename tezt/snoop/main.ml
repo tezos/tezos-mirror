@@ -30,9 +30,8 @@ let run proto =
   Lwt_main.run
     (let* () = Prepare_data.main proto in
      let* () = Perform_benchmarks.main proto in
-     Perform_inference.main () )
-
+     Perform_inference.main ())
 
 let () =
-  Background.start (fun x -> raise x);
+  Background.start (fun x -> raise x) ;
   run Protocol.Alpha
