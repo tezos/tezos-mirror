@@ -466,4 +466,4 @@ let tests =
     ("p256", p256);
   ]
 
-let tests_lwt = []
+let () = Alcotest.run "tezos-crypto" tests
