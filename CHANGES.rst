@@ -113,6 +113,11 @@ Node
    be confusing, the RPC now returns the new filter configuration of
    the mempool.
 
+-  When encoded in binary, errors now have a single size field. This only
+   affects the binary representation of errors or values that include errors
+   inside. It may break the compatibility for tools that request binary-only
+   answers from the node and parse the errors by hand.
+
 Client
 ------
 

@@ -386,14 +386,13 @@ end = struct
             in
             let union_encoding = Data_encoding.union cases in
             let open Data_encoding in
-            dynamic_size
-            @@ splitted
-                 ~json:union_encoding
-                 ~binary:
-                   (conv
-                      (Json.construct union_encoding)
-                      (Json.destruct union_encoding)
-                      json)
+            splitted
+              ~json:union_encoding
+              ~binary:
+                (conv
+                   (Json.construct union_encoding)
+                   (Json.destruct union_encoding)
+                   json)
           else
             let cases =
               List.map
@@ -405,14 +404,13 @@ end = struct
             in
             let union_encoding = Data_encoding.union cases in
             let open Data_encoding in
-            dynamic_size
-            @@ splitted
-                 ~json:union_encoding
-                 ~binary:
-                   (conv
-                      (Json.construct union_encoding)
-                      (Json.destruct union_encoding)
-                      json)
+            splitted
+              ~json:union_encoding
+              ~binary:
+                (conv
+                   (Json.construct union_encoding)
+                   (Json.destruct union_encoding)
+                   json)
         in
         error_encoding_cache := Some encoding ;
         encoding
