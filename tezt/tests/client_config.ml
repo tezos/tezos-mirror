@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,34 +25,30 @@
 
 (* Testing
    -------
-   Component:    Basic
-   Invocation:   dune exec tezt/tests/main.exe -- --file basic.ml
+   Component:    Client configuration
+   Invocation:   dune exec tezt/tests/main.exe -- --file client_config.ml
    Subject:      .
 *)
 
-(* This example is included in the documentation (docs/developers/tezt.rst).
-   It is part of the tests to ensure we keep it up-to-date. *)
-let check_node_initialization history_mode =
+let additional_bootstrap_accounts =
   Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
-    ~tags:["basic"; "node"; Node.show_history_mode history_mode]
+    ~title:"additional bootstrap accounts"
+    ~tags:["client"; "bootstrap"; "accounts"]
   @@ fun protocol ->
-  let* node = Node.init [History_mode history_mode] in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  Log.info "Activated protocol." ;
-  let* () = repeat 10 (fun () -> Client.bake_for client) in
-  Log.info "Baked 10 blocks." ;
-  let* level = Node.wait_for_level node 11 in
-  Log.info "Level is now %d." level ;
-  let* identity = Node.wait_for_identity node in
-  if identity = "" then Test.fail "identity is empty" ;
-  Log.info "Identity is not empty." ;
-  return ()
+  let* (_node, client) =
+    Client.init_activate_bake
+      ~additional_bootstrap_account_count:2
+      `Client
+      ~protocol
+      ()
+  in
+  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
+  let* bootstrap7 = Client.show_address ~alias:"bootstrap7" client in
+  Client.transfer
+    ~amount:(Tez.of_int 2)
+    ~giver:bootstrap6.public_key_hash
+    ~receiver:bootstrap7.public_key_hash
+    client
 
-let register ~protocols =
-  check_node_initialization Archive ~protocols ;
-  check_node_initialization Full ~protocols ;
-  check_node_initialization Rolling ~protocols
+let register ~protocols = additional_bootstrap_accounts ~protocols
