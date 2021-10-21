@@ -1,5 +1,3 @@
-module Alcotest = Alcotest_glue
-
 module type T = sig
   val tests : unit Alcotest.test list
 

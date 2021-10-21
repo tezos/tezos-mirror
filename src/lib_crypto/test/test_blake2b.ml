@@ -30,7 +30,6 @@
     Dependencies: src/lib_crypto/test/roundtrips.ml
     Subject:      On the hash function BLAKE2b
 *)
-module Alcotest = Alcotest_glue
 
 let test_hashed_roundtrip name enc dec input =
   (* this wrapper to start with hashing *)
