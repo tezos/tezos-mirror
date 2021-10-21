@@ -45,7 +45,7 @@ type ('a, 'b) union = L of 'a | R of 'b
 
 type operation = packed_internal_operation * Lazy_storage.diffs option
 
-type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
+type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 type empty_cell = EmptyCell
 

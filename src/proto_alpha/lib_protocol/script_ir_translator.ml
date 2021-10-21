@@ -2733,7 +2733,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
         parse_comparable_data ?type_logger ctxt ty expr
-        >|=? fun ((ticketer, (contents, amount)), ctxt) ->
+        >|=? fun (((ticketer, _entrypoint), (contents, amount)), ctxt) ->
         ({ticketer; contents; amount}, ctxt)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
@@ -6024,7 +6024,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ~stack_depth
         mode
         t
-        (ticketer, (contents, amount))
+        ((ticketer, "default"), (contents, amount))
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->
