@@ -16,7 +16,6 @@ depends: [
   "benchmark-utils"
   "pyml-plot"
   "ocaml-migrate-parsetree"
-  "conf-autoconf"
   "hashcons"
 ]
 build: [
