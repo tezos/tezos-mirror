@@ -154,6 +154,9 @@ let cemented_blocks_metadata_dir dir = mk_dir dir "metadata"
 let cemented_blocks_metadata_file dir {file_path} =
   mk_file dir (Filename.basename file_path ^ ".zip")
 
+let cemented_blocks_tmp_metadata_file dir {file_path} =
+  mk_file dir (Filename.basename file_path ^ ".zip.part")
+
 type floating_kind = RO | RW | RW_TMP | RO_TMP | Restore of floating_kind
 
 let floating_blocks_dir dir kind =
