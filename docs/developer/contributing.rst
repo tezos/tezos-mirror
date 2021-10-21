@@ -343,6 +343,7 @@ must be mitigated as follows:
 - Have the entire piece of work described or done somewhere. For example in
   an issue, or a branch containing the entire change, or a
   large (unsplit) work as a draft merge request.
+  For complex works, an external document may be referred in the issue/MR, detailing the design/implementation rationale; if such documents are only targeted to reviewers and/or are only describing a *change*, they should not go in the online documentation. 
 - Include a link to the entire piece of work in the description of each
   small merge requests created by splitting the large piece of work.
   This will help reviewers get the big picture.
