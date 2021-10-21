@@ -694,7 +694,10 @@ let commands () =
       ~desc:"Ask the type of an entrypoint of a script."
       (args2 emacs_mode_switch no_print_source_flag)
       (prefixes ["get"; "script"; "entrypoint"; "type"; "of"]
-      @@ string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ param
+           ~name:"entrypoint"
+           ~desc:"the entrypoint to describe"
+           entrypoint_parameter
       @@ prefixes ["for"]
       @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) entrypoint program cctxt ->
@@ -937,7 +940,10 @@ let commands () =
          now_arg
          level_arg)
       (prefixes ["run"; "tzip4"; "view"]
-      @@ param ~name:"entrypoint" ~desc:"the name of the view" string_parameter
+      @@ param
+           ~name:"entrypoint"
+           ~desc:"the name of the view"
+           entrypoint_parameter
       @@ prefixes ["on"; "contract"]
       @@ ContractAlias.destination_param
            ~name:"contract"

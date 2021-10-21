@@ -64,6 +64,11 @@ val of_string_strict : loc:Script_repr.location -> string -> t tzresult
     Converts "" to "default". *)
 val of_string_strict_exn : string -> t
 
+(** Converts a string to an entrypoint.
+    Returns an error if the string is too long.
+    Accepts "default" and converts "" to "default". *)
+val of_string_lax : string -> t tzresult
+
 (** Converts an entrypoint to a string used as an address suffix.
     For the default entrypoint, the result is the empty string.
     Otherwise it is "%" followed by the entrypoint. *)

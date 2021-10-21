@@ -147,6 +147,10 @@ let data_parameter =
       Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
       @@ Michelson_v1_parser.parse_expression data)
 
+let entrypoint_parameter =
+  parameter (fun _ str ->
+      Lwt.return @@ Environment.wrap_tzresult @@ Entrypoint.of_string_lax str)
+
 let init_arg =
   default_arg
     ~long:"init"
@@ -191,14 +195,14 @@ let entrypoint_arg =
     ~long:"entrypoint"
     ~placeholder:"name"
     ~doc:"entrypoint of the smart contract"
-    string_parameter
+    entrypoint_parameter
 
 let default_entrypoint_arg =
   arg
     ~long:"default-entrypoint"
     ~placeholder:"name"
     ~doc:"default entrypoint of the smart contracts"
-    string_parameter
+    entrypoint_parameter
 
 let force_switch =
   switch

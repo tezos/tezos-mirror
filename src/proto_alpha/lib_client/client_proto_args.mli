@@ -30,6 +30,8 @@ open Protocol_client_context
 
 val tez_sym : string
 
+val entrypoint_parameter : (Entrypoint.t, full) Clic.parameter
+
 val init_arg : (string, full) Clic.arg
 
 val fee_arg : (Tez.t option, full) Clic.arg
