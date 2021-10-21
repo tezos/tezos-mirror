@@ -501,16 +501,16 @@ module Arbitraries = struct
 end
 
 (** Function to unwrap an [option] when it MUST be a [Some] *)
-let force_opt = function
+let force_opt ~loc = function
   | Some x -> x
-  | None -> QCheck.Test.fail_report "Unexpected None"
+  | None -> QCheck.Test.fail_reportf "Unexpected None at %s" loc
 
 (* Values from [start] (included) to [ancestor] (excluded) *)
 let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
     (start : 'a) (ancestor : 'a) : 'a list =
   Tree.predecessors ~equal tree start
   |> List_extra.take_until_if_found ~pred:(( = ) ancestor)
-  |> force_opt
+  |> force_opt ~loc:__LOC__
   |> fun preds -> start :: preds
 
 (** Pretty print values of type [Operation_hash.Set.t] *)
@@ -564,7 +564,7 @@ module Handle_operations = struct
       Arbitraries.chain_tools_arb
     @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let actual : Operation.t Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
         ~block_store:Block.tools
@@ -587,10 +587,11 @@ module Handle_operations = struct
       Arbitraries.chain_tools_arb
     @@ fun (chain, tree, pair_blocks_opt, _) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let equal = Block.equal in
     let ancestor : Block.t =
-      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
     in
     let expected =
       List.map
@@ -620,13 +621,14 @@ module Handle_operations = struct
       Arbitraries.chain_tools_arb
     @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let cleared = ref Operation_hash.Set.empty in
     let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
     let chain = {chain with clear_or_cancel = clearer} in
     let equal = Block.equal in
     let ancestor : Block.t =
-      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
     in
     let expected_superset =
       List.map
@@ -657,7 +659,7 @@ module Handle_operations = struct
       Arbitraries.chain_tools_arb
     @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let injected = ref Operation_hash.Set.empty in
     let inject_operation oph _op =
       injected := Operation_hash.Set.add oph !injected ;
@@ -666,7 +668,8 @@ module Handle_operations = struct
     let chain = {chain with inject_operation} in
     let equal = Block.equal in
     let ancestor : Block.t =
-      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
     in
     let expected_superset =
       List.map
@@ -783,7 +786,7 @@ module Recyle_operations = struct
     @@ fun ( (chain, _tree, pair_blocks_opt, classification, pending),
              handle_branch_refused ) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let actual : Operation.t Op_map.t =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -810,10 +813,11 @@ module Recyle_operations = struct
     @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
              handle_branch_refused ) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let equal = Block.equal in
     let ancestor : Block.t =
-      Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
     in
     let live_blocks : Block_hash.Set.t =
       Tree.values tree
@@ -890,7 +894,7 @@ module Recyle_operations = struct
         ~refused:true
         classification
     in
-    let (from_branch, to_branch) = force_opt pair_blocks_opt in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let () =
       Classification.recycle_operations
         ~block_store:Block.tools
