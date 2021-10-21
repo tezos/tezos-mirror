@@ -160,6 +160,11 @@ val cemented_blocks_metadata_file :
   [`Cemented_blocks_file] file ->
   [`Cemented_blocks_metadata] file
 
+val cemented_blocks_tmp_metadata_file :
+  [`Cemented_metadata_dir] directory ->
+  [`Cemented_blocks_file] file ->
+  [`Cemented_blocks_metadata] file
+
 (** The type of floating store's kind. *)
 type floating_kind = RO | RW | RW_TMP | RO_TMP | Restore of floating_kind
 
