@@ -40,6 +40,21 @@ let () =
     (function Name_too_long entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> Name_too_long entrypoint)
 
+type error += Unexpected_default of Script_repr.location
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_default_entrypoint"
+    ~title:
+      "The annotation 'default' was encountered where an entrypoint is expected"
+    ~description:
+      "A node in the syntax tree was improperly annotated. An annotation used \
+       to designate an entrypoint cannot be exactly 'default'."
+    Data_encoding.(obj1 (req "location" Script_repr.location_encoding))
+    (function Unexpected_default loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_default loc)
+
 let default = "default"
 
 let is_default name = name = default
@@ -57,6 +72,12 @@ let of_string str =
   else if Compare.Int.(String.length str > 31) then Too_long
   else if is_default str then Got_default
   else Ok str
+
+let of_string_strict ~loc str =
+  match of_string str with
+  | Too_long -> error (Name_too_long str)
+  | Got_default -> error (Unexpected_default loc)
+  | Ok name -> Ok name
 
 let of_string_strict' str =
   match of_string str with

@@ -2297,15 +2297,11 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       (match String.index_opt s '%' with
       | None -> ok (s, Entrypoint.default)
-      | Some pos -> (
+      | Some pos ->
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then error (Entrypoint.Name_too_long name)
-          else
-            match (String.sub s 0 pos, name) with
-            | (addr, "") -> ok (addr, "default")
-            | (_, "default") -> error @@ Unexpected_annotation loc
-            | addr_and_name -> ok addr_and_name))
+          Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
+          (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
       Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt)
   | expr ->

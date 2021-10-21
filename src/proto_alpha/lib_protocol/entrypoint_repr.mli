@@ -50,6 +50,11 @@ val remove_delegate : t
 type error += Name_too_long of string
 
 (** Converts a string to an entrypoint.
+    Returns an error if the string is too long or is "default".
+    Converts "" to "default". *)
+val of_string_strict : loc:Script_repr.location -> string -> t tzresult
+
+(** Converts a string to an entrypoint.
     Fails with [Invalid_arg] if the string is too long or is "default".
     Converts "" to "default". *)
 val of_string_strict_exn : string -> t
