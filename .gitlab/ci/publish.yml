@@ -2,7 +2,6 @@
   extends:
     - .default_settings_template
     - .image_template__latest
-    - .rules_template__master_and_releases
   services:
     - docker:dind
   variables:
@@ -22,7 +21,9 @@
   interruptible: false
 
 publish:docker_manual:
-  extends: .build_docker_release_template
+  extends:
+    - .build_docker_release_template
+    - .rules_template__development_docker
   variables:
     public_docker_image_name: ${CI_REGISTRY_IMAGE}/
     DOCKER_DRIVER: overlay2
@@ -30,22 +31,14 @@ publish:docker_manual:
     IMAGE_ARCH_PREFIX: "amd64-"
   stage: manual
   needs: []
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
-      when: on_success
-    # Run when there is label on the merge request.
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docker(?:$|[,])/'
-      when: on_success
-    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
-      when: manual
-      allow_failure: true
-    - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk --no-cache --virtual add git
 
 build_release:docker_amd64:
-  extends: .build_docker_release_template
+  extends:
+    - .build_docker_release_template
+    - .rules_template__master_and_releases
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "amd64-"
@@ -58,7 +51,9 @@ build_release:docker_amd64:
     - apk --no-cache --virtual add git
 
 build_release:docker_arm64:
-  extends: .build_docker_release_template
+  extends:
+    - .build_docker_release_template
+    - .rules_template__master_and_releases
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: "arm64-"
@@ -106,14 +101,11 @@ build_release:static-arm64-linux-binaries:
     - arm64
 
 .release_static_binaries_template:
+  extends:
+    - .rules_template__release_tag
   image: registry.gitlab.com/gitlab-org/release-cli
   variables:
     ARCH_PREFIX: ""
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: on_success
-    - when: never
-  variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
   script:
@@ -135,11 +127,9 @@ release-static-arm64-binaries:
     - build_release:static-arm64-linux-binaries
 
 release-on-gitlab:
+  extends:
+    - .rules_template__release_tag
   image: registry.gitlab.com/gitlab-org/release-cli
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: on_success
-    - when: never
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
@@ -148,6 +138,8 @@ release-on-gitlab:
     - scripts/release/create-release-with-static-binaries.sh
 
 merge-manifest:
+  extends:
+    - .rules_template__master_and_releases
   image: docker:latest
   services:
     - name: "docker:dind"
@@ -155,10 +147,6 @@ merge-manifest:
   variables:
     DOCKER_DRIVER: overlay2
   stage: publish_release
-  only:
-    - master@tezos/tezos
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   before_script:
     - apk add git binutils
     - mkdir ~/.docker || true
