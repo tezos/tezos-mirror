@@ -125,7 +125,7 @@ module Default_config = struct
     conv
       (fun {type_size} -> type_size)
       (fun type_size -> {type_size})
-      (obj1 (req "max_depth" Base_samplers.range_encoding))
+      (obj1 (req "type_size" Base_samplers.range_encoding))
 
   let config_encoding =
     let open Data_encoding in

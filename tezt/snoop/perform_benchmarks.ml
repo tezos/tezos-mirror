@@ -57,8 +57,6 @@ let interpreter_benchmark_config =
         ("int_size", range 8 100000);
         ("string_size", range 1024 131072);
         ("bytes_size", range 1024 131072);
-        ("stack_size", range 3 3);
-        ("michelson_type_depth", range 3 3);
         ("list_size", range 10 1000);
         ("set_size", range 10 1000);
         ("map_size", range 10 1000);
@@ -70,11 +68,13 @@ let interpreter_benchmark_config =
     dict [("sapling_txs_file", string dir); ("seed", `Null)]
   in
   let comb_parameters = dict [("max_depth", int 500)] in
+  let compare_parameters = dict [("type_size", range 1 15)] in
   dict
     [
       ("sampler", sampler_parameters);
       ("sapling", sapling_parameters);
       ("comb", comb_parameters);
+      ("compare", compare_parameters);
     ]
 
 let typecheck_benchmark_config dir =
