@@ -88,6 +88,9 @@ let of_string_strict' str =
 let of_string_strict_exn str =
   match of_string_strict' str with Ok v -> v | Error err -> invalid_arg err
 
+let of_annot_strict ~loc (a : Non_empty_string.t) =
+  of_string_strict ~loc (a :> string)
+
 let root = "root"
 
 let do_ = "do"

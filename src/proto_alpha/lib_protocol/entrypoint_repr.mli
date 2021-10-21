@@ -49,6 +49,11 @@ val remove_delegate : t
 
 type error += Name_too_long of string
 
+(** Converts an annot to an entrypoint.
+    Returns an error if the string is too long or is "default". *)
+val of_annot_strict :
+  loc:Script_repr.location -> Non_empty_string.t -> t tzresult
+
 (** Converts a string to an entrypoint.
     Returns an error if the string is too long or is "default".
     Converts "" to "default". *)

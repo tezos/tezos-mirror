@@ -4784,15 +4784,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         annot
         ~default:(gen_access_annot addr_annot default_contract_annot)
       >>?= fun (annot, entrypoint) ->
-      (match entrypoint with
-      | None -> Ok Entrypoint.default
-      | Some (Field_annot entrypoint) ->
-          let entrypoint = (entrypoint :> string) in
-          if Compare.String.(entrypoint = "default") then
-            error (Unexpected_annotation loc)
-          else if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint.Name_too_long entrypoint)
-          else Ok entrypoint)
+      Script_ir_annot.field_annot_opt_to_entrypoint_strict ~loc entrypoint
       >>?= fun entrypoint ->
       let instr =
         {apply = (fun kinfo k -> IContract (kinfo, t, entrypoint, k))}

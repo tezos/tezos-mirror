@@ -129,6 +129,10 @@ let var_to_field_annot : var_annot option -> field_annot option = function
   | None -> None
   | Some (Var_annot s) -> Some (Field_annot s)
 
+let field_annot_opt_to_entrypoint_strict ~loc = function
+  | None -> Ok Entrypoint.default
+  | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
+
 let default_annot ~default = function None -> default | annot -> annot
 
 let gen_access_annot :
