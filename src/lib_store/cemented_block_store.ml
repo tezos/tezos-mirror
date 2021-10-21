@@ -338,13 +338,13 @@ let cement_blocks_metadata cemented_store blocks =
   |> function
   | None -> fail (Cannot_cement_blocks_metadata `Not_cemented)
   | Some {file; _} ->
-      let metadata_file_path =
-        Naming.cemented_blocks_metadata_file cemented_metadata_dir file
+      let tmp_metadata_file_path =
+        Naming.cemented_blocks_tmp_metadata_file cemented_metadata_dir file
         |> Naming.file_path
       in
       if List.exists (fun block -> Block_repr.metadata block <> None) blocks
       then (
-        let out_file = Zip.open_out metadata_file_path in
+        let out_file = Zip.open_out tmp_metadata_file_path in
         List.iter
           (fun block ->
             let level = Block_repr.level block in
@@ -363,6 +363,11 @@ let cement_blocks_metadata cemented_store blocks =
             | None -> ())
           blocks ;
         Zip.close_out out_file ;
+        let metadata_file_path =
+          Naming.cemented_blocks_metadata_file cemented_metadata_dir file
+          |> Naming.file_path
+        in
+        Lwt_unix.rename tmp_metadata_file_path metadata_file_path >>= fun () ->
         return_unit)
       else return_unit
 
