@@ -88,8 +88,13 @@ done
 ## Filtering unrequired packages
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
+case $(opam --version) in
+    2.0.* ) opam_depext_dep="opam-depext," ;;
+    * ) opam_depext_dep="" ;;
+esac
+#shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,opam-ed
+  $packages,ocaml,ocaml-base-compiler,odoc,$opam_depext_dep,js_of_ocaml-ppx,opam-ed
 
 ## Adding useful compiler variants
 for variant in afl flambda fp spacetime ; do
