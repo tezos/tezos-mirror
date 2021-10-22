@@ -25,7 +25,7 @@
 
 (** Definitions used in files with actual tests *)
 
-module Store = Tezos_context_memory.Context
+module Store = Tezos_proxy.Local_context
 open Lib_test.Qcheck_helpers
 
 let check_irmin_tree_eq t1 t2 =

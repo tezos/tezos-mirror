@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -22,43 +23,4 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** A container of input data needed to process a consensus. *)
-type input = {
-  printer : Tezos_client_base.Client_context.printer;
-  min_agreement : float;  (** The same value as [Light.sources.min_agreement] *)
-  chain : Tezos_shell_services.Block_services.chain;
-      (** The chain considered *)
-  block : Tezos_shell_services.Block_services.block;
-      (** The block considered *)
-  key : string list;
-      (** The key of the context for which data is being requested *)
-  mtree : Tezos_shell_services.Block_services.merkle_tree;
-      (** The tree received from the endpoint providing data.
-          It is much smaller than [tree]. *)
-  tree : Local_context.tree;
-      (** The current data tree. The call to [M.consensus]
-      will check that validating endpoints send data
-      which agree with this tree. *)
-}
-
-(** [min_agreeing_endpoints min_agreement nb_endpoints] returns
-    the minimum number of endpoints that must agree for [Make.consensus]
-    to return [true]. The first parameter should be
-    [Light.sources.min_agreement] while the second
-    parameter should be the length of [Light.sources.endpoints]. *)
-val min_agreeing_endpoints : float -> int -> int
-
-(** Given RPCs specific to the light mode, obtain the consensus
-    algorithm *)
-module Make (Light_proto : Light_proto.PROTO_RPCS) : sig
-  (** Whether consensus on data can be achieved. Parameters are:
-
-      - The data to consider
-      - The endpoints to contact for validating
-
-      Returns: whether consensus was attained or an error message.
-    *)
-  val consensus :
-    input -> (Uri.t * RPC_context.simple) list -> (bool, string) result Lwt.t
-end
+include module type of Tezos_context_memory.Context

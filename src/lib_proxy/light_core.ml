@@ -28,7 +28,7 @@
 module Internal = Light_internal
 module Logger = Light_logger.Logger
 module Merkle = Internal.Merkle
-module Store = Tezos_context_memory.Context
+module Store = Local_context
 module Consensus = Light_consensus
 module Block_services = Tezos_shell_services.Block_services
 

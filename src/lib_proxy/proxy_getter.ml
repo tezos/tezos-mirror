@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local = Tezos_context_memory.Context
+module Local = Local_context
 
 (** The kind of RPC request: is it a GET (i.e. is it loading data?) or
     is it only a MEMbership request (i.e. is the key associated to data?). *)

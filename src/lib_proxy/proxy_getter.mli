@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local := Tezos_context_memory.Context
+module Local := Local_context
 
 (** The size of a tree, for logging *)
 val raw_context_size : Tezos_shell_services.Block_services.raw_context -> int
