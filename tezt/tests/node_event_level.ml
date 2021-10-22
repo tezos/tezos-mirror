@@ -87,9 +87,8 @@ let wait_for_arrival = wait_for_request_kind ~level:"debug" "arrived"
 let transfer_and_wait_for_injection node client amount_int giver_key
     receiver_key =
   let wait_for = wait_for_injection node in
-  let _ =
+  let* () =
     Client.transfer
-      ~wait:"0"
       ~amount:(Tez.of_int amount_int)
       ~giver:Constant.(giver_key.alias)
       ~receiver:Constant.(receiver_key.alias)
