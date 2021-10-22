@@ -553,6 +553,10 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           pp
           e2
 
+let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
+    Operation_hash.Set.t =
+  List.concat blocks |> List.concat |> Operation_hash.Set.of_list
+
 module Handle_operations = struct
   (** Test that [handle_live_operations] returns an empty map
       of operations when [is_branch_alive] rules
@@ -597,7 +601,7 @@ module Handle_operations = struct
       List.map
         Block.tools.all_operation_hashes
         (values_from_to ~equal tree from_branch ancestor)
-      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+      |> blocks_to_oph_set
     in
     let actual =
       Classification.Internal_for_tests.handle_live_operations
@@ -634,7 +638,7 @@ module Handle_operations = struct
       List.map
         Block.tools.all_operation_hashes
         (values_from_to ~equal tree to_branch ancestor)
-      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+      |> blocks_to_oph_set
     in
     Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
@@ -675,7 +679,7 @@ module Handle_operations = struct
       List.map
         Block.tools.all_operation_hashes
         (values_from_to ~equal tree from_branch ancestor)
-      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+      |> blocks_to_oph_set
     in
     Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
@@ -829,7 +833,7 @@ module Recyle_operations = struct
       List.map
         Block.tools.all_operation_hashes
         (values_from_to ~equal tree from_branch ancestor)
-      |> List.concat |> List.concat |> Operation_hash.Set.of_list
+      |> blocks_to_oph_set
     in
     (* This is coming from [recycle_operations] itself *)
     let op_map_to_hash_list (m : 'a Operation_hash.Map.t) =
