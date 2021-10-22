@@ -165,3 +165,12 @@ let balance_was_credited =
   balance_was_operated ~operand:Alpha_context.Tez.( +? )
 
 let balance_was_debited = balance_was_operated ~operand:Alpha_context.Tez.( -? )
+
+let pp_print_list pp out xs =
+  let list_pp fmt =
+    Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@.") fmt
+  in
+  Format.fprintf out "[%a]" (list_pp pp) xs
+
+let assert_equal_list ~loc eq msg pp =
+  equal ~loc (List.equal eq) msg (pp_print_list pp)
