@@ -36,7 +36,7 @@
 
 module Internal = Tezos_proxy.Light_internal
 module Merkle = Internal.Merkle
-module Store = Tezos_context_memory.Context
+module Store = Tezos_proxy.Local_context
 open Lib_test.Qcheck_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
@@ -428,10 +428,14 @@ module AddTree = struct
          HashStability.tree_and_shallow_arb
          (list1_arb string)
          irmin_tree_arb)
-      (fun ( ((_, tree) : _ * Store.tree),
+      (fun ( ((_, _tree) : _ * Store.tree),
              (key : Store.key),
              (added : Store.tree) ) ->
-        let tree' = Store.Tree.add_tree tree key added |> Lwt_main.run in
+        let tree' =
+          (* Here _tree is shallow, replace it with the empty tree. *)
+          Store.Tree.add_tree (Store.Tree.empty Store.empty) key added
+          |> Lwt_main.run
+        in
         let tree_opt_set_at_key =
           Store.Tree.find_tree tree' key |> Lwt_main.run
         in
