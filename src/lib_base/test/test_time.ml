@@ -120,14 +120,30 @@ module System = struct
   open System
   open QCheck2
 
+  let gen_date : (int * int * int) Gen.t =
+    let open Gen in
+    let thirty_one = [1; 3; 5; 7; 8; 10; 12] |> List.map pure |> oneof in
+    let thirty = [4; 6; 9; 11] |> List.map pure |> oneof in
+
+    let gen_month_day =
+      oneof
+        [
+          pair thirty_one (1 -- 31);
+          pair thirty (1 -- 30);
+          pair (pure 2) (1 -- 28);
+        ]
+    in
+
+    map
+      (fun (year, (month, day)) -> (year, month, day))
+      (pair (0 -- 9999) gen_month_day)
+
   (** Generator of {!t} from usual time fragments year-month-day hour-minute-second, parsed through {!Ptime.of_date_time}. *)
   let t_ymdhms_gen : t Gen.t =
-    of_option_gen
-      Gen.(
-        pair
-          (triple (0 -- 9999) (1 -- 12) (1 -- 31))
-          (triple (0 -- 23) (0 -- 59) (0 -- 60))
-        |> map (fun (date, time) -> Ptime.of_date_time (date, (time, 0))))
+    Gen.(
+      pair gen_date (triple (0 -- 23) (0 -- 59) (0 -- 60))
+      |> map (fun (date, time) ->
+             Ptime.of_date_time (date, (time, 0)) |> Option.get))
 
   let (min_day, min_ps) = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
 
