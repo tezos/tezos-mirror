@@ -162,6 +162,38 @@ module Make_tree (Store : DB) = struct
 
   let list tree ?offset ?length key =
     Store.Tree.list ~cache:true tree ?offset ?length key
+
+  exception Context_dangling_hash of string
+
+  let find_tree tree key =
+    Lwt.catch
+      (fun () -> Store.Tree.find_tree tree key)
+      (function
+        | Dangling_hash {context; hash} ->
+            let str =
+              Fmt.str
+                "%s encountered dangling hash %a"
+                context
+                (Irmin.Type.pp Hash.t)
+                hash
+            in
+            raise (Context_dangling_hash str)
+        | exn -> raise exn)
+
+  let add_tree tree key value =
+    Lwt.catch
+      (fun () -> Store.Tree.add_tree tree key value)
+      (function
+        | Dangling_hash {context; hash} ->
+            let str =
+              Fmt.str
+                "%s encountered dangling hash %a"
+                context
+                (Irmin.Type.pp Hash.t)
+                hash
+            in
+            raise (Context_dangling_hash str)
+        | exn -> raise exn)
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t
