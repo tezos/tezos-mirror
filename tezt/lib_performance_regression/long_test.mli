@@ -430,7 +430,8 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
             "api_token": "123456789",
             "data_source": "InfluxDB",
             "timeout": 20
-        }
+        },
+        "test_data_path" : "/path/to/the/test_data_path"
     }
 
     where:
@@ -477,9 +478,15 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
       - [timeout] is how long, in seconds, to wait when updating dashboards before giving up
         (optional, default value is 20).
 
+    - [test_data_path] configures the folder in which large data are stored
+      (optional, default value is "/s3data" which is the folder used by default executor).
+
     Note that for Grafana dashboards to be updated, InfluxDB also needs to be configured,
     because measurements in Grafana queries are prefixed with the measurement prefix
     configured for InfluxDB. *)
+
+(** The [test_data_path] field from the configuration. *)
+val test_data_path : string
 
 (** {2 Internal Functions for Debugging} *)
 
