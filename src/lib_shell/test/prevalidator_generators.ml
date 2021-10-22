@@ -44,10 +44,14 @@ let block_hash_gen : Block_hash.t QCheck.Gen.t =
   Block_hash.hash_string ?key path
 
 (** Operations don't contain "valid" proto bytes but we don't care
-   *  as far as [Prevalidator_classification] is concerned. *)
-let operation_gen : Operation.t QCheck.Gen.t =
+    as far as [Prevalidator_classification] is concerned. [block_hash_t]
+    is an optional generator for the branch. If omitted {!block_hash_gen}
+    is used. *)
+let operation_gen ?block_hash_t : Operation.t QCheck.Gen.t =
   let open QCheck.Gen in
-  let+ branch = block_hash_gen and+ proto = string_gen >|= Bytes.of_string in
+  let prod_block_hash_gen = Option.value ~default:block_hash_gen block_hash_t in
+  let+ branch = prod_block_hash_gen
+  and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
 
 (** Do we need richer errors? If so, how to generate those? *)

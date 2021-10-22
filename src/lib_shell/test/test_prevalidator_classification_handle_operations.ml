@@ -278,13 +278,19 @@ module Block = struct
   end
 
   module Set = Set.Make (Ord)
+
+  let set_to_list s = Set.to_seq s |> List.of_seq
 end
 
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  let op_map_gen : Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  (** A generator of maps of operations and their hashes. [?block_hash_t]
+      is an optional generator for the branch of operations. *)
+  let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
     let open QCheck.Gen in
-    let* ops = small_list Prevalidator_generators.operation_gen in
+    let* ops =
+      small_list (Prevalidator_generators.operation_gen ?block_hash_t)
+    in
     (* Op_map.of_seq eliminates duplicate keys (if any) *)
     List.map (fun op -> (Operation.hash op, op)) ops
     |> List.to_seq |> Op_map.of_seq |> return
@@ -306,6 +312,21 @@ module Generators = struct
     let hash = Block.hash_of_block ops_and_hashes in
     return Block.{hash; operations = ops_and_hashes}
 
+  (* A generator of lists of {!Block.t} where all elements are guaranteed
+     to be different. *)
+  let unique_block_gen : Block.Set.t QCheck.Gen.t =
+    QCheck.Gen.(small_list block_gen >|= Block.Set.of_list)
+
+  (* A generator of lists of {!Block.t} where all elements are guaranteed
+     to be different and returned lists are guaranteed to be non empty. *)
+  let unique_nonempty_block_gen =
+    let open QCheck.Gen in
+    let opt_gen =
+      let+ l = unique_block_gen in
+      if Block.Set.is_empty l then None else Some l
+    in
+    of_option_gen opt_gen
+
   (** A tree generator. Written in a slightly unusual style because it
       generates all values beforehand, to make sure they are all different.
       This is a property we want for trees of blocks. To do so,
@@ -315,13 +336,27 @@ module Generators = struct
       For example it takes [e1] for the root value and then splits
       the rest into [e2; e3] and [e4; e5; e6]. Then it recurses, sending
       [e2; e3] as values to create the left subtree and [e4; e5; e6] to
-      create the right subtree. *)
-  let tree_gen =
+      create the right subtree.
+
+      This generator takes as parameter an optional list of blocks. If
+      they are given, they are used to build the tree; otherwise fresh
+      ones are generated. *)
+  let tree_gen ?blocks =
     let open QCheck.Gen in
-    let* (elems : Block.t list) =
-      list_size (1 -- 100) block_gen
-      >|= Block.Set.of_list >|= Block.Set.to_seq >|= List.of_seq
+    let* (blocks : Block.t list) =
+      match blocks with
+      | None ->
+          (* no blocks received: generate them, use the [nonempty] flavor
+             of the generator, to guarantee [blocks <> []] below. *)
+          unique_nonempty_block_gen >|= Block.set_to_list
+      | Some [] ->
+          QCheck.Test.fail_report
+            "tree_gen should not be called with an empty list of blocks"
+      | Some blocks ->
+          (* take blocks passed as parameters *)
+          return blocks
     in
+    assert (blocks <> []) ;
     let ret x = return (Some x) in
     let rec go = function
       | [] -> return None
@@ -344,14 +379,9 @@ module Generators = struct
             | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
             | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
     in
-    let tree = go elems in
-    map
-      (function
-        | None ->
-            raise (Invalid_argument "tree should not be None")
-            (* the tree is None iff the list is empty, however, we restrict its length between 1 and 100 *)
-        | Some x -> x)
-      tree
+    (* The assertion cannot break, because we made sure that [blocks] is
+       not empty. *)
+    go blocks >|= Option.value_f ~default:(fun () -> assert false)
 
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
@@ -378,21 +408,21 @@ module Generators = struct
         the two blocks have a common ancestor.
       - a map of operations that is fine for being passed as the
         last argument of [handle_live_operations].
-    *)
-  let chain_tools_gen :
+
+      If given, the specified [?blocks] are used. Otherwise they are
+      generated. *)
+  let chain_tools_gen ?blocks :
       (Block.t Classification.chain_tools
       * Block.t Tree.tree
       * (Block.t * Block.t) option
       * Operation.t Operation_hash.Map.t)
       QCheck.Gen.t =
     let open QCheck.Gen in
-    let* tree = tree_gen in
+    let* tree = tree_gen ?blocks in
     assert (Tree.well_formed Block.compare tree) ;
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in
     let not_equal x y = not @@ equal x y in
-    (* Blocks that are leaves are blocks which aren't the predecessor
-       of any other block *)
     let read_predecessor_opt (block : Block.t) : Block.t option Lwt.t =
       List.assoc ~equal block predecessor_pairs |> Lwt.return
     in
@@ -457,6 +487,13 @@ module Generators = struct
       }
     in
     return (res, tree, chosen_pair, old_mempool)
+
+  (** [split_in_two l] is a generator producing [(l1, l2)] such that [l1 @ l2 = l] *)
+  let split_in_two (l : 'a list) : ('a list * 'a list) QCheck.Gen.t =
+    let open QCheck.Gen in
+    let length = List.length l in
+    let+ i = 0 -- length in
+    List_extra.split_n l i
 end
 
 module Arbitraries = struct
@@ -464,18 +501,19 @@ module Arbitraries = struct
 end
 
 (** Function to unwrap an [option] when it MUST be a [Some] *)
-let force_opt = function
+let force_opt ~loc = function
   | Some x -> x
-  | None -> QCheck.Test.fail_report "Unexpected None"
+  | None -> QCheck.Test.fail_reportf "Unexpected None at %s" loc
 
 (* Values from [start] (included) to [ancestor] (excluded) *)
 let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
     (start : 'a) (ancestor : 'a) : 'a list =
   Tree.predecessors ~equal tree start
   |> List_extra.take_until_if_found ~pred:(( = ) ancestor)
-  |> force_opt
+  |> force_opt ~loc:__LOC__
   |> fun preds -> start :: preds
 
+(** Pretty print values of type [Operation_hash.Set.t] *)
 let op_set_pp fmt x =
   let set_to_list m = Operation_hash.Set.to_seq m |> List.of_seq in
   Format.fprintf
@@ -483,6 +521,17 @@ let op_set_pp fmt x =
     "%a"
     (Format.pp_print_list Operation_hash.pp)
     (set_to_list x)
+
+(** Pretty print values of type [Operation.t Operation_hash.Map] *)
+let op_map_pp fmt x =
+  let pp_pair fmt (oph, op) =
+    Format.fprintf fmt "%a:%a" Operation_hash.pp oph Operation.pp op
+  in
+  Format.fprintf
+    fmt
+    "%a"
+    (Format.pp_print_list pp_pair)
+    (Operation_hash.Map.bindings x)
 
 let qcheck_cond ?pp ~cond e1 e2 () =
   if cond e1 e2 then true
@@ -504,161 +553,398 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           pp
           e2
 
-(** Test that operations returned by [handle_live_operations] is
-    a subset of the input mempool when [is_branch_alive] rules
-    out all operations *)
-let test_handle_live_operations_live_blocks_all_outdated =
-  QCheck.Test.make
-    ~name:
-      "[handle_live_operations ~is_branch_alive:(Fun.const false)] is a subset \
-       of its last argument"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  (* List of operation hashes coming from [old_mempool] *)
-  let expected_superset : Operation_hash.Set.t =
-    Op_map.bindings old_mempool |> List.map fst |> Operation_hash.Set.of_list
-  in
-  let actual : Operation_hash.Set.t =
-    Classification.Internal_for_tests.handle_live_operations
-      ~block_store:Block.tools
-      ~chain
-      ~from_branch
-      ~to_branch
-      ~is_branch_alive:(Fun.const false)
-      old_mempool
-    |> Lwt_main.run |> Op_map.bindings |> List.map fst
-    |> Operation_hash.Set.of_list
-  in
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    actual
-    expected_superset
-    ()
+let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
+    Operation_hash.Set.t =
+  List.concat blocks |> List.concat |> Operation_hash.Set.of_list
 
-(** Test that operations returned by [handle_live_operations] is
-    the union of operations in its last argument and operations on
-    the "path" between [from_branch] and [to_branch] *)
-let test_handle_live_operations_path_spec =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] path specification"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, _) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree from_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  let actual =
+module Handle_operations = struct
+  (** Test that [handle_live_operations] returns an empty map
+      of operations when [is_branch_alive] rules
+      out all operations *)
+  let test_handle_live_operations_live_blocks_all_outdated =
+    QCheck.Test.make
+      ~name:
+        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is empty"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let actual : Operation.t Op_map.t =
+      Classification.Internal_for_tests.handle_live_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~is_branch_alive:(Fun.const false)
+        old_mempool
+      |> Lwt_main.run
+    in
+    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
+
+  (** Test that operations returned by [handle_live_operations] is
+      the union of 1/ operations from its last argument (a map) and 2/
+      operations on the "path" between [from_branch] and [to_branch] (when
+      all blocks are considered live). *)
+  let test_handle_live_operations_path_spec =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] path specification"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, _) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
+    in
+    let expected =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> blocks_to_oph_set
+    in
+    let actual =
+      Classification.Internal_for_tests.handle_live_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~is_branch_alive:(Fun.const true)
+        Operation_hash.Map.empty
+      |> Lwt_main.run |> Op_map.bindings |> List.map fst
+      |> Operation_hash.Set.of_list
+    in
+    qcheck_eq' ~pp:op_set_pp ~eq:Operation_hash.Set.equal ~expected ~actual ()
+
+  (** Test that operations cleared by [handle_live_operations]
+      are operations on the path from [ancestor] to [to_branch] (when all
+      operations are deemed up-to-date). *)
+  let test_handle_live_operations_clear =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] clear approximation"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let cleared = ref Operation_hash.Set.empty in
+    let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
+    let chain = {chain with clear_or_cancel = clearer} in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
+    in
+    let expected_superset =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree to_branch ancestor)
+      |> blocks_to_oph_set
+    in
     Classification.Internal_for_tests.handle_live_operations
       ~block_store:Block.tools
       ~chain
       ~from_branch
       ~to_branch
       ~is_branch_alive:(Fun.const true)
-      Operation_hash.Map.empty
-    |> Lwt_main.run |> Op_map.bindings |> List.map fst
-    |> Operation_hash.Set.of_list
-  in
-  qcheck_eq' ~pp:op_set_pp ~eq:Operation_hash.Set.equal ~expected ~actual ()
+      old_mempool
+    |> Lwt_main.run |> ignore ;
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      !cleared
+      expected_superset
+      ()
 
-(** Test that operations cleared by [handle_live_operations]
-    are operations on the path from [ancestor] to [to_branch] (when all
-    operations are deemed up-to-date). *)
-let test_handle_live_operations_clear =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] clear approximation"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let cleared = ref Operation_hash.Set.empty in
-  let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
-  let chain = {chain with clear_or_cancel = clearer} in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected_superset =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree to_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  Classification.Internal_for_tests.handle_live_operations
-    ~block_store:Block.tools
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(Fun.const true)
-    old_mempool
-  |> Lwt_main.run |> ignore ;
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    !cleared
-    expected_superset
-    ()
+  (** Test that operations injected by [handle_live_operations]
+      are operations on the path from [ancestor] to [from_branch]. *)
+  let test_handle_live_operations_inject =
+    QCheck.Test.make
+      ~name:"[handle_live_operations] inject approximation"
+      Arbitraries.chain_tools_arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let injected = ref Operation_hash.Set.empty in
+    let inject_operation oph _op =
+      injected := Operation_hash.Set.add oph !injected ;
+      Lwt.return_unit
+    in
+    let chain = {chain with inject_operation} in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
+    in
+    let expected_superset =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> blocks_to_oph_set
+    in
+    Classification.Internal_for_tests.handle_live_operations
+      ~block_store:Block.tools
+      ~chain
+      ~from_branch
+      ~to_branch
+      ~is_branch_alive:(Fun.const true)
+      old_mempool
+    |> Lwt_main.run |> ignore ;
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      !injected
+      expected_superset
+      ()
+end
 
-(** Test that operations injected by [handle_live_operations]
-    are operations on the path from [ancestor] to [from_branch]. *)
-let test_handle_live_operations_inject =
-  QCheck.Test.make
-    ~name:"[handle_live_operations] inject approximation"
-    Arbitraries.chain_tools_arb
-  @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-  QCheck.assume @@ Option.is_some pair_blocks_opt ;
-  let (from_branch, to_branch) = force_opt pair_blocks_opt in
-  let injected = ref Operation_hash.Set.empty in
-  let inject_operation oph _op =
-    injected := Operation_hash.Set.add oph !injected ;
-    Lwt.return_unit
-  in
-  let chain = {chain with inject_operation} in
-  let equal = Block.equal in
-  let ancestor : Block.t =
-    Tree.find_ancestor ~equal tree from_branch to_branch |> force_opt
-  in
-  let expected_superset =
-    List.map
-      Block.tools.all_operation_hashes
-      (values_from_to ~equal tree from_branch ancestor)
-    |> List.concat |> List.concat |> Operation_hash.Set.of_list
-  in
-  Classification.Internal_for_tests.handle_live_operations
-    ~block_store:Block.tools
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(Fun.const true)
-    old_mempool
-  |> Lwt_main.run |> ignore ;
-  qcheck_cond
-    ~pp:op_set_pp
-    ~cond:Operation_hash.Set.subset
-    !injected
-    expected_superset
-    ()
+module Recyle_operations = struct
+  (** A generator of {!Classification.t} that uses
+      the given operations and hashes. It is used in place
+      of {!Prevalidator_generators.t_gen} because we need to
+      control the operations and hashes used (because we want them
+      to be distinct from the one in the tree of blocks). This
+      generator generates classifications that contains all the
+      given operations and hashes, spreading them among the different
+      classes of {!Prevalidator_classification.t}. This generator is NOT
+      a fully random generator like {!Prevalidator_generators.t_gen}. *)
+  let classification_of_ops_gen (ops : Operation.t Op_map.t) :
+      Classification.t QCheck.Gen.t =
+    let open QCheck.Gen in
+    let bindings = Operation_hash.Map.bindings ops in
+    let length = List.length bindings in
+    let* empty_space = 0 -- 100 in
+    (* To avoid throwing part of [ops], we want the capacity of the classification
+       to be equal or larger than [length], hence: *)
+    let map_size_limit = length + empty_space in
+    (* Because capacity must be > 0 in Ring.create: *)
+    let map_size_limit = max 1 map_size_limit in
+    let parameters : Classification.parameters =
+      {map_size_limit; on_discarded_operation = Fun.const ()}
+    in
+    let* classes =
+      list_size (pure length) Prevalidator_generators.classification_gen
+    in
+    assert (List.length classes == length) ;
+    let t = Prevalidator_classification.create parameters in
+    List.iter
+      (fun (classification, (oph, op)) ->
+        Prevalidator_generators.add_if_not_present classification oph op t)
+      (List.combine_drop classes bindings) ;
+    return t
+
+  (** Returns data to test {!Classification.recyle_operations}:
+      - an instance of [block chain_tools]
+      - the tree of blocks
+      - a pair of blocks (that belong to the tree) and is
+        fine for being passed as [(~from_branch, ~to_branch)]; i.e.
+        the two blocks have a common ancestor.
+      - a classification
+      - a list of pending operations
+
+      As in production, the following lists of operations are disjoint:
+      operations in the blocks, classification, and pending list. Note
+      that this is not a precondition of [recycle_operations], it's
+      to test the typical use case. *)
+  let gen =
+    let open QCheck.Gen in
+    let* blocks = Generators.unique_nonempty_block_gen >|= Block.set_to_list in
+    assert (blocks <> []) ;
+    let to_ops (blk : Block.t) = List.concat blk.operations in
+    let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
+    let blocks_ops =
+      List.map to_ops blocks |> List.concat |> oph_op_list_to_map
+    in
+    let both f (a, b) = (f a, f b) in
+    let blocks_hashes = List.map (fun (blk : Block.t) -> blk.hash) blocks in
+    let block_hash_t =
+      (* For classification and pending, put 50% of them in live_blocks.
+         For the remaining 50%, generate branch randomly, so likely outside
+         live_blocks. *)
+      frequency
+        [(1, Prevalidator_generators.block_hash_gen); (1, oneofl blocks_hashes)]
+    in
+    let* classification_pendings_ops =
+      (* For classification and pending, we want operations that are NOT in
+         the blocks already. Hence: *)
+      Generators.op_map_gen ~block_hash_t
+      >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
+    in
+    let* (classification_ops, pending_ops) =
+      Op_map.bindings classification_pendings_ops
+      |> Generators.split_in_two >|= both oph_op_list_to_map
+    in
+    let* (chain_tools, tree, from_to, _) = Generators.chain_tools_gen ~blocks in
+    let+ classification = classification_of_ops_gen classification_ops in
+    (chain_tools, tree, from_to, classification, pending_ops)
+
+  let arb = QCheck.make gen
+
+  (** Test that {!Classification.recycle_operations} returns an empty map when
+      live blocks are empty. This test lifts
+      {!Handle_operations.test_handle_live_operations_live_blocks_all_outdated}
+      to [recycle_operations]. *)
+  let test_recycle_operations_empty_live_blocks =
+    QCheck.Test.make
+      ~name:"[recycle_operations ~live_blocks:empty] is empty"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, _tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let actual : Operation.t Op_map.t =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks:Block_hash.Set.empty
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run
+    in
+    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
+
+  (** Test that the value returned by {!Classification.recycle_operations}
+      can be approximated by unioning the sets of values:
+      - returned by {!Classification.Internal_for_tests.handle_live_operations}
+      - classified in the classification data structure
+      - sent as [pending]. *)
+  let test_recycle_operations_returned_value_spec =
+    QCheck.Test.make
+      ~name:"[recycle_operations] returned value can be approximated"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let equal = Block.equal in
+    let ancestor : Block.t =
+      Tree.find_ancestor ~equal tree from_branch to_branch
+      |> force_opt ~loc:__LOC__
+    in
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree
+      |> List.map (fun (blk : Block.t) -> blk.hash)
+      |> Block_hash.Set.of_list
+    in
+    (* This is inherited from the behavior of [handle_live_operations] *)
+    let expected_from_tree : Operation_hash.Set.t =
+      List.map
+        Block.tools.all_operation_hashes
+        (values_from_to ~equal tree from_branch ancestor)
+      |> blocks_to_oph_set
+    in
+    (* This is coming from [recycle_operations] itself *)
+    let op_map_to_hash_list (m : 'a Operation_hash.Map.t) =
+      Op_map.bindings m |> List.map fst |> Operation_hash.Set.of_list
+    in
+    let expected_from_classification =
+      Classification.Internal_for_tests.to_map
+        ~applied:true
+        ~branch_delayed:true
+        ~branch_refused:handle_branch_refused
+        ~refused:false
+        classification
+      |> op_map_to_hash_list
+    in
+    let expected_from_pending = op_map_to_hash_list pending in
+    let expected_superset : Operation_hash.Set.t =
+      Operation_hash.Set.union
+        (Operation_hash.Set.union
+           expected_from_tree
+           expected_from_classification)
+        expected_from_pending
+    in
+    let actual : Operation_hash.Set.t =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run |> Op_map.bindings |> List.map fst
+      |> Operation_hash.Set.of_list
+    in
+    qcheck_cond
+      ~pp:op_set_pp
+      ~cond:Operation_hash.Set.subset
+      actual
+      expected_superset
+      ()
+
+  (** Test that the classification is appropriately trimmed
+      by {!Classification.recycle_operations} *)
+  let test_recycle_operations_classification =
+    QCheck.Test.make
+      ~name:"[recycle_operations] correctly trims its input classification"
+      (QCheck.pair arb QCheck.bool)
+    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+             handle_branch_refused ) ->
+    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree
+      |> List.map (fun (blk : Block.t) -> blk.hash)
+      |> Block_hash.Set.of_list
+    in
+    let expected : Operation.t Op_map.t =
+      Classification.Internal_for_tests.to_map
+        ~applied:false
+        ~branch_delayed:false
+        ~branch_refused:(not handle_branch_refused)
+        ~refused:true
+        classification
+    in
+    let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let () =
+      Classification.recycle_operations
+        ~block_store:Block.tools
+        ~chain
+        ~from_branch
+        ~to_branch
+        ~live_blocks
+        ~classification
+        ~pending
+        ~handle_branch_refused
+      |> Lwt_main.run |> ignore
+    in
+    let actual =
+      Classification.Internal_for_tests.to_map
+        ~applied:true
+        ~branch_delayed:true
+        ~branch_refused:true
+        ~refused:true
+        classification
+    in
+    qcheck_eq' ~pp:op_map_pp ~expected ~actual ()
+end
 
 let () =
   Alcotest.run
     "Prevalidator"
     [
+      (* Run only those tests with:
+         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'handle_operations' *)
       ( "handle_operations",
         qcheck_wrap
-          [
-            test_handle_live_operations_live_blocks_all_outdated;
-            test_handle_live_operations_path_spec;
-            test_handle_live_operations_clear;
-            test_handle_live_operations_inject;
-          ] );
+          Handle_operations.
+            [
+              test_handle_live_operations_live_blocks_all_outdated;
+              test_handle_live_operations_path_spec;
+              test_handle_live_operations_clear;
+              test_handle_live_operations_inject;
+            ] );
+      (* Run only first two tests (for example) with:
+         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'recycle_operations' '0..2'*)
+      ( "recycle_operations",
+        qcheck_wrap
+          Recyle_operations.
+            [
+              test_recycle_operations_empty_live_blocks;
+              test_recycle_operations_returned_value_spec;
+              test_recycle_operations_classification;
+            ] );
     ]
