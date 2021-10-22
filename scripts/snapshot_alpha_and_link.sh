@@ -41,13 +41,6 @@ fi
 echo "dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version_number} ${short_hash}"
 dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version_number} ${short_hash}
 
-echo "update_integration_test.sh"
-test_parameters="src/proto_${version_number}_${short_hash}/lib_parameters/test-parameters.json"
-dune build "$test_parameters"
-cp -f _build/default/"$test_parameters" \
-   src/proto_"${version_number}_${short_hash}"/parameters/test-parameters.json
-"$script_dir"/update_integration_test.sh
-
 echo "link_protocol.sh src/proto_${version_number}_${short_hash}"
 $script_dir/link_protocol.sh src/proto_${version_number}_${short_hash}
 
