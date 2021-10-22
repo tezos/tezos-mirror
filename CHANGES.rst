@@ -23,20 +23,85 @@ be documented here either.
 Node
 ----
 
--  Fixed wrong behaviour when updating the additional cycles of the
-   node's history mode.
+- The following RPCs output format changed:
+  1. ``/workers/block_validator``,
+  2. ``/workers/chain_validators``,
+  3. ``/workers/chain_validators/<chain_id>``,
+  4. ``/workers/chain_validator/<chain_id>/peer_validators``,
+  5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
+  6. ``/workers/prevalidators``.
+  The field ``backlog`` is removed. Those logs can be obtained via the
+  node itself. Logging can be redirected to a file via the option
+  ``--log-file``. External tools such as ``logrotate`` can be used to
+  remove entries that are too old.
 
--  Removed redundant event while setting a new head.
+- The node configuration format is changed. The
+  following paths are removed:
+  1. ``shell.chain_validator.limits.worker_backlog_size``
+  2. ``shell.chain_validator.limits.worker_backlog_level``
+  3. ``shell.peer_validator.limits.worker_backlog_size``
+  4. ``shell.peer_validator.limits.worker_backlog_level``
+  5. ``shell.prevalidator.limits.worker_backlog_size``
+  6. ``shell.prevalidator.limits.worker_backlog_level``
+  7. ``shell.block_validator.limits.worker_backlog_size``
+  8. ``shell.block_validator.limits.worker_backlog_level``
 
--  Fixed wrong behaviour when merging the store after a rolling
-   snapshot import.
+  If those fields are present in your configuration file, they can
+  simply be removed.
 
--  Fixed an issue when reconstructing a storage with missing block or
-   operations metadata hashes.
+- Added version ``1`` to RPC ``GET chains/main/mempool/pending_operations``.
+  It can be used by calling the RPC with the parameter ``?version=1``
+  (default version is still ``0``).
 
--  Fixed an issue in the store were the table in charge of maintaining
-   the associations between a protocol and its activation block was
-   not well updated.
+- Added an RPC ``/config/logging`` to reconfigure the logging framework
+  without having to restart the node. See also the new documentation pages
+  related to logging.
+
+-  Better handling of mempool cache in the `distributed_db` which
+   should make the `distributed_db` RAM consumption strongly
+   correlated to the one of the mempool.
+
+-  Improved the snapshot export mechanism by reducing both the export
+   time and the memory footprint.
+
+-  Added new RPCs to inspect the storage status:
+
+   -  GET ``chains/main/levels/checkpoint``: checkpoint block hash and
+      level.
+   -  GET ``chains/main/levels/savepoint``: savepoint block hash and
+      level.
+   -  GET ``chains/main/levels/caboose``: caboose block hash and
+      level.
+   -  GET ``config/history_mode``: history mode of the node.
+
+-  Deprecated the ``chains/main/checkpoint`` RPC.
+
+-  The ``tezos-admin-client show current checkpoint`` command now only
+   outputs the current checkpoint. It no longer outputs the savepoint,
+   caboose and history mode.
+
+-  Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
+   show fields of the filter configuration that were equal to their
+   default value: e.g. if the configuration was the default one, it
+   just returned ``{}``. Now displays all the fields by default. The
+   old behavior may be brought back by setting the new optional
+   parameter ``include_default`` to ``false``.
+
+-  Changed the behavior of RPC POST ``/chains/<chain_id>/mempool/filter``
+   when provided an input json that does not describe a valid filter
+   configuration. It used to revert the filter back to the default
+   configuration in that case, but now it leaves it unchanged. (Note:
+   if the input json is valid but does not provide all the fields of
+   the filter configuration, then any missing field is set back to its
+   default value, rather than left unchanged. This is the same
+   behavior as the previous version of the RPC.) As this behavior may
+   be confusing, the RPC now returns the new filter configuration of
+   the mempool.
+
+-  When encoded in binary, errors now have a single size field. This only
+   affects the binary representation of errors or values that include errors
+   inside. It may break the compatibility for tools that request binary-only
+   answers from the node and parse the errors by hand.
 
 Client
 ------
@@ -56,12 +121,174 @@ Codec
 Docker Images
 -------------
 
+Miscellaneous
+-------------
+
+-  Made the ``file-descriptor-{path,stdout,stderr}://`` event-logging
+   sink more configurable (e.g. filtering per level and per section). The
+   environment variable ``TEZOS_NODE_HOSTNAME`` used for the output of events
+   was renamed to the more appropriate ``TEZOS_EVENT_HOSTNAME``.
+
+-  Added specific documentation pages about logging for users and
+   developers.
+
+Version 11.0~rc1
+================
+
+Node
+----
+
+-  **Breaking change**:
+   updated the output of the ``/stats/gc`` RPC entry point: it now also
+   reports the number of full major collections made by the OCaml
+   garbage collector.
+
+-  **Breaking change**:
+   updated the encoding of chain validator events.
+   The output of RPC ``GET /workers/chain_validators/<chain_id>``
+   was modified as a result.
+
+-  Updated RPC ``GET /workers/prevalidators``: field ``backlog`` now
+   always returns an empty list. The events in this backlog can now be
+   obtained either via stdout, or by configuring a new sink for events
+   via the environment variable ``TEZOS_EVENTS_CONFIG`` (to be set
+   before launching the node).
+
+-  Updated RPC ``GET /chains/<chain_id>/mempool/monitor_operation``:
+   output was extended to include operation hashes (field name is
+   ``hash``) and errors (field name is ``error``) when the operation
+   is classified as ``Branch_delayed``, ``Branch_refused`` or ``Refused``.
+
+-  Improved how the distributed database (DDB) handles the mempool cache.
+   This should make the DDB RAM consumption strongly correlated
+   to the one of the mempool.
+
+-  Fixed wrong error message in case of P2P network address binding collision.
+
+-  Added new RPCs to ban/unban operations locally.
+
+   -  POST ``/chains/<chain_id>/mempool/ban_operation``: ban a given
+      operation hash. The operation is removed from the mempool, and
+      its effect is reverted if it was applied. It is also added to
+      the prevalidator's set of banned operations, to prevent it from
+      being fetched/processed/injected in the future.
+
+   -  POST ``/chains/<chain_id>/mempool/unban_operation``: unban a given
+      operation hash, removing it from the prevalidator's set of banned
+      operations. Nothing happens if the operation was not banned.
+
+   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: unban
+      all operations, i.e. clear the set of banned operations.
+
+-  Added the possibility to use the ``~``, ``-`` and ``+`` operators
+   when querying blocks by their level using the
+   ``/chains/.../blocks/`` RPC. For instance,
+   ``/chains/main/blocks/41+1`` requests the block at level 42. Before
+   this change, these notations were only available with aliases (such
+   as ``head-1``).
+
+-  Added the possibility to use the ``+`` operator when specifying the
+   block to export, using the ``--block`` argument of the snapshot
+   export command. Before, only ``~`` and ``-`` were allowed.
+
+-  Fixed a bug where the mempool forgot about ``refused`` operations
+   on flush, leading to these operations being potentially reevaluated
+   in the future (e.g. if they are advertised again by a peer).
+
+-  Removed the built-in network aliases for Edonet and Florencenet,
+   since Edo and Florence have been replaced by Granada.
+
+-  Added a built-in network alias for Hangzhounet.
+
+Client
+------
+
+-  Disabled indentation checking by default in the ``tezos-client
+   convert script`` and ``tezos-client hash script`` commands. In
+   particular, ``tezos-client convert script <script> from Michelson
+   to Michelson`` can now be used as a Michelson script formatter. To
+   force the indentation check, the new ``--enforce-indentation``
+   command line switch can be used.
+
+-  Added admin commands ``ban operation <operation_hash>``,
+   ``unban operation <operation_hash>``, and ``unban all operations``
+   that call the corresponding RPCs.
+
+-  Made mode light ``--endpoint`` / ``--sources`` consistency check
+   happen earlier, so that it is guaranteed to catch mismatches.
+
+-  Added commands ``list proxy protocols`` and ``list light protocols``,
+   to get the list of protocols supported by ``--mode proxy`` and ``--mode light``
+
+-  Fix gas simulation for operation batches for Granada, Hangzhou and Alpha
+
+-  Added timestamp display of the snapshot's block target when running
+   the ``tezos-node snapshot info`` command.
+
+Baker / Endorser / Accuser
+--------------------------
+
+-  Removed baker, endorser and accuser for Edo and Florence, since they
+   have been replaced by Granada.
+
+Protocol Compiler And Environment
+---------------------------------
+
+-  Added a new version of the protocol environment (V3).
+
+   -  Updated some dependency libraries that have had releases since V2.
+
+   -  Improved safety by removing access to some potentially dangerous functions
+      (functions that make assumptions about their input, functions that rely on
+      implicit comparison, etc.).
+
+   -  Added new features: ``Timelock`` and ``FallbackArray``.
+
+   -  Added new feature: RPC outputs can now be chunked.
+      RPCs that use this feature in the protocol can now respond without blocking
+      during the encoding of the output.
+
+Docker Images
+-------------
+
+-  The entrypoint script now starts the node with ``--allow-all-rpc``.
+   This means that ACLs are inactive in the Docker image on the default RPC port.
+   Note that the Docker image does not expose this port by default.
+   If you use ``tezos-docker-manager.sh``, it will expose this port only to
+   other Octez containers.
+   In summary, you can now call all RPCs if you use Docker images, without
+   compromising security as long as you do not explicitely expose the RPC port.
+
+Version 10.3
+============
+
+Node
+----
+
+-  Fixed wrong behaviour when updating the additional cycles of the
+   node's history mode.
+
+-  Removed redundant event while setting a new head.
+
+-  Fixed wrong behaviour when merging the store after a rolling
+   snapshot import.
+
+-  Fixed an issue when reconstructing a storage with missing block or
+   operations metadata hashes.
+
+-  Fixed an issue in the store were the table in charge of maintaining
+   the associations between a protocol and its activation block was not
+   well updated.
+
+-  Prevented some store files from being written only partially,
+   which could result in store corruptions.
+
+Docker Images
+-------------
+
 -  The ``--force-history-mode-switch`` option is now available for
    ``tezos-node`` entrypoint. It allows the user to switch the history
    mode of the node's storage.
-
-Miscellaneous
--------------
 
 Version 10.2
 ============
@@ -255,8 +482,11 @@ Node
    ``TEZOS_CONTEXT`` instead (see previous item).
 
 -  Added an RPC to run `TZIP-4
-   views <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
+   views <https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
    offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
+
+- Added a CLI option ``--allow-all-rpc`` to enable full access to all RPC
+  endpoints on a given listening address.
 
 Client
 ------
@@ -313,7 +543,6 @@ Proxy server
 
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
-
 
 Version 9.7
 ===========
