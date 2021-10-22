@@ -102,15 +102,14 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /doc/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /doc/'
+    - changes:
+        - docs/introduction/*.sh
       when: always
     # Run when there is label on the merge request.
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
       when: always
-    - changes:
-        - /docs
-      when: always
-    - when: never
+    - when: manual
+      allow_failure: true
 
 .rules_template__opam_child_pipeline_tests:
   rules:
