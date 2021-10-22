@@ -33,9 +33,6 @@ These are defined in
 - `lib_protocol/test`
 - `tests_python/tests_XXX`
 
-All integration tests should be removed from :src:`.gitlab/ci/integration.yml`
-using the script :src:`scripts/update_integration_test.sh`
-
 Remove ``lib_delegate``
 -----------------------
 
@@ -72,9 +69,6 @@ protocol should be removed. Any mention of the protocol in
 
 These changes remove the migration testing code of the current protocol that is
 no longer necessary to test.
-
-Integration tests should be amended by running the script
-`scripts/update_integration_test.sh`.
 
 Remove RW Commands From ``lib_client_commands``
 -----------------------------------------------
