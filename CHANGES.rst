@@ -80,21 +80,6 @@ Node
    outputs the current checkpoint. It no longer outputs the savepoint,
    caboose and history mode.
 
--  Fixed an issue in the store were the table in charge of maintaining
-   the associations between a protocol and its activation block was not
-   well updated.
-
--  Fixed wrong behaviour when updating the additional cycles of the
-   node's history mode.
-
--  Removed redundant event while setting a new head.
-
--  Fixed wrong behaviour when merging the store after a rolling
-   snapshot import.
-
--  Fixed an issue when reconstructing a storage with missing block or
-   operations metadata hashes.
-
 -  Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
    show fields of the filter configuration that were equal to their
    default value: e.g. if the configuration was the default one, it
@@ -135,10 +120,6 @@ Codec
 
 Docker Images
 -------------
-
--  The ``--force-history-mode-switch`` option is now available for
-   ``tezos-node`` entrypoint. It allows the user to switch the history
-   mode of the node's storage.
 
 Miscellaneous
 -------------
@@ -277,6 +258,37 @@ Docker Images
    other Octez containers.
    In summary, you can now call all RPCs if you use Docker images, without
    compromising security as long as you do not explicitely expose the RPC port.
+
+Version 10.3
+============
+
+Node
+----
+
+-  Fixed wrong behaviour when updating the additional cycles of the
+   node's history mode.
+
+-  Removed redundant event while setting a new head.
+
+-  Fixed wrong behaviour when merging the store after a rolling
+   snapshot import.
+
+-  Fixed an issue when reconstructing a storage with missing block or
+   operations metadata hashes.
+
+-  Fixed an issue in the store were the table in charge of maintaining
+   the associations between a protocol and its activation block was not
+   well updated.
+
+-  Prevented some store files from being written only partially,
+   which could result in store corruptions.
+
+Docker Images
+-------------
+
+-  The ``--force-history-mode-switch`` option is now available for
+   ``tezos-node`` entrypoint. It allows the user to switch the history
+   mode of the node's storage.
 
 Version 10.2
 ============
