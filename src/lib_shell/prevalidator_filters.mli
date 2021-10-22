@@ -41,7 +41,8 @@ module type FILTER = sig
       [ `Undecided
       | `Branch_delayed of tztrace
       | `Branch_refused of Error_monad.tztrace
-      | `Refused of Error_monad.tztrace ]
+      | `Refused of Error_monad.tztrace
+      | `Outdated of tztrace ]
 
     val post_filter :
       config ->
