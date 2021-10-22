@@ -164,20 +164,28 @@ let mempool_encoding : mempool Data_encoding.t =
     (fun operations ->
       let applied = [] in
       let refused = [] in
+      let outdated = [] in
       let branch_refused = [] in
       let branch_delayed = [] in
       let unprocessed = operations in
-      (applied, refused, branch_refused, branch_delayed, unprocessed))
-    (fun (applied, refused, branch_refused, branch_delayed, unprocessed) ->
+      (applied, refused, outdated, branch_refused, branch_delayed, unprocessed))
+    (fun ( applied,
+           refused,
+           outdated,
+           branch_refused,
+           branch_delayed,
+           unprocessed ) ->
       assert (is_empty applied) ;
       assert (is_empty refused) ;
+      assert (is_empty outdated) ;
       assert (is_empty branch_refused) ;
       assert (is_empty branch_delayed) ;
       unprocessed)
-    (obj5
+    (obj6
        (* We put [unit] as a stub *)
        (req "applied" (list (dynamic_size unit)))
        (req "refused" (list (dynamic_size unit)))
+       (req "outdated" (list (dynamic_size unit)))
        (req "branch_refused" (list (dynamic_size unit)))
        (req "branch_delayed" (list (dynamic_size unit)))
        (req

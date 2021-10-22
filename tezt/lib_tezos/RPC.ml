@@ -107,8 +107,11 @@ let get_mempool ?endpoint ?hooks ?chain client =
   let branch_delayed = get_hashes "branch_delayed" in
   let branch_refused = get_hashes "branch_refused" in
   let refused = get_hashes "refused" in
+  let outdated = get_hashes "outdated" in
   let unprocessed = get_hashes "unprocessed" in
-  return Mempool.{applied; branch_delayed; branch_refused; refused; unprocessed}
+  return
+    Mempool.
+      {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
 
 let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
   let path = ["chains"; chain; "mempool"; "request_operations"] in

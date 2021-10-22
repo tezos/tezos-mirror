@@ -151,6 +151,7 @@ type mempool_count = {
   branch_delayed : int;
   branch_refused : int;
   refused : int;
+  outdated : int;
   unprocessed : int;
   total : int;
 }
@@ -161,23 +162,41 @@ let count_mempool mempool =
   let branch_delayed = as_list (mempool |-> "branch_delayed") |> List.length in
   let branch_refused = as_list (mempool |-> "branch_refused") |> List.length in
   let refused = as_list (mempool |-> "refused") |> List.length in
+  let outdated = as_list (mempool |-> "outdated") |> List.length in
   let unprocessed = as_list (mempool |-> "unprocessed") |> List.length in
   let total =
-    applied + branch_delayed + branch_refused + refused + unprocessed
+    applied + branch_delayed + branch_refused + refused + outdated + unprocessed
   in
-  {applied; branch_delayed; branch_refused; refused; unprocessed; total}
+  {
+    applied;
+    branch_delayed;
+    branch_refused;
+    refused;
+    outdated;
+    unprocessed;
+    total;
+  }
 
 let pp_mempool_count fmt
-    {applied; branch_delayed; branch_refused; refused; unprocessed; total} =
+    {
+      applied;
+      branch_delayed;
+      branch_refused;
+      refused;
+      outdated;
+      unprocessed;
+      total;
+    } =
   Format.fprintf
     fmt
     "total: %d - applied: %d, branch_delayed: %d, branch_refused: %d, refused: \
-     %d, unprocessed: %d"
+     %d, outdated: %d, unprocessed: %d"
     total
     applied
     branch_delayed
     branch_refused
     refused
+    outdated
     unprocessed
 
 (** Matches events which contain an injection request.
@@ -339,7 +358,7 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_mempool ?endpoint client =
   let mempool_str =
-    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
   in
   let mempool = Temp.file "mempool.json" in
   let* _ =
@@ -440,7 +459,7 @@ let ban_operation_branch_refused_reevaluated =
   let empty_mempool_file = Temp.file "mempool.json" in
   let* _ =
     let empty_mempool =
-      {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+      {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
     in
     Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
         Lwt_io.write oc empty_mempool)
@@ -1801,7 +1820,7 @@ let recycling_branch_refused =
   let empty_mempool_file = Temp.file "mempool.json" in
   let* _ =
     let empty_mempool =
-      {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+      {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
     in
     Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
         Lwt_io.write oc empty_mempool)

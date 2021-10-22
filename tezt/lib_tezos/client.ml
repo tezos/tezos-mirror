@@ -353,7 +353,7 @@ let endorse_for ?endpoint ?key client =
 
 let empty_mempool_file ?(filename = "mempool.json") () =
   let mempool_str =
-    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1928
      a write_file function should be added to the tezt base module *)

@@ -26,6 +26,7 @@
 type 'error t = {
   applied : (Operation_hash.t * Operation.t) list;
   refused : (Operation.t * 'error list) Operation_hash.Map.t;
+  outdated : (Operation.t * 'error list) Operation_hash.Map.t;
   branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
   branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;
 }
@@ -34,6 +35,7 @@ let empty =
   {
     applied = [];
     refused = Operation_hash.Map.empty;
+    outdated = Operation_hash.Map.empty;
     branch_refused = Operation_hash.Map.empty;
     branch_delayed = Operation_hash.Map.empty;
   }
@@ -60,18 +62,21 @@ let encoding error_encoding =
       Operation_hash.Map.empty
   in
   conv
-    (fun {applied; refused; branch_refused; branch_delayed} ->
+    (fun {applied; refused; outdated; branch_refused; branch_delayed} ->
       ( applied,
         build_list refused,
+        build_list outdated,
         build_list branch_refused,
         build_list branch_delayed ))
-    (fun (applied, refused, branch_refused, branch_delayed) ->
+    (fun (applied, refused, outdated, branch_refused, branch_delayed) ->
       let refused = build_map refused in
+      let outdated = build_map outdated in
       let branch_refused = build_map branch_refused in
       let branch_delayed = build_map branch_delayed in
-      {applied; refused; branch_refused; branch_delayed})
-    (obj4
+      {applied; refused; outdated; branch_refused; branch_delayed})
+    (obj5
        (req "applied" (list operation_encoding))
        (req "refused" (list refused_encoding))
+       (req "outdated" (list refused_encoding))
        (req "branch_refused" (list refused_encoding))
        (req "branch_delayed" (list refused_encoding)))
