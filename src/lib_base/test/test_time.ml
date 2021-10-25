@@ -32,38 +32,39 @@
 *)
 
 open Time
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 module Protocol = struct
   include Protocol
+  open QCheck2
 
   let max_rfc3339_seconds = to_seconds max_rfc3339
 
   let min_rfc3339_seconds = to_seconds min_rfc3339
 
-  let t_arb = QCheck.map ~rev:to_seconds of_seconds QCheck.int64
+  let gen = Gen.(map of_seconds int64)
 
-  let rfc3339_compatible_t_arb =
+  let rfc3339_compatible_t_gen =
+    let open Gen in
     let within_rfc3339 =
-      QCheck.map
-        ~rev:to_seconds
-        of_seconds
-        (int64_range min_rfc3339_seconds max_rfc3339_seconds)
+      map of_seconds (int64_range_gen min_rfc3339_seconds max_rfc3339_seconds)
     in
-    QCheck.frequency
+    frequency
       [
         (97, within_rfc3339);
-        (1, QCheck.always max_rfc3339);
-        (1, QCheck.always min_rfc3339);
-        (1, QCheck.always epoch);
+        (1, pure max_rfc3339);
+        (1, pure min_rfc3339);
+        (1, pure epoch);
       ]
 
   let pp fmt t = Format.fprintf fmt "%Lx" (to_seconds t)
 
+  let print = Format.asprintf "%a" pp
+
   let add_diff_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"Protocol.[add|diff] roundtrip"
-      (QCheck.pair t_arb QCheck.int64)
+      Gen.(pair gen int64)
       (fun (some_time, delta) ->
         let other_time = add some_time delta in
         let actual = diff other_time some_time in
@@ -75,39 +76,34 @@ module Protocol = struct
           ())
 
   let diff_add_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"Protocol.[diff|add] roundtrip"
-      (QCheck.pair t_arb t_arb)
+      (Gen.pair gen gen)
       (fun (some_time, other_time) ->
         let delta = diff other_time some_time in
         let actual = add some_time delta in
         qcheck_eq' ~pp ~eq:equal ~expected:other_time ~actual ())
 
   let encoding_binary_roundtrip =
-    QCheck.Test.make
-      ~name:"Protocol.encoding roundtrips in binary"
-      t_arb
-      (fun t ->
+    Test.make ~name:"Protocol.encoding roundtrips in binary" gen (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn encoding t in
         let actual = Data_encoding.Binary.of_bytes_exn encoding b in
         qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
   let encoding_json_roundtrip =
-    QCheck.Test.make
-      ~name:"Protocol.encoding roundtrips in JSON"
-      t_arb
-      (fun t ->
+    Test.make ~name:"Protocol.encoding roundtrips in JSON" gen (fun t ->
         let j = Data_encoding.Json.construct encoding t in
         let actual = Data_encoding.Json.destruct encoding j in
         qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
   let encoding_to_notation_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"Protocol.[to|of]_notation roundtrip in RFC3339 range"
-      rfc3339_compatible_t_arb
+      ~print
+      rfc3339_compatible_t_gen
       (fun t ->
         to_notation t |> of_notation |> function
-        | None -> QCheck.Test.fail_report "Failed to roundtrip notation"
+        | None -> Test.fail_report "Failed to roundtrip notation"
         | Some actual -> qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
   let tests =
@@ -122,36 +118,48 @@ end
 
 module System = struct
   open System
+  open QCheck2
 
-  (** Arbitrary of {!t} from usual time fragments year-month-day hour-minute-second, parsed through {!Ptime.of_date_time}. *)
-  let t_ymdhms_arb : t QCheck.arbitrary =
-    let open QCheck in
-    let rev t =
-      Option.get t |> Ptime.to_date_time |> fun (date, (time, _)) -> (date, time)
+  let gen_date : (int * int * int) Gen.t =
+    let open Gen in
+    let thirty_one = [1; 3; 5; 7; 8; 10; 12] |> List.map pure |> oneof in
+    let thirty = [4; 6; 9; 11] |> List.map pure |> oneof in
+
+    let gen_month_day =
+      oneof
+        [
+          pair thirty_one (1 -- 31);
+          pair thirty (1 -- 30);
+          pair (pure 2) (1 -- 28);
+        ]
     in
-    of_option_arb
-      (pair
-         (triple (0 -- 9999) (1 -- 12) (1 -- 31))
-         (triple (0 -- 23) (0 -- 59) (0 -- 60))
-      |> map ~rev (fun (date, time) -> Ptime.of_date_time (date, (time, 0))))
-    |> set_print (Format.asprintf "%a" pp_hum)
+
+    map
+      (fun (year, (month, day)) -> (year, month, day))
+      (pair (0 -- 9999) gen_month_day)
+
+  (** Generator of {!t} from usual time fragments year-month-day hour-minute-second, parsed through {!Ptime.of_date_time}. *)
+  let t_ymdhms_gen : t Gen.t =
+    Gen.(
+      pair gen_date (triple (0 -- 23) (0 -- 59) (0 -- 60))
+      |> map (fun (date, time) ->
+             Ptime.of_date_time (date, (time, 0)) |> Option.get))
 
   let (min_day, min_ps) = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
 
   let (max_day, max_ps) = Ptime.max |> Ptime.to_span |> Ptime.Span.to_d_ps
 
-  (** Arbitrary of {!t} from days + picoseconds, parsed through {!Ptime.Span.of_d_ps}. *)
-  let t_dps_arb : t QCheck.arbitrary =
-    let open QCheck in
-    let rev t = Ptime.to_span t |> Ptime.Span.to_d_ps in
-    pair (min_day -- max_day) (int64_range min_ps max_ps)
-    |> map ~rev (fun (d, ps) ->
+  (** Gen.T of {!t} from days + picoseconds, parsed through {!Ptime.Span.of_d_ps}. *)
+  let t_dps_gen : t Gen.t =
+    let open Gen in
+    pair (min_day -- max_day) (int64_range_gen min_ps max_ps)
+    |> map (fun (d, ps) ->
            Ptime.Span.of_d_ps (d, ps)
            |> Option.get |> Ptime.of_span |> Option.get)
-    (* But please keep using a nice pretty printer... We can probably write in the future a generic function that mixes features of [map ~rev] and [map_keep_input ~print] to only pass the monotonic transformation and the pretty printer, instead of manually writing [rev]. *)
-    |> set_print (Format.asprintf "%a" pp_hum)
 
-  let t_arb = QCheck.choose [t_ymdhms_arb; t_dps_arb]
+  let gen = Gen.oneof [t_ymdhms_gen; t_dps_gen]
+
+  let print = Format.asprintf "%a" pp_hum
 
   (** Check that the span is smaller than 1 second (useful for Protocol time roundtrips as Protocol time precision is the second). *)
   let is_small delta =
@@ -160,12 +168,13 @@ module System = struct
       0
 
   let to_protocol_of_protocol_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"System.[to|of]_protocol roundtrip modulo option"
-      t_arb
+      ~print
+      gen
       (fun t ->
         match to_protocol t |> of_protocol_opt with
-        | None -> QCheck.Test.fail_report "Failed roundtrip"
+        | None -> Test.fail_report "Failed roundtrip"
         | Some actual ->
             let delta = Ptime.Span.abs @@ Ptime.diff t actual in
             is_small delta)
@@ -178,11 +187,13 @@ module System = struct
         of the RFC3339 time range)
   *)
   let of_protocol_to_protocol_roundtrip_or_outside_rfc3339 =
-    QCheck.Test.make
-      ~name:"System.[of|to]_protocol roundtrip or outside RFC3339 range"
-      (* Use both generators, otherwise statistically, we will almost
-          never hit the RFC3339 time range. *)
-      (QCheck.choose [Protocol.t_arb; Protocol.rfc3339_compatible_t_arb])
+    Test.make
+      ~name:
+        "System.[of|to]_protocol roundtrip or outside RFC3339 range"
+        (* Use both generators, otherwise statistically, we will almost
+            never hit the RFC3339 time range. *)
+      ~print:Protocol.print
+      Gen.(oneof [Protocol.gen; Protocol.rfc3339_compatible_t_gen])
       (fun protocol_time ->
         match of_protocol_opt protocol_time with
         | None ->
@@ -198,9 +209,10 @@ module System = struct
               ())
 
   let rfc_encoding_binary_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"System.rfc_encoding roundtrips in binary modulo precision"
-      t_arb
+      ~print
+      gen
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn rfc_encoding t in
         let tt = Data_encoding.Binary.of_bytes_exn rfc_encoding b in
@@ -208,9 +220,10 @@ module System = struct
         is_small delta)
 
   let rfc_encoding_json_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"System.rfc_encoding roundtrips in JSON modulo precision"
-      t_arb
+      ~print
+      gen
       (fun t ->
         let j = Data_encoding.Json.construct rfc_encoding t in
         let tt = Data_encoding.Json.destruct rfc_encoding j in
@@ -218,9 +231,10 @@ module System = struct
         is_small delta)
 
   let encoding_binary_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"System.encoding roundtrips in binary modulo precision"
-      t_arb
+      ~print
+      gen
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn encoding t in
         let tt = Data_encoding.Binary.of_bytes_exn encoding b in
@@ -228,9 +242,10 @@ module System = struct
         is_small delta)
 
   let encoding_json_roundtrip =
-    QCheck.Test.make
+    Test.make
       ~name:"System.encoding roundtrips in JSON modulo precision"
-      t_arb
+      ~print
+      gen
       (fun t ->
         let j = Data_encoding.Json.construct encoding t in
         let tt = Data_encoding.Json.destruct encoding j in
