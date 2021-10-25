@@ -17,7 +17,7 @@ misc_checks:
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
     - dune runtest -p tezos-test-helpers ||
-      echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
+      { echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
   artifacts:
     when: always
     paths:
