@@ -19,6 +19,11 @@ This protocol requires a different protocol environment than Hangzhou.
 It requires protocol environment V4, compared to V3 for Hangzhou.
 (MR :gl:`!3468`)
 
+Tickets Strengthening
+---------------------
+
+- Add ticket-balance storage module. (MR :gl:`!3495`)
+
 Bug Fixes
 ---------
 
@@ -28,3 +33,21 @@ Bug Fixes
 
 Minor Changes
 -------------
+
+- Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
+  :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`, :gl:`!3540`,
+  :gl:`!3622`, :gl:`!3631`, :gl:`!3630`)
+
+- Fix gas simulation for operation batches. (MR :gl:`!3546`)
+
+- Update and simplify fixed constants. (MR :gl:`!3454`)
+
+- Refactor client commands in ro and rw commands. (MR :gl:`!3490`)
+
+- Simplify pack cost. (MR :gl:`!3620`)
+
+- Do not play with locations inside protocol. (MR :gl:`!3667`)
+
+- Fix stresstest stats. (MR :gl:`!3586`)
+
+- Remove the optional entrypoint in ticketer address. (MR :gl:`!3570`)
