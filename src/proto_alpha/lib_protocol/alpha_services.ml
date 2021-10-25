@@ -156,7 +156,7 @@ module Cache = struct
         ~query:RPC_query.empty
         ~input:Alpha_context.Contract.encoding
         ~output:Data_encoding.(option int31)
-        RPC_path.(custom_root / "context" / "cache" / "contract_rank")
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "rank")
   end
 
   let register () =
