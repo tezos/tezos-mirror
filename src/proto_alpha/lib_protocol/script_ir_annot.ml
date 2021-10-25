@@ -203,8 +203,7 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     l =
   (* allow empty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
-  let sub_or_wildcard ~specials wrap s =
-    let mem_char c cs = List.exists (Char.equal c) cs in
+  let sub_or_wildcard wrap s =
     let len = String.length s in
     (if Compare.Int.(len > max_annot_length) then
      error (Unexpected_annotation loc)
@@ -217,33 +216,22 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
           (* check that all characters are valid*)
           string_iter (check_char loc) s 2 >>? fun () ->
           ok @@ wrap (Some (String.sub s 1 (len - 1)))
-      | '@' when Compare.Int.(len = 2) && mem_char '@' specials ->
-          ok @@ wrap (Some "@")
-      | '%' when mem_char '%' specials ->
-          if Compare.Int.(len = 2) then ok @@ wrap (Some "%")
-          else if Compare.Int.(len = 3) && Compare.Char.(s.[2] = '%') then
-            ok @@ wrap (Some "%%")
-          else error (Unexpected_annotation loc)
       | _ -> error (Unexpected_annotation loc)
   in
   List.map_e
-    (fun s ->
-      if Compare.Int.(String.length s = 0) then
-        error (Unexpected_annotation loc)
-      else
-        match s.[0] with
-        | ':' -> sub_or_wildcard ~specials:[] (fun a -> Type_annot_opt a) s
-        | '@' ->
-            sub_or_wildcard
-              ~specials:(if allow_special_var then ['%'] else [])
-              (fun a -> Var_annot_opt a)
-              s
-        | '%' ->
-            sub_or_wildcard
-              ~specials:(if allow_special_field then ['@'] else [])
-              (fun a -> Field_annot_opt a)
-              s
-        | _ -> error (Unexpected_annotation loc))
+    (function
+      | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some "%")
+      | "@%%" when allow_special_var -> ok @@ Var_annot_opt (Some "%%")
+      | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some "@")
+      | s -> (
+          if Compare.Int.(String.length s = 0) then
+            error (Unexpected_annotation loc)
+          else
+            match s.[0] with
+            | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) s
+            | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) s
+            | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) s
+            | _ -> error (Unexpected_annotation loc)))
     l
 
 let opt_var_of_var_opt = function None -> None | Some a -> Some (Var_annot a)
