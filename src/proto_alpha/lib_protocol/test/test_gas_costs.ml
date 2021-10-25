@@ -122,14 +122,13 @@ let all_interpreter_costs =
     ("is_nat", is_nat);
     ("abs_int", abs_int forty_two);
     ("int_nat", int_nat);
-    ("neg_int", neg_int forty_two);
-    ("neg_nat", neg_nat forty_two_n);
-    ("add_intint", add_intint forty_two forty_two);
+    ("neg", neg forty_two);
+    ("add_int", add_int forty_two forty_two);
     ("sub_int", sub_int forty_two forty_two);
-    ("mul_intint", mul_intint forty_two forty_two);
+    ("mul_int", mul_int forty_two forty_two);
     ("ediv_teznat", ediv_teznat Alpha_context.Tez.fifty_cents forty_two);
     ("ediv_tez", ediv_tez);
-    ("ediv_intint", ediv_intint forty_two (Alpha_context.Script_int.of_int 1));
+    ("ediv_int", ediv_int forty_two (Alpha_context.Script_int.of_int 1));
     ("eq", eq);
     ("lsl_nat", lsl_nat forty_two);
     ("lsr_nat", lsr_nat forty_two);
@@ -137,7 +136,6 @@ let all_interpreter_costs =
     ("and_nat", and_nat forty_two forty_two);
     ("xor_nat", xor_nat forty_two forty_two);
     ("not_int", not_int forty_two);
-    ("not_nat", not_nat forty_two);
     ("if_", if_);
     ("loop", loop);
     ("loop_left", loop_left);

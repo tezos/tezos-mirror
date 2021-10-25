@@ -147,75 +147,30 @@ module Cost_of : sig
 
     val int_nat : Gas.cost
 
-    val neg_int : Alpha_context.Script_int.z Script_int.num -> Gas.cost
+    val neg : 'a Script_int.num -> Gas.cost
 
-    val neg_nat : Alpha_context.Script_int.n Script_int.num -> Gas.cost
+    val add_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val add_intint :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
-
-    val add_intnat :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
-
-    val add_natint :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
-
-    val add_natnat :
+    val add_nat :
       Alpha_context.Script_int.n Script_int.num ->
       Alpha_context.Script_int.n Script_int.num ->
       Gas.cost
 
     val sub_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val mul_intint :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
+    val mul_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val mul_intnat :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
-
-    val mul_natint :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
-
-    val mul_natnat :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
+    val mul_nat :
+      Alpha_context.Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
 
     val ediv_teznat : 'a -> 'b Script_int.num -> Gas.cost
 
     val ediv_tez : Gas.cost
 
-    val ediv_intint :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
+    val ediv_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
-    val ediv_intnat :
-      Alpha_context.Script_int.z Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
-
-    val ediv_natint :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.z Script_int.num ->
-      Gas.cost
-
-    val ediv_natnat :
-      Alpha_context.Script_int.n Script_int.num ->
-      Alpha_context.Script_int.n Script_int.num ->
-      Gas.cost
+    val ediv_nat :
+      Alpha_context.Script_int.n Script_int.num -> 'a Script_int.num -> Gas.cost
 
     val eq : Gas.cost
 
@@ -235,8 +190,6 @@ module Cost_of : sig
     val xor_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val not_int : 'a Script_int.num -> Gas.cost
-
-    val not_nat : 'a Script_int.num -> Gas.cost
 
     val if_ : Gas.cost
 

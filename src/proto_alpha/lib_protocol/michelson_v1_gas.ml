@@ -70,21 +70,13 @@ module Cost_of = struct
       let v0 = S.safe_int (Compare.Int.max size1 size2) in
       S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
 
-    (* model N_IAdd_intint *)
-    (* Approximating 0.077989 x term *)
-    let cost_N_IAdd_intint = cost_linear_op_int
-
-    (* model N_IAdd_intnat *)
-    (* Approximating 0.077997 x term *)
-    let cost_N_IAdd_intnat = cost_linear_op_int
-
-    (* model N_IAdd_natint *)
+    (* model N_IAdd_int *)
     (* Approximating 0.078154 x term *)
-    let cost_N_IAdd_natint = cost_linear_op_int
+    let cost_N_IAdd_int = cost_linear_op_int
 
-    (* model N_IAdd_natnat *)
+    (* model N_IAdd_nat *)
     (* Approximating 0.077807 x term *)
-    let cost_N_IAdd_natnat = cost_linear_op_int
+    let cost_N_IAdd_nat = cost_linear_op_int
 
     (* model N_IAdd_seconds_to_timestamp *)
     (* Approximating 0.078056 x term *)
@@ -115,6 +107,8 @@ module Cost_of = struct
 
     (* model N_IAnd_nat *)
     (* Approximating 0.076804 x term *)
+    (* The difference with `cost_N_IAnd_int_nat` comes from Zarith, where the
+       complexity of `Z.logand` depends on the sign of the argument. *)
     let cost_N_IAnd_nat size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.min size1 size2) in
@@ -286,21 +280,13 @@ module Cost_of = struct
         let v0 = S.safe_int q * S.safe_int size2 in
         S.safe_int 110 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
 
-    (* model N_IEdiv_intint *)
+    (* model N_IEdiv_int *)
     (* Approximating 0.001591 x term *)
-    let cost_N_IEdiv_intint = cost_div_int
+    let cost_N_IEdiv_int = cost_div_int
 
-    (* model N_IEdiv_intnat *)
-    (* Approximating 0.001548 x term *)
-    let cost_N_IEdiv_intnat = cost_div_int
-
-    (* model N_IEdiv_natint *)
-    (* Approximating 0.001535 x term *)
-    let cost_N_IEdiv_natint = cost_div_int
-
-    (* model N_IEdiv_natnat *)
+    (* model N_IEdiv_nat *)
     (* Approximating 0.001605 x term *)
-    let cost_N_IEdiv_natnat = cost_div_int
+    let cost_N_IEdiv_nat = cost_div_int
 
     (* model N_IEdiv_tez *)
     let cost_N_IEdiv_tez = S.safe_int 65
@@ -487,21 +473,13 @@ module Cost_of = struct
       let v0 = a * log2 a in
       S.safe_int 75 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4)
 
-    (* model N_IMul_intint *)
-    (* Approximating 0.857296 x term *)
-    let cost_N_IMul_intint = cost_mul
-
-    (* model N_IMul_intnat *)
+    (* model N_IMul_int *)
     (* Approximating 0.857931 x term *)
-    let cost_N_IMul_intnat = cost_mul
+    let cost_N_IMul_int = cost_mul
 
-    (* model N_IMul_natint *)
+    (* model N_IMul_nat *)
     (* Approximating 0.861823 x term *)
-    let cost_N_IMul_natint = cost_mul
-
-    (* model N_IMul_natnat *)
-    (* Approximating 0.849870 x term *)
-    let cost_N_IMul_natnat = cost_mul
+    let cost_N_IMul_nat = cost_mul
 
     (* model N_IMul_nattez *)
     let cost_N_IMul_nattez = S.safe_int 100
@@ -518,15 +496,9 @@ module Cost_of = struct
     (* model N_INeg_bls12_381_g2 *)
     let cost_N_INeg_bls12_381_g2 = S.safe_int 555
 
-    (* model N_INeg_int *)
-    (* Approximating 0.065748 x term *)
-    let cost_N_INeg_int size =
-      let open S_syntax in
-      S.safe_int 25 + (S.safe_int size lsr 4)
-
-    (* model N_INeg_nat *)
+    (* model N_INeg *)
     (* Approximating 0.066076 x term *)
-    let cost_N_INeg_nat size =
+    let cost_N_INeg size =
       let open S_syntax in
       S.safe_int 25 + (S.safe_int size lsr 4)
 
@@ -542,13 +514,6 @@ module Cost_of = struct
     (* model N_INot_int *)
     (* Approximating 0.075541 x term *)
     let cost_N_INot_int size =
-      let open S_syntax in
-      let v0 = S.safe_int size in
-      S.safe_int 25 + ((v0 lsr 4) + (v0 lsr 7))
-
-    (* model N_INot_nat *)
-    (* Approximating 0.074613 x term *)
-    let cost_N_INot_nat size =
       let open S_syntax in
       let v0 = S.safe_int size in
       S.safe_int 25 + ((v0 lsr 4) + (v0 lsr 7))
@@ -1103,52 +1068,32 @@ module Cost_of = struct
 
     let int_nat = atomic_step_cost cost_N_IInt_nat
 
-    let neg_int i = atomic_step_cost (cost_N_INeg_int (int_bytes i))
+    let neg i = atomic_step_cost (cost_N_INeg (int_bytes i))
 
-    let neg_nat n = atomic_step_cost (cost_N_INeg_nat (int_bytes n))
+    let add_int i1 i2 =
+      atomic_step_cost (cost_N_IAdd_int (int_bytes i1) (int_bytes i2))
 
-    let add_intint i1 i2 =
-      atomic_step_cost (cost_N_IAdd_intint (int_bytes i1) (int_bytes i2))
-
-    let add_intnat i1 i2 =
-      atomic_step_cost (cost_N_IAdd_intnat (int_bytes i1) (int_bytes i2))
-
-    let add_natint i1 i2 =
-      atomic_step_cost (cost_N_IAdd_natint (int_bytes i1) (int_bytes i2))
-
-    let add_natnat i1 i2 =
-      atomic_step_cost (cost_N_IAdd_natnat (int_bytes i1) (int_bytes i2))
+    let add_nat i1 i2 =
+      atomic_step_cost (cost_N_IAdd_nat (int_bytes i1) (int_bytes i2))
 
     let sub_int i1 i2 =
       atomic_step_cost (cost_N_ISub_int (int_bytes i1) (int_bytes i2))
 
-    let mul_intint i1 i2 =
-      atomic_step_cost (cost_N_IMul_intint (int_bytes i1) (int_bytes i2))
+    let mul_int i1 i2 =
+      atomic_step_cost (cost_N_IMul_int (int_bytes i1) (int_bytes i2))
 
-    let mul_intnat i1 i2 =
-      atomic_step_cost (cost_N_IMul_intnat (int_bytes i1) (int_bytes i2))
-
-    let mul_natint i1 i2 =
-      atomic_step_cost (cost_N_IMul_natint (int_bytes i1) (int_bytes i2))
-
-    let mul_natnat i1 i2 =
-      atomic_step_cost (cost_N_IMul_natnat (int_bytes i1) (int_bytes i2))
+    let mul_nat i1 i2 =
+      atomic_step_cost (cost_N_IMul_nat (int_bytes i1) (int_bytes i2))
 
     let ediv_teznat _tez _n = atomic_step_cost cost_N_IEdiv_teznat
 
     let ediv_tez = atomic_step_cost cost_N_IEdiv_tez
 
-    let ediv_intint i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_intint (int_bytes i1) (int_bytes i2))
+    let ediv_int i1 i2 =
+      atomic_step_cost (cost_N_IEdiv_int (int_bytes i1) (int_bytes i2))
 
-    let ediv_intnat i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_intnat (int_bytes i1) (int_bytes i2))
-
-    let ediv_natint i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_natint (int_bytes i1) (int_bytes i2))
-
-    let ediv_natnat i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_natnat (int_bytes i1) (int_bytes i2))
+    let ediv_nat i1 i2 =
+      atomic_step_cost (cost_N_IEdiv_nat (int_bytes i1) (int_bytes i2))
 
     let eq = atomic_step_cost cost_N_IEq
 
@@ -1169,8 +1114,6 @@ module Cost_of = struct
       atomic_step_cost (cost_N_IXor_nat (int_bytes n1) (int_bytes n2))
 
     let not_int i = atomic_step_cost (cost_N_INot_int (int_bytes i))
-
-    let not_nat i = atomic_step_cost (cost_N_INot_nat (int_bytes i))
 
     let if_ = atomic_step_cost cost_N_IIf
 
@@ -1516,7 +1459,7 @@ module Cost_of = struct
       in
       Gas.(
         contents_comparison +@ compare_address
-        +@ add_natnat ticket_a.amount ticket_b.amount)
+        +@ add_nat ticket_a.amount ticket_b.amount)
 
     (* Continuations *)
     module Control = struct

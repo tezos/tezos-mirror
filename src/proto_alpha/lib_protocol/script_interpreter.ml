@@ -788,27 +788,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let x = accu in
           let res = Script_int.int x in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | INeg_int (_, k) ->
+      | INeg (_, k) ->
           let x = accu in
           let res = Script_int.neg x in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | INeg_nat (_, k) ->
-          let x = accu in
-          let res = Script_int.neg x in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_intint (_, k) ->
+      | IAdd_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.add x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.add x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.add x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_natnat (_, k) ->
+      | IAdd_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.add_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -816,19 +804,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let x = accu and (y, stack) = stack in
           let res = Script_int.sub x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_intint (_, k) ->
+      | IMul_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.mul x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.mul x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.mul x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_natnat (_, k) ->
+      | IMul_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.mul_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -865,19 +845,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                     | Some r -> Some (q, r)))
           in
           (step [@ocaml.tailcall]) g gas k ks result stack
-      | IEdiv_intint (_, k) ->
+      | IEdiv_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.ediv x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.ediv x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.ediv x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_natnat (_, k) ->
+      | IEdiv_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.ediv_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -900,10 +872,6 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_int.logxor x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | INot_int (_, k) ->
-          let x = accu in
-          let res = Script_int.lognot x in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | INot_nat (_, k) ->
           let x = accu in
           let res = Script_int.lognot x in
           (step [@ocaml.tailcall]) g gas k ks res stack

@@ -617,61 +617,38 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIs_nat :
       (z num, 's) kinfo * (n num option, 's, 'r, 'f) kinstr
       -> (z num, 's, 'r, 'f) kinstr
-  | INeg_nat :
-      (n num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (n num, 's, 'r, 'f) kinstr
-  | INeg_int :
-      (z num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, 's, 'r, 'f) kinstr
+  | INeg :
+      ('a num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> ('a num, 's, 'r, 'f) kinstr
   | IAbs_int :
       (z num, 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (z num, 's, 'r, 'f) kinstr
   | IInt_nat :
       (n num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
       -> (n num, 's, 'r, 'f) kinstr
-  | IAdd_intint :
-      (z num, z num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, z num * 's, 'r, 'f) kinstr
-  | IAdd_intnat :
-      (z num, n num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, n num * 's, 'r, 'f) kinstr
-  | IAdd_natint :
-      (n num, z num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (n num, z num * 's, 'r, 'f) kinstr
-  | IAdd_natnat :
+  | IAdd_int :
+      ('a num, 'b num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> ('a num, 'b num * 's, 'r, 'f) kinstr
+  | IAdd_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | ISub_int :
       ('a num, 'b num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
       -> ('a num, 'b num * 's, 'r, 'f) kinstr
-  | IMul_intint :
-      (z num, z num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, z num * 's, 'r, 'f) kinstr
-  | IMul_intnat :
-      (z num, n num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, n num * 's, 'r, 'f) kinstr
-  | IMul_natint :
-      (n num, z num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (n num, z num * 's, 'r, 'f) kinstr
-  | IMul_natnat :
-      (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
-      -> (n num, n num * 's, 'r, 'f) kinstr
-  | IEdiv_intint :
-      (z num, z num * 's) kinfo
+  | IMul_int :
+      ('a num, 'b num * 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> ('a num, 'b num * 's, 'r, 'f) kinstr
+  | IMul_nat :
+      (n num, 'a num * 's) kinfo * ('a num, 's, 'r, 'f) kinstr
+      -> (n num, 'a num * 's, 'r, 'f) kinstr
+  | IEdiv_int :
+      ('a num, 'b num * 's) kinfo
       * ((z num, n num) pair option, 's, 'r, 'f) kinstr
-      -> (z num, z num * 's, 'r, 'f) kinstr
-  | IEdiv_intnat :
-      (z num, n num * 's) kinfo
-      * ((z num, n num) pair option, 's, 'r, 'f) kinstr
-      -> (z num, n num * 's, 'r, 'f) kinstr
-  | IEdiv_natint :
-      (n num, z num * 's) kinfo
-      * ((z num, n num) pair option, 's, 'r, 'f) kinstr
-      -> (n num, z num * 's, 'r, 'f) kinstr
-  | IEdiv_natnat :
-      (n num, n num * 's) kinfo
-      * ((n num, n num) pair option, 's, 'r, 'f) kinstr
-      -> (n num, n num * 's, 'r, 'f) kinstr
+      -> ('a num, 'b num * 's, 'r, 'f) kinstr
+  | IEdiv_nat :
+      (n num, 'a num * 's) kinfo
+      * (('a num, n num) pair option, 's, 'r, 'f) kinstr
+      -> (n num, 'a num * 's, 'r, 'f) kinstr
   | ILsl_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
@@ -681,6 +658,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IOr_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
+  (* Even though `IAnd_nat` and `IAnd_int_nat` could be merged into a single
+     instruction from both the type and behavior point of views, their gas costs
+     differ too much (see `cost_N_IAnd_nat` and `cost_N_IAnd_int_nat` in
+     `Michelson_v1_gas.Cost_of.Generated_costs`), so we keep them separated. *)
   | IAnd_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
@@ -690,12 +671,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IXor_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
-  | INot_nat :
-      (n num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (n num, 's, 'r, 'f) kinstr
   | INot_int :
-      (z num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (z num, 's, 'r, 'f) kinstr
+      ('a num, 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> ('a num, 's, 'r, 'f) kinstr
   (*
      Control
      -------
@@ -1286,30 +1264,22 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IXor (kinfo, _) -> kinfo
   | INot (kinfo, _) -> kinfo
   | IIs_nat (kinfo, _) -> kinfo
-  | INeg_nat (kinfo, _) -> kinfo
-  | INeg_int (kinfo, _) -> kinfo
+  | INeg (kinfo, _) -> kinfo
   | IAbs_int (kinfo, _) -> kinfo
   | IInt_nat (kinfo, _) -> kinfo
-  | IAdd_intint (kinfo, _) -> kinfo
-  | IAdd_intnat (kinfo, _) -> kinfo
-  | IAdd_natint (kinfo, _) -> kinfo
-  | IAdd_natnat (kinfo, _) -> kinfo
+  | IAdd_int (kinfo, _) -> kinfo
+  | IAdd_nat (kinfo, _) -> kinfo
   | ISub_int (kinfo, _) -> kinfo
-  | IMul_intint (kinfo, _) -> kinfo
-  | IMul_intnat (kinfo, _) -> kinfo
-  | IMul_natint (kinfo, _) -> kinfo
-  | IMul_natnat (kinfo, _) -> kinfo
-  | IEdiv_intint (kinfo, _) -> kinfo
-  | IEdiv_intnat (kinfo, _) -> kinfo
-  | IEdiv_natint (kinfo, _) -> kinfo
-  | IEdiv_natnat (kinfo, _) -> kinfo
+  | IMul_int (kinfo, _) -> kinfo
+  | IMul_nat (kinfo, _) -> kinfo
+  | IEdiv_int (kinfo, _) -> kinfo
+  | IEdiv_nat (kinfo, _) -> kinfo
   | ILsl_nat (kinfo, _) -> kinfo
   | ILsr_nat (kinfo, _) -> kinfo
   | IOr_nat (kinfo, _) -> kinfo
   | IAnd_nat (kinfo, _) -> kinfo
   | IAnd_int_nat (kinfo, _) -> kinfo
   | IXor_nat (kinfo, _) -> kinfo
-  | INot_nat (kinfo, _) -> kinfo
   | INot_int (kinfo, _) -> kinfo
   | IIf {kinfo; _} -> kinfo
   | ILoop (kinfo, _, _) -> kinfo
@@ -1482,30 +1452,22 @@ let kinstr_rewritek :
   | IXor (kinfo, k) -> IXor (kinfo, f.apply k)
   | INot (kinfo, k) -> INot (kinfo, f.apply k)
   | IIs_nat (kinfo, k) -> IIs_nat (kinfo, f.apply k)
-  | INeg_nat (kinfo, k) -> INeg_nat (kinfo, f.apply k)
-  | INeg_int (kinfo, k) -> INeg_int (kinfo, f.apply k)
+  | INeg (kinfo, k) -> INeg (kinfo, f.apply k)
   | IAbs_int (kinfo, k) -> IAbs_int (kinfo, f.apply k)
   | IInt_nat (kinfo, k) -> IInt_nat (kinfo, f.apply k)
-  | IAdd_intint (kinfo, k) -> IAdd_intint (kinfo, f.apply k)
-  | IAdd_intnat (kinfo, k) -> IAdd_intnat (kinfo, f.apply k)
-  | IAdd_natint (kinfo, k) -> IAdd_natint (kinfo, f.apply k)
-  | IAdd_natnat (kinfo, k) -> IAdd_natnat (kinfo, f.apply k)
+  | IAdd_int (kinfo, k) -> IAdd_int (kinfo, f.apply k)
+  | IAdd_nat (kinfo, k) -> IAdd_nat (kinfo, f.apply k)
   | ISub_int (kinfo, k) -> ISub_int (kinfo, f.apply k)
-  | IMul_intint (kinfo, k) -> IMul_intint (kinfo, f.apply k)
-  | IMul_intnat (kinfo, k) -> IMul_intnat (kinfo, f.apply k)
-  | IMul_natint (kinfo, k) -> IMul_natint (kinfo, f.apply k)
-  | IMul_natnat (kinfo, k) -> IMul_natnat (kinfo, f.apply k)
-  | IEdiv_intint (kinfo, k) -> IEdiv_intint (kinfo, f.apply k)
-  | IEdiv_intnat (kinfo, k) -> IEdiv_intnat (kinfo, f.apply k)
-  | IEdiv_natint (kinfo, k) -> IEdiv_natint (kinfo, f.apply k)
-  | IEdiv_natnat (kinfo, k) -> IEdiv_natnat (kinfo, f.apply k)
+  | IMul_int (kinfo, k) -> IMul_int (kinfo, f.apply k)
+  | IMul_nat (kinfo, k) -> IMul_nat (kinfo, f.apply k)
+  | IEdiv_int (kinfo, k) -> IEdiv_int (kinfo, f.apply k)
+  | IEdiv_nat (kinfo, k) -> IEdiv_nat (kinfo, f.apply k)
   | ILsl_nat (kinfo, k) -> ILsl_nat (kinfo, f.apply k)
   | ILsr_nat (kinfo, k) -> ILsr_nat (kinfo, f.apply k)
   | IOr_nat (kinfo, k) -> IOr_nat (kinfo, f.apply k)
   | IAnd_nat (kinfo, k) -> IAnd_nat (kinfo, f.apply k)
   | IAnd_int_nat (kinfo, k) -> IAnd_int_nat (kinfo, f.apply k)
   | IXor_nat (kinfo, k) -> IXor_nat (kinfo, f.apply k)
-  | INot_nat (kinfo, k) -> INot_nat (kinfo, f.apply k)
   | INot_int (kinfo, k) -> INot_int (kinfo, f.apply k)
   | IIf {kinfo; branch_if_true; branch_if_false; k} ->
       IIf
@@ -1882,30 +1844,22 @@ let kinstr_traverse i init f =
     | IXor (_, k) -> (next [@ocaml.tailcall]) k
     | INot (_, k) -> (next [@ocaml.tailcall]) k
     | IIs_nat (_, k) -> (next [@ocaml.tailcall]) k
-    | INeg_nat (_, k) -> (next [@ocaml.tailcall]) k
-    | INeg_int (_, k) -> (next [@ocaml.tailcall]) k
+    | INeg (_, k) -> (next [@ocaml.tailcall]) k
     | IAbs_int (_, k) -> (next [@ocaml.tailcall]) k
     | IInt_nat (_, k) -> (next [@ocaml.tailcall]) k
-    | IAdd_intint (_, k) -> (next [@ocaml.tailcall]) k
-    | IAdd_intnat (_, k) -> (next [@ocaml.tailcall]) k
-    | IAdd_natint (_, k) -> (next [@ocaml.tailcall]) k
-    | IAdd_natnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IAdd_nat (_, k) -> (next [@ocaml.tailcall]) k
     | ISub_int (_, k) -> (next [@ocaml.tailcall]) k
-    | IMul_intint (_, k) -> (next [@ocaml.tailcall]) k
-    | IMul_intnat (_, k) -> (next [@ocaml.tailcall]) k
-    | IMul_natint (_, k) -> (next [@ocaml.tailcall]) k
-    | IMul_natnat (_, k) -> (next [@ocaml.tailcall]) k
-    | IEdiv_intint (_, k) -> (next [@ocaml.tailcall]) k
-    | IEdiv_intnat (_, k) -> (next [@ocaml.tailcall]) k
-    | IEdiv_natint (_, k) -> (next [@ocaml.tailcall]) k
-    | IEdiv_natnat (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IMul_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_int (_, k) -> (next [@ocaml.tailcall]) k
+    | IEdiv_nat (_, k) -> (next [@ocaml.tailcall]) k
     | ILsl_nat (_, k) -> (next [@ocaml.tailcall]) k
     | ILsr_nat (_, k) -> (next [@ocaml.tailcall]) k
     | IOr_nat (_, k) -> (next [@ocaml.tailcall]) k
     | IAnd_nat (_, k) -> (next [@ocaml.tailcall]) k
     | IAnd_int_nat (_, k) -> (next [@ocaml.tailcall]) k
     | IXor_nat (_, k) -> (next [@ocaml.tailcall]) k
-    | INot_nat (_, k) -> (next [@ocaml.tailcall]) k
     | INot_int (_, k) -> (next [@ocaml.tailcall]) k
     | IIf {kinfo = _; branch_if_true = k1; branch_if_false = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
