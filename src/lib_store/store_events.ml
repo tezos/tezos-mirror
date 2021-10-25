@@ -326,5 +326,5 @@ let notify_merge_error =
     ~msg:
       "store merge has failed, restart the node to restore the consistency: \
        {errs}"
-    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)
