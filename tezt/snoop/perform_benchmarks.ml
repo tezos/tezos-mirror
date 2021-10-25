@@ -244,7 +244,7 @@ let perform_encoding_benchmarks snoop proto =
   perform_benchmarks patches snoop benches
 
 let perform_global_constants_benchmarks snoop =
-  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Gotc] snoop) in
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Gtoc] snoop) in
   perform_benchmarks [] snoop benches
 
 let perform_cache_benchmarks snoop =

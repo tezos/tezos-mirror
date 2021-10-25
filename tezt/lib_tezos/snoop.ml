@@ -41,7 +41,7 @@ type tag =
   | Io
   | Misc
   | Builtin
-  | Gotc
+  | Gtoc
   | Cache
 
 type michelson_term_kind = Data | Code
@@ -352,7 +352,7 @@ let string_of_tag (tag : tag) =
   | Io -> "io"
   | Misc -> "misc"
   | Builtin -> "builtin"
-  | Gotc -> "global_constants"
+  | Gtoc -> "global_constants"
   | Cache -> "cache"
 
 let list_benchmarks_command mode tags =
