@@ -115,7 +115,7 @@ let () =
 module Make (I : Dump_interface) = struct
   type command =
     | Root
-    | Node of (string * I.hash) list
+    | Node of (string * I.Kinded_hash.t) list
     | Blob of bytes
     | Eoc of {info : I.commit_info; parents : I.Commit_hash.t list}
     | Eof
@@ -136,7 +136,7 @@ module Make (I : Dump_interface) = struct
     case
       ~title:"node"
       (Tag (Char.code 'n'))
-      (list (obj2 (req "name" string) (req "hash" I.hash_encoding)))
+      (list (obj2 (req "name" string) (req "hash" I.Kinded_hash.encoding)))
       (function Node x -> Some x | _ -> None)
       (function x -> Node x)
 
@@ -431,7 +431,7 @@ module Make_legacy (I : Dump_interface_legacy) = struct
         pred_block_metadata_hash : Block_metadata_hash.t option;
         pred_ops_metadata_hashes : Operation_metadata_hash.t list list option;
       }
-    | Node of (string * I.hash) list
+    | Node of (string * I.Kinded_hash.t) list
     | Blob of bytes
     | Proot of I.Pruned_block.t
     | Loot of I.Protocol_data.t
@@ -453,7 +453,7 @@ module Make_legacy (I : Dump_interface_legacy) = struct
     case
       ~title:"node"
       (Tag (Char.code 'd'))
-      (list (obj2 (req "name" string) (req "hash" I.hash_encoding)))
+      (list (obj2 (req "name" string) (req "hash" I.Kinded_hash.encoding)))
       (function Node x -> Some x | _ -> None)
       (function x -> Node x)
 

@@ -116,6 +116,9 @@ Node
 
 -  Added a built-in network alias for Hangzhounet.
 
+-  Improved the snapshot export mechanism by reducing both the export
+   time and the memory footprint.
+
 Client
 ------
 

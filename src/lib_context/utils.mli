@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Tarides <contact@tarides.com>                          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Context serialization format. *)
-
-module Hash : sig
-  include Irmin.Hash.S
-
-  val to_raw_string : t -> string
-
-  val to_context_hash : t -> Context_hash.t
-
-  val of_context_hash : Context_hash.t -> t
-end
-
-module Conf : Irmin_pack.Conf.S
-
-module Contents : Irmin.Contents.S with type t = bytes
-
-module Metadata : Irmin.Metadata.S with type t = unit
-
-module Path : Irmin.Path.S with type step = string and type t = string list
-
-module Branch : Irmin.Branch.S with type t = string
-
-(* Note: [Irmin.Private] contains backend-specific modules and module types.
-   These are intended to be consumed by [lib_context] but not to appear in its
-   main public API. *)
-
-module Node : Irmin.Private.Node.Maker
-
-module Commit : Irmin.Private.Commit.Maker
-
-module Info = Irmin.Info
+(** @inline *)
+include Utils_intf.Intf

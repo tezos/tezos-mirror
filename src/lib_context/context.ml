@@ -546,7 +546,25 @@ module Dumpable_context = struct
 
   type tree = Store.tree
 
-  type hash = [`Blob of Store.hash | `Node of Store.hash]
+  type hash = Store.hash
+
+  module Kinded_hash = struct
+    type t = [`Blob of hash | `Node of hash]
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
+      conv
+        (function
+          | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
+          | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
+        (function
+          | (`Blob, h) ->
+              `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
+          | (`Node, h) ->
+              `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
+        (obj2 (req "kind" kind_encoding) (req "value" bytes))
+  end
 
   type commit_info = Info.t
 
@@ -567,20 +585,6 @@ module Dumpable_context = struct
         (author, message, date))
       (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
-
-  let hash_encoding : hash Data_encoding.t =
-    let open Data_encoding in
-    let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
-    conv
-      (function
-        | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
-        | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
-      (function
-        | (`Blob, h) ->
-            `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
-        | (`Node, h) ->
-            `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
-      (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
   let hash_equal (h1 : hash) (h2 : hash) = h1 = h2
 
@@ -607,12 +611,6 @@ module Dumpable_context = struct
 
   let context_tree ctxt = ctxt.tree
 
-  let tree_hash tree =
-    let hash = Store.Tree.hash tree in
-    match Store.Tree.destruct tree with
-    | `Node _ -> `Node hash
-    | `Contents _ -> `Blob hash
-
   type binding = {
     key : string;
     value : tree;
@@ -633,34 +631,42 @@ module Dumpable_context = struct
                    iterating over existing keys *)
                assert false
            | Some value_kind ->
-               let value_hash = tree_hash value in
+               let value_hash = Store.Tree.hash value in
                {key; value; value_kind; value_hash})
     >|= fun bindings ->
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
       >>= List.map_s (fun {key; value; value_hash; value_kind} ->
-              let kv = (key, value_hash) in
+              let kinded_value_hash =
+                match value_kind with
+                | `Node -> `Node value_hash
+                | `Contents -> `Blob value_hash
+              in
+              let kv = (key, kinded_value_hash) in
               if visited value_hash then Lwt.return kv
               else
                 match value_kind with
@@ -890,7 +896,25 @@ module Dumpable_context_legacy = struct
 
   type tree = Store.tree
 
-  type hash = [`Blob of Store.hash | `Node of Store.hash]
+  type hash = Store.hash
+
+  module Kinded_hash = struct
+    type t = [`Blob of hash | `Node of hash]
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
+      conv
+        (function
+          | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
+          | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
+        (function
+          | (`Blob, h) ->
+              `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
+          | (`Node, h) ->
+              `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
+        (obj2 (req "kind" kind_encoding) (req "value" bytes))
+  end
 
   type commit_info = Info.t
 
@@ -911,20 +935,6 @@ module Dumpable_context_legacy = struct
         (author, message, date))
       (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
-
-  let hash_encoding : hash Data_encoding.t =
-    let open Data_encoding in
-    let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
-    conv
-      (function
-        | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
-        | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
-      (function
-        | (`Blob, h) ->
-            `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
-        | (`Node, h) ->
-            `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
-      (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
   let hash_equal (h1 : hash) (h2 : hash) = h1 = h2
 
@@ -954,12 +964,6 @@ module Dumpable_context_legacy = struct
 
   let context_tree ctxt = ctxt.tree
 
-  let tree_hash tree =
-    let hash = Store.Tree.hash tree in
-    match Store.Tree.destruct tree with
-    | `Node _ -> `Node hash
-    | `Contents _ -> `Blob hash
-
   type binding = {
     key : string;
     value : tree;
@@ -980,34 +984,42 @@ module Dumpable_context_legacy = struct
                   iterating over existing keys *)
                assert false
            | Some value_kind ->
-               let value_hash = tree_hash value in
+               let value_hash = Store.Tree.hash value in
                {key; value; value_kind; value_hash})
     >|= fun bindings ->
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
       >>= List.map_s (fun {key; value; value_hash; value_kind} ->
-              let kv = (key, value_hash) in
+              let kinded_value_hash =
+                match value_kind with
+                | `Node -> `Node value_hash
+                | `Contents -> `Blob value_hash
+              in
+              let kv = (key, kinded_value_hash) in
               if visited value_hash then Lwt.return kv
               else
                 match value_kind with
