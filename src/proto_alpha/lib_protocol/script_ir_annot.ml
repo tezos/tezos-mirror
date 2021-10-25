@@ -205,17 +205,12 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard wrap s =
     let len = String.length s in
-    (if Compare.Int.(len > max_annot_length) then
-     error (Unexpected_annotation loc)
-    else Result.return_unit)
-    >>? fun () ->
-    if Compare.Int.(len = 1) then ok @@ wrap None
+    if Compare.Int.(len = 0) then ok @@ wrap None
     else
-      match s.[1] with
+      match s.[0] with
       | 'a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9' ->
           (* check that all characters are valid*)
-          string_iter (check_char loc) s 2 >>? fun () ->
-          ok @@ wrap (Some (String.sub s 1 (len - 1)))
+          string_iter (check_char loc) s 1 >>? fun () -> ok @@ wrap (Some s)
       | _ -> error (Unexpected_annotation loc)
   in
   List.map_e
@@ -224,13 +219,15 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
       | "@%%" when allow_special_var -> ok @@ Var_annot_opt (Some "%%")
       | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some "@")
       | s -> (
-          if Compare.Int.(String.length s = 0) then
+          let len = String.length s in
+          if Compare.Int.(len = 0 || len > max_annot_length) then
             error (Unexpected_annotation loc)
           else
+            let rest = String.sub s 1 (len - 1) in
             match s.[0] with
-            | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) s
-            | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) s
-            | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) s
+            | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) rest
+            | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) rest
+            | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) rest
             | _ -> error (Unexpected_annotation loc)))
     l
 
