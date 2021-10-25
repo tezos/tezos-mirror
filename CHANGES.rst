@@ -41,6 +41,10 @@ Codec
 Docker Images
 -------------
 
+-  The ``--force-history-mode-switch`` option is now available for
+   ``tezos-node`` entrypoint. It allows the user to switch the history
+   mode of the node's storage.
+
 Miscellaneous
 -------------
 
