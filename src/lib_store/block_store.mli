@@ -209,8 +209,9 @@ val mem : block_store -> key -> bool tzresult Lwt.t
 val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
 
 (** [read_block ~read_metadata block_store key] reads the block [key]
-    in [block_store] if present. Return [None] if the block is
-    unknown. *)
+   in [block_store] if present. Return [None] if the block is
+   unknown. If [read_metadata] is set to [true] it tries to retreive
+   the metadata but do not fail if it is not available. *)
 val read_block :
   read_metadata:bool -> block_store -> key -> Block_repr.t option tzresult Lwt.t
 
@@ -313,19 +314,24 @@ val switch_history_mode :
   new_history_mode:History_mode.t ->
   unit tzresult Lwt.t
 
-(** [create ~chain_dir ~genesis_block] instantiates a fresh
-   [block_store] in directory [chain_dir] and stores the
+(** [create ?block_cache_limit ~chain_dir ~genesis_block] instantiates
+   a fresh [block_store] in directory [chain_dir] and stores the
    [genesis_block] in it. It fails if the given [chain_dir] is already
-   populated.*)
+   populated. Setting the [block_cache_limit] allows to override the
+   default block cache size. *)
 val create :
+  ?block_cache_limit:int ->
   [`Chain_dir] Naming.directory ->
   genesis_block:Block_repr.t ->
   block_store tzresult Lwt.t
 
-(** [load chain_dir ~genesis_block ~readonly] loads an existing
-    block_store from directory [chain_dir]. Setting [readonly] will
-    prevent new blocks from being stored. *)
+(** [load ?block_cache_limit chain_dir ~genesis_block ~readonly] loads
+   an existing block_store from directory [chain_dir]. Setting
+   [readonly] will prevent new blocks from being stored. Setting the
+   [block_cache_limit] allows to override the default block cache
+   size. *)
 val load :
+  ?block_cache_limit:int ->
   [`Chain_dir] Naming.directory ->
   genesis_block:Block_repr.t ->
   readonly:bool ->

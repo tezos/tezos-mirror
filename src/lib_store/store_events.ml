@@ -251,9 +251,50 @@ let restore_protocol_activation =
     ~pp2:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+let update_protocol_table =
+  declare_4
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"update_protocol_table"
+    ~msg:
+      "the protocol table was updated: protocol {proto_hash} (level \
+       {proto_level}) was activated on block {block_hash} (level \
+       {block_level})"
+    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Protocol_hash.pp_short
+    ("proto_level", Data_encoding.int31)
+    ("block_hash", Block_hash.encoding)
+    ~pp3:Block_hash.pp
+    ("block_level", Data_encoding.int32)
+    ~pp4:pp_int32
+
+let restore_history_mode =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"restore_history_mode"
+    ~msg:
+      "history mode was sucessfully restored to {history_mode}, based on the \
+       configuration file or command line argument"
+    ("history_mode", History_mode.encoding)
+    ~pp1:History_mode.pp
+
+let restore_infered_history_mode =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"restore_infered_history_mode"
+    ~msg:
+      "history mode was sucessfully restored to {history_mode}. Warning: this \
+       history mode may differ from the one preceding the restore procedure \
+       and you may need to restart the node to explicitely force the history \
+       mode switch"
+    ("history_mode", History_mode.encoding)
+    ~pp1:History_mode.pp
+
 (* Warning *)
 let warning_incomplete_storage =
-  Internal_event.Simple.declare_1
+  declare_1
     ~level:Internal_event.Warning
     ~section
     ~name:"incomplete_storage"
@@ -278,9 +319,12 @@ let merge_error =
     ("message", Data_encoding.string)
 
 let notify_merge_error =
-  declare_0
+  declare_1
     ~section
     ~level:Internal_event.Error
     ~name:"notify_merge_error"
-    ~msg:"store merge has failed, restart the node to restore the consistency"
-    ()
+    ~msg:
+      "store merge has failed, restart the node to restore the consistency: \
+       {errs}"
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
+    ("errs", Error_monad.trace_encoding)
