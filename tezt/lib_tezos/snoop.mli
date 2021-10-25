@@ -46,18 +46,6 @@ type determinizer = Percentile of int | Mean
     For the meaning of the other optional parameters, see the documentation
     of [tezos-snoop].
  *)
-val spawn_benchmark :
-  bench_name:string ->
-  bench_num:int ->
-  nsamples:int ->
-  determinizer:determinizer ->
-  save_to:string ->
-  ?seed:int ->
-  ?config_dir:string ->
-  ?csv_dump:string ->
-  t ->
-  Process.t
-
 val benchmark :
   bench_name:string ->
   bench_num:int ->
@@ -80,17 +68,6 @@ type regression_method =
   | NNLS
 
 (** Infers parameters for a model on some benchmark data. *)
-val spawn_infer_parameters :
-  model_name:string ->
-  workload_data:string ->
-  regression_method:regression_method ->
-  dump_csv:string ->
-  solution:string ->
-  ?report:string ->
-  ?graph:string ->
-  t ->
-  Process.t
-
 val infer_parameters :
   model_name:string ->
   workload_data:string ->
@@ -103,18 +80,6 @@ val infer_parameters :
   unit Lwt.t
 
 (** Generate a bunch of sapling transactions *)
-val spawn_sapling_generate :
-  ?protocol:Protocol.t ->
-  tx_count:int ->
-  max_inputs:int ->
-  max_outputs:int ->
-  file:string ->
-  ?max_nullifiers:int ->
-  ?max_additional_commitments:int ->
-  ?seed:int ->
-  t ->
-  Process.t
-
 val sapling_generate :
   ?protocol:Protocol.t ->
   tx_count:int ->
@@ -155,14 +120,6 @@ val michelson_generate :
   unit Lwt.t
 
 (** Concatenate files containing Michelson terms *)
-val spawn_michelson_concat :
-  ?protocol:Protocol.t ->
-  file1:string ->
-  file2:string ->
-  target:string ->
-  t ->
-  Process.t
-
 val michelson_concat :
   ?protocol:Protocol.t ->
   file1:string ->
@@ -186,7 +143,5 @@ type tag =
   | Cache
 
 type list_mode = All | Any | Exactly
-
-val spawn_list_benchmarks : mode:list_mode -> tags:tag list -> t -> Process.t
 
 val list_benchmarks : mode:list_mode -> tags:tag list -> t -> string list Lwt.t
