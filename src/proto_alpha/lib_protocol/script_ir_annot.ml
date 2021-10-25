@@ -203,52 +203,48 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     l =
   (* allow empty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
-  let sub_or_wildcard ~specials wrap s acc =
+  let sub_or_wildcard ~specials wrap s =
     let mem_char c cs = List.exists (Char.equal c) cs in
     let len = String.length s in
     (if Compare.Int.(len > max_annot_length) then
      error (Unexpected_annotation loc)
     else Result.return_unit)
     >>? fun () ->
-    if Compare.Int.(len = 1) then ok @@ wrap None :: acc
+    if Compare.Int.(len = 1) then ok @@ wrap None
     else
       match s.[1] with
       | 'a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9' ->
           (* check that all characters are valid*)
           string_iter (check_char loc) s 2 >>? fun () ->
-          ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
+          ok @@ wrap (Some (String.sub s 1 (len - 1)))
       | '@' when Compare.Int.(len = 2) && mem_char '@' specials ->
-          ok @@ wrap (Some "@") :: acc
+          ok @@ wrap (Some "@")
       | '%' when mem_char '%' specials ->
-          if Compare.Int.(len = 2) then ok @@ wrap (Some "%") :: acc
+          if Compare.Int.(len = 2) then ok @@ wrap (Some "%")
           else if Compare.Int.(len = 3) && Compare.Char.(s.[2] = '%') then
-            ok @@ wrap (Some "%%") :: acc
+            ok @@ wrap (Some "%%")
           else error (Unexpected_annotation loc)
       | _ -> error (Unexpected_annotation loc)
   in
-  List.fold_left_e
-    (fun acc s ->
+  List.map_e
+    (fun s ->
       if Compare.Int.(String.length s = 0) then
         error (Unexpected_annotation loc)
       else
         match s.[0] with
-        | ':' -> sub_or_wildcard ~specials:[] (fun a -> Type_annot_opt a) s acc
+        | ':' -> sub_or_wildcard ~specials:[] (fun a -> Type_annot_opt a) s
         | '@' ->
             sub_or_wildcard
               ~specials:(if allow_special_var then ['%'] else [])
               (fun a -> Var_annot_opt a)
               s
-              acc
         | '%' ->
             sub_or_wildcard
               ~specials:(if allow_special_field then ['@'] else [])
               (fun a -> Field_annot_opt a)
               s
-              acc
         | _ -> error (Unexpected_annotation loc))
-    []
     l
-  >|? List.rev
 
 let opt_var_of_var_opt = function None -> None | Some a -> Some (Var_annot a)
 
