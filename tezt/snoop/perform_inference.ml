@@ -67,6 +67,10 @@ let main () =
   Lwt_list.iter_s
     (fun model_name ->
       cleanup model_name ;
+      (* Python bindings tend to crash, hence the need to retry and resume inference midway,
+         multiple times. When python bindings are removed, this needs to be removed as well
+         See https://gitlab.com/tezos/tezos/-/issues/1523
+      *)
       retry ~max_tries:5 (fun () ->
           Snoop.infer_parameters
             ~model_name
