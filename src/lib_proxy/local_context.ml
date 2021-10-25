@@ -28,6 +28,13 @@ include Tezos_context_memory.Context
 
 let store_empty = empty
 
+let shallow_of_tree repo tree =
+  let h = Tree.hash tree in
+  let hash =
+    match Tree.kind tree with `Tree -> `Node h | `Value -> `Contents h
+  in
+  Tree.shallow repo hash
+
 module Tree = struct
   include Tree
 
