@@ -1,8 +1,9 @@
 Version 10.3
 ============
 
-**This version changes the storage backend and requires
-specific care when updating.**
+**This version changes the storage backend and requires specific care
+when updating. If you are upgrading from version 10.0~rc2 or earlier,
+you will need to upgrade your storage carefully.**
 
 The new storage backend uses a different file format for storing
 files, which contain the block history. This new storage layer
