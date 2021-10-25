@@ -127,7 +127,11 @@ let is_directory_nonempty dir =
   | S_DIR -> (
       let entries = fold_dir (fun x acc -> x :: acc) dir in
       let entries =
-        List.filter (fun entry -> entry <> "." && entry <> "..") entries
+        List.filter
+          (fun entry ->
+            entry <> Filename.current_dir_name
+            && entry <> Filename.parent_dir_name)
+          entries
       in
       match entries with [] -> return false | _ -> return true)
   | S_REG | S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK ->
@@ -149,7 +153,7 @@ let unlink_if_present file =
   | exception Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   | {Unix.st_kind; _} -> (
       match st_kind with
-      | Unix.S_REG ->
+      | Unix.S_REG -> (
           Log.info "Removing existing %s" file ;
-          Unix.unlink file
+          try Unix.unlink file with Unix.Unix_error (Unix.ENOENT, _, _) -> ())
       | _ -> Test.fail "%s is not a regular file" file)

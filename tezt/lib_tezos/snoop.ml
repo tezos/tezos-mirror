@@ -367,7 +367,7 @@ let spawn_list_benchmarks ~mode ~tags snoop =
 
 let list_benchmarks ~mode ~tags snoop =
   let process = spawn_list_benchmarks ~mode ~tags snoop in
-  let* output = Lwt_io.read (Process.stdout process) in
+  let* output = Process.check_and_read_stdout process in
   let lines = String.split_on_char '\n' output in
   Lwt_list.filter_map_s
     (function
