@@ -17,6 +17,8 @@ like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 The website https://tezos.com/ contains more information about the project.
 
+.. _octez:
+
 Octez
 -----
 
