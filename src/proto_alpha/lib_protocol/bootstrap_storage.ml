@@ -47,7 +47,7 @@ let init_contract ~typecheck ctxt
     ~balance:amount
     ~prepaid_bootstrap_storage:true
     ~script
-    ~delegate:(Some delegate)
+    ~delegate
 
 let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   let nonce = Operation_hash.hash_string ["Un festival de GADT."] in

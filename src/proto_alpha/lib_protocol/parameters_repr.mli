@@ -35,7 +35,7 @@ type bootstrap_account = {
 
 (** An originated contract initially existing on a chain since genesis. *)
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Signature.Public_key_hash.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
 }

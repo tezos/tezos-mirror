@@ -30,7 +30,7 @@ type bootstrap_account = {
 }
 
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Signature.Public_key_hash.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
 }
@@ -84,7 +84,7 @@ let bootstrap_contract_encoding =
     (fun {delegate; amount; script} -> (delegate, amount, script))
     (fun (delegate, amount, script) -> {delegate; amount; script})
     (obj3
-       (req "delegate" Signature.Public_key_hash.encoding)
+       (opt "delegate" Signature.Public_key_hash.encoding)
        (req "amount" Tez_repr.encoding)
        (req "script" Script_repr.encoding))
 
