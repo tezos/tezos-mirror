@@ -2032,28 +2032,25 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
 
 module Entrypoints = Set.Make (String)
 
-exception Duplicate of string
-
-exception Too_long of string
-
-let[@coq_axiom_with_reason "use of exceptions"] well_formed_entrypoints
-    (type full) (full : full ty) ~root_name =
+let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((first_unreachable, all) as acc) =
     match annot with
-    | None | Some (Field_annot "") -> (
-        if reachable then acc
-        else
-          match ty with
-          | Union_t _ -> acc
-          | _ -> (
-              match first_unreachable with
-              | None -> (Some (List.rev path), all)
-              | Some _ -> acc))
+    | None | Some (Field_annot "") ->
+        ok
+          (if reachable then acc
+          else
+            match ty with
+            | Union_t _ -> acc
+            | _ -> (
+                match first_unreachable with
+                | None -> (Some (List.rev path), all)
+                | Some _ -> acc))
     | Some (Field_annot name) ->
-        if Compare.Int.(String.length name > 31) then raise (Too_long name)
-        else if Entrypoints.mem name all then raise (Duplicate name)
-        else (first_unreachable, Entrypoints.add name all)
+        if Compare.Int.(String.length name > 31) then
+          error (Entrypoint_name_too_long name)
+        else if Entrypoints.mem name all then error (Duplicate_entrypoint name)
+        else ok (first_unreachable, Entrypoints.add name all)
   in
   let rec check :
       type t.
@@ -2061,41 +2058,36 @@ let[@coq_axiom_with_reason "use of exceptions"] well_formed_entrypoints
       prim list ->
       bool ->
       prim list option * Entrypoints.t ->
-      prim list option * Entrypoints.t =
+      (prim list option * Entrypoints.t) tzresult =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
-        let acc = merge (D_Left :: path) al tl reachable acc in
-        let acc = merge (D_Right :: path) ar tr reachable acc in
-        let acc =
-          check
-            tl
-            (D_Left :: path)
-            (match al with Some _ -> true | None -> reachable)
-            acc
-        in
+        merge (D_Left :: path) al tl reachable acc >>? fun acc ->
+        merge (D_Right :: path) ar tr reachable acc >>? fun acc ->
+        check
+          tl
+          (D_Left :: path)
+          (match al with Some _ -> true | None -> reachable)
+          acc
+        >>? fun acc ->
         check
           tr
           (D_Right :: path)
           (match ar with Some _ -> true | None -> reachable)
           acc
-    | _ -> acc
+    | _ -> ok acc
   in
-  try
-    let (init, reachable) =
-      match root_name with
-      | None | Some (Field_annot "") -> (Entrypoints.empty, false)
-      | Some (Field_annot name) -> (Entrypoints.singleton name, true)
-    in
-    let (first_unreachable, all) = check full [] reachable (None, init) in
-    if not (Entrypoints.mem "default" all) then Result.return_unit
-    else
-      match first_unreachable with
-      | None -> Result.return_unit
-      | Some path -> error (Unreachable_entrypoint path)
-  with
-  | Duplicate name -> error (Duplicate_entrypoint name)
-  | Too_long name -> error (Entrypoint_name_too_long name)
+  let (init, reachable) =
+    match root_name with
+    | None | Some (Field_annot "") -> (Entrypoints.empty, false)
+    | Some (Field_annot name) -> (Entrypoints.singleton name, true)
+  in
+  check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
+  if not (Entrypoints.mem "default" all) then Result.return_unit
+  else
+    match first_unreachable with
+    | None -> Result.return_unit
+    | Some path -> error (Unreachable_entrypoint path)
 
 let parse_uint ~nb_bits =
   assert (Compare.Int.(nb_bits >= 0 && nb_bits <= 30)) ;
