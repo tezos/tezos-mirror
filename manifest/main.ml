@@ -347,6 +347,20 @@ let tezos_test_helpers =
         "testable";
       ]
 
+let tezos_expect_helper =
+  public_lib
+    "tezos-expect-helper"
+    ~path:"src/lib_expect_helper"
+    ~synopsis:"Tezos: helper for writing expect tests for Tezos"
+
+let _tezos_expect_helper_test =
+  private_lib
+    "tezos_expect_helper_test"
+    ~opam:"tezos-expect-helper"
+    ~path:"src/lib_expect_helper/test"
+    ~deps:[tezos_expect_helper]
+    ~inline_tests:ppx_expect
+
 let tezos_stdlib =
   public_lib
     "tezos-stdlib"

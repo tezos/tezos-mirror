@@ -746,6 +746,13 @@ opam:tezos-event-logging-test-helpers:
   variables:
     package: tezos-event-logging-test-helpers
 
+opam:tezos-expect-helper:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tezos-expect-helper
+
 opam:tezos-hacl:
   extends:
     - .opam_template

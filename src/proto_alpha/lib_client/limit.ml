@@ -42,11 +42,17 @@ let join (type a) ~where eq (l1 : a t) (l2 : a t) =
       else error_with "Limit.join: error (%s)" where
 
 let%expect_test "join" =
-  let print = function
-    | Result.Error _ -> Printf.printf "error"
-    | Ok None -> Printf.printf "None"
-    | Ok (Some b) -> Printf.printf "%b" b
+  let pp_print_err fmt = function
+    | Result.Error _ -> Format.pp_print_string fmt "error"
+    | Ok x ->
+        Format.(
+          pp_print_option
+            ~none:(fun fmt () -> pp_print_string fmt "None")
+            pp_print_bool)
+          fmt
+          x
   in
+  let print x = Format.fprintf Format.std_formatter "%a" pp_print_err x in
   print (join ~where:__LOC__ Bool.equal (Some true) (Some true)) ;
   [%expect {| true |}] ;
   print (join ~where:__LOC__ Bool.equal None None) ;
@@ -63,10 +69,11 @@ let get ~when_unknown = function
   | Some x -> ok x
 
 let%expect_test "get" =
-  let print = function
-    | Result.Error _ -> Printf.printf "error"
-    | Ok b -> Printf.printf "%b" b
+  let pp_print_err fmt = function
+    | Result.Error _ -> Format.fprintf fmt "error"
+    | Ok b -> Format.pp_print_bool fmt b
   in
+  let print x = Format.fprintf Format.std_formatter "%a" pp_print_err x in
   print (get ~when_unknown:"" (Some true)) ;
   [%expect {| true |}] ;
   print (get ~when_unknown:"" None) ;
