@@ -441,7 +441,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
-      #simple -> ?chain:chain -> unit -> unit tzresult Lwt.t
+      #simple ->
+      ?chain:chain ->
+      ?peer_id:P2p_peer.Id.t ->
+      unit ->
+      unit tzresult Lwt.t
   end
 
   val live_blocks :
@@ -704,7 +708,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
       (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :
-        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+        ('a, 'b) RPC_path.t ->
+        ( [`POST],
+          'a,
+          'b,
+          < peer_id : P2p_peer_id.t option >,
+          unit,
+          unit )
+        RPC_service.t
     end
 
     val live_blocks :

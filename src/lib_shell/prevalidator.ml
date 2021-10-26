@@ -789,8 +789,11 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.request_operations RPC_path.open_root)
-           (fun pv () () ->
-             Distributed_db.Request.current_head pv.shell.parameters.chain_db () ;
+           (fun pv t () ->
+             Distributed_db.Request.current_head
+               pv.shell.parameters.chain_db
+               ?peer:t#peer_id
+               () ;
              return_unit) ;
        dir :=
          RPC_directory.gen_register

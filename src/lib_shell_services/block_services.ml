@@ -1208,11 +1208,22 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:json
           RPC_path.(path / "filter")
 
+      let request_operations_query =
+        let open RPC_query in
+        query (fun peer_id ->
+            object
+              method peer_id = peer_id
+            end)
+        |+ opt_field "peer_id" P2p_peer_id.rpc_arg (fun t -> t#peer_id)
+        |> seal
+
       let request_operations path =
         RPC_service.post_service
-          ~description:"Request the operations of your peers."
+          ~description:
+            "Request the operations of our peers or a specific peer if \
+             specified via a query parameter."
           ~input:Data_encoding.empty
-          ~query:RPC_query.empty
+          ~query:request_operations_query
           ~output:Data_encoding.empty
           RPC_path.(path / "request_operations")
     end
@@ -1472,9 +1483,16 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         end)
         ()
 
-    let request_operations ctxt ?(chain = `Main) () =
+    let request_operations ctxt ?(chain = `Main) ?peer_id () =
       let s = S.Mempool.request_operations (mempool_path chain_path) in
-      RPC_context.make_call1 s ctxt chain () ()
+      RPC_context.make_call1
+        s
+        ctxt
+        chain
+        (object
+           method peer_id = peer_id
+        end)
+        ()
   end
 
   let live_blocks ctxt =

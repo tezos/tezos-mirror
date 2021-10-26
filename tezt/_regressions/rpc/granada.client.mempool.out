@@ -5229,8 +5229,19 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "path": [
                   "request_operations"
                 ],
-                "description": "Request the operations of your peers.",
-                "query": [],
+                "description": "Request the operations of our peers or a specific peer if specified via a query parameter.",
+                "query": [
+                  {
+                    "name": "peer_id",
+                    "kind": {
+                      "optional": {
+                        "id": "single",
+                        "name": "peer_id",
+                        "descr": "A cryptographic node identity (Base58Check-encoded)"
+                      }
+                    }
+                  }
+                ],
                 "input": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
