@@ -26,6 +26,9 @@ variables:
 .image_template__runtime_build_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
 
+.image_template__runtime_prebuild_dependencies_template:
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+
 .image_template__latest:
   image: docker:latest
 
