@@ -86,14 +86,21 @@ let ezjson : json Crowbar.gen =
 let ezjson = Crowbar.with_printer pp_json ezjson
 
 let large_ezjson =
+  (* We use a smaller size for jsoo. It speeds up the CI and avoids
+     some stackoverfow issues in nodejs. *)
+  let factor =
+    match Sys.backend_type with
+    | Other "js_of_ocaml" -> 4
+    | Native | Bytecode | Other _ -> 16
+  in
   (* special generator for testing large values *)
   let open Crowbar in
   with_printer pp_json
   @@ map [ezjson; ezjson; ezjson] (fun j1 j2 j3 ->
          `A
-           (List.init 16 (fun _ ->
+           (List.init factor (fun _ ->
                 `A
-                  (List.init 16 (fun _ ->
+                  (List.init factor (fun _ ->
                        `O
                          [
                            ("j1", j1);

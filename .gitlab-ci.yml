@@ -2,6 +2,7 @@ default:
   before_script:
     - sudo apt-get update
     - sudo apt-get install --yes libgmp-dev
+    - sudo apt-get install --yes nodejs
 
 include: 'https://gitlab.com/nomadic-labs/gitlab-ocaml-ci-example/-/raw/main/.gitlab-ci.yml'
 
@@ -12,6 +13,8 @@ include: 'https://gitlab.com/nomadic-labs/gitlab-ocaml-ci-example/-/raw/main/.gi
     - OCAML_COMPILER: "4.11.2"
     - OCAML_COMPILER: "4.12.1"
     - OCAML_COMPILER: "4.13.1"
+    - OCAML_COMPILER: "4.13.1"
+      DUNE_TEST_TARGETS: "@runtest_js"
 
 variables:
   CLEAN_OPAM_CACHE: "false"
