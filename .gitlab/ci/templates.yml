@@ -115,25 +115,6 @@ variables:
     - when: manual
       allow_failure: true
 
-.rules_template__opam_child_pipeline_tests:
-  rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: always
-    # Run on scheduled builds.
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
-    # Run when the branch name contains the `opam` keyword.
-    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
-      when: always
-    # Run when there is label on the merge request.
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
-      when: always
-    # Run when opam changes are detected.
-    - if: '$TZ_OPAM_FILES_MODIFIED == "true"'
-      when: always
-    - when: never
-
 .rules_template__development_coverage:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
@@ -171,7 +152,7 @@ variables:
       when: always
     - when: never
 
-.rules_template__trigger_opam_child_pipeline:
+.rules_template__trigger_opam_pipeline:
   rules:
     # Run on push to the default branch (i.e master).
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
@@ -185,7 +166,43 @@ variables:
     # Run when there is label on the merge request.
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: always
-    # Run on merge requests.
-    - if: '$CI_MERGE_REQUEST_PROJECT_ID'
+    # Run on merge requests when opam changes are detected.
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes:
+        - "**/dune"
+        - "**/dune.inc"
+        - "**/*.dune.inc"
+        - "**/dune-project"
+        - "**/dune_protocol.*"
+        - "**/*.opam"
+        - scripts/version.sh
+        - .gitlab-ci.yml
       when: always
     - when: never # default
+
+# Job templates
+
+# This template is used by the opam test jobs in the child pipeline
+# triggered by `bootstrap-opam-pipeline.yml`.
+.opam_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies_template
+    # Note that the rules for jobs in the child pipeline must be the
+    # same as that of the generator job (`opam:create_pipeline`) and
+    # the child pipeline triggerer (`opam:trigger`).
+    - .rules_template__trigger_opam_pipeline
+  stage: packaging
+  script:
+    - ./scripts/opam-pin.sh
+    - opam depext --yes ${package}
+    - opam install --yes ${package}
+    - opam reinstall --yes --with-test ${package}
+  after_script:
+    # Stores logs in opam_logs/ for artifacts and outputs an excerpt on failure.
+    - OPAM_LOGS=opam_logs/ ./scripts/ci/opam_handle_output.sh
+  artifacts:
+    paths:
+      - opam_logs/
+    expire_in: 1 week
+    when: always
