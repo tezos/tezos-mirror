@@ -578,24 +578,29 @@ val convert_data_to_json :
 
     [sources] is a string containing all the [source_aliases],
     [source_pkhs], and [source_accounts] in JSON format as expected by
-    the [stresstest] command.
+    the [stresstest] command. Each optional argument [source_aliases],
+    [source_pkhs], and [source_accounts] defaults to an empty
+    list. However, if all three are empty, then the [sources] given to
+    the command are [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
+    [bootstrap5].
 
-    Default values:
-    - [endpoint]: cf {!create}
-    - [source_aliases], [source_pkhs], and [source_accounts]: each of
-      these defaults to an empty list. However, if all three are empty,
-      then the [sources] given to the command are
-      [Constant.bootstrap_keys] i.e. [bootstrap1], ..., [bootstrap5]
+    The parameter [--seed <seed>] is always provided (because without
+    it, the [stresstest] command would use a fixed seed). If the
+    corresponding optional argument is not provided to the function,
+    then a new random seed is generated.
 
-    Optional parameters (if the argument is not provided to this
-    function, neither is the corresponding parameter to the command):
+    Optional parameters (provided only if the function is called with
+    the corresponding optional argument):
     - [--transfers <transfers>]
-    - [--tps <tps>] *)
+    - [--tps <tps>]
+
+    [endpoint]: cf {!create} *)
 val stresstest :
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
+  ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
   t ->
@@ -607,6 +612,7 @@ val spawn_stresstest :
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
+  ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
   t ->

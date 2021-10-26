@@ -787,7 +787,7 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash -> return hash
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?transfers ?tps client =
+    ?(source_accounts = []) ?seed ?transfers ?tps client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -824,22 +824,34 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     in
     Ezjsonm.value_to_string (`A source_objs)
   in
-  let make_int_arg (name : string) = function
+  let seed =
+    (* Note: Tezt does not call [Random.self_init] so this is not
+       randomized from one run to the other (if the exact same tests
+       are run).
+
+       The goal here is to use different seeds for instances of the
+       [stresstest] command called in the same test, so that they
+       don't all inject the same operations. *)
+    (match seed with Some seed -> seed | None -> Random.int 0x3FFFFFFF)
+    |> Int.to_string
+  in
+  let make_int_opt_arg (name : string) = function
     | Some (arg : int) -> [name; Int.to_string arg]
     | None -> []
   in
   spawn_command ?endpoint client
-  @@ ["stresstest"; "transfer"; "using"; sources]
-  @ make_int_arg "--transfers" transfers
-  @ make_int_arg "--tps" tps
+  @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
+  @ make_int_opt_arg "--transfers" transfers
+  @ make_int_opt_arg "--tps" tps
 
-let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts
+let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?transfers ?tps client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
     ?source_pkhs
     ?source_accounts
+    ?seed
     ?transfers
     ?tps
     client
