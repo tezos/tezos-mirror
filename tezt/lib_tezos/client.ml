@@ -1145,33 +1145,45 @@ let get_parameter_file ?additional_bootstrap_account_count
       in
       return (Some parameter_file)
 
-let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
+let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?additional_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file tag ~protocol () =
+    ?(keys = Constant.all_secret_keys) tag () =
+  match tag with
+  | (`Client | `Proxy) as mode ->
+      let* node = Node.init ?event_level ?event_sections_levels nodes_args in
+      let endpoint = Node node in
+      let mode =
+        match mode with
+        | `Client -> Client (Some endpoint, None)
+        | `Proxy -> Proxy endpoint
+      in
+      let client =
+        create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
+      in
+      let* () = Lwt_list.iter_s (import_secret_key client) keys in
+      return (node, client)
+  | `Light ->
+      let* (client, node1, _) =
+        init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
+      in
+      return (node1, client)
+
+let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
+    ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
+    ?default_accounts_balance ?parameter_file tag ~protocol () =
   let* (node, client) =
-    match tag with
-    | (`Client | `Proxy) as mode ->
-        let* node = Node.init ?event_level ?event_sections_levels nodes_args in
-        let endpoint = Node node in
-        let mode =
-          match mode with
-          | `Client -> Client (Some endpoint, None)
-          | `Proxy -> Proxy endpoint
-        in
-        let client =
-          create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
-        in
-        let* () =
-          Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
-        in
-        return (node, client)
-    | `Light ->
-        let* (client, node1, _) =
-          init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
-        in
-        return (node1, client)
+    init_with_node
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      ?event_level
+      ?event_sections_levels
+      ?nodes_args
+      tag
+      ()
   in
   let* parameter_file =
     get_parameter_file

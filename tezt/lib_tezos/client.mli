@@ -771,6 +771,28 @@ val init :
   unit ->
   t Lwt.t
 
+(** Set up a client and node(s).
+
+    - Create a client with mode [Client], [Light], or [Proxy].
+    - Import all secret [?keys] (by default, {!Constant.all_secret_keys}).
+
+    In addition to the client, returns the first created node
+    (if [`Light] is passed, a second node has been created, but it is
+    not exposed). *)
+val init_with_node :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?nodes_args:Node.argument list ->
+  ?keys:Account.key list ->
+  [`Client | `Light | `Proxy] ->
+  unit ->
+  (Node.t * t) Lwt.t
+
 (** Set up a client and node(s) and activate a protocol.
 
     - Create a client with mode [Client], [Light], or [Proxy]
