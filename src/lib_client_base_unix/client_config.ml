@@ -50,6 +50,8 @@ let client_mode_to_string = function
 
 type error += Invalid_endpoint_arg of string
 
+type error += Invalid_media_type_arg of string
+
 type error += Suppressed_arg of {args : string list; by : string}
 
 type error += Invalid_chain_argument of string
@@ -67,6 +69,19 @@ type error += Invalid_wait_arg of string
 type error += Invalid_mode_arg of string
 
 let () =
+  register_error_kind
+    `Branch
+    ~id:"badMediaTypeArgument"
+    ~title:"Bad Media Type Argument"
+    ~description:"Media type argument could not be parsed"
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "media_type parameter must be 'json', 'binary' or 'any'. Got: %s"
+        s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_media_type_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_media_type_arg s) ;
   register_error_kind
     `Branch
     ~id:"badEndpointArgument"
@@ -184,6 +199,8 @@ let default_block = `Head 0
 
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
+let default_media_type = Media_type.all_media_types
+
 open Filename.Infix
 
 module Cfg_file = struct
@@ -195,6 +212,7 @@ module Cfg_file = struct
     node_addr : string option;
     node_port : int option;
     tls : bool option;
+    media_type : Media_type.t list option;
     endpoint : Uri.t option;
     web_port : int;
     remote_signer : Uri.t option;
@@ -205,6 +223,7 @@ module Cfg_file = struct
   let default =
     {
       base_dir = default_base_dir;
+      media_type = None;
       endpoint = None;
       node_addr = None;
       node_port = None;
@@ -224,6 +243,7 @@ module Cfg_file = struct
              node_addr;
              node_port;
              tls;
+             media_type;
              endpoint;
              web_port;
              remote_signer;
@@ -234,6 +254,7 @@ module Cfg_file = struct
           node_addr,
           node_port,
           tls,
+          media_type,
           endpoint,
           Some web_port,
           remote_signer,
@@ -243,6 +264,7 @@ module Cfg_file = struct
              node_addr,
              node_port,
              tls,
+             media_type,
              endpoint,
              web_port,
              remote_signer,
@@ -254,17 +276,19 @@ module Cfg_file = struct
           node_addr;
           node_port;
           tls;
+          media_type;
           endpoint;
           web_port;
           remote_signer;
           confirmations;
           password_filename;
         })
-      (obj9
+      (obj10
          (req "base_dir" string)
          (opt "node_addr" string)
          (opt "node_port" uint16)
          (opt "tls" bool)
+         (opt "media_type" (list Media_type.encoding))
          (opt "endpoint" RPC_encoding.uri_encoding)
          (opt "web_port" uint16)
          (opt "remote_signer" RPC_encoding.uri_encoding)
@@ -299,6 +323,15 @@ open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
+
+let media_type_parameter () :
+    (Media_type.t list, #Client_context.full) parameter =
+  parameter (fun _ x ->
+      match x with
+      | "json" -> return Media_type.[json; bson]
+      | "binary" -> return Media_type.[octet_stream]
+      | "any" -> return Media_type.all_media_types
+      | _ -> fail (Invalid_media_type_arg x))
 
 let endpoint_parameter () =
   parameter (fun _ x ->
@@ -473,6 +506,22 @@ let tls_switch () =
     ~short:'S'
     ~doc:"[DEPRECATED: use --endpoint instead] use TLS to connect to node."
     ()
+
+let media_type_confdesc = "-m/--media-type"
+
+let media_type_arg () =
+  arg
+    ~long:"media-type"
+    ~short:'m'
+    ~placeholder:"json, binary, any or default"
+    ~doc:
+      "Sets the \"media-type\" value for the \"accept\" header for RPC \
+       requests to the node. The media accept header indicates to the node \
+       which format of data serialisation is supported. Use the value \"json\" \
+       for serialisation to the JSON format.\n\
+      \          Use the value \"binary\" for faster but less human-readable \
+       binary serialisation format."
+    (media_type_parameter ())
 
 let endpoint_confdesc = "-E/--endpoint ('endpoint' in config file)"
 
@@ -755,7 +804,7 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  args16
+  args17
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -767,6 +816,7 @@ let global_options () =
     (addr_arg ())
     (port_arg ())
     (tls_switch ())
+    (media_type_arg ())
     (endpoint_arg ())
     (sources_arg ())
     (remote_signer_arg ())
@@ -933,6 +983,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_addr,
                node_port,
                tls,
+               media_type,
                endpoint,
                sources,
                remote_signer,
@@ -1044,12 +1095,14 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let password_filename =
     Option.either password_filename cfg.password_filename
   in
+  let media_type = Option.either media_type cfg.media_type in
   let cfg =
     {
       cfg with
       node_addr = None;
       node_port = None;
       tls = None;
+      media_type;
       endpoint = Some endpoint;
       remote_signer;
       confirmations;
@@ -1101,6 +1154,7 @@ type t =
   * string option
   * int option
   * bool
+  * Media_type.t list option
   * Uri.t option
   * Tezos_proxy.Light.sources_config option
   * Uri.t option

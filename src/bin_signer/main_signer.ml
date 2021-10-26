@@ -333,7 +333,7 @@ let password_filename_arg () =
 let global_options () =
   args3 (base_dir_arg ()) (require_auth_arg ()) (password_filename_arg ())
 
-module C = struct
+module Signer_config = struct
   type t = string option * bool * string option
 
   let global_options = global_options
@@ -356,6 +356,8 @@ module C = struct
 
   let default_base_dir = default_base_dir
 
+  let default_media_type = [Media_type.octet_stream]
+
   let other_registrations = None
 
   let clic_commands ~base_dir ~config_commands:_ ~builtin_commands:_
@@ -365,4 +367,7 @@ module C = struct
   let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
 end
 
-let () = Client_main_run.run (module C) ~select_commands:(fun _ _ -> return_nil)
+let () =
+  Client_main_run.run
+    (module Signer_config)
+    ~select_commands:(fun _ _ -> return_nil)

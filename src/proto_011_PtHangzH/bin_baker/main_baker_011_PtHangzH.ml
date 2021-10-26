@@ -44,4 +44,4 @@ let select_commands _ _ =
    validation will not be more expensive. *)
 let () = Tezos_sapling.Core.Validator.init_params ()
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () = Client_main_run.run (module Daemon_config) ~select_commands

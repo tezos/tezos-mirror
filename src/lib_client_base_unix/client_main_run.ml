@@ -58,6 +58,8 @@ module type M = sig
 
   val default_base_dir : string
 
+  val default_media_type : Media_type.t list
+
   val other_registrations :
     (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
     option
@@ -207,7 +209,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             let rpc_builder endpoint =
               (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                  {rpc_config with endpoint}
-                 Media_type.all_media_types
+                 rpc_config.media_type
                 :> RPC_context.simple)
             in
             let sources =
@@ -342,6 +344,8 @@ let main (module C : M) ~select_commands =
             | Some cfg ->
                 {
                   RPC_client_unix.default_config with
+                  media_type =
+                    Option.value cfg.media_type ~default:C.default_media_type;
                   endpoint =
                     Option.value
                       cfg.endpoint

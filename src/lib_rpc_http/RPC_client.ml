@@ -54,7 +54,11 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {endpoint : Uri.t; logger : logger}
+  type config = {
+    media_type : Media_type.t list;
+    endpoint : Uri.t;
+    logger : logger;
+  }
 
   val config_encoding : config Data_encoding.t
 
@@ -352,17 +356,28 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     Client.call_service ?logger ?headers ~base accept service params query body
     >>= fun ans -> handle accept ans
 
-  type config = {endpoint : Uri.t; logger : logger}
+  type config = {
+    media_type : Media_type.t list;
+    endpoint : Uri.t;
+    logger : logger;
+  }
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {endpoint; logger = _} -> endpoint)
-      (fun endpoint -> {endpoint; logger = null_logger})
-      (obj1 (req "endpoint" RPC_encoding.uri_encoding))
+      (fun {media_type; endpoint; logger = _} -> (media_type, endpoint))
+      (fun (media_type, endpoint) ->
+        {media_type; endpoint; logger = null_logger})
+      (obj2
+         (req "media-type" (list Media_type.encoding))
+         (req "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
-    {endpoint = Uri.of_string "http://localhost:8732"; logger = null_logger}
+    {
+      media_type = Media_type.all_media_types;
+      endpoint = Uri.of_string "http://localhost:8732";
+      logger = null_logger;
+    }
 
   class http_ctxt config media_types : RPC_context.json =
     let base = config.endpoint in

@@ -46,7 +46,7 @@ let init ?nodes_args ?parameter_file ?bake ~protocol () =
       ()
   in
   let* proxy_server = Proxy_server.init node in
-  Client.set_mode (Client (Some (Proxy_server proxy_server))) client ;
+  Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
   return (node, proxy_server, client)
 
 (* An event handler that checks that the 'split_key' heuristic of the
