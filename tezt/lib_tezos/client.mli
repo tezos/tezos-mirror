@@ -596,6 +596,7 @@ val init :
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
     - Activate the given protocol
+    - Wait for the protocol to be activated (i.e. chain level 1)
     - Bake (unless [~bake:false] is passed)
 
     In addition to the client, returns the first created node

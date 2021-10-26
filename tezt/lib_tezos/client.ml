@@ -841,6 +841,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
         Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
+      let* _ = Node.wait_for_level node 1 in
       let* () = if bake then bake_for client else Lwt.return_unit in
       return (node, client)
   | `Light ->
