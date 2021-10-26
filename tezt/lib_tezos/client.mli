@@ -649,6 +649,7 @@ val init :
       [default_accounts_balance]
     - Activate the given protocol with [additional_account_count]
       additional bootstrap accounts
+    - Wait for the protocol to be activated (i.e. chain level 1)
     - Bake (unless [~bake:false] is passed)
 
     In addition to the client, returns the first created node

@@ -972,6 +972,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       in
       let* parameter_file = get_parameter_file client in
       let* () = activate_protocol ?parameter_file ~protocol client in
+      let* _ = Node.wait_for_level node 1 in
       let* () = if bake then bake_for client else Lwt.return_unit in
       return (node, client)
   | `Light ->
