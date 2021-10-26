@@ -10,35 +10,35 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["2"] to "two"
 trace
-  - location: 43 (remaining gas: 1039931.791 units remaining)
+  - location: 43 (remaining gas: 1039917.211 units remaining)
     [ (Pair (Left Unit) (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	 ]
-  - location: 43 (remaining gas: 1039931.781 units remaining)
+  - location: 43 (remaining gas: 1039917.201 units remaining)
     [ (Left Unit)  	@parameter
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 44 (remaining gas: 1039931.771 units remaining)
+  - location: 44 (remaining gas: 1039917.191 units remaining)
     [ Unit  	@parameter.swap
       (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 46 (remaining gas: 1039931.761 units remaining)
+  - location: 46 (remaining gas: 1039917.181 units remaining)
     [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
-  - location: 48 (remaining gas: 1039931.751 units remaining)
+  - location: 48 (remaining gas: 1039917.171 units remaining)
     [ (Pair { Elt "1" "one" } { Elt "2" "two" })  	@storage.left ]
-  - location: 48 (remaining gas: 1039931.736 units remaining)
+  - location: 48 (remaining gas: 1039917.156 units remaining)
     [ (Pair { Elt "1" "one" } { Elt "2" "two" })  	@storage.left ]
-  - location: 54 (remaining gas: 1039931.726 units remaining)
+  - location: 54 (remaining gas: 1039917.146 units remaining)
     [ { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: 55 (remaining gas: 1039931.716 units remaining)
+  - location: 55 (remaining gas: 1039917.136 units remaining)
     [ { Elt "2" "two" }  	
       { Elt "1" "one" }  	 ]
-  - location: 56 (remaining gas: 1039931.701 units remaining)
+  - location: 56 (remaining gas: 1039917.121 units remaining)
     [ (Pair { Elt "2" "two" } { Elt "1" "one" })  	 ]
-  - location: 57 (remaining gas: 1039931.686 units remaining)
+  - location: 57 (remaining gas: 1039917.106 units remaining)
     [ (Left (Pair { Elt "2" "two" } { Elt "1" "one" }))  	 ]
-  - location: 44 (remaining gas: 1039931.671 units remaining)
+  - location: 44 (remaining gas: 1039917.091 units remaining)
     [ (Left (Pair { Elt "2" "two" } { Elt "1" "one" }))  	 ]
-  - location: 151 (remaining gas: 1039931.656 units remaining)
+  - location: 151 (remaining gas: 1039917.076 units remaining)
     [ {}  	
       (Left (Pair { Elt "2" "two" } { Elt "1" "one" }))  	 ]
-  - location: 153 (remaining gas: 1039931.641 units remaining)
+  - location: 153 (remaining gas: 1039917.061 units remaining)
     [ (Pair {} (Left (Pair { Elt "2" "two" } { Elt "1" "one" })))  	 ]
 

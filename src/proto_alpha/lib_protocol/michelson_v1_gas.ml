@@ -879,7 +879,7 @@ module Cost_of = struct
        and copied manually from the parameter fit for the MERGE_TYPES benchmark
        (the model is parametric on the size of the type, which we don't have
        access to in O(1)). *)
-    let cost_MERGE_TYPES = S.safe_int 40
+    let cost_MERGE_TYPES = S.safe_int 220
 
     (* model TYPECHECKING_CODE
        This is the cost of one iteration of parse_instr, extracted by hand from the
