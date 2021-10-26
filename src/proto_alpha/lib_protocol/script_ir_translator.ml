@@ -341,12 +341,17 @@ let[@coq_struct "function_parameter"] rec strip_var_annots = function
       let annots = List.filter not_var_annot annots in
       Prim (loc, name, List.map strip_var_annots args, annots)
 
-let serialize_ty_for_error ctxt ty =
-  unparse_ty ctxt ty
-  >>? (fun (ty, ctxt) ->
-        Gas.consume ctxt (Script.strip_locations_cost ty) >|? fun ctxt ->
-        (Micheline.strip_locations (strip_var_annots ty), ctxt))
-  |> record_trace Cannot_serialize_error
+let serialize_ty_for_error ty =
+  (*
+    Types are bounded by [Constants.michelson_maximum_type_size], so
+    [unparse_ty_uncarbonated], [strip_var_annots], and [strip_locations] are
+    bounded in time.
+
+    It is hence OK to use them in errors that are not caught in the validation
+    (only once in apply).
+  *)
+  let ty = unparse_ty_uncarbonated ty in
+  Micheline.strip_locations (strip_var_annots ty)
 
 let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
     type a.
@@ -383,7 +388,7 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
   | Contract_t _ | Operation_t _ | Bls12_381_fr_t _ | Bls12_381_g1_t _
   | Bls12_381_g2_t _ | Sapling_state_t _ | Sapling_transaction_t _
   | Chest_key_t _ | Chest_t _ ->
-      serialize_ty_for_error ctxt ty >>? fun (t, _ctxt) ->
+      let t = serialize_ty_for_error ty in
       error (Comparable_type_expected (loc, t))
 
 let rec unparse_stack :
@@ -766,11 +771,11 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent_types ctxt loc ta tb =
+let record_inconsistent_types loc ta tb =
   record_trace_eval (fun () ->
-      serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
-      Inconsistent_types (Some loc, ta, tb))
+      let ta = serialize_ty_for_error ta in
+      let tb = serialize_ty_for_error tb in
+      ok @@ Inconsistent_types (Some loc, ta, tb))
 
 module type GAS_MONAD = sig
   type 'a t
@@ -789,15 +794,11 @@ module type GAS_MONAD = sig
 
   val from_tzresult : 'a tzresult -> 'a t
 
-  val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
-
   val gas_consume : Gas.cost -> unit t
 
   val run : context -> 'a t -> ('a tzresult * context) tzresult
 
   val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
-
-  val get_context : context t
 end
 
 module Gas_monad : GAS_MONAD = struct
@@ -822,19 +823,12 @@ module Gas_monad : GAS_MONAD = struct
 
   let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
 
-  let unsafe_embed f ctxt = f ctxt >>? fun (x, ctxt) -> return x ctxt
-
   let gas_consume cost ctxt = Gas.consume ctxt cost >>? return ()
 
   let run ctxt x = x ctxt
 
-  let get_context ctxt = return ctxt ctxt
-
   let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
 end
-
-let serialize_ty_for_error_carbonated t =
-  Gas_monad.unsafe_embed (fun ctxt -> serialize_ty_for_error ctxt t)
 
 let merge_type_metadata :
     legacy:bool -> 'a ty_metadata -> 'b ty_metadata -> 'a ty_metadata tzresult =
@@ -935,9 +929,9 @@ let rec merge_comparable_types :
         merge_comparable_types ~legacy ta tb >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
-        serialize_ty_for_error_carbonated (ty_of_comparable_ty ta) >>$ fun ta ->
-        serialize_ty_for_error_carbonated (ty_of_comparable_ty tb) >?$ fun tb ->
-        error (Inconsistent_types (None, ta, tb))
+        let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
+        let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
+        from_tzresult @@ error (Inconsistent_types (None, ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -961,25 +955,24 @@ let merge_memo_sizes ms1 ms2 =
 type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
 
 let default_merge_type_error ty1 ty2 =
-  let open Gas_monad in
-  serialize_ty_for_error_carbonated ty1 >>$ fun ty1 ->
-  serialize_ty_for_error_carbonated ty2 >?$ fun ty2 ->
-  ok (Inconsistent_types (None, ty1, ty2))
+  let ty1 = serialize_ty_for_error ty1 in
+  let ty2 = serialize_ty_for_error ty2 in
+  Inconsistent_types (None, ty1, ty2)
 
 type error += Inconsistent_types_fast
 
-let fast_merge_type_error _ty1 _ty2 = Gas_monad.return Inconsistent_types_fast
+let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
 
 let merge_type_error ~merge_type_error_flag =
   match merge_type_error_flag with
   | Default_merge_type_error -> default_merge_type_error
   | Fast_merge_type_error -> fast_merge_type_error
 
-let record_inconsistent_carbonated ctxt ta tb =
+let record_inconsistent_carbonated ta tb =
   Gas_monad.record_trace_eval (fun () ->
-      serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
-      Inconsistent_types (None, ta, tb))
+      let ta = serialize_ty_for_error ta in
+      let tb = serialize_ty_for_error tb in
+      ok @@ Inconsistent_types (None, ta, tb))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
@@ -992,11 +985,10 @@ let merge_types :
     ((a ty, b ty) eq * a ty) Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
-    get_context >>$ fun initial_ctxt ->
     let merge_type_metadata tn1 tn2 =
       from_tzresult
         (merge_type_metadata ~legacy tn1 tn2
-        |> record_inconsistent_types initial_ctxt loc ty1 ty2)
+        |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
       from_tzresult (merge_field_annot ~legacy tn1 tn2)
@@ -1004,8 +996,7 @@ let merge_types :
     let merge_memo_sizes ms1 ms2 = from_tzresult (merge_memo_sizes ms1 ms2) in
     let rec help :
         type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
-     fun ty1 ty2 ->
-      help0 ty1 ty2 |> record_inconsistent_carbonated initial_ctxt ty1 ty2
+     fun ty1 ty2 -> help0 ty1 ty2 |> record_inconsistent_carbonated ty1 ty2
     and help0 :
         type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
      fun ty1 ty2 ->
@@ -1116,8 +1107,8 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          merge_type_error ~merge_type_error_flag ty1 ty2 >?$ fun err ->
-          error err
+          from_tzresult @@ error
+          @@ merge_type_error ~merge_type_error_flag ty1 ty2
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -2416,8 +2407,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
      [parse_comparable_data] doesn't call [parse_returning].
      The stack depth is bounded by the type depth, bounded by 1024. *)
   let parse_data_error () =
-    serialize_ty_for_error ctxt (ty_of_comparable_ty ty) >|? fun (ty, _ctxt) ->
-    Invalid_constant (location script_data, strip_locations script_data, ty)
+    let ty = serialize_ty_for_error (ty_of_comparable_ty ty) in
+    ok
+    @@ Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body =
@@ -2511,8 +2503,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         script_data
   in
   let parse_data_error () =
-    serialize_ty_for_error ctxt ty >|? fun (ty, _ctxt) ->
-    Invalid_constant (location script_data, strip_locations script_data, ty)
+    let ty = serialize_ty_for_error ty in
+    ok
+    @@ Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let fail_parse_data () = parse_data_error () >>?= fail in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
@@ -3007,17 +3000,16 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
       Lwt.return
       @@ record_trace_eval
            (fun () ->
-             serialize_ty_for_error ctxt ret >>? fun (ret, ctxt) ->
+             let ret = serialize_ty_for_error ret in
              serialize_stack_for_error ctxt stack_ty
              >|? fun (stack_ty, _ctxt) -> Bad_return (loc, stack_ty, ret))
            ( ty_eq ~legacy ctxt loc ty ret >|? fun (Eq, ctxt) ->
              ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt)
            )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
-      Lwt.return
-        ( serialize_ty_for_error ctxt ret >>? fun (ret, ctxt) ->
-          serialize_stack_for_error ctxt stack_ty >>? fun (stack_ty, _ctxt) ->
-          error (Bad_return (loc, stack_ty, ret)) )
+      let ret = serialize_ty_for_error ret in
+      serialize_stack_for_error ctxt stack_ty >>?= fun (stack_ty, _ctxt) ->
+      fail @@ Bad_return (loc, stack_ty, ret)
   | (Failed {descr}, ctxt) ->
       return
         ( (Lam (close_descr (descr (Item_t (ret, Bot_t, None))), script_instr)
@@ -3126,8 +3118,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_var_annot loc annot ~default:stack_annot >>?= fun annot ->
       record_trace_eval
         (fun () ->
-          serialize_ty_for_error ctxt v >|? fun (t, _ctxt) ->
-          Non_dupable_type (loc, t))
+          let t = serialize_ty_for_error v in
+          ok @@ Non_dupable_type (loc, t))
         (check_dupable_ty ctxt loc v)
       >>?= fun ctxt ->
       let dup = {apply = (fun kinfo k -> IDup (kinfo, k))} in
@@ -3158,8 +3150,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
       record_trace_eval
         (fun () ->
-          serialize_ty_for_error ctxt after_ty >|? fun (t, _ctxt) ->
-          Non_dupable_type (loc, t))
+          let t = serialize_ty_for_error after_ty in
+          ok @@ Non_dupable_type (loc, t))
         (check_dupable_ty ctxt loc after_ty)
       >>?= fun ctxt ->
       let dupn = {apply = (fun kinfo k -> IDup_n (kinfo, n, witness, k))} in
@@ -5266,8 +5258,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           [],
           _ ),
       Item_t (ta, Item_t (tb, _, _), _) ) ->
-      serialize_ty_for_error ctxt ta >>?= fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt tb >>?= fun (tb, _ctxt) ->
+      let ta = serialize_ty_for_error ta in
+      let tb = serialize_ty_for_error tb in
       fail (Undefined_binop (loc, name, ta, tb))
   | ( Prim
         ( loc,
@@ -5279,7 +5271,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           [],
           _ ),
       Item_t (t, _, _) ) ->
-      serialize_ty_for_error ctxt t >>?= fun (t, _ctxt) ->
+      let t = serialize_ty_for_error t in
       fail (Undefined_unop (loc, name, t))
   | (Prim (loc, ((I_UPDATE | I_SLICE | I_OPEN_CHEST) as name), [], _), stack) ->
       Lwt.return
@@ -5768,10 +5760,8 @@ let parse_storage :
   Script.force_decode_in_context ctxt storage >>?= fun (storage, ctxt) ->
   trace_eval
     (fun () ->
-      Lwt.return
-        ( serialize_ty_for_error ctxt storage_type
-        >|? fun (storage_type, _ctxt) ->
-          Ill_typed_data (None, storage, storage_type) ))
+      let storage_type = serialize_ty_for_error storage_type in
+      return @@ Ill_typed_data (None, storage, storage_type))
     (parse_data
        ?type_logger
        ~stack_depth:0

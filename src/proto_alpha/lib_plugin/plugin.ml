@@ -938,10 +938,8 @@ module RPC = struct
       >>?= fun (Ex_ty exp_ty, ctxt) ->
       trace_eval
         (fun () ->
-          Lwt.return
-            ( Script_ir_translator.serialize_ty_for_error ctxt exp_ty
-            >|? fun (exp_ty, _ctxt) ->
-              Script_tc_errors.Ill_typed_data (None, data, exp_ty) ))
+          let exp_ty = Script_ir_translator.serialize_ty_for_error exp_ty in
+          return @@ Script_tc_errors.Ill_typed_data (None, data, exp_ty))
         (let allow_forged =
            true
            (* Safe since we ignore the value afterwards. *)
