@@ -339,7 +339,7 @@ let build_new_store nb_blocks ~base_dir ~patch_context ~history_mode =
       }
     in
     Block_validation.apply apply_environment activation_block [] ~cache:`Lazy
-    >>=? fun (bv, _) ->
+    >>=? fun {result = bv; _} ->
     (Store.Block.store_block
        chain_store
        ~block_header:activation_block

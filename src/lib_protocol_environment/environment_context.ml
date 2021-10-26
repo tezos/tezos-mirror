@@ -257,10 +257,10 @@ module Context = struct
 
   type cache_key = Environment_cache.key
 
-  type block_cache = {block_hash : Block_hash.t; cache : cache}
+  type block_cache = {context_hash : Context_hash.t; cache : cache}
 
   type source_of_cache =
-    [`Load | `Lazy | `Inherited of block_cache * Block_hash.t]
+    [`Load | `Lazy | `Inherited of block_cache * Context_hash.t]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -463,8 +463,8 @@ module Context = struct
 
   let load_cache (Context ctxt) mode builder =
     (match mode with
-    | `Inherited ({block_hash; cache}, predecessor) ->
-        if Block_hash.equal block_hash predecessor then
+    | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
+        if Context_hash.equal context_hash predecessor_context_hash then
           (*
 
              We can safely reuse the cache of the predecessor block.

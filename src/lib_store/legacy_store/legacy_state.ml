@@ -1024,7 +1024,13 @@ module Block = struct
   (* EDITED : No context checks *)
   let store chain_state block_header block_header_metadata operations
       operations_metadata block_metadata_hash ops_metadata_hashes
-      ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
+      ({
+         context_hash;
+         timestamp = _;
+         message;
+         max_operations_ttl;
+         last_allowed_fork_level;
+       } :
         Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in

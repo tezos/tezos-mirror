@@ -35,6 +35,8 @@ type result =
   | Outdated_block
   | Validated
   | Validation_error of error trace
+  | Preapplied of (Block_header.shell_header * error Preapply_result.t list)
+  | Preapplication_error of error trace
 
 module Name = struct
   type t = unit
@@ -62,23 +64,38 @@ end
 module Request = struct
   include Request
 
-  type 'a t =
-    | Request_validation : {
-        chain_db : Distributed_db.chain_db;
-        notify_new_block : Store.Block.t -> unit;
-        canceler : Lwt_canceler.t option;
-        peer : P2p_peer.Id.t option;
-        hash : Block_hash.t;
-        header : Block_header.t;
-        operations : Operation.t list list;
-      }
-        -> result t
+  type validation_request = {
+    chain_db : Distributed_db.chain_db;
+    notify_new_block : Store.Block.t -> unit;
+    canceler : Lwt_canceler.t option;
+    peer : P2p_peer.Id.t option;
+    hash : Block_hash.t;
+    header : Block_header.t;
+    operations : Operation.t list list;
+  }
 
-  let view : type a. a t -> view =
-   fun (Request_validation {chain_db; peer; hash; _}) ->
-    let chain_store = Distributed_db.chain_store chain_db in
-    let chain_id = Store.Chain.chain_id chain_store in
-    {chain_id; block = hash; peer}
+  type preapplication_request = {
+    chain_store : Store.chain_store;
+    canceler : Lwt_canceler.t option;
+    predecessor : Store.Block.t;
+    timestamp : Time.Protocol.t;
+    protocol_data : bytes;
+    operations : Operation.t list list;
+  }
+
+  type 'a t =
+    | Request_validation : validation_request -> result t
+    | Request_preapplication : preapplication_request -> result t
+
+  let view : type a. a t -> view = function
+    | Request_validation {chain_db; peer; hash; _} ->
+        let chain_store = Distributed_db.chain_store chain_db in
+        let chain_id = Store.Chain.chain_id chain_store in
+        Validation {chain_id; block = hash; peer}
+    | Request_preapplication {chain_store; predecessor; _} ->
+        let chain_id = Store.Chain.chain_id chain_store in
+        let level = Int32.succ (Store.Block.level predecessor) in
+        Preapplication {chain_id; level}
 end
 
 module Logger =
@@ -107,10 +124,16 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
 let is_already_validated chain_store hash =
   Store.Block.is_known chain_store hash
 
-let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
- fun w
-     (Request.Request_validation
-       {chain_db; notify_new_block; canceler; peer; hash; header; operations}) ->
+let on_validation_request w
+    {
+      Request.chain_db;
+      notify_new_block;
+      canceler;
+      peer;
+      hash;
+      header;
+      operations;
+    } =
   let bv = Worker.state w in
   let chain_store = Distributed_db.chain_store chain_db in
   is_already_validated chain_store hash >>= function
@@ -176,25 +199,77 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
             >>=? fun () -> return (Validation_error err)
           else return (Validation_error err))
 
+let on_preapplication_request w
+    {
+      Request.chain_store;
+      canceler;
+      predecessor;
+      timestamp;
+      protocol_data;
+      operations;
+    } =
+  let bv = Worker.state w in
+  Worker.protect w (fun () ->
+      protect ?canceler (fun () ->
+          Block_validator_process.preapply_block
+            bv.validation_process
+            chain_store
+            ~predecessor
+            ~protocol_data
+            ~timestamp
+            operations))
+  >>= function
+  | Ok res -> return (Preapplied res)
+  | Error errs -> return (Preapplication_error errs)
+
+let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
+ fun w -> function
+  | Request.Request_validation r -> on_validation_request w r
+  | Request.Request_preapplication r -> on_preapplication_request w r
+
 let on_launch _ _ (limits, start_testchain, db, validation_process) =
   let protocol_validator = Protocol_validator.create db in
   return {Types.protocol_validator; validation_process; limits; start_testchain}
 
 let on_error w r st errs =
-  Worker.log_event w (Validation_failure (r, st, errs)) >>= fun () ->
-  (* Keep the worker alive. *)
-  return_unit
+  match r with
+  | Request.Validation v ->
+      Worker.log_event w (Validation_failure (v, st, errs)) >>= fun () ->
+      (* Keep the worker alive. *)
+      return_unit
+  | Preapplication v ->
+      Worker.log_event w (Preapplication_failure (v, st, errs)) >>= fun () ->
+      (* Keep the worker alive. *)
+      return_unit
 
 let on_completion :
     type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
- fun w (Request.Request_validation {hash; _} as r) v st ->
-  match v with
-  | Already_commited | Outdated_block ->
+ fun w request v st ->
+  match (request, v) with
+  | (Request.Request_validation {hash; _}, (Already_commited | Outdated_block))
+    ->
       Worker.log_event w (Previously_validated hash) >>= fun () ->
       Lwt.return_unit
-  | Validated -> Worker.log_event w (Validation_success (Request.view r, st))
-  | Validation_error errs ->
-      Worker.log_event w (Event.Validation_failure (Request.view r, st, errs))
+  | (Request.Request_validation _, Validated) -> (
+      match Request.view request with
+      | Validation v -> Worker.log_event w (Validation_success (v, st))
+      | _ -> (* assert false *) Lwt.return_unit)
+  | (Request.Request_validation _, Validation_error errs) -> (
+      match Request.view request with
+      | Validation v ->
+          Worker.log_event w (Event.Validation_failure (v, st, errs))
+      | _ -> (* assert false *) Lwt.return_unit)
+  | (Request.Request_preapplication _, Preapplied _) -> (
+      match Request.view request with
+      | Preapplication v ->
+          Worker.log_event w (Event.Preapplication_success (v, st))
+      | _ -> (* assert false *) Lwt.return_unit)
+  | (Request.Request_preapplication _, Preapplication_error errs) -> (
+      match Request.view request with
+      | Preapplication v ->
+          Worker.log_event w (Event.Preapplication_failure (v, st, errs))
+      | _ -> (* assert false *) Lwt.return_unit)
+  | _ -> (* assert false *) Lwt.return_unit
 
 let on_close w =
   let bv = Worker.state w in
@@ -265,7 +340,26 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
            })
       >>= function
       | Ok (Validated | Already_commited | Outdated_block) -> return_unit
-      | Ok (Validation_error errs) | Error errs -> Lwt.return_error errs)
+      | Ok (Validation_error errs) | Error errs -> Lwt.return_error errs
+      | _ -> assert false)
+
+let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
+    operations =
+  Worker.Queue.push_request_and_wait
+    w
+    (Request_preapplication
+       {
+         chain_store;
+         canceler;
+         predecessor;
+         timestamp;
+         protocol_data;
+         operations;
+       })
+  >>= function
+  | Ok (Preapplied res) -> return res
+  | Ok (Preapplication_error errs) | Error errs -> Lwt.return_error errs
+  | _ -> failwith "unexpected result"
 
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in

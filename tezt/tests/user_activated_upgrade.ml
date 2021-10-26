@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Basic
+   Invocation:   dune exec tezt/tests/main.exe -- --file user_activated_upgrade.ml
+   Subject:      .
+*)
+
 let test_metadata_consistency ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__

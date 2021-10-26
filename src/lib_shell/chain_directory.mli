@@ -34,14 +34,6 @@ val get_chain_store_exn :
 
 val get_checkpoint : Store.t -> Chain_services.chain -> Block_hash.t Lwt.t
 
-val rpc_directory :
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  Validator.t ->
-  Store.chain_store RPC_directory.t
+val rpc_directory : Validator.t -> Store.chain_store RPC_directory.t
 
-val build_rpc_directory :
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  Validator.t ->
-  unit RPC_directory.t
+val build_rpc_directory : Validator.t -> unit RPC_directory.t

@@ -320,6 +320,7 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
       Tezos_validation.Block_validation.validation_store =
         {
           context_hash = Block_repr.context raw_block;
+          timestamp = Block_repr.timestamp raw_block;
           message = Block_repr.message metadata;
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
           last_allowed_fork_level = Block_repr.last_allowed_fork_level metadata;
