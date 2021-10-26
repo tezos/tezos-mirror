@@ -48,13 +48,17 @@ let () =
     (fun () -> Endorsement_branch_not_live)
 
 module type T = sig
-  module Proto : Tezos_protocol_environment.PROTOCOL
+  type operation_data
+
+  type operation_receipt
+
+  type validation_state
 
   type t
 
-  val parse : Operation.t -> Proto.operation_data operation tzresult
+  val parse : Operation.t -> operation_data operation tzresult
 
-  val parse_unsafe : bytes -> Proto.operation_data tzresult
+  val parse_unsafe : bytes -> operation_data tzresult
 
   val create :
     Store.chain_store ->
@@ -66,15 +70,15 @@ module type T = sig
     t tzresult Lwt.t
 
   type result =
-    | Applied of t * Proto.operation_receipt
+    | Applied of t * operation_receipt
     | Branch_delayed of tztrace
     | Branch_refused of tztrace
     | Refused of tztrace
     | Outdated of tztrace
 
-  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
+  val apply_operation : t -> operation_data operation -> result Lwt.t
 
-  val validation_state : t -> Proto.validation_state
+  val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit
 end
@@ -87,8 +91,15 @@ let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
   | Some protocol_data -> ok protocol_data
 
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
-  T with module Proto = Proto = struct
-  module Proto = Proto
+  T
+    with type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state = struct
+  type operation_data = Proto.operation_data
+
+  type operation_receipt = Proto.operation_receipt
+
+  type validation_state = Proto.validation_state
 
   type t = {
     state : Proto.validation_state;
