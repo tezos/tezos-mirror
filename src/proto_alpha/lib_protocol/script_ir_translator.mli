@@ -141,8 +141,8 @@ module Gas_monad : sig
   val ( >??$ ) :
     ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace) t) -> ('b, 'trace) t
 
-  (** gas-free embedding of tzresult values. [from_result x] is equivalent to [return () >?$ fun () -> x] *)
-  val from_result : ('a, 'trace) result -> ('a, 'trace) t
+  (** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
+  val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
   (** Gas consumption *)
   val gas_consume : Gas.cost -> (unit, 'trace) t

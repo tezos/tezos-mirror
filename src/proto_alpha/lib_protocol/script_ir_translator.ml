@@ -794,7 +794,7 @@ module type GAS_MONAD = sig
     (('a, 'trace) result -> ('b, 'trace2) t) ->
     ('b, 'trace2) t
 
-  val from_result : ('a, 'trace) result -> ('a, 'trace) t
+  val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
   val gas_consume : Gas.cost -> (unit, 'trace) t
 
@@ -812,17 +812,17 @@ module Gas_monad : GAS_MONAD = struct
 
   type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-  let from_result x ctxt = ok (x, ctxt)
+  let of_result x ctxt = ok (x, ctxt)
 
-  let return x = from_result (ok x)
+  let return x = of_result (ok x)
 
   let ( >>$ ) m f ctxt =
     m ctxt >>? fun (x, ctxt) ->
-    match x with Ok y -> f y ctxt | Error _ as err -> from_result err ctxt
+    match x with Ok y -> f y ctxt | Error _ as err -> of_result err ctxt
 
-  let ( >|$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> from_result (x >|? f) ctxt
+  let ( >|$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> of_result (x >|? f) ctxt
 
-  let ( >?$ ) m f = m >>$ fun x -> from_result (f x)
+  let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
 
   let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
 
@@ -832,7 +832,7 @@ module Gas_monad : GAS_MONAD = struct
 
   let record_trace_eval f m ctxt =
     m ctxt >>? fun (x, ctxt) ->
-    from_result (x |> record_trace_eval @@ fun () -> ok @@ f ()) ctxt
+    of_result (x |> record_trace_eval @@ fun () -> ok @@ f ()) ctxt
 end
 
 let merge_type_metadata :
@@ -868,10 +868,10 @@ let rec merge_comparable_types :
   fun ~legacy ta tb ->
     gas_consume Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata ~legacy meta_a meta_b =
-      from_result @@ merge_type_metadata ~legacy meta_a meta_b
+      of_result @@ merge_type_metadata ~legacy meta_a meta_b
     in
     let merge_field_annot ~legacy annot_a annot_b =
-      from_result @@ merge_field_annot ~legacy annot_a annot_b
+      of_result @@ merge_field_annot ~legacy annot_a annot_b
     in
     let return f eq annot_a annot_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
@@ -940,7 +940,7 @@ let rec merge_comparable_types :
     | (_, _) ->
         let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
         let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
-        from_result @@ error (Inconsistent_types (None, ta, tb))
+        of_result @@ error (Inconsistent_types (None, ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -995,14 +995,14 @@ let merge_types :
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
-      from_result
+      of_result
         (merge_type_metadata ~legacy tn1 tn2
         |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
-      from_result (merge_field_annot ~legacy tn1 tn2)
+      of_result (merge_field_annot ~legacy tn1 tn2)
     in
-    let merge_memo_sizes ms1 ms2 = from_result (merge_memo_sizes ms1 ms2) in
+    let merge_memo_sizes ms1 ms2 = of_result (merge_memo_sizes ms1 ms2) in
     let rec help :
         type ta tb.
         ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
@@ -1119,8 +1119,7 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          from_result @@ error
-          @@ merge_type_error ~merge_type_error_flag ty1 ty2
+          of_result @@ error @@ merge_type_error ~merge_type_error_flag ty1 ty2
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -2019,7 +2018,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
     (string * exp ty, error trace) Gas_monad.t =
   let open Gas_monad in
   match find_entrypoint full ~root_name entrypoint with
-  | Error _ as err -> from_result err
+  | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
       merge_types ~legacy ~merge_type_error_flag loc ty expected
       >??$ fun eq_ty ->
@@ -2030,8 +2029,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
           | Error _ ->
               merge_types ~legacy ~merge_type_error_flag loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
-      | _ -> from_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty)))
-      )
+      | _ -> of_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
 
 module Entrypoints = Set.Make (String)
 
