@@ -1996,7 +1996,7 @@ type 'before dup_n_proof_argument =
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
   let annot_is_entrypoint entrypoint = function
     | None -> false
-    | Some (Field_annot l) -> Compare.String.(l = entrypoint)
+    | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
   in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
@@ -2025,8 +2025,8 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     error (Entrypoint_name_too_long entrypoint)
   else
     match root_name with
-    | Some (Field_annot root_name) when Compare.String.(entrypoint = root_name)
-      ->
+    | Some (Field_annot root_name)
+      when Compare.String.(entrypoint = (root_name :> string)) ->
         ok ((fun e -> e), Ex_ty full)
     | _ -> (
         match find_entrypoint full entrypoint with
@@ -2046,7 +2046,8 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
       merge_types ~legacy ~merge_type_error_flag loc ty expected
       >??$ fun eq_ty ->
       match (entrypoint, root_name) with
-      | ("default", Some (Field_annot "root")) -> (
+      | ("default", Some (Field_annot fa))
+        when Compare.String.((fa :> string) = "root") -> (
           match eq_ty with
           | Ok (Eq, ty) -> return ("default", (ty : exp ty))
           | Error _ ->
@@ -2060,7 +2061,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((first_unreachable, all) as acc) =
     match annot with
-    | None | Some (Field_annot "") ->
+    | None ->
         ok
           (if reachable then acc
           else
@@ -2071,6 +2072,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
                 | None -> (Some (List.rev path), all)
                 | Some _ -> acc))
     | Some (Field_annot name) ->
+        let name = (name :> string) in
         if Compare.Int.(String.length name > 31) then
           error (Entrypoint_name_too_long name)
         else if Entrypoints.mem name all then error (Duplicate_entrypoint name)
@@ -2103,8 +2105,8 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   in
   let (init, reachable) =
     match root_name with
-    | None | Some (Field_annot "") -> (Entrypoints.empty, false)
-    | Some (Field_annot name) -> (Entrypoints.singleton name, true)
+    | None -> (Entrypoints.empty, false)
+    | Some (Field_annot name) -> (Entrypoints.singleton (name :> string), true)
   in
   check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
   if not (Entrypoints.mem "default" all) then Result.return_unit
@@ -4789,9 +4791,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (annot, entrypoint) ->
       (match entrypoint with
       | None -> Ok "default"
-      | Some (Field_annot "default") -> error (Unexpected_annotation loc)
       | Some (Field_annot entrypoint) ->
-          if Compare.Int.(String.length entrypoint > 31) then
+          let entrypoint = (entrypoint :> string) in
+          if Compare.String.(entrypoint = "default") then
+            error (Unexpected_annotation loc)
+          else if Compare.Int.(String.length entrypoint > 31) then
             error (Entrypoint_name_too_long entrypoint)
           else Ok entrypoint)
       >>?= fun entrypoint ->
@@ -4989,7 +4993,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         >>? fun (annot, entrypoint) ->
           let entrypoint =
             Option.fold
-              ~some:(fun (Field_annot annot) -> annot)
+              ~some:(fun (Field_annot annot) -> (annot :> string))
               ~none:"default"
               entrypoint
           in
@@ -5873,7 +5877,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((unreachables, all) as acc) =
     match annot with
-    | None | Some (Field_annot "") -> (
+    | None -> (
         ok
         @@
         if reachable then acc
@@ -5882,6 +5886,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
           | Union_t _ -> acc
           | _ -> (List.rev path :: unreachables, all))
     | Some (Field_annot name) ->
+        let name = (name :> string) in
         if Compare.Int.(String.length name > 31) then
           ok (List.rev path :: unreachables, all)
         else if Entrypoints_map.mem name all then
@@ -5923,9 +5928,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
-    | None | Some (Field_annot "") -> (Entrypoints_map.empty, false)
+    | None -> (Entrypoints_map.empty, false)
     | Some (Field_annot name) ->
-        (Entrypoints_map.singleton name ([], unparsed_full), true)
+        (Entrypoints_map.singleton (name :> string) ([], unparsed_full), true)
   in
   fold_tree full [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]

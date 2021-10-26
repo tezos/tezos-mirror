@@ -27,23 +27,28 @@ open Alpha_context
 open Micheline
 open Script_tc_errors
 
-type var_annot = Var_annot of string [@@ocaml.unboxed]
+type var_annot = Var_annot of Non_empty_string.t [@@ocaml.unboxed]
 
-type type_annot = Type_annot of string [@@ocaml.unboxed]
+type type_annot = Type_annot of Non_empty_string.t [@@ocaml.unboxed]
 
-type field_annot = Field_annot of string [@@ocaml.unboxed]
+type field_annot = Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS = struct
-  let unsafe_var_annot_of_string s = Var_annot s
+  let unsafe_var_annot_of_string s =
+    Var_annot (Non_empty_string.of_string_exn s)
 
-  let unsafe_type_annot_of_string s = Type_annot s
+  let unsafe_type_annot_of_string s =
+    Type_annot (Non_empty_string.of_string_exn s)
 
-  let unsafe_field_annot_of_string s = Field_annot s
+  let unsafe_field_annot_of_string s =
+    Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let some_var_annot_of_string_exn s = Some (Var_annot s)
+let some_var_annot_of_string_exn s =
+  Some (Var_annot (Non_empty_string.of_string_exn s))
 
-let some_field_annot_of_string_exn s = Some (Field_annot s)
+let some_field_annot_of_string_exn s =
+  Some (Field_annot (Non_empty_string.of_string_exn s))
 
 let default_now_annot = some_var_annot_of_string_exn "now"
 
@@ -102,15 +107,15 @@ let default_sapling_balance_annot =
 
 let unparse_type_annot : type_annot option -> string list = function
   | None -> []
-  | Some (Type_annot a) -> [":" ^ a]
+  | Some (Type_annot a) -> [":" ^ (a :> string)]
 
 let unparse_var_annot : var_annot option -> string list = function
   | None -> []
-  | Some (Var_annot a) -> ["@" ^ a]
+  | Some (Var_annot a) -> ["@" ^ (a :> string)]
 
 let unparse_field_annot : field_annot option -> string list = function
   | None -> []
-  | Some (Field_annot a) -> ["%" ^ a]
+  | Some (Field_annot a) -> ["%" ^ (a :> string)]
 
 let field_to_var_annot : field_annot option -> var_annot option = function
   | None -> None
@@ -133,14 +138,12 @@ let gen_access_annot :
     var_annot option =
  fun value_annot ?(default = None) field_annot ->
   match (value_annot, field_annot, default) with
-  | (None, None, _) | (Some _, None, None) | (None, Some (Field_annot ""), _) ->
-      None
+  | (None, None, _) | (Some _, None, None) -> None
   | (None, Some (Field_annot f), _) -> Some (Var_annot f)
-  | (Some (Var_annot v), (None | Some (Field_annot "")), Some (Field_annot f))
-    ->
-      Some (Var_annot (String.concat "." [v; f]))
+  | (Some (Var_annot v), None, Some (Field_annot f)) ->
+      Some (Var_annot (Non_empty_string.cat2 v ~sep:"." f))
   | (Some (Var_annot v), Some (Field_annot f), _) ->
-      Some (Var_annot (String.concat "." [v; f]))
+      Some (Var_annot (Non_empty_string.cat2 v ~sep:"." f))
 
 let merge_type_annot :
     legacy:bool ->
@@ -151,8 +154,10 @@ let merge_type_annot :
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Type_annot a1), Some (Type_annot a2)) ->
-      if legacy || String.equal a1 a2 then ok annot1
-      else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
+      if legacy || Non_empty_string.(a1 = a2) then ok annot1
+      else
+        error
+          (Inconsistent_annotations (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
 
 let merge_field_annot :
     legacy:bool ->
@@ -163,15 +168,17 @@ let merge_field_annot :
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Field_annot a1), Some (Field_annot a2)) ->
-      if legacy || String.equal a1 a2 then ok annot1
-      else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
+      if legacy || Non_empty_string.(a1 = a2) then ok annot1
+      else
+        error
+          (Inconsistent_annotations ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
 
 let merge_var_annot : var_annot option -> var_annot option -> var_annot option =
  fun annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> None
   | (Some (Var_annot a1), Some (Var_annot a2)) ->
-      if String.equal a1 a2 then annot1 else None
+      if Non_empty_string.(a1 = a2) then annot1 else None
 
 let error_unexpected_annot loc annot =
   match annot with
@@ -200,29 +207,37 @@ let check_char loc c =
 let max_annot_length = 255
 
 type annot_opt =
-  | Field_annot_opt of string option
-  | Type_annot_opt of string option
-  | Var_annot_opt of string option
+  | Field_annot_opt of Non_empty_string.t option
+  | Type_annot_opt of Non_empty_string.t option
+  | Var_annot_opt of Non_empty_string.t option
+
+let percent = Non_empty_string.of_string_exn "%"
+
+let percent_percent = Non_empty_string.of_string_exn "%%"
+
+let at = Non_empty_string.of_string_exn "@"
 
 let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     l =
   (* allow empty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard wrap s =
-    let len = String.length s in
-    if Compare.Int.(len = 0) then ok @@ wrap None
-    else
-      match s.[0] with
-      | 'a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9' ->
-          (* check that all characters are valid*)
-          string_iter (check_char loc) s 1 >>? fun () -> ok @@ wrap (Some s)
-      | _ -> error (Unexpected_annotation loc)
+    match Non_empty_string.of_string s with
+    | None -> ok @@ wrap None
+    | Some s -> (
+        match (s :> string).[0] with
+        | 'a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9' ->
+            (* check that all characters are valid*)
+            string_iter (check_char loc) (s :> string) 1 >>? fun () ->
+            ok @@ wrap (Some s)
+        | _ -> error (Unexpected_annotation loc))
   in
   List.map_e
     (function
-      | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some "%")
-      | "@%%" when allow_special_var -> ok @@ Var_annot_opt (Some "%%")
-      | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some "@")
+      | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some percent)
+      | "@%%" when allow_special_var ->
+          ok @@ Var_annot_opt (Some percent_percent)
+      | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some at)
       | s -> (
           let len = String.length s in
           if Compare.Int.(len = 0 || len > max_annot_length) then
@@ -328,8 +343,11 @@ let check_correct_field :
   match (f1, f2) with
   | (None, _) | (_, None) -> Result.return_unit
   | (Some (Field_annot s1), Some (Field_annot s2)) ->
-      if String.equal s1 s2 then Result.return_unit
-      else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
+      if Non_empty_string.(s1 = s2) then Result.return_unit
+      else
+        error
+          (Inconsistent_field_annotations
+             ("%" ^ (s1 :> string), "%" ^ (s2 :> string)))
 
 let parse_var_annot :
     Script.location ->
@@ -347,21 +365,19 @@ let parse_var_annot :
 let split_last_dot = function
   | None -> (None, None)
   | Some (Field_annot s) -> (
-      match String.rindex_opt s '.' with
-      | Some i when Compare.Int.(i > 0 && i < String.length s - 1) ->
-          let s1 = String.sub s 0 i in
-          let s2 = String.sub s (i + 1) (String.length s - i - 1) in
+      match Non_empty_string.split_on_last '.' s with
+      | Some (s1, s2) ->
           let f =
-            if Compare.String.equal s2 "car" || Compare.String.equal s2 "cdr"
-            then None
-            else Some (Field_annot s2)
+            match (s2 :> string) with
+            | "car" | "cdr" -> None
+            | _ -> Some (Field_annot s2)
           in
           (Some (Var_annot s1), f)
-      | _ -> (None, Some (Field_annot s)))
+      | None -> (None, Some (Field_annot s)))
 
 let split_if_special ~loc ~if_special v f =
   match f with
-  | Some (Field_annot "@") -> (
+  | Some (Field_annot fa) when Non_empty_string.(fa = at) -> (
       match if_special with
       | Some special_var -> ok @@ split_last_dot special_var
       | None -> error (Unexpected_annotation loc))
@@ -369,7 +385,7 @@ let split_if_special ~loc ~if_special v f =
 
 let common_prefix v1 v2 =
   match (v1, v2) with
-  | (Some (Var_annot s1), Some (Var_annot s2)) when Compare.String.equal s1 s2
+  | (Some (Var_annot s1), Some (Var_annot s2)) when Non_empty_string.(s1 = s2)
     ->
       v1
   | (Some _, None) -> v1
@@ -414,9 +430,11 @@ let var_annot_from_special :
     var_annot option =
  fun ~field_name ~default ~value_annot v ->
   match v with
-  | Some (Var_annot "%") -> field_to_var_annot field_name
-  | Some (Var_annot "%%") -> default
-  | Some _ -> v
+  | Some (Var_annot va) -> (
+      match (va :> string) with
+      | "%" -> field_to_var_annot field_name
+      | "%%" -> default
+      | _ -> v)
   | None -> value_annot
 
 let parse_destr_annot :
