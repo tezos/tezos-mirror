@@ -129,8 +129,7 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
             }) ;
   !dir
 
-let build_raw_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides (module Proto : Block_services.PROTO)
+let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
   let dir : (Store.chain_store * Store.Block.block) RPC_directory.t ref =
     ref RPC_directory.empty
@@ -403,10 +402,12 @@ let build_raw_rpc_directory ~user_activated_upgrades
               operations)
           p.operations
       in
-      Prevalidation.preapply
+      (try return (Block_validator.running_worker ())
+       with _ -> failwith "Block validator is not running")
+      >>=? fun bv ->
+      Block_validator.preapply
+        bv
         chain_store
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
         ~predecessor:block
         ~timestamp
         ~protocol_data
@@ -509,8 +510,7 @@ let get_protocol hash =
   | None -> raise Not_found
   | Some protocol -> protocol
 
-let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
-    chain_store block =
+let get_directory chain_store block =
   Store.Chain.get_rpc_directory chain_store block >>= function
   | Some dir -> Lwt.return dir
   | None -> (
@@ -519,8 +519,6 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       let (module Next_proto) = get_protocol next_protocol_hash in
       let build_fake_rpc_directory () =
         build_raw_rpc_directory
-          ~user_activated_upgrades
-          ~user_activated_protocol_overrides
           (module Block_services.Fake_protocol)
           (module Next_proto)
       in
@@ -552,11 +550,7 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
         | Some dir -> Lwt.return dir
         | None ->
             let dir =
-              build_raw_rpc_directory
-                ~user_activated_upgrades
-                ~user_activated_protocol_overrides
-                (module Proto)
-                (module Next_proto)
+              build_raw_rpc_directory (module Proto) (module Next_proto)
             in
             Store.Chain.set_rpc_directory
               chain_store
@@ -613,15 +607,9 @@ let get_block chain_store = function
       if Compare.Int32.(i < 0l) then Lwt.fail Not_found
       else Store.Block.read_block_by_level_opt chain_store i
 
-let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides chain_store block =
+let build_rpc_directory chain_store block =
   get_block chain_store block >>= function
   | None -> Lwt.fail Not_found
   | Some b ->
-      get_directory
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        chain_store
-        b
-      >>= fun dir ->
+      get_directory chain_store b >>= fun dir ->
       Lwt.return (RPC_directory.map (fun _ -> Lwt.return (chain_store, b)) dir)

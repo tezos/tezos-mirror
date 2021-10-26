@@ -111,8 +111,7 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
     requested_heads
   >>=? fun (_, blocks) -> return (List.rev blocks)
 
-let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
-    validator =
+let rpc_directory validator =
   let dir : Store.chain_store RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir :=
@@ -165,9 +164,7 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       list_blocks chain ?length:q#length ?min_date:q#min_date q#heads) ;
   register_dynamic_directory2
     Block_services.path
-    (Block_directory.build_rpc_directory
-       ~user_activated_upgrades
-       ~user_activated_protocol_overrides) ;
+    Block_directory.build_rpc_directory ;
   (* invalid_blocks *)
   register0 S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
@@ -182,17 +179,10 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       Store.Block.unmark_invalid chain_store hash) ;
   !dir
 
-let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides validator =
+let build_rpc_directory validator =
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
-  let dir =
-    ref
-      (rpc_directory
-         ~user_activated_upgrades
-         ~user_activated_protocol_overrides
-         validator)
-  in
+  let dir = ref (rpc_directory validator) in
   (* Mempool *)
   let merge d = dir := RPC_directory.merge !dir d in
   merge

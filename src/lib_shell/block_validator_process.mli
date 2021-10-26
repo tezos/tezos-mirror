@@ -75,6 +75,15 @@ val apply_block :
   Operation.t list list ->
   Block_validation.result tzresult Lwt.t
 
+val preapply_block :
+  t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
+  protocol_data:bytes ->
+  timestamp:Time.Protocol.t ->
+  Operation.t list list ->
+  (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)

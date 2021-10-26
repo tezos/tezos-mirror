@@ -31,6 +31,7 @@
 
 type validation_store = {
   context_hash : Context_hash.t;
+  timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
@@ -44,7 +45,10 @@ val may_patch_protocol :
   Tezos_protocol_environment.validation_result Lwt.t
 
 val update_testchain_status :
-  Context.t -> Block_header.t -> Time.Protocol.t -> Context.t Lwt.t
+  Context.t ->
+  predecessor_hash:Block_hash.t ->
+  Time.Protocol.t ->
+  Context.t Lwt.t
 
 (** [check_proto_environment_version_increasing hash before after]
     returns successfully if the environment version stays the same or
@@ -65,7 +69,12 @@ type result = {
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
 }
 
+type apply_result = {result : result; cache : Environment_context.Context.cache}
+
 val result_encoding : result Data_encoding.t
+
+val preapply_result_encoding :
+  (Block_header.shell_header * error Preapply_result.t list) Data_encoding.t
 
 (** [check_liveness live_blocks live_operations hash ops] checks
     there is no duplicate operation and that is not out-of-date *)
@@ -100,8 +109,29 @@ type apply_environment = {
     3. [P.finalize_block]
 *)
 val apply :
+  ?cached_result:apply_result * Context.t ->
   apply_environment ->
   cache:Environment_context.Context.source_of_cache ->
   Block_header.t ->
   Operation.t list list ->
-  (result * Environment_context.Context.cache) tzresult Lwt.t
+  apply_result tzresult Lwt.t
+
+val preapply :
+  chain_id:Chain_id.t ->
+  cache:Environment_context.Context.source_of_cache ->
+  user_activated_upgrades:Tezos_base.User_activated.upgrades ->
+  user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
+  timestamp:Time.Protocol.t ->
+  protocol_data:bytes ->
+  live_blocks:Block_hash.Set.t ->
+  live_operations:Operation_hash.Set.t ->
+  predecessor_context:Context.t ->
+  predecessor_shell_header:Block_header.shell_header ->
+  predecessor_hash:Block_hash.t ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+  Operation.t list list ->
+  ((Block_header.shell_header * error Preapply_result.t list)
+  * (apply_result * Context.t))
+  tzresult
+  Lwt.t

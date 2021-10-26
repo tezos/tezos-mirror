@@ -78,6 +78,7 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
           Block_validation.validation_store =
             {
               context_hash;
+              timestamp = header.shell.timestamp;
               message;
               max_operations_ttl;
               last_allowed_fork_level = 0l;
@@ -115,6 +116,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
   let empty_result =
     {
       Block_validation.context_hash = context;
+      timestamp = Time.Protocol.epoch;
       message = None;
       max_operations_ttl = 0;
       last_allowed_fork_level = 0l;

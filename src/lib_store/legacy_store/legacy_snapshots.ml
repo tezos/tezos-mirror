@@ -944,7 +944,7 @@ let import ?patch_context ~data_dir ~user_activated_upgrades
         block_header
         operations
         ~cache:`Lazy
-      >>=? fun (block_validation_result, _) ->
+      >>=? fun {result = block_validation_result; _} ->
       check_context_hash_consistency
         block_validation_result.validation_store
         block_header

@@ -57,6 +57,20 @@ module type S = sig
     Operation.t list list ->
     Block_validation.result tzresult Lwt.t
 
+  val preapply_block :
+    t ->
+    chain_id:Chain_id.t ->
+    timestamp:Time.Protocol.t ->
+    protocol_data:bytes ->
+    live_blocks:Block_hash.Set.t ->
+    live_operations:Operation_hash.Set.t ->
+    predecessor_shell_header:Block_header.shell_header ->
+    predecessor_hash:Block_hash.t ->
+    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+    Operation.t list list ->
+    (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
@@ -123,6 +137,7 @@ module Internal_validator_process = struct
        of caches passed from one block to the next one here.
     *)
     mutable cache : Environment_context.Context.block_cache option;
+    mutable preapply_result : (Block_validation.apply_result * Context.t) option;
   }
 
   let init
@@ -135,6 +150,7 @@ module Internal_validator_process = struct
         user_activated_upgrades;
         user_activated_protocol_overrides;
         cache = None;
+        preapply_result = None;
       }
 
   let close _ = Events.(emit close ())
@@ -178,20 +194,69 @@ module Internal_validator_process = struct
     >>=? fun env ->
     let now = Systime_os.now () in
     let block_hash = Block_header.hash block_header in
+    let predecessor_context_hash = Store.Block.context_hash predecessor in
     Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
     let cache =
       match validator.cache with
       | None -> `Load
-      | Some block_cache -> `Inherited (block_cache, block_hash)
+      | Some block_cache -> `Inherited (block_cache, predecessor_context_hash)
     in
-    Block_validation.apply env block_header operations ~cache
-    >>=? fun (result, cache) ->
+    Block_validation.apply
+      ?cached_result:validator.preapply_result
+      env
+      block_header
+      operations
+      ~cache
+    >>=? fun {result; cache} ->
     let timespan =
       let then_ = Systime_os.now () in
       Ptime.diff then_ now
     in
-    validator.cache <- Some {block_hash; cache} ;
+    validator.cache <- Some {context_hash = block_header.shell.context; cache} ;
+    validator.preapply_result <- None ;
     Events.(emit validation_success (block_hash, timespan)) >>= fun () ->
+    return result
+
+  let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
+      ~live_operations ~predecessor_shell_header ~predecessor_hash
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations
+      =
+    let context_index =
+      Store.context_index (Store.Chain.global_store validator.chain_store)
+    in
+    let context_hash = predecessor_shell_header.Block_header.context in
+    (Context.checkout context_index context_hash >>= function
+     | None ->
+         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
+     | Some ctx -> return ctx)
+    >>=? fun predecessor_context ->
+    let user_activated_upgrades = validator.user_activated_upgrades in
+    let user_activated_protocol_overrides =
+      validator.user_activated_protocol_overrides
+    in
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_shell_header.context)
+    in
+    Block_validation.preapply
+      ~chain_id
+      ~cache
+      ~user_activated_upgrades
+      ~user_activated_protocol_overrides
+      ~timestamp
+      ~protocol_data
+      ~live_blocks
+      ~live_operations
+      ~predecessor_context
+      ~predecessor_shell_header
+      ~predecessor_hash
+      ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash
+      operations
+    >>=? fun (result, apply_result) ->
+    validator.preapply_result <- Some apply_result ;
     return result
 
   let commit_genesis validator ~chain_id =
@@ -587,6 +652,27 @@ module External_validator_process = struct
     in
     send_request validator request Block_validation.result_encoding
 
+  let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
+      ~live_operations ~predecessor_shell_header ~predecessor_hash
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations
+      =
+    let request =
+      External_validation.Preapply
+        {
+          chain_id;
+          timestamp;
+          protocol_data;
+          live_blocks;
+          live_operations;
+          predecessor_shell_header;
+          predecessor_hash;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          operations;
+        }
+    in
+    send_request validator request Block_validation.preapply_result_encoding
+
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
@@ -703,3 +789,29 @@ let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
 let init_test_chain (E {validator_process = (module VP); validator})
     forked_block =
   VP.init_test_chain validator forked_block
+
+let preapply_block (E {validator_process = (module VP); validator} : t)
+    chain_store ~predecessor ~protocol_data ~timestamp operations =
+  let chain_id = Store.Chain.chain_id chain_store in
+  Store.Chain.compute_live_blocks chain_store ~block:predecessor
+  >>=? fun (live_blocks, live_operations) ->
+  let predecessor_shell_header = Store.Block.shell_header predecessor in
+  let predecessor_hash = Store.Block.hash predecessor in
+  let predecessor_block_metadata_hash =
+    Store.Block.block_metadata_hash predecessor
+  in
+  let predecessor_ops_metadata_hash =
+    Store.Block.all_operations_metadata_hash predecessor
+  in
+  VP.preapply_block
+    validator
+    ~chain_id
+    ~timestamp
+    ~protocol_data
+    ~live_blocks
+    ~live_operations
+    ~predecessor_shell_header
+    ~predecessor_hash
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
+    operations

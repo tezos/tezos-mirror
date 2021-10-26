@@ -100,6 +100,28 @@ val validate :
   Operation.t list list ->
   unit tzresult Lwt.t
 
+(** [preapply validator canceler chains_store predecessor timestamp
+    protocol_data operations] creates a new block and returns it.  It
+    may call the [Block_validator_process] process associated to the
+    current [validator]. If the preapply is a succeeded, the
+    application resulted is cached to avoid re-apply the block if the
+    next call block validation, through [validate], targets the same
+    block.
+
+    An error is raised if the pre-apply failed. However, if the first
+    [pre-apply] attempt failed because the protocol was missing, it
+    tries to [fetch] and [download] the protocol before trying to
+    pre-apply the block a second time. *)
+val preapply :
+  t ->
+  ?canceler:Lwt_canceler.t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
+  timestamp:Time.Protocol.t ->
+  protocol_data:bytes ->
+  Operation.t list list ->
+  (Block_header.shell_header * error Preapply_result.t trace) tzresult Lwt.t
+
 val fetch_and_compile_protocol :
   t ->
   ?peer:P2p_peer.Id.t ->
