@@ -43,3 +43,8 @@ val get_hash_version : t -> Context_hash.Version.t
     of the whole context, which can be a long process.
     Returns an [Error] if the hash version is unsupported. *)
 val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+
+(** Exception raised by [find_tree] and [add_tree] when applied to shallow
+    trees. It is exposed so that it can be catched by the proxy where such
+    operations on shallow trees are expected. *)
+exception Context_dangling_hash of string

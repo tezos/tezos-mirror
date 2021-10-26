@@ -465,8 +465,8 @@ let add_predecessor_ops_metadata_hash v hash =
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ?(readonly = false) root =
-  Store.Repo.v
-    (Irmin_pack.config ~readonly ?index_log_size:!index_log_size root)
+  let index_log_size = Option.value ~default:2_500_000 !index_log_size in
+  Store.Repo.v (Irmin_pack.config ~readonly ~index_log_size root)
   >|= fun repo -> {path = root; repo; patch_context; readonly}
 
 let close index = Store.Repo.close index.repo

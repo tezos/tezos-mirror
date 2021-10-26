@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,42 +24,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A container of input data needed to process a consensus. *)
-type input = {
-  printer : Tezos_client_base.Client_context.printer;
-  min_agreement : float;  (** The same value as [Light.sources.min_agreement] *)
-  chain : Tezos_shell_services.Block_services.chain;
-      (** The chain considered *)
-  block : Tezos_shell_services.Block_services.block;
-      (** The block considered *)
-  key : string list;
-      (** The key of the context for which data is being requested *)
-  mtree : Tezos_shell_services.Block_services.merkle_tree;
-      (** The tree received from the endpoint providing data.
-          It is much smaller than [tree]. *)
-  tree : Local_context.tree;
-      (** The current data tree. The call to [M.consensus]
-      will check that validating endpoints send data
-      which agree with this tree. *)
-}
+include Tezos_context_memory.Context
 
-(** [min_agreeing_endpoints min_agreement nb_endpoints] returns
-    the minimum number of endpoints that must agree for [Make.consensus]
-    to return [true]. The first parameter should be
-    [Light.sources.min_agreement] while the second
-    parameter should be the length of [Light.sources.endpoints]. *)
-val min_agreeing_endpoints : float -> int -> int
+let store_empty = empty
 
-(** Given RPCs specific to the light mode, obtain the consensus
-    algorithm *)
-module Make (Light_proto : Light_proto.PROTO_RPCS) : sig
-  (** Whether consensus on data can be achieved. Parameters are:
+let shallow_of_tree repo tree =
+  let h = Tree.hash tree in
+  let hash =
+    match Tree.kind tree with `Tree -> `Node h | `Value -> `Contents h
+  in
+  Tree.shallow repo hash
 
-      - The data to consider
-      - The endpoints to contact for validating
+module Tree = struct
+  include Tree
 
-      Returns: whether consensus was attained or an error message.
-    *)
-  val consensus :
-    input -> (Uri.t * RPC_context.simple) list -> (bool, string) result Lwt.t
+  (* Since irmin.2.8.0, [find_tree] raises [Dangling_hash] exceptions when
+     called on shallow node.  The proxy starts with an empty in-memory store and
+     does not have access to the on disk store. It calls distant nodes to resolve
+     its shallow trees. So it is expected that it will call `find_tree` on shallow
+     trees which will raise the expection. We catch that exception and return
+     `None` to signal to the proxy that a shallow tree is not in its store. *)
+  let find_tree t k =
+    Lwt.catch
+      (fun () -> find_tree t k)
+      (function Context_dangling_hash _ -> Lwt.return_none | exn -> raise exn)
+
+  let remove_dangling_hash t =
+    let kind = kind t in
+    add t [] Bytes.empty >>= fun t ->
+    match kind with
+    | `Value -> Lwt.return t
+    | `Tree -> add_tree t [] (empty store_empty)
+
+  (* Similarly [add_tree t] raises [Dangling_hash] exceptions when [t] is a
+     shallow node or contents. When this occurs we replace [t] with the empty
+     node or contents. *)
+  let add_tree t k v =
+    Lwt.catch
+      (fun () -> add_tree t k v)
+      (function
+        | Context_dangling_hash _ ->
+            remove_dangling_hash t >>= fun t -> add_tree t k v
+        | exn -> raise exn)
 end
