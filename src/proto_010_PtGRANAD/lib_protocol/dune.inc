@@ -434,7 +434,9 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_protocol_010_PtGRANAD_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-010-PtGRANAD)
  (libraries
       tezos-protocol-environment

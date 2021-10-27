@@ -370,7 +370,9 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_protocol_003_PsddFKi3_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
