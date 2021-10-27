@@ -7,7 +7,7 @@ sudo apt-get install -y sudo
 sudo apt-get install -y cargo # NV: to avoid error on compiling rust-conf
 export OPAMYES=true
 # [install packages]
-sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq zlib1g-dev
+sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq zlib1g-dev bc autoconf
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
