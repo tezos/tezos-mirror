@@ -2606,7 +2606,7 @@ module RPC = struct
         |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
         |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
                t.delegates)
-        |+ opt_field "max_round" RPC_arg.nat (fun t -> t.max_round)
+        |+ opt_field "max_round" RPC_arg.uint (fun t -> t.max_round)
         |+ flag "all" (fun t -> t.all)
         |> seal
 

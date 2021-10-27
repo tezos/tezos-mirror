@@ -45,15 +45,15 @@ val bool : bool arg
 
 val int : int arg
 
-val nat : int arg
+val uint : int arg
 
 val int32 : int32 arg
 
-val nat32 : int32 arg
+val uint31 : int32 arg
 
 val int64 : int64 arg
 
-val nat64 : int64 arg
+val uint63 : int64 arg
 
 val string : string arg
 

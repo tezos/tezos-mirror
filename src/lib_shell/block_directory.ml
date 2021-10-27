@@ -328,7 +328,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   (* context *)
   register1 S.Context.read (fun (chain_store, block) path q () ->
       let depth = Option.value ~default:max_int q#depth in
-      (* [depth] is defined as a [nat] not an [int] *)
+      (* [depth] is defined as a [uint] not an [int] *)
       assert (depth >= 0) ;
       Store.Block.context chain_store block >>=? fun context ->
       Context.mem context path >>= fun mem ->

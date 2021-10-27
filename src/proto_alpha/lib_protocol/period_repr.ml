@@ -97,7 +97,7 @@ module Internal : INTERNAL = struct
           else Error "Positive int64 required")
         int64)
 
-  let rpc_arg = RPC_arg.nat64
+  let rpc_arg = RPC_arg.uint63
 
   let pp ppf v = Format.fprintf ppf "%Ld" v
 

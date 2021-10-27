@@ -39,7 +39,7 @@ let succ i = Int32.succ i
 
 let random sequence ~bound = Seed_repr.take_int32 sequence bound
 
-let rpc_arg = RPC_arg.like RPC_arg.nat32 "roll"
+let rpc_arg = RPC_arg.like RPC_arg.uint31 "roll"
 
 let to_int32 v = v
 

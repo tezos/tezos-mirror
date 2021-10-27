@@ -30,7 +30,7 @@ type cycle = t
 
 let encoding = Data_encoding.int32
 
-let rpc_arg = RPC_arg.like RPC_arg.nat32 ~descr:"A cycle integer" "block_cycle"
+let rpc_arg = RPC_arg.like RPC_arg.uint31 ~descr:"A cycle integer" "block_cycle"
 
 let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 

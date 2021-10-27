@@ -875,7 +875,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             object
               method depth = depth
             end)
-        |+ opt_field "depth" RPC_arg.nat (fun t -> t#depth)
+        |+ opt_field "depth" RPC_arg.uint (fun t -> t#depth)
         |> seal
 
       let read =

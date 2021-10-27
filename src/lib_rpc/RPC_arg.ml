@@ -27,9 +27,9 @@ type ('i, 'j) eq = ('i, 'j) Resto.eq = Eq : ('a, 'a) eq
 
 include Resto.Arg
 
-let nat =
+let uint =
   make
-    ~name:"nat"
+    ~name:"uint"
     ~destruct:(fun s ->
       match int_of_string_opt s with
       | None -> Error "Cannot parse natural number (number expected)"
@@ -39,9 +39,9 @@ let nat =
     ~construct:string_of_int
     ()
 
-let nat32 =
+let uint31 =
   make
-    ~name:"nat32"
+    ~name:"uint31"
     ~destruct:(fun s ->
       match Int32.of_string_opt s with
       | None -> Error "Cannot parse natural number (number expected)"
@@ -51,9 +51,9 @@ let nat32 =
     ~construct:Int32.to_string
     ()
 
-let nat64 =
+let uint63 =
   make
-    ~name:"nat64"
+    ~name:"uint63"
     ~destruct:(fun s ->
       match Int64.of_string_opt s with
       | None -> Error "Cannot parse natural number (number expected)"
