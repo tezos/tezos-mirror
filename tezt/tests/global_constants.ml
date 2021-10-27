@@ -124,6 +124,59 @@ let test_billion_laughs_contract =
   in
   Client.bake_for client
 
+let test_entrypoint_expansion =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Global constants are expanded on entrypoints RPC"
+    ~tags:["global_constant"; "rpc"]
+  @@ fun protocol ->
+  let* (_, client) = Client.init_activate_bake ~protocol `Client () in
+  (* Register the expression *)
+  let* _ =
+    Client.register_global_constant
+      ~src:"bootstrap1"
+      ~value:"unit"
+      ?burn_cap:(Some (Tez.of_int 100))
+      client
+  in
+  let* () = Client.bake_for client in
+  (* Register a contract that uses the expression. *)
+  let* contract =
+    Client.originate_contract
+      ~alias:"entrypoints_contract"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg:"./tezt/tests/contracts/proto_alpha/constant_entrypoints.tz"
+      ~init:"0x0054048627dedcf810b65da3ac50dfd068427615d7"
+      ~burn_cap:Tez.(of_int 9999999)
+      client
+  in
+  let* () = Client.bake_for client in
+  (* Get the entrypoints. *)
+  let* result =
+    Client.rpc
+      GET
+      [
+        "chains";
+        "main";
+        "blocks";
+        "head";
+        "context";
+        "contracts";
+        contract;
+        "entrypoints";
+      ]
+      client
+  in
+  let open JSON in
+  let entrypoints =
+    result |-> "entrypoints" |> as_object |> List.map fst
+    |> List.sort String.compare
+  in
+  if entrypoints = ["default"; "do"] then return ()
+  else Test.fail "Expected to find two entrypoints: 'do' and 'default'"
+
 let register ~protocols =
   test_large_flat_contract ~protocols ;
-  test_billion_laughs_contract ~protocols
+  test_billion_laughs_contract ~protocols ;
+  test_entrypoint_expansion ~protocols

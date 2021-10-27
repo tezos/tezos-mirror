@@ -1,0 +1,20 @@
+# Derived from https://gitlab.com/tezos/tezos/-/issues/1906
+# A simple contract where the expression "unit" in
+#    (lambda %do unit (list operation))
+# has been replaced with a constant reference.
+parameter (or (lambda %do (constant "exprvKFFbc7SnPjkPZgyhaHewQhmrouNjNae3DpsQ8KuADn9i2WuJ8") (list operation)) (unit %default));
+storage key_hash;
+code { { { DUP ; CAR ; DIP { CDR } } } ;
+       IF_LEFT
+         { PUSH mutez 0 ;
+           AMOUNT ;
+           { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;
+           { DIP { DUP } ; SWAP } ;
+           IMPLICIT_ACCOUNT ;
+           ADDRESS ;
+           SENDER ;
+           { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;
+           UNIT ;
+           EXEC ;
+           PAIR }
+         { DROP ; NIL operation ; PAIR } }
