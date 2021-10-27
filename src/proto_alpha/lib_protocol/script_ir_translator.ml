@@ -6702,6 +6702,10 @@ let unparse_code ctxt mode code =
 let parse_contract ~legacy context loc arg_ty contract ~entrypoint =
   parse_contract ~stack_depth:0 ~legacy context loc arg_ty contract ~entrypoint
 
+let parse_toplevel ctxt ~legacy toplevel =
+  Global_constants_storage.expand ctxt toplevel >>=? fun (ctxt, toplevel) ->
+  Lwt.return @@ parse_toplevel ctxt ~legacy toplevel
+
 let parse_comparable_ty = parse_comparable_ty ~stack_depth:0
 
 let parse_big_map_value_ty = parse_big_map_value_ty ~stack_depth:0
