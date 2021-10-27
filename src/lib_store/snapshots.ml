@@ -3281,7 +3281,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
            "%a"
            pp_print_trace
            errs)
-    >>=? fun (block_validation_result, _) ->
+    >>=? fun {result = block_validation_result; _} ->
     check_context_hash_consistency
       block_validation_result.validation_store
       block_header
@@ -3818,7 +3818,7 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
              "%a"
              pp_print_trace
              errs)
-      >>=? fun (block_validation_result, _) ->
+      >>=? fun {result = block_validation_result; _} ->
       check_context_hash_consistency_legacy
         block_validation_result.validation_store
         block_header

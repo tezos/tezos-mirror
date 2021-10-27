@@ -103,6 +103,11 @@ Node
    inside. It may break the compatibility for tools that request binary-only
    answers from the node and parse the errors by hand.
 
+- Changed the ``/chains/<chain_id>/blocks/<block>/helpers/preapply``
+  RPC's backend so that the preapplication is done by the validator
+  process in order to cache the result in order to optimize the
+  potential following block application (of the same block).
+
 Client
 ------
 

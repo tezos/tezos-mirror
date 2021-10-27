@@ -317,7 +317,13 @@ module Block = struct
   let store_block chain_store ~block_header ~operations validation_result =
     let {
       Block_validation.validation_store =
-        {context_hash; message; max_operations_ttl; last_allowed_fork_level};
+        {
+          context_hash;
+          timestamp = _;
+          message;
+          max_operations_ttl;
+          last_allowed_fork_level;
+        };
       block_metadata;
       ops_metadata;
       block_metadata_hash;

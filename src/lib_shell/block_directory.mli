@@ -28,15 +28,9 @@ val get_block :
   Store.chain_store -> Block_services.block -> Store.Block.t option Lwt.t
 
 val build_raw_rpc_directory :
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   (module Block_services.PROTO) ->
   (module Registered_protocol.T) ->
   (Store.chain_store * Store.Block.t) RPC_directory.directory
 
 val build_rpc_directory :
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  Store.chain_store ->
-  Block_services.block ->
-  'a RPC_directory.t Lwt.t
+  Store.chain_store -> Block_services.block -> 'a RPC_directory.t Lwt.t

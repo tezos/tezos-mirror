@@ -172,7 +172,8 @@ let run input output =
             genesis,
             user_activated_upgrades,
             user_activated_protocol_overrides ) ->
-  let rec loop (cache : Environment_context.Context.block_cache option) =
+  let rec loop (cache : Environment_context.Context.block_cache option)
+      cached_result =
     External_validation.recv input External_validation.request_encoding
     >>= function
     | External_validation.Init ->
@@ -182,7 +183,7 @@ let run input output =
             (Error_monad.result_encoding Data_encoding.empty)
             (Ok ())
         in
-        init >>= fun () -> loop cache
+        init >>= fun () -> loop cache None
     | External_validation.Commit_genesis {chain_id} ->
         let commit_genesis : unit Lwt.t =
           Events.(emit commit_genesis_request genesis.block) >>= fun () ->
@@ -198,7 +199,7 @@ let run input output =
             (Error_monad.result_encoding Context_hash.encoding)
             commit
         in
-        commit_genesis >>= fun () -> loop cache
+        commit_genesis >>= fun () -> loop cache None
     | External_validation.Validate
         {
           chain_id;
@@ -236,13 +237,18 @@ let run input output =
                 predecessor_context;
               }
             in
-            let predecessor = Block_header.hash predecessor_block_header in
+            let predecessor_context = predecessor_block_header.shell.context in
             let cache =
               match cache with
               | None -> `Load
-              | Some cache -> `Inherited (cache, predecessor)
+              | Some cache -> `Inherited (cache, predecessor_context)
             in
-            Block_validation.apply env block_header operations ~cache
+            Block_validation.apply
+              ?cached_result
+              env
+              block_header
+              operations
+              ~cache
             >>= function
             | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
               as err -> (
@@ -257,9 +263,9 @@ let run input output =
           let (res, cache) =
             match res with
             | Error _ as err -> (err, cache)
-            | Ok (res, cache) ->
-                ( Ok res,
-                  Some {block_hash = Block_header.hash block_header; cache} )
+            | Ok {result; cache} ->
+                ( Ok result,
+                  Some {context_hash = block_header.shell.context; cache} )
           in
           External_validation.send
             output
@@ -267,7 +273,83 @@ let run input output =
             res
           >>= fun () -> Lwt.return cache
         in
-        validate >>= loop
+        validate >>= fun cache -> loop cache None
+    | Preapply
+        {
+          chain_id;
+          timestamp;
+          protocol_data;
+          live_blocks;
+          live_operations;
+          predecessor_shell_header;
+          predecessor_hash;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          operations;
+        } ->
+        let preapply =
+          (* TODO event preapply *)
+          (( Error_monad.protect (fun () ->
+                 let pred_context_hash = predecessor_shell_header.context in
+                 Context.checkout context_index pred_context_hash >>= function
+                 | Some context -> return context
+                 | None ->
+                     fail
+                       (Block_validator_errors.Failed_to_checkout_context
+                          pred_context_hash))
+           >>=? fun predecessor_context ->
+             Context.get_protocol predecessor_context >>= fun protocol_hash ->
+             load_protocol protocol_hash protocol_root >>=? fun () ->
+             let cache =
+               match cache with
+               | None -> `Load
+               | Some cache ->
+                   `Inherited (cache, predecessor_shell_header.context)
+             in
+             let preapply () =
+               Block_validation.preapply
+                 ~chain_id
+                 ~cache
+                 ~user_activated_upgrades
+                 ~user_activated_protocol_overrides
+                 ~timestamp
+                 ~protocol_data
+                 ~live_blocks
+                 ~live_operations
+                 ~predecessor_context
+                 ~predecessor_shell_header
+                 ~predecessor_hash
+                 ~predecessor_block_metadata_hash
+                 ~predecessor_ops_metadata_hash
+                 operations
+             in
+             preapply () >>= function
+             | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
+               as err -> (
+                 (* If `next_protocol` is missing, try to load it *)
+                 load_protocol protocol protocol_root
+                 >>= function
+                 | Error _ -> Lwt.return err
+                 | Ok () -> preapply ())
+             | result -> Lwt.return result )
+           >>= function
+           | Ok (res, last_preapplied_context) ->
+               External_validation.send
+                 output
+                 (Error_monad.result_encoding
+                    Block_validation.preapply_result_encoding)
+                 (Ok res)
+               >>= fun () -> Lwt.return_some last_preapplied_context
+           | Error _ as err ->
+               External_validation.send
+                 output
+                 (Error_monad.result_encoding
+                    Block_validation.preapply_result_encoding)
+                 err
+               >>= fun () -> Lwt.return_none)
+          >>= fun cachable_result -> Lwt.return cachable_result
+        in
+        preapply >>= fun cachable_result -> loop cache cachable_result
     | External_validation.Fork_test_chain {context_hash; forked_header} ->
         let fork_test_chain : unit Lwt.t =
           Events.(emit fork_test_chain_request forked_header) >>= fun () ->
@@ -292,7 +374,7 @@ let run input output =
                    (Block_validator_errors.Failed_to_checkout_context
                       context_hash))
         in
-        fork_test_chain >>= fun () -> loop cache
+        fork_test_chain >>= fun () -> loop cache None
     | External_validation.Terminate ->
         Lwt_io.flush_all () >>= fun () -> Events.(emit termination_request ())
     | External_validation.Reconfigure_event_logging config ->
@@ -301,9 +383,9 @@ let run input output =
           output
           (Error_monad.result_encoding Data_encoding.empty)
           res
-        >>= fun () -> loop cache
+        >>= fun () -> loop cache None
   in
-  loop None >>= fun () -> return_unit
+  loop None None >>= fun () -> return_unit
 
 let main ?socket_dir () =
   let canceler = Lwt_canceler.create () in
