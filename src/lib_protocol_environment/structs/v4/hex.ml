@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Dailambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,37 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module H =
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Blinded public key hash"
+include Hex
 
-      let title = "A blinded public key hash"
+let to_char x y =
+  try Some (Hex.to_char x y) with Stdlib.Invalid_argument _ -> None
 
-      let b58check_prefix = "\001\002\049\223"
+let to_string h =
+  try Some (Hex.to_string h) with Stdlib.Invalid_argument _ -> None
 
-      let size = Some Ed25519.Public_key_hash.size
-    end)
-
-module Index = struct
-  include H
-  include Path_encoding.Make_hex (H)
-end
-
-include H
-
-let () = Base58.check_encoded_prefix b58check_encoding "btz1" 37
-
-let of_ed25519_pkh activation_code pkh =
-  hash_bytes ~key:activation_code [Ed25519.Public_key_hash.to_bytes pkh]
-
-type activation_code = bytes
-
-let activation_code_size = Ed25519.Public_key_hash.size
-
-let activation_code_encoding = Data_encoding.Fixed.bytes activation_code_size
-
-let activation_code_of_hex h =
-  if Compare.Int.(String.length h <> activation_code_size * 2) then None
-  else Hex.to_bytes (`Hex h)
+let to_bytes h =
+  try Some (Hex.to_bytes h) with Stdlib.Invalid_argument _ -> None

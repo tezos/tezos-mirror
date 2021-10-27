@@ -99,7 +99,9 @@ let secrets () =
       Account.add_account account ;
       {
         account = account.pkh;
-        activation_code = Blinded_public_key_hash.activation_code_of_hex secret;
+        activation_code =
+          Stdlib.Option.get
+            (Blinded_public_key_hash.activation_code_of_hex secret);
         amount =
           WithExceptions.Option.to_exn
             ~none:(Invalid_argument "tez conversion")

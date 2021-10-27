@@ -40,6 +40,6 @@ val activation_code_encoding : activation_code Data_encoding.t
 
 val of_ed25519_pkh : activation_code -> Ed25519.Public_key_hash.t -> t
 
-val activation_code_of_hex : string -> activation_code
+val activation_code_of_hex : string -> activation_code option
 
 module Index : Storage_description.INDEX with type t = t
