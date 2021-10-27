@@ -67,12 +67,13 @@ module Revamped = struct
 
   (** {2 Tests } *)
 
-  (** This test manually injects some operations and checks that the mempool does
+  (** This test injects some transfer operations and checks that the mempool does
     not lose any operation after a flush even if it contains more than
     operations_batch_size operations. *)
   let flush_mempool =
     let operations_batch_size = 5 in
     let number_of_operations = operations_batch_size * 2 in
+    let nb_additional_bootstrap_accounts = number_of_operations in
     Protocol.register_test
       ~__FILE__
       ~title:"Flush mempool"
@@ -80,28 +81,56 @@ module Revamped = struct
     @@ fun protocol ->
     log_step
       1
-      "Initialize a node with 'operations_batch_size=%d'."
-      operations_batch_size ;
+      "Initialize a node with 'operations_batch_size=%d' and %d more bootstrap \
+       accounts."
+      operations_batch_size
+      (number_of_operations - 5) ;
     let node = Node.create [Connections 0; Synchronisation_threshold 0] in
     let* () = Node.config_init node [] in
     Node.Config_file.(update node (set_prevalidator ~operations_batch_size)) ;
     let* () = Node.run node [] in
     let* () = Node.wait_for_ready node in
     let* client = Client.init ~endpoint:(Node node) () in
-    let* () = Client.activate_protocol ~protocol client in
+    let nb_existing_bootstrap_accounts =
+      List.length Constant.all_bootstrap_keys
+    in
+    let* additional_bootstrap_accounts =
+      Lwt_list.map_s
+        (fun i ->
+          let alias = sf "bootstrap%d" i in
+          let* key = Client.gen_and_show_secret_keys ~alias client in
+          return (key, None))
+        (range
+           (nb_existing_bootstrap_accounts + 1)
+           (nb_existing_bootstrap_accounts + nb_additional_bootstrap_accounts))
+    in
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~additional_bootstrap_accounts
+        ~base:(Either.right protocol)
+        []
+    in
+    let* () = Client.activate_protocol ~parameter_file ~protocol client in
+    let* _ = Node.wait_for_level node 1 in
 
-    log_step 2 "Forge and inject %d operations." number_of_operations ;
-    let* _ = Operation.inject_transfers ~node ~number_of_operations client in
+    log_step 2 "Inject %d transfer operations." number_of_operations ;
+    let* _ =
+      Tezos_base__TzPervasives.List.iter_s
+        (fun ((key : Account.key), _) ->
+          Client.transfer
+            ~amount:(Tez.of_int 1)
+            ~giver:key.alias
+            ~receiver:Constant.bootstrap1.alias
+            client)
+        additional_bootstrap_accounts
+    in
 
     log_step 3 "Check operations are all classified as 'Applied'." ;
     let* mempool = RPC.get_mempool client in
     let error_msg =
-      "some operations not classfied as 'applied: expected length %R, got %L"
+      "some operations not classified as 'applied: expected length %R, got %L"
     in
-    Check.(
-      (List.compare_length_with mempool.applied number_of_operations = 0)
-        int
-        ~error_msg) ;
+    Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
 
     log_step 4 "Bake a block with an empty mempool." ;
     let* () = bake_for ~empty:true ~protocol node client in
