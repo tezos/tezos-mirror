@@ -57,7 +57,7 @@ type execution_result = {
   operations : packed_internal_operation list;
 }
 
-type step_constants = {
+type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
   payer : Contract.t;
   self : Contract.t;
@@ -68,7 +68,7 @@ type step_constants = {
 val step :
   logger option ->
   context ->
-  step_constants ->
+  Script_typed_ir.step_constants ->
   ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
   'a ->
   's ->

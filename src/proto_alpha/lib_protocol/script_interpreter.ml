@@ -90,7 +90,7 @@ open Local_gas_counter
 open Script_interpreter_defs
 module S = Saturation_repr
 
-type step_constants = Script_interpreter_defs.step_constants = {
+type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
   payer : Contract.t;
   self : Contract.t;
@@ -348,7 +348,10 @@ and next :
           (kmap_enter [@ocaml.tailcall]) id g gas extra ks accu stack
       | KMap_exit_body (body, xs, ys, yk, ks) ->
           let extra = (body, xs, ys, yk) in
-          (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack)
+          (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack
+      | KView_exit (orig_step_constants, ks) ->
+          let g = (fst g, orig_step_constants) in
+          (next [@ocaml.tailcall]) g gas ks accu stack)
 
 (*
 
@@ -1092,7 +1095,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                   } )
                                 (update_local_gas_counter ctxt)
                                 kinstr
-                                (KReturn (stack, ks))
+                                (KView_exit (sc, KReturn (stack, ks)))
                                 (input, storage)
                                 (EmptyCell, EmptyCell))))))
       | ICreate_contract
@@ -1584,6 +1587,9 @@ and klog :
   | KMap_exit_body (body, xs, ys, yk, ks') ->
       let ks' = mk ks' in
       (kmap_exit [@ocaml.tailcall]) mk g gas (body, xs, ys, yk) ks' accu stack
+  | KView_exit (orig_step_constants, ks') ->
+      let g = (fst g, orig_step_constants) in
+      (next [@ocaml.tailcall]) g gas ks' accu stack
   | KLog (_, _) ->
       (* This case should never happen. *)
       (next [@ocaml.tailcall]) g gas ks accu stack

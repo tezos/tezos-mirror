@@ -459,6 +459,7 @@ let ir_model ?specialization instr_or_cont =
       | N_KNil -> model_0 instr_or_cont (const1_model name)
       | N_KCons -> model_0 instr_or_cont (const1_model name)
       | N_KReturn -> model_0 instr_or_cont (const1_model name)
+      | N_KView_exit -> model_0 instr_or_cont (const1_model name)
       | N_KUndip -> model_0 instr_or_cont (const1_model name)
       | N_KLoop_in -> model_0 instr_or_cont (const1_model name)
       | N_KLoop_in_left -> model_0 instr_or_cont (const1_model name)

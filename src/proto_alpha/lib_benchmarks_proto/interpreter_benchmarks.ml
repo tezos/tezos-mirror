@@ -2827,6 +2827,34 @@ module Registration_section = struct
 
     let () =
       (*
+        KView_exit -> next
+        KNil
+       *)
+      continuation_benchmark
+        ~amplification:100
+        ~name:Interpreter_workload.N_KView_exit
+        ~cont_and_stack_sampler:(fun _cfg _rng_state ->
+          let open Script_typed_ir in
+          let open Alpha_context in
+          let zero =
+            Contract.implicit_contract Signature.Public_key_hash.zero
+          in
+          let step_constants =
+            {
+              source = zero;
+              payer = zero;
+              self = zero;
+              amount = Tez.zero;
+              chain_id = Chain_id.zero;
+            }
+          in
+          let cont = KView_exit (step_constants, KNil) in
+          let stack = ((), eos) in
+          fun () -> Ex_stack_and_cont {stack; cont})
+        ()
+
+    let () =
+      (*
         KLoop_in -> next
         KNil
        *)
