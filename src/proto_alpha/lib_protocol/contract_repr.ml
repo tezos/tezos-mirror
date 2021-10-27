@@ -201,8 +201,9 @@ module Index = struct
 
   let of_path = function
     | [key] ->
-        let raw_key = Hex.to_bytes (`Hex key) in
-        Data_encoding.Binary.of_bytes_opt encoding raw_key
+        Option.bind
+          (Hex.to_bytes (`Hex key))
+          (Data_encoding.Binary.of_bytes_opt encoding)
     | _ -> None
 
   let rpc_arg = rpc_arg

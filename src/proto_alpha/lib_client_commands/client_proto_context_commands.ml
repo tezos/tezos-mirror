@@ -741,9 +741,11 @@ let commands_network network () =
           @@ param
                ~name:"code"
                (Clic.parameter (fun _ctx code ->
-                    protect (fun () ->
-                        return
-                          (Blinded_public_key_hash.activation_code_of_hex code))))
+                    match
+                      Blinded_public_key_hash.activation_code_of_hex code
+                    with
+                    | Some c -> return c
+                    | None -> failwith "Hexadecimal parsing failure"))
                ~desc:"Activation code obtained from the Tezos foundation."
           @@ stop)
           (fun dry_run (name, _pkh) code cctxt ->

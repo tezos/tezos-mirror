@@ -101,6 +101,7 @@ let generate_accounts ?rng_state ?(initial_balances = []) n : (t * Tez.t) list =
 let commitment_secret =
   Blinded_public_key_hash.activation_code_of_hex
     "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"
+  |> WithExceptions.Option.get ~loc:__LOC__
 
 let new_commitment ?seed () =
   let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in

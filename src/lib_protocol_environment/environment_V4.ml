@@ -142,6 +142,12 @@ struct
         Stdlib.exit 1
 
   include Stdlib
+
+  (* The modules provided in the [_struct.V4.M] pack are meant specifically to
+     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
+     versions. Thus we open the module, hiding the incompatible, newer modules.
+  *)
+  open Tezos_protocol_environment_structs.V4.M
   module Pervasives = Stdlib
 
   module Logging = struct
