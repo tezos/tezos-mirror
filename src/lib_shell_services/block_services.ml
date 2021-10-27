@@ -233,6 +233,25 @@ let raw_context_encoding =
             (fun () -> Cut);
         ])
 
+let raw_context_insert =
+  let default = Dir TzString.Map.empty in
+  (* not tail recursive but over the length of [k], which is small *)
+  let rec aux (k, v) ctx =
+    let d = match ctx with Dir d -> d | Key _ | Cut -> TzString.Map.empty in
+    match k with
+    | [] -> v
+    | [kh] -> Dir (TzString.Map.add kh v d)
+    | kh :: ktl ->
+        Dir
+          (TzString.Map.update
+             kh
+             (fun ctxtopt ->
+               let ctx' = Option.value ctxtopt ~default in
+               Some (aux (ktl, v) ctx'))
+             d)
+  in
+  aux
+
 type error += Invalid_depth_arg of int
 
 type merkle_hash_kind = Contents | Node

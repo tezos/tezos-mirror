@@ -74,7 +74,13 @@ type raw_context =
  *  are recursively equal *)
 val raw_context_eq : raw_context -> raw_context -> bool
 
+val raw_context_encoding : raw_context Data_encoding.t
+
 val pp_raw_context : Format.formatter -> raw_context -> unit
+
+(** [raw_context_insert (k,v) c] inserts a key-value pair [(k,v)] in a raw_context [c].
+    If [k] collides to a existing sub-tree in [c], the sub-tree is replaced by a new key-value pair. *)
+val raw_context_insert : string list * raw_context -> raw_context -> raw_context
 
 type error += Invalid_depth_arg of int
 
