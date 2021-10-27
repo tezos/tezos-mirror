@@ -354,6 +354,14 @@ let split_last_dot = function
           in
           (Some (Var_annot s1), f))
 
+let split_if_special ~loc ~if_special v f =
+  match f with
+  | Some (Field_annot "@") -> (
+      match if_special with
+      | Some special_var -> ok @@ split_last_dot special_var
+      | None -> error (Unexpected_annotation loc))
+  | _ -> ok (v, f)
+
 let common_prefix v1 v2 =
   match (v1, v2) with
   | (Some (Var_annot s1), Some (Var_annot s2)) when Compare.String.equal s1 s2
@@ -379,18 +387,8 @@ let parse_constr_annot :
   get_one_annot loc vars >>? fun v ->
   get_one_annot loc types >>? fun t ->
   get_two_annot loc fields >>? fun (f1, f2) ->
-  (match (if_special_first, f1) with
-  | (Some special_var, Some (Field_annot "@")) ->
-      ok (split_last_dot special_var)
-  | (None, Some (Field_annot "@")) -> error (Unexpected_annotation loc)
-  | (_, _) -> ok (v, f1))
-  >>? fun (v1, f1) ->
-  (match (if_special_second, f2) with
-  | (Some special_var, Some (Field_annot "@")) ->
-      ok (split_last_dot special_var)
-  | (None, Some (Field_annot "@")) -> error (Unexpected_annotation loc)
-  | (_, _) -> ok (v, f2))
-  >|? fun (v2, f2) ->
+  split_if_special ~loc ~if_special:if_special_first v f1 >>? fun (v1, f1) ->
+  split_if_special ~loc ~if_special:if_special_second v f2 >|? fun (v2, f2) ->
   let v = match v with None -> common_prefix v1 v2 | Some _ -> v in
   (v, t, f1, f2)
 
