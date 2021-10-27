@@ -343,8 +343,7 @@ let split_last_dot = function
   | None -> (None, None)
   | Some (Field_annot s) -> (
       match String.rindex_opt s '.' with
-      | None -> (None, Some (Field_annot s))
-      | Some i ->
+      | Some i when Compare.Int.(i > 0 && i < String.length s - 1) ->
           let s1 = String.sub s 0 i in
           let s2 = String.sub s (i + 1) (String.length s - i - 1) in
           let f =
@@ -352,7 +351,8 @@ let split_last_dot = function
             then None
             else Some (Field_annot s2)
           in
-          (Some (Var_annot s1), f))
+          (Some (Var_annot s1), f)
+      | _ -> (None, Some (Field_annot s)))
 
 let split_if_special ~loc ~if_special v f =
   match f with
