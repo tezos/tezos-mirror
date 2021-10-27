@@ -39,21 +39,3 @@ let sign_bytes ~watermark ~signer (message : Bytes.t) =
     Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
   in
   Tezos_crypto.Signature.sign ~watermark secret_key message
-
-let write_stresstest_sources_file (accounts : key list) =
-  let account_to_json (account : key) =
-    let (Unencrypted sk) = account.secret_key in
-    `O
-      [
-        ("pkh", `String account.public_key_hash);
-        ("pk", `String account.public_key);
-        ("sk", `String sk);
-      ]
-  in
-  let accounts_json_obj = `A (List.map account_to_json accounts) in
-  let sources = Temp.file "sources.json" in
-  let* () =
-    Lwt_io.with_file ~mode:Lwt_io.Output sources (fun oc ->
-        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string accounts_json_obj)
-  in
-  return sources

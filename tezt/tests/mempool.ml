@@ -106,9 +106,6 @@ module Revamped = struct
     let* () = Node.run node [] in
     let* () = Node.wait_for_ready node in
     let* client = Client.init ~endpoint:(Node node) () in
-    let nb_existing_bootstrap_accounts =
-      List.length Constant.all_bootstrap_keys
-    in
     let* additional_bootstrap_accounts =
       Lwt_list.map_s
         (fun i ->
@@ -116,8 +113,8 @@ module Revamped = struct
           let* key = Client.gen_and_show_secret_keys ~alias client in
           return (key, None))
         (range
-           (nb_existing_bootstrap_accounts + 1)
-           (nb_existing_bootstrap_accounts + nb_additional_bootstrap_accounts))
+           (Constant.default_bootstrap_count + 1)
+           (Constant.default_bootstrap_count + nb_additional_bootstrap_accounts))
     in
     let* parameter_file =
       Protocol.write_parameter_file

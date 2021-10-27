@@ -786,20 +786,44 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash -> return hash
 
-let write_bootstrap_stresstest_sources_file client =
-  let keys : Account.key list =
-    List.filter
-      (fun {Account.alias; _} -> alias <> "activator")
-      Constant.all_secret_keys
+let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
+    ?(source_accounts = []) ?transfers ?tps client =
+  let sources =
+    (* [sources] is a string containing all the [source_aliases],
+       [source_pkhs], and [source_accounts] in JSON format, as
+       expected by the [stresstest] client command. If all three lists
+       [source_aliases], [source_pkhs], and [source_accounts] are
+       empty (typically, when none of these optional arguments is
+       provided to {!spawn_stresstest}), then [sources] instead
+       contains the [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
+       [bootstrap5]. *)
+    (* Note: We provide the sources JSON directly as a string, rather
+       than writing it to a file, to avoid concurrency issues (we
+       would need to ensure that each call writes to a different file:
+       this would be doable, but providing a string containing the
+       JSON is simpler). *)
+    let open Account in
+    let account_to_obj account =
+      let (Unencrypted sk) = account.secret_key in
+      `O
+        [
+          ("pkh", `String account.public_key_hash);
+          ("pk", `String account.public_key);
+          ("sk", `String sk);
+        ]
+    in
+    let source_objs =
+      List.map (fun alias -> `O [("alias", `String alias)]) source_aliases
+      @ List.map (fun pkh -> `O [("pkh", `String pkh)]) source_pkhs
+      @ List.map account_to_obj source_accounts
+    in
+    let source_objs =
+      match source_objs with
+      | [] -> List.map account_to_obj Constant.bootstrap_keys
+      | _ :: _ -> source_objs
+    in
+    Ezjsonm.value_to_string (`A source_objs)
   in
-  let* (accounts : Account.key list) =
-    Lwt_list.map_s
-      (fun (account : Account.key) -> show_address ~alias:account.alias client)
-      keys
-  in
-  Account.write_stresstest_sources_file accounts
-
-let spawn_stresstest ?endpoint ?transfers ?tps ~sources client =
   let make_int_arg (name : string) = function
     | Some (arg : int) -> [name; Int.to_string arg]
     | None -> []
@@ -809,9 +833,17 @@ let spawn_stresstest ?endpoint ?transfers ?tps ~sources client =
   @ make_int_arg "--transfers" transfers
   @ make_int_arg "--tps" tps
 
-let stresstest ?endpoint ?transfers ?tps client =
-  let* sources = write_bootstrap_stresstest_sources_file client in
-  spawn_stresstest ?endpoint ?transfers ?tps ~sources client |> Process.check
+let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts
+    ?transfers ?tps client =
+  spawn_stresstest
+    ?endpoint
+    ?source_aliases
+    ?source_pkhs
+    ?source_accounts
+    ?transfers
+    ?tps
+    client
+  |> Process.check
 
 let spawn_run_script ~src ~storage ~input client =
   spawn_command

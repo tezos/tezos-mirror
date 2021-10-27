@@ -55,8 +55,3 @@ val sign_bytes :
   signer:key ->
   bytes ->
   Tezos_crypto.Signature.t
-
-(** [write_stresstest_sources_file accounts] returns the name of a
-    file containing the [accounts] in JSON format, as expected by
-    the [stresstest] client command. *)
-val write_stresstest_sources_file : key list -> string Lwt.t
