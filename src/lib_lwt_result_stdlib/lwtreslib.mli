@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1 Lwtreslib: the Lwt- and result-aware Stdlib complement}
+(** {1:intro Lwtreslib: the Lwt- and result-aware Stdlib complement}
 
     Lwtreslib (or Lwt-result-stdlib) is a library to complement the OCaml's
     Stdlib in software projects that make heavy use of Lwt and the result type.
@@ -61,7 +61,7 @@
     Functions exported by Lwtreslib do not raise exceptions. (With the exception
     of the functions exported by the {!WithExceptions} module.) If a function
     raises an exception in the Stdlib, its type is changed in Lwtreslib. In
-    general the following substitution apply:
+    general the following substitutions apply:
 
     {ul
       {li Functions that may raise {!Not_found} (e.g., [List.find]) return an
@@ -69,8 +69,8 @@
       {li Functions that may fail because of indexing errors (e.g., [List.nth],
           [List.hd], etc.) also return an {!option} instead.}
       {li Functions that may raise {!Invalid_argument} (e.g., [List.iter2])
-          return a {!result} type instead. The take an additional argument
-          indicating what [Error_] to return instead of the exception.}
+          return a {!result} type instead. They take an additional argument
+          indicating what [Error] to return instead of the exception.}
     }
 
     {3 Semantic of Lwt-aware functions}
@@ -95,7 +95,7 @@
     {3 Semantic of result-aware functions}
 
     Lwtreslib exports result-aware functions for all the traversal functions of
-    the Stdlib. These function allow easy manipulation of {!('a, 'e) result}
+    the Stdlib. These function allow easy manipulation of [('a, 'e) result]
     values.
 
     Functions with the [_e] suffix traverse their underlying collection whilst
@@ -107,7 +107,7 @@
 
     Lwtreslib exports Lwt-result-aware functions for all the traversal functions
     of the Stdlib. These function allow easy manipulation of
-    [!('a, 'e) result Lwt.t] -- i.e., promises that may fail.
+    [('a, 'e) result Lwt.t] -- i.e., promises that may fail.
 
     Functions with the [_es] suffix traverse their underlying collection
     sequentially (like [_s] functions) whilst wrapping the accumulator/result in
@@ -141,9 +141,11 @@
     into the sequence type itself.
 
     If you want to map a sequnence using an Lwt-returning function, you should
-    do the following: [Seq_s.map_s f (Seq_s.of_seq s)]. Note that this returns
-    a [Seq_s.t] sequence so further transformations will be within [Seq_s] and
-    not within [Seq]. Once in a monad, you stay in the monad.
+    first convert the sequence to an Lwt-aware sequence using [Seq_s.of_seq],
+    and then map this converted function using [Seq_s.map_s].
+    Note that this returns a [Seq_s.t] sequence so further transformations will
+    be within [Seq_s] and not within [Seq]. Once in a monad, you stay in the
+    monad.
 
     {3 [Traced]}
 
@@ -290,6 +292,14 @@ module Bare : sig
   module WithExceptions : Bare_sigs.WithExceptions.S
 end
 
+(** A module with the [TRACE] signature provides the necessary type and functions
+    to collect multiple errors into a single error data-structure. This, in turn,
+    allows Lwtreslib to provide more usable [_ep] variants to standard traversal
+    functions. *)
+module type TRACE = Traced_sigs.Trace.S
+
+module type TRACED_MONAD = Traced_sigs.Monad.S
+
 (** [Traced] is a functor to generate advanced combined-monad replacements
     for parts of the Stdlib. The generated module is similar to [Bare] with the
     addition of traces: structured collections of errors.
@@ -319,11 +329,6 @@ let load_config file =
 
     Example implementations of traces are provided in the [traces/] directory.
 *)
-module type TRACE = Traced_sigs.Trace.S
-(* exporting for availablility *)
-
-module type TRACED_MONAD = Traced_sigs.Monad.S (* exporting for availablility *)
-
 module Traced (Trace : TRACE) : sig
   module Monad : TRACED_MONAD with type 'error trace = 'error Trace.trace
 

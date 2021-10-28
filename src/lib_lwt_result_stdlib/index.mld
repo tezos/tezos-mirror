@@ -1,0 +1,72 @@
+{0 Lwtreslib: an Lwt- and Result-friendly addition/replacement for the Stdlib}
+
+The OCaml's Stdlib modules are orthogonal: each define their own datatype and a
+set of functions operating on this datatype. [Result] for [result], [Option]
+for [option], [List] for [list], etc. This orthogonality provides a high
+expressive power for a low lines-of-code count. E.g.,
+
+{[
+let fold f init xs =
+   List.fold_left
+      (fun acc x -> Result.bind acc (fun acc -> f acc x))
+      (Result.ok init)
+      xs
+]}
+
+However, in code-bases that make heavy uses of some datatypes, a little more
+integration is welcome. For example, in code bases that use the [result] type
+pervasively, the [fold] function above should be available in a module of
+list-traversing functions.
+
+Lwtreslib is a library that supplement some of the OCaml's Stdlib modules with a
+tight integration of Lwt and Result. It focuses on data-structures that can be
+traversed (iterated, mapped, folded, what have you).
+
+
+{1:designprinciples Design principles}
+
+{ol
+{- Exception-safety
+
+The functions exported by Lwtreslib do not raise exceptions. These functions
+may return [option] or [result] to indicate that some error happened during
+traversal, and they may propagate [result].
+
+(For convenience, the module [WithExceptions] provides a few exception-raising
+functions which are convenient in specific contexts.)}
+{- Coverage
+
+As much as it makes sense, for each function [foo], Lwtreslib also provides
+
+- [foo_e]: a variant operating on [result],
+- [foo_s]: a variant operating on [Lwt] promises, sequentially,
+- [foo_es]: a variant operating on [Lwt] promises of results, sequentially,
+- [foo_p]: a variant operating on [Lwt] promises, concurrently, and
+- [foo_ep]: a variant operating on [Lwt] promises of results, concurrently.
+
+As mentioned, this is only applied when it makes sense. E.g., some
+traversals cannot happen concurrently in which case the [_p] and [_ep] are not
+provided.}
+{- Semantic consistency
+
+Exported functions and values have consistent names that reflect their
+consistent semantic. For example, all [_e] and [_es] functions have a
+fail-early semantic wherein the traversal is interrupted as soon as an [Error]
+occurs.}}
+
+{1 API}
+
+The {!module:Tezos_lwt_result_stdlib} library exports a single top-level module
+{{!module:Tezos_lwt_result_stdlib.Lwtreslib}[Lwtreslib]}. This module exports
+{{!module:Tezos_lwt_result_stdlib.Lwtreslib.Bare}[Bare]} for
+simple traversal functions, and
+{{!module:Tezos_lwt_result_stdlib.Lwtreslib.Traced}[Traced]} for traversal with
+automatic composition of errors.
+
+
+{1 Reading guide}
+
+It is recommended to read the entirety of
+{{!module:Tezos_lwt_result_stdlib.Lwtreslib}the documentation of the entry-point
+[Lwtreslib] module.} It contains a high-level overview as well as
+some details about notable features of the library.
