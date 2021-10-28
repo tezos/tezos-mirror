@@ -356,21 +356,21 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
+          Script.force_decode_in_context ctxt expr >>?= fun (expr, _) ->
+          parse_toplevel ctxt ~legacy expr
+          >>=? fun ({arg_type; root_name; _}, ctxt) ->
           Lwt.return
-            ( Script.force_decode_in_context ctxt expr >>? fun (expr, _) ->
-              ( parse_toplevel ctxt ~legacy expr
-              >>? fun ({arg_type; root_name; _}, ctxt) ->
-                parse_parameter_ty ctxt ~legacy arg_type
-                >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.find_entrypoint
-                  ~root_name
-                  arg_type
-                  entrypoint )
-              |> function
-              | Ok (_f, Ex_ty ty) ->
-                  unparse_ty ctxt ty >|? fun (ty_node, _) ->
-                  Some (Micheline.strip_locations ty_node)
-              | Error _ -> Result.return_none )) ;
+            (( parse_parameter_ty ctxt ~legacy arg_type
+             >>? fun (Ex_ty arg_type, _) ->
+               Script_ir_translator.find_entrypoint
+                 ~root_name
+                 arg_type
+                 entrypoint )
+             |> function
+             | Ok (_f, Ex_ty ty) ->
+                 unparse_ty ctxt ty >|? fun (ty_node, _) ->
+                 Some (Micheline.strip_locations ty_node)
+             | Error _ -> Result.return_none)) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
@@ -379,15 +379,15 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
+          Script.force_decode_in_context ctxt expr >>?= fun (expr, _) ->
+          parse_toplevel ctxt ~legacy expr
+          >>=? fun ({arg_type; root_name; _}, ctxt) ->
           Lwt.return
-            ( Script.force_decode_in_context ctxt expr >>? fun (expr, _) ->
-              ( parse_toplevel ctxt ~legacy expr
-              >>? fun ({arg_type; root_name; _}, ctxt) ->
-                parse_parameter_ty ctxt ~legacy arg_type
-                >>? fun (Ex_ty arg_type, _) ->
+            ( ( parse_parameter_ty ctxt ~legacy arg_type
+              >>? fun (Ex_ty arg_type, _) ->
                 Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
               )
-              >|? fun (unreachable_entrypoint, map) ->
+            >|? fun (unreachable_entrypoint, map) ->
               Some
                 ( unreachable_entrypoint,
                   Entrypoints_map.fold
