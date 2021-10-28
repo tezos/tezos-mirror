@@ -122,6 +122,9 @@ Node
   process in order to cache the result in order to optimize the
   potential following block application (of the same block).
 
+- Added a new mempool's classification for the recently introduced
+  outdated error category of protocols in environment v4.
+
 Client
 ------
 
