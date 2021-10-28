@@ -41,7 +41,7 @@ proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
 # Get version number.
-version=$(dune exec src/lib_version/print_version.exe)
+version=$(dune exec src/lib_version/tezos_print_version.exe)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
