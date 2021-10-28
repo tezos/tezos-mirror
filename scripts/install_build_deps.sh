@@ -80,6 +80,8 @@ fi
 # opam packages that depend on Rust.
 "$script_dir"/install_build_deps.rust.sh
 
+# Opam < 2.1 requires opam-depext as a plugin, later versions include it
+# natively:
 case $(opam --version) in
     2.0.* )
         opam install --yes opam-depext ;;
