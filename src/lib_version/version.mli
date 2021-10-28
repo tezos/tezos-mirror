@@ -72,7 +72,8 @@ type t = Tezos_version_parser.t = {
     Examples:
     - [to_string { major = 7; minor = 0; additional_info = Release } = "7.0"]
     - [to_string { major = 7; minor = 0; additional_info = Dev } = "7.0+dev"]
-    - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"] *)
+    - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"]
+    - [to_string { major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
 val to_string : t -> string
 
 (* Parse a version in tezos format. Return None if the version cannot be parsed *)
