@@ -53,6 +53,7 @@ type request =
       live_operations : Operation_hash.Set.t;
       predecessor_shell_header : Block_header.shell_header;
       predecessor_hash : Block_hash.t;
+      predecessor_max_operations_ttl : int;
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
@@ -196,19 +197,21 @@ let case_preapply tag =
   case
     tag
     ~title:"preapply"
-    (obj10
-       (req "chain_id" Chain_id.encoding)
-       (req "timestamp" Time.Protocol.encoding)
-       (req "protocol_data" bytes)
-       (req "live_blocks" Block_hash.Set.encoding)
-       (req "live_operations" Operation_hash.Set.encoding)
-       (req "predecessor_shell_header" Block_header.shell_header_encoding)
-       (req "predecessor_hash" Block_hash.encoding)
-       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
-       (opt
-          "predecessor_ops_metadata_hash"
-          Operation_metadata_list_list_hash.encoding)
-       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+    (merge_objs
+       (obj10
+          (req "chain_id" Chain_id.encoding)
+          (req "timestamp" Time.Protocol.encoding)
+          (req "protocol_data" bytes)
+          (req "live_blocks" Block_hash.Set.encoding)
+          (req "live_operations" Operation_hash.Set.encoding)
+          (req "predecessor_shell_header" Block_header.shell_header_encoding)
+          (req "predecessor_hash" Block_hash.encoding)
+          (req "predecessor_max_operations_ttl" int31)
+          (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+          (opt
+             "predecessor_ops_metadata_hash"
+             Operation_metadata_list_list_hash.encoding))
+       (obj1 (req "operations" (list (list (dynamic_size Operation.encoding))))))
     (function
       | Preapply
           {
@@ -219,31 +222,34 @@ let case_preapply tag =
             live_operations;
             predecessor_shell_header;
             predecessor_hash;
+            predecessor_max_operations_ttl;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
             operations;
           } ->
           Some
-            ( chain_id,
-              timestamp,
-              protocol_data,
-              live_blocks,
-              live_operations,
-              predecessor_shell_header,
-              predecessor_hash,
-              predecessor_block_metadata_hash,
-              predecessor_ops_metadata_hash,
+            ( ( chain_id,
+                timestamp,
+                protocol_data,
+                live_blocks,
+                live_operations,
+                predecessor_shell_header,
+                predecessor_hash,
+                predecessor_max_operations_ttl,
+                predecessor_block_metadata_hash,
+                predecessor_ops_metadata_hash ),
               operations )
       | _ -> None)
-    (fun ( chain_id,
-           timestamp,
-           protocol_data,
-           live_blocks,
-           live_operations,
-           predecessor_shell_header,
-           predecessor_hash,
-           predecessor_block_metadata_hash,
-           predecessor_ops_metadata_hash,
+    (fun ( ( chain_id,
+             timestamp,
+             protocol_data,
+             live_blocks,
+             live_operations,
+             predecessor_shell_header,
+             predecessor_hash,
+             predecessor_max_operations_ttl,
+             predecessor_block_metadata_hash,
+             predecessor_ops_metadata_hash ),
            operations ) ->
       Preapply
         {
@@ -254,6 +260,7 @@ let case_preapply tag =
           live_operations;
           predecessor_shell_header;
           predecessor_hash;
+          predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
