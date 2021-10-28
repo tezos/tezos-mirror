@@ -20,6 +20,8 @@ export OPAMYES=${OPAMYES:=true}
 # to install it if needed, so using opam depext is redundant anyway.
 conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi ctypes-foreign conf-autoconf conf-libffi conf-zlib" #conf-rust
 
+# Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
+# `--depext-only`:
 case $(opam --version) in
     2.0.* ) opam_depext_command="opam depext $conf_packages" ;;
     * ) opam_depext_command="opam install --depext-only $conf_packages" ;;

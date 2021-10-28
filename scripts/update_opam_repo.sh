@@ -88,6 +88,8 @@ done
 ## Filtering unrequired packages
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
+# Opam < 2.1 requires opam-depext as a plugin, later versions include it
+# natively:
 case $(opam --version) in
     2.0.* ) opam_depext_dep="opam-depext," ;;
     * ) opam_depext_dep="" ;;
