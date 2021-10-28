@@ -2,16 +2,16 @@ variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
   build_deps_image_version: 81526450d9a35941769e88517757c046ed0aef61
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
-  public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
+  public_docker_image_name: registry.gitlab.com/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
-  GIT_DEPTH: "1"
+  GIT_DEPTH: "10"
   GET_SOURCES_ATTEMPTS: "2"
   ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
   # Sets the number of tries before failing opam downloads.
   OPAMRETRIES: "5"
 
-  TEZOS_DEFAULT_BRANCH: "master"
-  TEZOS_DEFAULT_NAMESPACE: "tezos"
+  TEZOS_DEFAULT_BRANCH: "abate@release-tag-2"
+  TEZOS_DEFAULT_NAMESPACE: "nomadic-labs"
 
 # Basic, specialised, minimal, orthogonal templates
 
