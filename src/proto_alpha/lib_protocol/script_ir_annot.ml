@@ -41,6 +41,10 @@ module FOR_TESTS = struct
   let unsafe_field_annot_of_string s = Field_annot s
 end
 
+let some_var_annot_of_string_exn s = Some (Var_annot s)
+
+let some_field_annot_of_string_exn s = Some (Field_annot s)
+
 let default_now_annot = Some (Var_annot "now")
 
 let default_amount_annot = Some (Var_annot "amount")
