@@ -763,9 +763,8 @@ module Chain = struct
     if Block.equal current_head block && not force then
       Lwt.return (live_blocks, live_operations)
     else
-      let max_operations_ttl = Block.max_operations_ttl metadata in
       (* We actually compute max_op_ttl + 1... *)
-      let expected_capacity = max_operations_ttl + 1 in
+      let expected_capacity = Block.max_operations_ttl metadata + 1 in
       match live_data_cache with
       | Some live_data_cache
         when update_cache
@@ -803,7 +802,7 @@ module Chain = struct
           Chain_traversal.live_blocks_with_ring
             chain_store
             block
-            max_operations_ttl
+            expected_capacity
             new_cache
           >>= fun () ->
           chain_state.live_data_cache <- Some new_cache ;
@@ -816,7 +815,7 @@ module Chain = struct
           in
           Lwt.return (live_blocks, live_ops)
       | _ ->
-          Chain_traversal.live_blocks chain_store block max_operations_ttl
+          Chain_traversal.live_blocks chain_store block expected_capacity
           >>= fun (live_blocks, live_ops) -> Lwt.return (live_blocks, live_ops)
 
   let compute_live_blocks chain_store ~block =
@@ -1564,7 +1563,7 @@ module Chain = struct
     let current_head = genesis_block in
     let active_testchain = None in
     let mempool = Mempool.empty in
-    let live_blocks = Block_hash.Set.empty in
+    let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
     let live_data_cache = None in
     return
