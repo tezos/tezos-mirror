@@ -34,10 +34,10 @@
 )
 
 (executable
- (name print_version)
- (public_name print-version)
+ (name tezos_print_version)
+ (public_name tezos-print-version)
  (package tezos-version)
- (modules print_version)
+ (modules tezos_print_version)
  (libraries tezos-version tezos-base.unix)
  (flags (:standard -open Tezos_version))
  )
