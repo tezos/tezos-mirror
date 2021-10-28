@@ -29,7 +29,6 @@
     Invocation:   dune build @src/lib_crypto/runtest
     Subject:      Merkle tree
 *)
-module Alcotest = Alcotest_glue
 
 open Utils.Infix
 

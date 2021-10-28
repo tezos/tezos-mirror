@@ -1,6 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -21,70 +23,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+include module type of Tezos_context_memory.Context
 
-module type TESTABLE = sig
-  type t
-
-  val pp : t Fmt.t
-
-  val equal : t -> t -> bool
-end
-
-type 'a testable = (module TESTABLE with type t = 'a)
-
-val testable : 'a Fmt.t -> ('a -> 'a -> bool) -> 'a testable
-
-module Source_code_position : sig
-  type here = Lexing.position
-
-  type pos = string * int * int * int
-end
-
-type 'a extra_info =
-  ?here:Source_code_position.here -> ?pos:Source_code_position.pos -> 'a
-
-type return = unit
-
-type speed_level = [`Quick | `Slow]
-
-type 'a test_case = string * speed_level * ('a -> return)
-
-(*exception Test_error of unit Fmt.t*)
-
-type 'a test = string * 'a test_case list
-
-type 'a with_options =
-  ?and_exit:bool ->
-  ?verbose:bool ->
-  ?compact:bool ->
-  ?tail_errors:[`Unlimited | `Limit of int] ->
-  ?quick_only:bool ->
-  ?show_errors:bool ->
-  ?json:bool ->
-  ?filter:Re.re option * int list option ->
-  ?log_dir:string ->
-  ?bail:bool ->
-  'a
-
-val bool : bool testable
-
-val int : int testable
-
-val string : string testable
-
-val option : 'a testable -> 'a option testable
-
-val bytes : bytes testable
-
-val pp : 'a testable -> 'a Fmt.t
-
-val equal : 'a testable -> 'a -> 'a -> bool
-
-val check : ('a testable -> string -> 'a -> 'a -> unit) extra_info
-
-val fail : (string -> 'a) extra_info
-
-val failf : (('a, Format.formatter, unit, 'b) format4 -> 'a) extra_info
-
-val run :
-  (?argv:string array -> string -> unit test list -> return) with_options
+(** [shallow_of_tree repo t] returns a shallow tree with the same hash as [t]. *)
+val shallow_of_tree : Tree.repo -> tree -> tree

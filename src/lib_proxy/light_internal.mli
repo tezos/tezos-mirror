@@ -29,8 +29,7 @@ val key_to_string : string list -> string
 (** Translates a [raw_context], i.e. a tree sent by the [raw_bytes] RPC,
     to an Irmin tree that can be integrated in the light mode's store. *)
 val raw_context_to_irmin_tree :
-  Tezos_shell_services.Block_services.raw_context ->
-  Tezos_context_memory.Context.tree Lwt.t
+  Tezos_shell_services.Block_services.raw_context -> Local_context.tree Lwt.t
 
 (** Module containing operations of Merkle proofs used by the light mode *)
 module Merkle : sig
@@ -41,16 +40,16 @@ module Merkle : sig
 
       Returns: The Irmin tree obtained or an error message *)
   val merkle_tree_to_irmin_tree :
-    Tezos_context_memory.Context.Tree.repo ->
+    Local_context.Tree.repo ->
     Tezos_shell_services.Block_services.merkle_tree ->
-    (Tezos_context_memory.Context.tree, string) result Lwt.t
+    (Local_context.tree, string) result Lwt.t
 
   (** Whether an Irmin tree contains a Merkle tree (in particular
       whether they agree on hashes). Returns unit if the Irmin tree
       contains the Merkle tree, otherwise a message explaining why it is
       not the case. *)
   val contains_merkle_tree :
-    Tezos_context_memory.Context.tree ->
+    Local_context.tree ->
     Tezos_shell_services.Block_services.merkle_tree ->
     (unit, string) result Lwt.t
 
@@ -64,10 +63,10 @@ module Merkle : sig
       Returns: an augmented variant of the input Irmin tree or an error
                message. *)
   val union_irmin_tree_merkle_tree :
-    Tezos_context_memory.Context.Tree.repo ->
-    Tezos_context_memory.Context.tree ->
+    Local_context.Tree.repo ->
+    Local_context.tree ->
     Tezos_shell_services.Block_services.merkle_tree ->
-    (Tezos_context_memory.Context.tree, string) result Lwt.t
+    (Local_context.tree, string) result Lwt.t
 
   (** [trees_shape_match path t1 t2] returns [Ok ()] if [t1] and [t2] have the same shape
       (tree of keys), otherwise an [Error] explaining how the shapes differ.

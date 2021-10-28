@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +24,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
-    Subject:      On hash functions with deterministic nonce
-*)
+include Tezos_context_memory.Context
 
-(** Deterministic nonce generation using HMAC-SHA256 *)
+let store_empty = empty
 
-let test_hash_matches (module X : S.SIGNATURE) () =
-  let (_, _, sk) = X.generate_key () in
-  let data = Bytes.of_string "ce input sa pun eu aici oare?" in
-  let nonce = X.deterministic_nonce sk data in
-  let nonce_hash = X.deterministic_nonce_hash sk data in
-  let hashed_nonce = Blake2B.hash_bytes [nonce] in
-  if nonce_hash <> Blake2B.to_bytes hashed_nonce then
-    Alcotest.failf
-      "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
+let shallow_of_tree repo tree =
+  let h = Tree.hash tree in
+  let hash =
+    match Tree.kind tree with `Tree -> `Node h | `Value -> `Contents h
+  in
+  Tree.shallow repo hash
 
-let ed25519 = (module Ed25519 : S.SIGNATURE)
+module Tree = struct
+  include Tree
 
-let p256 = (module P256 : S.SIGNATURE)
+  (* Since irmin.2.8.0, [find_tree] raises [Dangling_hash] exceptions when
+     called on shallow node.  The proxy starts with an empty in-memory store and
+     does not have access to the on disk store. It calls distant nodes to resolve
+     its shallow trees. So it is expected that it will call `find_tree` on shallow
+     trees which will raise the expection. We catch that exception and return
+     `None` to signal to the proxy that a shallow tree is not in its store. *)
+  let find_tree t k =
+    Lwt.catch
+      (fun () -> find_tree t k)
+      (function Context_dangling_hash _ -> Lwt.return_none | exn -> raise exn)
 
-let secp256k1 = (module Secp256k1 : S.SIGNATURE)
+  let remove_dangling_hash t =
+    let kind = kind t in
+    add t [] Bytes.empty >>= fun t ->
+    match kind with
+    | `Value -> Lwt.return t
+    | `Tree -> add_tree t [] (empty store_empty)
 
-let tests =
-  [
-    ( "deterministic_nonce",
-      [
-        ("hash_matches_ed25519", `Quick, test_hash_matches ed25519);
-        ("hash_matches_p256", `Quick, test_hash_matches p256);
-        ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1);
-      ] );
-  ]
-
-let tests_lwt = []
+  (* Similarly [add_tree t] raises [Dangling_hash] exceptions when [t] is a
+     shallow node or contents. When this occurs we replace [t] with the empty
+     node or contents. *)
+  let add_tree t k v =
+    Lwt.catch
+      (fun () -> add_tree t k v)
+      (function
+        | Context_dangling_hash _ ->
+            remove_dangling_hash t >>= fun t -> add_tree t k v
+        | exn -> raise exn)
+end

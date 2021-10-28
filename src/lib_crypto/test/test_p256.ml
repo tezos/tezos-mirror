@@ -22,8 +22,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Alcotest = Alcotest_glue
-
 module type B58CHECK = sig
   type t
 

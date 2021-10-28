@@ -30,8 +30,6 @@
     Subject:      Checking all of the HACL* primitives used in lib_crypto:
                   hashing, HMAC, NaCl, Ed25519, and P-256.
 *)
-module Alcotest = Alcotest_glue
-
 open Hacl
 
 let hex s = Hex.to_bytes (`Hex s)

@@ -30,7 +30,6 @@
     Dependencies: src/lib_crypto/test/roundtrips.ml
     Subject:      Checking Base58 encodings for Ed25519 keys.
 *)
-module Alcotest = Alcotest_glue
 
 module type B58CHECK = sig
   type t

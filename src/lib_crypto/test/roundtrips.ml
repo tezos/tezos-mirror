@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Alcotest = Alcotest_glue
-
 let test_rt_opt name testable enc dec input =
   let roundtripped = dec (enc input) in
   Alcotest.check (Alcotest.option testable) name (Some input) roundtripped

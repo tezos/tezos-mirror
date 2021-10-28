@@ -34,7 +34,7 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = TzString.Map
-module Local = Tezos_context_memory.Context
+module Local = Tezos_proxy.Local_context
 
 (** Alias to make "empty list" intention more explicit *)
 let tree_root = []

@@ -30,8 +30,6 @@
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
-module Alcotest = Alcotest_glue
-
 let (sk, pk, pkh) = Crypto_box.random_keypair ()
 
 let zero_nonce = Crypto_box.zero_nonce

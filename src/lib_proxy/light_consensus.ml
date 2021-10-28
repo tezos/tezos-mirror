@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Internal = Light_internal
-module Store = Tezos_context_memory.Context
+module Store = Local_context
 module Merkle = Internal.Merkle
 
 type input = {
