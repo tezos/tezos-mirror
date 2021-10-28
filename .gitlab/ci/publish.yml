@@ -9,6 +9,7 @@
     IMAGE_ARCH_PREFIX: ""
   script:
     - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
+    - git fetch --prune --depth 20 origin 'refs/tags/*:refs/tags/*'
     - ./scripts/create_docker_image.sh
         "${public_docker_image_name}"
         "${IMAGE_ARCH_PREFIX}${TAG_NAME}"
@@ -78,6 +79,7 @@ build_release:docker_arm64:
     # protocol functor with static linking (because of
     # liquidity_baking_cpmm.ml).
     # Let's skip protocol functors, they are not needed for the release
+    - git fetch --prune --depth 20 origin 'refs/tags/*:refs/tags/*'
     - dune build $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done) --profile static
     - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
     # Strip debug symbols in binaries
