@@ -73,7 +73,6 @@ class TestManualBaking:
         #  . protocol injection
         #  . empty block
         #  . block with endorsers
-        assert len(time) == 3
         endorser_block_time = time[-1]
         # log format may use s or ms unit
         if endorser_block_time[-1] == 'm':

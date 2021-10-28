@@ -45,6 +45,19 @@ type request =
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
+  | Preapply of {
+      chain_id : Chain_id.t;
+      timestamp : Time.Protocol.t;
+      protocol_data : bytes;
+      live_blocks : Block_hash.Set.t;
+      live_operations : Operation_hash.Set.t;
+      predecessor_shell_header : Block_header.shell_header;
+      predecessor_hash : Block_hash.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
+      operations : Operation.t list list;
+    }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;
@@ -60,6 +73,14 @@ let request_pp ppf = function
         "block validation %a for chain %a"
         Block_hash.pp_short
         (Block_header.hash block_header)
+        Chain_id.pp_short
+        chain_id
+  | Preapply {predecessor_hash; chain_id; _} ->
+      Format.fprintf
+        ppf
+        "preapply block ontop of %a for chain %a"
+        Block_hash.pp_short
+        predecessor_hash
         Chain_id.pp_short
         chain_id
   | Commit_genesis {chain_id} ->
@@ -119,6 +140,125 @@ let parameters_encoding =
           User_activated.protocol_overrides_encoding)
        (opt "sandbox_parameters" json))
 
+let case_validate tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"validate"
+    (obj7
+       (req "chain_id" Chain_id.encoding)
+       (req "block_header" (dynamic_size Block_header.encoding))
+       (req "pred_header" (dynamic_size Block_header.encoding))
+       (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
+       (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
+       (req "max_operations_ttl" int31)
+       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+    (function
+      | Validate
+          {
+            chain_id;
+            block_header;
+            predecessor_block_header;
+            predecessor_block_metadata_hash;
+            predecessor_ops_metadata_hash;
+            max_operations_ttl;
+            operations;
+          } ->
+          Some
+            ( chain_id,
+              block_header,
+              predecessor_block_header,
+              predecessor_block_metadata_hash,
+              predecessor_ops_metadata_hash,
+              max_operations_ttl,
+              operations )
+      | _ -> None)
+    (fun ( chain_id,
+           block_header,
+           predecessor_block_header,
+           predecessor_block_metadata_hash,
+           predecessor_ops_metadata_hash,
+           max_operations_ttl,
+           operations ) ->
+      Validate
+        {
+          chain_id;
+          block_header;
+          predecessor_block_header;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          max_operations_ttl;
+          operations;
+        })
+
+let case_preapply tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"preapply"
+    (obj10
+       (req "chain_id" Chain_id.encoding)
+       (req "timestamp" Time.Protocol.encoding)
+       (req "protocol_data" bytes)
+       (req "live_blocks" Block_hash.Set.encoding)
+       (req "live_operations" Operation_hash.Set.encoding)
+       (req "predecessor_shell_header" Block_header.shell_header_encoding)
+       (req "predecessor_hash" Block_hash.encoding)
+       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+       (opt
+          "predecessor_ops_metadata_hash"
+          Operation_metadata_list_list_hash.encoding)
+       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+    (function
+      | Preapply
+          {
+            chain_id;
+            timestamp;
+            protocol_data;
+            live_blocks;
+            live_operations;
+            predecessor_shell_header;
+            predecessor_hash;
+            predecessor_block_metadata_hash;
+            predecessor_ops_metadata_hash;
+            operations;
+          } ->
+          Some
+            ( chain_id,
+              timestamp,
+              protocol_data,
+              live_blocks,
+              live_operations,
+              predecessor_shell_header,
+              predecessor_hash,
+              predecessor_block_metadata_hash,
+              predecessor_ops_metadata_hash,
+              operations )
+      | _ -> None)
+    (fun ( chain_id,
+           timestamp,
+           protocol_data,
+           live_blocks,
+           live_operations,
+           predecessor_shell_header,
+           predecessor_hash,
+           predecessor_block_metadata_hash,
+           predecessor_ops_metadata_hash,
+           operations ) ->
+      Preapply
+        {
+          chain_id;
+          timestamp;
+          protocol_data;
+          live_blocks;
+          live_operations;
+          predecessor_shell_header;
+          predecessor_hash;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          operations;
+        })
+
 let request_encoding =
   let open Data_encoding in
   union
@@ -129,63 +269,12 @@ let request_encoding =
         empty
         (function Init -> Some () | _ -> None)
         (fun () -> Init);
-      case
-        (Tag 1)
-        ~title:"validate"
-        (obj7
-           (req "chain_id" Chain_id.encoding)
-           (req "block_header" (dynamic_size Block_header.encoding))
-           (req "pred_header" (dynamic_size Block_header.encoding))
-           (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
-           (opt
-              "pred_ops_metadata_hash"
-              Operation_metadata_list_list_hash.encoding)
-           (req "max_operations_ttl" int31)
-           (req "operations" (list (list (dynamic_size Operation.encoding)))))
-        (function
-          | Validate
-              {
-                chain_id;
-                block_header;
-                predecessor_block_header;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                max_operations_ttl;
-                operations;
-              } ->
-              Some
-                ( chain_id,
-                  block_header,
-                  predecessor_block_header,
-                  predecessor_block_metadata_hash,
-                  predecessor_ops_metadata_hash,
-                  max_operations_ttl,
-                  operations )
-          | _ -> None)
-        (fun ( chain_id,
-               block_header,
-               predecessor_block_header,
-               predecessor_block_metadata_hash,
-               predecessor_ops_metadata_hash,
-               max_operations_ttl,
-               operations ) ->
-          Validate
-            {
-              chain_id;
-              block_header;
-              predecessor_block_header;
-              predecessor_block_metadata_hash;
-              predecessor_ops_metadata_hash;
-              max_operations_ttl;
-              operations;
-            });
+      case_validate (Tag 1);
       case
         (Tag 2)
         ~title:"commit_genesis"
         (obj1 (req "chain_id" Chain_id.encoding))
-        (function
-          | Commit_genesis {chain_id} -> Some chain_id
-          | Init | Validate _ | Fork_test_chain _ | Terminate -> None)
+        (function Commit_genesis {chain_id} -> Some chain_id | _ -> None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
         (Tag 3)
@@ -205,6 +294,7 @@ let request_encoding =
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
+      case_preapply (Tag 6);
     ]
 
 let send pin encoding data =

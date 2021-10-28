@@ -133,7 +133,7 @@ module Context : sig
   (** A cache is a block-dependent value: to know whether a cache can
      be reused or recycled in a given block, we need the block that
      produces it. *)
-  type block_cache = {block_hash : Block_hash.t; cache : cache}
+  type block_cache = {context_hash : Context_hash.t; cache : cache}
 
   (** During its loading, a cache can be populated in two different
      ways:
@@ -167,7 +167,7 @@ module Context : sig
 
           RPCs are a typical place where this Lazy loading makes
           sense, though. *)
-    | `Inherited of block_cache * Block_hash.t
+    | `Inherited of block_cache * Context_hash.t
       (** When we already have some [block_cache] in memory, we can
          reuse or recycle its entries to have a cache to check some
          other block. *)

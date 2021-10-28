@@ -35,3 +35,12 @@ let new_protocol_initialisation =
     ~level:Notice
     ~pp1:Protocol_hash.pp_short
     ("proto_hash", Protocol_hash.encoding)
+
+let using_preapply_result =
+  declare_1
+    ~section
+    ~name:"using_preapply_result"
+    ~msg:"using pre-application result for block {block_hash} application"
+    ~level:Info
+    ~pp1:Block_hash.pp
+    ("block_hash", Block_hash.encoding)

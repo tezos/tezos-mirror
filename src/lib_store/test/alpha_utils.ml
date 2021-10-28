@@ -529,6 +529,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
       Tezos_validation.Block_validation.validation_store =
         {
           context_hash;
+          timestamp = block_header.shell.timestamp;
           message = validation.Environment_context.message;
           max_operations_ttl = validation.max_operations_ttl;
           last_allowed_fork_level = validation.last_allowed_fork_level;

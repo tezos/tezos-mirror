@@ -45,6 +45,19 @@ type request =
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
+  | Preapply of {
+      chain_id : Chain_id.t;
+      timestamp : Time.Protocol.t;
+      protocol_data : bytes;
+      live_blocks : Block_hash.Set.t;
+      live_operations : Operation_hash.Set.t;
+      predecessor_shell_header : Block_header.shell_header;
+      predecessor_hash : Block_hash.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
+      operations : Operation.t list list;
+    }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;

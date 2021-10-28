@@ -24,11 +24,17 @@
 (*****************************************************************************)
 
 module Request : sig
-  type view = {
+  type validation_view = {
     chain_id : Chain_id.t;
     block : Block_hash.t;
     peer : P2p_peer.Id.t option;
   }
+
+  type preapplication_view = {chain_id : Chain_id.t; level : int32}
+
+  type view =
+    | Validation of validation_view
+    | Preapplication of preapplication_view
 
   val encoding : view Data_encoding.encoding
 
@@ -37,9 +43,14 @@ end
 
 module Event : sig
   type t =
-    | Validation_success of Request.view * Worker_types.request_status
+    | Validation_success of
+        Request.validation_view * Worker_types.request_status
     | Validation_failure of
-        Request.view * Worker_types.request_status * error list
+        Request.validation_view * Worker_types.request_status * error list
+    | Preapplication_success of
+        Request.preapplication_view * Worker_types.request_status
+    | Preapplication_failure of
+        Request.preapplication_view * Worker_types.request_status * error list
     | Could_not_find_context of Block_hash.t
     | Previously_validated of Block_hash.t
     | Validating_block of Block_hash.t
