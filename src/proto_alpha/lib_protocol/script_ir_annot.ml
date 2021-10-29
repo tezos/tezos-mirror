@@ -139,7 +139,9 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
   | Some (Field_annot a) -> (
       match Entrypoint.of_annot_lax_opt a with
       | None -> false
-      | Some a' -> Compare.String.(a' = entrypoint))
+      | Some a' ->
+          Compare.String.(
+            (a' :> string) = (entrypoint : Entrypoint.t :> string)))
 
 let default_annot ~default = function None -> default | annot -> annot
 

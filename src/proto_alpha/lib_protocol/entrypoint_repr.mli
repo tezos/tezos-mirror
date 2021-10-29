@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An entrypoint is a string of at most 31 characters *)
-type t = string
+(** An entrypoint is a non-empty string of at most 31 characters *)
+type t = private string
 
 (** Total ordering of entrypoints *)
 val compare : t -> t -> int
@@ -46,8 +46,6 @@ val set_delegate : t
 
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
-
-type error += Name_too_long of string
 
 (** Converts an annot to an entrypoint.
     Returns an error if the string is too long or is "default". *)
