@@ -31,7 +31,7 @@
                   and [Prevalidator_classification.recyle_operations]
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 module Op_map = Operation_hash.Map
 module Classification = Prevalidator_classification
 
@@ -290,10 +290,10 @@ end
 
 module External_generators = Generators
 
-(** [QCheck] generators used in tests below *)
+(** [QCheck2] generators used in tests below *)
 module Generators = struct
-  let block_gen : Block.t QCheck.Gen.t =
-    let open QCheck.Gen in
+  let block_gen : Block.t QCheck2.Gen.t =
+    let open QCheck2.Gen in
     let* ops =
       let ops_list_gen =
         (* Having super long list of operations isn't necessary.
@@ -310,18 +310,15 @@ module Generators = struct
 
   (* A generator of lists of {!Block.t} where all elements are guaranteed
      to be different. *)
-  let unique_block_gen : Block.Set.t QCheck.Gen.t =
-    QCheck.Gen.(small_list block_gen >|= Block.Set.of_list)
+  let unique_block_gen : Block.Set.t QCheck2.Gen.t =
+    QCheck2.Gen.(small_list block_gen >|= Block.Set.of_list)
 
   (* A generator of lists of {!Block.t} where all elements are guaranteed
      to be different and returned lists are guaranteed to be non empty. *)
   let unique_nonempty_block_gen =
-    let open QCheck.Gen in
-    let opt_gen =
-      let+ l = unique_block_gen in
-      if Block.Set.is_empty l then None else Some l
-    in
-    of_option_gen opt_gen
+    let open QCheck2.Gen in
+    let+ block = block_gen and+ l = unique_block_gen in
+    Block.Set.add block l
 
   (** A tree generator. Written in a slightly unusual style because it
       generates all values beforehand, to make sure they are all different.
@@ -337,8 +334,8 @@ module Generators = struct
       This generator takes as parameter an optional list of blocks. If
       they are given, they are used to build the tree; otherwise fresh
       ones are generated. *)
-  let tree_gen ?blocks =
-    let open QCheck.Gen in
+  let tree_gen ?blocks () =
+    let open QCheck2.Gen in
     let* (blocks : Block.t list) =
       match blocks with
       | None ->
@@ -346,7 +343,7 @@ module Generators = struct
              of the generator, to guarantee [blocks <> []] below. *)
           unique_nonempty_block_gen >|= Block.set_to_list
       | Some [] ->
-          QCheck.Test.fail_report
+          QCheck2.Test.fail_report
             "tree_gen should not be called with an empty list of blocks"
       | Some blocks ->
           (* take blocks passed as parameters *)
@@ -358,7 +355,7 @@ module Generators = struct
       | [] -> return None
       | [x] -> ret (Tree.Leaf x)
       | x :: xs -> (
-          let* one_child = QCheck.Gen.bool in
+          let* one_child = QCheck2.Gen.bool in
           if one_child then
             let* sub = go xs in
             match sub with
@@ -366,7 +363,7 @@ module Generators = struct
             | Some sub -> ret (Tree.Node1 (x, sub))
           else
             let* (left, right) =
-              QCheck.Gen.int_bound (List.length xs - 1)
+              QCheck2.Gen.int_bound (List.length xs - 1)
               >|= List_extra.split_n xs
             in
             let* left = go left and* right = go right in
@@ -382,7 +379,7 @@ module Generators = struct
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
   let old_mempool_gen (tree : Block.t Tree.tree) :
-      Operation.t Operation_hash.Map.t QCheck.Gen.t =
+      Operation.t Operation_hash.Map.t QCheck2.Gen.t =
     let blocks = Tree.values tree in
     let pairs =
       List.map Block.tools.operations blocks |> List.concat |> List.concat
@@ -390,10 +387,10 @@ module Generators = struct
     let elements =
       List.map (fun (op : Operation.t) -> (Operation.hash op, op)) pairs
     in
-    if elements = [] then QCheck.Gen.return Operation_hash.Map.empty
+    if elements = [] then QCheck2.Gen.return Operation_hash.Map.empty
     else
-      let list_gen = QCheck.Gen.(oneofl elements |> list) in
-      QCheck.Gen.map
+      let list_gen = QCheck2.Gen.(oneofl elements |> list) in
+      QCheck2.Gen.map
         (fun l -> Operation_hash.Map.of_seq (List.to_seq l))
         list_gen
 
@@ -407,14 +404,14 @@ module Generators = struct
 
       If given, the specified [?blocks] are used. Otherwise they are
       generated. *)
-  let chain_tools_gen ?blocks :
+  let chain_tools_gen ?blocks () :
       (Block.t Classification.chain_tools
       * Block.t Tree.tree
       * (Block.t * Block.t) option
       * Operation.t Operation_hash.Map.t)
-      QCheck.Gen.t =
-    let open QCheck.Gen in
-    let* tree = tree_gen ?blocks in
+      QCheck2.Gen.t =
+    let open QCheck2.Gen in
+    let* tree = tree_gen ?blocks () in
     assert (Tree.well_formed Block.compare tree) ;
     let predecessor_pairs = Tree.predecessor_pairs tree in
     let equal = Block.equal in
@@ -485,21 +482,17 @@ module Generators = struct
     return (res, tree, chosen_pair, old_mempool)
 
   (** [split_in_two l] is a generator producing [(l1, l2)] such that [l1 @ l2 = l] *)
-  let split_in_two (l : 'a list) : ('a list * 'a list) QCheck.Gen.t =
-    let open QCheck.Gen in
+  let split_in_two (l : 'a list) : ('a list * 'a list) QCheck2.Gen.t =
+    let open QCheck2.Gen in
     let length = List.length l in
     let+ i = 0 -- length in
     List_extra.split_n l i
 end
 
-module Arbitraries = struct
-  let chain_tools_arb = QCheck.make Generators.chain_tools_gen
-end
-
 (** Function to unwrap an [option] when it MUST be a [Some] *)
 let force_opt ~loc = function
   | Some x -> x
-  | None -> QCheck.Test.fail_reportf "Unexpected None at %s" loc
+  | None -> QCheck2.Test.fail_reportf "Unexpected None at %s" loc
 
 (* Values from [start] (included) to [ancestor] (excluded) *)
 let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
@@ -534,11 +527,11 @@ let qcheck_cond ?pp ~cond e1 e2 () =
   else
     match pp with
     | None ->
-        QCheck.Test.fail_reportf
+        QCheck2.Test.fail_reportf
           "@[<h 0>The condition check failed, but no pretty printer was \
            provided.@]"
     | Some pp ->
-        QCheck.Test.fail_reportf
+        QCheck2.Test.fail_reportf
           "@[<v 2>The condition check failed!@,\
            first element:@,\
            %a@,\
@@ -575,9 +568,9 @@ module Handle_operations = struct
        Could be in [chain_tools_gen] itself, but only used in this test. So
        it would be overkill. *)
     let gen =
-      let open QCheck.Gen in
+      let open QCheck2.Gen in
       let* (chain, tree, pair_blocks_opt, old_mempool) =
-        Generators.chain_tools_gen ?blocks:None
+        Generators.chain_tools_gen ?blocks:None ()
       in
       let* live_blocks =
         sublist (Tree.values tree)
@@ -590,12 +583,11 @@ module Handle_operations = struct
           old_mempool,
           Block_hash.Set.of_list live_blocks )
     in
-    let arb = QCheck.make gen in
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[handle_live_operations] is a subset of alive blocks"
-      arb
+      gen
     @@ fun (chain, tree, pair_blocks_opt, old_mempool, live_blocks) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let expected_superset : Operation.t Op_map.t =
       (* Take all blocks *)
@@ -625,11 +617,11 @@ module Handle_operations = struct
       operations on the "path" between [from_branch] and [to_branch] (when
       all blocks are considered live). *)
   let test_handle_live_operations_path_spec =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[handle_live_operations] path specification"
-      Arbitraries.chain_tools_arb
+      (Generators.chain_tools_gen ())
     @@ fun (chain, tree, pair_blocks_opt, _) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let equal = Block.equal in
     let ancestor : Block.t =
@@ -668,11 +660,11 @@ module Handle_operations = struct
       are operations on the path from [ancestor] to [to_branch] (when all
       operations are deemed up-to-date). *)
   let test_handle_live_operations_clear =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[handle_live_operations] clear approximation"
-      Arbitraries.chain_tools_arb
+      Generators.(chain_tools_gen ())
     @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let cleared = ref Operation_hash.Set.empty in
     let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
@@ -706,11 +698,11 @@ module Handle_operations = struct
   (** Test that operations injected by [handle_live_operations]
       are operations on the path from [ancestor] to [from_branch]. *)
   let test_handle_live_operations_inject =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[handle_live_operations] inject approximation"
-      Arbitraries.chain_tools_arb
+      (Generators.chain_tools_gen ())
     @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let injected = ref Operation_hash.Set.empty in
     let inject_operation oph _op =
@@ -756,8 +748,8 @@ module Recyle_operations = struct
       classes of {!Prevalidator_classification.t}. This generator is NOT
       a fully random generator like {!Prevalidator_generators.t_gen}. *)
   let classification_of_ops_gen (ops : Operation.t Op_map.t) :
-      Classification.t QCheck.Gen.t =
-    let open QCheck.Gen in
+      Classification.t QCheck2.Gen.t =
+    let open QCheck2.Gen in
     let bindings = Operation_hash.Map.bindings ops in
     let length = List.length bindings in
     let* empty_space = 0 -- 100 in
@@ -794,7 +786,7 @@ module Recyle_operations = struct
       that this is not a precondition of [recycle_operations], it's
       to test the typical use case. *)
   let gen =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let* blocks = Generators.unique_nonempty_block_gen >|= Block.set_to_list in
     assert (blocks <> []) ;
     let to_ops (blk : Block.t) = List.concat blk.operations in
@@ -821,11 +813,11 @@ module Recyle_operations = struct
       Op_map.bindings classification_pendings_ops
       |> Generators.split_in_two >|= both oph_op_list_to_map
     in
-    let* (chain_tools, tree, from_to, _) = Generators.chain_tools_gen ~blocks in
+    let* (chain_tools, tree, from_to, _) =
+      Generators.chain_tools_gen ~blocks ()
+    in
     let+ classification = classification_of_ops_gen classification_ops in
     (chain_tools, tree, from_to, classification, pending_ops)
-
-  let arb = QCheck.make gen
 
   (** Test that {!Classification.recycle_operations} returns an empty map when
       live blocks are empty.
@@ -840,12 +832,13 @@ module Recyle_operations = struct
       is partly random for them). This makes lifting
       the [handle_operations] test quite heavy. We don't do that. *)
   let test_recycle_operations_empty_live_blocks =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[recycle_operations ~live_blocks:empty] is empty"
-      (QCheck.pair arb QCheck.bool)
+      Gen.(pair gen bool)
     @@ fun ( (chain, _tree, pair_blocks_opt, classification, pending),
              handle_branch_refused ) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let actual : Operation.t Op_map.t =
       Classification.recycle_operations
@@ -867,12 +860,12 @@ module Recyle_operations = struct
       - classified in the classification data structure
       - sent as [pending]. *)
   let test_recycle_operations_returned_value_spec =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[recycle_operations] returned value can be approximated"
-      (QCheck.pair arb QCheck.bool)
+      QCheck2.Gen.(pair gen bool)
     @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
              handle_branch_refused ) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
     let equal = Block.equal in
     let ancestor : Block.t =
@@ -935,12 +928,12 @@ module Recyle_operations = struct
   (** Test that the classification is appropriately trimmed
       by {!Classification.recycle_operations} *)
   let test_recycle_operations_classification =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"[recycle_operations] correctly trims its input classification"
-      (QCheck.pair arb QCheck.bool)
+      QCheck2.Gen.(pair gen bool)
     @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
              handle_branch_refused ) ->
-    QCheck.assume @@ Option.is_some pair_blocks_opt ;
+    QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let live_blocks : Block_hash.Set.t =
       Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
