@@ -1,6 +1,9 @@
 Protocol Hangzhou
 =================
 
+**Important: revision 011_PtHangzH of protocol Hangzhou contains a bug that
+is corrected in the latest version 011_PtHangz2**
+
 This page contains all the relevant information for protocol Hangzhou
 (see :ref:`naming_convention`).
 
@@ -43,6 +46,10 @@ RPC Changes
   ``context.storage_error``. (MR :gl:`!3258`, issues :gl:`#450`,
   :gl:`#451`, and :gl:`#1276`)
 
+- RPC ``GET ../context/constants`` exposes the "fixed" constants
+  ``cache_layout`` and ``michelson_maximum_type_size`` (MR
+  :gl:`!3454`)
+
 Timelock
 --------
 
@@ -71,7 +78,7 @@ There are two added Michelson primitives: ``VIEW`` (instruction) and
 ``view`` (top-level keyword).
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/169>`__
-- MRs :gl:`!2359` and :gl:`!3431`
+- MRs :gl:`!2359`, :gl:`!3431` and :gl:`!3654`
 
 Global Constants
 ----------------
@@ -87,7 +94,7 @@ Global Constants
 
 - `TZIP <https://gitlab.com/tezos/tzip/-/merge_requests/117>`__
 
-- MRs: :gl:`!2962`, :gl:`!3467`, :gl:`!3473`, :gl:`!3492`
+- MRs: :gl:`!2962`, :gl:`!3467`, :gl:`!3473`, :gl:`!3492`, :gl:`!3731`
 
 Cache
 -----
@@ -110,13 +117,13 @@ Cache
   cache size (in bytes). When this size is reached, the cache removes
   the least recently used entries.
 
-- The new RPC ``context/cache/contract_rank`` gives the number of contracts
+- The new RPC ``context/cache/contracts/rank`` gives the number of contracts
   that are less recently used than the one provided as argument.
 
 - The new RPC ``scripts/script_size`` gives the size of the script
   and its storage when stored in the cache.
 
-- MRs: :gl:`!3234` :gl:`!3419`
+- MRs: :gl:`!3234` :gl:`!3419` :gl:`!3717`
 
 - Gas instrumentation implemented in MR :gl:`!3430`
 
@@ -139,7 +146,9 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Gas improvements for typechecking instruction ``CONTRACT`` (MR :gl:`!3241`)
+- Gas improvements for typechecking instruction ``CONTRACT`` (MR
+  :gl:`!3241`) and general gas cost adjustments (MRs :gl:`!3441`
+  :gl:`!3724`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
   :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266` :gl:`!3270`
