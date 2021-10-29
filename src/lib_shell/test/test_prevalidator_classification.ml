@@ -30,7 +30,7 @@
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 module Classification = Prevalidator_classification
 
 module Operation_map = struct
@@ -91,7 +91,7 @@ module Extra_generators = struct
       The classification, hash and operation for [Add_if_not_present]
       events are generated independently from [t]. *)
   let event_gen t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let add_gen =
       let+ (classification, (oph, op)) =
         pair
@@ -117,7 +117,7 @@ module Extra_generators = struct
       operation hash in the case of a [Remove] event) is the [t]
       obtained by having applied all previous events to [t_initial]. *)
   let t_with_event_sequence_gen =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     Generators.t_gen () >>= fun t ->
     let t_initial = Internal_for_tests.copy t in
     let rec loop acc_gen n =
@@ -156,7 +156,7 @@ let qcheck_bounded_map_is_empty bounded_map =
 let disjoint_union_classified_fields ?fail_msg (t : Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "Invariant 'The fields: [refused; outdated; branch_refused; \
          branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
         Classification.Internal_for_tests.pp
@@ -208,7 +208,7 @@ let check_invariants ?fail_msg (t : Classification.t) =
         set_pp
         set2
     in
-    QCheck.Test.fail_reportf
+    QCheck2.Test.fail_reportf
       "Invariant 'The field [in_mempool] is the set of all operation hashes \
        present in fields: [refused; outdated; branch_refused; branch_delayed; \
        applied]' broken by t =@.%a\n\
@@ -247,12 +247,12 @@ let event_pp pp = function
       Format.fprintf pp "Flush ~handle_branch_refused:%b" handle_branch_refused
 
 let test_flush_empties_all_except_refused_and_outdated =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:
       "[flush ~handle_branch_refused:true] empties everything except [refused] \
        and [outdated]"
-    (make (Generators.t_gen ()))
+    (Generators.t_gen ())
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
   let outdated_before = t.outdated |> Classification.map in
@@ -276,12 +276,12 @@ let test_flush_empties_all_except_refused_and_outdated =
        ()
 
 let test_flush_empties_all_except_refused_and_branch_refused =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:
       "[flush ~handle_branch_refused:false] empties everything except \
        [refused], [outdated] and [branch_refused]"
-    (make (Generators.t_gen ()))
+    (Generators.t_gen ())
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
   let outdated_before = t.outdated |> Classification.map in
@@ -314,12 +314,10 @@ let test_flush_empties_all_except_refused_and_branch_refused =
        ()
 
 let test_is_in_mempool_remove =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"[is_in_mempool] and [remove_*] are well-behaved"
-    (make
-    @@ Generators.(
-         Gen.pair (t_with_operation_gen ()) unrefused_classification_gen))
+    Generators.(Gen.pair (t_with_operation_gen ()) unrefused_classification_gen)
   @@ fun ((t, (oph, op)), unrefused_classification) ->
   Classification.add unrefused_classification oph op t ;
   qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
@@ -328,10 +326,10 @@ let test_is_in_mempool_remove =
   true
 
 let test_is_applied =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"[is_applied] is well-behaved"
-    (make @@ Generators.(Gen.pair (t_gen ()) (operation_with_hash_gen ())))
+    Generators.(Gen.pair (t_gen ()) (operation_with_hash_gen ()))
   @@ fun (t, (oph, op)) ->
   Classification.add `Applied oph op t ;
   qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
@@ -343,11 +341,12 @@ let test_is_applied =
       true
 
 let test_invariants =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
     ~name:
       "invariants are preserved through any sequence of events (provided we do \
        not [add] already present operations)"
-    (QCheck.make Extra_generators.t_with_event_sequence_gen)
+    Extra_generators.t_with_event_sequence_gen
   @@ fun (t, events) ->
   let _ =
     List.fold_left
@@ -375,7 +374,7 @@ module Bounded = struct
     * binding list
     * binding list
 
-  let custom_print : custom QCheck.Print.t =
+  let custom_print : custom QCheck2.Print.t =
    fun (t, classification, first_bindings, other_bindings) ->
     let classification_string =
       match classification with
@@ -401,8 +400,8 @@ module Bounded = struct
       other_bindings
 
   let custom_gen (discarded_operations_rev : Operation_hash.t list ref) :
-      custom QCheck.Gen.t =
-    let open QCheck.Gen in
+      custom QCheck2.Gen.t =
+    let open QCheck2.Gen in
     let* map_size_limit = 1 -- 20 in
     let on_discarded_operation oph =
       discarded_operations_rev := oph :: !discarded_operations_rev
@@ -442,7 +441,7 @@ module Bounded = struct
            excess_hashes)
     then
       let hashes_pp = Format.pp_print_list Operation_hash.pp in
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "Expected all excess hashes to have been discarded but it was \
          not.@.Excess hashes:@.%a@.Discarded hashes:@.%a"
         hashes_pp
@@ -456,7 +455,7 @@ module Bounded = struct
         Operation_hash.Map.bindings (Classification.map bounded_map)
         <> expected_size)
     then
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "Expected bounded_map to be full (size = %i) but its actual size is \
          %i.@.Bounded_map content:@.%a"
         expected_size
@@ -466,19 +465,21 @@ module Bounded = struct
         bounded_map
 
   let test_bounded =
+    let open QCheck2 in
     let discarded_operations_rev = ref [] in
-    QCheck.Test.make
+    Test.make
       ~name:
         "When more error operations than the size limit are added, then the \
          first operations are discarded"
-      (QCheck.make ~print:custom_print @@ custom_gen discarded_operations_rev)
+      ~print:custom_print
+      (custom_gen discarded_operations_rev)
     @@ fun (t, error_classification, first_bindings, other_bindings) ->
     (* We must not have duplicate operation hashes otherwise we may not go over the bound *)
     let hashes =
       first_bindings @ other_bindings |> List.map (fun (hash, _) -> hash)
     in
     let unique_hashes = Operation_hash.Set.of_list hashes in
-    QCheck.assume
+    QCheck2.assume
       Compare.List_length_with.(
         hashes = Operation_hash.Set.cardinal unique_hashes) ;
     (* Remove all operations for the tested classification *)
@@ -568,9 +569,10 @@ module To_map = struct
   (** Tests the relationship between [Classification.create]
       and [Classification.to_map] *)
   let test_create =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[to_map_all (create params)] is empty"
-      (QCheck.make Generators.parameters_gen)
+      Generators.parameters_gen
     @@ fun parameters ->
     let t = Classification.create parameters in
     qcheck_eq'
@@ -583,12 +585,12 @@ module To_map = struct
   (** Tests the relationship between [Classification.add]
       and [Classification.to_map] *)
   let test_add =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[add] extends the size of [to_map] by 0 or 1"
-      (QCheck.make
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ())
-            Generators.classification_gen))
+      (Gen.pair
+         (Generators.t_with_operation_gen ())
+         Generators.classification_gen)
     @@ fun ((t, (oph, op)), classification) ->
     let initial = to_map_all t in
     Classification.add classification oph op t ;
@@ -603,9 +605,10 @@ module To_map = struct
   (** Tests the relationship between [Classification.remove]
       and [Classification.to_map] *)
   let test_remove =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[remove] reduces the size of [to_map] by 0 or 1"
-      (QCheck.make (Generators.t_with_operation_gen ()))
+      (Generators.t_with_operation_gen ())
     @@ fun (t, (oph, _)) ->
     let initial = to_map_all t in
     drop oph t ;
@@ -635,14 +638,14 @@ module To_map = struct
 
        This property is true only if [t] is not full with regard to
        the classification of the operation. *)
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"Check property between map, remove and add (1)"
       ~count:1000
-      (QCheck.make
-         ~print:to_string
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ~can_be_full:false ())
-            Generators.classification_gen))
+      ~print:to_string
+      (Gen.pair
+         (Generators.t_with_operation_gen ~can_be_full:false ())
+         Generators.classification_gen)
     @@ fun ((t, (oph, op)), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
     drop oph t ;
@@ -675,13 +678,13 @@ module To_map = struct
         Operation_hash.pp
         oph
     in
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"Check property between map, remove and add (2)"
-      (QCheck.make
-         ~print:to_string
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ~can_be_full:false ())
-            Generators.classification_gen))
+      ~print:to_string
+      (Gen.pair
+         (Generators.t_with_operation_gen ~can_be_full:false ())
+         Generators.classification_gen)
     @@ fun ((t, (oph, op)), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
     Classification.add classification oph op t ;
@@ -699,9 +702,10 @@ module To_map = struct
   (** Tests the relationship between [Classification.flush]
       and [Classification.to_map] *)
   let test_flush =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[flush] can be emulated by [to_map ~refused:true ..]"
-      (QCheck.make (QCheck.Gen.pair (Generators.t_gen ()) QCheck.Gen.bool))
+      (Gen.pair (Generators.t_gen ()) Gen.bool)
     @@ fun (t, handle_branch_refused) ->
     let initial =
       Classification.Internal_for_tests.to_map
@@ -720,9 +724,10 @@ module To_map = struct
   (** Tests the relationship between [Classification.is_in_mempool]
       and [Classification.to_map] *)
   let test_is_in_mempool =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[is_in_mempool] can be emulated by [to_map]"
-      (QCheck.make (Generators.t_with_operation_gen ()))
+      (Generators.t_with_operation_gen ())
     @@ fun (t, (oph, _)) ->
     let is_in_mempool = Classification.is_in_mempool oph t in
     let map =
@@ -736,9 +741,10 @@ module To_map = struct
   (** Tests that [Classification.to_map] returns an empty map if all parameters
       are set to [false]  *)
   let test_none =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[to_map] returns an empty map if all parameters are set to [false]"
-      (QCheck.make (Generators.t_gen ()))
+      (Generators.t_gen ())
     @@ fun t ->
     qcheck_eq'
       ~pp:map_pp
