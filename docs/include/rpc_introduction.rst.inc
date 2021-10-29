@@ -1,4 +1,7 @@
-Shell and Protocol
-==================
+RPCs - Index
+************
 
-The protocol-independent RPCs are described :ref:`here <rpc_index_shell>`.
+Shell
+=====
+
+The protocol-independent RPCs are described :doc:`here <../shell/rpc>`.
