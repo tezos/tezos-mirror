@@ -130,6 +130,14 @@ let simple_encoding =
     of_string_lax'
     string
 
+let value_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (function
+      | "" -> assert false (* invariant violated*) | "default" -> "" | s -> s)
+    of_string_strict'
+    Variable.string
+
 let in_memory_size name =
   Cache_memory_helpers.string_size_gen (String.length name)
 

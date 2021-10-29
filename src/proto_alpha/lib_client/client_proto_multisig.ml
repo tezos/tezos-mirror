@@ -587,11 +587,10 @@ let optimized_key_hash ~loc (key_hash : Signature.Public_key_hash.t) =
 
 let optimized_address ~loc ~(address : Contract.t) ~(entrypoint : Entrypoint.t)
     =
-  let entrypoint = match entrypoint with "default" -> "" | name -> name in
   bytes
     ~loc
     (Data_encoding.Binary.to_bytes_exn
-       Data_encoding.(tup2 Contract.encoding Variable.string)
+       Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
        (address, entrypoint))
 
 let optimized_key ~loc (key : Signature.Public_key.t) =

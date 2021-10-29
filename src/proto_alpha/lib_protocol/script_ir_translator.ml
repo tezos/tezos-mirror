@@ -476,10 +476,9 @@ let unparse_address ~loc ctxt mode (c, entrypoint) =
   >|? fun () ->
   match mode with
   | Optimized | Optimized_legacy ->
-      let entrypoint = match entrypoint with "default" -> "" | name -> name in
       let bytes =
         Data_encoding.Binary.to_bytes_exn
-          Data_encoding.(tup2 Contract.encoding Variable.string)
+          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           (c, entrypoint)
       in
       (Bytes (loc, bytes), ctxt)
@@ -2268,17 +2267,10 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
         Data_encoding.Binary.of_bytes_opt
-          Data_encoding.(tup2 Contract.encoding Variable.string)
+          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some (c, entrypoint) -> (
-          if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint.Name_too_long entrypoint)
-          else
-            match entrypoint with
-            | "" -> ok ((c, "default"), ctxt)
-            | "default" -> error (Unexpected_annotation loc)
-            | name -> ok ((c, name), ctxt))
+      | Some addr -> Ok (addr, ctxt)
       | None ->
           error
           @@ Invalid_syntactic_constant
