@@ -103,6 +103,8 @@
               (tezos-protocol-plugin-alpha-registerer -> void_for_linking-alpha-protocol-plugin-registerer.empty)
               (-> void_for_linking-alpha-protocol-plugin-registerer.empty))
              cmdliner
+             fmt.cli
+             fmt.tty
              tls
              lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
