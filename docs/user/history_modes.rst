@@ -203,15 +203,28 @@ contrary, decrease it to reduce the storage size. For example, it is
 possible to run a baker and a delegation service on rolling mode with
 *7 additional cycles* providing two more weeks to dispatch rewards.
 
-When running your node for the first time on an empty storage, you may
-specify the history mode and number of additional cycles using
-``--history-mode <HISTORY_MODE>:<NB_CYCLES>`` when running it. For
-example, running a node with ``--history-mode rolling:7`` would allow
-full RPC queries of the 7 previous cycles.
+When initialzing your node on an empty storage, you may specify the
+history mode and number of additional cycles using ``--history-mode
+<HISTORY_MODE>:<NB_CYCLES>`` when running it. For example, running a
+node with ``--history-mode rolling:7`` would allow full RPC queries of
+the 7 previous cycles.
+
 
 It is also possible to modify the number of additional cycles kept of
-a previously configured node. See :ref:`Switch mode
-restrictions<Switch_mode_restrictions>`
+a previously configured node, see :ref:`Switch mode
+restrictions<Switch_mode_restrictions>`. When updating the number of
+additional cycles to keep on an already configured node, one must
+consider that the change may require time. If the update aims to
+shrink the number of additional cycles to keep, it is just a matter of
+deleting some data, and the operation is performed instantaneously. If
+the update aims to increase the number of additional cycles to keep,
+one must consider that the switch will be complete only after waiting
+for the end of the aforementioned number of cycles. Indeed, the
+"cycles window" will be expanded as blocks/cycles are processed by the
+node and it won't fetch blocks prior to the previous limit. For
+example, switching from ``5`` to ``7`` cycles requires to wait ``2``
+complete cycles to reach the target number of cycles to keep. On the
+contrary, switching from ``7`` to ``5`` is instantaneous.
 
 .. _Switch_mode_restrictions:
 
