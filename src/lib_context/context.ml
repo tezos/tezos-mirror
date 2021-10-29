@@ -5,6 +5,7 @@
 (* Copyright (c) 2018-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 DaiLambda, Inc. <contact@dailambda.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -112,6 +113,13 @@ let reporter () =
 
 let index_log_size = ref None
 
+let auto_flush = ref 10_000
+(* This limit ensures that no trees with more than [auto_flush]
+   mutations can exist in memory, bounding the memory usage of a
+   single commit performed by a read-write process. As a trade-off,
+   the intermediate flushed trees to the store might be unused and
+   will have to be garbage collected later on to save space. *)
+
 let () =
   let verbose_info () =
     Logs.set_level (Some Logs.Info) ;
@@ -122,6 +130,7 @@ let () =
     Logs.set_reporter (reporter ())
   in
   let index_log_size n = index_log_size := Some (int_of_string n) in
+  let auto_flush n = auto_flush := int_of_string n in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -133,6 +142,7 @@ let () =
           | v -> (
               match String.split '=' v with
               | ["index-log-size"; n] -> index_log_size n
+              | ["auto-flush"; n] -> auto_flush n
               | _ -> ()))
         args
 
@@ -165,7 +175,13 @@ type index = {
   readonly : bool;
 }
 
-and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
+and context = {
+  index : index;
+  parents : Store.Commit.t list;
+  tree : Store.tree;
+  (* number of [remove], [add_tree] and [add] calls, not yet flushed *)
+  ops : int;
+}
 
 type t = context
 
@@ -200,7 +216,7 @@ let checkout index key =
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
   >|= Option.map (fun commit ->
           let tree = Store.Commit.tree commit in
-          {index; tree; parents = [commit]})
+          {index; tree; parents = [commit]; ops = 0})
 
 let checkout_exn index key =
   checkout index key >>= function
@@ -276,19 +292,34 @@ let list ctxt ?offset ?length key =
 
 let find ctxt key = raw_find ctxt (data_key key)
 
+let incr_ops ctxt = {ctxt with ops = ctxt.ops + 1}
+
 let raw_add ctxt key data =
-  Tree.add ctxt.tree key data >|= fun tree -> {ctxt with tree}
+  Tree.add ctxt.tree key data >|= fun tree -> incr_ops {ctxt with tree}
 
 let add ctxt key data = raw_add ctxt (data_key key) data
 
-let raw_remove ctxt k = Tree.remove ctxt.tree k >|= fun tree -> {ctxt with tree}
+let raw_remove ctxt k =
+  Tree.remove ctxt.tree k >|= fun tree -> incr_ops {ctxt with tree}
 
 let remove ctxt key = raw_remove ctxt (data_key key)
 
 let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
 
+let flush context =
+  P.Repo.batch context.index.repo (fun x y _ ->
+      Store.save_tree ~clear:true context.index.repo x y context.tree)
+  >|= fun _ -> {context with ops = 0}
+
+let may_flush context =
+  if (not context.index.readonly) && context.ops >= !auto_flush then
+    flush context
+  else Lwt.return context
+
 let add_tree ctxt key tree =
-  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
+  may_flush ctxt >>= fun ctxt ->
+  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree ->
+  incr_ops {ctxt with tree}
 
 let fold ?depth ctxt key ~init ~f =
   Tree.fold ?depth ctxt.tree (data_key key) ~init ~f
@@ -475,7 +506,7 @@ let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = Store.Tree.empty in
-  let ctxt = {index; tree; parents = []} in
+  let ctxt = {index; tree; parents = []; ops = 0} in
   (match index.patch_context with
   | None -> return ctxt
   | Some patch_context -> patch_context ctxt)
@@ -685,7 +716,8 @@ module Dumpable_context = struct
     in
     aux tree Fun.id >>= fun () -> Lwt.return !total_visited
 
-  let make_context index = {index; tree = Store.Tree.empty; parents = []}
+  let make_context index =
+    {index; tree = Store.Tree.empty; parents = []; ops = 0}
 
   let update_context context tree = {context with tree}
 
@@ -1038,7 +1070,8 @@ module Dumpable_context_legacy = struct
     in
     aux tree Fun.id
 
-  let make_context index = {index; tree = Store.Tree.empty; parents = []}
+  let make_context index =
+    {index; tree = Store.Tree.empty; parents = []; ops = 0}
 
   let update_context context tree = {context with tree}
 
@@ -1156,7 +1189,7 @@ let check_protocol_commit_consistency index ~expected_context_hash
   if Context_hash.equal expected_context_hash computed_context_hash then
     let ctxt =
       let parent = Store.of_private_commit index.repo commit in
-      {index; tree = Store.Tree.empty; parents = [parent]}
+      {index; tree = Store.Tree.empty; parents = [parent]; ops = 0}
     in
     add_test_chain ctxt test_chain_status >>= fun ctxt ->
     add_protocol ctxt given_protocol_hash >>= fun ctxt ->
@@ -1363,7 +1396,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
   if Context_hash.equal expected_context_hash computed_context_hash then
     let ctxt =
       let parent = Store.of_private_commit index.repo commit in
-      {index; tree = Store.Tree.empty; parents = [parent]}
+      {index; tree = Store.Tree.empty; parents = [parent]; ops = 0}
     in
     add_test_chain ctxt test_chain >>= fun ctxt ->
     add_protocol ctxt protocol_hash >>= fun ctxt ->
