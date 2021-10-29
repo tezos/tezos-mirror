@@ -228,8 +228,9 @@ module Manager_result = struct
            (opt "storage" Script.expr_encoding)
            (opt
               (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 It is kept here for a transitional period, for tools like indexers to update.
-                 TODO(009): remove it. *)
+                 It is kept here for a transitional period, for tools like indexers to update. *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
+                 Remove it in 009 or later. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
@@ -305,8 +306,9 @@ module Manager_result = struct
         (obj8
            (opt
               (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 It is kept here for a transitional period, for tools like indexers to update.
-                 TODO(009): remove it. *)
+                 It is kept here for a transitional period, for tools like indexers to update. *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
+                 Remove it in 009 or later. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
