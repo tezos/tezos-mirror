@@ -958,7 +958,9 @@ module View_helpers = struct
              (fun x -> x)
              (Michelson_v1_primitives.strings_of_prims typ)))
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "type" Script.expr_encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "type" Script.expr_encoding))
       (function Illformed_view_type (etp, exp) -> Some (etp, exp) | _ -> None)
       (fun (etp, exp) -> Illformed_view_type (etp, exp)) ;
     Environment.Error_monad.register_error_kind
@@ -978,7 +980,9 @@ module View_helpers = struct
           Contract.pp
           callback)
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "callback" Contract.encoding))
       (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
       (fun (e, c) -> View_never_returns (e, c)) ;
     Environment.Error_monad.register_error_kind
@@ -999,7 +1003,9 @@ module View_helpers = struct
           Contract.pp
           callback)
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "callback" Contract.encoding))
       (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
       (fun (e, c) -> View_never_returns (e, c))
 
@@ -1190,7 +1196,7 @@ module RPC = struct
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (dft "entrypoint" string Entrypoint.default))
+             (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           (obj3
              (opt "unparsing_mode" unparsing_mode_encoding)
              (opt "now" Script_timestamp.encoding)
@@ -1248,7 +1254,7 @@ module RPC = struct
         let open Data_encoding in
         obj10
           (req "contract" Contract.encoding)
-          (req "entrypoint" string)
+          (req "entrypoint" Entrypoint.simple_encoding)
           (req "input" Script.expr_encoding)
           (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
@@ -1409,7 +1415,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "script" Script.expr_encoding)
-               (dft "entrypoint" string Entrypoint.default))
+               (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           ~output:(obj1 (req "entrypoint_type" Script.expr_encoding))
           RPC_path.(path / "entrypoint")
 

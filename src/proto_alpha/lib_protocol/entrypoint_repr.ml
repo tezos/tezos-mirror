@@ -106,6 +106,11 @@ let of_string_lax str =
 
 let of_annot_lax (a : Non_empty_string.t) = of_string_lax (a :> string)
 
+let of_string_lax' str =
+  match of_string_lax_opt str with
+  | None -> Error ("Entrypoint name too long \"" ^ str ^ "\"")
+  | Some name -> Ok name
+
 let root = "root"
 
 let do_ = "do"
@@ -117,6 +122,13 @@ let remove_delegate = "remove_delegate"
 let to_address_suffix name = if is_default name then "" else "%" ^ name
 
 let pp = Format.pp_print_string
+
+let simple_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (function "" -> assert false (* invariant violated *) | s -> s)
+    of_string_lax'
+    string
 
 let in_memory_size name =
   Cache_memory_helpers.string_size_gen (String.length name)

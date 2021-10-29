@@ -503,7 +503,7 @@ let batch_transfer_operation_encoding =
        (opt "storage-limit" z)
        (req "amount" string)
        (opt "arg" string)
-       (opt "entrypoint" string))
+       (opt "entrypoint" Entrypoint.simple_encoding))
 
 let read_key key =
   match Bip39.of_words key.mnemonic with

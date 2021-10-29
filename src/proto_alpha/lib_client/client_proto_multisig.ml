@@ -320,7 +320,7 @@ let () =
     Data_encoding.(
       obj4
         (req "destination" Contract.encoding)
-        (req "entrypoint" string)
+        (req "entrypoint" Entrypoint.simple_encoding)
         (req "parameter_ty" Script.expr_encoding)
         (req "parameter" Script.expr_encoding))
     (function

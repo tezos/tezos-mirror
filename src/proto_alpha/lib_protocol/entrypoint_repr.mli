@@ -87,6 +87,11 @@ val to_address_suffix : t -> string
 (** Pretty-print an entrypoint *)
 val pp : Format.formatter -> t -> unit
 
+(** An encoding of entrypoints reusing the lax semantics,
+    i.e. accepts "default" and converts "" to "default".
+    Decoding fails if the string is too long. *)
+val simple_encoding : t Data_encoding.t
+
 (** In-memory size of an entrypoint *)
 val in_memory_size : t -> Saturation_repr.may_saturate Saturation_repr.t
 
