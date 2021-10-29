@@ -34,10 +34,6 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
-  :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
-  :gl:`!3622`, :gl:`!3631`, :gl:`!3630`)
-
 - Update and simplify fixed constants. (MR :gl:`!3454`)
 
 - Simplify pack cost. (MR :gl:`!3620`)
@@ -45,3 +41,7 @@ Minor Changes
 - Do not play with locations inside protocol. (MR :gl:`!3667`)
 
 - Remove the optional entrypoint in ticketer address. (MR :gl:`!3570`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
+  :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
+  :gl:`!3622`, :gl:`!3631`, :gl:`!3630`)
