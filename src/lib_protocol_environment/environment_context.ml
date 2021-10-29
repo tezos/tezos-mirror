@@ -26,7 +26,8 @@
 open Error_monad
 
 let err_implementation_mismatch ~expected ~got =
-  Fmt.invalid_arg
+  Format.kasprintf
+    invalid_arg
     "Context implementation mismatch: expecting %s, got %s"
     expected
     got

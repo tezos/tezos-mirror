@@ -311,12 +311,14 @@ open P256
 
 let check_p256_bytes_secret =
   Alcotest.testable
-    (fun fmt bytes -> Fmt.fmt "%S" fmt (Bytes.to_string (P256.to_bytes bytes)))
+    (fun fmt bytes ->
+      Format.fprintf fmt "%S" (Bytes.to_string (P256.to_bytes bytes)))
     P256.equal
 
 let check_p256_bytes_public =
   Alcotest.testable
-    (fun fmt bytes -> Fmt.fmt "%S" fmt (Bytes.to_string (P256.to_bytes bytes)))
+    (fun fmt bytes ->
+      Format.fprintf fmt "%S" (Bytes.to_string (P256.to_bytes bytes)))
     P256.equal
 
 let nb_iterations = 10

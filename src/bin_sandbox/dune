@@ -3,4 +3,5 @@
  (libraries
   tezos-base
   tezos-base.unix
+  fmt
   flextesa))

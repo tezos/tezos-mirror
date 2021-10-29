@@ -112,8 +112,8 @@ let unix_error_testable =
         Unix_error.Internal_for_tests.get_constructor_name error
       in
       match error with
-      | EUNKNOWNERR code -> Fmt.pf ppf "%s %d" error_name code
-      | _ -> Fmt.pf ppf "%s" error_name)
+      | EUNKNOWNERR code -> Format.fprintf ppf "%s %d" error_name code
+      | _ -> Format.fprintf ppf "%s" error_name)
     ( = )
 
 let json_encode_and_decode error =

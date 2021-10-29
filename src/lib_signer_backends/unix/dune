@@ -4,6 +4,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   ocplib-endian.bigstring
+  fmt
   tezos-signer-backends
   tezos-base
   tezos-base.unix

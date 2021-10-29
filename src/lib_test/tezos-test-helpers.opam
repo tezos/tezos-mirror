@@ -8,6 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "uri"
+  "fmt"
   "qcheck-alcotest"
   "alcotest" { >= "1.1.0" }
   "alcotest-lwt" { >= "1.1.0" }
