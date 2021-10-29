@@ -376,35 +376,6 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
-    let entrypoint_encoding =
-      def
-        ~title:"entrypoint"
-        ~description:"Named entrypoint to a Michelson smart contract"
-        "entrypoint"
-      @@
-      let builtin_case tag name =
-        Data_encoding.case
-          (Tag tag)
-          ~title:name
-          (constant name)
-          (fun n -> if Compare.String.(n = name) then Some () else None)
-          (fun () -> name)
-      in
-      union
-        [
-          builtin_case 0 "default";
-          builtin_case 1 "root";
-          builtin_case 2 "do";
-          builtin_case 3 "set_delegate";
-          builtin_case 4 "remove_delegate";
-          Data_encoding.case
-            (Tag 255)
-            ~title:"named"
-            (Bounded.string 31)
-            (fun s -> Some s)
-            (fun s -> s);
-        ]
-
     let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
@@ -417,7 +388,7 @@ module Encoding = struct
               (opt
                  "parameters"
                  (obj2
-                    (req "entrypoint" entrypoint_encoding)
+                    (req "entrypoint" Entrypoint_repr.smart_encoding)
                     (req "value" Script_repr.lazy_expr_encoding)));
           select =
             (function Manager (Transaction _ as op) -> Some op | _ -> None);

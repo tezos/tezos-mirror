@@ -121,6 +121,9 @@ let remove_delegate = "remove_delegate"
 
 let to_address_suffix name = if is_default name then "" else "%" ^ name
 
+let of_string_lax_exn str =
+  match of_string_lax' str with Ok name -> name | Error err -> invalid_arg err
+
 let pp = Format.pp_print_string
 
 let simple_encoding =
@@ -137,6 +140,37 @@ let value_encoding =
       | "" -> assert false (* invariant violated*) | "default" -> "" | s -> s)
     of_string_strict'
     Variable.string
+
+let smart_encoding =
+  let open Data_encoding in
+  def
+    ~title:"entrypoint"
+    ~description:"Named entrypoint to a Michelson smart contract"
+    "entrypoint"
+  @@
+  let builtin_case tag name =
+    case
+      (Tag tag)
+      ~title:name
+      (constant name)
+      (fun n -> if n = name then Some () else None)
+      (fun () -> name)
+  in
+  union
+    [
+      builtin_case 0 "default";
+      builtin_case 1 "root";
+      builtin_case 2 "do";
+      builtin_case 3 "set_delegate";
+      builtin_case 4 "remove_delegate";
+      case
+        (Tag 255)
+        ~title:"named"
+        (Bounded.string 31)
+        (function
+          | "" -> assert false (* invariant violated *) | name -> Some name)
+        of_string_lax_exn;
+    ]
 
 let in_memory_size name =
   Cache_memory_helpers.string_size_gen (String.length name)

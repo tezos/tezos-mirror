@@ -98,6 +98,9 @@ val simple_encoding : t Data_encoding.t
     "default" is encoded into "". *)
 val value_encoding : t Data_encoding.t
 
+(** An optimized encoding of entrypoints, used for operations. *)
+val smart_encoding : t Data_encoding.t
+
 (** In-memory size of an entrypoint *)
 val in_memory_size : t -> Saturation_repr.may_saturate Saturation_repr.t
 
