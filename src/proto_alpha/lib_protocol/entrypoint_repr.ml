@@ -91,11 +91,20 @@ let of_string_strict_exn str =
 let of_annot_strict ~loc (a : Non_empty_string.t) =
   of_string_strict ~loc (a :> string)
 
-let of_string_lax str =
+let of_string_lax_opt str =
   match of_string str with
-  | Too_long -> error (Name_too_long str)
-  | Got_default -> Ok default
-  | Ok name -> Ok name
+  | Too_long -> None
+  | Got_default -> Some default
+  | Ok name -> Some name
+
+let of_annot_lax_opt (a : Non_empty_string.t) = of_string_lax_opt (a :> string)
+
+let of_string_lax str =
+  match of_string_lax_opt str with
+  | None -> error (Name_too_long str)
+  | Some name -> Ok name
+
+let of_annot_lax (a : Non_empty_string.t) = of_string_lax (a :> string)
 
 let root = "root"
 

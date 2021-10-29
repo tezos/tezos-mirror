@@ -133,6 +133,14 @@ let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
 
+let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
+  match field_annot_opt with
+  | None -> false
+  | Some (Field_annot a) -> (
+      match Entrypoint.of_annot_lax_opt a with
+      | None -> false
+      | Some a' -> Compare.String.(a' = entrypoint))
+
 let default_annot ~default = function None -> default | annot -> annot
 
 let gen_access_annot :

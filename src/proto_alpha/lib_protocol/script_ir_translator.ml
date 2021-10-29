@@ -1934,10 +1934,6 @@ type 'before dup_n_proof_argument =
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty) ~root_name
     entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) result =
-  let annot_is_entrypoint entrypoint = function
-    | None -> false
-    | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
-  in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
@@ -1945,9 +1941,9 @@ let find_entrypoint (type full error_trace)
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
-        if annot_is_entrypoint entrypoint al then
+        if field_annot_opt_eq_entrypoint_lax al entrypoint then
           Some ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
-        else if annot_is_entrypoint entrypoint ar then
+        else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
           Some ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
         else
           match find_entrypoint tl entrypoint with
@@ -1967,23 +1963,18 @@ let find_entrypoint (type full error_trace)
       (match error_details with
       | Fast -> (Inconsistent_types_fast : error_trace)
       | Informative -> trace_of_error @@ Entrypoint.Name_too_long entrypoint)
+  else if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
+    ok ((fun e -> e), Ex_ty full)
   else
-    match root_name with
-    | Some (Field_annot root_name)
-      when Compare.String.(entrypoint = (root_name :> string)) ->
-        ok ((fun e -> e), Ex_ty full)
-    | _ -> (
-        match find_entrypoint full entrypoint with
-        | Some result -> ok result
-        | None ->
-            if Entrypoint.is_default entrypoint then
-              ok ((fun e -> e), Ex_ty full)
-            else
-              Error
-                (match error_details with
-                | Fast -> (Inconsistent_types_fast : error_trace)
-                | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
-        )
+    match find_entrypoint full entrypoint with
+    | Some result -> ok result
+    | None ->
+        if Entrypoint.is_default entrypoint then ok ((fun e -> e), Ex_ty full)
+        else
+          Error
+            (match error_details with
+            | Fast -> (Inconsistent_types_fast : error_trace)
+            | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
 let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
@@ -2020,11 +2011,8 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
                 | None -> (Some (List.rev path), all)
                 | Some _ -> acc))
     | Some (Field_annot name) ->
-        let name = (name :> string) in
-        if Compare.Int.(String.length name > 31) then
-          error (Entrypoint.Name_too_long name)
-        else if Entrypoint.Set.mem name all then
-          error (Duplicate_entrypoint name)
+        Entrypoint.of_annot_lax name >>? fun name ->
+        if Entrypoint.Set.mem name all then error (Duplicate_entrypoint name)
         else ok (first_unreachable, Entrypoint.Set.add name all)
   in
   let rec check :
@@ -2055,8 +2043,10 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let (init, reachable) =
     match root_name with
     | None -> (Entrypoint.Set.empty, false)
-    | Some (Field_annot name) ->
-        (Entrypoint.Set.singleton (name :> string), true)
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> (Entrypoint.Set.empty, false)
+        | Some name -> (Entrypoint.Set.singleton name, true))
   in
   check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
   if not (Entrypoint.Set.mem Entrypoint.default all) then Result.return_unit
@@ -4980,12 +4970,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Lwt.return
         ( parse_entrypoint_annot loc annot ~default:default_self_annot
         >>? fun (annot, entrypoint) ->
-          let entrypoint =
-            Option.fold
-              ~some:(fun (Field_annot annot) -> (annot :> string))
-              ~none:Entrypoint.default
-              entrypoint
-          in
+          (match entrypoint with
+          | None -> Ok Entrypoint.default
+          | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot)
+          >>? fun entrypoint ->
           let open Tc_context in
           match tc_context.callsite with
           | _ when is_in_lambda tc_context ->
@@ -5892,17 +5880,17 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
           match ty with
           | Union_t _ -> acc
           | _ -> (List.rev path :: unreachables, all))
-    | Some (Field_annot name) ->
-        let name = (name :> string) in
-        if Compare.Int.(String.length name > 31) then
-          ok (List.rev path :: unreachables, all)
-        else if Entrypoint.Map.mem name all then
-          ok (List.rev path :: unreachables, all)
-        else
-          unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
-          ok
-            ( unreachables,
-              Entrypoint.Map.add name (List.rev path, unparsed_ty) all )
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> ok (List.rev path :: unreachables, all)
+        | Some name ->
+            if Entrypoint.Map.mem name all then
+              ok (List.rev path :: unreachables, all)
+            else
+              unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
+              ok
+                ( unreachables,
+                  Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
   in
   let rec fold_tree :
       type t.
@@ -5936,8 +5924,11 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let (init, reachable) =
     match root_name with
     | None -> (Entrypoint.Map.empty, false)
-    | Some (Field_annot name) ->
-        (Entrypoint.Map.singleton (name :> string) ([], unparsed_full), true)
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> (Entrypoint.Map.empty, false)
+        | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
+        )
   in
   fold_tree full [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]

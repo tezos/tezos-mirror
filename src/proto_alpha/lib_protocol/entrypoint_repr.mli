@@ -64,6 +64,16 @@ val of_string_strict : loc:Script_repr.location -> string -> t tzresult
     Converts "" to "default". *)
 val of_string_strict_exn : string -> t
 
+(** Converts an annot to an entrypoint.
+    Returns an error if the string is too long.
+    Accepts "default". *)
+val of_annot_lax : Non_empty_string.t -> t tzresult
+
+(** Converts an annot to an entrypoint.
+    Returns [None] if the string is too long.
+    Accepts "default". *)
+val of_annot_lax_opt : Non_empty_string.t -> t option
+
 (** Converts a string to an entrypoint.
     Returns an error if the string is too long.
     Accepts "default" and converts "" to "default". *)
