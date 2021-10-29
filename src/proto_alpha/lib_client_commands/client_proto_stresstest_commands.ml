@@ -651,12 +651,13 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     dont_wait
       (fun () ->
         on_new_head cctxt (fun (block, _) ->
-            state.last_block <- block ;
-            state.shuffled_pool <-
-              Some
-                (List.shuffle
-                   ~rng_state
-                   (List.map (fun src_org -> src_org.source) state.pool)) ;
+            if not (Block_hash.equal block state.last_block) then (
+              state.last_block <- block ;
+              state.shuffled_pool <-
+                Some
+                  (List.shuffle
+                     ~rng_state
+                     (List.map (fun src_org -> src_org.source) state.pool))) ;
             Lwt_condition.broadcast state.new_block_condition () ;
             Lwt.return_unit))
       (fun trace ->
