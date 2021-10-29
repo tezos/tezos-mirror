@@ -8,7 +8,31 @@ and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezo
 Building instructions
 =====================
 
-To build the documentation, you need to install the Python package
+You can build the documentation locally or in the CI.
+
+.. _build_doc_ci:
+
+Building the documentation in the CI
+------------------------------------
+
+When reviewing a merge request in the Gitlab interface, you may build the documentation in the CI without installing anything locally. Proceed as follows:
+
+- if you want the light version of the documentation (RST pages only):
+
+  + make sure the CI job ``documentation:build`` under the CI stage ``build`` is executed (you may have to trigger it manually)
+  + once finished, check the light built documentation in the exposed artifacts
+
+- if you want the full version of the documentation (including CLI manuals and Odoc APIs):
+
+  + trigger the CI job ``documentation:build_all`` under the CI stage ``manual``
+  + once finished, check the full built documentation in the exposed artifacts
+
+If the artifacts are not exposed on the main page of the MR, click on the CI jobs mentioned above, and in the job's page (once finished), click on ``Browse``, then visualize file ``docs/_build/index.html``.
+
+Building the documentation locally
+----------------------------------
+
+To build the documentation locally, you need to install the Python package
 manager `Poetry <https://python-poetry.org/>`_. For instructions on
 how to obtain Python and Poetry, see :doc:`the installation
 instructions for the python testing

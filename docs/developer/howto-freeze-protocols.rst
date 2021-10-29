@@ -4,7 +4,7 @@ How to Freeze Protocols
 After each protocol activation, old protocols are kept in the codebase.
 However large parts of the code developed for the previous protocol can now be
 removed to avoid accumulating dead code in the repository. All daemons, tests
-associated to old protocols, and RW commands available to the client can be
+associated to old protocols, and RW (read-write) commands available to the client can be
 removed.
 
 In this document, "protocol" refers to the protocol that we want to freeze, N,
@@ -79,8 +79,11 @@ Integration tests should be amended by running the script
 Remove RW Commands From ``lib_client_commands``
 -----------------------------------------------
 
-The module `lib_client_commands` defines both read-only and read-write (RW)
-commands. The RW commands can now be safely removed as they are no longer
+The client commands at
+`proto_XXX/lib_client_commands/client_proto_context_commands.ml`
+define both read-only and read-write commands, where reads and
+writes refer to accesses to and modifications of the state of the
+chain. The RW commands can now be safely removed as they are no longer
 needed.
 
 Remove Mempool Protocol Plugins

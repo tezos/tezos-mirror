@@ -121,7 +121,7 @@ Examples:
 
 The format of the events is (usually minified):
 
-.. code:: json
+.. code:: javascript
 
    {"fd-sink-item.v0":
      {"hostname": <host-name>,
@@ -181,7 +181,7 @@ JSON Configuration Format
 A configuration JSON blob, is an object with one field ``"active_sinks"``
 which contains a list of URIs:
 
-.. code:: json
+.. code:: javascript
 
    {
      "active_sinks": [ <list-of-sink-URIs> ]
@@ -297,4 +297,3 @@ This is work-in-progress, see:
 
 Example:
 ``tezos-admin-client output schema of block-seen-alpha to block-seen-alpha.json``
-

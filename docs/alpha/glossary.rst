@@ -21,7 +21,7 @@ _`Accuser`
 
     The accuser is awarded some funds from the baking_ deposit of the accused.
 
-    Using the tools provided by Nomadic Labs, accusation is handled by a
+    When using :ref:`Octez <octez>`, accusations are handled by a
     separate binary.
 
 _`Account`
@@ -38,8 +38,8 @@ _`Baker`
     is allowed to bake; blocks created by another node_ are invalid.
     The baker selects transactions from the mempool_ to be included in the block_ it bakes.
 
-    Using the tools provided by Nomadic Labs, baking_ is handled by a
-    separate binary.
+    When using :ref:`Octez <octez>`, baking_ is handled by a separate
+    binary.
 
 _`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
@@ -102,8 +102,7 @@ _`Endorser`
     operation_. The accounts that emit the block_ are the endorsers of the block_.
     Endorsement operations_ are included in the next block_.
 
-    Using the tools provided by Nomadic Labs, endorsement is handled by a
-    separate binary.
+    When using :ref:`Octez <octez>`, endorsing is handled by a separate binary.
 
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol, there are some

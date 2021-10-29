@@ -17,6 +17,8 @@ like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 The website https://tezos.com/ contains more information about the project.
 
+.. _octez:
+
 Octez
 -----
 
@@ -151,10 +153,10 @@ in the :ref:`introduction <howtoget>`.
    active/consensus
    active/sapling
    active/voting
+   active/liquidity_baking
    active/glossary
    active/cli-commands
    active/rpc
-   active/liquidity_baking
 
 .. toctree::
    :maxdepth: 2
@@ -165,11 +167,11 @@ in the :ref:`introduction <howtoget>`.
    011/consensus
    011/sapling
    011/voting
+   011/liquidity_baking
+   011/timelock
    011/glossary
    011/cli-commands
    011/rpc
-   011/liquidity_baking
-   011/timelock
 
 .. toctree::
    :maxdepth: 2
@@ -180,12 +182,12 @@ in the :ref:`introduction <howtoget>`.
    alpha/consensus
    alpha/sapling
    alpha/voting
-   alpha/glossary
-   alpha/cli-commands
-   alpha/rpc
    alpha/liquidity_baking
    alpha/timelock
    alpha/global_constants
+   alpha/glossary
+   alpha/cli-commands
+   alpha/rpc
 
 .. toctree::
    :maxdepth: 2
