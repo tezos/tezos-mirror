@@ -101,6 +101,9 @@ val value_encoding : t Data_encoding.t
 (** An optimized encoding of entrypoints, used for operations. *)
 val smart_encoding : t Data_encoding.t
 
+(** Entrypoint RPC arg. *)
+val rpc_arg : t RPC_arg.t
+
 (** In-memory size of an entrypoint *)
 val in_memory_size : t -> Saturation_repr.may_saturate Saturation_repr.t
 

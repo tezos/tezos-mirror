@@ -105,7 +105,7 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Script.expr_encoding
       RPC_path.(
-        custom_root /: Contract.rpc_arg / "entrypoints" /: RPC_arg.string)
+        custom_root /: Contract.rpc_arg / "entrypoints" /: Entrypoint.rpc_arg)
 
   let list_entrypoints =
     RPC_service.get_service

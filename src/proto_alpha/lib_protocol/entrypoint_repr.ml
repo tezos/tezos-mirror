@@ -172,6 +172,14 @@ let smart_encoding =
         of_string_lax_exn;
     ]
 
+let rpc_arg =
+  RPC_arg.make
+    ~descr:"A Michelson entrypoint (string of length < 32)"
+    ~name:"entrypoint"
+    ~construct:(function "" -> assert false (* invariant violated*) | s -> s)
+    ~destruct:of_string_lax'
+    ()
+
 let in_memory_size name =
   Cache_memory_helpers.string_size_gen (String.length name)
 
