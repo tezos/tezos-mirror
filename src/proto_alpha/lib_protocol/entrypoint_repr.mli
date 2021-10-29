@@ -24,10 +24,13 @@
 (*****************************************************************************)
 
 (** An entrypoint is a non-empty string of at most 31 characters *)
-type t = private string
+type t = private Non_empty_string.t
 
 (** Total ordering of entrypoints *)
 val compare : t -> t -> int
+
+(** Equality of entrypoints *)
+val ( = ) : t -> t -> bool
 
 (** Default entrypoint "default" *)
 val default : t

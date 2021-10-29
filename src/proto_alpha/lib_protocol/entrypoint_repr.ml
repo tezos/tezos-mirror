@@ -24,7 +24,11 @@
 (*****************************************************************************)
 
 (** Invariants on the string: 1 <= length <= 31 *)
-include Compare.String
+type t = Non_empty_string.t
+
+let compare = Non_empty_string.compare
+
+let ( = ) = Non_empty_string.( = )
 
 type error += Name_too_long of string
 
@@ -55,7 +59,7 @@ let () =
     (function Unexpected_default loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_default loc)
 
-let default = "default"
+let default = Non_empty_string.of_string_exn "default"
 
 let is_default name = name = default
 
@@ -65,13 +69,17 @@ type of_string_result =
   | Got_default
       (** Got exactly "default", which can be an error in some cases or OK in others *)
 
-let of_string str =
-  if str = "" then
-    (* The empty string always means the default entrypoint *)
-    Ok default
-  else if Compare.Int.(String.length str > 31) then Too_long
+let of_non_empty_string (str : Non_empty_string.t) =
+  if Compare.Int.(String.length (str :> string) > 31) then Too_long
   else if is_default str then Got_default
   else Ok str
+
+let of_string str =
+  match Non_empty_string.of_string str with
+  | None (* empty string *) ->
+      (* The empty string always means the default entrypoint *)
+      Ok default
+  | Some str -> of_non_empty_string str
 
 let of_string_strict ~loc str =
   match of_string str with
@@ -88,8 +96,17 @@ let of_string_strict' str =
 let of_string_strict_exn str =
   match of_string_strict' str with Ok v -> v | Error err -> invalid_arg err
 
-let of_annot_strict ~loc (a : Non_empty_string.t) =
-  of_string_strict ~loc (a :> string)
+let of_annot_strict ~loc a =
+  match of_non_empty_string a with
+  | Too_long -> error (Name_too_long (a :> string))
+  | Got_default -> error (Unexpected_default loc)
+  | Ok name -> Ok name
+
+let of_annot_lax_opt a =
+  match of_non_empty_string a with
+  | Too_long -> None
+  | Got_default -> Some default
+  | Ok name -> Some name
 
 let of_string_lax_opt str =
   match of_string str with
@@ -97,49 +114,49 @@ let of_string_lax_opt str =
   | Got_default -> Some default
   | Ok name -> Some name
 
-let of_annot_lax_opt (a : Non_empty_string.t) = of_string_lax_opt (a :> string)
-
 let of_string_lax str =
   match of_string_lax_opt str with
   | None -> error (Name_too_long str)
   | Some name -> Ok name
 
-let of_annot_lax (a : Non_empty_string.t) = of_string_lax (a :> string)
+let of_annot_lax a =
+  match of_non_empty_string a with
+  | Too_long -> error (Name_too_long (a :> string))
+  | Got_default -> Ok default
+  | Ok name -> Ok name
 
 let of_string_lax' str =
   match of_string_lax_opt str with
   | None -> Error ("Entrypoint name too long \"" ^ str ^ "\"")
   | Some name -> Ok name
 
-let root = "root"
+let root = Non_empty_string.of_string_exn "root"
 
-let do_ = "do"
+let do_ = Non_empty_string.of_string_exn "do"
 
-let set_delegate = "set_delegate"
+let set_delegate = Non_empty_string.of_string_exn "set_delegate"
 
-let remove_delegate = "remove_delegate"
+let remove_delegate = Non_empty_string.of_string_exn "remove_delegate"
 
-let to_address_suffix name = if is_default name then "" else "%" ^ name
+let to_address_suffix (name : t) =
+  if is_default name then "" else "%" ^ (name :> string)
 
 let of_string_lax_exn str =
   match of_string_lax' str with Ok name -> name | Error err -> invalid_arg err
 
-let pp = Format.pp_print_string
+let pp fmt (name : t) = Format.pp_print_string fmt (name :> string)
 
 let simple_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    (function "" -> assert false (* invariant violated *) | s -> s)
+  Data_encoding.conv_with_guard
+    (fun (name : t) -> (name :> string))
     of_string_lax'
-    string
+    Data_encoding.string
 
 let value_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    (function
-      | "" -> assert false (* invariant violated*) | "default" -> "" | s -> s)
+  Data_encoding.conv_with_guard
+    (fun name -> if is_default name then "" else (name :> string))
     of_string_strict'
-    Variable.string
+    Data_encoding.Variable.string
 
 let smart_encoding =
   let open Data_encoding in
@@ -148,27 +165,26 @@ let smart_encoding =
     ~description:"Named entrypoint to a Michelson smart contract"
     "entrypoint"
   @@
-  let builtin_case tag name =
+  let builtin_case tag (name : Non_empty_string.t) =
     case
       (Tag tag)
-      ~title:name
-      (constant name)
+      ~title:(name :> string)
+      (constant (name :> string))
       (fun n -> if n = name then Some () else None)
       (fun () -> name)
   in
   union
     [
-      builtin_case 0 "default";
-      builtin_case 1 "root";
-      builtin_case 2 "do";
-      builtin_case 3 "set_delegate";
-      builtin_case 4 "remove_delegate";
+      builtin_case 0 default;
+      builtin_case 1 root;
+      builtin_case 2 do_;
+      builtin_case 3 set_delegate;
+      builtin_case 4 remove_delegate;
       case
         (Tag 255)
         ~title:"named"
         (Bounded.string 31)
-        (function
-          | "" -> assert false (* invariant violated *) | name -> Some name)
+        (fun (name : Non_empty_string.t) -> Some (name :> string))
         of_string_lax_exn;
     ]
 
@@ -176,12 +192,12 @@ let rpc_arg =
   RPC_arg.make
     ~descr:"A Michelson entrypoint (string of length < 32)"
     ~name:"entrypoint"
-    ~construct:(function "" -> assert false (* invariant violated*) | s -> s)
+    ~construct:(fun (name : t) -> (name :> string))
     ~destruct:of_string_lax'
     ()
 
-let in_memory_size name =
-  Cache_memory_helpers.string_size_gen (String.length name)
+let in_memory_size (name : t) =
+  Cache_memory_helpers.string_size_gen (String.length (name :> string))
 
-module Set = Set.Make (String)
-module Map = Map.Make (String)
+module Set = Set.Make (Non_empty_string)
+module Map = Map.Make (Non_empty_string)
