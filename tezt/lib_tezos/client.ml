@@ -787,7 +787,8 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash -> return hash
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?seed ?transfers ?tps client =
+    ?(source_accounts = []) ?seed ?transfers ?tps
+    ?(single_op_per_pkh_per_block = false) client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -843,9 +844,11 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
   @ make_int_opt_arg "--transfers" transfers
   @ make_int_opt_arg "--tps" tps
+  @
+  if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?transfers ?tps client =
+    ?transfers ?tps ?single_op_per_pkh_per_block client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
@@ -854,6 +857,7 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?seed
     ?transfers
     ?tps
+    ?single_op_per_pkh_per_block
     client
   |> Process.check
 

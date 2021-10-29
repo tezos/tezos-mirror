@@ -593,6 +593,8 @@ val convert_data_to_json :
     the corresponding optional argument):
     - [--transfers <transfers>]
     - [--tps <tps>]
+    - [--single-op-per-pkh-per-block] (if the argument
+      [single_op_per_pkh_per_block] is [true])
 
     [endpoint]: cf {!create} *)
 val stresstest :
@@ -603,6 +605,7 @@ val stresstest :
   ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
+  ?single_op_per_pkh_per_block:bool ->
   t ->
   unit Lwt.t
 
@@ -615,6 +618,7 @@ val spawn_stresstest :
   ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
+  ?single_op_per_pkh_per_block:bool ->
   t ->
   Process.t
 
