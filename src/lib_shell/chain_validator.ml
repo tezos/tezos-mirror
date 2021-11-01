@@ -759,11 +759,15 @@ let validate_block w ?force hash block operations =
   Block_validator.validate
     ~canceler:(Worker.canceler w)
     ~notify_new_block:(notify_new_block w None)
+    ~precheck_and_notify:true
     nv.parameters.block_validator
     nv.chain_db
     hash
     block
     operations
+  >>= function
+  | Valid -> return_unit
+  | Invalid errs | Invalid_after_precheck errs -> Lwt.return_error errs
 
 let bootstrapped w =
   let state = Worker.state w in
