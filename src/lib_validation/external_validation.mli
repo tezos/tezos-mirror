@@ -59,6 +59,14 @@ type request =
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
     }
+  | Precheck of {
+      chain_id : Chain_id.t;
+      predecessor_block_header : Block_header.t;
+      predecessor_block_hash : Block_hash.t;
+      header : Block_header.t;
+      operations : Operation.t list list;
+      hash : Block_hash.t;
+    }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;
