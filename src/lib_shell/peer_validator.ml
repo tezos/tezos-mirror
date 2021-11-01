@@ -154,18 +154,33 @@ let validate_new_head w hash (header : Block_header.t) =
   >>= fun () ->
   Block_validator.validate
     ~notify_new_block:pv.parameters.notify_new_block
+    ~precheck_and_notify:true
     pv.parameters.block_validator
     pv.parameters.chain_db
     hash
     header
     operations
-  >>=? fun _block ->
-  Worker.log_event w (New_head_validation_end block_received) >>= fun () ->
-  let meta =
-    Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-  in
-  Peer_metadata.incr meta Valid_blocks ;
-  return_unit
+  >>= function
+  | Invalid errs ->
+      (* This will convert into a kickban when treated by [on_error] --
+         or, at least, by a worker termination which will close the
+         connection. *)
+      Lwt.return_error errs
+  | Invalid_after_precheck _errs ->
+      Worker.log_event w (Ignoring_prechecked_invalid_block block_received)
+      >>= fun () ->
+      (* We do not kickban the peer if the block received was
+         successfully prechecked but invalid -- this means that he
+         could have propagated a precheckable block before terminating
+         its validation *)
+      return_unit
+  | Valid ->
+      Worker.log_event w (New_head_validation_end block_received) >>= fun () ->
+      let meta =
+        Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+      in
+      Peer_metadata.incr meta Valid_blocks ;
+      return_unit
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
@@ -359,6 +374,19 @@ let on_error w r st err =
       Worker.trigger_shutdown w ;
       Worker.log_event w (Event.Request (r, st, Some err)) >>= fun () ->
       return_unit
+  | Distributed_db.Operations.Canceled _ :: _ -> (
+      (* Given two nodes A and B (remote). This may happen if A
+         prechecks a block, sends it to B. B prechecks a block, sends
+         it to A. A tries to fetch operations of the block to B, in
+         the meantime, A validates the block and cancels the fetching.
+      *)
+      match r with
+      | New_head hash -> (
+          let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+          Store.Block.is_known_valid chain_store hash >>= function
+          | true -> return_unit
+          | false -> Lwt.return_error err)
+      | _ -> Lwt.return_error err)
   | _ ->
       Worker.log_event w (Event.Request (r, st, Some err)) >>= fun () ->
       Lwt.return_error err
