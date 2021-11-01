@@ -74,7 +74,7 @@ let ring = meta_ring symmetric_add_peer
 
 let star = meta_star symmetric_add_peer
 
-let wait_until_cluster_ready (node, connections) =
+let wait_for_connections node connections =
   let counter = ref 0 in
   let (waiter, resolver) = Lwt.task () in
   Node.on_event node (fun {name; value} ->
@@ -99,7 +99,7 @@ let start ?(public = false) ?event_level ?(wait_connections = false) nodes =
       Node.run ?event_level node (if public then [] else [Private_mode])
     in
     let waiter =
-      if wait_connections then wait_until_cluster_ready (node, n)
+      if wait_connections then wait_for_connections node n
       else Node.wait_for_ready node
     in
     waiter
