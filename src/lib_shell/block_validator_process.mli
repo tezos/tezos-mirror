@@ -87,6 +87,17 @@ val preapply_block :
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
+(** [precheck_block bvp chain_store ~predecessor header hash os] is a
+   wrapper for [Block_validation.precheck]. *)
+val precheck_block :
+  t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
+  Block_header.t ->
+  Block_hash.t ->
+  Operation.t trace trace ->
+  unit tzresult Lwt.t
+
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
