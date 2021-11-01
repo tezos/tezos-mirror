@@ -161,5 +161,14 @@ val meta_star : ('a -> 'b -> unit) -> 'a -> 'b list -> unit
     Set [public] to [true] to allow the topology to change over time.
     If you need some nodes to be in private mode, and some nodes not to,
     set [public] to [true], and give the [Private_mode] argument to [Cluster.create]
-    and/or [Node.create]. *)
-val start : ?public:bool -> Node.t list -> unit Lwt.t
+    and/or [Node.create].
+
+    If [?wait_connections] is set, the function will return only after
+    all nodes in the topology are connected to their expected number of
+    neighbors. *)
+val start :
+  ?public:bool ->
+  ?event_level:string ->
+  ?wait_connections:bool ->
+  Node.t list ->
+  unit Lwt.t
