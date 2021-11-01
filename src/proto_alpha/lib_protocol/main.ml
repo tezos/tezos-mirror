@@ -483,6 +483,18 @@ let init ctxt block_header =
     (({script with storage}, lazy_storage_diff), ctxt)
   in
   init_context ctxt >>= fun ctxt ->
+  (* The cache must be synced at the end of block validation, so we do so here for the first block in a protocol where `finalize_block` is not called. *)
+  let protocol_data : Alpha_context.Block_header.contents =
+    {
+      priority = 0;
+      liquidity_baking_escape_vote = false;
+      seed_nonce_hash = None;
+      proof_of_work_nonce =
+        Bytes.make Constants_repr.proof_of_work_nonce_size '0';
+    }
+  in
+  let cache_nonce = cache_nonce_from_block_header block_header protocol_data in
+  Context.Cache.sync ctxt ~cache_nonce >>= fun ctxt ->
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
   >>=? fun ctxt -> return (Alpha_context.finalize ctxt)
 

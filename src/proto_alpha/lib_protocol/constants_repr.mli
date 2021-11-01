@@ -133,7 +133,6 @@ module Proto_previous : sig
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez_repr.t;
-    michelson_maximum_type_size : int;
     seed_nonce_revelation_tip : Tez_repr.t;
     origination_size : int;
     block_security_deposit : Tez_repr.t;
