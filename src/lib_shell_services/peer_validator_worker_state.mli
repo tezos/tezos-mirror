@@ -44,6 +44,7 @@ module Event : sig
     | New_head_validation_end of block_received
     | Ignoring_head of block_received
     | Ignoring_previously_validated_block of block_received
+    | Ignoring_prechecked_block of block_received
     | Ignoring_invalid_block of block_received
     | Missing_new_head_predecessor of block_received
     | Ignoring_branch_with_invalid_locator of block_received
@@ -52,6 +53,7 @@ module Event : sig
     | Processing_new_head of block_received
     | Processing_new_branch of block_received
     | Terminating_worker of {peer : P2p_peer.Id.t; reason : string}
+    | Ignoring_prechecked_invalid_block of block_received
 
   type view = t
 
