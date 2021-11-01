@@ -176,6 +176,7 @@ let notify_new_block w peer block =
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
+      Worker.log_event w (Connection peer_id) >>= fun () ->
       Peer_validator.create
         ~notify_new_block:(notify_new_block w (Some peer_id))
         ~notify_termination:(fun _pv ->
