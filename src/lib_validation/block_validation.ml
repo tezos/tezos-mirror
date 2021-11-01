@@ -846,6 +846,47 @@ module Make (Proto : Registered_protocol.T) = struct
       {result; cache}
     in
     return (preapply_result, (result, context))
+
+  let precheck chain_id ~(predecessor_block_header : Block_header.t)
+      ~predecessor_block_hash ~predecessor_context ~cache
+      ~(block_header : Block_header.t) operations =
+    let block_hash = Block_header.hash block_header in
+    check_block_header ~predecessor_block_header block_hash block_header
+    >>=? fun () ->
+    parse_block_header block_hash block_header >>=? fun block_header ->
+    check_operation_quota block_hash operations >>=? fun () ->
+    update_testchain_status
+      predecessor_context
+      ~predecessor_hash:predecessor_block_hash
+      block_header.shell.timestamp
+    >>= fun context ->
+    parse_operations block_hash operations >>=? fun operations ->
+    let context = Shell_context.wrap_disk_context context in
+    ( Proto.begin_partial_application
+        ~chain_id
+        ~ancestor_context:context
+        ~predecessor:predecessor_block_header
+        ~predecessor_hash:predecessor_block_hash
+        ~cache
+        block_header
+    >>=? fun state ->
+      List.fold_left_es
+        (fun state ops ->
+          List.fold_left_es
+            (fun state op ->
+              Proto.apply_operation state op >>=? fun (state, _op_metadata) ->
+              return state)
+            state
+            ops
+          >>=? fun state -> return state)
+        state
+        operations
+      >>=? fun state ->
+      Proto.finalize_block state None
+      >>=? fun (_validation_result, _block_data) -> return_unit )
+    >>= function
+    | Error err -> fail (invalid_block block_hash (Economic_protocol_error err))
+    | Ok () -> return_unit
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
@@ -936,6 +977,27 @@ let apply ?cached_result
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
       fail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
+
+let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
+    ~predecessor_context ~cache block_header operations =
+  let block_hash = Block_header.hash block_header in
+  Context.get_protocol predecessor_context >>= fun pred_protocol_hash ->
+  (match Registered_protocol.get pred_protocol_hash with
+  | None ->
+      fail
+        (Unavailable_protocol
+           {block = block_hash; protocol = pred_protocol_hash})
+  | Some p -> return p)
+  >>=? fun (module Proto) ->
+  let module Block_validation = Make (Proto) in
+  Block_validation.precheck
+    chain_id
+    ~predecessor_block_header
+    ~predecessor_block_hash
+    ~predecessor_context
+    ~cache
+    ~block_header
+    operations
 
 let preapply ~chain_id ~cache ~user_activated_upgrades
     ~user_activated_protocol_overrides ~timestamp ~protocol_data ~live_blocks
