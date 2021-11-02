@@ -1065,15 +1065,6 @@ struct
     let begin_partial_application ~chain_id ~ancestor_context
         ~(predecessor : Block_header.t) ~predecessor_hash ~cache
         (raw_block : block_header) =
-      (*
-
-        [begin_partial_application] is called in the multipass
-        validation process with a context that can be older than
-        the one of the predecessor block. For this reason, values
-        in the in-memory caches can be outdated. Hence, the caches
-        must be cleared.
-
-      *)
       load_predecessor_cache
         ~chain_id
         ~predecessor_context:ancestor_context
@@ -1084,7 +1075,6 @@ struct
         ~timestamp:raw_block.shell.timestamp
         ~cache
       >>=? fun ancestor_context ->
-      let ancestor_context = Context.Cache.clear ancestor_context in
       begin_partial_application
         ~chain_id
         ~ancestor_context
