@@ -360,7 +360,10 @@ module Context = struct
       let ctxt = Context {ctxt with cache} in
       let cache_number = List.length layout in
       set_cache_number ctxt cache_number >>= fun ctxt ->
-      List.fold_left_i_s (fun i ctxt -> set_cache_limit ctxt i) ctxt layout
+      List.fold_left_i_s
+        (fun i ctxt limit -> set_cache_limit ctxt i limit)
+        ctxt
+        layout
 
     let get_cache_layout ctxt =
       get_cache_number ctxt >>= fun n ->
