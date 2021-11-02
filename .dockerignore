@@ -9,6 +9,7 @@ __pycache__
 _build_rust
 _opam
 _docker_build
+_snoop
 docs/api/tezos-client.html
 docs/api/tezos-admin-client.html
 

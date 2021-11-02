@@ -125,7 +125,7 @@ module Default_config = struct
     conv
       (fun {type_size} -> type_size)
       (fun type_size -> {type_size})
-      (obj1 (req "max_depth" Base_samplers.range_encoding))
+      (obj1 (req "type_size" Base_samplers.range_encoding))
 
   let config_encoding =
     let open Data_encoding in
@@ -859,12 +859,12 @@ module Registration_section = struct
       in
       benchmark
         ~name:Interpreter_workload.N_IUncomb
-        ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
+        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
           let width =
             Base_samplers.(
               sample_in_interval
                 rng_state
-                ~range:{min = 2; max = stack_size - 2})
+                ~range:{min = 2; max = cfg.comb.max_depth - 2})
           in
           let node = unpair width in
           let stack =
@@ -877,12 +877,12 @@ module Registration_section = struct
       let comb_get n = Micheline.(Prim (0, I_GET, [Int (0, Z.of_int n)], [])) in
       benchmark
         ~name:Interpreter_workload.N_IComb_get
-        ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
+        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
           let width =
             Base_samplers.(
               sample_in_interval
                 rng_state
-                ~range:{min = 2; max = stack_size - 2})
+                ~range:{min = 2; max = cfg.comb.max_depth - 2})
           in
           let index =
             Base_samplers.(
@@ -901,12 +901,12 @@ module Registration_section = struct
       in
       benchmark
         ~name:Interpreter_workload.N_IComb_set
-        ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
+        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
           let width =
             Base_samplers.(
               sample_in_interval
                 rng_state
-                ~range:{min = 2; max = stack_size - 2})
+                ~range:{min = 2; max = cfg.comb.max_depth - 2})
           in
           let index =
             Base_samplers.(
