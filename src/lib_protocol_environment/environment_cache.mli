@@ -253,6 +253,8 @@ val empty_domain : domain -> bool
    the given [domain] by reusing values from [initial] if nonces
    match, or by calling [value_of_key] otherwise.
 
+   [domain] and [initial] must share the same layout.
+
    This function is typically used when the cache is loaded from the
    context. See {!Environment_context}. *)
 val from_cache :
