@@ -361,7 +361,7 @@ let subcache_domain_encoding : subcache_domain Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list subcache_domain_encoding)
 
-let empty_domain = function [] -> true | _ -> false
+let empty_domain = List.is_empty
 
 let sync t ~cache_nonce =
   with_caches t @@ fun caches ->
