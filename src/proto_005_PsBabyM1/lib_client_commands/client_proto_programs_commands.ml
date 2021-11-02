@@ -37,6 +37,18 @@ open Client_proto_programs
 open Client_proto_args
 open Client_proto_contracts
 
+let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
+  match Data_encoding.Json.destruct encoding json with
+  | exception Data_encoding.Json.Cannot_destruct (_, exc) ->
+      cctxt#error
+        "could not decode json (%a)"
+        (Data_encoding.Json.print_error ~print_unknown:(fun fmt exc ->
+             Format.fprintf fmt "%s" (Printexc.to_string exc)))
+        exc
+  | exception exc ->
+      cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
+  | expr -> return expr
+
 let commands () =
   let open Clic in
   let show_types_switch =
@@ -628,10 +640,7 @@ let commands () =
             match Data_encoding.Json.from_string expr_string with
             | Error err -> cctxt#error "%s" err
             | Ok json ->
-                return
-                @@ Data_encoding.Json.destruct
-                     Alpha_context.Script.expr_encoding
-                     json)
+                safe_decode_json cctxt Alpha_context.Script.expr_encoding json)
         | `Binary -> (
             bytes_of_prefixed_string expr_string >>=? fun bytes ->
             match
@@ -717,10 +726,7 @@ let commands () =
             match Data_encoding.Json.from_string data_string with
             | Error err -> cctxt#error "%s" err
             | Ok json -> (
-                return
-                @@ Data_encoding.Json.destruct
-                     Alpha_context.Script.expr_encoding
-                     json
+                safe_decode_json cctxt Alpha_context.Script.expr_encoding json
                 >>=? fun expr ->
                 match data_ty with
                 | None -> return expr
