@@ -225,7 +225,9 @@ let () =
         expr)
     Data_encoding.(
       obj2
-        (req "location" Tezos_micheline.Micheline.canonical_location_encoding)
+        (req
+           "location"
+           Tezos_micheline.Micheline_encoding.canonical_location_encoding)
         (req "value" Script.expr_encoding))
     (function Unexpected_error (loc, expr) -> Some (loc, expr) | _ -> None)
     (fun (loc, expr) -> Unexpected_error (loc, expr))

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -71,8 +72,6 @@ val max_point : node list -> point
 
 val max_annot_length : int
 
-val node_encoding : node Data_encoding.encoding
-
 type error += Invalid_utf8_sequence of point * string
 
 type error += Unexpected_character of point * string
@@ -108,3 +107,10 @@ val parse_expression : ?check:bool -> token list -> node parsing_result
 val print_location : Format.formatter -> location -> unit
 
 val print_point : Format.formatter -> point -> unit
+
+(**/**)
+
+(* The following is so that the encoding can reuse the functions from the parser
+   to check for the validity of annotations. *)
+
+val check_annot : string -> bool
