@@ -1,0 +1,7 @@
+File "test_no_payload_input.ml", line 1, characters 11-27:
+1 | let _ = (0 [@time.duration])
+               ^^^^^^^^^^^^^^^^
+Error: time_measurement_ppx: Invalid or empty attribute payload.
+Hint: This attribute payload must be of the form: <id> [<expr>]
+  where <id> should be a valid identifier
+  and <expr> an Ocaml expression evaluating to a string list.

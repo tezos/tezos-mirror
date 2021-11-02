@@ -1,0 +1,7 @@
+(library
+ (name tezos_time_measurement_ppx)
+ (public_name tezos-time-measurement.ppx)
+ (preprocess (pps ppxlib.metaquot))
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries tezos-time-measurement)
+ (libraries ppxlib))
