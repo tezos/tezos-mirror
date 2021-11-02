@@ -61,6 +61,7 @@ let json =
         | Error _ as err -> err
         | Ok json -> (
             try Ok (Data_encoding.Json.destruct enc json) with
+            | (Stack_overflow | Out_of_memory) as exc -> raise exc
             | Data_encoding.Json.Cannot_destruct (_, exc) ->
                 Error
                   (Format.asprintf
@@ -113,6 +114,7 @@ let bson =
             Error (Format.asprintf "(at offset: %d) %s" pos msg)
         | bson -> (
             try Ok (Data_encoding.Bson.destruct enc bson) with
+            | (Stack_overflow | Out_of_memory) as exc -> raise exc
             | Data_encoding.Json.Cannot_destruct (_, exc) ->
                 Error
                   (Format.asprintf
