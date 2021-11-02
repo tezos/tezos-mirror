@@ -156,7 +156,11 @@ let protocol_parameters_json t : Ezjsonm.t =
     (* `src/proto_005_PsBabyM1/lib_protocol/parameters_repr.ml`
        `src/proto_006_PsCARTHA/lib_parameters/default_parameters.ml`
        `src/proto_007_PsDELPH1/lib_parameters/default_parameters.ml` *)
-    let alpha_specific_parameters =
+    let alpha_parameters =
+      match subkind with
+      | `Alpha -> [("max_operations_time_to_live", int 120)]
+      | _ -> [] in
+    let granada_parameters =
       match subkind with
       | `Granada | `Hangzhou | `Alpha ->
          [ ( "minimal_block_delay"
@@ -187,8 +191,7 @@ let protocol_parameters_json t : Ezjsonm.t =
       | `Granada | `Hangzhou | `Alpha -> (1_040_000, 5_200_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
-    alpha_specific_parameters
-    @ legacy_parameters
+    alpha_parameters @ granada_parameters @ legacy_parameters
     @ michelson_max_type_size
     @ [ ("blocks_per_commitment", int 4)
       ; ("endorsers_per_block", int 256)

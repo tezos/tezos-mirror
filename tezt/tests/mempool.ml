@@ -2391,6 +2391,7 @@ let injecting_old_operation_fails =
   let step4 = "Forge an operation with the old branch" in
   let step5 = "Inject the operation and wait for failure" in
   let log_step = Log.info "Step %d: %s" in
+  let max_operations_ttl = 0 in
   Protocol.register_test
     ~__FILE__
     ~title:"Injecting old operation fails"
@@ -2402,7 +2403,15 @@ let injecting_old_operation_fails =
     Node.init [Synchronisation_threshold 0; Private_mode; Connections 0]
   in
   let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right protocol)
+      [
+        ( ["max_operations_time_to_live"],
+          Some (string_of_int max_operations_ttl) );
+      ]
+  in
+  let* () = Client.activate_protocol ~protocol ~parameter_file client in
   let* _ = Node.wait_for_level node 1 in
   log_step 2 step2 ;
   let* counter =
@@ -2412,9 +2421,13 @@ let injecting_old_operation_fails =
   let* branch = RPC.get_branch client >|= JSON.as_string in
   log_step 3 step3 ;
   (* To avoid off-by-one mistakes *)
-  let max_op_ttl = Constant.max_op_ttl + 2 in
-  let* () = repeat max_op_ttl (fun () -> Client.bake_for client) in
-  let* _ = Node.wait_for_level node (max_op_ttl + 1) in
+  let blocks_to_bake = 2 in
+  let* () =
+    repeat (max_operations_ttl + blocks_to_bake) (fun () ->
+        Client.bake_for client)
+  in
+  (* + 1 for the activation block *)
+  let* _ = Node.wait_for_level node (max_operations_ttl + blocks_to_bake + 1) in
   log_step 4 step4 ;
   let* op_str_hex =
     forge_operation

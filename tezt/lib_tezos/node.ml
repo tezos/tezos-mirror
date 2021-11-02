@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type history_mode = Archive | Full | Rolling
+type history_mode = Archive | Full of int option | Rolling of int option
 
 type argument =
   | Network of string
@@ -40,8 +40,12 @@ type argument =
 let make_argument = function
   | Network x -> ["--network"; x]
   | History_mode Archive -> ["--history-mode"; "archive"]
-  | History_mode Full -> ["--history-mode"; "full"]
-  | History_mode Rolling -> ["--history-mode"; "rolling"]
+  | History_mode (Full None) -> ["--history-mode"; "full"]
+  | History_mode (Full (Some i)) ->
+      ["--history-mode"; "full:" ^ string_of_int i]
+  | History_mode (Rolling None) -> ["--history-mode"; "rolling"]
+  | History_mode (Rolling (Some i)) ->
+      ["--history-mode"; "rolling:" ^ string_of_int i]
   | Expected_pow x -> ["--expected-pow"; string_of_int x]
   | Singleprocess -> ["--singleprocess"]
   | Bootstrap_threshold x -> ["--bootstrap-threshold"; string_of_int x]
@@ -147,8 +151,10 @@ let identity_generate ?expected_pow node =
 
 let show_history_mode = function
   | Archive -> "archive"
-  | Full -> "full"
-  | Rolling -> "rolling"
+  | Full None -> "full"
+  | Full (Some i) -> "full_" ^ string_of_int i
+  | Rolling None -> "rolling"
+  | Rolling (Some i) -> "rolling_" ^ string_of_int i
 
 let spawn_config_init node arguments =
   let arguments = node.persistent_state.arguments @ arguments in

@@ -22,7 +22,8 @@ tezt/_regressions/rpc/alpha.proxy_server.others.out
   "delay_per_missing_endorsement": "1", "minimal_block_delay": "1",
   "liquidity_baking_subsidy": "2500000",
   "liquidity_baking_sunset_level": 4096,
-  "liquidity_baking_escape_ema_threshold": 1000000 }
+  "liquidity_baking_escape_ema_threshold": 1000000,
+  "max_operations_time_to_live": 120 }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",
