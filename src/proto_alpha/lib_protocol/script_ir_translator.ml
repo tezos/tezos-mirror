@@ -100,7 +100,6 @@ type tc_context =
       storage_type : 'sto ty;
       param_type : 'param ty;
       root_name : field_annot option;
-      legacy_create_contract_literal : bool;
     }
       -> tc_context
 
@@ -4867,13 +4866,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Toplevel
-              {
-                storage_type;
-                param_type = arg_type;
-                root_name;
-                legacy_create_contract_literal = false;
-              })
+           (Toplevel {storage_type; param_type = arg_type; root_name})
            ctxt
            ~legacy
            ?type_logger
@@ -4973,13 +4966,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               tc_context -> ((a, s) judgement * context) tzresult = function
             | Lambda -> error (Self_in_lambda loc)
             | Dip (_, prev) -> get_toplevel_type prev
-            | Toplevel
-                {
-                  param_type;
-                  root_name;
-                  legacy_create_contract_literal = false;
-                  _;
-                } ->
+            | Toplevel {param_type; root_name; storage_type = _} ->
                 find_entrypoint param_type ~root_name entrypoint
                 >>? fun (_, Ex_ty param_type) ->
                 contract_t loc param_type ~annot:None >>? fun res_ty ->
@@ -4987,22 +4974,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                   {
                     apply =
                       (fun kinfo k -> ISelf (kinfo, param_type, entrypoint, k));
-                  }
-                in
-                let stack = Item_t (res_ty, stack, annot) in
-                typed_no_lwt ctxt loc instr stack
-            | Toplevel
-                {
-                  param_type;
-                  root_name = _;
-                  legacy_create_contract_literal = true;
-                  _;
-                } ->
-                contract_t loc param_type ~annot:None >>? fun res_ty ->
-                let instr =
-                  {
-                    apply =
-                      (fun kinfo k -> ISelf (kinfo, param_type, "default", k));
                   }
                 in
                 let stack = Item_t (res_ty, stack, annot) in
@@ -5713,13 +5684,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       (Toplevel
-          {
-            storage_type;
-            param_type = arg_type;
-            root_name;
-            legacy_create_contract_literal = false;
-          })
+       (Toplevel {storage_type; param_type = arg_type; root_name})
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5840,13 +5805,7 @@ let typecheck_code :
   >>?= fun ret_type_full ->
   let result =
     parse_returning
-      (Toplevel
-         {
-           storage_type;
-           param_type = arg_type;
-           root_name;
-           legacy_create_contract_literal = false;
-         })
+      (Toplevel {storage_type; param_type = arg_type; root_name})
       ctxt
       ~legacy
       ~stack_depth:0
