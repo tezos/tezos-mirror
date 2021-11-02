@@ -36,8 +36,6 @@ let default_balance_annot = Some (Var_annot "balance")
 
 let default_level_annot = Some (Var_annot "level")
 
-let default_steps_annot = Some (Var_annot "steps")
-
 let default_source_annot = Some (Var_annot "source")
 
 let default_sender_annot = Some (Var_annot "sender")
@@ -58,8 +56,6 @@ let default_contract_annot = Some (Field_annot "contract")
 
 let default_addr_annot = Some (Field_annot "address")
 
-let default_manager_annot = Some (Field_annot "manager")
-
 let default_pack_annot = Some (Field_annot "packed")
 
 let default_unpack_annot = Some (Field_annot "unpacked")
@@ -79,8 +75,6 @@ let default_some_annot = Some (Field_annot "some")
 let default_left_annot = Some (Field_annot "left")
 
 let default_right_annot = Some (Field_annot "right")
-
-let default_binding_annot = Some (Field_annot "bnd")
 
 let default_sapling_state_annot = Some (Var_annot "sapling")
 
@@ -291,14 +285,6 @@ let parse_type_annot : int -> string list -> type_annot option tzresult =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
   error_unexpected_annot loc fields >>? fun () -> get_one_annot loc types
-
-let parse_type_field_annot :
-    int -> string list -> (type_annot option * field_annot option) tzresult =
- fun loc annot ->
-  parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
-  error_unexpected_annot loc vars >>? fun () ->
-  get_one_annot loc types >>? fun t ->
-  get_one_annot loc fields >|? fun f -> (t, f)
 
 let parse_composed_type_annot :
     int ->
