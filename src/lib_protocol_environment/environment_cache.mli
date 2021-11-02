@@ -211,6 +211,9 @@ val lookup : 'value t -> key -> ('value * value_metadata) option
 
      The [cache_nonce] of the entry is preserved.
 
+    If the cache is full, the insertion of a new entry provokes the
+    removal of the least recently used entries.
+
 *)
 val update : 'value t -> key -> ('value * size) option -> 'value t
 
@@ -230,30 +233,36 @@ val future_cache_expectation : 'value t -> time_in_blocks:int -> 'value t
    Synchronisation of a cache aims to be done once all the accesses to
    the caches have been done by the economic protocol.
 
-   After a synchronisation, for each sub-cache where the limit was
-   reached, older values are removed.
-
-   Hence, the size of the cache is a soft limit which is enforced only
-   after a synchronisation. It is the responsability of the protocol
-   to avoid arbitrary increase of the cache during block operation
-   applications.
-
    For each value added or updated since the last synchronisation,
    they are updated with the [nonce] provided by the economic
    protocol. *)
 
-(** Set of keys ordered by their identifier. *)
-module KeySet : Set.S with type elt = key
-
-(** Map of keys ordered by their identifier. *)
-module KeyMap : Map.S with type key = key
-
-type domain = value_metadata KeyMap.t list
+(** The domain is the on-disk representation of the cache. Notice
+    that in-memory values must be constructed from a domain to get
+    a cache. *)
+type domain
 
 val domain_encoding : domain Data_encoding.t
 
-(** [sync cache ~cache_nonce] computes a new cache with a new domain.
-    After the call to [sync] all the layout cache limits are ensured. *)
+(** [empty_domain d] returns [true] iff [d] is the domain of an
+    uninitialized cache. *)
+val empty_domain : domain -> bool
+
+(** [from_cache initial domain ~value_of_key] initializes a cache with
+   the given [domain] by reusing values from [initial] if nonces
+   match, or by calling [value_of_key] otherwise.
+
+   [domain] and [initial] must share the same layout.
+
+   This function is typically used when the cache is loaded from the
+   context. See {!Environment_context}. *)
+val from_cache :
+  'value t ->
+  domain ->
+  value_of_key:(key -> ('value, 'trace) result Lwt.t) ->
+  ('value t, 'trace) result Lwt.t
+
+(** [sync cache ~cache_nonce] computes a new cache with a new domain. *)
 val sync : 'value t -> cache_nonce:Bytes.t -> 'value t * domain
 
 (** Various functions used to introspect the content of the cache. *)

@@ -118,13 +118,16 @@ let pp_cache fmt {index; map; size; limit; counter; _} =
         map)
     map
 
+let invalid_arg_with_callstack msg =
+  let cs = Printexc.get_callstack 15 in
+  Fmt.invalid_arg
+    "Internal error: %s\nCall stack:\n%s\n"
+    msg
+    (Printexc.raw_backtrace_to_string cs)
+
 let with_caches cache f =
   match cache with
-  | None ->
-      let cs = Printexc.get_callstack 15 in
-      Fmt.invalid_arg
-        "Internal error: uninitialized caches: %s\n"
-        (Printexc.raw_backtrace_to_string cs)
+  | None -> invalid_arg_with_callstack "uninitialized caches"
   | Some caches -> f caches
 
 let cache_of_index t index =
@@ -269,18 +272,6 @@ let compatible_layout t layout =
 
 let from_layout layout = Some (make_caches layout)
 
-let clear_cache cache =
-  {
-    index = cache.index;
-    limit = cache.limit;
-    map = KeyMap.empty;
-    size = 0;
-    counter = 0L;
-    lru = Int64Map.empty;
-    entries_removals = [];
-    removed_entries = KeySet.empty;
-  }
-
 let future_cache_expectation t ~time_in_blocks =
   Some
     (with_caches t (fun caches ->
@@ -289,9 +280,6 @@ let future_cache_expectation t ~time_in_blocks =
              let oldness = time_in_blocks * median_entries_removals cache in
              Utils.fold_n_times oldness remove_dean cache)
            caches))
-
-let clear t =
-  Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
 let record_entries_removals cache =
   let entries_removals =
@@ -329,23 +317,51 @@ let finalize_cache ({map; _} as cache) nonce =
   let metamap = KeyMap.map snd map in
   ({cache with map}, metamap)
 
-type domain = value_metadata KeyMap.t list
+(**
+
+   A subcache has a domain composed of:
+
+   - [keys] to restore the in-memory representation of the subcache at
+     loading time ;
+
+   - [counter] to restart the generation of "birth dates" for new entries
+     at the right counter.
+
+   [counter] is important because restarting from [0] does not work.
+   Indeed, a baker that reloads the cache from the domain must be
+   able to reconstruct the exact same cache as the validator. The
+   validator maintains a cache in memory by inheriting it from the
+   predecessor block: hence its counter is never reset.
+
+*)
+type subcache_domain = {keys : value_metadata KeyMap.t; counter : int64}
+
+type domain = subcache_domain list
 
 let sync_cache cache ~cache_nonce =
   let cache = enforce_size_limit cache in
   let cache = record_entries_removals cache in
   let (cache, new_entries) = finalize_cache cache cache_nonce in
-  (cache, new_entries)
+  (cache, {keys = new_entries; counter = cache.counter})
 
-let subcache_domain_encoding : value_metadata KeyMap.t Data_encoding.t =
+let subcache_keys_encoding : value_metadata KeyMap.t Data_encoding.t =
   Data_encoding.(
     conv
       KeyMap.bindings
       (fun b -> KeyMap.of_seq (List.to_seq b))
       (list (dynamic_size (tup2 key_encoding value_metadata_encoding))))
 
+let subcache_domain_encoding : subcache_domain Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun {keys; counter} -> (keys, counter))
+      (fun (keys, counter) -> {keys; counter})
+      (obj2 (req "keys" subcache_keys_encoding) (req "counter" int64)))
+
 let domain_encoding : domain Data_encoding.t =
-  Data_encoding.(list (dynamic_size subcache_domain_encoding))
+  Data_encoding.(list subcache_domain_encoding)
+
+let empty_domain = List.is_empty
 
 let sync t ~cache_nonce =
   with_caches t @@ fun caches ->
@@ -363,6 +379,55 @@ let update_cache_key t key value meta =
   let cache = FunctionalArray.get caches key.cache_index in
   let cache = insert_cache_entry cache key (value, meta) in
   update_cache_with t key.cache_index cache
+
+let clear_cache cache =
+  {
+    index = cache.index;
+    limit = cache.limit;
+    map = KeyMap.empty;
+    size = 0;
+    counter = 0L;
+    lru = Int64Map.empty;
+    entries_removals = [];
+    removed_entries = KeySet.empty;
+  }
+
+let clear t =
+  Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
+
+let from_cache initial domain ~value_of_key =
+  let domain' = Array.of_list domain in
+  let cache =
+    with_caches (clear initial) @@ fun caches ->
+    FunctionalArray.mapi
+      (fun i (cache : 'a cache) ->
+        if i = -1 then cache
+        else if i >= Array.length domain' then
+          (* By precondition: the layout of [domain] and [initial]
+               must be the same. *)
+          invalid_arg_with_callstack "invalid usage of from_cache"
+        else
+          let subdomain = domain'.(i) in
+          {cache with counter = subdomain.counter})
+      caches
+  in
+  let fold_cache_keys subdomain cache =
+    KeyMap.fold_es
+      (fun key entry cache ->
+        (match lookup initial key with
+        | None -> value_of_key key
+        | Some (value, entry') ->
+            if Bytes.equal entry.cache_nonce entry'.cache_nonce then
+              return value
+            else value_of_key key)
+        >>=? fun value -> return (update_cache_key cache key value entry))
+      subdomain.keys
+      cache
+  in
+  List.fold_left_es
+    (fun cache subdomain -> fold_cache_keys subdomain cache)
+    (Some cache)
+    domain
 
 let number_of_caches t = with_caches t FunctionalArray.length
 
