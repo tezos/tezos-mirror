@@ -143,6 +143,7 @@ type parametric = {
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
+  max_operations_time_to_live : int;
 }
 
 let parametric_encoding =
@@ -176,7 +177,8 @@ let parametric_encoding =
             c.minimal_block_delay,
             c.liquidity_baking_subsidy,
             c.liquidity_baking_sunset_level,
-            c.liquidity_baking_escape_ema_threshold ) ) ))
+            c.liquidity_baking_escape_ema_threshold,
+            c.max_operations_time_to_live ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -204,7 +206,8 @@ let parametric_encoding =
                minimal_block_delay,
                liquidity_baking_subsidy,
                liquidity_baking_sunset_level,
-               liquidity_baking_escape_ema_threshold ) ) ) ->
+               liquidity_baking_escape_ema_threshold,
+               max_operations_time_to_live ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -234,6 +237,7 @@ let parametric_encoding =
         liquidity_baking_subsidy;
         liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold;
+        max_operations_time_to_live;
       })
     (merge_objs
        (obj10
@@ -262,7 +266,7 @@ let parametric_encoding =
              (req "endorsement_reward" (list Tez_repr.encoding))
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z))
-          (obj9
+          (obj10
              (req "quorum_min" int32)
              (req "quorum_max" int32)
              (req "min_proposal_quorum" int32)
@@ -271,7 +275,8 @@ let parametric_encoding =
              (req "minimal_block_delay" Period_repr.encoding)
              (req "liquidity_baking_subsidy" Tez_repr.encoding)
              (req "liquidity_baking_sunset_level" int32)
-             (req "liquidity_baking_escape_ema_threshold" int32))))
+             (req "liquidity_baking_escape_ema_threshold" int32)
+             (req "max_operations_time_to_live" int16))))
 
 type t = {fixed : fixed; parametric : parametric}
 

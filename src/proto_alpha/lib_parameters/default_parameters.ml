@@ -63,6 +63,14 @@ let constants_mainnet =
       liquidity_baking_sunset_level = 2_244_609l;
       (* 1/2 window size of 2000 blocks with precision of 1000 for integer computation *)
       liquidity_baking_escape_ema_threshold = 1_000_000l;
+      (* The rationale behind the value of this constant is that an
+         operation should be considered alive for about one hour:
+
+         minimal_block_delay context *  max_operations_ttl = 3600
+
+         The unit for this value is a block.
+      *)
+      max_operations_time_to_live = 120;
     }
 
 let constants_sandbox =

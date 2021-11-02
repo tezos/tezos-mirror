@@ -106,6 +106,7 @@ type parametric = {
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
+  max_operations_time_to_live : int;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding

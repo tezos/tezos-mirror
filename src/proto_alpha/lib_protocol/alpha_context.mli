@@ -601,6 +601,7 @@ module Constants : sig
     liquidity_baking_subsidy : Tez.t;
     liquidity_baking_sunset_level : int32;
     liquidity_baking_escape_ema_threshold : int32;
+    max_operations_time_to_live : int;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -1973,8 +1974,6 @@ module Global : sig
 
   val set_block_priority : context -> int -> context tzresult Lwt.t
 end
-
-val max_operations_ttl : int
 
 module Migration : sig
   type origination_result = {

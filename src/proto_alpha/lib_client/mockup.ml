@@ -62,6 +62,7 @@ module Protocol_constants_overrides = struct
     liquidity_baking_subsidy : Tez.t option;
     liquidity_baking_sunset_level : int32 option;
     liquidity_baking_escape_ema_threshold : int32 option;
+    max_operations_time_to_live : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -99,7 +100,8 @@ module Protocol_constants_overrides = struct
                 c.minimal_block_delay,
                 c.liquidity_baking_subsidy,
                 c.liquidity_baking_sunset_level,
-                c.liquidity_baking_escape_ema_threshold ),
+                c.liquidity_baking_escape_ema_threshold,
+                c.max_operations_time_to_live ),
               (c.chain_id, c.timestamp) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
@@ -128,7 +130,8 @@ module Protocol_constants_overrides = struct
                    minimal_block_delay,
                    liquidity_baking_subsidy,
                    liquidity_baking_sunset_level,
-                   liquidity_baking_escape_ema_threshold ),
+                   liquidity_baking_escape_ema_threshold,
+                   max_operations_time_to_live ),
                  (chain_id, timestamp) ) ) ) ->
         {
           preserved_cycles;
@@ -159,6 +162,7 @@ module Protocol_constants_overrides = struct
           liquidity_baking_subsidy;
           liquidity_baking_sunset_level;
           liquidity_baking_escape_ema_threshold;
+          max_operations_time_to_live;
           chain_id;
           timestamp;
         })
@@ -186,7 +190,7 @@ module Protocol_constants_overrides = struct
                (opt "cost_per_byte" Tez.encoding)
                (opt "hard_storage_limit_per_operation" z))
             (merge_objs
-               (obj9
+               (obj10
                   (opt "quorum_min" int32)
                   (opt "quorum_max" int32)
                   (opt "min_proposal_quorum" int32)
@@ -195,7 +199,8 @@ module Protocol_constants_overrides = struct
                   (opt "minimal_block_delay" Period.encoding)
                   (opt "liquidity_baking_subsidy" Tez.encoding)
                   (opt "liquidity_baking_sunset_level" int32)
-                  (opt "liquidity_baking_escape_ema_threshold" int32))
+                  (opt "liquidity_baking_escape_ema_threshold" int32)
+                  (opt "max_operations_time_to_live" int16))
                (obj2
                   (opt "chain_id" Chain_id.encoding)
                   (opt "initial_timestamp" Time.Protocol.encoding)))))
@@ -249,6 +254,8 @@ module Protocol_constants_overrides = struct
           Some parametric.liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold =
           Some parametric.liquidity_baking_escape_ema_threshold;
+        max_operations_time_to_live =
+          Some parametric.max_operations_time_to_live;
         (* Bastard, additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -284,6 +291,7 @@ module Protocol_constants_overrides = struct
       liquidity_baking_subsidy = None;
       liquidity_baking_sunset_level = None;
       liquidity_baking_escape_ema_threshold = None;
+      max_operations_time_to_live = None;
       chain_id = None;
       timestamp = None;
     }
@@ -582,6 +590,10 @@ module Protocol_constants_overrides = struct
              ~default:c.liquidity_baking_escape_ema_threshold
              o.liquidity_baking_escape_ema_threshold
            (* Notice that the chain_id and the timestamp are not used here as they are not protocol constants... *);
+         max_operations_time_to_live =
+           Option.value
+             ~default:c.max_operations_time_to_live
+             o.max_operations_time_to_live;
        }
         : Constants.parametric)
 end

@@ -734,7 +734,46 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Hangzhou_011 -> return ctxt)
+  | Hangzhou_011 ->
+      get_previous_protocol_constants ctxt >>= fun c ->
+      let constants =
+        Constants_repr.
+          {
+            minimal_block_delay = c.minimal_block_delay;
+            preserved_cycles = c.preserved_cycles;
+            blocks_per_cycle = c.blocks_per_cycle;
+            blocks_per_commitment = c.blocks_per_commitment;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
+            blocks_per_voting_period = c.blocks_per_voting_period;
+            time_between_blocks = c.time_between_blocks;
+            endorsers_per_block = c.endorsers_per_block;
+            hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block;
+            proof_of_work_threshold = c.proof_of_work_threshold;
+            tokens_per_roll = c.tokens_per_roll;
+            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
+            origination_size = c.origination_size;
+            block_security_deposit = c.block_security_deposit;
+            endorsement_security_deposit = c.endorsement_security_deposit;
+            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
+            endorsement_reward = c.endorsement_reward;
+            hard_storage_limit_per_operation =
+              c.hard_storage_limit_per_operation;
+            cost_per_byte = c.cost_per_byte;
+            quorum_min = c.quorum_min;
+            quorum_max = c.quorum_max;
+            min_proposal_quorum = c.min_proposal_quorum;
+            initial_endorsers = c.initial_endorsers;
+            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
+            liquidity_baking_subsidy = c.liquidity_baking_subsidy;
+            liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
+            liquidity_baking_escape_ema_threshold =
+              c.liquidity_baking_escape_ema_threshold;
+            (* Same value as in the previous protocol. *)
+            max_operations_time_to_live = 120;
+          }
+      in
+      add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
