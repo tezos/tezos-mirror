@@ -118,13 +118,16 @@ let pp_cache fmt {index; map; size; limit; counter; _} =
         map)
     map
 
+let invalid_arg_with_callstack msg =
+  let cs = Printexc.get_callstack 15 in
+  Fmt.invalid_arg
+    "Internal error: %s\nCall stack:\n%s\n"
+    msg
+    (Printexc.raw_backtrace_to_string cs)
+
 let with_caches cache f =
   match cache with
-  | None ->
-      let cs = Printexc.get_callstack 15 in
-      Fmt.invalid_arg
-        "Internal error: uninitialized caches: %s\n"
-        (Printexc.raw_backtrace_to_string cs)
+  | None -> invalid_arg_with_callstack "uninitialized caches"
   | Some caches -> f caches
 
 let cache_of_index t index =
@@ -400,11 +403,13 @@ let from_cache initial domain ~value_of_key =
         if i = -1 then cache
         else
           match List.nth domain i with
-          | None -> assert false
+          | None ->
+              (* By precondition: the layout of [domain] and [initial]
+                 must be the same. *)
+              invalid_arg_with_callstack "invalid usage of from_cache"
           | Some subdomain -> {cache with counter = subdomain.counter})
       caches
   in
-
   let fold_cache_keys subdomain cache =
     KeyMap.fold_es
       (fun key entry cache ->
