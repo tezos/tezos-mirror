@@ -329,6 +329,23 @@ let finalize_cache ({map; _} as cache) nonce =
   let metamap = KeyMap.map snd map in
   ({cache with map}, metamap)
 
+(**
+
+   A subcache has a domain composed of:
+
+   - [keys] to restore the in-memory representation of the subcache at
+     loading time ;
+
+   - [counter] to restart the generation of "birth date" for new entry
+     at the right counter.
+
+   [counter] is important because restarting from [0] does not work.
+   Indeed, a baker that reloads the cache from the domain must be
+   able to reconstruct the exact same cache as the validator. The
+   validator maintains a cache in memory by inheriting it from the
+   predecessor block: hence its counter is never reset.
+
+*)
 type subcache_domain = {keys : value_metadata KeyMap.t; counter : int64}
 
 type domain = subcache_domain list
