@@ -36,7 +36,11 @@ let canonical_location_encoding =
        and primitive application."
   @@ int31
 
-type semantics = V0 | V1
+(* Along the life of the Micheline encoding, several bugs have been discovered
+   and fixed. Each time, in order to preserve backwards compatibility within the
+   protocol, the existing buggy implementation is kept and a new implementation
+   is added. This leads to versioning, controlled via the [semantics] values. *)
+type semantics = V0 | V1 | V2
 
 let internal_canonical_encoding ~semantics ~variant prim_encoding =
   let open Data_encoding in
@@ -76,23 +80,47 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
       (fun args -> Seq (0, args))
   in
   let annots_encoding =
-    let split s =
-      if s = "" && semantics <> V0 then []
-      else
-        let annots = String.split_on_char ' ' s in
-        List.iter
-          (fun a ->
-            if String.length a > 255 then failwith "Oversized annotation")
-          annots ;
-        if String.concat " " annots <> s then
-          failwith
-            "Invalid annotation string, must be a sequence of valid \
-             annotations with spaces" ;
-        annots
-    in
-    splitted
-      ~json:(list (Bounded.string 255))
-      ~binary:(conv (String.concat " ") split string)
+    match semantics with
+    | V0 | V1 ->
+        (* in V0 there was a bug whereby an empty list of annotation ([[]])
+           would be decoded as a list containing one empty string ([[""]]).
+           Thus, the special case for [semantics <> V0]) *)
+        let split s =
+          if s = "" && semantics <> V0 then []
+          else
+            let annots = String.split_on_char ' ' s in
+            List.iter
+              (fun a ->
+                if String.length a > 255 then failwith "Oversized annotation")
+              annots ;
+            if String.concat " " annots <> s then
+              failwith
+                "Invalid annotation string, must be a sequence of valid \
+                 annotations with spaces" ;
+            annots
+        in
+        splitted
+          ~json:(list (Bounded.string 255))
+          ~binary:(conv (String.concat " ") split string)
+    | V2 ->
+        (* in V1 there was a bug whereby a syntactically invalid annotation
+           (i.e., one containing invalid characters) would be decoded as a valid
+           annotation. Thus this branch where an additional well-formed-ness
+           check is performed. *)
+        let well_formed_annotation s =
+          if Micheline_parser.check_annot s then Ok ()
+          else Error "Malformed annotation"
+        in
+        let split_with_guard s =
+          let annots = if s = "" then [] else String.split_on_char ' ' s in
+          if List.for_all Micheline_parser.check_annot annots then Ok annots
+          else Error "Malformed annotation"
+        in
+        splitted
+          ~json:
+            (list
+               (with_decoding_guard well_formed_annotation (Bounded.string 255)))
+          ~binary:(conv_with_guard (String.concat " ") split_with_guard string)
   in
   let application_encoding tag expr_encoding =
     case
@@ -201,7 +229,10 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
   conv root (fun node -> strip_locations node) node_encoding
 
 let canonical_encoding ~variant prim_encoding =
-  internal_canonical_encoding ~semantics:V1 ~variant prim_encoding
+  internal_canonical_encoding ~semantics:V2 ~variant prim_encoding
+
+let canonical_encoding_v2 ~variant prim_encoding =
+  internal_canonical_encoding ~semantics:V2 ~variant prim_encoding
 
 let canonical_encoding_v1 ~variant prim_encoding =
   internal_canonical_encoding ~semantics:V1 ~variant prim_encoding

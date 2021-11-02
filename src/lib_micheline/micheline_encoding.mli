@@ -64,8 +64,15 @@ val canonical_encoding_v0 :
   'l Data_encoding.encoding ->
   'l Micheline.canonical Data_encoding.encoding
 
-(** Alias for {!canonical_encoding}. *)
+(** Old version of {!canonical_encoding} for backward compatibility.
+    Do not use in new code. *)
 val canonical_encoding_v1 :
+  variant:string ->
+  'l Data_encoding.encoding ->
+  'l Micheline.canonical Data_encoding.encoding
+
+(** Alias for {!canonical_encoding}. *)
+val canonical_encoding_v2 :
   variant:string ->
   'l Data_encoding.encoding ->
   'l Micheline.canonical Data_encoding.encoding
