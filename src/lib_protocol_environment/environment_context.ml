@@ -296,6 +296,22 @@ module Context = struct
           ~msg:"stop loading cache now"
           ()
 
+      let start_loading_cache_lazily =
+        declare_0
+          ~section
+          ~level:Debug
+          ~name:"start_loading_cache_lazily"
+          ~msg:"start loading cache lazily"
+          ()
+
+      let stop_loading_cache_lazily =
+        declare_0
+          ~section
+          ~level:Debug
+          ~name:"stop_loading_cache_lazily"
+          ~msg:"stop loading cache lazily"
+          ()
+
       let emit = Internal_event.Simple.emit
 
       let observe start_event stop_event f =
@@ -450,7 +466,9 @@ module Context = struct
         | `Load ->
             observe start_loading_cache stop_loading_cache @@ fun () ->
             load_now ctxt cache builder
-        | `Lazy -> load_on_demand ctxt cache builder)
+        | `Lazy ->
+            observe start_loading_cache_lazily stop_loading_cache_lazily
+            @@ fun () -> load_on_demand ctxt cache builder)
 
     let ensure_valid_recycling (Context ctxt) cache =
       get_cache_layout (Context ctxt) >>= fun layout ->
