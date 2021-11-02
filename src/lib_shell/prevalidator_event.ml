@@ -42,8 +42,11 @@ let request_failed =
          [Data_encoding.dynamic_Size]. [Data_encoding] requires us to
          cast the first one explicitely. *)
       Data_encoding.dynamic_size Request.encoding )
+    ~pp1:Request.pp
     ("worker_status", Worker_types.request_status_encoding)
+    ~pp2:Worker_types.pp_status
     ("errors", Error_monad.trace_encoding)
+    ~pp3:Error_monad.pp_print_trace
 
 let invalid_mempool_filter_configuration =
   declare_0

@@ -129,6 +129,7 @@ val preapply :
   predecessor_context:Context.t ->
   predecessor_shell_header:Block_header.shell_header ->
   predecessor_hash:Block_hash.t ->
+  predecessor_max_operations_ttl:int ->
   predecessor_block_metadata_hash:Block_metadata_hash.t option ->
   predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   Operation.t list list ->

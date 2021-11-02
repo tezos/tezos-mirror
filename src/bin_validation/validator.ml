@@ -283,6 +283,7 @@ let run input output =
           live_operations;
           predecessor_shell_header;
           predecessor_hash;
+          predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
@@ -319,6 +320,7 @@ let run input output =
                  ~predecessor_context
                  ~predecessor_shell_header
                  ~predecessor_hash
+                 ~predecessor_max_operations_ttl
                  ~predecessor_block_metadata_hash
                  ~predecessor_ops_metadata_hash
                  operations
