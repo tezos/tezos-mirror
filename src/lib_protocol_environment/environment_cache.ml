@@ -396,18 +396,19 @@ let clear t =
   Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
 let from_cache initial domain ~value_of_key =
+  let domain' = Array.of_list domain in
   let cache =
     with_caches (clear initial) @@ fun caches ->
     FunctionalArray.mapi
       (fun i (cache : 'a cache) ->
         if i = -1 then cache
+        else if i >= Array.length domain' then
+          (* By precondition: the layout of [domain] and [initial]
+               must be the same. *)
+          invalid_arg_with_callstack "invalid usage of from_cache"
         else
-          match List.nth domain i with
-          | None ->
-              (* By precondition: the layout of [domain] and [initial]
-                 must be the same. *)
-              invalid_arg_with_callstack "invalid usage of from_cache"
-          | Some subdomain -> {cache with counter = subdomain.counter})
+          let subdomain = domain'.(i) in
+          {cache with counter = subdomain.counter})
       caches
   in
   let fold_cache_keys subdomain cache =
