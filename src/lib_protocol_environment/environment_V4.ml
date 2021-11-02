@@ -1002,6 +1002,7 @@ struct
 
   module Micheline = struct
     include Micheline
+    include Micheline_encoding
 
     let canonical_encoding_v1 ~variant encoding =
       canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding

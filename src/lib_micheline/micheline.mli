@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,25 +36,6 @@ type ('l, 'p) node =
   | Prim of 'l * 'p * ('l, 'p) node list * annot
   | Seq of 'l * ('l, 'p) node list
 
-(** Encoding for expressions, as their {!canonical} encoding.
-    Locations are stored in a side table.
-    See {!canonical_encoding} for the [variant] parameter. *)
-val table_encoding :
-  variant:string ->
-  'l Data_encoding.encoding ->
-  'p Data_encoding.encoding ->
-  ('l, 'p) node Data_encoding.encoding
-
-(** Encoding for expressions, as their {!canonical} encoding.
-    Locations are erased when serialized, and restored to a provided
-    default value when deserialized.
-    See {!canonical_encoding} for the [variant] parameter. *)
-val erased_encoding :
-  variant:string ->
-  'l ->
-  'p Data_encoding.encoding ->
-  ('l, 'p) node Data_encoding.encoding
-
 (** Extract the location of the node. *)
 val location : ('l, 'p) node -> 'l
 
@@ -70,31 +52,6 @@ type 'p canonical
 
 (** Canonical integer locations that appear inside {!canonical} expressions. *)
 type canonical_location = int
-
-(** Encoding for canonical integer locations. *)
-val canonical_location_encoding : canonical_location Data_encoding.encoding
-
-(** Encoding for expressions in canonical form. The first parameter
-    is a name used to produce named definitions in the schemas. Make
-    sure to use different names if two expression variants with
-    different primitive encodings are used in the same schema. *)
-val canonical_encoding :
-  variant:string ->
-  'l Data_encoding.encoding ->
-  'l canonical Data_encoding.encoding
-
-(** Old version of {!canonical_encoding} for backward compatibility.
-    Do not use in new code. *)
-val canonical_encoding_v0 :
-  variant:string ->
-  'l Data_encoding.encoding ->
-  'l canonical Data_encoding.encoding
-
-(** Alias for {!canonical_encoding}. *)
-val canonical_encoding_v1 :
-  variant:string ->
-  'l Data_encoding.encoding ->
-  'l canonical Data_encoding.encoding
 
 (** Compute the canonical form of an expression.
     Drops the concrete locations completely. *)

@@ -405,12 +405,6 @@ let tokenize source =
 
 type node = (location, string) Micheline.node
 
-let node_encoding =
-  Micheline.table_encoding
-    ~variant:"generic"
-    location_encoding
-    Data_encoding.string
-
 (* Beginning of a sequence of consecutive primitives *)
 let min_point : node list -> point = function
   | [] -> point_zero
@@ -947,22 +941,8 @@ let () =
       obj2 (req "location" location_encoding) (req "token" token_value_encoding))
     (function Extra {loc; token} -> Some (loc, token) | _ -> None)
     (fun (loc, token) -> Extra {loc; token}) ;
-  register_error_kind
-    `Permanent
-    ~id:"micheline.parse_error.misaligned_node"
-    ~title:"Micheline parser error: misaligned node"
-    ~description:
-      "While parsing a piece of Micheline source, an expression was not \
-       aligned with its siblings of the same mother application or sequence."
-    ~pp:(fun ppf node ->
-      Format.fprintf
-        ppf
-        "%a, misaligned expression"
-        print_location
-        (location node))
-    Data_encoding.(obj1 (req "expression" node_encoding))
-    (function Misaligned node -> Some node | _ -> None)
-    (fun node -> Misaligned node) ;
+  (* [Misaligned] is registered in the encoding module to break a dependency
+     cycle *)
   register_error_kind
     `Permanent
     ~id:"micheline.parse_error.empty_expression"
@@ -974,3 +954,12 @@ let () =
     Data_encoding.empty
     (function Empty -> Some () | _ -> None)
     (fun () -> Empty)
+
+(* helper functions for the encoding *)
+
+let check_annot s =
+  String.length s <= max_annot_length
+  &&
+  match tokenize s with
+  | ([{token = Annot s'; _}], [] (* no errors *)) -> String.equal s s'
+  | _ -> false
