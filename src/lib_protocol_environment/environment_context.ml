@@ -423,7 +423,20 @@ module Context = struct
     let load ctxt inherited ~value_of_key =
       Environment_cache.(
         find_domain ctxt >>= function
-        | None -> return @@ clear inherited
+        | None ->
+            (*
+
+               This case can happen if a reorganization occurs on the
+               very first block of the protocol that introduces the
+               cache.
+
+               Indeed, in the first block, the predecessor block had no
+               cache so no domain can be found in the storage. However,
+               a cache can be inherited from a block in a canceled
+               chain.
+
+            *)
+            return @@ clear inherited
         | Some domain -> from_cache inherited domain ~value_of_key)
 
     let load_now ctxt cache builder =
