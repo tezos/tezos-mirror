@@ -8,7 +8,7 @@
             tezos-protocol-updater
             ; TODO nomadic-labs/tezos#462: adapt next line(s)
             tezos-embedded-protocol-010-PtGRANAD
-            tezos-embedded-protocol-011-PtHangzH
+            tezos-embedded-protocol-011-PtHangz2
             tezos-embedded-protocol-alpha
             data-encoding
             re)

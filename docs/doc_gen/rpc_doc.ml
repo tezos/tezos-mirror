@@ -36,7 +36,7 @@ let protocols =
     ( "011",
       "011 Hangzhou",
       Some "/include/rpc_introduction.rst.inc",
-      "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r" );
+      "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
     ( "",
       "010 Granada",
       Some "/include/rpc_introduction.rst.inc",

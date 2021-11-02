@@ -1,7 +1,7 @@
 tests_011/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_trace_origination[compare_big_type.tz]
 
 Node is bootstrapped.
-Estimated gas: 2860.815 units (will add 100 for safety)
+Estimated gas: 3413.415 units (will add 100 for safety)
 Estimated storage: 385 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000656
+    Fee to the baker: ꜩ0.000711
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2961
+    Gas limit: 3514
     Storage limit: 405 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000656
-      fees(the baker who will include this operation,4) ... +ꜩ0.000656
+      [CONTRACT_HASH] ................ -ꜩ0.000711
+      fees(the baker who will include this operation,4) ... +ꜩ0.000711
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -78,7 +78,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 128 bytes
         Paid storage size diff: 128 bytes
-        Consumed gas: 2860.815
+        Consumed gas: 3413.415
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.032
           [CONTRACT_HASH] ... -ꜩ0.06425
