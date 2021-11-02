@@ -61,14 +61,14 @@ unit:010_PtGRANAD:
       src/proto_010_PtGRANAD/lib_client.test_proto
       src/proto_010_PtGRANAD/lib_protocol.test_proto
 
-unit:011_PtHangzH:
+unit:011_PtHangz2:
   extends: .unit_test_template
   variables:
     MAKE_TARGETS: >
-      src/proto_011_PtHangzH/lib_benchmark/lib_benchmark_type_inference.test_proto
-      src/proto_011_PtHangzH/lib_benchmark.test_proto
-      src/proto_011_PtHangzH/lib_client.test_proto
-      src/proto_011_PtHangzH/lib_protocol.test_proto
+      src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_011_PtHangz2/lib_benchmark.test_proto
+      src/proto_011_PtHangz2/lib_client.test_proto
+      src/proto_011_PtHangz2/lib_protocol.test_proto
 
 unit:alpha:
   extends: .unit_test_template_x86_64
