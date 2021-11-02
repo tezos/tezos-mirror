@@ -272,18 +272,6 @@ let compatible_layout t layout =
 
 let from_layout layout = Some (make_caches layout)
 
-let clear_cache cache =
-  {
-    index = cache.index;
-    limit = cache.limit;
-    map = KeyMap.empty;
-    size = 0;
-    counter = 0L;
-    lru = Int64Map.empty;
-    entries_removals = [];
-    removed_entries = KeySet.empty;
-  }
-
 let future_cache_expectation t ~time_in_blocks =
   Some
     (with_caches t (fun caches ->
@@ -292,9 +280,6 @@ let future_cache_expectation t ~time_in_blocks =
              let oldness = time_in_blocks * median_entries_removals cache in
              Utils.fold_n_times oldness remove_dean cache)
            caches))
-
-let clear t =
-  Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
 let record_entries_removals cache =
   let entries_removals =
@@ -394,6 +379,21 @@ let update_cache_key t key value meta =
   let cache = FunctionalArray.get caches key.cache_index in
   let cache = insert_cache_entry cache key (value, meta) in
   update_cache_with t key.cache_index cache
+
+let clear_cache cache =
+  {
+    index = cache.index;
+    limit = cache.limit;
+    map = KeyMap.empty;
+    size = 0;
+    counter = 0L;
+    lru = Int64Map.empty;
+    entries_removals = [];
+    removed_entries = KeySet.empty;
+  }
+
+let clear t =
+  Some (with_caches t (fun caches -> FunctionalArray.map clear_cache caches))
 
 let from_cache initial domain ~value_of_key =
   let cache =
