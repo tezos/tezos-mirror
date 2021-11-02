@@ -66,6 +66,7 @@ module type S = sig
     live_operations:Operation_hash.Set.t ->
     predecessor_shell_header:Block_header.shell_header ->
     predecessor_hash:Block_hash.t ->
+    predecessor_max_operations_ttl:int ->
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     Operation.t list list ->
@@ -219,8 +220,8 @@ module Internal_validator_process = struct
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
-      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations
-      =
+      ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash operations =
     let context_index =
       Store.context_index (Store.Chain.global_store validator.chain_store)
     in
@@ -252,6 +253,7 @@ module Internal_validator_process = struct
       ~predecessor_context
       ~predecessor_shell_header
       ~predecessor_hash
+      ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash
       operations
@@ -654,8 +656,8 @@ module External_validator_process = struct
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
-      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations
-      =
+      ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash operations =
     let request =
       External_validation.Preapply
         {
@@ -666,6 +668,7 @@ module External_validator_process = struct
           live_operations;
           predecessor_shell_header;
           predecessor_hash;
+          predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
@@ -803,6 +806,10 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
   let predecessor_ops_metadata_hash =
     Store.Block.all_operations_metadata_hash predecessor
   in
+  Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
+  let predecessor_max_operations_ttl =
+    Store.Block.max_operations_ttl metadata
+  in
   VP.preapply_block
     validator
     ~chain_id
@@ -812,6 +819,7 @@ let preapply_block (E {validator_process = (module VP); validator} : t)
     ~live_operations
     ~predecessor_shell_header
     ~predecessor_hash
+    ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash
     ~predecessor_ops_metadata_hash
     operations
