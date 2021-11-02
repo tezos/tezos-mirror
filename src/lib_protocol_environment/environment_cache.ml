@@ -368,9 +368,7 @@ let subcache_domain_encoding : subcache_domain Data_encoding.t =
     conv
       (fun {keys; counter} -> (keys, counter))
       (fun (keys, counter) -> {keys; counter})
-      (obj2
-         (req "keys" (dynamic_size subcache_keys_encoding))
-         (req "counter" int64)))
+      (obj2 (req "keys" subcache_keys_encoding) (req "counter" int64)))
 
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list subcache_domain_encoding)
