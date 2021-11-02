@@ -45,11 +45,6 @@ val canonical_encoding :
   'l Data_encoding.encoding ->
   'l canonical Data_encoding.encoding
 
-val canonical_encoding_v1 :
-  variant:string ->
-  'l Data_encoding.encoding ->
-  'l canonical Data_encoding.encoding
-
 val location : ('l, 'p) node -> 'l
 
 val annotations : ('l, 'p) node -> string list
