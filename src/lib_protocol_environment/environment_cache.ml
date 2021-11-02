@@ -324,7 +324,7 @@ let finalize_cache ({map; _} as cache) nonce =
    - [keys] to restore the in-memory representation of the subcache at
      loading time ;
 
-   - [counter] to restart the generation of "birth date" for new entry
+   - [counter] to restart the generation of "birth dates" for new entries
      at the right counter.
 
    [counter] is important because restarting from [0] does not work.
