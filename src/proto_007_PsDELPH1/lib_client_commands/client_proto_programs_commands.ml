@@ -44,6 +44,7 @@ let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
         (Data_encoding.Json.print_error ~print_unknown:(fun fmt exc ->
              Format.fprintf fmt "%s" (Printexc.to_string exc)))
         exc
+  | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
   | exception exc ->
       cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
   | expr -> return expr
