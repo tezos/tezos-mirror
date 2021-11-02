@@ -33,7 +33,7 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
-Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current developement version (see :doc:`../releases/releases` for more information).
+Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current development version (see :doc:`../releases/releases` for more information).
 
 When choosing between the installation options, you may take into account the
 convenience of the installation step (and of upgrading steps), but also
@@ -44,7 +44,7 @@ repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
 
 All our installation scenarios are tested daily, including by automated means, to ensure that they are correct and up to date.
-These tests are performed by applying scenarios in several standard environements, from scratch.
+These tests are performed by applying scenarios in several standard environments, from scratch.
 However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
 
 .. _getting_static_binaries:

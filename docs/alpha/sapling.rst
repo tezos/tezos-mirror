@@ -155,7 +155,7 @@ amounts that Alice transferred 15.3 tez to Bob.
 To decorrelate the two transfers it is important to change the
 amounts, let some time pass between the two and perform the
 transactions when there is traffic in the pool.
-Similar problems exist in ZCash and they are illustrated in this
+Similar problems exist in Zcash and they are illustrated in this
 introductory `blog post
 <https://electriccoin.co/blog/transaction-linkability/>`_.
 
@@ -322,9 +322,9 @@ At the moment there is no hardware wallet support, keys are stored in
 
 The client can also derive addresses from viewing keys.
 By default addresses are generated using an increasing counter called
-the address index. Not all indexes corresponds to valid addresses for
+the address index. Not all indexes correspond to valid addresses for
 each key so it is normal to see an increasing counter that
-occasionally skips a few position.
+occasionally skips a few positions.
 
 Because for now the only support for Sapling keys is to interact with
 smart contracts, the client binds each newly generated key to a
@@ -382,7 +382,7 @@ In order to export the Sapling library to the protocol we first need
 to expose it through the environment that sandboxes the protocol.
 The changes under `src/lib_protocol_environment` are simple but very
 relevant as any change of the environment requires a manual update of the
-Tezos node. This changes are part of version V1 of the environment
+Tezos node. These changes are part of version V1 of the environment
 while protocols 000 to 006 depends on version V0.
 
 There are two main changes to Tezos' economic protocol, the storage

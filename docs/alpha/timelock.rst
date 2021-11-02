@@ -67,7 +67,7 @@ The typical usage pattern would be as follows:
 
 1. In a first period, a contract collects user-submitted and timelock encrypted Michelson values along with some valuable deposit, such as tez.
 2. In a second period, after the values are collected, the contract collects from users a decryption of the value they submitted alongside with a proof that the decryption is correct.
-3. In a third period, if any value remains undecrypted, anyone can claim part of the deposit by submitting a decryption of they value, with the other part of the deposit being burnt. Different penalties can be assessed depending on whether the user merely failed to submit a decryption for their value, or if they also intentionally encrypted invalid data. Different rewards can be distributed for submitting a correct decryption. The third period needs to be long enough so that people have enough time to perform the timelock decryption.
+3. In a third period, if any value remains undecrypted, anyone can claim part of the deposit by submitting a decryption of the value, with the other part of the deposit being burnt. Different penalties can be assessed depending on whether the user merely failed to submit a decryption for their value, or if they also intentionally encrypted invalid data. Different rewards can be distributed for submitting a correct decryption. The third period needs to be long enough so that people have enough time to perform the timelock decryption.
 4. Finally, the contract can compute some function of all the decrypted data.
 
 There is generally no incentive for users not to provide

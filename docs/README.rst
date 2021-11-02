@@ -160,7 +160,7 @@ This better way is to write "executable documentation".
 The idea is to write such executable scripts separated from the documentation, and to automatically copy them in the documentation whenever it is (re)generated.
 Executable documentation allows one to test those scripts, e.g. in CI (continuous integration), ensuring they work and are up to date with the code and with its environment.
 
-Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distrbutions, and so on.
+Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distributions, and so on.
 By continuously testing such installation scripts, executable documentation allows one to detect problems and fix obsolete instructions as early as possible, avoiding headaches and frustration, for new end users and experienced developers alike.
 
 Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.

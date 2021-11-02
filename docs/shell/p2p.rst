@@ -52,7 +52,7 @@ possible with a peer; when a queue is full, it is not possible to read
 `P2p_socket.connection
 <../api/odoc/tezos-p2p/Tezos_p2p/P2p_socket/index.html#type-connection>`__
 type by the P2P layer is basically a UNIX socket upgraded with I/O
-scheduling, peer metadata, cryptographic keys, and two messages queues
+scheduling, peer metadata, cryptographic keys, and two message queues
 operated by dedicated workers which operate on those queues.
 
 Pool of connections

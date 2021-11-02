@@ -45,7 +45,7 @@ _`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
     baking/endorsing right for that block_. At the start of a Cycle_,
     baking and endorsing rights are computed for all the block_ heights in the
-    cycle_, based on the proportion of the stake owned by each accounts.
+    cycle_, based on the proportion of Rolls owned by each account.
 
     For each block_ height, there are several accounts that are allowed to bake.
     These different accounts are given different Priorities.
@@ -169,11 +169,11 @@ _`Transaction`
 _`Voting period`
     Any of the ``proposal``, ``exploration``, ``cooldown``,
     ``promotion`` or ``adoption`` stages in the voting procedure when
-    ammending the `economic protocol`_.
+    amending the `economic protocol`_.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
     the staking balance (in number of rolls) of each delegate_ that owns more
     than one roll_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when ammending the
+    reflects the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

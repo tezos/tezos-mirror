@@ -68,7 +68,7 @@ as a JSON object with field names.
 Lists, arrays, and options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-List, arrays and options types can by built on top of ground data types.
+List, arrays and options types can be built on top of ground data types.
 
 .. code-block:: ocaml
 

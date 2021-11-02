@@ -691,7 +691,7 @@ This environment is limited to a restricted set of libraries in order to constra
 
 It is meant to be used:
 
-- by developers to compile the protocol under developement,
+- by developers to compile the protocol under development,
 - by the packaging process to compile protocols that are pre-linked in the binaries,
 - by the Tezos node when there is an on-chain update to a protocol that is not pre-linked with the binary.
 
@@ -701,7 +701,7 @@ Summary
 In this tutorial, you have learned:
 
 - to start a Tezos node and set up its basic configuration;
-- to use the Tezos client to create implict accounts and do transfers between them;
+- to use the Tezos client to create implicit accounts and do transfers between them;
 - to deploy and interact with a simple predefined smart contract;
 - to distinguish between the various costs associated to transactions such as burnt tez, fees, storage costs, and gas consumption;
 - some further concepts such as transaction validation and the RPC interface;

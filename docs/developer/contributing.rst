@@ -152,7 +152,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      than master. You can (should) activate these jobs by including keywords in
      the branch name.
 
-     + Use ``opam`` in the branch name if you want to explictly trigger
+     + Use ``opam`` in the branch name if you want to explicitly trigger
        the OPAM packaging pipeline. Note that any OPAM related changes
        will automatically trigger it.
      + Use ``doc`` in the branch name if you change the documentation.
@@ -171,7 +171,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  Follow the format of commit names, `<Component>: <message>`, with
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
-   Use multilines commit messages for important commits.
+   Use multiline commit messages for important commits.
 -  Adhere to the :doc:`coding guidelines <guidelines>`.
 -  Document your changes, in the MR description and commit messages.
    Imagine if somebody asked what your change was about in front of the
@@ -349,7 +349,7 @@ must be mitigated as follows:
   This will help reviewers get the big picture.
 - Explain why the intermediate state is harmless, if applicable.
 - To mitigate loss of work if the whole piece is not accepted,
-  we advice to split the work so that improvements that are desirable on their own
+  we advise to split the work so that improvements that are desirable on their own
   are the first ones to be merged in the sequence of small merge requests.
   A desirable standalone improvement is for example a refactoring that
   improves the quality of the code, or adds new tests, or fixes typos.
@@ -532,7 +532,7 @@ pitfalls a code reviewer should avoid.
 - Discuss in person for more detailed points: Online comments are useful for
   focused technical questions. On many occasions it is more productive to
   discuss it in person rather than in the comments. Similarly, if discussion
-  about a point goes back and forth, It will be often more productive to pick
+  about a point goes back and forth, it will be often more productive to pick
   it up in person and finish out the discussion.
 
 - Explain reasoning: Sometimes it is best to both ask if there is a better
