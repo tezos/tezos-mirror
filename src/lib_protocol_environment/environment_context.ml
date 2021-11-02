@@ -424,10 +424,10 @@ module Context = struct
       | Some value -> value () >|= Option.some
 
     let load ctxt inherited ~value_of_key =
-      Environment_cache.(
-        find_domain ctxt >>= function
-        | None ->
-            (*
+      let open Environment_cache in
+      find_domain ctxt >>= function
+      | None ->
+          (*
 
                This case can happen if a reorganization occurs on the
                very first block of the protocol that introduces the
@@ -439,8 +439,8 @@ module Context = struct
                chain.
 
             *)
-            return @@ clear inherited
-        | Some domain -> from_cache inherited domain ~value_of_key)
+          return @@ clear inherited
+      | Some domain -> from_cache inherited domain ~value_of_key
 
     let load_now ctxt cache builder =
       load ctxt cache ~value_of_key:(fun key ->
