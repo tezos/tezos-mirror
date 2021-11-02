@@ -74,11 +74,34 @@ let ring = meta_ring symmetric_add_peer
 
 let star = meta_star symmetric_add_peer
 
-let start ?(public = false) nodes =
+let wait_for_connections node connections =
+  let counter = ref 0 in
+  let (waiter, resolver) = Lwt.task () in
+  Node.on_event node (fun {name; value} ->
+      if name = "node_chain_validator.v0" then
+        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
+        | None -> ()
+        | Some "connection" ->
+            incr counter ;
+            if !counter = connections then Lwt.wakeup resolver ()
+        | Some "disconnection" ->
+            Log.warn "The topology of the test has changed"
+        | Some _ -> ()) ;
+  let* () = Node.wait_for_ready node in
+  waiter
+
+let start ?(public = false) ?event_level ?(wait_connections = false) nodes =
   let start_node node =
     let* () = Node.identity_generate node in
+    let n = Node.get_peers node |> List.length in
     let* () = Node.config_init node [] in
-    let* () = Node.run node (if public then [] else [Private_mode]) in
-    Node.wait_for_ready node
+    let* () =
+      Node.run ?event_level node (if public then [] else [Private_mode])
+    in
+    let waiter =
+      if wait_connections then wait_for_connections node n
+      else Node.wait_for_ready node
+    in
+    waiter
   in
   Lwt_list.iter_p start_node nodes

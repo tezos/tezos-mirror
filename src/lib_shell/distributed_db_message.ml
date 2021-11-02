@@ -359,7 +359,7 @@ let encoding =
       (fun (hash, offset, header) -> Predecessor_header (hash, offset, header));
   ]
 
-let distributed_db_versions = Distributed_db_version.[zero; one]
+let distributed_db_versions = Distributed_db_version.[zero; one; two]
 
 let cfg chain_name : _ P2p_params.message_config =
   {encoding; chain_name; distributed_db_versions}

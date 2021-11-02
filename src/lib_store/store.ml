@@ -99,6 +99,7 @@ and chain_state = {
   live_operations : Operation_hash.Set.t;
   mutable live_data_cache :
     (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+  prechecked_blocks : Block_repr.t Block_lru_cache.t;
 }
 
 and testchain = {forked_block : Block_hash.t; testchain_store : chain_store}
@@ -208,6 +209,15 @@ module Block = struct
     Shared.use chain_state (fun chain_state ->
         locked_is_known_invalid chain_state hash)
 
+  let is_known_prechecked {chain_state; _} hash =
+    Shared.use chain_state (fun {prechecked_blocks; _} ->
+        match Block_lru_cache.find_opt prechecked_blocks hash with
+        | None -> Lwt.return_false
+        | Some t -> (
+            t >>= function
+            | None -> Lwt.return_false
+            | Some _ -> Lwt.return_true))
+
   let is_known chain_store hash =
     is_known_valid chain_store hash >>= fun is_known ->
     if is_known then Lwt.return_true else is_known_invalid chain_store hash
@@ -313,6 +323,17 @@ module Block = struct
   let read_block_by_level_opt chain_store level =
     current_head chain_store >>= fun current_head ->
     locked_read_block_by_level_opt chain_store current_head level
+
+  let read_prechecked_block_opt {chain_state; _} hash =
+    Shared.use chain_state (fun {prechecked_blocks; _} ->
+        match Block_lru_cache.find_opt prechecked_blocks hash with
+        | None -> Lwt.return_none
+        | Some t -> t)
+
+  let read_prechecked_block chain_store hash =
+    read_prechecked_block_opt chain_store hash >>= function
+    | Some b -> return b
+    | None -> fail (Block_not_found hash)
 
   let store_block chain_store ~block_header ~operations validation_result =
     let {
@@ -447,11 +468,45 @@ module Block = struct
         Block_store.store_block chain_store.block_store block >>=? fun () ->
         Store_events.(emit store_block) (hash, block_header.shell.level)
         >>= fun () ->
+        Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
+            Block_lru_cache.remove prechecked_blocks hash ;
+            Lwt.return_unit)
+        >>= fun () ->
         Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
           chain_store.global_store.global_block_watcher
           (chain_store, block) ;
         return_some block
+
+  let store_prechecked_block chain_store ~hash ~block_header ~operations =
+    let operations_length = List.length operations in
+    let validation_passes = block_header.Block_header.shell.validation_passes in
+    fail_unless
+      (validation_passes = operations_length)
+      (Cannot_store_block
+         ( hash,
+           Invalid_operations_length
+             {validation_passes; operations = operations_length} ))
+    >>=? fun () ->
+    let block =
+      {
+        Block_repr.hash;
+        contents =
+          {
+            header = block_header;
+            operations;
+            block_metadata_hash = None;
+            operations_metadata_hashes = None;
+          };
+        metadata = None;
+      }
+    in
+    Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
+        Block_lru_cache.replace prechecked_blocks hash (Lwt.return_some block) ;
+        Lwt.return_unit)
+    >>= fun () ->
+    Store_events.(emit store_prechecked_block) (hash, block_header.shell.level)
+    >>= return
 
   let context_exn chain_store block =
     let context_index = chain_store.global_store.context_index in
@@ -1566,6 +1621,7 @@ module Chain = struct
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
     let live_data_cache = None in
+    let prechecked_blocks = Block_lru_cache.create 10 in
     return
       {
         current_head_data;
@@ -1582,6 +1638,7 @@ module Chain = struct
         live_blocks;
         live_operations;
         live_data_cache;
+        prechecked_blocks;
       }
 
   (* In some case, when a merge was interrupted, the highest cemented
@@ -1647,6 +1704,7 @@ module Chain = struct
         let live_blocks = Block_hash.Set.empty in
         let live_operations = Operation_hash.Set.empty in
         let live_data_cache = None in
+        let prechecked_blocks = Block_lru_cache.create 10 in
         return
           {
             current_head_data;
@@ -1663,6 +1721,7 @@ module Chain = struct
             live_blocks;
             live_operations;
             live_data_cache;
+            prechecked_blocks;
           }
 
   let get_commit_info index header =

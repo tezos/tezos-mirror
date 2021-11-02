@@ -54,6 +54,7 @@ module Event : sig
       }
     | Notify_branch of P2p_peer.Id.t
     | Notify_head of P2p_peer.Id.t
+    | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped

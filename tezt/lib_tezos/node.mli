@@ -126,6 +126,9 @@ val add_argument : t -> argument -> unit
     where [<PORT>] is the P2P port of [peer]. *)
 val add_peer : t -> t -> unit
 
+(** Returns the list of address of all [Peer <addr>] arguments. *)
+val get_peers : t -> string list
+
 (** Add a [--peer] argument to a node.
 
     Usage: [add_peer node peer]

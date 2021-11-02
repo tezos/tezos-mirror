@@ -173,6 +173,7 @@ let notify_new_block w peer block =
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
+      Worker.log_event w (Connection peer_id) >>= fun () ->
       Peer_validator.create
         ~notify_new_block:(notify_new_block w (Some peer_id))
         ~notify_termination:(fun _pv ->
@@ -759,11 +760,15 @@ let validate_block w ?force hash block operations =
   Block_validator.validate
     ~canceler:(Worker.canceler w)
     ~notify_new_block:(notify_new_block w None)
+    ~precheck_and_notify:true
     nv.parameters.block_validator
     nv.chain_db
     hash
     block
     operations
+  >>= function
+  | Valid -> return_unit
+  | Invalid errs | Invalid_after_precheck errs -> Lwt.return_error errs
 
 let bootstrapped w =
   let state = Worker.state w in

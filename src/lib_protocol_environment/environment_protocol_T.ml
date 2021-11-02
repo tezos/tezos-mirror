@@ -120,6 +120,15 @@ module type PROTOCOL = sig
 
   val environment_version : Protocol.env_version
 
+  val begin_partial_application :
+    chain_id:Chain_id.t ->
+    ancestor_context:Context.t ->
+    predecessor:Block_header.t ->
+    predecessor_hash:Block_hash.t ->
+    cache:Context.source_of_cache ->
+    block_header ->
+    (validation_state, tztrace) result Lwt.t
+
   val begin_application :
     chain_id:Chain_id.t ->
     predecessor_context:Context.t ->

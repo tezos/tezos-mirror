@@ -480,14 +480,18 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         | ((addr, _), Some (_, port)) -> (addr, Some port)
         | (id_point, None) -> id_point
       in
-      return
-        (create_connection
-           t
-           conn
-           id_point
-           connection_point_info
-           peer_info
-           version)
+      let conn =
+        create_connection
+          t
+          conn
+          id_point
+          connection_point_info
+          peer_info
+          version
+      in
+      let peer_id = P2p_peer_state.Info.peer_id peer_info in
+      Events.(emit new_connection) (fst id_point, snd id_point, peer_id)
+      >>= fun () -> return conn
 
 let authenticate t ?point_info canceler fd point =
   let scheduled_conn = P2p_io_scheduler.register t.io_sched fd in

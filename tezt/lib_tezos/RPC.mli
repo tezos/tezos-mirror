@@ -130,6 +130,15 @@ val inject_block :
   Client.t ->
   JSON.t Lwt.t
 
+(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/protocol/raw]. *)
+val raw_protocol_data :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  string Lwt.t
+
 (** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
 val get_protocol_data :
   ?endpoint:Client.endpoint ->

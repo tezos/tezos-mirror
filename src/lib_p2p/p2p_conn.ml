@@ -183,3 +183,5 @@ let private_node t = t.private_node
 let peer_id t = t.peer_id
 
 let trusted_node t = t.trusted_node
+
+let negotiated_version t = t.negotiated_version

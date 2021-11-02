@@ -27,6 +27,29 @@ open Client_proto_utils
 
 let group = {Clic.name = "utilities"; title = "Utility Commands"}
 
+let unsigned_block_header_param =
+  let open Clic in
+  param
+    ~name:"unsigned block header"
+    ~desc:"A hex or JSON encoded unsigned block header"
+  @@ parameter (fun _ s ->
+         let bytes = `Hex s |> Hex.to_bytes in
+         let enc = Protocol.Alpha_context.Block_header.unsigned_encoding in
+         Data_encoding.Binary.of_bytes_opt enc bytes |> function
+         | Some s -> return s
+         | None -> (
+             let error =
+               Exn
+                 (Failure
+                    "Cannot decode unsigned block header: is it valid JSON or \
+                     hexadecimal?")
+             in
+             let open Data_encoding.Json in
+             from_string s |> function
+             | Error _ -> fail error
+             | Ok json -> (
+                 try destruct enc json |> return with _ -> fail error)))
+
 let commands () =
   let open Clic in
   let string_param ~name ~desc =
@@ -102,4 +125,35 @@ let commands () =
             else
               cctxt#message "Signature check successful" >>= fun () ->
               return_unit);
+    command
+      ~group
+      ~desc:
+        "Sign an arbitrary unsigned block header for a given delegate and \
+         return the signed block."
+      no_options
+      (prefixes ["sign"; "block"]
+      @@ unsigned_block_header_param
+      @@ prefixes ["for"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"delegate"
+           ~desc:"signing delegate"
+      @@ stop)
+      (fun ()
+           unsigned_block_header
+           delegate
+           (cctxt : #Protocol_client_context.full) ->
+        let unsigned_header =
+          Data_encoding.Binary.to_bytes_exn
+            Protocol.Alpha_context.Block_header.unsigned_encoding
+            unsigned_block_header
+        in
+        Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
+        >>=? fun chain_id ->
+        Client_keys.get_key cctxt delegate >>=? fun (_, _, sk) ->
+        Client_keys.sign
+          cctxt
+          ~watermark:(Block_header chain_id)
+          sk
+          unsigned_header
+        >>=? fun s -> cctxt#message "%a" Hex.pp (Signature.to_hex s) >>= return);
   ]

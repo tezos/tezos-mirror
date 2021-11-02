@@ -52,6 +52,11 @@ type invalid_block = {level : int32; errors : Error_monad.error list}
 (** Encoding for {!invalid_block}. *)
 val invalid_block_encoding : invalid_block Data_encoding.t
 
+(** Module [Block_lru_cache] implements a lwt LRU cache map indexed by
+    block hashes. *)
+module Block_lru_cache :
+  Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Block_hash.t
+
 (** Module [Protocol_levels] represents an associative map of protocol
     levels to corresponding blocks which supposedly activate new
     protocols, that is to say blocks that acknowledge a protocol
