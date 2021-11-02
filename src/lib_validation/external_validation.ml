@@ -59,6 +59,14 @@ type request =
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
     }
+  | Precheck of {
+      chain_id : Chain_id.t;
+      predecessor_block_header : Block_header.t;
+      predecessor_block_hash : Block_hash.t;
+      header : Block_header.t;
+      operations : Operation.t list list;
+      hash : Block_hash.t;
+    }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;
@@ -84,6 +92,8 @@ let request_pp ppf = function
         predecessor_hash
         Chain_id.pp_short
         chain_id
+  | Precheck {hash; _} ->
+      Format.fprintf ppf "precheck block %a" Block_hash.pp_short hash
   | Commit_genesis {chain_id} ->
       Format.fprintf
         ppf
@@ -266,6 +276,52 @@ let case_preapply tag =
           operations;
         })
 
+let case_precheck tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"precheck"
+    (obj6
+       (req "chain_id" Chain_id.encoding)
+       (req "predecessor_block_header" (dynamic_size Block_header.encoding))
+       (req "predecessor_block_hash" Block_hash.encoding)
+       (req "header" (dynamic_size Block_header.encoding))
+       (req "hash" Block_hash.encoding)
+       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+    (function
+      | Precheck
+          {
+            chain_id;
+            predecessor_block_header;
+            predecessor_block_hash;
+            header;
+            operations;
+            hash;
+          } ->
+          Some
+            ( chain_id,
+              predecessor_block_header,
+              predecessor_block_hash,
+              header,
+              hash,
+              operations )
+      | _ -> None)
+    (fun ( chain_id,
+           predecessor_block_header,
+           predecessor_block_hash,
+           header,
+           hash,
+           operations ) ->
+      Precheck
+        {
+          chain_id;
+          predecessor_block_header;
+          predecessor_block_hash;
+          header;
+          operations;
+          hash;
+        })
+
 let request_encoding =
   let open Data_encoding in
   union
@@ -302,6 +358,8 @@ let request_encoding =
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
       case_preapply (Tag 6);
+      (* Tag 5 was ["restore_integrity"]. *)
+      case_precheck (Tag 8);
     ]
 
 let send pin encoding data =

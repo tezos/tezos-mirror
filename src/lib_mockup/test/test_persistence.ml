@@ -120,8 +120,8 @@ module Mock_protocol : Registration.PROTOCOL = struct
       ~predecessor_timestamp:_ ~predecessor_fitness:_ ~cache:_ _ =
     assert false
 
-  let begin_partial_application ~chain_id:_ ~ancestor_context:_
-      ~predecessor_timestamp:_ ~predecessor_fitness:_ _ =
+  let begin_partial_application ~chain_id:_ ~ancestor_context:_ ~predecessor:_
+      ~predecessor_hash:_ ~cache:_ _ =
     assert false
 
   let relative_position_within_block _ = assert false

@@ -107,9 +107,15 @@ module Event = struct
         Request.preapplication_view * Worker_types.request_status
     | Preapplication_failure of
         Request.preapplication_view * Worker_types.request_status * error list
+    | Validation_failure_after_precheck of
+        Request.validation_view * Worker_types.request_status * error list
+    | Precheck_failure of
+        Request.validation_view * Worker_types.request_status * error list
     | Could_not_find_context of Block_hash.t
     | Previously_validated of Block_hash.t
     | Validating_block of Block_hash.t
+    | Prechecking_block of Block_hash.t
+    | Prechecked_block of Block_hash.t
 
   type view = t
 
@@ -118,9 +124,12 @@ module Event = struct
   let level req =
     match req with
     | Validation_success _ | Validation_failure _ | Preapplication_success _
-    | Preapplication_failure _ ->
+    | Preapplication_failure _ | Precheck_failure _ ->
         Internal_event.Notice
-    | Could_not_find_context _ | Previously_validated _ | Validating_block _ ->
+    | Validation_failure_after_precheck _ | Prechecked_block _ ->
+        Internal_event.Info
+    | Could_not_find_context _ | Previously_validated _ | Validating_block _
+    | Prechecking_block _ ->
         Internal_event.Debug
 
   let encoding =
@@ -147,44 +156,78 @@ module Event = struct
           (fun (r, s, err) -> Validation_failure (r, s, err));
         case
           (Tag 2)
+          ~title:"validation_failure_after_precheck"
+          (obj3
+             (req
+                "failed_validation_after_precheck"
+                Request.validation_view_encoding)
+             (req "status" Worker_types.request_status_encoding)
+             (dft "errors" RPC_error.encoding []))
+          (function
+            | Validation_failure_after_precheck (r, s, err) -> Some (r, s, err)
+            | _ -> None)
+          (fun (r, s, err) -> Validation_failure_after_precheck (r, s, err));
+        case
+          (Tag 3)
+          ~title:"precheck_failure"
+          (obj3
+             (req "failed_precheck" Request.validation_view_encoding)
+             (req "status" Worker_types.request_status_encoding)
+             (dft "errors" RPC_error.encoding []))
+          (function
+            | Precheck_failure (r, s, err) -> Some (r, s, err) | _ -> None)
+          (fun (r, s, err) -> Precheck_failure (r, s, err));
+        case
+          (Tag 4)
           ~title:"could_not_find_context"
           (obj1 (req "block" Block_hash.encoding))
           (function Could_not_find_context block -> Some block | _ -> None)
           (fun block -> Could_not_find_context block);
         case
-          (Tag 3)
+          (Tag 5)
           ~title:"previously_validated"
           (obj1 (req "block" Block_hash.encoding))
           (function Previously_validated block -> Some block | _ -> None)
           (fun block -> Previously_validated block);
         case
-          (Tag 4)
+          (Tag 6)
           ~title:"validating_block"
           (obj1 (req "block" Block_hash.encoding))
           (function Validating_block block -> Some block | _ -> None)
           (fun block -> Validating_block block);
         case
-          (Tag 5)
-          ~title:"preapplying_block"
+          (Tag 7)
+          ~title:"preapplication_success"
           (obj2
-             (req
-                "successful_preapplication"
-                Request.preapplication_view_encoding)
+             (req "preapplication_success" Request.preapplication_view_encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Preapplication_success (r, s) -> Some (r, s) | _ -> None)
           (fun (r, s) -> Preapplication_success (r, s));
         case
-          (Tag 6)
-          ~title:"preapplying_block"
+          (Tag 8)
+          ~title:"preapplication_failure"
           (obj3
-             (req
-                "successful_preapplication"
-                Request.preapplication_view_encoding)
+             (req "preapplication_failure" Request.preapplication_view_encoding)
              (req "status" Worker_types.request_status_encoding)
              (dft "errors" RPC_error.encoding []))
           (function
             | Preapplication_failure (r, s, e) -> Some (r, s, e) | _ -> None)
           (fun (r, s, e) -> Preapplication_failure (r, s, e));
+        case
+          (Tag 9)
+          ~title:"prechecking_block"
+          (obj1 (req "block" Block_hash.encoding))
+          (function Prechecking_block block -> Some block | _ -> None)
+          (fun block -> Prechecking_block block);
+        case
+          (Tag 10)
+          ~title:"prechecked_block"
+          (obj2
+             (req "kind" Data_encoding.string)
+             (req "block" Block_hash.encoding))
+          (function
+            | Prechecked_block block -> Some ("prechecked", block) | _ -> None)
+          (fun (_, block) -> Prechecked_block block);
       ]
 
   let pp ppf = function
@@ -222,6 +265,28 @@ module Event = struct
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
           errs
+    | Validation_failure_after_precheck (req, {pushed; treated; completed}, errs)
+      ->
+        Format.fprintf
+          ppf
+          "@[<v 0>validation of block %a failed but precheck succeeded@,\
+           %a, %a@]"
+          Block_hash.pp
+          req.block
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errs
+    | Precheck_failure (req, {pushed; treated; completed}, errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>precheck of block %a failed@,%a, %a@]"
+          Block_hash.pp
+          req.block
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errs
     | Could_not_find_context block ->
         Format.fprintf
           ppf
@@ -236,4 +301,8 @@ module Event = struct
           block
     | Validating_block block ->
         Format.fprintf ppf "validating block %a" Block_hash.pp block
+    | Prechecking_block block ->
+        Format.fprintf ppf "prechecking block %a" Block_hash.pp block
+    | Prechecked_block block ->
+        Format.fprintf ppf "prechecked block %a" Block_hash.pp block
 end

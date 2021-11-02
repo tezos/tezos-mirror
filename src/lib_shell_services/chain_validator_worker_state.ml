@@ -68,6 +68,7 @@ module Event = struct
       }
     | Notify_branch of P2p_peer.Id.t
     | Notify_head of P2p_peer.Id.t
+    | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped
@@ -92,7 +93,8 @@ module Event = struct
     | Could_not_switch_testchain _ -> Internal_event.Error
     | Notify_head _ -> Internal_event.Debug
     | Notify_branch _ -> Internal_event.Info
-    | Disconnection _ | Bootstrapped -> Internal_event.Notice
+    | Connection _ | Disconnection _ -> Internal_event.Info
+    | Bootstrapped -> Internal_event.Notice
     | Sync_status sync_status -> (
         match sync_status with
         | Synchronised {is_chain_stuck} ->
@@ -228,9 +230,15 @@ module Event = struct
           (Tag 8)
           ~title:"disconnection"
           (obj1
-             (req "disconnection" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
-          (function Disconnection peer_id -> Some peer_id | _ -> None)
-          (fun peer_id -> Disconnection peer_id);
+             (req
+                "disconnection"
+                (obj2
+                   (req "kind" Data_encoding.string)
+                   (req "peer_id" P2p_peer.Id.encoding))))
+          (function
+            | Disconnection peer_id -> Some ("disconnection", peer_id)
+            | _ -> None)
+          (fun (_, peer_id) -> Disconnection peer_id);
         case
           (Tag 9)
           ~title:"request_failure"
@@ -244,6 +252,15 @@ module Event = struct
           (function
             | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Request_failure (r, s, err));
+        case
+          (Tag 10)
+          ~title:"connection"
+          (obj2
+             (req "kind" Data_encoding.string)
+             (req "peer_id" P2p_peer.Id.encoding))
+          (function
+            | Connection peer_id -> Some ("connection", peer_id) | _ -> None)
+          (fun (_, peer_id) -> Connection peer_id);
       ]
 
   let sync_status_to_string = function
@@ -282,6 +299,8 @@ module Event = struct
         Format.fprintf ppf "Notify branch from %a" P2p_peer.Id.pp peer_id
     | Notify_head peer_id ->
         Format.fprintf ppf "Notify head from %a" P2p_peer.Id.pp peer_id
+    | Connection peer_id ->
+        Format.fprintf ppf "Connection of %a" P2p_peer.Id.pp peer_id
     | Disconnection peer_id ->
         Format.fprintf ppf "Disconnection of %a" P2p_peer.Id.pp peer_id
     | Could_not_switch_testchain err ->

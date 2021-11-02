@@ -83,6 +83,15 @@ let store_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
+let store_prechecked_block =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"store_prechecked_block"
+    ~msg:"prechecked block {block} was stored"
+    ~pp1:pp_block_descriptor
+    ("block", block_descriptor_encoding)
+
 (* Notice *)
 let fork_testchain =
   declare_4

@@ -63,6 +63,15 @@ module Events = struct
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
+  let precheck_request =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"precheck_request"
+      ~msg:"prechecking block {hash}"
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
+
   let commit_genesis_request =
     declare_1
       ~section
@@ -352,6 +361,49 @@ let run input output =
           >>= fun cachable_result -> Lwt.return cachable_result
         in
         preapply >>= fun cachable_result -> loop cache cachable_result
+    | External_validation.Precheck
+        {
+          chain_id;
+          predecessor_block_header;
+          predecessor_block_hash;
+          header;
+          operations;
+          hash;
+        } ->
+        let validate =
+          Events.(emit precheck_request hash) >>= fun () ->
+          ( Error_monad.protect (fun () ->
+                Context.checkout
+                  context_index
+                  predecessor_block_header.shell.context
+                >>= function
+                | Some context -> return context
+                | None ->
+                    fail
+                      (Block_validator_errors.Failed_to_checkout_context
+                         predecessor_block_header.shell.context))
+          >>=? fun predecessor_context ->
+            let cache =
+              match cache with
+              | None -> `Lazy
+              | Some cache ->
+                  `Inherited (cache, predecessor_block_header.shell.context)
+            in
+            Block_validation.precheck
+              ~chain_id
+              ~predecessor_block_header
+              ~predecessor_block_hash
+              ~predecessor_context
+              ~cache
+              header
+              operations )
+          >>= fun res ->
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.unit)
+            res
+        in
+        validate >>= fun () -> loop cache cached_result
     | External_validation.Fork_test_chain {context_hash; forked_header} ->
         let fork_test_chain : unit Lwt.t =
           Events.(emit fork_test_chain_request forked_header) >>= fun () ->

@@ -72,6 +72,15 @@ module type S = sig
     Operation.t list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
+  val precheck_block :
+    t ->
+    Store.chain_store ->
+    predecessor:Store.Block.t ->
+    Block_header.t ->
+    Block_hash.t ->
+    Operation.t trace trace ->
+    unit tzresult Lwt.t
+
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
@@ -260,6 +269,35 @@ module Internal_validator_process = struct
     >>=? fun (result, apply_result) ->
     validator.preapply_result <- Some apply_result ;
     return result
+
+  let precheck_block validator chain_store ~predecessor header _hash operations
+      =
+    let chain_id = Store.Chain.chain_id chain_store in
+    let context_index =
+      Store.context_index (Store.Chain.global_store validator.chain_store)
+    in
+    let predecessor_block_header = Store.Block.header predecessor in
+    let context_hash = predecessor_block_header.Block_header.shell.context in
+    (Context.checkout context_index context_hash >>= function
+     | None ->
+         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
+     | Some ctx -> return ctx)
+    >>=? fun predecessor_context ->
+    let cache =
+      match validator.cache with
+      | None -> `Lazy
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_block_header.shell.context)
+    in
+    let predecessor_block_hash = Store.Block.hash predecessor in
+    Block_validation.precheck
+      ~chain_id
+      ~predecessor_block_header
+      ~predecessor_block_hash
+      ~predecessor_context
+      ~cache
+      header
+      operations
 
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
@@ -676,6 +714,23 @@ module External_validator_process = struct
     in
     send_request validator request Block_validation.preapply_result_encoding
 
+  let precheck_block validator chain_store ~predecessor header hash operations =
+    let chain_id = Store.Chain.chain_id chain_store in
+    let predecessor_block_header = Store.Block.header predecessor in
+    let predecessor_block_hash = Store.Block.hash predecessor in
+    let request =
+      External_validation.Precheck
+        {
+          chain_id;
+          predecessor_block_header;
+          predecessor_block_hash;
+          header;
+          operations;
+          hash;
+        }
+    in
+    send_request validator request Data_encoding.unit
+
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
@@ -785,6 +840,10 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~max_operations_ttl
     header
     operations
+
+let precheck_block (E {validator_process = (module VP); validator}) chain_store
+    ~predecessor header operations =
+  VP.precheck_block validator chain_store ~predecessor header operations
 
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
