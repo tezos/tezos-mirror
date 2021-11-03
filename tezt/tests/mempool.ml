@@ -127,13 +127,13 @@ module Revamped = struct
     let* () = repeat 2 (fun () -> bake_for ~empty:true node client) in
     let* last_mempool = RPC.get_mempool client in
 
-    log_step 9 "Check endorsement is classified 'Refused'." ;
+    log_step 9 "Check endorsement is classified 'Outdated'." ;
     let error_msg = "one applied operation was lost: expected %L, got %R" in
     Check.((mempool_with_endorsement = last_mempool) Mempool.typ ~error_msg) ;
     let error_msg =
-      "endorsement is not classified as 'refused': length expected %L, got %R"
+      "endorsement is not classified as 'outdated': length expected %L, got %R"
     in
-    Check.((1 = List.length last_mempool.refused) int ~error_msg) ;
+    Check.((1 = List.length last_mempool.outdated) int ~error_msg) ;
     unit
 end
 

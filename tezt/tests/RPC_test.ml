@@ -661,6 +661,9 @@ let test_mempool ?endpoint client =
   let* node1_identity = Node.wait_for_identity node in
   let* () = Client.Admin.kick_peer ~peer:node1_identity client in
   let* _ = Mempool.bake_empty_mempool client in
+  (* Outdated operation after the second empty baking. *)
+  let* () = Client.endorse_for client in
+  let* _ = Mempool.bake_empty_mempool client in
   let monitor_path =
     (* To test the monitor_operations rpc we use curl since the client does
        not support streaming RPCs yet. *)
