@@ -262,6 +262,30 @@ let default_fee_arg =
     ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
     (tez_parameter "--default-fee")
 
+let level_kind =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return v
+      with _ -> failwith "invalid level (must be a positive number)")
+
+let level_arg =
+  arg
+    ~long:"level"
+    ~placeholder:"level"
+    ~doc:"Set the level to be returned by the LEVEL instruction"
+    level_kind
+
+let now_arg =
+  arg
+    ~long:"now"
+    ~placeholder:"timestamp"
+    ~doc:
+      "Set the timestamp to be returned by the NOW instruction. The format \
+       must follow RFC 3339 (YYYY-MM-DDTHH:MM:SSZ)"
+    string_parameter
+
 let gas_limit_kind =
   parameter (fun _ s ->
       try

@@ -40,6 +40,8 @@ val run_view :
   entrypoint:string ->
   input:Michelson_v1_parser.parsed ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
+  now:string option ->
+  level:Z.t option ->
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Gas.Arith.integral ->
@@ -56,6 +58,8 @@ val run :
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
+  now:string option ->
+  level:Z.t option ->
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Gas.Arith.integral ->
@@ -75,6 +79,8 @@ val trace :
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
+  now:string option ->
+  level:Z.t option ->
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Gas.Arith.integral ->

@@ -115,8 +115,8 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
 let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ~(contract : Contract.t) ~entrypoint
     ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
-    () =
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
+    ?payer ?gas () =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.run_view
     cctxt
@@ -129,14 +129,16 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ?source
     ?payer
     ~unparsing_mode
+    ~now
+    ~level
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
-    ?entrypoint () =
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
+    ?payer ?gas ?entrypoint () =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.run_code
     cctxt
@@ -152,14 +154,16 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~now
+    ~level
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
-    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
-    ?entrypoint () =
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ~now ~level ?source
+    ?payer ?gas ?entrypoint () =
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.trace_code
     cctxt
@@ -175,6 +179,8 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~now
+    ~level
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =
