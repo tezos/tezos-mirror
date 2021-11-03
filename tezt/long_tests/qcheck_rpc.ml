@@ -451,7 +451,7 @@ module Test = struct
     (* Log description of RPC *)
     let () = Log.info "%s\n\n" rpc_description.description in
     (* Start node and client *)
-    let* (node, client) = Client.init_activate_bake `Client ~protocol () in
+    let* (node, client) = Client.init_with_protocol `Client ~protocol () in
     (* Generate and test instances *)
     let* () =
       rpc_description |> Gen.instance_gen

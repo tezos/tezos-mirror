@@ -82,9 +82,10 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
     Lwt_list.iter_s
       (fun node ->
         let* () = Node.config_init node [] in
-        Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-          node
-          [(3, migrate_to)] ;
+        Node.Config_file.(
+          update
+            node
+            (set_sandbox_network_with_user_activated_upgrades [(3, migrate_to)])) ;
         Lwt.return_unit)
       [node_1; node_2]
   in

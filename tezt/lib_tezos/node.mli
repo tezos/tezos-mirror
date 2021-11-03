@@ -226,7 +226,8 @@ module Config_file : sig
   (** Write the configuration file of a node, replacing the existing one. *)
   val write : t -> JSON.t -> unit
 
-  (** Update the configuration file of a node.
+  (** Update the configuration file of a node. If the node is already
+     running, it needs to be restarted manually.
 
       Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
@@ -234,7 +235,18 @@ module Config_file : sig
   (** Set the network config to a sandbox with the given user
       activated upgrades. *)
   val set_sandbox_network_with_user_activated_upgrades :
-    t -> (int * Protocol.t) list -> unit
+    (int * Protocol.t) list -> JSON.t -> JSON.t
+
+  (** Set the prevalidator configuration in the given configuration. *)
+  val set_prevalidator :
+    ?operations_request_timeout:float ->
+    ?max_refused_operations:int ->
+    ?operations_batch_size:int ->
+    JSON.t ->
+    JSON.t
+
+  (** Set the peer_validator configuration in the given configuration. *)
+  val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)
@@ -305,6 +317,10 @@ val wait_for_level : t -> int -> int Lwt.t
 
     Return the identity. *)
 val wait_for_identity : t -> string Lwt.t
+
+(** [wait_for_request ?level ~request node] waits for [request] event
+   on the [node]. *)
+val wait_for_request : request:[< `Flush | `Inject] -> t -> unit Lwt.t
 
 (** Wait for a custom event to occur.
 

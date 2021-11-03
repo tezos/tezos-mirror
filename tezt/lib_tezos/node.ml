@@ -188,8 +188,39 @@ module Config_file = struct
 
   let update node update = read node |> update |> write node
 
-  let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
-    let network_json =
+  let set_prevalidator ?(operations_request_timeout = 10.)
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
+      =
+    let prevalidator =
+      `O
+        [
+          ("operations_request_timeout", `Float operations_request_timeout);
+          ( "max_refused_operations",
+            `Float (float_of_int max_refused_operations) );
+          ("operations_batch_size", `Float (float_of_int operations_batch_size));
+        ]
+      |> JSON.annotate ~origin:"set_prevalidator"
+    in
+    JSON.update
+      "shell"
+      (fun config -> JSON.put ("prevalidator", prevalidator) config)
+      old_config
+
+  let set_peer_validator ?(new_head_request_timeout = 60.) old_config =
+    let peer_validator =
+      `O
+        [
+          ( "peer_validator",
+            `O [("new_head_request_timeout", `Float new_head_request_timeout)]
+          );
+        ]
+      |> JSON.annotate ~origin:"set_peer_validator"
+    in
+    JSON.put ("shell", peer_validator) old_config
+
+  let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
+      =
+    let network =
       `O
         [
           ( "genesis",
@@ -228,15 +259,10 @@ module Config_file = struct
                      ])
                  upgrade_points) );
         ]
+      |> JSON.annotate
+           ~origin:"set_sandbox_network_with_user_activated_upgrades"
     in
-    update node @@ fun json ->
-    JSON.update
-      "network"
-      (fun _ ->
-        JSON.annotate
-          ~origin:"set_sandbox_network_with_user_activated_upgrades"
-          network_json)
-      json
+    JSON.put ("network", network) old_config
 end
 
 let trigger_ready node value =
@@ -345,6 +371,20 @@ let wait_for_identity node =
       node.persistent_state.pending_identity <-
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
+
+let wait_for_request ~request node =
+  let event_name =
+    match request with `Flush | `Inject -> "request_completed_notice.v0"
+  in
+  let request_str =
+    match request with `Flush -> "flush" | `Inject -> "inject"
+  in
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when String.equal s request_str -> Some ()
+    | Some _ | None -> None
+  in
+  wait_for node event_name filter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =

@@ -36,7 +36,7 @@ let test_baker =
     ~title:"baker stresstest"
     ~tags:["node"; "baker"]
   @@ fun protocol ->
-  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
   let* _ = Baker.init ~protocol node client in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in

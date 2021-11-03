@@ -1,5 +1,5 @@
 (library
  (name tezt_tezos)
  (public_name tezt-tezos)
- (libraries tezt hex)
+ (libraries tezt hex tezos-base tezos-base.unix)
  (flags (:standard -open Tezt -open Tezt.Base)))

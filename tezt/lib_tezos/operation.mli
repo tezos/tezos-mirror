@@ -23,32 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Client configuration
-   Invocation:   dune exec tezt/tests/main.exe -- --file client_config.ml
-   Subject:      .
-*)
+(** [inject_transfer] is a high-level wrapper around
+   [inject_operation] RPC for injecting a transfer operation.
 
-let additional_bootstrap_accounts =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"additional bootstrap accounts"
-    ~tags:["client"; "bootstrap"; "accounts"]
-  @@ fun protocol ->
-  let* (_node, client) =
-    Client.init_with_protocol
-      ~additional_bootstrap_account_count:2
-      `Client
-      ~protocol
-      ()
-  in
-  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
-  let* bootstrap7 = Client.show_address ~alias:"bootstrap7" client in
-  Client.transfer
-    ~amount:(Tez.of_int 2)
-    ~giver:bootstrap6.public_key_hash
-    ~receiver:bootstrap7.public_key_hash
-    client
+    Default [branch] is the current branch.
 
-let register ~protocols = additional_bootstrap_accounts ~protocols
+    Default [counter] is the successor of the counter of [source].
+
+    Default [amount] is [1] tez.
+
+    Default [fee] is [1000] mutez.
+
+    Default [gas_limit] is [1040] gas.
+
+    Default [source] is [Constant.bootstrap1].
+
+    Default [destination] is [Constant.bootstrap2].
+ *)
+val inject_transfer :
+  ?branch:string ->
+  ?counter:int ->
+  ?amount:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?source:Constant.key ->
+  ?destination:Constant.key ->
+  Client.t ->
+  string Lwt.t
+
+(** [inject_transfers] is a wrapper around [inject_transfer] to inject
+   [number_of_operations] transfers with the same parameters. *)
+val inject_transfers :
+  ?amount:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?source:Constant.key ->
+  ?destination:Constant.key ->
+  node:Node.t ->
+  number_of_operations:int ->
+  Client.t ->
+  string list Lwt.t

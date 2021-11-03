@@ -95,6 +95,21 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     path
     client
 
+let get_mempool ?endpoint ?hooks ?chain client =
+  let* pending_ops =
+    get_mempool_pending_operations ?endpoint ?hooks ?chain ~version:"1" client
+  in
+  let get_hash op = JSON.(op |-> "hash" |> as_string) in
+  let get_hashes classification =
+    List.map get_hash JSON.(pending_ops |-> classification |> as_list)
+  in
+  let applied = get_hashes "applied" in
+  let branch_delayed = get_hashes "branch_delayed" in
+  let branch_refused = get_hashes "branch_refused" in
+  let refused = get_hashes "refused" in
+  let unprocessed = get_hashes "unprocessed" in
+  return Mempool.{applied; branch_delayed; branch_refused; refused; unprocessed}
+
 let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
   let path = ["chains"; chain; "mempool"; "request_operations"] in
   Client.rpc

@@ -35,16 +35,11 @@
 
 (** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
-let init ?nodes_args ?parameter_file ?bake ~protocol () =
+let init ?nodes_args ?parameter_file ~protocol () =
   let* (node, client) =
-    Client.init_activate_bake
-      ?nodes_args
-      ?parameter_file
-      ?bake
-      `Client
-      ~protocol
-      ()
+    Client.init_with_protocol ?nodes_args ?parameter_file `Client ~protocol ()
   in
+  let* () = Client.bake_for client in
   let* proxy_server = Proxy_server.init node in
   Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
   return (node, proxy_server, client)
@@ -110,7 +105,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       ]
   in
   let* (node, client) =
-    Client.init_activate_bake ~parameter_file ~protocol `Client ()
+    Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in
   let* (endpoint : Client.endpoint option) =
     match mode with
@@ -126,6 +121,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         let args =
           Proxy_server.[Symbolic_block_caching_time sym_block_caching_time]
         in
+        let* () = Client.bake_for client in
         (* We want Debug level events, for [heuristic_event_handler]
            to work properly *)
         let* proxy_server = Proxy_server.init ~args ~event_level:"debug" node in

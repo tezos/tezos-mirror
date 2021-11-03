@@ -23,32 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Client configuration
-   Invocation:   dune exec tezt/tests/main.exe -- --file client_config.ml
-   Subject:      .
-*)
+type t = {
+  applied : string list;
+  branch_delayed : string list;
+  branch_refused : string list;
+  refused : string list;
+  unprocessed : string list;
+}
 
-let additional_bootstrap_accounts =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"additional bootstrap accounts"
-    ~tags:["client"; "bootstrap"; "accounts"]
-  @@ fun protocol ->
-  let* (_node, client) =
-    Client.init_with_protocol
-      ~additional_bootstrap_account_count:2
-      `Client
-      ~protocol
-      ()
+(* A comparable type for mempool where classification and ordering
+   does not matter. *)
+let typ : t Check.typ =
+  let open Check in
+  let sort = List.sort compare in
+  convert
+    (fun mempool ->
+      sort
+        (mempool.applied @ mempool.branch_delayed @ mempool.branch_refused
+       @ mempool.refused @ mempool.unprocessed))
+    (list string)
+
+let empty =
+  {
+    applied = [];
+    branch_delayed = [];
+    branch_refused = [];
+    refused = [];
+    unprocessed = [];
+  }
+
+let symmetric_diff left right =
+  let diff left right =
+    List.(
+      filter (fun op -> not (mem op right)) left
+      @ filter (fun op -> not (mem op left)) right)
   in
-  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
-  let* bootstrap7 = Client.show_address ~alias:"bootstrap7" client in
-  Client.transfer
-    ~amount:(Tez.of_int 2)
-    ~giver:bootstrap6.public_key_hash
-    ~receiver:bootstrap7.public_key_hash
-    client
-
-let register ~protocols = additional_bootstrap_accounts ~protocols
+  {
+    applied = diff left.applied right.applied;
+    branch_delayed = diff left.branch_delayed right.branch_delayed;
+    branch_refused = diff left.branch_refused right.branch_refused;
+    refused = diff left.refused right.refused;
+    unprocessed = diff left.unprocessed right.unprocessed;
+  }

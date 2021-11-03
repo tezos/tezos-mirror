@@ -117,14 +117,14 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
         | `Client | `Light | `Proxy -> false
       in
       let* (node, client) =
-        Client.init_activate_bake
+        Client.init_with_protocol
           ?parameter_file
           ?nodes_args:node_parameters
-          ~bake
           ~protocol
           client_mode_tag
           ()
       in
+      let* () = if bake then Client.bake_for client else Lwt.return_unit in
       let* endpoint =
         match test_mode_tag with
         | `Client | `Light | `Proxy -> return Client.(Node node)
@@ -653,7 +653,6 @@ let get_client_port client =
    - POST unban_operation
    - POST unban_all_operations *)
 let test_mempool ?endpoint client =
-  let open Lwt in
   let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
   let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
@@ -675,7 +674,7 @@ let test_mempool ?endpoint client =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
   (* Refused operation after the reclassification following the flush. *)
-  let* branch = RPC.get_branch client >|= JSON.as_string in
+  let* branch = Lwt.Infix.(RPC.get_branch client >|= JSON.as_string) in
   let* _ =
     Mempool.forge_and_inject_operation
       ~branch

@@ -23,32 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Client configuration
-   Invocation:   dune exec tezt/tests/main.exe -- --file client_config.ml
-   Subject:      .
-*)
+type t = {
+  applied : string list;
+  branch_delayed : string list;
+  branch_refused : string list;
+  refused : string list;
+  unprocessed : string list;
+}
 
-let additional_bootstrap_accounts =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"additional bootstrap accounts"
-    ~tags:["client"; "bootstrap"; "accounts"]
-  @@ fun protocol ->
-  let* (_node, client) =
-    Client.init_with_protocol
-      ~additional_bootstrap_account_count:2
-      `Client
-      ~protocol
-      ()
-  in
-  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
-  let* bootstrap7 = Client.show_address ~alias:"bootstrap7" client in
-  Client.transfer
-    ~amount:(Tez.of_int 2)
-    ~giver:bootstrap6.public_key_hash
-    ~receiver:bootstrap7.public_key_hash
-    client
+(** The mempool type description. *)
+val typ : t Check.typ
 
-let register ~protocols = additional_bootstrap_accounts ~protocols
+val empty : t
+
+(** Symetric difference (union(a, b) - intersection(a, b)) *)
+val symmetric_diff : t -> t -> t
