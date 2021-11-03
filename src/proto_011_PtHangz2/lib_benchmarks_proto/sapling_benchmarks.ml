@@ -149,4 +149,4 @@ module Apply_diff_bench : Benchmark.S = struct
           transitions
 end
 
-let () = Registration.register (module Apply_diff_bench)
+let () = Registration_helpers.register (module Apply_diff_bench)
