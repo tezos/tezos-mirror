@@ -390,20 +390,17 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       let t = serialize_ty_for_error ty in
       error (Comparable_type_expected (loc, t))
 
-let rec unparse_stack :
-    type a s.
-    context ->
-    (a, s) stack_ty ->
-    ((Script.expr * Script.annot) list * context) tzresult =
- fun ctxt -> function
-  | Bot_t -> ok ([], ctxt)
+let rec unparse_stack_uncarbonated :
+    type a s. (a, s) stack_ty -> (Script.expr * Script.annot) list = function
+  | Bot_t -> []
   | Item_t (ty, rest, annot) ->
-      unparse_ty ctxt ty >>? fun (uty, ctxt) ->
-      unparse_stack ctxt rest >|? fun (urest, ctxt) ->
-      ((strip_locations uty, unparse_var_annot annot) :: urest, ctxt)
+      let uty = unparse_ty_uncarbonated ty in
+      let urest = unparse_stack_uncarbonated rest in
+      (strip_locations uty, unparse_var_annot annot) :: urest
 
 let serialize_stack_for_error ctxt stack_ty =
-  record_trace Cannot_serialize_error (unparse_stack ctxt stack_ty)
+  (* FIXME: unbounded uncarbonated computations are dangerous! *)
+  ok (unparse_stack_uncarbonated stack_ty, ctxt)
 
 let name_of_ty : type a. a ty -> type_annot option = function
   | Unit_t meta -> meta.annot
@@ -3053,17 +3050,16 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
          >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
-  let log_stack ctxt loc stack_ty aft =
+  let log_stack _ctxt loc stack_ty aft =
     match (type_logger, script_instr) with
     | (None, _) | (Some _, (Int _ | String _ | Bytes _)) -> Result.return_unit
     | (Some log, (Prim _ | Seq _)) ->
-        (* Unparsing for logging done in an unlimited context as this
+        (* Unparsing for logging is not carbonated as this
               is used only by the client and not the protocol *)
-        let ctxt = Gas.set_unlimited ctxt in
-        unparse_stack ctxt stack_ty >>? fun (stack_ty, _) ->
-        unparse_stack ctxt aft >|? fun (aft, _) ->
+        let stack_ty = unparse_stack_uncarbonated stack_ty in
+        let aft = unparse_stack_uncarbonated aft in
         log loc stack_ty aft ;
-        ()
+        Result.return_unit
   in
   let typed_no_lwt ctxt loc instr aft =
     log_stack ctxt loc stack_ty aft >|? fun () ->
