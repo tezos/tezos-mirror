@@ -228,7 +228,7 @@ module Manager_result = struct
            (opt "storage" Script.expr_encoding)
            (opt
               (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 Is it kept here for a transition period, for tool like indexers to update.
+                 It is kept here for a transitional period, for tools like indexers to update.
                  TODO(009): remove it. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
@@ -305,7 +305,7 @@ module Manager_result = struct
         (obj8
            (opt
               (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 Is it kept here for a transition period, for tool like indexers to update.
+                 It is kept here for a transitional period, for tools like indexers to update.
                  TODO(009): remove it. *)
               "big_map_diff"
               Lazy_storage.legacy_big_map_diff_encoding)
