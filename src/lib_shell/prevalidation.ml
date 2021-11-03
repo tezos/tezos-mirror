@@ -33,6 +33,20 @@ type 'operation_data operation = {
   protocol_data : 'operation_data;
 }
 
+type error += Endorsement_branch_not_live
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"prevalidation.endorsement_branch_not_live"
+    ~title:"Endorsement branch not live"
+    ~description:"Endorsement's branch is not in the live blocks"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Endorsement's branch is not in the live blocks")
+    Data_encoding.(empty)
+    (function Endorsement_branch_not_live -> Some () | _ -> None)
+    (fun () -> Endorsement_branch_not_live)
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
@@ -54,10 +68,10 @@ module type T = sig
 
   type result =
     | Applied of t * Proto.operation_receipt
-    | Branch_delayed of error list
-    | Branch_refused of error list
-    | Refused of error list
-    | Outdated
+    | Branch_delayed of tztrace
+    | Branch_refused of tztrace
+    | Refused of tztrace
+    | Outdated of tztrace
 
   val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
@@ -86,10 +100,10 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 
   type result =
     | Applied of t * Proto.operation_receipt
-    | Branch_delayed of error list
-    | Branch_refused of error list
-    | Refused of error list
-    | Outdated
+    | Branch_delayed of tztrace
+    | Branch_refused of tztrace
+    | Refused of tztrace
+    | Outdated of tztrace
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
     safe_binary_of_bytes Proto.operation_data_encoding proto
@@ -154,7 +168,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
-      Lwt.return Outdated
+      Lwt.return (Outdated [Endorsement_branch_not_live])
     else
       protect (fun () ->
           Proto.apply_operation
@@ -187,7 +201,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
           | Branch -> Branch_refused trace
           | Permanent -> Refused trace
           | Temporary -> Branch_delayed trace
-          | Outdated -> Outdated)
+          | Outdated -> Outdated trace)
 
   let validation_state {state; _} = state
 
@@ -198,7 +212,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_trace err
     | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
     | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
-    | Outdated -> pp_print_string ppf "outdated"
+    | Outdated err -> fprintf ppf "outdated (%a)" pp_print_trace err
 end
 
 module Internal_for_tests = struct

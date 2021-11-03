@@ -41,7 +41,8 @@ type classification =
   [ `Applied
   | `Branch_delayed of tztrace
   | `Branch_refused of tztrace
-  | `Refused of tztrace ]
+  | `Refused of tztrace
+  | `Outdated of tztrace ]
 
 (** This type wraps together:
 
@@ -75,6 +76,7 @@ type parameters = {
 type t = {
   parameters : parameters;
   refused : bounded_map;
+  outdated : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
@@ -85,6 +87,7 @@ let create parameters =
   {
     parameters;
     refused = mk_empty_bounded_map parameters.map_size_limit;
+    outdated = mk_empty_bounded_map parameters.map_size_limit;
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
     in_mempool = Operation_hash.Set.empty;
@@ -106,8 +109,10 @@ let flush (classes : t) ~handle_branch_refused =
   classes.applied_rev <- [] ;
   classes.in_mempool <-
     Operation_hash.Set.union
-      (set_of_bounded_map classes.refused)
-      (set_of_bounded_map classes.branch_refused)
+      (Operation_hash.Set.union
+         (set_of_bounded_map classes.refused)
+         (set_of_bounded_map classes.branch_refused))
+      (set_of_bounded_map classes.outdated)
 
 let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 
@@ -126,6 +131,7 @@ let is_applied oph classes =
    set of pending operations instead. *)
 let remove oph classes =
   classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;
+  classes.outdated.map <- Operation_hash.Map.remove oph classes.outdated.map ;
   classes.branch_refused.map <-
     Operation_hash.Map.remove oph classes.branch_refused.map ;
   classes.branch_delayed.map <-
@@ -159,6 +165,7 @@ let handle_error oph op classification classes =
     | `Branch_refused tztrace -> (classes.branch_refused, tztrace)
     | `Branch_delayed tztrace -> (classes.branch_delayed, tztrace)
     | `Refused tztrace -> (classes.refused, tztrace)
+    | `Outdated tztrace -> (classes.outdated, tztrace)
   in
   Ringo.Ring.add_and_return_erased bounded_map.ring oph
   |> Option.iter (fun e ->
@@ -166,7 +173,7 @@ let handle_error oph op classification classes =
          classes.parameters.on_discarded_operation e ;
          classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool) ;
   (match classification with
-  | `Refused _ -> classes.parameters.on_discarded_operation oph
+  | `Refused _ | `Outdated _ -> classes.parameters.on_discarded_operation oph
   | _ -> ()) ;
   bounded_map.map <- Operation_hash.Map.add oph (op, tztrace) bounded_map.map ;
   classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
@@ -174,10 +181,11 @@ let handle_error oph op classification classes =
 let add classification oph op classes =
   match classification with
   | `Applied -> handle_applied oph op classes
-  | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->
+  | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
+    classification ->
       handle_error oph op classification classes
 
-let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
+let to_map ~applied ~branch_delayed ~branch_refused ~refused ~outdated classes =
   let module Map = Operation_hash.Map in
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
@@ -199,7 +207,8 @@ let to_map ~applied ~branch_delayed ~branch_refused ~refused classes =
   (if applied then Map.of_seq @@ List.to_seq classes.applied_rev else Map.empty)
   +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
   +> (if branch_refused then classes.branch_refused.map else Map.empty)
-  +> if refused then classes.refused.map else Map.empty
+  +> (if refused then classes.refused.map else Map.empty)
+  +> if outdated then classes.outdated.map else Map.empty
 
 type 'block block_tools = {
   hash : 'block -> Block_hash.t;
@@ -283,6 +292,7 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
           ~branch_delayed:true
           ~branch_refused:handle_branch_refused
           ~refused:false
+          ~outdated:false
           classification)
        pending)
   >|= fun pending ->
@@ -306,6 +316,7 @@ module Internal_for_tests = struct
     {
       parameters = t.parameters;
       refused = copy_bounded_map t.refused;
+      outdated = copy_bounded_map t.outdated;
       branch_refused = copy_bounded_map t.branch_refused;
       branch_delayed = copy_bounded_map t.branch_delayed;
       applied_rev = t.applied_rev;
@@ -321,6 +332,7 @@ module Internal_for_tests = struct
       {
         parameters;
         refused;
+        outdated;
         branch_refused;
         branch_delayed;
         applied_rev;
@@ -338,11 +350,13 @@ module Internal_for_tests = struct
     Format.fprintf
       ppf
       "Map_size_limit:@.%i@.On discarded operation: \
-       <function>@.Refused:%a@.Branch refused:@.%a@.Branch \
+       <function>@.Refused:%a@.Outdated:%a@.Branch refused:@.%a@.Branch \
        delayed:@.%a@.Applied:@.%a@.In Mempool:@.%a"
       parameters.map_size_limit
       bounded_map_pp
       refused
+      bounded_map_pp
+      outdated
       bounded_map_pp
       branch_refused
       bounded_map_pp
@@ -365,9 +379,10 @@ module Internal_for_tests = struct
     in
     Format.fprintf
       pp
-      "map_size_limit: %d\n%s\n%s\n%s\napplied_rev: %d\nin_mempool: %d"
+      "map_size_limit: %d\n%s\n%s\n%s\n%s\napplied_rev: %d\nin_mempool: %d"
       t.parameters.map_size_limit
       (show_bounded_map "refused" t.refused)
+      (show_bounded_map "outdated" t.outdated)
       (show_bounded_map "branch_refused" t.branch_refused)
       (show_bounded_map "branch_delayed" t.branch_delayed)
       (List.length t.applied_rev)

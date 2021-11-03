@@ -82,6 +82,10 @@
    if the protocol rejects this operation with an error classified as
    [Permanent].
 
+     - An operation is [Outdated] if the operation is too old to be
+   applied anymore or if the protocol rejects this operation with an
+   error classified as [Outdated]
+
      - An operation is [Branch_refused] if the operation is anchored
    on a block that has not been validated by the node but could be in
    the future or if the protocol rejects this operation with an error
@@ -154,12 +158,14 @@
 
    It is important that every operation we do not want to propagate
    are cleaned up from the [Distributed_db] explicitely. Operations we
-   do not want to propagate are operations classified as [Refused],
-   already included in block, or filtered out by the plugin.
+   do not want to propagate are operations classified as [Refused] or
+   [Outdated], already included in block, or filtered out by the
+   plugin.
 
-     The [mempool] field contains only operations which are in the
+   The [mempool] field contains only operations which are in the
    [in_mempool] field and that we accept to propagate. In particular,
-   we do not propagate operations classified as [Refused].
+   we do not propagate operations classified as [Refused] or
+   [Outdated].
 
      There are two ways to propagate our mempool:
 
@@ -175,13 +181,13 @@
 
    There is an [advertisement_delay] to postpone the next mempool
    advertisement if we advertised our mempool not long ago. Early
-   consensus operations will be propagated once the block is validated.
-   Every time an operation is [classified], it is recorded into the
-   [operation_stream] (note that this does not include [outdated]
-   operations). Such stream can be used by an external service to get
-   the classification of an operation (via the [monitor_operations] RPC).
-   This also means an operation can be notified several times if it is
-   classified again after a [flush]. *)
+   consensus operations will be propagated once the block is
+   validated. Every time an operation is [classified], it is recorded
+   into the [operation_stream]. Such stream can be used by an external
+   service to get the classification of an operation (via the
+   [monitor_operations] RPC). This also means an operation can be
+   notified several times if it is classified again after a
+   [flush]. *)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1491
    This module should not use [Prevalidation.parse_unsafe] *)
@@ -479,7 +485,8 @@ module Make
             pv.filter_config
             op.Filter.Proto.protocol_data
         with
-        | (`Branch_delayed _ | `Branch_refused _ | `Refused _) as errs ->
+        | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
+          errs ->
             handle
               ~notifier:(mk_notifier pv.operation_stream)
               pv.shell
@@ -542,10 +549,8 @@ module Make
         | Refused errors ->
             handle ~notifier pv.shell (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
-        | Outdated ->
-            Distributed_db.Operation.clear_or_cancel
-              pv.shell.parameters.chain_db
-              oph ;
+        | Outdated errors ->
+            handle ~notifier pv.shell (`Parsed op) (`Outdated errors) ;
             Lwt.return (validation_state, mempool))
 
   (* Classify pending operations into either: [Refused |
@@ -754,6 +759,11 @@ module Make
                  map_op_error
                  (Classification.map pv.shell.classification.refused)
              in
+             let outdated =
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.outdated)
+             in
              let branch_refused =
                filter
                  map_op_error
@@ -777,6 +787,7 @@ module Make
                {
                  Proto_services.Mempool.applied;
                  refused;
+                 outdated;
                  branch_refused;
                  branch_delayed;
                  unprocessed;
@@ -816,7 +827,6 @@ module Make
              let (op_stream, stopper) =
                Lwt_watcher.create_stream operation_stream
              in
-
              (* Convert ops *)
              let map_op error (hash, op) =
                match Prevalidation.parse_unsafe op.Operation.proto with
@@ -863,6 +873,7 @@ module Make
              let filter_result = function
                | `Applied -> params#applied
                | `Refused _ -> params#refused
+               | `Outdated _ -> params#outdated
                | `Branch_refused _ -> params#branch_refused
                | `Branch_delayed _ -> params#branch_delayed
              in
@@ -882,6 +893,7 @@ module Make
                          | `Branch_refused errors
                          | `Refused errors ->
                              errors
+                         | `Outdated errors -> errors
                        in
                        Lwt.return_some
                          [((hash, {Proto.shell; protocol_data}), errors)]
@@ -1359,6 +1371,7 @@ let empty_rpc_directory : unit RPC_directory.t =
         {
           Block_services.Empty.Mempool.applied = [];
           refused = Operation_hash.Map.empty;
+          outdated = Operation_hash.Map.empty;
           branch_refused = Operation_hash.Map.empty;
           branch_delayed = Operation_hash.Map.empty;
           unprocessed = Operation_hash.Map.empty;

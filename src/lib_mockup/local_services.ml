@@ -292,6 +292,7 @@ module Make (E : MENV) = struct
                       {
                         E.Block_services.Mempool.applied;
                         refused = Operation_hash.Map.empty;
+                        outdated = Operation_hash.Map.empty;
                         branch_refused = Operation_hash.Map.empty;
                         branch_delayed = Operation_hash.Map.empty;
                         unprocessed = Operation_hash.Map.empty;
