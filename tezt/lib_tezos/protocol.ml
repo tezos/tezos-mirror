@@ -40,7 +40,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
-  | Hangzhou -> "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+  | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
 
 let default_constants = Constants_sandbox
 
@@ -55,14 +55,14 @@ let parameter_file ?(constants = default_constants) protocol =
     match protocol with
     | Alpha -> "proto_alpha"
     | Granada -> "proto_010_PtGRANAD"
-    | Hangzhou -> "proto_011_PtHangzH"
+    | Hangzhou -> "proto_011_PtHangz2"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
 let daemon_name = function
   | Alpha -> "alpha"
   | Granada -> "010-PtGRANAD"
-  | Hangzhou -> "011-PtHangzH"
+  | Hangzhou -> "011-PtHangz2"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 

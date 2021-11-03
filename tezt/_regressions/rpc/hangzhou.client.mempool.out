@@ -2,10 +2,10 @@ tezt/_regressions/rpc/hangzhou.client.mempool.out
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
 []
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangzH.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/pending_operations
 { "applied":
@@ -21,7 +21,7 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
           "[SIGNATURE]" } ],
   "refused":
     [ [ "[OPERATION_HASH]",
-        { "protocol": "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
+        { "protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx",
           "branch": "[BRANCH_HASH]",
           "contents":
             [ { "kind": "transaction",
@@ -33,10 +33,10 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
             "[SIGNATURE]",
           "error":
             [ { "kind": "permanent",
-                "id": "proto.011-PtHangzH.prefilter.fees_too_low" } ] } ] ],
+                "id": "proto.011-PtHangz2.prefilter.fees_too_low" } ] } ] ],
   "branch_refused":
     [ [ "[OPERATION_HASH]",
-        { "protocol": "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
+        { "protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx",
           "branch": "[BRANCH_HASH]",
           "contents":
             [ { "kind": "transaction",
@@ -48,12 +48,12 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
             "[SIGNATURE]",
           "error":
             [ { "kind": "branch",
-                "id": "proto.011-PtHangzH.contract.counter_in_the_past",
+                "id": "proto.011-PtHangz2.contract.counter_in_the_past",
                 "contract": "[PUBLIC_KEY_HASH]",
                 "expected": "2", "found": "1" } ] } ] ],
   "branch_delayed":
     [ [ "[OPERATION_HASH]",
-        { "protocol": "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
+        { "protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx",
           "branch": "[BRANCH_HASH]",
           "contents":
             [ { "kind": "endorsement_with_slot",
@@ -68,11 +68,11 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
             "[SIGNATURE]",
           "error":
             [ { "kind": "temporary",
-                "id": "proto.011-PtHangzH.prefilter.outdated_endorsement" } ] } ] ],
+                "id": "proto.011-PtHangz2.prefilter.outdated_endorsement" } ] } ] ],
   "unprocessed": [] }
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.011-PtHangzH.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangzH.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangzH.prefilter.outdated_endorsement"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.011-PtHangz2.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.prefilter.outdated_endorsement"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
@@ -517,7 +517,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "protocol": {
                           "type": "string",
                           "enum": [
-                            "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                            "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                           ]
                         },
                         "branch": {
@@ -526,7 +526,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "contents": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                            "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                           }
                         },
                         "signature": {
@@ -546,7 +546,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       "additionalProperties": false
                     },
                     "definitions": {
-                      "011-PtHangzH.block_header.alpha.full_header": {
+                      "011-PtHangz2.block_header.alpha.full_header": {
                         "title": "Shell header",
                         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
                         "type": "object",
@@ -616,12 +616,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "011-PtHangzH.contract_id": {
+                      "011-PtHangz2.contract_id": {
                         "title": "A contract handle",
                         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
                         "$ref": "#/definitions/unistring"
                       },
-                      "011-PtHangzH.entrypoint": {
+                      "011-PtHangz2.entrypoint": {
                         "title": "entrypoint",
                         "description": "Named entrypoint to a Michelson smart contract",
                         "oneOf": [
@@ -666,7 +666,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.inlined.endorsement": {
+                      "011-PtHangz2.inlined.endorsement": {
                         "description": "An operation's shell header.",
                         "type": "object",
                         "properties": {
@@ -674,7 +674,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/block_hash"
                           },
                           "operations": {
-                            "$ref": "#/definitions/011-PtHangzH.inlined.endorsement.contents"
+                            "$ref": "#/definitions/011-PtHangz2.inlined.endorsement.contents"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -686,7 +686,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "011-PtHangzH.inlined.endorsement.contents": {
+                      "011-PtHangz2.inlined.endorsement.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -712,7 +712,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.michelson.v1.primitives": {
+                      "011-PtHangz2.michelson.v1.primitives": {
                         "type": "string",
                         "enum": [
                           "ABS",
@@ -864,10 +864,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "code"
                         ]
                       },
-                      "011-PtHangzH.mutez": {
+                      "011-PtHangz2.mutez": {
                         "$ref": "#/definitions/positive_bignum"
                       },
-                      "011-PtHangzH.operation.alpha.contents": {
+                      "011-PtHangz2.operation.alpha.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -929,7 +929,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "endorsement": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "slot": {
                                 "type": "integer",
@@ -955,10 +955,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "op1": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "op2": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "slot": {
                                 "type": "integer",
@@ -985,10 +985,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "bh1": {
-                                "$ref": "#/definitions/011-PtHangzH.block_header.alpha.full_header"
+                                "$ref": "#/definitions/011-PtHangz2.block_header.alpha.full_header"
                               },
                               "bh2": {
-                                "$ref": "#/definitions/011-PtHangzH.block_header.alpha.full_header"
+                                "$ref": "#/definitions/011-PtHangz2.block_header.alpha.full_header"
                               }
                             },
                             "required": [
@@ -1109,7 +1109,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -1149,7 +1149,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -1161,16 +1161,16 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/positive_bignum"
                               },
                               "amount": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/011-PtHangzH.contract_id"
+                                "$ref": "#/definitions/011-PtHangz2.contract_id"
                               },
                               "parameters": {
                                 "type": "object",
                                 "properties": {
                                   "entrypoint": {
-                                    "$ref": "#/definitions/011-PtHangzH.entrypoint"
+                                    "$ref": "#/definitions/011-PtHangz2.entrypoint"
                                   },
                                   "value": {
                                     "oneOf": [
@@ -1218,7 +1218,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         "title": "Sequence",
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                          "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                         }
                                       },
                                       {
@@ -1226,12 +1226,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         "type": "object",
                                         "properties": {
                                           "prim": {
-                                            "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                            "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                           },
                                           "args": {
                                             "type": "array",
                                             "items": {
-                                              "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                              "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                             }
                                           },
                                           "annots": {
@@ -1282,7 +1282,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -1294,13 +1294,13 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/positive_bignum"
                               },
                               "balance": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "delegate": {
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "script": {
-                                "$ref": "#/definitions/011-PtHangzH.scripted.contracts"
+                                "$ref": "#/definitions/011-PtHangz2.scripted.contracts"
                               }
                             },
                             "required": [
@@ -1329,7 +1329,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -1388,7 +1388,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -1445,7 +1445,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "title": "Sequence",
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   {
@@ -1453,12 +1453,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "type": "object",
                                     "properties": {
                                       "prim": {
-                                        "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                        "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                       },
                                       "args": {
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                          "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                         }
                                       },
                                       "annots": {
@@ -1489,7 +1489,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.scripted.contracts": {
+                      "011-PtHangz2.scripted.contracts": {
                         "type": "object",
                         "properties": {
                           "code": {
@@ -1538,7 +1538,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "title": "Sequence",
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               {
@@ -1546,12 +1546,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "type": "object",
                                 "properties": {
                                   "prim": {
-                                    "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                    "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                   },
                                   "args": {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   "annots": {
@@ -1614,7 +1614,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "title": "Sequence",
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               {
@@ -1622,12 +1622,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "type": "object",
                                 "properties": {
                                   "prim": {
-                                    "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                    "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                   },
                                   "args": {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   "annots": {
@@ -1708,7 +1708,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                         }
                       },
-                      "micheline.011-PtHangzH.michelson_v1.expression": {
+                      "micheline.011-PtHangz2.michelson_v1.expression": {
                         "oneOf": [
                           {
                             "title": "Int",
@@ -1754,7 +1754,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "title": "Sequence",
                             "type": "array",
                             "items": {
-                              "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                              "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                             }
                           },
                           {
@@ -1762,12 +1762,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "type": "object",
                             "properties": {
                               "prim": {
-                                "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                               },
                               "args": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               "annots": {
@@ -1847,7 +1847,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "fields": [
                       {
                         "description": {
-                          "title": "011-PtHangzH.scripted.contracts"
+                          "title": "011-PtHangz2.scripted.contracts"
                         },
                         "encoding": {
                           "fields": [
@@ -1886,7 +1886,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.contract_id"
+                          "title": "011-PtHangz2.contract_id"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -1970,7 +1970,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.entrypoint"
+                          "title": "011-PtHangz2.entrypoint"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -2162,7 +2162,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "entrypoint",
                               "layout": {
-                                "name": "011-PtHangzH.entrypoint",
+                                "name": "011-PtHangz2.entrypoint",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -2434,7 +2434,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.block_header.alpha.full_header"
+                          "title": "011-PtHangz2.block_header.alpha.full_header"
                         },
                         "encoding": {
                           "fields": [
@@ -2604,7 +2604,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.inlined.endorsement.contents"
+                          "title": "011-PtHangz2.inlined.endorsement.contents"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -2648,7 +2648,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.inlined.endorsement"
+                          "title": "011-PtHangz2.inlined.endorsement"
                         },
                         "encoding": {
                           "fields": [
@@ -2666,7 +2666,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "operations",
                               "layout": {
-                                "name": "011-PtHangzH.inlined.endorsement.contents",
+                                "name": "011-PtHangz2.inlined.endorsement.contents",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -2690,7 +2690,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "011-PtHangzH.operation.alpha.contents"
+                          "title": "011-PtHangz2.operation.alpha.contents"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -2792,7 +2792,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "op1",
                                   "layout": {
-                                    "name": "011-PtHangzH.inlined.endorsement",
+                                    "name": "011-PtHangz2.inlined.endorsement",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -2808,7 +2808,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "op2",
                                   "layout": {
-                                    "name": "011-PtHangzH.inlined.endorsement",
+                                    "name": "011-PtHangz2.inlined.endorsement",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -2854,7 +2854,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "bh1",
                                   "layout": {
-                                    "name": "011-PtHangzH.block_header.alpha.full_header",
+                                    "name": "011-PtHangz2.block_header.alpha.full_header",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -2870,7 +2870,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "bh2",
                                   "layout": {
-                                    "name": "011-PtHangzH.block_header.alpha.full_header",
+                                    "name": "011-PtHangz2.block_header.alpha.full_header",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -3069,7 +3069,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "endorsement",
                                   "layout": {
-                                    "name": "011-PtHangzH.inlined.endorsement",
+                                    "name": "011-PtHangz2.inlined.endorsement",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -3295,7 +3295,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "destination",
                                   "layout": {
-                                    "name": "011-PtHangzH.contract_id",
+                                    "name": "011-PtHangz2.contract_id",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -3423,7 +3423,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "script",
                                   "layout": {
-                                    "name": "011-PtHangzH.scripted.contracts",
+                                    "name": "011-PtHangz2.scripted.contracts",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -3658,7 +3658,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               "name": "contents",
                               "layout": {
                                 "layout": {
-                                  "name": "011-PtHangzH.operation.alpha.contents",
+                                  "name": "011-PtHangz2.operation.alpha.contents",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
@@ -3781,7 +3781,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -3809,7 +3809,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -3818,7 +3818,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -3851,7 +3851,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -3860,7 +3860,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -3893,7 +3893,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -3902,7 +3902,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -3935,7 +3935,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -3944,7 +3944,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -3990,7 +3990,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                    "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -4021,7 +4021,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                        "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                       ]
                                     },
                                     "branch": {
@@ -4030,7 +4030,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "contents": {
                                       "type": "array",
                                       "items": {
-                                        "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                        "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                       }
                                     },
                                     "signature": {
@@ -4068,7 +4068,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                        "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                       ]
                                     },
                                     "branch": {
@@ -4077,7 +4077,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "contents": {
                                       "type": "array",
                                       "items": {
-                                        "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                        "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                       }
                                     },
                                     "signature": {
@@ -4115,7 +4115,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "protocol": {
                                       "type": "string",
                                       "enum": [
-                                        "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                                        "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                       ]
                                     },
                                     "branch": {
@@ -4124,7 +4124,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "contents": {
                                       "type": "array",
                                       "items": {
-                                        "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                                        "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                                       }
                                     },
                                     "signature": {
@@ -4174,7 +4174,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       }
                     ],
                     "definitions": {
-                      "011-PtHangzH.block_header.alpha.full_header": {
+                      "011-PtHangz2.block_header.alpha.full_header": {
                         "title": "Shell header",
                         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
                         "type": "object",
@@ -4244,12 +4244,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "011-PtHangzH.contract_id": {
+                      "011-PtHangz2.contract_id": {
                         "title": "A contract handle",
                         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
                         "$ref": "#/definitions/unistring"
                       },
-                      "011-PtHangzH.entrypoint": {
+                      "011-PtHangz2.entrypoint": {
                         "title": "entrypoint",
                         "description": "Named entrypoint to a Michelson smart contract",
                         "oneOf": [
@@ -4294,7 +4294,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.inlined.endorsement": {
+                      "011-PtHangz2.inlined.endorsement": {
                         "description": "An operation's shell header.",
                         "type": "object",
                         "properties": {
@@ -4302,7 +4302,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/block_hash"
                           },
                           "operations": {
-                            "$ref": "#/definitions/011-PtHangzH.inlined.endorsement.contents"
+                            "$ref": "#/definitions/011-PtHangz2.inlined.endorsement.contents"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -4314,7 +4314,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "011-PtHangzH.inlined.endorsement.contents": {
+                      "011-PtHangz2.inlined.endorsement.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -4340,7 +4340,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.michelson.v1.primitives": {
+                      "011-PtHangz2.michelson.v1.primitives": {
                         "type": "string",
                         "enum": [
                           "ABS",
@@ -4492,10 +4492,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "code"
                         ]
                       },
-                      "011-PtHangzH.mutez": {
+                      "011-PtHangz2.mutez": {
                         "$ref": "#/definitions/positive_bignum"
                       },
-                      "011-PtHangzH.operation.alpha.contents": {
+                      "011-PtHangz2.operation.alpha.contents": {
                         "oneOf": [
                           {
                             "title": "Endorsement",
@@ -4557,7 +4557,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "endorsement": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "slot": {
                                 "type": "integer",
@@ -4583,10 +4583,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "op1": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "op2": {
-                                "$ref": "#/definitions/011-PtHangzH.inlined.endorsement"
+                                "$ref": "#/definitions/011-PtHangz2.inlined.endorsement"
                               },
                               "slot": {
                                 "type": "integer",
@@ -4613,10 +4613,10 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "bh1": {
-                                "$ref": "#/definitions/011-PtHangzH.block_header.alpha.full_header"
+                                "$ref": "#/definitions/011-PtHangz2.block_header.alpha.full_header"
                               },
                               "bh2": {
-                                "$ref": "#/definitions/011-PtHangzH.block_header.alpha.full_header"
+                                "$ref": "#/definitions/011-PtHangz2.block_header.alpha.full_header"
                               }
                             },
                             "required": [
@@ -4737,7 +4737,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -4777,7 +4777,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -4789,16 +4789,16 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/positive_bignum"
                               },
                               "amount": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/011-PtHangzH.contract_id"
+                                "$ref": "#/definitions/011-PtHangz2.contract_id"
                               },
                               "parameters": {
                                 "type": "object",
                                 "properties": {
                                   "entrypoint": {
-                                    "$ref": "#/definitions/011-PtHangzH.entrypoint"
+                                    "$ref": "#/definitions/011-PtHangz2.entrypoint"
                                   },
                                   "value": {
                                     "oneOf": [
@@ -4846,7 +4846,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         "title": "Sequence",
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                          "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                         }
                                       },
                                       {
@@ -4854,12 +4854,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         "type": "object",
                                         "properties": {
                                           "prim": {
-                                            "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                            "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                           },
                                           "args": {
                                             "type": "array",
                                             "items": {
-                                              "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                              "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                             }
                                           },
                                           "annots": {
@@ -4910,7 +4910,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -4922,13 +4922,13 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/positive_bignum"
                               },
                               "balance": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "delegate": {
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "script": {
-                                "$ref": "#/definitions/011-PtHangzH.scripted.contracts"
+                                "$ref": "#/definitions/011-PtHangz2.scripted.contracts"
                               }
                             },
                             "required": [
@@ -4957,7 +4957,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -5016,7 +5016,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/Signature.Public_key_hash"
                               },
                               "fee": {
-                                "$ref": "#/definitions/011-PtHangzH.mutez"
+                                "$ref": "#/definitions/011-PtHangz2.mutez"
                               },
                               "counter": {
                                 "$ref": "#/definitions/positive_bignum"
@@ -5073,7 +5073,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "title": "Sequence",
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   {
@@ -5081,12 +5081,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     "type": "object",
                                     "properties": {
                                       "prim": {
-                                        "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                        "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                       },
                                       "args": {
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                          "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                         }
                                       },
                                       "annots": {
@@ -5117,7 +5117,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "011-PtHangzH.scripted.contracts": {
+                      "011-PtHangz2.scripted.contracts": {
                         "type": "object",
                         "properties": {
                           "code": {
@@ -5166,7 +5166,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "title": "Sequence",
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               {
@@ -5174,12 +5174,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "type": "object",
                                 "properties": {
                                   "prim": {
-                                    "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                    "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                   },
                                   "args": {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   "annots": {
@@ -5242,7 +5242,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "title": "Sequence",
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               {
@@ -5250,12 +5250,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 "type": "object",
                                 "properties": {
                                   "prim": {
-                                    "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                    "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                                   },
                                   "args": {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                      "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                     }
                                   },
                                   "annots": {
@@ -5336,7 +5336,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                         }
                       },
-                      "micheline.011-PtHangzH.michelson_v1.expression": {
+                      "micheline.011-PtHangz2.michelson_v1.expression": {
                         "oneOf": [
                           {
                             "title": "Int",
@@ -5382,7 +5382,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "title": "Sequence",
                             "type": "array",
                             "items": {
-                              "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                              "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                             }
                           },
                           {
@@ -5390,12 +5390,12 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             "type": "object",
                             "properties": {
                               "prim": {
-                                "$ref": "#/definitions/011-PtHangzH.michelson.v1.primitives"
+                                "$ref": "#/definitions/011-PtHangz2.michelson.v1.primitives"
                               },
                               "args": {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/micheline.011-PtHangzH.michelson_v1.expression"
+                                  "$ref": "#/definitions/micheline.011-PtHangz2.michelson_v1.expression"
                                 }
                               },
                               "annots": {
@@ -5419,7 +5419,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r"
+                              "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                             ]
                           },
                           "branch": {
@@ -5428,7 +5428,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/definitions/011-PtHangzH.operation.alpha.contents"
+                              "$ref": "#/definitions/011-PtHangz2.operation.alpha.contents"
                             }
                           },
                           "signature": {

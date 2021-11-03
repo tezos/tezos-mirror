@@ -45,86 +45,86 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
 { "balance": "0", "counter": "0" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "balance": "100000000", "counter": "1" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "100000000"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "1"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "99999383"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "4"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "[PUBLIC_KEY]"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "[PUBLIC_KEY_HASH]"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "balance": "0",
   "script":
     { "code":
@@ -141,17 +141,17 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "0"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
@@ -164,15 +164,15 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "entrypoints": {} }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -185,11 +185,11 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "balance": "0",
   "script":
     { "code":
@@ -356,17 +356,17 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "0"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 Fatal error:
   No service found at this URL
   
@@ -379,11 +379,11 @@ Fatal error:
     "prim": "int"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -415,7 +415,7 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
                 "annots": [ "%add_right" ] } ] } } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "code":
     [ { "prim": "storage",
         "args":
@@ -570,7 +570,7 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
 ./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
@@ -581,7 +581,7 @@ protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuo
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
 
 ./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
@@ -592,5 +592,5 @@ null
     "prim": "string"
   }
 }'
-protocol of proxy unspecified, using the node's protocol: PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r
+protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
