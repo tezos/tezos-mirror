@@ -87,12 +87,23 @@ Node
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
 
+- Added two optional fields, ``now`` and ``level`` as input to the
+  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
+  fields can be used to override the values normally returned by the
+  ``NOW`` and ``LEVEL`` instructions.
+
 Client
 ------
 
 - Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be  ``json``, ``binary`` or ``any``.
+
+- Added two options, ``--now`` and ``--level`` to the ``run script``
+  and ``run view`` commands simulating exectution of Michelson
+  code. These options can be used to override the values normally
+  returned by the ``NOW`` and ``LEVEL`` instructions.
 
 
 Baker / Endorser / Accuser
