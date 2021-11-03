@@ -184,6 +184,11 @@ test-python-tenderbake: all
 test-flextesa:
 	@$(MAKE) -f sandbox.Makefile
 
+.PHONY: test-js
+test-js:
+	@dune build @runtest_js
+	@dune exec ./src/tooling/run_js_inline_tests.exe
+
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
 	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
