@@ -80,6 +80,14 @@ module Revamped = struct
     let filter json = JSON.(json |> as_int_opt) in
     Node.wait_for node "operations_to_reclassify.v0" filter
 
+  (* [synchronize_mempool client node] calls the [request_operations] RPC from
+     the [client] to retrieve mempool from its peers and waits for a [notify]
+     event on the [node] (debug events must be enabled). *)
+  let synchronize_mempool client node =
+    let mempool_notify_waiter = Node.wait_for_request ~request:`Notify node in
+    let* _ = RPC.mempool_request_operations client in
+    mempool_notify_waiter
+
   (** {2 Tests } *)
 
   (** This test injects some transfer operations and checks that the mempool does
