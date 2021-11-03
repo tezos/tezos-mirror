@@ -3051,7 +3051,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
          >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
-  let log_stack _ctxt loc stack_ty aft =
+  let log_stack loc stack_ty aft =
     match (type_logger, script_instr) with
     | (None, _) | (Some _, (Int _ | String _ | Bytes _)) -> Result.return_unit
     | (Some log, (Prim _ | Seq _)) ->
@@ -3063,7 +3063,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         Result.return_unit
   in
   let typed_no_lwt ctxt loc instr aft =
-    log_stack ctxt loc stack_ty aft >|? fun () ->
+    log_stack loc stack_ty aft >|? fun () ->
     let j = Typed {loc; instr; bef = stack_ty; aft} in
     (j, ctxt)
   in
@@ -4303,15 +4303,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           >>? fun () ->
           let instr = {apply = (fun kinfo _k -> IFailwith (kinfo, loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
-          log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
-        )
+          log_stack loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt) )
   | (Prim (loc, I_NEVER, [], annot), Item_t (Never_t _, _rest, _)) ->
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
           let instr = {apply = (fun kinfo _k -> INever kinfo)} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
-          log_stack ctxt loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt)
-        )
+          log_stack loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt) )
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
