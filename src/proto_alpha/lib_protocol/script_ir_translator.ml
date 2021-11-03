@@ -3053,19 +3053,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   in
   let log_stack loc stack_ty aft =
     match (type_logger, script_instr) with
-    | (None, _) | (Some _, (Int _ | String _ | Bytes _)) -> Result.return_unit
+    | (None, _) | (Some _, (Int _ | String _ | Bytes _)) -> ()
     | (Some log, (Prim _ | Seq _)) ->
         (* Unparsing for logging is not carbonated as this
               is used only by the client and not the protocol *)
         let stack_ty = unparse_stack_uncarbonated stack_ty in
         let aft = unparse_stack_uncarbonated aft in
-        log loc stack_ty aft ;
-        Result.return_unit
+        log loc stack_ty aft
   in
   let typed_no_lwt ctxt loc instr aft =
-    log_stack loc stack_ty aft >|? fun () ->
+    log_stack loc stack_ty aft ;
     let j = Typed {loc; instr; bef = stack_ty; aft} in
-    (j, ctxt)
+    Ok (j, ctxt)
   in
   let typed ctxt loc instr aft =
     Lwt.return @@ typed_no_lwt ctxt loc instr aft
@@ -4300,16 +4299,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( error_unexpected_annot loc annot >>? fun () ->
           (if legacy then Result.return_unit
           else check_packable ~legacy:false loc v)
-          >>? fun () ->
+          >|? fun () ->
           let instr = {apply = (fun kinfo _k -> IFailwith (kinfo, loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
-          log_stack loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt) )
+          log_stack loc stack_ty Bot_t ;
+          (Failed {descr}, ctxt) )
   | (Prim (loc, I_NEVER, [], annot), Item_t (Never_t _, _rest, _)) ->
       Lwt.return
-        ( error_unexpected_annot loc annot >>? fun () ->
+        ( error_unexpected_annot loc annot >|? fun () ->
           let instr = {apply = (fun kinfo _k -> INever kinfo)} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
-          log_stack loc stack_ty Bot_t >|? fun () -> (Failed {descr}, ctxt) )
+          log_stack loc stack_ty Bot_t ;
+          (Failed {descr}, ctxt) )
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
