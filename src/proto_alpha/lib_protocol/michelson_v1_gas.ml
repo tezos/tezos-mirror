@@ -365,7 +365,7 @@ module Cost_of = struct
     let cost_N_ILeft = S.safe_int 15
 
     (* model N_ILevel *)
-    let cost_N_ILevel = S.safe_int 25
+    let cost_N_ILevel = S.safe_int 15
 
     (* model N_IList_iter *)
     let cost_N_IList_iter _ = S.safe_int 50
@@ -519,7 +519,7 @@ module Cost_of = struct
       S.safe_int 25 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_INow *)
-    let cost_N_INow = S.safe_int 25
+    let cost_N_INow = S.safe_int 15
 
     (* model N_IOpen_chest *)
     (* 612000 + chest * 19 + time * 19050 *)
