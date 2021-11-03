@@ -24,6 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () =
+  (* The default allocation policy of Octez is "best-fit" which gives
+     the best compromise in terms of performances and memory
+     consumption. This default policy can be changed if the user set
+     an environment variable. *)
+  (* Any change to this constant should be replicated into the
+     external validator in [src/bin_validation/main_validator.ml]. *)
+  let default_allocation_policy = 2 in
+  let current = Gc.get () in
+  (match Sys.getenv_opt "OCAMLRUNPARAM" with
+  | None -> Gc.set {current with allocation_policy = default_allocation_policy}
+  | Some _ -> ()) ;
+  if current.allocation_policy <> default_allocation_policy then
+    Format.eprintf
+      "WARNING: Default allocation policy changed: %d (default %d)@."
+      current.allocation_policy
+      default_allocation_policy
+
 (* This can be removed once the protocol is fixed
    (currently there is [to_int Int32.max_int] which is obviously invalid). *)
 let () =
