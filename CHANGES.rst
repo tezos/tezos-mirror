@@ -23,6 +23,14 @@ be documented here either.
 Node
 ----
 
+- The default allocation policy for the OCaml runtime is set to ``2``
+  (also called ``best-fit``). The previous value was ``0``. This new
+  policy gives the best compromise in terms of performances and memory
+  consumption. This policy can be changed using the ``OCAMLRUNPARAM``
+  environment variable. For example, to set back this value to ``0``,
+  one can do ``OCAMLRUNPARAM="a=0"``. More information on this
+  environment variable in ``https://ocaml.org/manual/runtime.html``
+
 - Bumped the network version to 2.
 
 - Added early block advertisement based on a precheck mechanism to
