@@ -1,10 +1,10 @@
-Merge Team
-==========
+Octez Merge Team
+================
 
-The merge team is a `group of developers
+The Octez merge team is a `group of developers
 <https://gitlab.com/tezos/tezos/-/project_members>`_
 from different teams of the
-Tezos ecosystem that controls what is merged into the
+Tezos ecosystem that ensures quality of what is merged into the
 https://gitlab.com/tezos/tezos/ repository.
 They are automatically selected as approvers when you create a merge
 request.
@@ -14,7 +14,7 @@ request.
 Merge Dispatcher
 ----------------
 
-Every week, a dedicated member of the merge team, called the *merge dispatcher*,
+Every week, a dedicated member of the Octez merge team, called the *merge dispatcher*,
 is in charge of making sure merge requests get merged.
 Their role is to:
 
@@ -29,11 +29,11 @@ re-assigned to the current merge dispatcher to make it easy to find out
 who it is. Don't hesitate to contact the merge dispatcher if you need help
 to get your merge request moving.
 
-Getting into the Merge Team
----------------------------
+Getting into the Octez Merge Team
+---------------------------------
 
-Admission to the merge team is done by cooptation.
-The merge team is always looking for software engineers with at least the following qualities:
+Admission to the Octez merge team is done by cooptation.
+The Octez merge team is always looking for software engineers with at least the following qualities:
 
 - You are an active developer on the `tezos/tezos
   <https://gitlab.com/tezos/tezos>`_ repository.
@@ -53,16 +53,16 @@ The merge team is always looking for software engineers with at least the follow
 - You are relatively skilled in one of the technologies used in the ``tezos/tezos``
   repository, i.e. ``OCaml``, ``python``, ``CI``, building, packaging, etc.
 
-Helping the Merge Team
-----------------------
+Helping the Octez Merge Team
+----------------------------
 
-Even if you are not in the merge team, you can help it! If you review a merge
+Even if you are not in the Octez merge team, you can help it! If you review a merge
 request and you think it is ready to be merged, you should click the *Approve* button
 even if your approval "doesn't count".
 
 If the merge request is not critical,
 or if you are knowledgeable on the merge request topic; your approval
-will make it easier for a merge team member to approve too.
+will make it easier for an Octez merge team member to approve too.
 This is also an excellent way to show your skills and willingness to move development
-forward, contributing to potentially making you a merge team member in the future
-(see *Getting into the Merge Team* above).
+forward, contributing to potentially making you an Octez merge team member in the future
+(see *Getting into the Octez Merge Team* above).

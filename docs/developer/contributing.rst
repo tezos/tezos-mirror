@@ -1,8 +1,8 @@
-How to contribute
-=================
+How to contribute to Octez
+==========================
 
 The purpose of this document is to help contributors participate to
-the Tezos OCaml codebase.
+Octez.
 
 Introduction
 ------------
@@ -13,7 +13,7 @@ There are several ways to get involved with the codebase, and you may want to st
 Reporting issues
 ~~~~~~~~~~~~~~~~
 
-The simplest way to contribute to Tezos is to report issues that you may
+The simplest way to contribute to Octez is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
 consult the :doc:`technical support sources <../introduction/support>`
@@ -290,7 +290,7 @@ Therefore, when creating your MR, observe the following rules:
     as described above in the :ref:`MR workflow <mr_workflow>`, in order
     to ease the reviewers' task.
   + `Allow commits from members who can merge to the target branch.`
-    This option is useful to allow members of the merge team, who are
+    This option is useful to allow members of the :doc:`Octez merge team <merge_team>`, who are
     not developers in your project, to commit to your branch.
     It helps to rebase and propose fixes.
 
@@ -399,7 +399,7 @@ by prefixing its title with ``Draft:``.
 On ``tezos/tezos`` draft merge requests are ignored by reviewers.
 Marking merge requests as draft hence helps lower
 the number of merge requests that require attention from the
-:doc:`merge team<merge_team>`.
+:doc:`Octez merge team<merge_team>`.
 
 .. _adding_new_dependencies:
 
@@ -462,21 +462,21 @@ Code Review
 -----------
 
 At Tezos all the code is peer reviewed before getting committed in the
-master branch by the :doc:`merge team <merge_team>`.
+master branch by the :doc:`Octez merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
 
 Merge Request Approvals
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Two approvals from different merge team members are required for merge
+Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
 requests to be merged. After their review, the second approver will also
 typically merge unless there is another merge in progress.
 
 Both approvals must correspond to different thorough reviews
-but merge team members may trust the reviews of other developers and
+but Octez merge team members may trust the reviews of other developers and
 approve without reviewing thoroughly, especially for less critical
-parts of the code. Good comments from reviewers help the merge team to decide
+parts of the code. Good comments from reviewers help the Octez merge team to decide
 to approve a merge request without doing a full review.
 
 For this reason, if you make a partial review, for instance if you only

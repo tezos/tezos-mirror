@@ -49,9 +49,9 @@
 
 /.gitlab                     @romain.nl @raphael-proust
 
-# Merge Team
+# Octez Merge Team
 #
-# These users are, as members of the Merge Team, permitted to act as authorities on any code.
+# These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
 # @arvidnl = Arvid Jakobsson
 # @camlspotter = Jun Furuse
