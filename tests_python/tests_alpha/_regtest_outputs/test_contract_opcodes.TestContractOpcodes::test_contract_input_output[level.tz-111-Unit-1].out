@@ -11,11 +11,11 @@ trace
     [ (Pair Unit 111)  	 ]
   - location: 7 (remaining gas: 1039994.938 units remaining)
     [  ]
-  - location: 8 (remaining gas: 1039994.913 units remaining)
+  - location: 8 (remaining gas: 1039994.923 units remaining)
     [ 1  	@level ]
-  - location: 9 (remaining gas: 1039994.898 units remaining)
+  - location: 9 (remaining gas: 1039994.908 units remaining)
     [ {}  	
       1  	@level ]
-  - location: 11 (remaining gas: 1039994.883 units remaining)
+  - location: 11 (remaining gas: 1039994.893 units remaining)
     [ (Pair {} 1)  	 ]
 
