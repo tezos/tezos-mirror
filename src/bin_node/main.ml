@@ -36,7 +36,7 @@ let () =
   (match Sys.getenv_opt "OCAMLRUNPARAM" with
   | None -> Gc.set {current with allocation_policy = default_allocation_policy}
   | Some _ -> ()) ;
-  if current.allocation_policy <> default_allocation_policy then
+  if (Gc.get ()).allocation_policy <> default_allocation_policy then
     Format.eprintf
       "WARNING: Default allocation policy changed: %d (default %d)@."
       current.allocation_policy
