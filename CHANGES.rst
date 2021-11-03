@@ -37,6 +37,9 @@ Node
   improve the propagation time in the network. This mechanism is only
   available for nodes with a network version of 2.
 
+- Fixed issue #1930: during decoding, the validity of Micheline
+  annotations is enforced.
+
 - The following RPCs output format changed:
   1. ``/workers/block_validator``,
   2. ``/workers/chain_validators``,
