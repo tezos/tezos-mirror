@@ -450,6 +450,95 @@ module Revamped = struct
         Mempool.classified_typ
         ~error_msg:"node1 mempool expected to be %L, got %R") ;
     unit
+
+  (** This test checks the one operation per manager per block restriction on
+      propagation.
+      We inject two operations with the same manager (and same counter) on two
+      differents nodes.
+      The first operation is propagated to a third node and classified as
+      applied. Then the second operation is propagated to the third node we
+      check that the second operation is classified as branch_delayed *)
+  let one_operation_per_manager_per_block_restriction_propagation =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_propagation"
+      ~tags:["mempool"; "manager_restriction"; "propagation"]
+    @@ fun protocol ->
+    log_step 1 "Initialize three nodes with the protocol." ;
+    let* (node1, client1) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0; Private_mode]
+        ~protocol
+        `Client
+        ()
+    in
+    let* (node2, client2) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0; Private_mode]
+        ~protocol
+        `Client
+        ()
+    in
+    let* (node3, client3) =
+      Client.init_with_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Forge and inject an operation on node1." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
+    let* oph1 = Operation.inject_transfer client1 in
+    let* () = injection_waiter in
+
+    log_step
+      3
+      "Forge and inject an operation on node2 with the same manager and \
+       counter but a different destination." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node2 in
+    let* oph2 =
+      Operation.inject_transfer ~destination:Constant.bootstrap3 client2
+    in
+    let* () = injection_waiter in
+
+    log_step
+      4
+      "Propagate %s from node1 to node3 and check that it is classified as \
+       applied."
+      oph1 ;
+    let* () = Client.Admin.trust_address client3 ~peer:node1
+    and* () = Client.Admin.trust_address client1 ~peer:node3 in
+    let* () = Client.Admin.connect_address ~peer:node1 client3 in
+    let* () = synchronize_mempool client3 node3 in
+    let* mempool_first_injection = RPC.get_mempool client3 in
+    let expected_mempool_first_injection =
+      {Mempool.empty with applied = [oph1]}
+    in
+    Check.(
+      (expected_mempool_first_injection = mempool_first_injection)
+        Mempool.classified_typ
+        ~error_msg:"node3 mempool expected to be %L, got %R") ;
+
+    log_step
+      5
+      "Propagate %s from node2 to node3 and check that it is classified as \
+       branch_delayed."
+      oph2 ;
+    let* () = Client.Admin.trust_address client3 ~peer:node2
+    and* () = Client.Admin.trust_address client2 ~peer:node3 in
+    let* () = Client.Admin.connect_address ~peer:node2 client3 in
+    let* () = synchronize_mempool client3 node3 in
+    let* mempool_second_injection = RPC.get_mempool client3 in
+    let expected_mempool_second_injection =
+      {expected_mempool_first_injection with branch_delayed = [oph2]}
+    in
+    Check.(
+      (expected_mempool_second_injection = mempool_second_injection)
+        Mempool.classified_typ
+        ~error_msg:"node3 mempool expected to be %L, got %R") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3223,6 +3312,8 @@ let register ~protocols =
   Revamped.flush_mempool ~protocols ;
   Revamped.recycling_branch_refused ~protocols ;
   Revamped.one_operation_per_manager_per_block_restriction_injection ~protocols ;
+  Revamped.one_operation_per_manager_per_block_restriction_propagation
+    ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
