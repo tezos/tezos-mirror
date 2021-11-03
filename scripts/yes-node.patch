@@ -1,8 +1,8 @@
 diff --git a/src/lib_crypto/signature.ml b/src/lib_crypto/signature.ml
-index acf7de0e1f..ae54273020 100644
+index df61310038..15d633c3b2 100644
 --- a/src/lib_crypto/signature.ml
 +++ b/src/lib_crypto/signature.ml
-@@ -635,7 +635,7 @@ let pp_watermark ppf =
+@@ -634,7 +634,7 @@ let pp_watermark ppf =
          "Custom: 0x%s"
          (try String.sub hexed 0 10 ^ "..." with Invalid_argument _ -> hexed)
  
@@ -11,7 +11,7 @@ index acf7de0e1f..ae54273020 100644
    let watermark = Option.map bytes_of_watermark watermark in
    match secret_key with
    | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -665,6 +665,25 @@ let check ?watermark public_key signature message =
+@@ -664,6 +664,25 @@ let check ?watermark public_key signature message =
        P256.check ?watermark pk signature message
    | _ -> false
  
@@ -37,3 +37,35 @@ index acf7de0e1f..ae54273020 100644
  (* The following cache is a hack to work around a quadratic algorithm
     in Tezos Mainnet protocols up to Edo. *)
  
+@@ -735,7 +754,17 @@ let concat msg signature = Bytes.cat msg (to_bytes signature)
+ 
+ type algo = Ed25519 | Secp256k1 | P256
+ 
+-let generate_key ?(algo = Ed25519) ?seed () =
++let fake_generate_key (pkh, pk, _) =
++  let sk_of_pk (pk : public_key) : secret_key =
++    let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
++    let sk_b = Bytes.sub pk_b 0 33 in
++    let sk = Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b in
++    sk
++  in
++  let fake_sk = sk_of_pk pk in
++  (pkh, pk, fake_sk)
++
++let original_generate_key ?(algo = Ed25519) ?seed () =
+   match algo with
+   | Ed25519 ->
+       let (pkh, pk, sk) = Ed25519.generate_key ?seed () in
+@@ -749,6 +778,12 @@ let generate_key ?(algo = Ed25519) ?seed () =
+       let (pkh, pk, sk) = P256.generate_key ?seed () in
+       (Public_key_hash.P256 pkh, Public_key.P256 pk, Secret_key.P256 sk)
+ 
++let generate_key ?(algo = Ed25519) ?seed () =
++  (* We keep the original keys generation to stay as close as possible of the
++     initial performences. *)
++  let true_keys = original_generate_key ~algo ?seed () in
++  fake_generate_key true_keys
++
+ let deterministic_nonce sk msg =
+   match sk with
+   | Secret_key.Ed25519 sk -> Ed25519.deterministic_nonce sk msg
