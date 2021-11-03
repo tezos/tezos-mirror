@@ -165,7 +165,8 @@ module Mempool = struct
       [ `Undecided
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
-      | `Refused of tztrace ] =
+      | `Refused of tztrace
+      | `Outdated of tztrace ] =
    fun config op size ->
     match get_manager_operation_gas_and_fee op with
     | Error err ->
@@ -261,7 +262,7 @@ module Mempool = struct
                   let delta = Raw_level.diff current_level level in
                   if delta > 2l then
                     (* consensus operation too far in the past. *)
-                    `Refused [Environment.wrap_tzerror Outdated_endorsement]
+                    `Outdated [Environment.wrap_tzerror Outdated_endorsement]
                   else
                     (* consensus operation not too far in the past or in the
                        future. *)

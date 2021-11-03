@@ -934,6 +934,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       type t = {
         applied : (Operation_hash.t * Next_proto.operation) list;
         refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+        outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
         branch_refused :
           (Next_proto.operation * error list) Operation_hash.Map.t;
         branch_delayed :
@@ -943,11 +944,35 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let version_0_encoding =
         conv
-          (fun {applied; refused; branch_refused; branch_delayed; unprocessed} ->
-            (applied, refused, branch_refused, branch_delayed, unprocessed))
-          (fun (applied, refused, branch_refused, branch_delayed, unprocessed) ->
-            {applied; refused; branch_refused; branch_delayed; unprocessed})
-          (obj5
+          (fun {
+                 applied;
+                 refused;
+                 outdated;
+                 branch_refused;
+                 branch_delayed;
+                 unprocessed;
+               } ->
+            ( applied,
+              refused,
+              outdated,
+              branch_refused,
+              branch_delayed,
+              unprocessed ))
+          (fun ( applied,
+                 refused,
+                 outdated,
+                 branch_refused,
+                 branch_delayed,
+                 unprocessed ) ->
+            {
+              applied;
+              refused;
+              outdated;
+              branch_refused;
+              branch_delayed;
+              unprocessed;
+            })
+          (obj6
              (req
                 "applied"
                 (list
@@ -963,6 +988,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          (dynamic_size Next_proto.operation_data_encoding)))))
              (req
                 "refused"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req
+                "outdated"
                 (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
@@ -999,11 +1030,35 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                         (obj1 (req "error" RPC_error.encoding))))))
         in
         conv
-          (fun {applied; refused; branch_refused; branch_delayed; unprocessed} ->
-            (applied, refused, branch_refused, branch_delayed, unprocessed))
-          (fun (applied, refused, branch_refused, branch_delayed, unprocessed) ->
-            {applied; refused; branch_refused; branch_delayed; unprocessed})
-          (obj5
+          (fun {
+                 applied;
+                 refused;
+                 outdated;
+                 branch_refused;
+                 branch_delayed;
+                 unprocessed;
+               } ->
+            ( applied,
+              refused,
+              outdated,
+              branch_refused,
+              branch_delayed,
+              unprocessed ))
+          (fun ( applied,
+                 refused,
+                 outdated,
+                 branch_refused,
+                 branch_delayed,
+                 unprocessed ) ->
+            {
+              applied;
+              refused;
+              outdated;
+              branch_refused;
+              branch_delayed;
+              unprocessed;
+            })
+          (obj6
              (req
                 "applied"
                 (list
@@ -1018,6 +1073,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                             Operation.shell_header_encoding)
                          (dynamic_size Next_proto.operation_data_encoding)))))
              (operations_with_error_encoding "refused")
+             (operations_with_error_encoding "outdated")
              (operations_with_error_encoding "branch_refused")
              (operations_with_error_encoding "branch_delayed")
              (req
@@ -1125,11 +1181,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let mempool_query =
         let open RPC_query in
-        query (fun applied refused branch_refused branch_delayed ->
+        query (fun applied refused outdated branch_refused branch_delayed ->
             object
               method applied = applied
 
               method refused = refused
+
+              method outdated = outdated
 
               method branch_refused = branch_refused
 
@@ -1147,6 +1205,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              RPC_arg.bool
              false
              (fun t -> t#refused)
+        |+ field
+             ~descr:"Include outdated operations"
+             "outdated"
+             RPC_arg.bool
+             false
+             (fun t -> t#outdated)
         |+ field
              ~descr:"Include branch refused operations"
              "branch_refused"
@@ -1426,6 +1490,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     type t = S.Mempool.t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
@@ -1465,8 +1530,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       RPC_context.make_call1 s ctxt chain () ()
 
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
-        ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false) ()
-        =
+        ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
+        ?(outdated = false) () =
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
       RPC_context.make_streamed_call
         s
@@ -1476,6 +1541,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
            method applied = applied
 
            method refused = refused
+
+           method outdated = outdated
 
            method branch_refused = branch_refused
 

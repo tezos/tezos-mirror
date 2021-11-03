@@ -526,6 +526,7 @@ let merge_preapps (old : error Preapply_result.t)
   {
     Preapply_result.applied = [];
     refused = merge old.refused neu.refused;
+    outdated = merge old.outdated neu.outdated;
     branch_refused = merge old.branch_refused neu.branch_refused;
     branch_delayed = merge old.branch_delayed neu.branch_delayed;
   }

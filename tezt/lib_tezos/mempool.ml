@@ -28,6 +28,7 @@ type t = {
   branch_delayed : string list;
   branch_refused : string list;
   refused : string list;
+  outdated : string list;
   unprocessed : string list;
 }
 
@@ -40,7 +41,7 @@ let typ : t Check.typ =
     (fun mempool ->
       sort
         (mempool.applied @ mempool.branch_delayed @ mempool.branch_refused
-       @ mempool.refused @ mempool.unprocessed))
+       @ mempool.refused @ mempool.outdated @ mempool.unprocessed))
     (list string)
 
 let empty =
@@ -49,6 +50,7 @@ let empty =
     branch_delayed = [];
     branch_refused = [];
     refused = [];
+    outdated = [];
     unprocessed = [];
   }
 
@@ -63,5 +65,6 @@ let symmetric_diff left right =
     branch_delayed = diff left.branch_delayed right.branch_delayed;
     branch_refused = diff left.branch_refused right.branch_refused;
     refused = diff left.refused right.refused;
+    outdated = diff left.outdated right.outdated;
     unprocessed = diff left.unprocessed right.unprocessed;
   }

@@ -845,6 +845,7 @@ module Recyle_operations = struct
         ~branch_delayed:true
         ~branch_refused:handle_branch_refused
         ~refused:false
+        ~outdated:false
         classification
       |> op_map_to_hash_list
     in
@@ -896,6 +897,7 @@ module Recyle_operations = struct
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
+        ~outdated:true
         classification
     in
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
@@ -917,6 +919,7 @@ module Recyle_operations = struct
         ~branch_delayed:true
         ~branch_refused:true
         ~refused:true
+        ~outdated:true
         classification
     in
     qcheck_eq' ~pp:op_map_pp ~expected ~actual ()

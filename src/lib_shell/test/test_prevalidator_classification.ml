@@ -147,28 +147,29 @@ let qcheck_bounded_map_is_empty bounded_map =
   in
   qcheck_eq_true ~actual
 
-(** Computes the set of operation hashes present in fields [refused;
+(** Computes the set of operation hashes present in fields [refused; outdated;
     branch_refused; branch_delayed; applied_rev] of [t]. Also checks
     that these fields are disjoint. *)
 let disjoint_union_classified_fields ?fail_msg (t : Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
       QCheck.Test.fail_reportf
-        "Invariant 'The fields: [refused; branch_refused; branch_delayed; \
-         applied] are disjoint' broken by t =@.%a@.%s"
+        "Invariant 'The fields: [refused; outdated; branch_refused; \
+         branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
         Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
     Operation_hash.Set.union acc next_set
   in
   let to_set = Classification.Internal_for_tests.set_of_bounded_map in
-  to_set t.refused +> to_set t.branch_refused +> to_set t.branch_delayed
+  to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
+  +> to_set t.branch_delayed
   +> (Operation_hash.Set.of_list @@ List.rev_map fst t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
-      in fields: [refused; branch_refused; branch_delayed; applied].
-    - The fields: [refused; branch_refused; branch_delayed; applied]
+      in fields: [refused; outdated; branch_refused; branch_delayed; applied].
+    - The fields: [refused; outdated; branch_refused; branch_delayed; applied]
       are disjoint.
     These invariants are enforced by [Prevalidator_classification]
     **as long as the caller does not [add] an operation which is already
@@ -199,8 +200,8 @@ let check_invariants ?fail_msg (t : Classification.t) =
     in
     QCheck.Test.fail_reportf
       "Invariant 'The field [in_mempool] is the set of all operation hashes \
-       present in fields: [refused; branch_refused; branch_delayed; applied]' \
-       broken by t =@.%a\n\
+       present in fields: [refused; outdated; branch_refused; branch_delayed; \
+       applied]' broken by t =@.%a\n\
        @.%s@.%a@.%s"
       Classification.Internal_for_tests.pp
       t
@@ -218,7 +219,8 @@ let classification_pp pp classification =
     | `Applied -> "Applied"
     | `Branch_delayed _ -> "Branch_delayed"
     | `Branch_refused _ -> "Branch_refused"
-    | `Refused _ -> "Refused")
+    | `Refused _ -> "Refused"
+    | `Outdated _ -> "Outdated")
 
 let event_pp pp = function
   | Add_if_not_present (classification, oph, _op) ->
@@ -233,16 +235,19 @@ let event_pp pp = function
   | Flush handle_branch_refused ->
       Format.fprintf pp "Flush ~handle_branch_refused:%b" handle_branch_refused
 
-let test_flush_empties_all_except_refused =
+let test_flush_empties_all_except_refused_and_outdated =
   let open QCheck in
   Test.make
     ~name:
-      "[flush ~handle_branch_refused:true] empties everything except [refused]"
+      "[flush ~handle_branch_refused:true] empties everything except [refused] \
+       and [outdated]"
     (make (Generators.t_gen ()))
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
+  let outdated_before = t.outdated |> Classification.map in
   Classification.Internal_for_tests.flush ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Classification.map in
+  let outdated_after = t.outdated |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
@@ -252,19 +257,27 @@ let test_flush_empties_all_except_refused =
     ~expected:refused_before
     ~actual:refused_after
     ()
+  && qcheck_eq'
+       ~pp:Operation_map.pp_with_trace
+       ~eq:Operation_map.eq
+       ~expected:outdated_before
+       ~actual:outdated_after
+       ()
 
 let test_flush_empties_all_except_refused_and_branch_refused =
   let open QCheck in
   Test.make
     ~name:
       "[flush ~handle_branch_refused:false] empties everything except \
-       [refused] and [branch_refused]"
+       [refused], [outdated] and [branch_refused]"
     (make (Generators.t_gen ()))
   @@ fun t ->
   let refused_before = t.refused |> Classification.map in
+  let outdated_before = t.outdated |> Classification.map in
   let branch_refused_before = t.branch_refused |> Classification.map in
   Classification.Internal_for_tests.flush ~handle_branch_refused:false t ;
   let refused_after = t.refused |> Classification.map in
+  let outdated_after = t.outdated |> Classification.map in
   let branch_refused_after = t.branch_refused |> Classification.map in
   let _ =
     qcheck_eq'
@@ -282,6 +295,12 @@ let test_flush_empties_all_except_refused_and_branch_refused =
     ~expected:refused_before
     ~actual:refused_after
     ()
+  && qcheck_eq'
+       ~pp:Operation_map.pp_with_trace
+       ~eq:Operation_map.eq
+       ~expected:outdated_before
+       ~actual:outdated_after
+       ()
 
 let test_is_in_mempool_remove =
   let open QCheck in
@@ -339,7 +358,8 @@ module Bounded = struct
     Classification.t
     * [ `Branch_delayed of tztrace
       | `Branch_refused of tztrace
-      | `Refused of tztrace ]
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
     * binding list
     * binding list
 
@@ -350,6 +370,7 @@ module Bounded = struct
       | `Branch_delayed _ -> "Branch_delayed <tztrace>"
       | `Branch_refused _ -> "Branch_refused <tztrace>"
       | `Refused _ -> "Refused <tztrace>"
+      | `Outdated _ -> "Outdated <tztrace>"
     in
     let binding_pp ppf bindings =
       bindings
@@ -386,7 +407,7 @@ module Bounded = struct
         Classification.add classification operation_hash operation t)
       inputs ;
     let+ error_classification =
-      oneofl [`Branch_delayed []; `Branch_refused []; `Refused []]
+      oneofl [`Branch_delayed []; `Branch_refused []; `Refused []; `Outdated []]
     and+ first_bindings =
       list_size (1 -- 10) Generators.(pair operation_hash_gen operation_gen)
     and+ other_bindings =
@@ -456,6 +477,7 @@ module Bounded = struct
       | `Branch_delayed _ -> t.branch_delayed
       | `Branch_refused _ -> t.branch_refused
       | `Refused _ -> t.refused
+      | `Outdated _ -> t.outdated
     in
     let () =
       Operation_hash.Map.iter
@@ -473,8 +495,9 @@ module Bounded = struct
       other_bindings
       (error_classification :> Classification.classification)
       t ;
-    (* [add] calls [on_discarded_operation] when adding any [Refused] operation,
-     * so the recorded discarded operations is a superset of the [first_bindings] ones. *)
+    (* [add] calls [on_discarded_operation] when adding any [Refused] or
+       [Outdated] operation, so the recorded discarded operations is a superset
+       of the [first_bindings] ones. *)
     check_discarded_contains_bindings
       ~discarded_hashes:(!discarded_operations_rev |> List.rev)
       ~bindings:first_bindings ;
@@ -529,6 +552,7 @@ module To_map = struct
       ~branch_delayed:true
       ~branch_refused:true
       ~refused:true
+      ~outdated:true
 
   (** Tests the relationship between [Classification.create]
       and [Classification.to_map] *)
@@ -674,6 +698,7 @@ module To_map = struct
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
+        ~outdated:true
         t
     in
     Classification.Internal_for_tests.flush ~handle_branch_refused t ;
@@ -694,6 +719,7 @@ module To_map = struct
         ~branch_delayed:false
         ~branch_refused:false
         ~refused:false
+        ~outdated:false
         t
       |> Operation_hash.Map.filter (fun oph' _val -> oph' = oph)
     in
@@ -735,6 +761,7 @@ module To_map = struct
            ~branch_delayed:false
            ~branch_refused:false
            ~refused:false
+           ~outdated:false
            t)
       ()
 end
@@ -747,7 +774,7 @@ let () =
       mk_tests
         "flush"
         [
-          test_flush_empties_all_except_refused;
+          test_flush_empties_all_except_refused_and_outdated;
           test_flush_empties_all_except_refused_and_branch_refused;
         ];
       mk_tests "is_in_mempool" [test_is_in_mempool_remove];

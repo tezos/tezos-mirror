@@ -389,6 +389,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
@@ -432,6 +433,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
       ?refused:bool ->
+      ?outdated:bool ->
       unit ->
       (((Operation_hash.t * Next_proto.operation) * error list) list
        Lwt_stream.t
@@ -679,7 +681,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < applied : bool
           ; branch_delayed : bool
           ; branch_refused : bool
-          ; refused : bool >,
+          ; refused : bool
+          ; outdated : bool >,
           unit,
           ((Operation_hash.t * Next_proto.operation) * error list) list )
         RPC_service.t

@@ -71,10 +71,10 @@ module type T = sig
 
   type result =
     | Applied of t * Proto.operation_receipt
-    | Branch_delayed of error list
-    | Branch_refused of error list
-    | Refused of error list
-    | Outdated
+    | Branch_delayed of tztrace
+    | Branch_refused of tztrace
+    | Refused of tztrace
+    | Outdated of tztrace
 
   val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 

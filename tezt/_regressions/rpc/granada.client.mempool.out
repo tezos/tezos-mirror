@@ -1,10 +1,10 @@
 tezt/_regressions/rpc/granada.client.mempool.out
 
-curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
-[]
+curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.prefilter.outdated_endorsement"}]}]
 [{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
 [{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]"}]
 [{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/pending_operations
@@ -34,6 +34,24 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
           "error":
             [ { "kind": "permanent",
                 "id": "proto.010-PtGRANAD.prefilter.fees_too_low" } ] } ] ],
+  "outdated":
+    [ [ "[OPERATION_HASH]",
+        { "protocol": "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV",
+          "branch": "[BRANCH_HASH]",
+          "contents":
+            [ { "kind": "endorsement_with_slot",
+                "endorsement":
+                  { "branch":
+                      "[BRANCH_HASH]",
+                    "operations": { "kind": "endorsement", "level": 2 },
+                    "signature":
+                      "[SIGNATURE]" },
+                "slot": 10 } ],
+          "signature":
+            "[SIGNATURE]",
+          "error":
+            [ { "kind": "temporary",
+                "id": "proto.010-PtGRANAD.prefilter.outdated_endorsement" } ] } ] ],
   "branch_refused":
     [ [ "[OPERATION_HASH]",
         { "protocol": "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV",
@@ -60,10 +78,10 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
                 "endorsement":
                   { "branch":
                       "[BRANCH_HASH]",
-                    "operations": { "kind": "endorsement", "level": 2 },
+                    "operations": { "kind": "endorsement", "level": 3 },
                     "signature":
                       "[SIGNATURE]" },
-                "slot": 10 } ],
+                "slot": 4 } ],
           "signature":
             "[SIGNATURE]",
           "error":
@@ -71,8 +89,8 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
                 "id": "proto.010-PtGRANAD.prefilter.outdated_endorsement" } ] } ] ],
   "unprocessed": [] }
 
-curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.010-PtGRANAD.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.prefilter.outdated_endorsement"}]}]
+curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.010-PtGRANAD.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.prefilter.outdated_endorsement"}]}]
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
@@ -475,6 +493,16 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                   {
                     "name": "refused",
                     "description": "Include refused operations",
+                    "kind": {
+                      "single": {
+                        "id": "single",
+                        "name": "bool"
+                      }
+                    }
+                  },
+                  {
+                    "name": "outdated",
+                    "description": "Include outdated operations",
                     "kind": {
                       "single": {
                         "id": "single",
@@ -3631,6 +3659,48 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               "additionalProperties": false
                             }
                           },
+                          "outdated": {
+                            "type": "array",
+                            "items": {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "hash": {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                "protocol": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                  ]
+                                },
+                                "branch": {
+                                  "$ref": "#/definitions/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/definitions/Signature"
+                                },
+                                "error": {
+                                  "$ref": "#/definitions/error"
+                                }
+                              },
+                              "required": [
+                                "error",
+                                "signature",
+                                "contents",
+                                "branch",
+                                "protocol",
+                                "hash"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "branch_refused": {
                             "type": "array",
                             "items": {
@@ -3758,6 +3828,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "unprocessed",
                           "branch_delayed",
                           "branch_refused",
+                          "outdated",
                           "refused",
                           "applied"
                         ],
@@ -3799,6 +3870,53 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             }
                           },
                           "refused": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": [
+                                {
+                                  "$ref": "#/definitions/Operation_hash"
+                                },
+                                {
+                                  "description": "An operation's shell header.",
+                                  "type": "object",
+                                  "properties": {
+                                    "protocol": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                      ]
+                                    },
+                                    "branch": {
+                                      "$ref": "#/definitions/block_hash"
+                                    },
+                                    "contents": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/definitions/010-PtGRANAD.operation.alpha.contents"
+                                      }
+                                    },
+                                    "signature": {
+                                      "$ref": "#/definitions/Signature"
+                                    },
+                                    "error": {
+                                      "$ref": "#/definitions/error"
+                                    }
+                                  },
+                                  "required": [
+                                    "error",
+                                    "signature",
+                                    "contents",
+                                    "branch",
+                                    "protocol"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ],
+                              "additionalItems": false
+                            }
+                          },
+                          "outdated": {
                             "type": "array",
                             "items": {
                               "type": "array",
@@ -3959,6 +4077,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "unprocessed",
                           "branch_delayed",
                           "branch_refused",
+                          "outdated",
                           "refused",
                           "applied"
                         ],

@@ -209,7 +209,11 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
 let () =
   let nb_ops = [64; 128] in
   let handle_refused_pair =
-    ((fun tztrace -> Classification.add (`Refused tztrace)), "handle_refused")
+    [
+      ((fun tztrace -> Classification.add (`Refused tztrace)), "handle_refused");
+      ( (fun tztrace -> Classification.add (`Outdated tztrace)),
+        "handle_outdated" );
+    ]
   in
   let handle_branch_pairs =
     [
@@ -219,7 +223,7 @@ let () =
         "handle_branch_delayed" );
     ]
   in
-  let applier_funs = handle_branch_pairs @ [handle_refused_pair] in
+  let applier_funs = handle_branch_pairs @ handle_refused_pair in
   let mk_test_cases ~test (applier_fun, applier_fun_str) =
     List.map
       (fun nb_ops ->
@@ -233,7 +237,8 @@ let () =
     List.map (mk_test_cases ~test:test_db_leak) applier_funs |> List.concat
   in
   let in_mempool_leak_test =
-    mk_test_cases ~test:test_in_mempool_leak handle_refused_pair
+    List.map (mk_test_cases ~test:test_in_mempool_leak) handle_refused_pair
+    |> List.concat
   in
   let ddb_clearing_tests =
     List.map

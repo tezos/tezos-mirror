@@ -27,7 +27,8 @@ type classification =
   [ `Applied
   | `Branch_delayed of tztrace
   | `Branch_refused of tztrace
-  | `Refused of tztrace ]
+  | `Refused of tztrace
+  | `Outdated of tztrace ]
 
 type bounded_map
 
@@ -53,6 +54,7 @@ type parameters = {
 type t = private {
   parameters : parameters;
   refused : bounded_map;
+  outdated : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
@@ -187,6 +189,7 @@ module Internal_for_tests : sig
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
+    outdated:bool ->
     t ->
     Operation.t Operation_hash.Map.t
 
@@ -194,7 +197,8 @@ module Internal_for_tests : sig
       - fields [applied_rev] and [branch_delayed] are emptied;
       - field [branch_refused] is emptied iff [handle_branch_refused] is [true];
       - field [refused] is left unchanged, to avoid revalidating operations that
-        will never be valid.
+        will never be valid;
+      - field [outdated] is left unchanged.
       Also updates field [in_mempool] to maintain the corresponding invariant
       of {!t}. *)
   val flush : t -> handle_branch_refused:bool -> unit

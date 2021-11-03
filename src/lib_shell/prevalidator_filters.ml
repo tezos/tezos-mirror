@@ -40,7 +40,8 @@ module type FILTER = sig
       [ `Undecided
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
-      | `Refused of tztrace ]
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
 
     val post_filter :
       config ->

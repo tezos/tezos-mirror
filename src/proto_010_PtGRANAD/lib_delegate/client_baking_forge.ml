@@ -465,7 +465,7 @@ let all_ops_valid (results : error Preapply_result.t list) =
   let open Operation_hash.Map in
   List.for_all
     (fun (result : error Preapply_result.t) ->
-      is_empty result.refused
+      is_empty result.refused && is_empty result.outdated
       && is_empty result.branch_refused
       && is_empty result.branch_delayed)
     results
@@ -533,6 +533,7 @@ let merge_preapps (old : error Preapply_result.t)
   {
     Preapply_result.applied = [];
     refused = merge old.refused neu.refused;
+    outdated = merge old.outdated neu.outdated;
     branch_refused = merge old.branch_refused neu.branch_refused;
     branch_delayed = merge old.branch_delayed neu.branch_delayed;
   }
@@ -543,12 +544,15 @@ let error_of_op (result : error Preapply_result.t) op =
   match Operation_hash.Map.find h result.refused with
   | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
   | None -> (
-      match Operation_hash.Map.find h result.branch_refused with
+      match Operation_hash.Map.find h result.outdated with
       | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
       | None -> (
-          match Operation_hash.Map.find h result.branch_delayed with
+          match Operation_hash.Map.find h result.branch_refused with
           | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
-          | None -> None))
+          | None -> (
+              match Operation_hash.Map.find h result.branch_delayed with
+              | Some (_, trace) -> Some (Failed_to_preapply (op, trace))
+              | None -> None)))
 
 let compute_endorsement_powers cctxt constants ~chain ~block =
   Delegate_services.Endorsing_rights.get
@@ -1013,6 +1017,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
     ~applied:true
     ~branch_delayed:false
     ~refused:false
+    ~outdated:false
     ~branch_refused:false
     ()
   >>=? fun (operation_stream, _stop) ->

@@ -28,6 +28,7 @@ type t = {
   branch_delayed : string list;
   branch_refused : string list;
   refused : string list;
+  outdated : string list;
   unprocessed : string list;
 }
 

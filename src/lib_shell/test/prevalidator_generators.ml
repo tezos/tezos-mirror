@@ -57,7 +57,13 @@ let operation_gen ?block_hash_t : Operation.t QCheck.Gen.t =
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck.Gen.t =
   QCheck.Gen.oneofa
-    [|`Applied; `Branch_delayed []; `Branch_refused []; `Refused []|]
+    [|
+      `Applied;
+      `Branch_delayed [];
+      `Branch_refused [];
+      `Refused [];
+      `Outdated [];
+    |]
 
 let unrefused_classification_gen : classification QCheck.Gen.t =
   QCheck.Gen.oneofa [|`Applied; `Branch_delayed []; `Branch_refused []|]
@@ -110,7 +116,8 @@ let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t =
         (freq_of_list t.applied_rev
         + freq_of_map (Classification.map t.branch_refused)
         + freq_of_map (Classification.map t.branch_delayed)
-        + freq_of_map (Classification.map t.refused))
+        + freq_of_map (Classification.map t.refused)
+        + freq_of_map (Classification.map t.outdated))
     in
     frequency
       [
@@ -118,6 +125,7 @@ let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t =
         freq_and_gen_of_map (Classification.map t.branch_refused);
         freq_and_gen_of_map (Classification.map t.branch_delayed);
         freq_and_gen_of_map (Classification.map t.refused);
+        freq_and_gen_of_map (Classification.map t.outdated);
         (freq_fresh t, pair operation_hash_gen operation_gen);
       ]
 
