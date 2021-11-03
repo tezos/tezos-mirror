@@ -58,6 +58,7 @@ unit:010_PtGRANAD:
   extends:
   - .unit_test_template_x86_64
   - .template__coverage
+  - .template__cobertura
   variables:
     MAKE_TARGETS: >
       src/proto_010_PtGRANAD/lib_client.test_proto
@@ -67,6 +68,7 @@ unit:011_PtHangz2:
   extends:
   - .unit_test_template_x86_64
   - .template__coverage
+  - .template__cobertura
   variables:
     MAKE_TARGETS: >
       src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -78,6 +80,7 @@ unit:alpha:
   extends:
   - .unit_test_template_x86_64
   - .template__coverage
+  - .template__cobertura
   variables:
     MAKE_TARGETS: >
       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -91,6 +94,7 @@ unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64
   - .template__coverage
+  - .template__cobertura
   variables:
     MAKE_TARGETS: test-nonproto-unit
 

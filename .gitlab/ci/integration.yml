@@ -9,6 +9,7 @@
   extends:
     - .test_template
     - .template__coverage
+    - .template__cobertura
   dependencies: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
@@ -110,6 +111,7 @@ integration:sandboxes:daemons-upgrade:
   extends:
     - .test_template
     - .template__coverage
+    - .template__cobertura
   needs:
     - build_x86_64
   dependencies:
@@ -129,6 +131,9 @@ integration:sandboxes:daemons-upgrade:
     - poetry run pytest "$PYTEST_SUITE" --exitfirst -m "$PYTEST_SUITE_MARKER" -s --log-dir=tmp "--junitxml=reports/$PYTEST_SUITE_NAME.xml" 2>&1 | tee "tmp/$PYTEST_SUITE_NAME.out" | tail
   after_script:
     - tail -n 100 tests_python/tmp/*
+    # We need the `after_script` of the cobertura template to be executed here.
+    # It is analogous (albeit not strictly equivalent) to the super() mechanism of OOP
+    - !reference [.template__cobertura, after_script]
   artifacts:
     paths:
       - tests_python/tmp/

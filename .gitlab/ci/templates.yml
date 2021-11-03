@@ -212,3 +212,16 @@ variables:
   variables:
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+
+# Create and upload cobertura report
+.template__cobertura:
+  after_script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/1945
+    # Pin bisect_ppx on Cobertura commit: https://github.com/aantron/bisect_ppx/pull/383
+    - opam repository add default https://opam.ocaml.org --rank=-1
+    - opam pin add bisect_ppx git+https://github.com/aantron/bisect_ppx.git#50ba4a38a091ba27a34139782994ee7d53f46091 --yes
+    - make coverage-report-cobertura
+  artifacts:
+    reports:
+      cobertura: _coverage_report/cobertura.xml
+

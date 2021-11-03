@@ -8,6 +8,7 @@
   extends:
     - .integration_template
     - .template__coverage
+    - .template__cobertura
   artifacts:
     reports:
       junit: tezt-junit.xml
