@@ -94,7 +94,9 @@ unit:non-proto-arm64:
 unit:js_components:
   extends: .unit_test_template_x86_64
   script:
-    - dune build @runtest_js
+    # install node
+    - . ./scripts/install_build_deps.js.sh
+    - make test-js
 
 unit:protocol_compiles:
   extends: .unit_test_template_x86_64
