@@ -331,8 +331,8 @@ module Set_add : Benchmark.S = struct
 end
 
 let () =
-  Registration.register (module Set_add) ;
-  Registration.register_for_codegen
+  Registration_helpers.register (module Set_add) ;
+  Registration_helpers.register_for_codegen
     "Set_add"
     (Model.For_codegen
        (WithExceptions.Option.get ~loc:__LOC__
@@ -389,8 +389,8 @@ module Set_elements : Benchmark.S = struct
 end
 
 let () =
-  Registration.register (module Set_elements) ;
-  Registration.register_for_codegen
+  Registration_helpers.register (module Set_elements) ;
+  Registration_helpers.register_for_codegen
     "Set_elements"
     (Model.For_codegen
        (WithExceptions.Option.get ~loc:__LOC__
@@ -465,8 +465,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
 end
 
 let () =
-  Registration.register (module Script_expr_hash_of_b58check_opt) ;
-  Registration.register_for_codegen
+  Registration_helpers.register (module Script_expr_hash_of_b58check_opt) ;
+  Registration_helpers.register_for_codegen
     "Script_expr_hash_of_b58check_opt"
     (Model.For_codegen
        (WithExceptions.Option.get ~loc:__LOC__
@@ -526,9 +526,9 @@ struct
 end
 
 let () =
-  Registration.register
+  Registration_helpers.register
     (module Global_constants_storage_expr_to_address_in_context) ;
-  Registration.register_for_codegen
+  Registration_helpers.register_for_codegen
     "Global_constants_storage_expr_to_address_in_context"
     (Model.For_codegen
        (WithExceptions.Option.get ~loc:__LOC__
@@ -634,9 +634,9 @@ module Global_constants_storage_expand_models = struct
   end
 
   let () =
-    Registration.register
+    Registration_helpers.register
       (module Global_constants_storage_expand_constant_branch) ;
-    Registration.register_for_codegen
+    Registration_helpers.register_for_codegen
       "Global_constants_storage_expand_constant_branch"
       (Model.For_codegen
          (WithExceptions.Option.get ~loc:__LOC__
@@ -714,9 +714,9 @@ module Global_constants_storage_expand_models = struct
   end
 
   let () =
-    Registration.register
+    Registration_helpers.register
       (module Global_constants_storage_expand_no_constant_branch) ;
-    Registration.register_for_codegen
+    Registration_helpers.register_for_codegen
       "Global_constants_storage_expand_no_constant_branch"
       (Model.For_codegen
          (WithExceptions.Option.get ~loc:__LOC__
