@@ -1156,8 +1156,67 @@ let get_merge_status block_store =
       | Lwt.Return (Error errs) -> Merge_failed errs
       | Lwt.Fail exn -> Merge_failed [Exn exn])
 
-let may_recover_merge block_store =
+let merge_temporary_floating block_store =
   let chain_dir = block_store.chain_dir in
+  Lwt_list.iter_s
+    Floating_block_store.close
+    (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
+  >>= fun () ->
+  (* Remove RO_TMP if it still exists *)
+  let ro_tmp_floating_store_dir_path =
+    Naming.floating_blocks_dir chain_dir RO_TMP |> Naming.dir_path
+  in
+  Lwt_utils_unix.remove_dir ro_tmp_floating_store_dir_path >>= fun () ->
+  (* If RW_TMP exists, merge RW and RW_TMP into one new
+     single floating_store RW_RESTORE then swap it with
+     the previous one. *)
+  Floating_block_store.all_files_exists chain_dir RW_TMP
+  >>= fun is_rw_tmp_present ->
+  (if is_rw_tmp_present then return_unit else return_unit) >>=? fun () ->
+  Floating_block_store.init chain_dir ~readonly:false (Restore RW)
+  >>= fun rw_restore ->
+  Lwt.finalize
+    (fun () ->
+      Floating_block_store.init chain_dir ~readonly:true RW >>= fun rw ->
+      Floating_block_store.init chain_dir ~readonly:true RW_TMP
+      >>= fun rw_tmp ->
+      Floating_block_store.append_floating_store ~from:rw ~into:rw_restore
+      >>=? fun () ->
+      Floating_block_store.append_floating_store ~from:rw_tmp ~into:rw_restore
+      >>=? fun () ->
+      Floating_block_store.close rw_restore >>= fun () ->
+      Floating_block_store.swap ~src:rw_restore ~dst:rw >>= fun () ->
+      Floating_block_store.delete_files rw_tmp >>= fun () -> return_unit)
+    (fun () -> Floating_block_store.delete_files rw_restore)
+  >>=? fun () ->
+  (* Re-instantiate RO and RW *)
+  Floating_block_store.init chain_dir ~readonly:false RO >>= fun ro ->
+  Floating_block_store.init chain_dir ~readonly:false RW >>= fun rw ->
+  block_store.ro_floating_block_stores <- [ro] ;
+  block_store.rw_floating_block_store <- rw ;
+  write_status block_store Idle
+
+(* Removes the potentially leftover temporary files from the cementing
+   of cycles. *)
+let may_clean_cementing_artifacts block_store =
+  let chain_dir = block_store.chain_dir in
+  let cemented_path = Naming.cemented_blocks_dir chain_dir |> Naming.dir_path in
+  let rec loop dir =
+    Lwt_unix.readdir dir >>= function
+    | s when Filename.extension s = ".tmp" ->
+        Lwt_unix.unlink (Filename.concat cemented_path s) >>= fun () -> loop dir
+    | _ -> loop dir
+  in
+  Lwt_unix.file_exists cemented_path >>= function
+  | true ->
+      Lwt_unix.opendir cemented_path >>= fun dir ->
+      Lwt.catch
+        (fun () ->
+          Lwt.finalize (fun () -> loop dir) (fun () -> Lwt_unix.closedir dir))
+        (function End_of_file -> Lwt.return_unit | err -> Lwt.fail err)
+  | false -> Lwt.return_unit
+
+let may_recover_merge block_store =
   fail_when block_store.readonly Cannot_write_in_readonly >>=? fun () ->
   Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
       Lwt_mutex.with_lock block_store.merge_mutex (fun () ->
@@ -1165,55 +1224,10 @@ let may_recover_merge block_store =
           | Idle -> return_unit
           | Merging ->
               Store_events.(emit recover_merge ()) >>= fun () ->
-              Lwt_list.iter_s
-                Floating_block_store.close
-                (block_store.rw_floating_block_store
-                 :: block_store.ro_floating_block_stores)
-              >>= fun () ->
-              (* Remove RO_TMP if it still exists *)
-              let ro_tmp_floating_store_dir_path =
-                Naming.floating_blocks_dir chain_dir RO_TMP |> Naming.dir_path
-              in
-              Lwt_utils_unix.remove_dir ro_tmp_floating_store_dir_path
-              >>= fun () ->
-              (* If RW_TMP exists, merge RW and RW_TMP into one new
-                 single floating_store RW_RESTORE then swap it with
-                 the previous one. *)
-              Floating_block_store.all_files_exists chain_dir RW_TMP
-              >>= fun is_rw_tmp_present ->
-              (if is_rw_tmp_present then return_unit else return_unit)
-              >>=? fun () ->
-              Floating_block_store.init chain_dir ~readonly:false (Restore RW)
-              >>= fun rw_restore ->
-              Lwt.finalize
-                (fun () ->
-                  Floating_block_store.init chain_dir ~readonly:true RW
-                  >>= fun rw ->
-                  Floating_block_store.init chain_dir ~readonly:true RW_TMP
-                  >>= fun rw_tmp ->
-                  Floating_block_store.append_floating_store
-                    ~from:rw
-                    ~into:rw_restore
-                  >>=? fun () ->
-                  Floating_block_store.append_floating_store
-                    ~from:rw_tmp
-                    ~into:rw_restore
-                  >>=? fun () ->
-                  Floating_block_store.close rw_restore >>= fun () ->
-                  Floating_block_store.swap ~src:rw_restore ~dst:rw
-                  >>= fun () ->
-                  Floating_block_store.delete_files rw_tmp >>= fun () ->
-                  return_unit)
-                (fun () -> Floating_block_store.delete_files rw_restore)
-              >>=? fun () ->
-              (* Re-instantiate RO and RW *)
-              Floating_block_store.init chain_dir ~readonly:false RO
-              >>= fun ro ->
-              Floating_block_store.init chain_dir ~readonly:false RW
-              >>= fun rw ->
-              block_store.ro_floating_block_stores <- [ro] ;
-              block_store.rw_floating_block_store <- rw ;
-              write_status block_store Idle >>=? fun () -> return_unit))
+              merge_temporary_floating block_store))
+  >>=? fun () ->
+  (* Try to clean temporary file anyway. *)
+  may_clean_cementing_artifacts block_store >>= return
 
 let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   Cemented_block_store.init chain_dir ~readonly >>=? fun cemented_store ->

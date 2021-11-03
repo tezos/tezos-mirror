@@ -345,6 +345,5 @@ val load :
 val close : block_store -> unit Lwt.t
 
 (** [may_recover_merge block_store] recovers, if needed, from a
-   [block_store] where the merge procedure was unexpectedly
-   interrupted. *)
+   [block_store] where the merge procedure was interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t

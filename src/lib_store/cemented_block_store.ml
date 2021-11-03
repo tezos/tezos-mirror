@@ -515,7 +515,6 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
       Lwt_utils_unix.write_bytes ~pos:0 ~len:preamble_length fd offsets_buffer)
     (fun () -> Lwt_utils_unix.safe_close fd >>= fun _ -> Lwt.return_unit)
   >>= fun () ->
-  (* TODO clear potential artifacts *)
   Lwt_unix.rename tmp_file_path final_path >>= fun () ->
   (* Flush the indexes to make sure that the data is stored on disk *)
   Cemented_block_level_index.flush
