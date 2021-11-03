@@ -16,5 +16,5 @@
 (rule
  (alias runtest_js)
  (package tezos-hacl-glue-js)
- (deps ../.yarnrc test.bc.js test.sh)
+ (deps ../.npmrc package-lock.json test.bc.js test.sh)
  (action (system ./test.sh)))
