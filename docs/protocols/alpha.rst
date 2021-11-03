@@ -42,6 +42,10 @@ Minor Changes
 
 - Remove the optional entrypoint in ticketer address. (MR :gl:`!3570`)
 
+- ``NOW`` and ``LEVEL`` are now passed to the Michelson interpreter as
+  step constants instead of being read from the context each time
+  these instructions are executed. (MR :gl:`!3524`)
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`)
