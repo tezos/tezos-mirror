@@ -337,7 +337,7 @@ val wait_for_identity : t -> string Lwt.t
 
 (** [wait_for_request ?level ~request node] waits for [request] event
    on the [node]. *)
-val wait_for_request : request:[< `Flush | `Inject] -> t -> unit Lwt.t
+val wait_for_request : request:[< `Flush | `Inject | `Notify] -> t -> unit Lwt.t
 
 (** Wait for a custom event to occur.
 

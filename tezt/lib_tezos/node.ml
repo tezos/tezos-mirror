@@ -380,10 +380,15 @@ let wait_for_identity node =
 
 let wait_for_request ~request node =
   let event_name =
-    match request with `Flush | `Inject -> "request_completed_notice.v0"
+    match request with
+    | `Flush | `Inject -> "request_completed_notice.v0"
+    | `Notify -> "request_completed_debug.v0"
   in
   let request_str =
-    match request with `Flush -> "flush" | `Inject -> "inject"
+    match request with
+    | `Flush -> "flush"
+    | `Inject -> "inject"
+    | `Notify -> "notify"
   in
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
