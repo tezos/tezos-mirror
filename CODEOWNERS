@@ -64,7 +64,6 @@
 # @NicVolanschi = Nic Volanschi
 # @paracetamolo = Marco Stronati
 # @pirbo = Pierre Boutillier
-# @pmetzger = Perry E. Metzger
 # @rafoo_ = Raphaël Cauderlier
 # @raphael-proust = Raphaël Proust
 # @romain.nl = Romain
@@ -78,7 +77,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @hhugo1 @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
+* @arvidnl @camlspotter @hhugo1 @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
 
 # CODEOWNERS Owners
 #
@@ -86,6 +85,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
-/docs/CODEOWNERS    @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
-/.gitlab/CODEOWNERS @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
+/CODEOWNERS         @murbard @pirbo @smondet @klakplok @vbotbol @romain.nl
+/docs/CODEOWNERS    @murbard @pirbo @smondet @klakplok @vbotbol @romain.nl
+/.gitlab/CODEOWNERS @murbard @pirbo @smondet @klakplok @vbotbol @romain.nl
