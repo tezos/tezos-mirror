@@ -206,3 +206,9 @@ variables:
       - opam_logs/
     expire_in: 1 week
     when: always
+
+# Add variables for bisect_ppx instrumentation
+.template__coverage:
+  variables:
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/

@@ -6,7 +6,9 @@
 # Ideally we should also check that the baker / accuser / endorser
 # exist (some tests use them) but their actual name depend on the protocol.
 .integration_template:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .template__coverage
   dependencies: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
@@ -105,7 +107,9 @@ integration:sandboxes:daemons-upgrade:
 # definition for the environment to run all integration tests
 # integration tests are run only on x86_64 architectures (for now)
 .integration_python_template:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .template__coverage
   needs:
     - build_x86_64
   dependencies:
