@@ -777,48 +777,52 @@ let record_inconsistent_types loc ta tb =
       ok @@ Inconsistent_types (Some loc, ta, tb))
 
 module type GAS_MONAD = sig
-  type 'a t
+  type ('a, 'trace) t
 
-  type 'a gas_monad = 'a t
+  type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-  val return : 'a -> 'a t
+  val return : 'a -> ('a, 'trace) t
 
-  val ( >>$ ) : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
 
-  val ( >|$ ) : 'a t -> ('a -> 'b) -> 'b t
+  val ( >|$ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
 
-  val ( >?$ ) : 'a t -> ('a -> 'b tzresult) -> 'b t
+  val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
 
-  val ( >??$ ) : 'a t -> ('a tzresult -> 'b t) -> 'b t
+  val ( >??$ ) :
+    ('a, 'trace) t ->
+    (('a, 'trace) result -> ('b, 'trace2) t) ->
+    ('b, 'trace2) t
 
-  val from_tzresult : 'a tzresult -> 'a t
+  val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
-  val gas_consume : Gas.cost -> unit t
+  val gas_consume : Gas.cost -> (unit, 'trace) t
 
-  val run : context -> 'a t -> ('a tzresult * context) tzresult
+  val run :
+    context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
 
-  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+  val record_trace_eval :
+    (unit -> 'err) -> ('a, 'err trace) t -> ('a, 'err trace) t
 end
 
 module Gas_monad : GAS_MONAD = struct
   (* The outer tzresult is for gas exhaustion only. The inner one is for all
      other (non-gas) errors. *)
-  type 'a t = context -> ('a tzresult * context) tzresult
+  type ('a, 'trace) t = context -> (('a, 'trace) result * context) tzresult
 
-  type 'a gas_monad = 'a t
+  type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-  let from_tzresult x ctxt = ok (x, ctxt)
+  let of_result x ctxt = ok (x, ctxt)
 
-  let return x = from_tzresult (ok x)
+  let return x = of_result (ok x)
 
   let ( >>$ ) m f ctxt =
     m ctxt >>? fun (x, ctxt) ->
-    match x with Ok y -> f y ctxt | Error _ as err -> from_tzresult err ctxt
+    match x with Ok y -> f y ctxt | Error _ as err -> of_result err ctxt
 
-  let ( >|$ ) m f ctxt =
-    m ctxt >>? fun (x, ctxt) -> from_tzresult (x >|? f) ctxt
+  let ( >|$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> of_result (x >|? f) ctxt
 
-  let ( >?$ ) m f = m >>$ fun x -> from_tzresult (f x)
+  let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
 
   let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
 
@@ -826,7 +830,9 @@ module Gas_monad : GAS_MONAD = struct
 
   let run ctxt x = x ctxt
 
-  let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
+  let record_trace_eval f m ctxt =
+    m ctxt >>? fun (x, ctxt) ->
+    of_result (x |> record_trace_eval @@ fun () -> ok @@ f ()) ctxt
 end
 
 let merge_type_metadata :
@@ -855,18 +861,22 @@ let rec merge_comparable_types :
     legacy:bool ->
     ta comparable_ty ->
     tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) Gas_monad.t =
+    ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
+      error trace )
+    Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ta tb ->
     gas_consume Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata ~legacy meta_a meta_b =
-      from_tzresult @@ merge_type_metadata ~legacy meta_a meta_b
+      of_result @@ merge_type_metadata ~legacy meta_a meta_b
     in
     let merge_field_annot ~legacy annot_a annot_b =
-      from_tzresult @@ merge_field_annot ~legacy annot_a annot_b
+      of_result @@ merge_field_annot ~legacy annot_a annot_b
     in
     let return f eq annot_a annot_b :
-        ((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) gas_monad =
+        ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
+          error trace )
+        gas_monad =
       merge_type_metadata ~legacy annot_a annot_b >>$ fun annot ->
       return (eq, f annot)
     in
@@ -930,7 +940,7 @@ let rec merge_comparable_types :
     | (_, _) ->
         let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
         let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
-        from_tzresult @@ error (Inconsistent_types (None, ta, tb))
+        of_result @@ error (Inconsistent_types (None, ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -971,7 +981,7 @@ let record_inconsistent_carbonated ta tb =
   Gas_monad.record_trace_eval (fun () ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
-      ok @@ Inconsistent_types (None, ta, tb))
+      Inconsistent_types (None, ta, tb))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
@@ -981,26 +991,29 @@ let merge_types :
     Script.location ->
     a ty ->
     b ty ->
-    ((a ty, b ty) eq * a ty) Gas_monad.t =
+    ((a ty, b ty) eq * a ty, error trace) Gas_monad.t =
   let open Gas_monad in
   fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
-      from_tzresult
+      of_result
         (merge_type_metadata ~legacy tn1 tn2
         |> record_inconsistent_types loc ty1 ty2)
     in
     let merge_field_annot ~legacy tn1 tn2 =
-      from_tzresult (merge_field_annot ~legacy tn1 tn2)
+      of_result (merge_field_annot ~legacy tn1 tn2)
     in
-    let merge_memo_sizes ms1 ms2 = from_tzresult (merge_memo_sizes ms1 ms2) in
+    let merge_memo_sizes ms1 ms2 = of_result (merge_memo_sizes ms1 ms2) in
     let rec help :
-        type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
+        type ta tb.
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
      fun ty1 ty2 -> help0 ty1 ty2 |> record_inconsistent_carbonated ty1 ty2
     and help0 :
-        type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
+        type ta tb.
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
      fun ty1 ty2 ->
       gas_consume Typecheck_costs.merge_cycle >>$ fun () ->
-      let return f eq annot_a annot_b : ((ta ty, tb ty) eq * ta ty) gas_monad =
+      let return f eq annot_a annot_b :
+          ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
         merge_type_metadata annot_a annot_b >>$ fun annot -> return (eq, f annot)
       in
       match (ty1, ty2) with
@@ -1106,8 +1119,7 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          from_tzresult @@ error
-          @@ merge_type_error ~merge_type_error_flag ty1 ty2
+          of_result @@ error @@ merge_type_error ~merge_type_error_flag ty1 ty2
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -2003,10 +2015,10 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
 
 let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
-    (string * exp ty) Gas_monad.t =
+    (string * exp ty, error trace) Gas_monad.t =
   let open Gas_monad in
   match find_entrypoint full ~root_name entrypoint with
-  | Error _ as err -> from_tzresult err
+  | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
       merge_types ~legacy ~merge_type_error_flag loc ty expected
       >??$ fun eq_ty ->
@@ -2017,8 +2029,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
           | Error _ ->
               merge_types ~legacy ~merge_type_error_flag loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
-      | _ ->
-          from_tzresult (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
+      | _ -> of_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
 
 module Entrypoints = Set.Make (String)
 

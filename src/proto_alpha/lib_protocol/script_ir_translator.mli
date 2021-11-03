@@ -119,38 +119,42 @@ module Gas_monad : sig
      It is useful for backtracking on type checking errors without backtracking
      the consumed gas.
   *)
-  type 'a t
+  type ('a, 'trace) t
 
-  (** Alias of ['a t] to avoid confusion when the module is open *)
-  type 'a gas_monad = 'a t
+  (** Alias of [('a, 'trace) t] to avoid confusion when the module is open *)
+  type ('a, 'trace) gas_monad = ('a, 'trace) t
 
   (** monadic return operator of the gas monad *)
-  val return : 'a -> 'a t
+  val return : 'a -> ('a, 'trace) t
 
   (** Binding operator for the gas monad *)
-  val ( >>$ ) : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
 
   (** Mapping operator for the gas monad, [m >|$ f] is equivalent to
      [m >>$ fun x -> return (f x)] *)
-  val ( >|$ ) : 'a t -> ('a -> 'b) -> 'b t
+  val ( >|$ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
 
   (** Variant of [( >>$ )] to bind uncarbonated functions *)
-  val ( >?$ ) : 'a t -> ('a -> 'b tzresult) -> 'b t
+  val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
 
   (** Another variant of [( >>$ )] that lets recover from inner errors *)
-  val ( >??$ ) : 'a t -> ('a tzresult -> 'b t) -> 'b t
+  val ( >??$ ) :
+    ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace) t) -> ('b, 'trace) t
 
-  (** gas-free embedding of tzresult values. [from_tzresult x] is equivalent to [return () >?$ fun () -> x] *)
-  val from_tzresult : 'a tzresult -> 'a t
+  (** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
+  val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
   (** Gas consumption *)
-  val gas_consume : Gas.cost -> unit t
+  val gas_consume : Gas.cost -> (unit, 'trace) t
 
   (** Escaping the gas monad *)
-  val run : context -> 'a t -> ('a tzresult * context) tzresult
+  val run :
+    context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
 
-  (** re-export of [Error_monad.record_trace_eval] *)
-  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+  (** re-export of [Error_monad.record_trace_eval]. This function has no
+      effect in the case of a gas-exhaustion error. *)
+  val record_trace_eval :
+    (unit -> 'err) -> ('a, 'err trace) t -> ('a, 'err trace) t
 end
 
 type type_logger =
@@ -210,7 +214,8 @@ val merge_types :
   Script.location ->
   'a Script_typed_ir.ty ->
   'b Script_typed_ir.ty ->
-  (('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq * 'a Script_typed_ir.ty)
+  ( ('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq * 'a Script_typed_ir.ty,
+    error trace )
   Gas_monad.t
 
 val parse_comparable_data :
