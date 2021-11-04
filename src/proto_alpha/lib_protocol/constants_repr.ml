@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,9 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let version_number_004 = "\000"
-
-let version_number = "\001"
+(* The fitness version number was:
+   - "\000" until and including proto 004
+   - "\001" until and including proto 010
+*)
+let fitness_version_number = "\002"
 
 let proof_of_work_nonce_size = 8
 
@@ -43,10 +46,27 @@ let max_micheline_bytes_limit = 50_000
 
 let max_allowed_global_constant_depth = 10_000
 
-(* In this version of the protocol, there is a single cache for
-   contract source code and storage. Its size has been chosen
-   not too exceed 100 000 000 bytes. *)
-let cache_layout = [100_000_000]
+(* In this version of the protocol, there are the following subcaches:
+
+   * One for contract source code and storage. Its size has been
+   chosen not too exceed 100 000 000 bytes.
+
+   * One for the stake distribution for all cycles stored at any
+   moment (* preserved_cycles + max_slashing_period + 1 *)
+
+   * One for the sampler state for all cycles stored at any moment.  *)
+
+let stake_distribution_size = 500 (* delegates*) * 15 (* words *) * 4
+(* bytes *)
+
+let sampler_state_size = 80 (* words *) * 4 (* bytes *)
+
+let cache_layout =
+  [
+    100_000_000;
+    8 (* cycles *) * stake_distribution_size;
+    8 (* cycles *) * sampler_state_size;
+  ]
 
 (* In previous versions of the protocol, this
    [michelson_maximum_type_size] limit was set to 1000 but
@@ -57,6 +77,18 @@ let cache_layout = [100_000_000]
 let michelson_maximum_type_size = 2001
 
 type fixed = unit
+
+type ratio = {numerator : int; denominator : int}
+
+let ratio_encoding =
+  let open Data_encoding in
+  conv
+    (fun r -> (r.numerator, r.denominator))
+    (fun (numerator, denominator) -> {numerator; denominator})
+    (obj2 (req "numerator" uint16) (req "denominator" uint16))
+
+let pp_ratio fmt {numerator; denominator} =
+  Format.fprintf fmt "%d/%d" numerator denominator
 
 let fixed_encoding =
   let open Data_encoding in
@@ -107,6 +139,28 @@ let fixed_encoding =
 
 let fixed = ()
 
+type delegate_selection =
+  | Random
+  | Round_robin_over of Signature.Public_key.t list list
+
+let delegate_selection_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Random_delegate_selection"
+        (constant "random")
+        (function Random -> Some () | _ -> None)
+        (fun () -> Random);
+      case
+        (Tag 1)
+        ~title:"Round_robin_over_delegates"
+        (list (list Signature.Public_key.encoding))
+        (function Round_robin_over l -> Some l | _ -> None)
+        (fun l -> Round_robin_over l);
+    ]
+
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
    the previous protocol may break the context migration, or (even
@@ -118,32 +172,35 @@ type parametric = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
-  blocks_per_roll_snapshot : int32;
+  blocks_per_stake_snapshot : int32;
   blocks_per_voting_period : int32;
-  time_between_blocks : Period_repr.t list;
-  minimal_block_delay : Period_repr.t;
-  endorsers_per_block : int;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
-  block_security_deposit : Tez_repr.t;
-  endorsement_security_deposit : Tez_repr.t;
-  baking_reward_per_endorsement : Tez_repr.t list;
-  endorsement_reward : Tez_repr.t list;
+  baking_reward_fixed_portion : Tez_repr.t;
+  baking_reward_bonus_per_slot : Tez_repr.t;
+  endorsing_reward_per_slot : Tez_repr.t;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
   quorum_max : int32;
   min_proposal_quorum : int32;
-  initial_endorsers : int;
-  delay_per_missing_endorsement : Period_repr.t;
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
   max_operations_time_to_live : int;
+  round_durations : Round_repr.Durations.t;
+  minimal_participation_ratio : ratio;
+  consensus_committee_size : int;
+  consensus_threshold : int;
+  max_slashing_period : int;
+  frozen_deposits_percentage : int;
+  double_baking_punishment : Tez_repr.t;
+  ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+  delegate_selection : delegate_selection;
 }
 
 let parametric_encoding =
@@ -153,130 +210,146 @@ let parametric_encoding =
       ( ( c.preserved_cycles,
           c.blocks_per_cycle,
           c.blocks_per_commitment,
-          c.blocks_per_roll_snapshot,
+          c.blocks_per_stake_snapshot,
           c.blocks_per_voting_period,
-          c.time_between_blocks,
-          c.endorsers_per_block,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
-          c.proof_of_work_threshold ),
-        ( ( c.tokens_per_roll,
-            c.seed_nonce_revelation_tip,
+          c.proof_of_work_threshold,
+          c.tokens_per_roll ),
+        ( ( c.seed_nonce_revelation_tip,
             c.origination_size,
-            c.block_security_deposit,
-            c.endorsement_security_deposit,
-            c.baking_reward_per_endorsement,
-            c.endorsement_reward,
+            c.baking_reward_fixed_portion,
+            c.baking_reward_bonus_per_slot,
+            c.endorsing_reward_per_slot,
             c.cost_per_byte,
-            c.hard_storage_limit_per_operation ),
-          ( c.quorum_min,
-            c.quorum_max,
-            c.min_proposal_quorum,
-            c.initial_endorsers,
-            c.delay_per_missing_endorsement,
-            c.minimal_block_delay,
-            c.liquidity_baking_subsidy,
-            c.liquidity_baking_sunset_level,
-            c.liquidity_baking_escape_ema_threshold,
-            c.max_operations_time_to_live ) ) ))
+            c.hard_storage_limit_per_operation,
+            c.quorum_min ),
+          ( ( c.quorum_max,
+              c.min_proposal_quorum,
+              c.liquidity_baking_subsidy,
+              c.liquidity_baking_sunset_level,
+              c.liquidity_baking_escape_ema_threshold,
+              c.max_operations_time_to_live,
+              c.round_durations,
+              c.consensus_committee_size,
+              c.consensus_threshold ),
+            ( c.minimal_participation_ratio,
+              c.max_slashing_period,
+              c.frozen_deposits_percentage,
+              c.double_baking_punishment,
+              c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
+              c.delegate_selection ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
-             blocks_per_roll_snapshot,
+             blocks_per_stake_snapshot,
              blocks_per_voting_period,
-             time_between_blocks,
-             endorsers_per_block,
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
-             proof_of_work_threshold ),
-           ( ( tokens_per_roll,
-               seed_nonce_revelation_tip,
+             proof_of_work_threshold,
+             tokens_per_roll ),
+           ( ( seed_nonce_revelation_tip,
                origination_size,
-               block_security_deposit,
-               endorsement_security_deposit,
-               baking_reward_per_endorsement,
-               endorsement_reward,
+               baking_reward_fixed_portion,
+               baking_reward_bonus_per_slot,
+               endorsing_reward_per_slot,
                cost_per_byte,
-               hard_storage_limit_per_operation ),
-             ( quorum_min,
-               quorum_max,
-               min_proposal_quorum,
-               initial_endorsers,
-               delay_per_missing_endorsement,
-               minimal_block_delay,
-               liquidity_baking_subsidy,
-               liquidity_baking_sunset_level,
-               liquidity_baking_escape_ema_threshold,
-               max_operations_time_to_live ) ) ) ->
+               hard_storage_limit_per_operation,
+               quorum_min ),
+             ( ( quorum_max,
+                 min_proposal_quorum,
+                 liquidity_baking_subsidy,
+                 liquidity_baking_sunset_level,
+                 liquidity_baking_escape_ema_threshold,
+                 max_operations_time_to_live,
+                 round_durations,
+                 consensus_committee_size,
+                 consensus_threshold ),
+               ( minimal_participation_ratio,
+                 max_slashing_period,
+                 frozen_deposits_percentage,
+                 double_baking_punishment,
+                 ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                 delegate_selection ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
         blocks_per_commitment;
-        blocks_per_roll_snapshot;
+        blocks_per_stake_snapshot;
         blocks_per_voting_period;
-        time_between_blocks;
-        endorsers_per_block;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         tokens_per_roll;
         seed_nonce_revelation_tip;
         origination_size;
-        block_security_deposit;
-        endorsement_security_deposit;
-        baking_reward_per_endorsement;
-        endorsement_reward;
+        baking_reward_fixed_portion;
+        baking_reward_bonus_per_slot;
+        endorsing_reward_per_slot;
         cost_per_byte;
         hard_storage_limit_per_operation;
         quorum_min;
         quorum_max;
         min_proposal_quorum;
-        initial_endorsers;
-        delay_per_missing_endorsement;
-        minimal_block_delay;
         liquidity_baking_subsidy;
         liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold;
         max_operations_time_to_live;
+        round_durations;
+        minimal_participation_ratio;
+        max_slashing_period;
+        consensus_committee_size;
+        consensus_threshold;
+        frozen_deposits_percentage;
+        double_baking_punishment;
+        ratio_of_frozen_deposits_slashed_per_double_endorsement;
+        delegate_selection;
       })
     (merge_objs
-       (obj10
+       (obj9
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
-          (req "blocks_per_roll_snapshot" int32)
+          (req "blocks_per_stake_snapshot" int32)
           (req "blocks_per_voting_period" int32)
-          (req "time_between_blocks" (list Period_repr.encoding))
-          (req "endorsers_per_block" uint16)
           (req
              "hard_gas_limit_per_operation"
              Gas_limit_repr.Arith.z_integral_encoding)
           (req
              "hard_gas_limit_per_block"
              Gas_limit_repr.Arith.z_integral_encoding)
-          (req "proof_of_work_threshold" int64))
+          (req "proof_of_work_threshold" int64)
+          (req "tokens_per_roll" Tez_repr.encoding))
        (merge_objs
-          (obj9
-             (req "tokens_per_roll" Tez_repr.encoding)
+          (obj8
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
-             (req "block_security_deposit" Tez_repr.encoding)
-             (req "endorsement_security_deposit" Tez_repr.encoding)
-             (req "baking_reward_per_endorsement" (list Tez_repr.encoding))
-             (req "endorsement_reward" (list Tez_repr.encoding))
+             (req "baking_reward_fixed_portion" Tez_repr.encoding)
+             (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
+             (req "endorsing_reward_per_slot" Tez_repr.encoding)
              (req "cost_per_byte" Tez_repr.encoding)
-             (req "hard_storage_limit_per_operation" z))
-          (obj10
-             (req "quorum_min" int32)
-             (req "quorum_max" int32)
-             (req "min_proposal_quorum" int32)
-             (req "initial_endorsers" uint16)
-             (req "delay_per_missing_endorsement" Period_repr.encoding)
-             (req "minimal_block_delay" Period_repr.encoding)
-             (req "liquidity_baking_subsidy" Tez_repr.encoding)
-             (req "liquidity_baking_sunset_level" int32)
-             (req "liquidity_baking_escape_ema_threshold" int32)
-             (req "max_operations_time_to_live" int16))))
+             (req "hard_storage_limit_per_operation" z)
+             (req "quorum_min" int32))
+          (merge_objs
+             (obj9
+                (req "quorum_max" int32)
+                (req "min_proposal_quorum" int32)
+                (req "liquidity_baking_subsidy" Tez_repr.encoding)
+                (req "liquidity_baking_sunset_level" int32)
+                (req "liquidity_baking_escape_ema_threshold" int32)
+                (req "max_operations_time_to_live" int16)
+                (req "round_durations" Round_repr.Durations.encoding)
+                (req "consensus_committee_size" int31)
+                (req "consensus_threshold" int31))
+             (obj6
+                (req "minimal_participation_ratio" ratio_encoding)
+                (req "max_slashing_period" int31)
+                (req "frozen_deposits_percentage" int31)
+                (req "double_baking_punishment" Tez_repr.encoding)
+                (req
+                   "ratio_of_frozen_deposits_slashed_per_double_endorsement"
+                   ratio_encoding)
+                (dft "delegate_selection" delegate_selection_encoding Random)))))
 
 type t = {fixed : fixed; parametric : parametric}
 
@@ -304,28 +377,86 @@ let () =
     (fun reason -> Invalid_protocol_constants reason)
 
 let check_constants constants =
-  let min_time_between_blocks =
-    match constants.time_between_blocks with
-    | first_time_between_blocks :: _ -> first_time_between_blocks
-    | [] ->
-        (* this constant is used in the Baking module *)
-        Period_repr.one_minute
-  in
   error_unless
-    Compare.Int64.(
-      Period_repr.to_seconds min_time_between_blocks
-      >= Period_repr.to_seconds constants.minimal_block_delay)
+    Compare.Int.(constants.consensus_committee_size > 0)
     (Invalid_protocol_constants
-       (Format.asprintf
-          "minimal_block_delay value (%Ld) should be smaller than \
-           time_between_blocks[0] value (%Ld)"
-          (Period_repr.to_seconds constants.minimal_block_delay)
-          (Period_repr.to_seconds min_time_between_blocks)))
+       "the consensus committee size must be higher than 0.")
   >>? fun () ->
   error_unless
-    Compare.Int.(constants.endorsers_per_block >= constants.initial_endorsers)
+    Compare.Int.(
+      constants.consensus_threshold >= 0
+      && constants.consensus_threshold <= constants.consensus_committee_size)
     (Invalid_protocol_constants
-       "initial_endorsers should be smaller than endorsers_per_block")
+       "the consensus threshold must be higher than 0 and less or equal the \
+        consensus commitee size.")
+  >>? fun () ->
+  error_unless
+    (let {numerator; denominator} = constants.minimal_participation_ratio in
+     Compare.Int.(numerator >= 0 && denominator > 0))
+    (Invalid_protocol_constants
+       "The minimal participation ratio must be a positive valid ratio.")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(
+      constants.minimal_participation_ratio.numerator
+      <= constants.minimal_participation_ratio.denominator)
+    (Invalid_protocol_constants
+       "the minimal participation ratio must be less or equal than 100%.")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(constants.max_slashing_period > 0)
+    (Invalid_protocol_constants "the unfreeze delay must be higher than 0.")
+  >>? fun () ->
+  (* The [frozen_deposits_percentage] should be a percentage *)
+  error_unless
+    Compare.Int.(
+      constants.frozen_deposits_percentage > 0
+      && constants.frozen_deposits_percentage <= 100)
+    (Invalid_protocol_constants
+       "the frozen percentage ratio must be higher than 0 and less than 100.")
+  >>? fun () ->
+  error_unless
+    Tez_repr.(constants.double_baking_punishment >= zero)
+    (Invalid_protocol_constants "the double baking punishment must be positive.")
+  >>? fun () ->
+  error_unless
+    (let {numerator; denominator} =
+       constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+     in
+     Compare.Int.(numerator >= 0 && denominator > 0))
+    (Invalid_protocol_constants
+       "The ratio of frozen deposits ratio slashed per double endorsement must \
+        be a positive valid ratio.")
+  >>? fun () -> Result.return_unit
+
+module Generated = struct
+  type t = {
+    consensus_threshold : int;
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
+  }
+
+  let generate ~consensus_committee_size ~blocks_per_minute =
+    let committee_size_third = consensus_committee_size / 3 in
+    let consensus_threshold = (2 * committee_size_third) + 1 in
+    (* As in previous protocols, we set the maximum total rewards per minute to
+       be 80 tez. *)
+    let rewards_per_minute = Tez_repr.(mul_exn one 80) in
+    let rewards_per_block =
+      Tez_repr.(div_exn rewards_per_minute blocks_per_minute)
+    in
+    let rewards_half = Tez_repr.(div_exn rewards_per_block 2) in
+    let rewards_quarter = Tez_repr.(div_exn rewards_per_block 4) in
+    {
+      consensus_threshold;
+      baking_reward_fixed_portion = rewards_quarter;
+      baking_reward_bonus_per_slot =
+        Tez_repr.div_exn rewards_quarter committee_size_third;
+      endorsing_reward_per_slot =
+        Tez_repr.div_exn rewards_half consensus_committee_size;
+    }
+end
 
 module Proto_previous = struct
   type parametric = {

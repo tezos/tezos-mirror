@@ -651,6 +651,46 @@ module Delegates : sig
     Client.t ->
     Process.t
 
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/full_balance *)
+  val get_full_balance :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_full_balance], but do not wait for the process to exit. *)
+  val spawn_get_full_balance :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_deposits *)
+  val get_frozen_deposits :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_frozen_deposits], but do not wait for the process to exit. *)
+  val spawn_get_frozen_deposits :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
   val get_deactivated :
     ?endpoint:Client.endpoint ->

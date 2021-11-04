@@ -41,7 +41,6 @@ val prepare_first_block :
     Lwt.t) ->
   level:int32 ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   (Raw_context.t, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t
 
 val prepare :
@@ -49,7 +48,6 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   (Raw_context.t
   * Receipt_repr.balance_updates
   * Migration_repr.origination_result list)

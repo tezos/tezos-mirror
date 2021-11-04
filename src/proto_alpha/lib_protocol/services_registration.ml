@@ -34,12 +34,10 @@ type rpc_context = {
 let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
   let level = block_header.level in
   let timestamp = block_header.timestamp in
-  let fitness = block_header.fitness in
   Alpha_context.prepare
     ~level
     ~predecessor_timestamp:timestamp
     ~timestamp
-    ~fitness
     context
   >|=? fun (context, _, _) -> {block_hash; block_header; context}
 
@@ -112,7 +110,10 @@ let get_rpc_services () =
   let p =
     RPC_directory.map
       (fun c ->
-        rpc_init c >|= function Error _ -> assert false | Ok c -> c.context)
+        rpc_init c >|= function
+        | Error t ->
+            raise (Failure (Format.asprintf "%a" Error_monad.pp_trace t))
+        | Ok c -> c.context)
       (Storage_description.build_directory Alpha_context.description)
   in
   RPC_directory.register_dynamic_directory

@@ -29,15 +29,16 @@ open Alpha_context
 open Apply_results
 open Protocol_client_context
 
-(* Under normal network conditions and an attacker with less
-   than 33% of stake, an operation can be considered final with
-   quasi-certainty if there are at least 5 blocks built on top of it.
-   See Emmy* TZIP for more detailed explanations. *)
-let num_confirmation_blocks = 5
-
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
-  let branch = Option.value ~default:0 branch in
+  (* The default value is set to 2, because with Tenderbake the same
+     transaction may be included again in another block candidate at
+     the same level, so 'branch' cannot point to the head. It's not a good
+     idea if it points to the head's predecessor as well, as the predecessor
+     hash may still change because of potential reorgs (only the predecessor
+     payload is finalized, not the whole block). So 'branch' should point to
+     HEAD~2 or to an older ancestor. *)
+  let branch = Option.value ~default:2 branch in
   (* TODO export parameter *)
   (match block with
   | `Head n -> return (`Head (n + branch))
@@ -229,7 +230,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
 let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(verbose_signing = false) ?fee_parameter ?branch ?src_sk
     (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun (chain_id, branch) ->
+  get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
@@ -240,7 +241,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some src_sk ->
       let watermark =
         match contents with
-        | Single (Endorsement _) -> Signature.(Endorsement chain_id)
+        (* TODO-TB sign endosrement? *)
         | _ -> Signature.Generic_operation
       in
       (if verbose_signing then
@@ -314,6 +315,7 @@ let estimated_gas_single (type kind)
     | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
     | Applied (Register_global_constant_result {consumed_gas; _}) ->
         Ok consumed_gas
+    | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
@@ -344,6 +346,7 @@ let estimated_storage_single (type kind) origination_size
     | Applied (Delegation_result _) -> Ok Z.zero
     | Applied (Register_global_constant_result {size_of_constant; _}) ->
         Ok size_of_constant
+    | Applied (Set_deposits_limit_result _) -> Ok Z.zero
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Z.zero (* there must be another error for this to happen *)
@@ -382,6 +385,7 @@ let originated_contracts_single (type kind)
     | Applied (Register_global_constant_result _) -> Ok []
     | Applied (Reveal_result _) -> Ok []
     | Applied (Delegation_result _) -> Ok []
+    | Applied (Set_deposits_limit_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)
@@ -779,6 +783,27 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         (Annotated_manager_operation.manager_list_from_annotated
            annotated_contents)
 
+let tenderbake_finality_confirmations = 1
+
+let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
+  | None -> Lwt.return_none
+  | Some cli_confirmations ->
+      if cli_confirmations > tenderbake_finality_confirmations then
+        cctxt#message
+          "Tenderbake needs at most %d confirmations for finality (%d given). \
+           Using %d confirmations."
+          tenderbake_finality_confirmations
+          cli_confirmations
+          tenderbake_finality_confirmations
+        >>= fun () -> Lwt.return_some tenderbake_finality_confirmations
+      else Lwt.return_some cli_confirmations
+
+(* For Tenderbake we restrain the interval of confirmations to be [0,
+   tenderbake_finality_confirmations]
+
+   Any value greater than the tenderbake_finality_confirmations is treated as if it
+   were tenderbake_finality_confirmations.
+ *)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
     ~fee_parameter (contents : kind contents_list) =
@@ -824,6 +849,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
     cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
+    (* Adjust user-provided confirmations with respect to Alpha protocol finality properties *)
+    tenderbake_adjust_confirmations cctxt confirmations >>= fun confirmations ->
     (match confirmations with
     | None ->
         cctxt#message
@@ -835,7 +862,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
            included.@]"
           Operation_hash.pp
           oph
-          num_confirmation_blocks
+          tenderbake_finality_confirmations
           Block_hash.pp
           op.shell.branch
         >>= fun () -> return result
@@ -879,7 +906,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     (match confirmations with
     | None -> Lwt.return_unit
     | Some number ->
-        if number >= num_confirmation_blocks then
+        if number >= tenderbake_finality_confirmations then
           cctxt#message
             "The operation was included in a block %d blocks ago."
             number
@@ -894,7 +921,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
             number
             Operation_hash.pp
             oph
-            num_confirmation_blocks
+            tenderbake_finality_confirmations
             Block_hash.pp
             op.shell.branch)
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)

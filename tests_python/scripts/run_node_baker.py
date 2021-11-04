@@ -6,7 +6,7 @@ from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
-def scenario(contract, storage, time_between_blocks, proto):
+def scenario(contract, storage, round_duration, proto):
     if proto is None:
         proto = 'alpha'
     assert proto in {'alpha', 'babylon'}, 'unknown protocol'
@@ -21,11 +21,14 @@ def scenario(contract, storage, time_between_blocks, proto):
         storage = 'unit'
     with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         parameters = dict(constants.ALPHA_PARAMETERS)
-        parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
-
+        parameters["round_durations"] = [
+            str(round_duration),
+            str(2 * round_duration),
+        ]
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        utils.activate_alpha(sandbox.client(1), proto_hash, parameters)
-        sandbox.add_baker(1, 'bootstrap5', proto=proto_daemon)
+        utils.activate_protocol(sandbox.client(1), proto_hash, parameters)
+        accounts = [f'bootstrap{i}' for i in range(1, 6)]
+        sandbox.add_baker(1, accounts, proto=proto_daemon)
         client = sandbox.client(1)
         if contract:
             args = ['--init', storage, '--burn-cap', '10.0']
@@ -36,7 +39,7 @@ def scenario(contract, storage, time_between_blocks, proto):
             )
         while 1:
             client.get_head()
-            time.sleep(time_between_blocks)
+            time.sleep(round_duration)
 
 
 DESCRIPTION = '''

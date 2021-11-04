@@ -345,15 +345,9 @@ let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
     client
   |> Process.check
 
-let spawn_endorse_for ?endpoint ?(key = Constant.bootstrap2.alias) client =
-  spawn_command ?endpoint client ["endorse"; "for"; key]
-
-let endorse_for ?endpoint ?key client =
-  spawn_endorse_for ?endpoint ?key client |> Process.check
-
 let empty_mempool_file ?(filename = "mempool.json") () =
   let mempool_str =
-    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}|}
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1928
      a write_file function should be added to the tezt base module *)
@@ -365,7 +359,8 @@ let empty_mempool_file ?(filename = "mempool.json") () =
   Lwt.return mempool
 
 let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
-    ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
+    ?(minimal_timestamp = true) ?mempool ?monitor_node_mempool ?force
+    ?context_path client =
   spawn_command
     ?endpoint
     client
@@ -379,21 +374,139 @@ let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
         ~none:[]
         ~some:(fun mempool_json -> ["--mempool"; mempool_json])
         mempool
+    @ (match monitor_node_mempool with
+      | None | Some true -> []
+      | Some false -> (
+          match protocol with
+          (* Only Alpha/Tenderbake supports this switch *)
+          | Some Alpha -> ["--ignore-node-mempool"]
+          | None | Some _ -> []))
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
     )
 
-let bake_for ?endpoint ?protocol ?key ?minimal_timestamp ?mempool ?force
-    ?context_path client =
+let bake_for ?endpoint ?protocol ?key ?minimal_timestamp ?mempool
+    ?monitor_node_mempool ?force ?context_path client =
   spawn_bake_for
     ?endpoint
     ?key
     ?minimal_timestamp
     ?mempool
+    ?monitor_node_mempool
     ?force
     ?context_path
     ?protocol
     client
+  |> Process.check
+
+let spawn_tenderbake_for ?endpoint ?protocol
+    ?(keys = [Constant.bootstrap1.alias]) ?(minimal_timestamp = true) ?mempool
+    ?monitor_node_mempool ?force ?context_path client =
+  spawn_command
+    ?endpoint
+    client
+    (Option.fold
+       ~none:[]
+       ~some:(fun p -> ["--protocol"; Protocol.hash p])
+       protocol
+    @ ["bake"; "for"] @ keys
+    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
+    @ Option.fold
+        ~none:[]
+        ~some:(fun mempool_json -> ["--mempool"; mempool_json])
+        mempool
+    @ (match monitor_node_mempool with
+      | None | Some true -> []
+      (* default behavior *)
+      | Some false -> ["--ignore-node-mempool"])
+    @ (match force with None | Some false -> [] | Some true -> ["--force"])
+    @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
+    )
+
+let tenderbake_for ?endpoint ?protocol ?keys ?minimal_timestamp ?mempool
+    ?monitor_node_mempool ?force ?context_path client =
+  spawn_tenderbake_for
+    ?endpoint
+    ?keys
+    ?minimal_timestamp
+    ?mempool
+    ?monitor_node_mempool
+    ?force
+    ?context_path
+    ?protocol
+    client
+  |> Process.check
+
+(* Handle endorsing and preendorsing similarly *)
+type tenderbake_action = Preendorse | Endorse | Propose
+
+let tenderbake_action_to_string = function
+  | Preendorse -> "preendorse"
+  | Endorse -> "endorse"
+  | Propose -> "propose"
+
+let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
+    ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false) ?force
+    client =
+  spawn_command
+    ?endpoint
+    client
+    (Option.fold
+       ~none:[]
+       ~some:(fun p -> ["--protocol"; Protocol.hash p])
+       protocol
+    @ [tenderbake_action_to_string tenderbake_action; "for"]
+    @ key
+    @
+    if minimal_timestamp then ["--minimal-timestamp"]
+    else
+      []
+      @
+      match force with
+      | None | Some false -> []
+      | Some true when protocol = Some Protocol.Alpha -> ["--force"]
+      | Some true -> [] (* --force is not supported prior to Tenderbake *))
+
+let spawn_endorse_for ?endpoint ?protocol ?key ?force client =
+  spawn_tenderbake_action_for
+    ~tenderbake_action:Endorse
+    ~minimal_timestamp:false
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    client
+
+let spawn_preendorse_for ?endpoint ?protocol ?key ?force client =
+  spawn_tenderbake_action_for
+    ~tenderbake_action:Preendorse
+    ~minimal_timestamp:false
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    client
+
+let spawn_propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
+    =
+  spawn_tenderbake_action_for
+    ~tenderbake_action:Propose
+    ?minimal_timestamp
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    client
+
+let endorse_for ?endpoint ?protocol ?key ?force client =
+  spawn_endorse_for ?endpoint ?protocol ?key ?force client |> Process.check
+
+let preendorse_for ?endpoint ?protocol ?key ?force client =
+  spawn_preendorse_for ?endpoint ?protocol ?key ?force client |> Process.check
+
+let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
+    client =
+  spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
 let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
@@ -575,7 +688,8 @@ let get_balance_for =
     and* output = Lwt_io.read (Process.stdout process) in
     return @@ extract_balance output
 
-let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client =
+let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
+    client =
   let cmd =
     let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
     (match sync_mode with
@@ -583,14 +697,14 @@ let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client =
     | Asynchronous -> common @ ["--asynchronous"])
     @ Option.fold
         ~none:[]
-        ~some:(fun constants ->
-          ["--protocol-constants"; Protocol.parameter_file ~constants protocol])
-        constants
+        ~some:(fun parameter_file -> ["--protocol-constants"; parameter_file])
+        parameter_file
   in
   spawn_command client cmd
 
-let create_mockup ?sync_mode ?constants ~protocol client =
-  spawn_create_mockup ?sync_mode ?constants ~protocol client |> Process.check
+let create_mockup ?sync_mode ?parameter_file ~protocol client =
+  spawn_create_mockup ?sync_mode ?parameter_file ~protocol client
+  |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")
     ~proto_hash client =
@@ -861,8 +975,8 @@ let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   in
   return client
 
-let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
-    ~protocol () =
+let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode
+    ?parameter_file ?constants ~protocol () =
   (* The mockup's public documentation doesn't use `--mode mockup`
      for `create mockup` (as it is not required). We wanna do the same here.
      Hence `Client None` here: *)
@@ -875,7 +989,12 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
       ?base_dir
       (Client (None, None))
   in
-  let* () = create_mockup ?sync_mode ?constants ~protocol client in
+  let parameter_file =
+    Option.value
+      ~default:(Protocol.parameter_file ?constants protocol)
+      parameter_file
+  in
+  let* () = create_mockup ?sync_mode ~parameter_file ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
   set_mode Mockup client ;
   return client

@@ -42,6 +42,18 @@ let pred c (l : Level_repr.t) =
   | None -> None
   | Some l -> Some (from_raw c l)
 
+let add c (l : Level_repr.t) n = from_raw c (Raw_level_repr.add l.level n)
+
+let sub c (l : Level_repr.t) n =
+  match Raw_level_repr.sub l.level n with
+  | None -> None
+  | Some raw_level ->
+      let cycle_eras = Raw_context.cycle_eras c in
+      let root_level = Level_repr.root_level cycle_eras in
+      if Raw_level_repr.(raw_level >= root_level.level) then
+        Some (from_raw c raw_level)
+      else None
+
 let current ctxt = Raw_context.current_level ctxt
 
 let previous ctxt =
@@ -102,9 +114,9 @@ let dawn_of_a_new_cycle ctxt =
 
 let may_snapshot_rolls ctxt =
   let level = current ctxt in
-  let blocks_per_roll_snapshot =
-    Constants_storage.blocks_per_roll_snapshot ctxt
+  let blocks_per_stake_snapshot =
+    Constants_storage.blocks_per_stake_snapshot ctxt
   in
   Compare.Int32.equal
-    (Int32.rem level.cycle_position blocks_per_roll_snapshot)
-    (Int32.pred blocks_per_roll_snapshot)
+    (Int32.rem level.cycle_position blocks_per_stake_snapshot)
+    (Int32.pred blocks_per_stake_snapshot)

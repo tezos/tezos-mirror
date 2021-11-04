@@ -110,8 +110,6 @@ let reveal ctxt level nonce =
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash : Nonce_hash.t;
   delegate : Signature.Public_key_hash.t;
-  rewards : Tez_repr.t;
-  fees : Tez_repr.t;
 }
 
 type status = Storage.Seed.nonce_status =
@@ -119,6 +117,13 @@ type status = Storage.Seed.nonce_status =
   | Revealed of Seed_repr.nonce
 
 let get = Storage.Seed.Nonce.get
+
+type nonce_presence = No_nonce_expected | Nonce_expected of status
+
+let check ctxt level =
+  Storage.Seed.Nonce.find ctxt level >>=? function
+  | None -> return No_nonce_expected
+  | Some status -> return (Nonce_expected status)
 
 let of_bytes = Seed_repr.make_nonce
 

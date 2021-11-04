@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -17,8 +17,8 @@ This sequence of operations was run:
     Gas limit: 1506
     Storage limit: 317 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000421
-      fees(the baker who will include this operation,0) ... +ꜩ0.000421
+      [CONTRACT_HASH] ... -ꜩ0.000421
+      payload fees(the block proposer) ....... +ꜩ0.000421
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ100
@@ -36,13 +36,15 @@ This sequence of operations was run:
         Consumed gas: 1405.257
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01
+          storage fees ........................... +ꜩ0.01
           [CONTRACT_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ100
           [CONTRACT_HASH] ... +ꜩ100
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as transfer_amount.
-Injected block [BLOCK_HASH]
+Injected block at minimal timestamp
 Node is bootstrapped.
 Estimated gas: 2049.488 units (will add 100 for safety)
 Estimated storage: 4 bytes added (will add 20 for safety)
@@ -50,7 +52,7 @@ Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -60,8 +62,8 @@ This sequence of operations was run:
     Gas limit: 2150
     Storage limit: 24 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000467
-      fees(the baker who will include this operation,0) ... +ꜩ0.000467
+      [CONTRACT_HASH] ... -ꜩ0.000467
+      payload fees(the block proposer) ....... +ꜩ0.000467
     Transaction:
       Amount: ꜩ500
       From: [CONTRACT_HASH]
@@ -73,8 +75,9 @@ This sequence of operations was run:
       Consumed gas: 2049.488
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.001
+        storage fees ........................... +ꜩ0.001
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
 
-Injected block [BLOCK_HASH]
+Injected block at minimal timestamp
 500000000

@@ -95,7 +95,7 @@ for proto in $(cat "$active_protocol_versions") ; do
     hostname: baker-$proto
     environment:
       - PROTOCOL=$proto
-    command: tezos-baker --max-priority 128
+    command: tezos-baker
     links:
       - node
     volumes:
@@ -132,7 +132,7 @@ for proto in $(cat "$active_protocol_versions") ; do
     hostname: baker-$proto-test
     environment:
       - PROTOCOL=$proto
-    command: tezos-baker-test --max-priority 128
+    command: tezos-baker-test
     links:
       - node
     volumes:

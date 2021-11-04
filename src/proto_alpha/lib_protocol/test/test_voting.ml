@@ -28,18 +28,26 @@
     Component:  Protocol (voting)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^voting$"
     Subject:    On the voting process.
+
 *)
 
-open Protocol
+(* Note that some of these tests assume (more or less) that the
+   accounts remain active during a voting period, which roughly
+   translates to the following condition being assumed to hold:
+   `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
+   *)
 
-(* missing stuff in Alpha_context.Vote *)
-let ballots_zero = Alpha_context.Vote.{yay = 0l; nay = 0l; pass = 0l}
+open Protocol
+open Alpha_context
+
+(* missing stuff in Vote *)
+let ballots_zero = Vote.{yay = 0l; nay = 0l; pass = 0l}
 
 let ballots_equal b1 b2 =
-  Alpha_context.Vote.(b1.yay = b2.yay && b1.nay = b2.nay && b1.pass = b2.pass)
+  Vote.(b1.yay = b2.yay && b1.nay = b2.nay && b1.pass = b2.pass)
 
 let ballots_pp ppf v =
-  Alpha_context.Vote.(
+  Vote.(
     Format.fprintf ppf "{ yay = %ld ; nay = %ld ; pass = %ld" v.yay v.nay v.pass)
 
 (* constants and ratios used in voting:
@@ -114,9 +122,9 @@ let assert_period_kind expected_kind kind loc =
     Alcotest.failf
       "%s - Unexpected voting period kind - expected %a, got %a"
       loc
-      Alpha_context.Voting_period.pp_kind
+      Voting_period.pp_kind
       expected_kind
-      Alpha_context.Voting_period.pp_kind
+      Voting_period.pp_kind
       kind
 
 let assert_period_index expected_index index loc =
@@ -179,7 +187,7 @@ let assert_period ?expected_kind ?expected_index ?expected_position
   else return_unit
 
 let mk_contracts_from_pkh pkh_list =
-  List.map Alpha_context.Contract.implicit_contract pkh_list
+  List.map Contract.implicit_contract pkh_list
 
 (* get the list of delegates and the list of their rolls from listings *)
 let get_delegates_and_rolls_from_listings b =
@@ -211,7 +219,8 @@ let bake_until_first_block_of_next_period b =
 let test_successful_vote num_delegates () =
   let open Alpha_context in
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, _) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, _) ->
   (* no ballots in proposal period *)
   Context.Vote.get_ballots (B b) >>=? fun v ->
   Assert.equal
@@ -488,7 +497,8 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
     in exploration, go back to proposal period. *)
 let test_not_enough_quorum_in_exploration num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, delegates) ->
   (* proposal period *)
   let open Alpha_context in
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
@@ -544,7 +554,8 @@ let test_not_enough_quorum_in_exploration num_delegates () =
    In promotion period, go back to proposal period. *)
 let test_not_enough_quorum_in_promotion num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, delegates) ->
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
@@ -650,7 +661,11 @@ let test_multiple_identical_proposals_count_as_one () =
     least 4 times the value of the tokens_per_roll constant. *)
 let test_supermajority_in_proposal there_is_a_winner () =
   let min_proposal_quorum = 0l in
-  Context.init ~min_proposal_quorum ~initial_balances:[1L; 1L; 1L] 10
+  Context.init
+    ~consensus_threshold:0
+    ~min_proposal_quorum
+    ~initial_balances:[1L; 1L; 1L]
+    10
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun {
@@ -676,8 +691,8 @@ let test_supermajority_in_proposal there_is_a_winner () =
     del2
     tokens_per_roll
   >>=? fun op2 ->
-  (if there_is_a_winner then Test_tez.Tez.( *? ) tokens_per_roll 3L
-  else Test_tez.Tez.( *? ) tokens_per_roll 2L)
+  (if there_is_a_winner then Test_tez.( *? ) tokens_per_roll 3L
+  else Test_tez.( *? ) tokens_per_roll 2L)
   >>?= fun bal3 ->
   Op.transaction
     (B b)
@@ -720,7 +735,10 @@ let test_supermajority_in_proposal there_is_a_winner () =
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
   let half_tokens = Int64.div total_tokens 2L in
-  Context.init ~initial_balances:[1L; half_tokens; half_tokens] 3
+  Context.init
+    ~consensus_threshold:0
+    ~initial_balances:[1L; half_tokens; half_tokens]
+    3
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun {
@@ -743,7 +761,7 @@ let test_quorum_in_proposal has_quorum () =
     else Int64.(sub (of_int32 min_proposal_quorum) 10L)
   in
   let bal =
-    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.Tez.of_mutez_exn
+    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez_exn
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
   Block.bake ~policy ~operations:[op2] b >>=? fun b ->
@@ -777,7 +795,8 @@ let test_quorum_in_proposal has_quorum () =
     reached. Otherwise, it remains in proposal period. *)
 let test_supermajority_in_exploration supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
-  Context.init ~min_proposal_quorum 100 >>=? fun (b, delegates) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum 100
+  >>=? fun (b, delegates) ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let proposal = protos.(0) in
   Op.proposals (B b) del1 [proposal] >>=? fun ops1 ->
@@ -821,7 +840,8 @@ let test_supermajority_in_exploration supermajority () =
     proposals. *)
 let test_no_winning_proposal num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, _) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, _) ->
   (* beginning of proposal, denoted by _p1;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b >>=? fun (delegates_p1, _rolls_p1) ->
@@ -843,7 +863,8 @@ let test_no_winning_proposal num_delegates () =
     maximum quorum cap. *)
 let test_quorum_capped_maximum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, delegates) ->
   (* set the participation EMA to 100% *)
   Context.Vote.set_participation_ema b 100_00l >>= fun b ->
   Context.get_constants (B b) >>=? fun {parametric = {quorum_max; _}; _} ->
@@ -883,7 +904,8 @@ let test_quorum_capped_maximum num_delegates () =
     minimum quorum cap. *)
 let test_quorum_capped_minimum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
+  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
+  >>=? fun (b, delegates) ->
   (* set the participation EMA to 0% *)
   Context.Vote.set_participation_ema b 0l >>= fun b ->
   Context.get_constants (B b) >>=? fun {parametric = {quorum_min; _}; _} ->
@@ -928,34 +950,46 @@ let get_voting_power block pkhash =
     the total voting power coincides with the addition of the voting powers
     of bakers *)
 let test_voting_power_updated_each_voting_period () =
-  let open Test_tez.Tez in
+  let init_bal1 = 80_000_000_000L in
+  let init_bal2 = 48_000_000_000L in
+  let init_bal3 = 40_000_000_000L in
   (* Create three accounts with different amounts *)
   Context.init
-    ~initial_balances:[80_000_000_000L; 48_000_000_000L; 4_000_000_000_000L]
+    ~consensus_threshold:0
+    ~initial_balances:[init_bal1; init_bal2; init_bal3]
     3
-  >>=? fun (block, contracts) ->
+  >>=? fun (genesis, contracts) ->
+  Context.get_constants (B genesis)
+  >>=? fun {parametric = {tokens_per_roll; _}; _} ->
   let con1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
   let con3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2 in
-  (* Retrieve balance of con1 *)
-  Context.Contract.balance (B block) con1 >>=? fun balance1 ->
-  Assert.equal_tez ~loc:__LOC__ balance1 (of_mutez_exn 80_000_000_000L)
-  >>=? fun _ ->
-  (* Retrieve balance of con2 *)
-  Context.Contract.balance (B block) con2 >>=? fun balance2 ->
-  Assert.equal_tez ~loc:__LOC__ balance2 (of_mutez_exn 48_000_000_000L)
-  >>=? fun _ ->
-  (* Retrieve balance of con3 *)
-  Context.Contract.balance (B block) con3 >>=? fun balance3 ->
-  (* Retrieve constants blocks_per_voting_period and tokens_per_roll *)
-  Context.get_constants (B block)
-  >>=? fun {parametric = {tokens_per_roll; _}; _} ->
   (* Get the key hashes of the bakers *)
-  Context.get_bakers (B block) >>=? fun bakers ->
-  (* [Context.init] and [Context.get_bakers] store the accounts in reversed orders *)
-  let baker1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 2 in
-  let baker2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 1 in
-  let baker3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 0 in
+  Context.Contract.pkh con1 >>=? fun baker1 ->
+  Context.Contract.pkh con2 >>=? fun baker2 ->
+  Context.Contract.pkh con3 >>=? fun baker3 ->
+  (* Retrieve balance of con1 *)
+  let open Test_tez in
+  Context.Contract.balance (B genesis) con1 >>=? fun balance1 ->
+  Context.Delegate.frozen_deposits (B genesis) baker1
+  >>=? fun frozen_deposits1 ->
+  balance1 +? frozen_deposits1 >>?= fun full_balance1 ->
+  Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez_exn init_bal1)
+  >>=? fun () ->
+  (* Retrieve balance of con2 *)
+  Context.Contract.balance (B genesis) con2 >>=? fun balance2 ->
+  Context.Delegate.frozen_deposits (B genesis) baker2
+  >>=? fun frozen_deposits2 ->
+  balance2 +? frozen_deposits2 >>?= fun full_balance2 ->
+  Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez_exn init_bal2)
+  >>=? fun () ->
+  (* Retrieve balance of con3 *)
+  Context.Contract.balance (B genesis) con3 >>=? fun balance3 ->
+  Context.Delegate.frozen_deposits (B genesis) baker3
+  >>=? fun frozen_deposits3 ->
+  balance3 +? frozen_deposits3 >>?= fun full_balance3 ->
+  Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez_exn init_bal3)
+  >>=? fun () ->
   (* Auxiliary assert_voting_power *)
   let assert_voting_power ~loc n block baker =
     get_voting_power block baker >>=? fun voting_power ->
@@ -968,19 +1002,19 @@ let test_voting_power_updated_each_voting_period () =
   in
   (* Assert voting power is equal to the balance divided by tokens_per_roll *)
   let expected_power_of_baker_1 =
-    Int64.(to_int (div (to_mutez balance1) (to_mutez tokens_per_roll)))
+    Int64.(to_int (div (to_mutez full_balance1) (to_mutez tokens_per_roll)))
   in
-  assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
-  >>=? fun _ ->
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 genesis baker1
+  >>=? fun () ->
   (* Assert voting power is equal to the balance divided by tokens_per_roll *)
   let expected_power_of_baker_2 =
-    Int64.(to_int (div (to_mutez balance2) (to_mutez tokens_per_roll)))
+    Int64.(to_int (div (to_mutez full_balance2) (to_mutez tokens_per_roll)))
   in
-  assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
-  >>=? fun _ ->
+  assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 genesis baker2
+  >>=? fun () ->
   (* Assert total voting power *)
   let expected_power_of_baker_3 =
-    Int64.(to_int (div (to_mutez balance3) (to_mutez tokens_per_roll)))
+    Int64.(to_int (div (to_mutez full_balance3) (to_mutez tokens_per_roll)))
   in
   assert_total_voting_power
     ~loc:__LOC__
@@ -988,31 +1022,33 @@ let test_voting_power_updated_each_voting_period () =
       add
         (add expected_power_of_baker_1 expected_power_of_baker_2)
         expected_power_of_baker_3)
-    block
-  >>=? fun _ ->
+    genesis
+  >>=? fun () ->
   (* Create policy that excludes baker1 and baker2 from baking *)
   let policy = Block.Excluding [baker1; baker2] in
   (* Transfer tokens_per_roll * num_rolls from baker1 to baker2 *)
   let num_rolls = 5L in
   tokens_per_roll *? num_rolls >>?= fun amount ->
-  Op.transaction (B block) con1 con2 amount >>=? fun op ->
+  Op.transaction (B genesis) con1 con2 amount >>=? fun op ->
   (* Bake the block containing the transaction *)
-  Block.bake ~policy ~operations:[op] block >>=? fun block ->
+  Block.bake ~policy ~operations:[op] genesis >>=? fun block ->
   (* Retrieve balance of con1 *)
   Context.Contract.balance (B block) con1 >>=? fun balance1 ->
-  (* Assert balance has changed by tokens_per_roll * num_rolls *)
-  tokens_per_roll *? num_rolls >>?= fun rolls ->
-  of_mutez_exn 80_000_000_000L -? rolls
+  (* Assert balance has changed by deducing the amount *)
+  of_mutez_exn init_bal1 -? amount >>?= fun balance1_after_deducing_amount ->
+  Context.Delegate.frozen_deposits (B block) baker1 >>=? fun frozen_deposit1 ->
+  balance1_after_deducing_amount -? frozen_deposit1
   >>?= Assert.equal_tez ~loc:__LOC__ balance1
-  >>=? fun _ ->
+  >>=? fun () ->
   (* Retrieve balance of con2 *)
   Context.Contract.balance (B block) con2 >>=? fun balance2 ->
-  (* Assert balance has changed by tokens_per_roll * num_rolls *)
-  tokens_per_roll *? num_rolls >>?= fun rolls ->
-  of_mutez_exn 48_000_000_000L +? rolls
+  (* Assert balance has changed by adding amount *)
+  of_mutez_exn init_bal2 +? amount >>?= fun balance2_after_adding_amount ->
+  Context.Delegate.frozen_deposits (B block) baker2 >>=? fun frozen_deposit2 ->
+  balance2_after_adding_amount -? frozen_deposit2
   >>?= Assert.equal_tez ~loc:__LOC__ balance2
   >>=? fun () ->
-  Block.bake block >>=? fun block ->
+  Block.bake ~policy block >>=? fun block ->
   (* Assert voting power (and total) remains the same before next voting period *)
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
   >>=? fun () ->
@@ -1027,7 +1063,7 @@ let test_voting_power_updated_each_voting_period () =
         (add expected_power_of_baker_1 expected_power_of_baker_2)
         expected_power_of_baker_3)
     block
-  >>=? fun _ ->
+  >>=? fun () ->
   bake_until_first_block_of_next_period block >>=? fun block ->
   (* Assert voting power of baker1 has decreased by num_rolls *)
   let expected_power_of_baker_1 =

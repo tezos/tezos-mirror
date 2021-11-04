@@ -272,6 +272,13 @@ module type Indexed_data_snapshotable_storage = sig
 
   val snapshot : context -> snapshot -> Raw_context.t tzresult Lwt.t
 
+  val fold_snapshot :
+    context ->
+    snapshot ->
+    init:'a ->
+    f:(key -> value -> 'a -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t
+
   val delete_snapshot : context -> snapshot -> Raw_context.t Lwt.t
 end
 

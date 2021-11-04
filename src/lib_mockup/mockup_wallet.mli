@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type bootstrap_secret = {
+  name : string;
+  sk_uri : Tezos_client_base.Client_keys.sk_uri;
+}
+
+val default_bootstrap_accounts : bootstrap_secret list tzresult Lwt.t
+
 (** Initializes a wallet with bootstrap accounts (including secret keys).
     If the second argument is provided, it must be a path to a file
     containing definitions of the bootstrap accounts in JSON format.

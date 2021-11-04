@@ -42,25 +42,14 @@ let test_max_operations_ttl () =
   let open Protocol in
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
 
-     [minimal_block_delay context *  max_operations_time_to_live = 3600] *)
-  let minimal_block_delay =
+     [minimal_time_between_blocks *  max_operations_time_to_live = 3600] *)
+  let constants =
     Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-      .minimal_block_delay
   in
-  let time_between_blocks =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-      .time_between_blocks
-  in
-  let max_operations_time_to_live =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-      .max_operations_time_to_live
-  in
-  Context.init ~time_between_blocks ~minimal_block_delay 1 >>=? fun (b, _) ->
-  Context.get_constants (Context.B b) >>=? fun constants ->
   Environment.wrap_tzresult
     (Alpha_context.Period.mult
-       (Int32.of_int max_operations_time_to_live)
-       constants.parametric.minimal_block_delay)
+       (Int32.of_int constants.max_operations_time_to_live)
+       (Alpha_context.Round.Durations.first constants.round_durations))
   >>?= fun result ->
   Assert.equal
     ~loc:__LOC__
@@ -70,22 +59,25 @@ let test_max_operations_ttl () =
     Alpha_context.Period.one_hour
     result
 
-(* Test that the amount of the liquidity baking subsidy is 1/16th of total rewards
-   of a fully-endorsed block with priority zero. *)
+(** Test that the amount of the liquidity baking subsidy is epsilon smaller than
+   1/16th of the maximum reward. *)
 let liquidity_baking_subsidy_param () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
-  Context.get_constants (B blk) >>=? fun csts ->
-  let hd l = Option.value_fe ~error:(fun () -> assert false) (List.hd l) in
-  hd csts.parametric.baking_reward_per_endorsement
-  >>?= fun baking_reward_per_endorsement ->
-  hd csts.parametric.endorsement_reward >>?= fun endorsement_reward ->
-  let endorsers_per_block = csts.parametric.endorsers_per_block in
-  let actual_subsidy = csts.parametric.liquidity_baking_subsidy in
-  Tez.(baking_reward_per_endorsement +? endorsement_reward)
-  >>?= fun total_reward ->
-  Tez.(mul_exn total_reward endorsers_per_block /? 16L)
-  >>?= fun expected_subsidy ->
-  Assert.equal_tez ~loc:__LOC__ actual_subsidy expected_subsidy
+  let constants =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+  in
+  constants.baking_reward_bonus_per_slot
+  *? Int64.of_int (constants.consensus_committee_size / 3)
+  >>?= fun baking_reward_bonus ->
+  constants.baking_reward_fixed_portion +? baking_reward_bonus
+  >>?= fun baking_rewards ->
+  constants.endorsing_reward_per_slot
+  *? Int64.of_int constants.consensus_committee_size
+  >>?= fun validators_rewards ->
+  baking_rewards +? validators_rewards >>?= fun total_rewards ->
+  total_rewards /? 16L >>?= fun expected_subsidy ->
+  constants.liquidity_baking_subsidy -? expected_subsidy >>?= fun diff ->
+  let max_diff = 1000 (* mutez *) in
+  Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff
 
 let tests =
   [

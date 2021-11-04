@@ -30,6 +30,7 @@
     Subject:      Operations in Tez_repr
 *)
 
+open Protocol.Alpha_context
 open Test_tez
 
 let z_mutez_min = Z.zero
@@ -108,19 +109,19 @@ let test_coherent_mul =
   QCheck.Test.make
     ~name:"Tez.(*?) is coherent w.r.t. Z.(*)"
     QCheck.(pair arb_tez_sizes arb_ui64_sizes)
-    (prop_binop64 Tez.( *? ) Z.( * ))
+    (prop_binop64 ( *? ) Z.( * ))
 
 let test_coherent_sub =
   QCheck.Test.make
     ~name:"Tez.(-?) is coherent w.r.t. Z.(-)"
     QCheck.(pair arb_tez_sizes arb_tez_sizes)
-    (prop_binop Tez.( -? ) Z.( - ))
+    (prop_binop ( -? ) Z.( - ))
 
 let test_coherent_add =
   QCheck.Test.make
     ~name:"Tez.(+?) is coherent w.r.t. Z.(+)"
     QCheck.(pair arb_tez_sizes arb_tez_sizes)
-    (prop_binop Tez.( +? ) Z.( + ))
+    (prop_binop ( +? ) Z.( + ))
 
 let test_coherent_div =
   QCheck.Test.make
@@ -128,7 +129,7 @@ let test_coherent_div =
     QCheck.(pair arb_tez_sizes arb_ui64_sizes)
     (fun (a, b) ->
       QCheck.assume (b > 0L) ;
-      prop_binop64 Tez.( /? ) Z.( / ) (a, b))
+      prop_binop64 ( /? ) Z.( / ) (a, b))
 
 let tests =
   [test_coherent_mul; test_coherent_sub; test_coherent_add; test_coherent_div]

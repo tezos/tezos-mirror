@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (* `Permanent *)
-type error += Malformed_period | Invalid_arg | Period_overflow
+type error += Malformed_period of int64 | Invalid_arg | Period_overflow
 
 let () =
   let open Data_encoding in
@@ -34,10 +34,11 @@ let () =
     ~id:"malformed_period"
     ~title:"Malformed period"
     ~description:"Period is negative."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Malformed period")
-    empty
-    (function Malformed_period -> Some () | _ -> None)
-    (fun () -> Malformed_period) ;
+    ~pp:(fun ppf period ->
+      Format.fprintf ppf "The given period '%Ld' is negative " period)
+    (obj1 (req "malformed_period" int64))
+    (function Malformed_period n -> Some n | _ -> None)
+    (fun n -> Malformed_period n) ;
   (* Invalid arg *)
   register_error_kind
     `Permanent
@@ -128,7 +129,7 @@ let to_seconds (t : Internal.t) = (t :> int64)
 let of_seconds secs =
   match Internal.create secs with
   | Some v -> ok v
-  | None -> error Malformed_period
+  | None -> error (Malformed_period secs)
 
 let of_seconds_exn t =
   match Internal.create t with

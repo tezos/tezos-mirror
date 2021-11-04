@@ -79,7 +79,6 @@ let make ~rng_state =
       return (block, step_constants))
   >>=? fun (block, step_constants) ->
   Incremental.begin_construction
-    ~priority:0
     ~timestamp:(Time.Protocol.add block.header.shell.timestamp 30L)
     block
   >>=? fun vs ->

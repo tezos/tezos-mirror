@@ -31,7 +31,6 @@ manuals: main
     # alpha protocol
 	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
-	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
     # 011 (Hangzhou) protocol
 	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-client.html

@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +23,74 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val from_int64 : int64 -> bytes list
+type error +=
+  | (* `Permanent *) Invalid_fitness
+  | (* `Permanent *) Wrong_fitness
+  | (* `Permanent *) Outdated_fitness
+  | (* `Permanent *)
+      Locked_round_not_less_than_round of {
+      round : Round_repr.t;
+      locked_round : Round_repr.t;
+    }
 
-val to_int64 : bytes list -> (int64, error trace) result
+type t
+
+val encoding : t Data_encoding.t
+
+val pp : Format.formatter -> t -> unit
+
+val create :
+  level:Raw_level_repr.t ->
+  locked_round:Round_repr.t option ->
+  predecessor_round:Round_repr.t ->
+  round:Round_repr.t ->
+  t tzresult
+
+val create_without_locked_round :
+  level:Raw_level_repr.t ->
+  predecessor_round:Round_repr.t ->
+  round:Round_repr.t ->
+  t
+
+val to_raw : t -> Fitness.t
+
+(** Returns the corresponding protocol fitness if the shell fitness has
+    the expected version, given by
+    Constants_repr.fitness_version_number. If the fitness' version is
+    from a previous protocol version, then it raises an "outdated
+    fitness" error. If the fitness version is higher then
+    it raises an "invalid fitness" error. *)
+val from_raw : Fitness.t -> t tzresult
+
+(** Returns the round from a raw fitness. If the fitness is from a
+    previous protocol, the returned value will be Round.zero. *)
+val round_from_raw : Fitness.t -> Round_repr.t tzresult
+
+(** Returns the predecessor round from a raw fitness. If the fitness
+   is from a previous protocol, the returned value will be Round.zero. *)
+val predecessor_round_from_raw : Fitness.t -> Round_repr.t tzresult
+
+(** Validate only the part of the fitness for which information are
+    available during begin_application *)
+val check_except_locked_round :
+  t -> level:Raw_level_repr.t -> predecessor_round:Round_repr.t -> unit tzresult
+
+(** Validate the locked_round component of the fitness, which could
+    not be validated during begin_application. *)
+val check_locked_round : t -> locked_round:Round_repr.t option -> unit tzresult
+
+val level : t -> Raw_level_repr.t
+
+val round : t -> Round_repr.t
+
+val locked_round : t -> Round_repr.t option
+
+val predecessor_round : t -> Round_repr.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** uses a lexicographic order relation for [level, locked_round,
+     -predecessor_round, round] *)
+  val compare : t -> t -> int
+end

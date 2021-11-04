@@ -140,6 +140,8 @@ let register_error_kind category ~id ~title ~description ?pp encoding from_error
 let () =
   let open Data_encoding.Registration in
   register Protocol.Alpha_context.Lazy_storage.encoding ;
+  register ~pp:Protocol.Alpha_context.Fitness.pp
+  @@ Protocol.Alpha_context.Fitness.encoding ;
   (* These encodings are missing a def field which we add before registering them.
      These defs should be moved inside their encodings in the protocol code. *)
   let def id ids ?title ?description encoding =
@@ -152,9 +154,6 @@ let () =
   register @@ def "parameters" [] Protocol.Parameters_repr.encoding ;
   register ~pp:Protocol.Alpha_context.Tez.pp
   @@ def "tez" [] Protocol.Alpha_context.Tez.encoding ;
-  register @@ def "roll" [] Protocol.Alpha_context.Roll.encoding ;
-  register ~pp:Protocol.Alpha_context.Fitness.pp
-  @@ def "fitness" [] Protocol.Alpha_context.Fitness.encoding ;
   register ~pp:Protocol.Alpha_context.Timestamp.pp
   @@ def "timestamp" [] Protocol.Alpha_context.Timestamp.encoding ;
   register ~pp:Protocol.Alpha_context.Raw_level.pp
@@ -183,16 +182,6 @@ let () =
        "contract"
        ["big_map_diff"]
        Protocol.Alpha_context.Lazy_storage.legacy_big_map_diff_encoding ;
-  register
-  @@ def
-       "delegate"
-       ["frozen_balance"]
-       Protocol.Alpha_context.Delegate.frozen_balance_encoding ;
-  register
-  @@ def
-       "delegate"
-       ["frozen_balance_by_cycles"]
-       Protocol.Alpha_context.Delegate.frozen_balance_by_cycle_encoding ;
   register
   @@ def
        "receipt"

@@ -151,3 +151,17 @@ let conflicting_endorsements_tag =
           (Operation.hash a)
           Operation_hash.pp
           (Operation.hash b))
+
+let conflicting_preendorsements_tag =
+  Tag.def
+    ~doc:"Two conflicting preendorsements signed by the same key"
+    "conflicting_preendorsements"
+    Format.(
+      fun ppf (a, b) ->
+        fprintf
+          ppf
+          "%a / %a"
+          Operation_hash.pp
+          (Operation.hash a)
+          Operation_hash.pp
+          (Operation.hash b))

@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -17,8 +17,8 @@ This sequence of operations was run:
     Gas limit: 1513
     Storage limit: 360 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000462
-      fees(the baker who will include this operation,0) ... +ꜩ0.000462
+      [CONTRACT_HASH] ... -ꜩ0.000462
+      payload fees(the block proposer) ....... +ꜩ0.000462
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ0
@@ -42,9 +42,12 @@ This sequence of operations was run:
         Consumed gas: 1412.223
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.02075
+          storage fees ........................... +ꜩ0.02075
           [CONTRACT_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as self_address_receiver.
-Injected block [BLOCK_HASH]
-[ [], [], [], [ "[BLOCK_HASH]" ] ]
+Injected block at minimal timestamp
+[ [ "[BLOCK_HASH]" ], [], [],
+  [ "[BLOCK_HASH]" ] ]

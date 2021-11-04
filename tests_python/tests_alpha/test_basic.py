@@ -1,12 +1,14 @@
 from os import path
+from typing import List
 import pytest
 from client.client import Client
-from tools import utils
+from tools import constants, utils
 from tools.paths import ACCOUNT_PATH
 from tools.utils import assert_run_failure
 from .contract_paths import CONTRACT_PATH
 
 
+BAKE_ARGS: List[str] = []
 TRANSFER_ARGS = ['--burn-cap', '0.257']
 
 
@@ -235,7 +237,10 @@ class TestRawContext:
         utils.bake(client)
 
     def test_transfers_bootstraps5_bootstrap1(self, client: Client):
-        assert client.get_balance('bootstrap5') == 4000000
+        bootstrap5 = constants.IDENTITIES['bootstrap5']['identity']
+        all_deposits = client.frozen_deposits(bootstrap5)
+        balance = client.get_mutez_balance('bootstrap5')
+        assert balance + all_deposits == utils.mutez_of_tez(4000000.0)
         client.transfer(
             400000,
             'bootstrap5',
@@ -250,7 +255,10 @@ class TestRawContext:
             ['--fee', '0', '--force-low-fee'],
         )
         utils.bake(client)
-        assert client.get_balance('bootstrap5') == 4000000
+        all_deposits = client.frozen_deposits(bootstrap5)
+        assert client.get_mutez_balance(
+            'bootstrap5'
+        ) + all_deposits == utils.mutez_of_tez(4000000.0)
 
     def test_activate_accounts(self, client: Client, session):
         account = f"{ACCOUNT_PATH}/king_commitment.json"

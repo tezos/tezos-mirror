@@ -122,7 +122,11 @@ let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   (match Cycle_repr.sub last_cycle preserved with
   | None -> return ctxt
-  | Some cleared_cycle -> clear_cycle ctxt cleared_cycle)
+  | Some cleared_cycle ->
+      (* LEGACY: we only need to keep at most [max_slashing_period] seed
+         but we need to preserve [preserved_cycles] seed to be able to
+         slash in Emmy after the migration *)
+      clear_cycle ctxt cleared_cycle)
   >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
   | None -> return (ctxt, [])

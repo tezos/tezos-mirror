@@ -24,12 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type frozen_balance = {
-  deposit : Tez_repr.t;
-  fees : Tez_repr.t;
-  rewards : Tez_repr.t;
-}
-
 (** Allow to register a delegate when creating an account. *)
 val init :
   Raw_context.t ->
@@ -37,17 +31,10 @@ val init :
   Signature.Public_key_hash.t ->
   Raw_context.t tzresult Lwt.t
 
-(** Cleanup delegation when deleting a contract. *)
-val remove : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
-
-(** Reading the current delegate of a contract. *)
-val get :
+val pubkey :
   Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option tzresult Lwt.t
-
-val registered :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  Signature.Public_key_hash.t ->
+  Signature.Public_key.t tzresult Lwt.t
 
 (** Updating the delegate of a contract.
 
@@ -61,22 +48,57 @@ val set :
   Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
-type error +=
-  | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
-  | Active_delegate (* `Temporary *)
-  | Current_delegate (* `Temporary *)
-  | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
-  | Balance_too_low_for_deposit of {
-      delegate : Signature.Public_key_hash.t;
-      deposit : Tez_repr.t;
-      balance : Tez_repr.t;
-    }
+val frozen_deposits_limit :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Tez_repr.t option tzresult Lwt.t
 
-(* `Temporary *)
+val set_frozen_deposits_limit :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Tez_repr.t option ->
+  Raw_context.t Lwt.t
+
+type error +=
+  | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
+  | (* `Temporary *) Active_delegate
+  | (* `Temporary *) Current_delegate
+  | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
+  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
+  | (* `Permanent *) Unassigned_validation_slot_for_level of Level_repr.t * int
+  | (* `Permanent *)
+      Cannot_find_active_stake of {
+      cycle : Cycle_repr.t;
+      delegate : Signature.Public_key_hash.t;
+    }
+  | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
 (** Check that a given implicit account is a registered delegate. *)
 val check_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> unit tzresult Lwt.t
+
+(** Participation information *)
+type participation_info = {
+  expected_cycle_activity : int;
+      (** The total expected slots to be endorsed in the cycle *)
+  minimal_cycle_activity : int;
+      (** The minimal endorsed slots in the cycle to get endorsing rewards *)
+  missed_slots : bool;
+      (** Whether the delegate has missed endorsing slots in the cycle *)
+  remaining_allowed_missed_slots : int;
+      (** Remaining amount of endorsing slots that can be missed in the
+     cycle before forfeiting the rewards *)
+  expected_endorsing_rewards : Tez_repr.t;
+      (** Endorsing rewards that will be distributed at the end of the
+      cycle if activity is greater than the minimal at that point *)
+  current_pending_rewards : Tez_repr.t;
+      (** Estimated accumulated endorsing rewards in the cycle so far *)
+}
+
+val delegate_participation_info :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  participation_info tzresult Lwt.t
 
 (** Iterate on all registered delegates. *)
 val fold :
@@ -88,94 +110,125 @@ val fold :
 (** List all registered delegates. *)
 val list : Raw_context.t -> Signature.Public_key_hash.t list Lwt.t
 
-(** Various functions to 'freeze' tokens.  A frozen 'deposit' keeps its
-    associated rolls. When frozen, 'fees' may trigger new rolls
-    allocation. Rewards won't trigger new rolls allocation until
-    unfrozen. *)
-val freeze_deposit :
+val balance :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.tez tzresult Lwt.t
+
+type level_participation = Participated | Didn't_participate
+
+(** Record the participation of a delegate as a validator. *)
+val record_endorsing_participation :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
+  delegate:Signature.Public_key_hash.t ->
+  participation:level_participation ->
+  endorsing_power:int ->
   Raw_context.t tzresult Lwt.t
 
-val freeze_fees :
+(** Sets the payload and block producer as active. Pays the baking
+   reward and the fees to the payload producer and the reward bonus to
+   the payload producer (if the reward_bonus is not None).*)
+val record_baking_activity_and_pay_rewards_and_fees :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
-val freeze_rewards :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  payload_producer:Signature.Public_key_hash.t ->
+  block_producer:Signature.Public_key_hash.t ->
+  baking_reward:Tez_repr.t ->
+  reward_bonus:Tez_repr.t option ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
-    unfreeze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
-    provided unrevealed seeds (typically seed from cycle 'n - 1').
-    Returns a list of account with the amount that was unfrozen for each
-    and the list of deactivated delegates. *)
+   unfreeze the endorsing rewards, potentially deactivate delegates.
+   Return the corresponding balances updates and the list of
+   deactivated delegates. *)
 val cycle_end :
   Raw_context.t ->
   Cycle_repr.t ->
-  Nonce_storage.unrevealed list ->
+  Storage.Seed.unrevealed_nonce list ->
   (Raw_context.t
   * Receipt_repr.balance_updates
   * Signature.Public_key_hash.t list)
   tzresult
   Lwt.t
 
-(** Burn all then frozen deposit/fees/rewards for a delegate at a given
-    cycle. Returns the burned amounts. *)
-val punish :
+(** Returns true if the given delegate has already been slashed
+   for double baking for the given level. *)
+val already_slashed_for_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  Cycle_repr.t ->
-  (Raw_context.t * frozen_balance) tzresult Lwt.t
-
-(** Has the given key some frozen tokens in its implicit contract? *)
-val has_frozen_balance :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Cycle_repr.t ->
+  Level_repr.t ->
   bool tzresult Lwt.t
 
-(** Returns the amount of frozen deposit, fees and rewards associated
-    to a given delegate. *)
-val frozen_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
-val frozen_balance_encoding : frozen_balance Data_encoding.t
-
-val frozen_balance_by_cycle_encoding :
-  frozen_balance Cycle_repr.Map.t Data_encoding.t
-
-(** Returns the amount of frozen deposit, fees and rewards associated
-    to a given delegate, indexed by the cycle by which at the end the
-    balance will be unfrozen. *)
-val frozen_balance_by_cycle :
+(** Returns true if the given delegate has already been slashed
+   for double preendorsing or double endorsing for the given level. *)
+val already_slashed_for_double_endorsing :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  frozen_balance Cycle_repr.Map.t Lwt.t
+  Level_repr.t ->
+  bool tzresult Lwt.t
+
+(** Burn some frozen deposit for a delegate at a given level. Returns
+    the burned amount. *)
+val punish_double_endorsing :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
+  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+val punish_double_baking :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
+  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+(** Returns the amount of frozen deposits (aka frozen deposits).
+
+    A delegate's frozen balance is only composed of frozen deposits;
+    rewards and fees are not frozen, but simply credited at the right
+    moment.
+*)
+val frozen_deposits :
+  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance and of the
-    frozen balance. *)
+    frozen balance.
+
+    Only use this function for RPCs: this is expensive. *)
 val full_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val staking_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Returns the list of contracts (implicit or originated) that delegated towards a given delegate *)
-val delegated_contracts :
-  Raw_context.t -> Signature.Public_key_hash.t -> Contract_repr.t list Lwt.t
-
+(** Only use this function for RPCs: this is expensive. *)
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val deactivated :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
-val grace_period :
-  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
+(** Participation slots potentially associated to accounts. The
+   accounts that didn't pay the deposits will be excluded from this
+   list. This function should only be used to compute the deposits to
+   freeze or initialize the protocol while stitching. RPCs can use this
+   function to predict an approximation of long term future slot
+   allocations. It shouldn't be used in the baker *)
+val slot_owner :
+  Raw_context.t ->
+  Level_repr.t ->
+  Slot_repr.t ->
+  (Raw_context.t * (Signature.Public_key.t * Signature.Public_key_hash.t))
+  tzresult
+  Lwt.t
+
+val baking_rights_owner :
+  Raw_context.t ->
+  Level_repr.t ->
+  round:Round_repr.round ->
+  (Raw_context.t * int * (Signature.public_key * Signature.public_key_hash))
+  tzresult
+  Lwt.t
+
+val freeze_deposits_do_not_call_except_for_migration :
+  Raw_context.t ->
+  new_cycle:Cycle_repr.t ->
+  balance_updates:Receipt_repr.balance_updates ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

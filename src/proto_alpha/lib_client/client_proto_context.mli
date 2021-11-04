@@ -100,6 +100,13 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
+val get_frozen_deposits_limit :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Signature.Public_key_hash.t ->
+  Tez.t option tzresult Lwt.t
+
 val build_delegate_operation :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
@@ -122,6 +129,22 @@ val set_delegate :
   fee_parameter:Injection.fee_parameter ->
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
+
+val set_deposits_limit :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  public_key_hash ->
+  src_pk:public_key ->
+  manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  Tez.t option ->
+  Kind.set_deposits_limit Kind.manager Injection.result tzresult Lwt.t
 
 val register_as_delegate :
   #Protocol_client_context.full ->

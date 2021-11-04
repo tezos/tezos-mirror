@@ -9,7 +9,7 @@ from tools.constants import IDENTITIES
 from client.client import Client
 from .contract_paths import CONTRACT_PATH
 
-BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
+BAKE_ARGS = ['--minimal-timestamp']
 BURN_CAP_ARGS = ['--burn-cap', '1.0']
 
 

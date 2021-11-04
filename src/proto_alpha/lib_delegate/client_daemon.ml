@@ -54,7 +54,7 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   f () >>= function
   | Ok () -> return_unit
-  | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
+  | Error (Baking_errors.Node_connection_lost :: _) ->
       cctxt#warning
         "Lost connection with the node. Retrying to establish connection..."
       >>= fun () ->
@@ -66,55 +66,41 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   | Error err ->
       cctxt#error "Unexpected error: %a. Exiting..." pp_print_trace err
 
-module Endorser = struct
-  let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
-      delegates =
-    let process () =
-      Client_baking_blocks.monitor_heads
-        ~next_protocols:(Some [Protocol.hash])
-        cctxt
-        chain
-      >>=? fun block_stream ->
-      cctxt#message "Endorser started." >>= fun () ->
-      Client_baking_endorsement.create cctxt ~delay delegates block_stream
-    in
-    Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
-      cctxt
-    >>=? fun () ->
-    if keep_alive then retry_on_disconnection cctxt process else process ()
-end
-
 module Baker = struct
-  let run (cctxt : #Protocol_client_context.full) ?minimal_fees
-      ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ?per_block_vote_file ~chain ~context_path ~keep_alive delegates =
+  let run (cctxt : Protocol_client_context.full) ?minimal_fees
+      ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+      ?liquidity_baking_escape_vote ?per_block_vote_file ~chain ~context_path
+      ~keep_alive delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
-      Client_baking_blocks.monitor_heads
-        ~next_protocols:(Some [Protocol.hash])
-        cctxt
-        chain
-      >>=? fun block_stream ->
+      let config =
+        Baking_configuration.make
+          ?minimal_fees
+          ?minimal_nanotez_per_gas_unit
+          ?minimal_nanotez_per_byte
+          ?liquidity_baking_escape_vote
+          ?per_block_vote_file
+          ~context_path
+          ~user_activated_upgrades
+          ()
+      in
       cctxt#message "Baker started." >>= fun () ->
-      Client_baking_forge.create
-        cctxt
-        ~user_activated_upgrades
-        ?minimal_fees
-        ?minimal_nanotez_per_gas_unit
-        ?minimal_nanotez_per_byte
-        ?max_priority
-        ?per_block_vote_file
-        ~chain
-        ~context_path
-        delegates
-        block_stream
+      let canceler = Lwt_canceler.create () in
+      let _ =
+        Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+            cctxt#message "Shutting down the baker..." >>= fun () ->
+            Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return_unit)
+      in
+      Baking_scheduling.run cctxt ~canceler ~chain config delegates
     in
     Client_confirmations.wait_for_bootstrapped
       ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
+    cctxt#message "Waiting for protocol %s to start..." Protocol.name
+    >>= fun () ->
+    Node_rpc.await_protocol_activation cctxt ~chain () >>=? fun () ->
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
@@ -129,8 +115,15 @@ module Accuser = struct
         ()
       >>=? fun valid_blocks_stream ->
       cctxt#message "Accuser started." >>= fun () ->
+      let canceler = Lwt_canceler.create () in
+      let _ =
+        Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+            cctxt#message "Shutting down the accuser..." >>= fun () ->
+            Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return_unit)
+      in
       Client_baking_denunciation.create
         cctxt
+        ~canceler
         ~preserved_levels
         valid_blocks_stream
     in

@@ -38,13 +38,13 @@ module Genesis_block_hash = struct
         ( pure (function
             | None | Some "default" -> `Ok `Default
             | Some "random" -> `Ok `Random
-            | Some force -> `Ok (`Force force))
+            | Some force -> `Ok (`Force force) )
         $ Arg.(
             let doc =
               Fmt.str
                 "Set the genesis block hash (from which the chain-id is \
-                 derived). The default (or the string %S) is `%s...`, %S \
-                 means pick-one-at-random. This option is ignored when the \
+                 derived). The default (or the string %S) is `%s...`, %S means \
+                 pick-one-at-random. This option is ignored when the \
                  `--keep-root` option allows the chain to resume (the \
                  previously chosen genesis-hash will be still in effect)."
                 "default"
@@ -53,13 +53,13 @@ module Genesis_block_hash = struct
             value
               (opt (some string) None
                  (info ["genesis-block-hash"] ~docv:"BLOCK-HASH|random|default"
-                    ~doc))) )
+                    ~doc ) )) )
   end
 
   let chain_id_of_hash hash =
     let open Tezos_crypto in
     Option.map (Block_hash.of_b58check_opt hash) ~f:(fun bh ->
-        bh |> Chain_id.of_block_hash |> Chain_id.to_b58check)
+        bh |> Chain_id.of_block_hash |> Chain_id.to_b58check )
 
   let process_choice state choice =
     let json_file = path state in
@@ -77,17 +77,18 @@ module Genesis_block_hash = struct
             match Ezjsonm.value_from_string json_str with
             | `O [("genesis-block-hash", `String hash)] -> hash
             | _ ->
-                Fmt.failwith "invalid json for genesis-block-hash: %S" json_str)
+                Fmt.failwith "invalid json for genesis-block-hash: %S" json_str
+            )
         >>= fun hash ->
         Console.sayf state
           More_fmt.(
             fun ppf () ->
-              wf ppf "Genesis-block-hash already set: %a%a" pp_hash_fancily
-                hash
-                (fun ppf -> function `Default -> pf ppf "."
+              wf ppf "Genesis-block-hash already set: %a%a" pp_hash_fancily hash
+                (fun ppf -> function
+                  | `Default -> pf ppf "."
                   | choice ->
                       pf ppf " (user choice “%a” is then ignored)."
-                        Choice.pp choice)
+                        Choice.pp choice )
                 choice)
         >>= fun () -> return hash
     | false ->
@@ -144,7 +145,7 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
       (Ezjsonm.dict
          ( base
          @ Option.value_map ~default:[] hard_fork ~f:(fun hf ->
-               [Hard_fork.node_network_config hf]) )) in
+               [Hard_fork.node_network_config hf] ) ) ) in
   Test_scenario.network_with_protocol ?external_peer_ports ~protocol ~size
     ~do_activation:clear_root ~nodes_history_mode_edits ~base_port state
     ~node_exec ~client_exec ~node_custom_network
@@ -163,14 +164,14 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
         ~sandbox_json:(Tezos_protocol.sandbox_path state protocol)
         ~nodes:
           (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
-               sprintf "http://localhost:%d" rpc_port))
+               sprintf "http://localhost:%d" rpc_port ) )
         ~bakers:
           (List.map protocol.Tezos_protocol.bootstrap_accounts
              ~f:(fun (account, _) ->
-               Tezos_protocol.Account.(name account, pubkey_hash account)))
+               Tezos_protocol.Account.(name account, pubkey_hash account) ) )
         ~network_string:network_id ~node_exec ~client_exec
         ~protocol_execs:
-          [(protocol.Tezos_protocol.hash, baker_exec, endorser_exec)])
+          [(protocol.Tezos_protocol.hash, baker_exec, endorser_exec)] )
   >>= fun (_ : unit option) ->
   let to_keyed acc client =
     let key, priv = Tezos_protocol.Account.(name acc, private_key acc) in
@@ -197,9 +198,9 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
                  @ [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node
                        ~key
                    ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client
-                       node ~key ] )) in
+                       node ~key ] ) ) in
   List_sequential.iter keys_and_daemons ~f:(fun (_, _, kc, _) ->
-      Tezos_client.Keyed.initialize state kc >>= fun _ -> return ())
+      Tezos_client.Keyed.initialize state kc >>= fun _ -> return () )
   >>= fun () ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.
@@ -209,13 +210,12 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
     let accusers =
       List.map nodes ~f:(fun node ->
           let client = Tezos_client.of_node node ~exec:client_exec in
-          Tezos_daemon.accuser_of_node ~exec:accuser_exec ~client node) in
+          Tezos_daemon.accuser_of_node ~exec:accuser_exec ~client node ) in
     List_sequential.iter accusers ~f:(fun acc ->
         Running_processes.start state (Tezos_daemon.process state acc)
-        >>= fun {process= _; lwt= _} -> return ())
+        >>= fun {process= _; lwt= _} -> return () )
     >>= fun () ->
-    List_sequential.iter keys_and_daemons
-      ~f:(fun (_acc, client, kc, daemons) ->
+    List_sequential.iter keys_and_daemons ~f:(fun (_acc, client, kc, daemons) ->
         Tezos_client.wait_for_node_bootstrap state client
         >>= fun () ->
         let key_name = kc.Tezos_client.Keyed.key_name in
@@ -236,14 +236,14 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
         >>= fun () ->
         List_sequential.iter daemons ~f:(fun daemon ->
             Running_processes.start state (Tezos_daemon.process state daemon)
-            >>= fun {process= _; lwt= _} -> return ()))
+            >>= fun {process= _; lwt= _} -> return () ) )
   else
     List.fold ~init:(return []) keys_and_daemons
       ~f:(fun prev_m (_acc, client, keyed, _) ->
         prev_m
         >>= fun prev ->
         Tezos_client.wait_for_node_bootstrap state client
-        >>= fun () -> return (keyed :: prev))
+        >>= fun () -> return (keyed :: prev) )
     >>= fun clients ->
     Interactive_test.Pauser.add_commands state
       Interactive_test.Commands.[bake_command state ~clients] ;
@@ -257,7 +257,7 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
   >>= fun shell_env_help ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.(
-      (shell_env_help :: all_defaults state ~nodes)
+      shell_env_help :: all_defaults state ~nodes
       @ [secret_keys state ~protocol]
       @ arbitrary_commands_for_each_and_all_clients state ~clients) ;
   match test_kind with
@@ -271,11 +271,12 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
         ~until_level:level `Any
   | `Wait_level (`At_least lvl as opt) ->
       let seconds =
+        let multiplier = 10 in
         let tbb =
           protocol.Tezos_protocol.time_between_blocks |> List.hd
           |> Option.value ~default:10 in
-        Float.of_int tbb *. 3. in
-      let attempts = lvl in
+        Float.of_int (tbb * multiplier) in
+      let attempts = 2 * lvl in
       Test_scenario.Queries.wait_for_all_levels_to_be state ~attempts ~seconds
         nodes opt
 
@@ -289,32 +290,33 @@ let cmd () =
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
     pure
-      (fun test_kind
-           (`Clear_root clear_root)
-           size
-           base_port
-           (`External_peers external_peer_ports)
-           (`No_daemons_for no_daemons_for)
-           (`With_baking with_baking)
-           protocol
-           bnod
-           bcli
-           bak
-           endo
-           accu
-           hard_fork
-           genesis_block_choice
-           generate_kiln_config
-           nodes_history_mode_edits
-           state
-           ->
+      (fun
+        test_kind
+        (`Clear_root clear_root)
+        size
+        base_port
+        (`External_peers external_peer_ports)
+        (`No_daemons_for no_daemons_for)
+        (`With_baking with_baking)
+        protocol
+        bnod
+        bcli
+        bak
+        endo
+        accu
+        hard_fork
+        genesis_block_choice
+        generate_kiln_config
+        nodes_history_mode_edits
+        state
+      ->
         let actual_test =
           run state ~size ~base_port ~protocol bnod bcli bak endo accu
             ?hard_fork ~clear_root ~nodes_history_mode_edits ~with_baking
             ?generate_kiln_config ~external_peer_ports ~no_daemons_for
             ~genesis_block_choice test_kind in
         Test_command_line.Run_command.or_hard_fail state ~pp_error
-          (Interactive_test.Pauser.run_test ~pp_error state actual_test))
+          (Interactive_test.Pauser.run_test ~pp_error state actual_test) )
     $ term_result ~usage:true
         Arg.(
           pure
@@ -323,24 +325,22 @@ let cmd () =
                 match (level_opt, random_traffic) with
                 | Some l, None -> return (`Wait_level (`At_least l))
                 | None, None -> return `Interactive
-                | Some l, Some kind ->
-                    return (`Random_traffic (kind, `Until l))
+                | Some l, Some kind -> return (`Random_traffic (kind, `Until l))
                 | None, Some _ ->
                     fail
                       (`Msg
                         "Error: option `--random-traffic` requires also \
-                         `--until-level`."))
+                         `--until-level`." ))
           $ value
               (opt (some int) None
                  (info ["until-level"] ~docs
-                    ~doc:
-                      "Run the sandbox until a given level (not interactive)"))
+                    ~doc:"Run the sandbox until a given level (not interactive)" ) )
           $ value
               (opt
                  (some (enum [("any", `Any)]))
                  None
                  (info ["random-traffic"] ~docs
-                    ~doc:"Generate random traffic (requires `--until-level`).")))
+                    ~doc:"Generate random traffic (requires `--until-level`)." ) ))
     $ Arg.(
         pure (fun kr -> `Clear_root (not kr))
         $ value
@@ -348,8 +348,8 @@ let cmd () =
                (info ["keep-root"] ~docs
                   ~doc:
                     "Do not erase the root path before starting (this also \
-                     makes the sandbox start-up bypass the \
-                     protocol-activation step).")))
+                     makes the sandbox start-up bypass the protocol-activation \
+                     step)." ) ))
     $ Arg.(
         value & opt int 5
         & info ["size"; "S"] ~docs ~doc:"Set the size of the network.")
@@ -361,21 +361,21 @@ let cmd () =
         $ value
             (opt_all int []
                (info ["add-external-peer-port"] ~docv:"PORT-NUMBER" ~docs
-                  ~doc:"Add $(docv) to the peers of the network nodes.")))
+                  ~doc:"Add $(docv) to the peers of the network nodes." ) ))
     $ Arg.(
         pure (fun l -> `No_daemons_for l)
         $ value
             (opt_all string []
                (info ["no-daemons-for"] ~docv:"ACCOUNT-NAME" ~docs
-                  ~doc:"Do not start daemons for $(docv).")))
+                  ~doc:"Do not start daemons for $(docv)." ) ))
     $ Arg.(
         pure (fun x -> `With_baking (not x))
         $ value
             (flag
                (info ["no-baking"] ~docs
                   ~doc:
-                    "Completely disable baking/endorsing/accusing (you need \
-                     to bake manually to make the chain advance).")))
+                    "Completely disable baking/endorsing/accusing (you need to \
+                     bake manually to make the chain advance)." ) ))
     $ Tezos_protocol.cli_term base_state
     $ Tezos_executable.cli_term base_state `Node "tezos"
     $ Tezos_executable.cli_term base_state `Client "tezos"
@@ -399,8 +399,7 @@ let cmd () =
             "One can also run this sandbox with `--no-baking` to make baking \
              interactive-only."
         ; `P
-            "There is also the option of running the sandbox \
-             non-interactively for a given number of blocks, cf. \
-             `--until-level LEVEL`." ] in
+            "There is also the option of running the sandbox non-interactively \
+             for a given number of blocks, cf. `--until-level LEVEL`." ] in
     info "mini-network" ~man ~doc in
   (term, info)

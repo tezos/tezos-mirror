@@ -72,6 +72,7 @@ def check_pairing_check(client, args):
 # Setting this higher makes things rather slow
 RANDOM_ITERATIONS = range(10)
 
+
 STORE_CLASSES = [G1, G2, Fr]
 CURVES = [G1, G2]
 ADD_CLASSES = [G1, G2, Fr]
@@ -91,6 +92,7 @@ class TestBls12_381:
     gen.seed(bytes.fromhex(h.hexdigest()))
 
     # Store
+
     @pytest.mark.parametrize("cls", STORE_CLASSES)
     def test_store_zero(self, client_regtest, cls):
         check_store(client_regtest, cls, cls.zero)

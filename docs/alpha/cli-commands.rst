@@ -32,15 +32,6 @@ Baker manual
          :file: tezos-baker.html
 
 
-.. _endorser_manual_alpha:
-
-Endorser manual
-===============
-
-.. raw:: html
-         :file: tezos-endorser.html
-
-
 .. _accuser_manual_alpha:
 
 Accuser manual

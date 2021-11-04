@@ -97,7 +97,6 @@ endorsers:
            --number-of-bootstrap-accounts 2 \
            --tezos-node-binary ./tezos-node \
            --tezos-baker-alpha-binary ./tezos-baker-alpha \
-           --tezos-endorser-alpha-binary ./tezos-endorser-alpha \
            --tezos-accuser-alpha-binary ./tezos-accuser-alpha \
            --tezos-client-binary ./tezos-client
 

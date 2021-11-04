@@ -4,8 +4,9 @@ from tools import utils, constants
 from launchers.sandbox import Sandbox
 from . import protocol
 
-
 # TODO parameterize test
+
+ROUND_DURATION = 15
 
 
 @pytest.mark.baker
@@ -20,10 +21,11 @@ class TestManyBakers:
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0))
         for i in range(5):
-            sandbox.add_baker(i, f'bootstrap{i + 1}', proto=protocol.DAEMON)
+            sandbox.add_baker(i, [f'bootstrap{i + 1}'], proto=protocol.DAEMON)
 
     def test_wait(self):
-        time.sleep(10)
+        # expects two level to be added to level start
+        time.sleep(2 * ROUND_DURATION)
 
     def test_progress(self, sandbox: Sandbox):
         min_level = min(

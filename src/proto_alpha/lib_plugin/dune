@@ -3,10 +3,14 @@
  (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-alpha)
  (libraries tezos-base
-            tezos-protocol-alpha)
+            tezos-protocol-alpha
+            tezos-stdlib-unix
+            )
  (modules (:standard) \ Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_alpha)))
+                   -open Tezos_protocol_alpha
+                   -open Tezos_stdlib_unix
+                   )))
 
 (library
  (name tezos_protocol_plugin_alpha_registerer)

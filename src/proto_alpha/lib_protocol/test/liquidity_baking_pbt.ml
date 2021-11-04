@@ -32,7 +32,6 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
 open Liquidity_baking_machine
 
 (** We use the “machines” provided by the {! Liquidity_baking_machine}

@@ -27,12 +27,12 @@
 let () =
   Client_commands.register Protocol.hash @@ fun _network ->
   List.map (Clic.map_command (new Protocol_client_context.wrap_full))
-  @@ Delegate_commands.accuser_commands ()
+  @@ Baking_commands.accuser_commands ()
 
 let select_commands _ _ =
   return
     (List.map
        (Clic.map_command (new Protocol_client_context.wrap_full))
-       (Delegate_commands.accuser_commands ()))
+       (Baking_commands.accuser_commands ()))
 
 let () = Client_main_run.run (module Daemon_config) ~select_commands

@@ -133,12 +133,12 @@ let test_random_tez_literals () =
     (match vs with
     | None -> assert false
     | Some vs ->
-        let rev = Tez_repr.to_int64 vs in
+        let rev = Tez_repr.to_mutez vs in
         assert (v = rev)) ;
     match vs' with
     | None -> assert false
     | Some vs' ->
-        let rev = Tez_repr.to_int64 vs' in
+        let rev = Tez_repr.to_mutez vs' in
         assert (v = rev)
   done ;
   return_unit

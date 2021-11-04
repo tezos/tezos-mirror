@@ -88,7 +88,7 @@ class TestVotingFull:
         )
 
     def test_add_baker(self, sandbox: Sandbox):
-        sandbox.add_baker(0, BAKER, proto=PROTO_B_DAEMON)
+        sandbox.add_baker(0, [BAKER], proto=PROTO_B_DAEMON)
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -156,7 +156,7 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
         # we let a PROTO_A baker bake the last blocks of PROTO_A
-        sandbox.add_baker(0, BAKER, proto=PROTO_A_DAEMON)
+        sandbox.add_baker(0, [BAKER], proto=PROTO_A_DAEMON)
         clients = sandbox.all_clients()
         all_have_proto = False
         while not all_have_proto:

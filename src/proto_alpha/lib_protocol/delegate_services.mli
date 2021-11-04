@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,10 +36,10 @@ val list :
   Signature.Public_key_hash.t list shell_tzresult Lwt.t
 
 type info = {
-  balance : Tez.t;
-  frozen_balance : Tez.t;
-  frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+  full_balance : Tez.t;  (** Balance + Frozen balance *)
+  frozen_deposits : Tez.t;
   staking_balance : Tez.t;
+  frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
   deactivated : bool;
@@ -54,29 +55,29 @@ val info :
   Signature.Public_key_hash.t ->
   info shell_tzresult Lwt.t
 
-val balance :
+val full_balance :
   'a #RPC_context.simple ->
   'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
-val frozen_balance :
+val frozen_deposits :
   'a #RPC_context.simple ->
   'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
-
-val frozen_balance_by_cycle :
-  'a #RPC_context.simple ->
-  'a ->
-  Signature.Public_key_hash.t ->
-  Delegate.frozen_balance Cycle.Map.t shell_tzresult Lwt.t
 
 val staking_balance :
   'a #RPC_context.simple ->
   'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
+
+val frozen_deposits_limit :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t option shell_tzresult Lwt.t
 
 val delegated_contracts :
   'a #RPC_context.simple ->
@@ -104,14 +105,5 @@ val grace_period :
 
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int32 shell_tzresult Lwt.t
-
-module Minimal_valid_time : sig
-  val get :
-    'a #RPC_context.simple -> 'a -> int -> int -> Time.t shell_tzresult Lwt.t
-end
-
-(* temporary export for deprecated unit test *)
-val minimal_valid_time :
-  Alpha_context.t -> int -> int -> Time.t -> Time.t tzresult
 
 val register : unit -> unit

@@ -129,6 +129,8 @@ let int_parameter =
   parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
+let uri_parameter = parameter (fun _ x -> return (Uri.of_string x))
+
 let bytes_of_prefixed_string s =
   try
     if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
@@ -204,6 +206,12 @@ let force_switch =
       "disables the node's injection checks\n\
        Force the injection of branch-invalid operation or force  the injection \
        of block without a fitness greater than the  current head."
+    ()
+
+let no_endorse_switch =
+  switch
+    ~long:"no-endorse"
+    ~doc:"Do not let the client automatically endorse a block that it baked."
     ()
 
 let minimal_timestamp_switch =
@@ -437,11 +445,10 @@ let endorsement_delay_arg =
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
-  default_arg
+  arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
-    ~default:"4096"
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in

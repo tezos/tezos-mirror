@@ -39,6 +39,14 @@ val pred : Raw_context.t -> Level_repr.t -> Level_repr.t option
 
 val succ : Raw_context.t -> Level_repr.t -> Level_repr.t
 
+(** [i] must be positive *)
+val add : Raw_context.t -> Level_repr.t -> int -> Level_repr.t
+
+(** [sub c level i] returns None if the level is before the first
+   level of the Alpha family of protocol, otherwise it returns the
+   expected level. [i] must be positive. *)
+val sub : Raw_context.t -> Level_repr.t -> int -> Level_repr.t option
+
 val first_level_in_cycle : Raw_context.t -> Cycle_repr.t -> Level_repr.t
 
 val last_level_in_cycle : Raw_context.t -> Cycle_repr.t -> Level_repr.t

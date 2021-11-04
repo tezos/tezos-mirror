@@ -22,7 +22,9 @@ def client(sandbox: Sandbox) -> Iterator[Client]:
     """
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
-    protocol.activate(client, activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    protocol.activate(client, parameters=parameters, activate_in_the_past=True)
     yield client
 
 
@@ -61,7 +63,9 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
         1, client_factory=reg_client_factory, params=constants.NODE_PARAMS
     )
     client = sandbox.client(1)
-    protocol.activate(client, activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    protocol.activate(client, activate_in_the_past=True, parameters=parameters)
     yield client
 
 
@@ -79,7 +83,13 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     for i in range(num_nodes):
         # Large number may increases peers connection time
         sandbox.add_node(i, params=constants.NODE_PARAMS)
-    protocol.activate(sandbox.client(0), activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    parameters['round_durations'] = ['1', '1']
+    protocol.activate(
+        sandbox.client(0), parameters=parameters, activate_in_the_past=True
+    )
+
     clients = sandbox.all_clients()
     for client in clients:
         proto = protocol.HASH

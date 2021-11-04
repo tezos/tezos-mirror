@@ -433,6 +433,31 @@ class Client:
         cmd += args
         return client_output.BakeForResult(self.run(cmd))
 
+    def multibake(
+        self, delegates: List[str] = None, args: List[str] = None
+    ) -> client_output.BakeForResult:
+        """The empty list for delegates means 'all known delegates'"""
+        cmd = ['bake', 'for']
+        if delegates is None:
+            delegates = []
+        cmd += delegates
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.BakeForResult(self.run(cmd))
+
+    def propose(
+        self, delegates: List[str] = None, args: List[str] = None
+    ) -> client_output.ProposeForResult:
+        cmd = ['propose', 'for']
+        if delegates is None:
+            delegates = []
+        cmd += delegates
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.ProposeForResult(self.run(cmd))
+
     def originate(
         self,
         contract_name: str,
@@ -645,24 +670,6 @@ class Client:
 
         return timestamp_date
 
-    def get_now(self) -> str:
-        """Returns the timestamp of next-to-last block,
-        offset by time_between_blocks"""
-
-        timestamp_date = self.get_block_timestamp(block='head~1')
-
-        constants = self.rpc(
-            'get', '/chains/main/blocks/head/context/constants'
-        )
-        delta = datetime.timedelta(
-            seconds=int(constants['time_between_blocks'][0])
-        )
-
-        now_date = timestamp_date + delta
-
-        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
-        return now_date.strftime(rfc3399_format)
-
     def get_receipt(
         self, operation: str, args: List[str] = None
     ) -> client_output.GetReceiptResult:
@@ -779,6 +786,17 @@ class Client:
             'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
         )
         return int(rpc_res['level'])
+
+    def get_tenderbake_round(
+        self, params: List[str] = None, chain: str = 'main', level: str = 'head'
+    ) -> int:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc(
+            'get',
+            f'/chains/{chain}/blocks/{level}/helpers/' 'round',
+            params=params,
+        )
+        return int(rpc_res)
 
     def get_checkpoint(self) -> dict:
         rpc_res = self.rpc('get', '/chains/main/checkpoint')
@@ -1806,3 +1824,17 @@ class Client:
         args = args or []
         cmd += args
         return client_output.ViewResult(self.run(cmd))
+
+    def frozen_deposits(self, delegate: str, level: str = None) -> int:
+        """ returns deposits (in mutez) held for account for given level """
+        if level:
+            level_arg = f'/?level={level}'
+        else:
+            level_arg = ''
+        return int(
+            self.rpc(
+                'get',
+                f'/chains/main/blocks/head/context/delegates/'
+                f'{delegate}/frozen_deposits{level_arg}',
+            )
+        )

@@ -31,6 +31,7 @@ test_coverage:
     - . $HOME/.venv/bin/activate
     # A failing test shouldn't prevent the generation of the report (|| true)
     - make $TEST_TARGET || true
+    - make test-coverage-tenderbake || true
     - make coverage-report
     - make coverage-report-summary
     # hack to capture script success in after_script script

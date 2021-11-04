@@ -30,8 +30,6 @@ type error +=
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
-      Unspendable_contract of Contract_repr.contract
-  | (* `Permanent *)
       Non_existing_contract of Contract_repr.contract
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
@@ -40,18 +38,9 @@ type error +=
       Signature.Public_key_hash.t
   | (* `Temporary *)
       Empty_transaction of Contract_repr.t (* `Temporary *)
-  | Inconsistent_hash of
-      Signature.Public_key.t
-      * Signature.Public_key_hash.t
-      * Signature.Public_key_hash.t
+  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Inconsistent_public_key of
-      Signature.Public_key.t * Signature.Public_key.t
-  | (* `Permanent *)
-      Failure of string (* `Permanent *)
-  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
-  | Unrevealed_manager_key of Contract_repr.t
-
+      Failure of string
 (* `Permanent *)
 
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
@@ -77,20 +66,6 @@ val check_counter_increment :
 
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val get_manager_key :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
-
-val is_manager_key_revealed :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
-val reveal_manager_key :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t ->
-  Raw_context.t tzresult Lwt.t
 
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
@@ -149,19 +124,25 @@ val update_script_storage :
   Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
 
-val credit :
+val credit_only_call_from_token :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
-val spend :
+val spend_only_call_from_token :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
+(** [raw_originate ctxt ~prepaid_bootstrap_storage contract ~script]
+    originates the [contract] parameter. The [storage] space allocated by this
+    origination is considered to be free of charge or to have been already paid
+    for by the user, if and only if [prepaid_bootstrap_storage] is [true]. In 
+    particular, the amount of space allocated by this origination will be part
+    of the consumed space to pay for returned by the next call to
+    [Fees_storage.record_paid_storage_space ctxt contract], if and only if
+    [prepaid_bootstrap_storage] is [false]. *)
 val raw_originate :
   Raw_context.t ->
-  ?prepaid_bootstrap_storage:bool ->
+  prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
-  balance:Tez_repr.t ->
   script:Script_repr.t * Lazy_storage_diff.diffs option ->
-  delegate:Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
 val fresh_contract_from_current_nonce :
@@ -183,3 +164,13 @@ val set_paid_storage_space_and_return_fees_to_pay :
   Contract_repr.t ->
   Z.t ->
   (Z.t * Raw_context.t) tzresult Lwt.t
+
+(** Increases the balance of a contract. Calling this function directly may
+    break important invariants. Consider calling [credit] instead]. *)
+val increase_balance_only_call_from_token :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** Decreases the balance of a contract. Calling this function directly may
+    break important invariants. Consider calling [spend] instead]. *)
+val decrease_balance_only_call_from_token :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t

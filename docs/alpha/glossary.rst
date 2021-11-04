@@ -45,7 +45,7 @@ _`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
     baking/endorsing right for that block_. At the start of a Cycle_,
     baking and endorsing rights are computed for all the block_ heights in the
-    cycle_, based on the proportion of Rolls owned by each accounts.
+    cycle_, based on the proportion of the stake owned by each accounts.
 
     For each block_ height, there are several accounts that are allowed to bake.
     These different accounts are given different Priorities.
@@ -85,7 +85,7 @@ _`Delegate`
 
 _`Delegation`
     An operation_ in which an account_ balance is lent to a
-    delegate_. This increases the delegate_'s rolls and consequently
+    delegate_. This increases the delegate_'s stake and consequently
     its Baking_ rights. The delegate_ does not control the funds from
     the account_.
 
@@ -150,9 +150,11 @@ _`Priority`
     priority, results in an invalid block_.
 
 _`Roll`
-    An amount of tez (e.g., 8000ꜩ) serving as a unit to determine delegates'
-    baking_ rights in a cycle_. A delegate_ with twice as many rolls as another
-    will be given twice as many rights to bake.
+    An amount of tez (e.g., 6000ꜩ) serving as a minimal amount to
+    determine delegates' baking_ rights in a cycle_. A delegate_ with
+    twice as much stake as another will be given twice as many rights
+    to bake. A roll also serves as a unit to determine delegates'
+    voting rights in a cycle_.
 
 _`Smart contract`
     Account_ which is associated to a :ref:`Michelson <glossary_michelson_alpha>` script. They are

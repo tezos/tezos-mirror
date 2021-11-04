@@ -27,76 +27,24 @@
     -------
     Component:  Protocol (endorsement)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^endorsement$"
-    Subject:    Endorsing a block adds an extra layer of confidence to the
-                Tezos' PoS algorithm. The block endorsing operation must be
-                included in the following block. Each endorser possesses a
-                number of slots corresponding to their priority. After
-                [preserved_cycles], a reward is given to the endorser. This
-                reward depends on the priority of the block that contains
-                the endorsements.
+    Subject:    Endorsing a block adds an extra layer of confidence
+                to the Tezos' PoS algorithm. The block endorsing
+                operation must be included in the following block.
 *)
 
 open Protocol
 open Alpha_context
-open Test_tez
 
-(****************************************************************)
-(*                    Utility functions                         *)
-(****************************************************************)
+let init_genesis ?policy () =
+  Context.init ~consensus_threshold:0 5 >>=? fun (genesis, _) ->
+  Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
 
-let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
-
-let get_expected_reward ctxt ~priority ~baker ~endorsing_power =
-  (if baker then Context.get_baking_reward ctxt ~priority ~endorsing_power
-  else return (Test_tez.Tez.of_int 0))
-  >>=? fun baking_reward ->
-  Context.get_endorsing_reward ctxt ~priority ~endorsing_power
-  >>=? fun endorsing_reward ->
-  Test_tez.Tez.(endorsing_reward +? baking_reward) >>?= fun reward ->
-  return reward
-
-let get_expected_deposit ctxt ~baker ~endorsing_power =
-  Context.get_constants ctxt
-  >>=? fun Constants.
-             {
-               parametric =
-                 {endorsement_security_deposit; block_security_deposit; _};
-               _;
-             } ->
-  let open Environment in
-  let open Tez in
-  let baking_deposit = if baker then block_security_deposit else of_int 0 in
-  endorsement_security_deposit *? Int64.of_int endorsing_power
-  >>?= fun endorsement_deposit ->
-  endorsement_deposit +? baking_deposit >>?= fun deposit -> return deposit
-
-(* [baker] is true if the [pkh] has also baked the current block, in
-   which case corresponding deposit and reward should be adjusted *)
-let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
-    ~endorsing_power ctxt pkh initial_balance =
-  let contract = Contract.implicit_contract pkh in
-  get_expected_reward ctxt ~priority ~baker ~endorsing_power >>=? fun reward ->
-  get_expected_deposit ctxt ~baker ~endorsing_power >>=? fun deposit ->
-  Assert.balance_was_debited ~loc ctxt contract initial_balance deposit
-  >>=? fun () ->
-  Context.Contract.balance ~kind:Rewards ctxt contract
-  >>=? fun reward_balance ->
-  Assert.equal_tez ~loc reward_balance reward >>=? fun () ->
-  Context.Contract.balance ~kind:Deposit ctxt contract
-  >>=? fun deposit_balance -> Assert.equal_tez ~loc deposit_balance deposit
-
-let delegates_with_slots endorsers =
-  List.map
-    (fun (endorser : Plugin.RPC.Endorsing_rights.t) ->
-      (endorser.delegate, endorser.slots))
-    endorsers
-
-let endorsing_power endorsers =
-  List.fold_left
-    (fun sum (endorser : Plugin.RPC.Endorsing_rights.t) ->
-      sum + List.length endorser.slots)
-    0
-    endorsers
+(** inject an endorsement and return the block with the endorsement and its
+   parent. *)
+let inject_the_first_endorsement () =
+  init_genesis () >>=? fun (genesis, b) ->
+  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun op ->
+  Block.bake ~operations:[Operation.pack op] b >>=? fun b' -> return (b', b)
 
 (****************************************************************)
 (*                      Tests                                   *)
@@ -104,571 +52,455 @@ let endorsing_power endorsers =
 
 (** Apply a single endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_endorser (B b) >>=? fun (delegate, slots) ->
-  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) () >>=? fun op ->
-  Context.Contract.balance (B b) (Contract.implicit_contract delegate)
-  >>=? fun initial_balance ->
-  let policy = Block.Excluding [delegate] in
-  Block.get_next_baker ~policy b >>=? fun (_, priority, _) ->
-  Block.bake ~policy ~operations:[Operation.pack op] b >>=? fun b2 ->
-  assert_endorser_balance_consistency
-    ~loc:__LOC__
-    (B b2)
-    ~priority
-    ~endorsing_power:(List.length slots)
-    delegate
-    initial_balance
-
-(** Apply a maximum number of endorsements. An endorser can be
-    selected twice. *)
-let test_max_endorsement () =
-  let endorsers_per_block = 16 in
-  Context.init ~endorsers_per_block 32 >>=? fun (b, _) ->
-  Context.get_endorsers (B b) >>=? fun endorsers ->
-  Assert.equal_int
-    ~loc:__LOC__
-    (List.length
-       (List.concat
-          (List.map
-             (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
-             endorsers)))
-    endorsers_per_block
-  >>=? fun () ->
-  List.fold_left_es
-    (fun (delegates, ops, balances) (endorser : Plugin.RPC.Endorsing_rights.t) ->
-      let delegate = endorser.delegate in
-      Context.Contract.balance (B b) (Contract.implicit_contract delegate)
-      >>=? fun balance ->
-      Op.endorsement_with_slot ~delegate:(delegate, endorser.slots) (B b) ()
-      >|=? fun op ->
-      ( delegate :: delegates,
-        Operation.pack op :: ops,
-        (List.length endorser.slots, balance) :: balances ))
-    ([], [], [])
-    endorsers
-  >>=? fun (delegates, ops, previous_balances) ->
-  Block.bake ~policy:(Excluding delegates) ~operations:(List.rev ops) b
-  >>=? fun b ->
-  (* One account can endorse more than one time per level, we must
-     check that the bonds are summed up *)
-  List.iter2_es
-    ~when_different_lengths:(TzTrace.make (Exn (Failure __LOC__)))
-    (fun endorser_account (endorsing_power, previous_balance) ->
-      assert_endorser_balance_consistency
-        ~loc:__LOC__
-        (B b)
-        ~endorsing_power
-        endorser_account
-        previous_balance)
-    delegates
-    previous_balances
-
-(** Check that every endorsers' balances are consistent with different
-    priorities. *)
-let test_consistent_priorities () =
-  let priorities = 0 -- 64 in
-  Context.init 64 >>=? fun (b, _) ->
-  List.fold_left_es
-    (fun (b, used_pkhes) priority ->
-      (* Choose an endorser that has not baked nor endorsed before *)
-      Context.get_endorsers (B b) >>=? fun endorsers ->
-      let endorser =
-        List.find_opt
-          (fun (e : Plugin.RPC.Endorsing_rights.t) ->
-            not (Signature.Public_key_hash.Set.mem e.delegate used_pkhes))
-          endorsers
-      in
-      match endorser with
-      | None ->
-          return (b, used_pkhes) (* not enough fresh endorsers; we "stop" *)
-      | Some endorser ->
-          Context.Contract.balance
-            (B b)
-            (Contract.implicit_contract endorser.delegate)
-          >>=? fun balance ->
-          Op.endorsement_with_slot
-            ~delegate:(endorser.delegate, endorser.slots)
-            (B b)
-            ()
-          >>=? fun operation ->
-          let operation = Operation.pack operation in
-          Block.get_next_baker ~policy:(By_priority priority) b
-          >>=? fun (baker, _, _) ->
-          let used_pkhes = Signature.Public_key_hash.Set.add baker used_pkhes in
-          let used_pkhes =
-            Signature.Public_key_hash.Set.add endorser.delegate used_pkhes
-          in
-          (* Bake with a specific priority *)
-          Block.bake ~policy:(By_priority priority) ~operation b >>=? fun b ->
-          let is_baker =
-            Signature.Public_key_hash.(baker = endorser.delegate)
-          in
-          assert_endorser_balance_consistency
-            ~loc:__LOC__
-            ~priority
-            ~baker:is_baker
-            (B b)
-            ~endorsing_power:(List.length endorser.slots)
-            endorser.delegate
-            balance
-          >|=? fun () -> (b, used_pkhes))
-    (b, Signature.Public_key_hash.Set.empty)
-    priorities
-  >>=? fun _b -> return_unit
-
-(** Check that after [preserved_cycles] number of cycles the endorser
-    gets his reward. *)
-let test_reward_retrieval () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
-  Context.get_endorser (B b) >>=? fun (endorser, slots) ->
-  Context.Contract.balance (B b) (Contract.implicit_contract endorser)
-  >>=? fun balance ->
-  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
-  >>=? fun operation ->
-  let operation = Operation.pack operation in
-  let policy = Block.Excluding [endorser] in
-  Block.get_next_baker ~policy b >>=? fun (_, priority, _) ->
-  Block.bake ~policy ~operation b >>=? fun b ->
-  (* Bake (preserved_cycles + 1) cycles *)
-  List.fold_left_es
-    (fun b _ -> Block.bake_until_cycle_end ~policy:(Excluding [endorser]) b)
-    b
-    (0 -- preserved_cycles)
-  >>=? fun b ->
-  get_expected_reward
-    (B b)
-    ~priority
-    ~baker:false
-    ~endorsing_power:(List.length slots)
-  >>=? fun reward ->
-  Assert.balance_was_credited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser)
-    balance
-    reward
-
-(** Check that after [preserved_cycles] number of cycles endorsers get
-    their reward. Two endorsers are used and they endorse in different
-    cycles. *)
-let test_reward_retrieval_two_endorsers () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun Constants.
-             {
-               parametric = {preserved_cycles; endorsement_security_deposit; _};
-               _;
-             } ->
-  Context.get_endorsers (B b) >>=? fun endorsers ->
-  let (endorser1, endorser2) = get_hd_hd endorsers in
-  Context.Contract.balance (B b) (Contract.implicit_contract endorser1.delegate)
-  >>=? fun balance1 ->
-  Context.Contract.balance (B b) (Contract.implicit_contract endorser2.delegate)
-  >>=? fun balance2 ->
-  Tez.(
-    endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots))
-  >>?= fun security_deposit1 ->
-  (* endorser1 endorses the genesis block in cycle 0 *)
-  Op.endorsement_with_slot
-    ~delegate:(endorser1.delegate, endorser1.slots)
-    (B b)
-    ()
-  >>=? fun operation1 ->
-  let policy = Block.Excluding [endorser1.delegate; endorser2.delegate] in
-  Block.get_next_baker ~policy b >>=? fun (_, priority, _) ->
-  Context.get_endorsing_reward
-    (B b)
-    ~priority
-    ~endorsing_power:(List.length endorser1.slots)
-  >>=? fun reward1 ->
-  (* bake next block, include endorsement of endorser1 *)
-  Block.bake ~policy ~operation:(Operation.pack operation1) b >>=? fun b ->
-  Assert.balance_was_debited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser1.delegate)
-    balance1
-    security_deposit1
-  >>=? fun () ->
-  Assert.balance_is
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser2.delegate)
-    balance2
-  >>=? fun () ->
-  (* complete cycle 0 *)
-  Block.bake_until_cycle_end ~policy b >>=? fun b ->
-  Assert.balance_was_debited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser1.delegate)
-    balance1
-    security_deposit1
-  >>=? fun () ->
-  Assert.balance_is
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser2.delegate)
-    balance2
-  >>=? fun () ->
-  (* get the slots of endorser2 for the current block *)
-  Context.get_endorsers (B b) >>=? fun endorsers ->
-  let same_endorser2 endorser =
-    Signature.Public_key_hash.(
-      endorser.Plugin.RPC.Endorsing_rights.delegate = endorser2.delegate)
-  in
-  let endorser2 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.find same_endorser2 endorsers
-  in
-  (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
-  Tez.(
-    endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
-  >>?= fun security_deposit2 ->
-  (* endorser2 endorses the last block in cycle 0 *)
-  Op.endorsement_with_slot
-    ~delegate:(endorser2.delegate, endorser2.slots)
-    (B b)
-    ()
-  >>=? fun operation2 ->
-  (* bake first block in cycle 1, include endorsement of endorser2 *)
-  Block.bake ~policy ~operation:(Operation.pack operation2) b >>=? fun b ->
-  let priority = b.header.protocol_data.contents.priority in
-  Context.get_endorsing_reward
-    (B b)
-    ~priority
-    ~endorsing_power:(List.length endorser2.slots)
-  >>=? fun reward2 ->
-  Assert.balance_was_debited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser1.delegate)
-    balance1
-    security_deposit1
-  >>=? fun () ->
-  Assert.balance_was_debited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser2.delegate)
-    balance2
-    security_deposit2
-  >>=? fun () ->
-  (* bake [preserved_cycles] number of cycles *)
-  List.fold_left_es
-    (fun b _ ->
-      Assert.balance_was_debited
-        ~loc:__LOC__
-        (B b)
-        (Contract.implicit_contract endorser1.delegate)
-        balance1
-        security_deposit1
-      >>=? fun () ->
-      Assert.balance_was_debited
-        ~loc:__LOC__
-        (B b)
-        (Contract.implicit_contract endorser2.delegate)
-        balance2
-        security_deposit2
-      >>=? fun () -> Block.bake_until_cycle_end ~policy b)
-    b
-    (1 -- preserved_cycles)
-  >>=? fun b ->
-  Assert.balance_was_credited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser1.delegate)
-    balance1
-    reward1
-  >>=? fun () ->
-  Assert.balance_was_debited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser2.delegate)
-    balance2
-    security_deposit2
-  >>=? fun () ->
-  (* bake cycle [preserved_cycle + 1] *)
-  Block.bake_until_cycle_end ~policy b >>=? fun b ->
-  Assert.balance_was_credited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser1.delegate)
-    balance1
-    reward1
-  >>=? fun () ->
-  Assert.balance_was_credited
-    ~loc:__LOC__
-    (B b)
-    (Contract.implicit_contract endorser2.delegate)
-    balance2
-    reward2
+  inject_the_first_endorsement () >>=? fun _ -> return_unit
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
 (****************************************************************)
 
-(** Apply an endorsement without its slot bearing wrapper. *)
-let test_unwrapped_endorsement () =
-  Context.init 5 >>=? fun (b, _) ->
+(** Apply an endorsement with a negative slot. *)
+let test_negative_slot () =
+  Context.init 5 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b ->
   Context.get_endorser (B b) >>=? fun (delegate, _slots) ->
-  Op.endorsement ~delegate (B b) () >>=? fun op ->
-  let policy = Block.Excluding [delegate] in
-  Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Unwrapped_endorsement -> true
-      | _ -> false)
-
-(** Apply an endorsement with an invalid slot in its slot bearing wrapper. *)
-let test_bad_slot_wrapper () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_endorser (B b) >>=? fun (delegate, _slots) ->
-  Op.endorsement_with_slot ~delegate:(delegate, [2000]) (B b) () >>=? fun op ->
-  let policy = Block.Excluding [delegate] in
-  Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Baking.Invalid_endorsement_slot _ -> true
-      | _ -> false)
-
-(** Apply an endorsement with a negative slot in its slot bearing wrapper. *)
-let test_neg_slot_wrapper () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_endorser (B b) >>=? fun (delegate, _slots) ->
-  Op.endorsement_with_slot ~delegate:(delegate, [-1]) (B b) () >>=? fun op ->
-  let policy = Block.Excluding [delegate] in
   Lwt.catch
     (fun () ->
-      Block.bake ~policy ~operations:[Operation.pack op] b >>= fun _ ->
-      failwith
-        "negative slot wrapper should not be accepted by the binary format")
+      Op.endorsement
+        ~delegate:(delegate, [Slot.of_int_do_not_use_except_for_parameters (-1)])
+        ~endorsed_block:b
+        (B genesis)
+        ()
+      >>=? fun _ ->
+      failwith "negative slot should not be accepted by the binary format")
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
 
-(** Apply an endorsement with a non-normalized slot in its slot bearing wrapper. *)
-let test_non_normalized_slot_wrapper () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_endorsers (B b) >>=? fun endorsers ->
+(** Apply an endorsement with a non-normalized slot (that is, not the smallest
+   possible). *)
+let test_non_normalized_slot () =
+  Context.init 5 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b ->
+  Context.get_endorsers (B b) >>=? fun endorsers_list ->
   (* find an endorsers with more than 1 slot *)
-  let endorser =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun endorser ->
-           List.length endorser.Plugin.RPC.Endorsing_rights.slots > 1)
-         endorsers
-  in
-  let (delegate, slots) = (endorser.delegate, endorser.slots) in
-  (* the first slot should be the smallest slot *)
-  Assert.equal_int
-    ~loc:__LOC__
-    (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorser.slots)
-    (WithExceptions.Option.get ~loc:__LOC__
-    @@ List.hd (List.sort compare endorser.slots))
-  >>=? fun () ->
-  Op.endorsement_with_slot ~delegate:(delegate, List.rev slots) (B b) ()
-  >>=? fun op ->
-  let policy = Block.Excluding [delegate] in
-  Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Baking.Unexpected_endorsement_slot _ -> true
-      | _ -> false)
+  List.find_map
+    (function
+      | {Plugin.RPC.Validators.delegate; slots; _} ->
+          if List.length slots > 1 then Some (delegate, slots) else None)
+    endorsers_list
+  |> function
+  | None -> assert false
+  | Some (delegate, slots) ->
+      let set_slots = Slot.Set.of_list slots in
+      (* no duplicated slots *)
+      Assert.equal_int
+        ~loc:__LOC__
+        (Slot.Set.cardinal set_slots)
+        (List.length slots)
+      >>=? fun () ->
+      (* the first slot should be the smallest slot *)
+      Assert.equal
+        ~loc:__LOC__
+        (fun x y -> Slot.compare x y = 0)
+        "the first slot is not the smallest"
+        Slot.pp
+        (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd slots)
+        (WithExceptions.Option.get ~loc:__LOC__ @@ Slot.Set.min_elt set_slots)
+      >>=? fun () ->
+      Op.endorsement
+        ~delegate:(delegate, List.rev slots)
+        ~endorsed_block:b
+        (B genesis)
+        ()
+      >>=? fun op ->
+      let policy = Block.Excluding [delegate] in
+      Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
+      Assert.proto_error ~loc:__LOC__ res (function err ->
+          let error_info =
+            Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+          in
+          error_info.title = "wrong slot")
 
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
 let test_wrong_endorsement_predecessor () =
-  Context.init 5 >>=? fun (b, _) ->
-  Block.bake b >>=? fun b' ->
-  Op.endorsement_with_slot ~signing_context:(B b) (B b') ()
+  init_genesis () >>=? fun (genesis, b) ->
+  Op.endorsement ~endorsed_block:b (B genesis) ~signing_context:(B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
-  Block.bake ~operation b' >>= fun res ->
+  Block.bake ~operation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Wrong_endorsement_predecessor _ -> true
+      | Apply.Wrong_consensus_operation_branch _ -> true
       | _ -> false)
 
 (** Invalid_endorsement_level: apply an endorsement with an incorrect
     level (i.e. the predecessor level). *)
 let test_invalid_endorsement_level () =
-  Context.init 5 >>=? fun (b, _) ->
-  Context.get_level (B b) >>?= fun genesis_level ->
-  Block.bake b >>=? fun b' ->
-  Context.get_endorser (B b) >>=? fun (genesis_endorser, slots) ->
-  Op.endorsement_with_slot
-    ~delegate:(genesis_endorser, slots)
-    ~signing_context:(B b')
-    ~level:genesis_level
-    (B b')
-    ()
-  >>=? fun operation ->
-  let operation = Operation.pack operation in
-  Block.bake ~operation b' >>= fun res ->
+  init_genesis () >>=? fun (genesis, b) ->
+  Context.get_level (B genesis) >>?= fun genesis_level ->
+  Op.endorsement ~level:genesis_level ~endorsed_block:b (B genesis) ()
+  >>=? fun op ->
+  Block.bake ~operations:[Operation.pack op] b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_endorsement_level -> true
+      | Apply.Wrong_level_for_consensus_operation _ -> true
       | _ -> false)
 
-(** Duplicate endorsement : apply an endorsement that has already been
-    done. *)
+(** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
-  Context.init 5 >>=? fun (b, _) ->
+  init_genesis () >>=? fun (genesis, b) ->
   Incremental.begin_construction b >>=? fun inc ->
-  Op.endorsement_with_slot (B b) () >>=? fun operation ->
+  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
   let operation = Operation.pack operation in
   Incremental.add_operation inc operation >>=? fun inc ->
-  Op.endorsement_with_slot (B b) () >>=? fun operation ->
+  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
   let operation = Operation.pack operation in
   Incremental.add_operation inc operation >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Duplicate_endorsement _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "double inclusion of consensus operation"
 
-(** Apply a single endorsement from the slot 0 endorser. *)
-let test_not_enough_for_deposit () =
-  Context.init 5 ~endorsers_per_block:1 >>=? fun (b_init, contracts) ->
-  List.map_es
-    (fun c -> Context.Contract.manager (B b_init) c >|=? fun m -> (m, c))
-    contracts
-  >>=? fun managers ->
-  Block.bake b_init >>=? fun b ->
-  (* retrieve the level 2's endorser *)
-  Context.get_endorser (B b) >>=? fun (endorser, slots) ->
-  let (_, contract_other_than_endorser) =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun (c, _) ->
-           not (Signature.Public_key_hash.equal c.Account.pkh endorser))
-         managers
-  in
-  let (_, contract_of_endorser) =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun (c, _) -> Signature.Public_key_hash.equal c.Account.pkh endorser)
-         managers
-  in
-  Context.Contract.balance (B b) (Contract.implicit_contract endorser)
-  >>=? fun initial_balance ->
-  (* Empty the future endorser account *)
-  Op.transaction
-    (B b_init)
-    contract_of_endorser
-    contract_other_than_endorser
-    initial_balance
-  >>=? fun op_trans ->
-  Block.bake ~operation:op_trans b_init >>=? fun b ->
-  (* Endorse with a zero balance *)
-  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
-  >>=? fun op_endo ->
-  Block.bake
-    ~policy:(Excluding [endorser])
-    ~operation:(Operation.pack op_endo)
-    b
-  >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Delegate_storage.Balance_too_low_for_deposit _ -> true
-      | _ -> false)
+(** Consensus operation for future level : apply an endorsement with a level in the future *)
+let test_consensus_operation_endorsement_for_future_level () =
+  init_genesis () >>=? fun (genesis, pred) ->
+  let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
+  let level = match raw_level with Ok l -> l | Error _ -> assert false in
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~level
+    ~error_title:"Consensus operation for future level"
+    ~context:(Context.B genesis)
+    ~construction_mode:(pred, None)
+    ()
 
-(** Check that a block with not enough endorsement cannot be baked. *)
-let test_endorsement_threshold () =
-  let initial_endorsers = 28 in
-  let num_accounts = 100 in
-  Context.init ~initial_endorsers num_accounts >>=? fun (b, _) ->
-  Context.get_endorsers (B b) >>=? fun endorsers ->
-  let num_endorsers = List.length endorsers in
-  (* we try to bake with more and more endorsers, but at each
-     iteration with a timestamp smaller than required *)
-  List.iter_es
-    (fun i ->
-      (* the priority is chosen rather arbitrarily *)
-      let priority = num_endorsers - i in
-      let crt_endorsers = List.take_n i endorsers in
-      let endorsing_power = endorsing_power crt_endorsers in
-      let delegates = delegates_with_slots crt_endorsers in
-      List.map_es
-        (fun x -> Op.endorsement_with_slot ~delegate:x (B b) ())
-        delegates
-      >>=? fun ops ->
-      Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
-      >>=? fun timestamp ->
-      (* decrease the timestamp by one second *)
-      let seconds =
-        Int64.(sub (of_string (Timestamp.to_seconds_string timestamp)) 1L)
-      in
-      match Timestamp.of_seconds_string (Int64.to_string seconds) with
-      | None -> failwith "timestamp to/from string manipulation failed"
-      | Some timestamp ->
-          Block.bake
-            ~timestamp
-            ~policy:(By_priority priority)
-            ~operations:(List.map Operation.pack ops)
-            b
-          >>= fun b2 ->
-          Assert.proto_error ~loc:__LOC__ b2 (function
-              | Baking.Timestamp_too_early _ -> true
-              | _ -> false))
-    (0 -- (num_endorsers - 1))
-  >>=? fun () ->
-  (* we bake with all endorsers endorsing, at the right time *)
-  let priority = 0 in
-  let endorsing_power = endorsing_power endorsers in
-  let delegates = delegates_with_slots endorsers in
-  List.map_es
-    (fun delegate -> Op.endorsement_with_slot ~delegate (B b) ())
-    delegates
-  >>=? fun ops ->
-  Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
-  >>=? fun timestamp ->
-  Block.bake
-    ~policy:(By_priority priority)
-    ~timestamp
-    ~operations:(List.map Operation.pack ops)
-    b
-  >>= fun _ -> return_unit
+(** Consensus operation for old level : apply an endorsement one level in the past *)
+let test_consensus_operation_endorsement_for_predecessor_level () =
+  init_genesis () >>=? fun (genesis, pred) ->
+  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
+  let level = match raw_level with Ok l -> l | Error _ -> assert false in
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~level
+    ~error_title:"Endorsement for previous level"
+    ~context:(Context.B genesis)
+    ~construction_mode:(pred, None)
+    ()
 
-(** Fitness gap *)
+(** Consensus operation for old level : apply an endorsement with more than one level in the past *)
+let test_consensus_operation_endorsement_for_old_level () =
+  init_genesis () >>=? fun (genesis, pred) ->
+  Block.bake genesis >>=? fun next_block ->
+  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
+  let level = match raw_level with Ok l -> l | Error _ -> assert false in
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~level
+    ~error_title:"Consensus operation for old level"
+    ~context:(Context.B next_block)
+    ~construction_mode:(pred, None)
+    ()
+
+(** Consensus operation for future round : apply an endorsement with a round in the future *)
+let test_consensus_operation_endorsement_for_future_round () =
+  init_genesis () >>=? fun (genesis, pred) ->
+  Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~round
+    ~error_title:"Consensus operation for future round"
+    ~context:(Context.B genesis)
+    ~construction_mode:(pred, None)
+    ()
+
+(** Consensus operation for old round : apply an endorsement with a round in the past *)
+let test_consensus_operation_endorsement_for_old_round () =
+  init_genesis ~policy:(By_round 10) () >>=? fun (genesis, pred) ->
+  Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~round
+    ~error_title:"Consensus operation for old round"
+    ~context:(Context.B genesis)
+    ~construction_mode:(pred, None)
+    ()
+
+(** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
+let test_consensus_operation_endorsement_on_competing_proposal () =
+  init_genesis () >>=? fun (genesis, pred) ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:pred
+    ~block_payload_hash:Block_payload_hash.zero
+    ~error_title:"Consensus operation on competing proposal"
+    ~context:(Context.B genesis)
+    ~construction_mode:(pred, None)
+    ()
+
+(** Wrong round : apply an endorsement with an incorrect round *)
+let test_wrong_round () =
+  init_genesis () >>=? fun (genesis, b) ->
+  Environment.wrap_tzresult (Round.of_int 2) >>?= fun round ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:b
+    ~round
+    ~error_title:"wrong round for consensus operation"
+    ~context:(Context.B genesis)
+    ()
+
+(** Wrong level : apply an endorsement with an incorrect level *)
+let test_wrong_level () =
+  init_genesis () >>=? fun (genesis, b) ->
+  let context = Context.B genesis in
+  let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
+  let level = match raw_level with Ok l -> l | Error _ -> assert false in
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:b
+    ~level
+    ~error_title:"wrong level for consensus operation"
+    ~context
+    ()
+
+(** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
+let test_wrong_payload_hash () =
+  init_genesis () >>=? fun (genesis, b) ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:b
+    ~block_payload_hash:Block_payload_hash.zero
+    ~error_title:"wrong payload hash for consensus operation"
+    ~context:(Context.B genesis)
+    ()
+
+let test_wrong_slot_used () =
+  init_genesis () >>=? fun (genesis, b) ->
+  Context.get_endorser (B b) >>=? fun (_, slots) ->
+  (match slots with
+  | _x :: y :: _ -> return y
+  | _ -> failwith "Slots size should be at least of 2 ")
+  >>=? fun slot ->
+  Consensus_helpers.test_consensus_operation
+    ~loc:__LOC__
+    ~is_preendorsement:false
+    ~endorsed_block:b
+    ~slot
+    ~error_title:"wrong slot"
+    ~context:(Context.B genesis)
+    ()
+
+(** Check that:
+    - a block with not enough endorsement cannot be baked;
+    - a block with enough endorsement is baked. *)
+let test_endorsement_threshold ~sufficient_threshold () =
+  (* We choose a relative large number of accounts so that the probability that
+     any delegate has [consensus_threshold] slots is low and most delegates have
+     about 1 slot so we can get closer to the limit of [consensus_threshold]: we
+     check that a block with endorsing power [consensus_threshold - 1] won't be
+     baked. *)
+  Context.init 10 >>=? fun (genesis, _contracts) ->
+  Block.bake genesis >>=? fun b ->
+  Context.get_constants (B b)
+  >>=? fun {parametric = {consensus_threshold; _}; _} ->
+  Context.get_endorsers (B b) >>=? fun endorsers_list ->
+  Block.get_round b >>?= fun round ->
+  List.fold_left_es
+    (fun (counter, endos) {Plugin.RPC.Validators.delegate; slots; _} ->
+      let new_counter = counter + List.length slots in
+      if
+        (sufficient_threshold && counter < consensus_threshold)
+        || ((not sufficient_threshold) && new_counter < consensus_threshold)
+      then
+        Op.endorsement
+          ~round
+          ~delegate:(delegate, slots)
+          ~endorsed_block:b
+          (B genesis)
+          ()
+        >>=? fun endo -> return (new_counter, Operation.pack endo :: endos)
+      else return (counter, endos))
+    (0, [])
+    endorsers_list
+  >>=? fun (_, endos) ->
+  Block.bake ~operations:endos b >>= fun b ->
+  if sufficient_threshold then return_unit
+  else
+    Assert.proto_error ~loc:__LOC__ b (function err ->
+        let error_info =
+          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+        in
+        error_info.title = "Not enough endorsements")
+
+(** Fitness gap: this is a straightforward update from Emmy to Tenderbake, that
+    is, check that the level is incremented in a child block. *)
 let test_fitness_gap () =
-  let num_accounts = 5 in
-  Context.init num_accounts >>=? fun (b, _) ->
-  (match Fitness_repr.to_int64 b.header.shell.fitness with
-  | Ok fitness -> Int64.to_int fitness
-  | Error _ -> assert false)
-  |> fun fitness ->
-  Context.get_endorser (B b) >>=? fun (delegate, slots) ->
-  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) () >>=? fun op ->
-  (* bake at priority 0 succeed thanks to enough endorsements *)
-  Block.bake ~policy:(By_priority 0) ~operations:[Operation.pack op] b
-  >>=? fun b ->
-  (match Fitness_repr.to_int64 b.header.shell.fitness with
-  | Ok new_fitness -> Int64.to_int new_fitness - fitness
-  | Error _ -> assert false)
-  |> fun res ->
-  (* in Emmy+, the fitness increases by 1, so the difference between
-     the fitness at level 1 and at level 0 is 1, independently if the
-     number fo endorsements (here 1) *)
-  Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
+  inject_the_first_endorsement () >>=? fun (b, pred_b) ->
+  let fitness =
+    match Fitness.from_raw b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let pred_fitness =
+    match Fitness.from_raw pred_b.header.shell.fitness with
+    | Ok fitness -> fitness
+    | _ -> assert false
+  in
+  let level = Fitness.level fitness in
+  let pred_level = Fitness.level pred_fitness in
+  let level_diff =
+    Int32.sub (Raw_level.to_int32 level) (Raw_level.to_int32 pred_level)
+  in
+  Assert.equal_int32 ~loc:__LOC__ level_diff 1l
+
+let test_preendorsement_endorsement_same_level () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b1 ->
+  Incremental.begin_construction ~mempool_mode:true ~policy:(By_round 2) b1
+  >>=? fun i ->
+  Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_endo ->
+  let op_endo = Alpha_context.Operation.pack op_endo in
+  Incremental.add_operation i op_endo >>=? fun _i ->
+  Op.preendorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_preendo ->
+  let op_preendo = Alpha_context.Operation.pack op_preendo in
+  Incremental.add_operation i op_preendo >>=? fun _i -> return ()
+
+(** Test for endorsement injection with wrong slot in mempool mode. This
+    test is expected to fail *)
+let test_wrong_endorsement_slot_in_mempool_mode () =
+  Context.init ~consensus_threshold:1 5 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b1 ->
+  let module V = Plugin.RPC.Validators in
+  (Context.get_endorsers (B b1) >>=? function
+   | {V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
+       (* we didn't use min slot for the injection. It's bad !*)
+       return (Some non_canonical_slot)
+   | _ -> assert false)
+  >>=? fun slot ->
+  Op.endorsement ~endorsed_block:b1 (B genesis) ?slot () >>=? fun endo ->
+  let endo = Operation.pack endo in
+  Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
+  Incremental.add_operation i endo >>= fun res ->
+  Assert.proto_error_with_info ~loc:__LOC__ res "wrong slot"
+
+(** Endorsement for next level *)
+let test_endorsement_for_next_level () =
+  init_genesis () >>=? fun (genesis, _) ->
+  Consensus_helpers.test_consensus_op_for_next
+    ~genesis
+    ~kind:`Endorsement
+    ~next:`Level
+
+(** Endorsement for next round *)
+let test_endorsement_for_next_round () =
+  init_genesis () >>=? fun (genesis, _) ->
+  Consensus_helpers.test_consensus_op_for_next
+    ~genesis
+    ~kind:`Endorsement
+    ~next:`Round
+
+(** Endorsement of grandparent  *)
+let test_endorsement_grandparent () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b_gp ->
+  Block.bake b_gp >>=? fun b ->
+  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
+  (* Endorsement on grandparent *)
+  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
+  (* Endorsement on parent *)
+  Op.endorsement ~endorsed_block:b (B b_gp) () >>=? fun op2 ->
+  let op1 = Alpha_context.Operation.pack op1 in
+  let op2 = Alpha_context.Operation.pack op2 in
+  (* Both should be accepted by the mempool *)
+  Incremental.add_operation i op1 >>=? fun i ->
+  Incremental.add_operation i op2 >>=? fun _i -> return ()
+
+(** Double inclusion of grandparent endorsement *)
+let test_double_endorsement_grandparent () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b_gp ->
+  Block.bake b_gp >>=? fun b ->
+  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
+  (* Endorsement on grandparent *)
+  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
+  (* Endorsement on parent *)
+  Op.endorsement ~endorsed_block:b (B b_gp) () >>=? fun op2 ->
+  let op1 = Alpha_context.Operation.pack op1 in
+  let op2 = Alpha_context.Operation.pack op2 in
+  (* The first grand parent endorsement should be accepted by the
+     mempool but the second rejected. *)
+  Incremental.add_operation i op1 >>=? fun i ->
+  Incremental.add_operation i op1 >>= fun res ->
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "double inclusion of consensus operation"
+  >>=? fun () ->
+  Incremental.add_operation i op2 >>=? fun _i -> return ()
+
+(** Endorsement of grandparent on same slot as parent *)
+let test_endorsement_grandparent_same_slot () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b_gp ->
+  Block.bake b_gp >>=? fun b ->
+  Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
+  (* Endorsement on parent *)
+  Consensus_helpers.delegate_of_first_slot (B b) >>=? fun (delegate, slot) ->
+  Op.endorsement ~endorsed_block:b ~delegate (B b_gp) () >>=? fun op2 ->
+  (* Endorsement on grandparent *)
+  Consensus_helpers.delegate_of_slot slot (B b_gp) >>=? fun delegate ->
+  Op.endorsement ~endorsed_block:b_gp ~delegate (B genesis) () >>=? fun op1 ->
+  let op1 = Alpha_context.Operation.pack op1 in
+  let op2 = Alpha_context.Operation.pack op2 in
+  (* Both should be accepted by the mempool *)
+  Incremental.add_operation i op1 >>=? fun i ->
+  Incremental.add_operation i op2 >>=? fun _i -> return ()
+
+(** Endorsement of grandparent in application mode should be rejected *)
+let test_endorsement_grandparent_application () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b_gp ->
+  Block.bake b_gp >>=? fun b ->
+  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op ->
+  Block.bake ~operations:[Operation.pack op] b >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Apply.Wrong_level_for_consensus_operation _ -> true
+      | _ -> false)
+
+(** Endorsement of grandparent in full construction mode should be rejected *)
+let test_endorsement_grandparent_full_construction () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Block.bake genesis >>=? fun b_gp ->
+  Block.bake b_gp >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  (* Endorsement on grandparent *)
+  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
+  let op1 = Alpha_context.Operation.pack op1 in
+  Incremental.add_operation i op1 >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Apply.Wrong_level_for_consensus_operation _ -> true
+      | _ -> false)
 
 let tests =
   [
     Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
-    Tztest.tztest "Unwrapped endorsement" `Quick test_unwrapped_endorsement;
-    Tztest.tztest
-      "Endorsement wrapped with invalid slot"
-      `Quick
-      test_bad_slot_wrapper;
-    Tztest.tztest
-      "Endorsement wrapped with slot -1"
-      `Quick
-      test_neg_slot_wrapper;
+    Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
     Tztest.tztest
       "Endorsement wrapped with non-normalized slot"
       `Quick
-      test_non_normalized_slot_wrapper;
-    Tztest.tztest "Maximum endorsement" `Quick test_max_endorsement;
-    Tztest.tztest "Consistent priorities" `Quick test_consistent_priorities;
-    Tztest.tztest "Reward retrieval" `Quick test_reward_retrieval;
-    Tztest.tztest
-      "Reward retrieval two endorsers"
-      `Quick
-      test_reward_retrieval_two_endorsers;
-    Tztest.tztest "Endorsement threshold" `Quick test_endorsement_threshold;
+      test_non_normalized_slot;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
     Tztest.tztest
@@ -680,5 +512,82 @@ let tests =
       `Quick
       test_invalid_endorsement_level;
     Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
-    Tztest.tztest "Not enough for deposit" `Quick test_not_enough_for_deposit;
+    Tztest.tztest
+      "Endorsement for future level"
+      `Quick
+      test_consensus_operation_endorsement_for_future_level;
+    Tztest.tztest
+      "Endorsement for predecessor level"
+      `Quick
+      test_consensus_operation_endorsement_for_old_level;
+    Tztest.tztest
+      "Endorsement for old level"
+      `Quick
+      test_consensus_operation_endorsement_for_old_level;
+    Tztest.tztest
+      "Endorsement for future round"
+      `Quick
+      test_consensus_operation_endorsement_for_future_round;
+    Tztest.tztest
+      "Endorsement for old round"
+      `Quick
+      test_consensus_operation_endorsement_for_old_round;
+    Tztest.tztest
+      "Endorsement on competing proposal"
+      `Quick
+      test_consensus_operation_endorsement_on_competing_proposal;
+    Tztest.tztest "Wrong level for consensus operation" `Quick test_wrong_level;
+    Tztest.tztest "Wrong round for consensus operation" `Quick test_wrong_round;
+    Tztest.tztest
+      "Wrong payload hash for consensus operation"
+      `Quick
+      test_wrong_payload_hash;
+    Tztest.tztest
+      "Wrong slot used for consensus operation"
+      `Quick
+      test_wrong_slot_used;
+    Tztest.tztest
+      "sufficient endorsement threshold"
+      `Quick
+      (test_endorsement_threshold ~sufficient_threshold:true);
+    Tztest.tztest
+      "insufficient endorsement threshold"
+      `Quick
+      (test_endorsement_threshold ~sufficient_threshold:false);
+    Tztest.tztest
+      "Endorsement/Preendorsement at same level"
+      `Quick
+      test_preendorsement_endorsement_same_level;
+    Tztest.tztest
+      "Wrong endorsement slot in mempool mode"
+      `Quick
+      test_wrong_endorsement_slot_in_mempool_mode;
+    Tztest.tztest
+      "Endorsement for next level"
+      `Quick
+      test_endorsement_for_next_level;
+    Tztest.tztest
+      "Endorsement for next round"
+      `Quick
+      test_endorsement_for_next_round;
+    Tztest.tztest
+      "Endorsement for grandparent"
+      `Quick
+      test_endorsement_grandparent;
+    Tztest.tztest
+      "Double endorsement of grandparent"
+      `Quick
+      test_double_endorsement_grandparent;
+    Tztest.tztest
+      "Endorsement for grandparent on same slot as parent"
+      `Quick
+      test_endorsement_grandparent_same_slot;
+    Tztest.tztest
+      "Endorsement for grandparent in application mode"
+      `Quick
+      test_endorsement_grandparent_application;
+    Tztest.tztest
+      "Endorsement for grandparent in full construction mode"
+      `Quick
+      test_endorsement_grandparent_full_construction;
   ]

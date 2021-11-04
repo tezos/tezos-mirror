@@ -1,5 +1,6 @@
 import time
 
+import subprocess
 import pytest
 
 from launchers.sandbox import Sandbox
@@ -10,7 +11,8 @@ from . import protocol
 BLOCKS_PER_VOTING_PERIOD = 8
 OFFSET = int(BLOCKS_PER_VOTING_PERIOD / 2)
 POLLING_TIME = 5
-NUM_NODES = 3
+BAKING_RATE = 1
+NUM_NODES = 5
 BAKER = "bootstrap1"
 ERROR_PATTERN = r"Uncaught|registered|error"
 
@@ -26,9 +28,20 @@ def client_get_current_period_kind(client) -> dict:
     return res['voting_period']['kind']
 
 
+def tenderbake(client: Client):
+    """Call to 'bake for' that uses the multi-account command for Tenderbake.
+
+    In particular, this allows to never get a 'Delegates do not have enough
+    voting power' error in sandboxed mode since we bake for all known accounts
+    (aka all bootstrap accounts) by default in method multibake.
+
+    """
+    client.multibake(args=['--minimal-timestamp'])
+
+
 def bake_n_blocks(client: Client, baker: str, n_blocks: int):
     for _ in range(n_blocks):
-        utils.bake(client, baker)
+        utils.bake(client, bake_for=baker)
 
 
 def bake_until_next_voting_period(client: Client, baker: str, offset: int = 0):
@@ -39,8 +52,9 @@ def bake_until_next_voting_period(client: Client, baker: str, offset: int = 0):
     bake_n_blocks(client, baker, 1 + remaining_blocks + offset)
 
 
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(60)
 def wait_until_level(clients, level):
+    print(f"Waiting until {level}")
     for client in clients:
         while client.get_level() < level:
             time.sleep(1)
@@ -81,14 +95,22 @@ class TestVotingFull:
     def test_add_initial_nodes(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        parameters = dict(protocol.PREV_PARAMETERS)
+
+    def test_activate_proto_a(self, sandbox: Sandbox):
+        parameters = protocol.get_parameters(protocol.Protocol.PREV)
         parameters["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
         utils.activate_protocol(
-            sandbox.client(0), PROTO_A, parameters, activate_in_the_past=True
+            sandbox.client(0),
+            PROTO_A,
+            parameters=parameters,
+            activate_in_the_past=True,
         )
 
-    def test_add_baker(self, sandbox: Sandbox):
-        sandbox.add_baker(0, BAKER, proto=PROTO_B_DAEMON)
+    # def test_add_bakers(self, sandbox: Sandbox):
+    #     """Add a baker per node"""
+    #     sandbox.add_baker(
+    #         1, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_B_DAEMON
+    #     )
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -156,18 +178,38 @@ class TestVotingFull:
     @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
         # we let a PROTO_A baker bake the last blocks of PROTO_A
-        sandbox.add_baker(0, BAKER, proto=PROTO_A_DAEMON)
+        # sandbox.add_baker(
+        #     0, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_A_DAEMON
+        # )
+        # for i in range(1,NUM_NODES):
+        #     sandbox.add_baker(
+        #         i, [f"bootstrap{i}"], proto=PROTO_B_DAEMON
+        #     )
         clients = sandbox.all_clients()
-        all_have_proto = False
-        while not all_have_proto:
-            all_have_proto = all(
-                client.get_protocol() == PROTO_B for client in clients
-            )
+        client = clients[0]
+        utils.bake(client, bake_for="bootstrap2")
+        all_have_proto_b = False
+        while not all_have_proto_b:
+            try:
+                utils.bake(client, bake_for="bootstrap2")
+            except subprocess.CalledProcessError:
+                # A fatal error is raised when we do not have enough endorsing
+                # power.
+                # This is typical of a simple bake for call in Tenderbake
+                # Therefore this means we actually have migrated to Tenderbake
+                # Let's use a baking call that is sure to pass
+                tenderbake(client)
+            # either succeeds out of the loop or fails due to the timeout header
+            client_protocols = [client.get_protocol() for c in clients]
+            all_have_proto_b = all(p == PROTO_B for p in client_protocols)
             time.sleep(POLLING_TIME)
 
     def test_new_chain_progress(self, sandbox: Sandbox):
+        # sandbox.rm_baker(0, proto=PROTO_A_DAEMON)
         client = sandbox.client(0)
-        level_before = client.get_level()
+        level_before = client.get_level(chain='main')
+        tenderbake(client)
+        print(f"level before {level_before}")
         assert utils.check_level_greater_than(client, level_before + 1)
 
     @pytest.mark.xfail

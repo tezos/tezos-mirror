@@ -33,7 +33,11 @@ def clear_cache(sandbox, node_id):
 class TestMultiNodeStorageReconstruction:
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=PARAMS)
-        protocol.activate(sandbox.client(0), activate_in_the_past=True)
+        parameters = protocol.get_parameters()
+        parameters['consensus_threshold'] = 0
+        protocol.activate(
+            sandbox.client(0), parameters=parameters, activate_in_the_past=True
+        )
         # Keep node 3 in the dance
         # History mode by default (full)
         sandbox.add_node(3, params=PARAMS)

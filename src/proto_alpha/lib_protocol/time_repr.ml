@@ -60,7 +60,14 @@ let pp = pp_hum
 let ( +? ) x y =
   let span = Period_repr.to_seconds y in
   let t64 = Time.add x span in
-  if t64 < Time.of_seconds 0L then error Timestamp_add else ok t64
+  (* As long as span and time representations are int64, we cannont overflow if
+     x is negative. *)
+  if x < Time.of_seconds 0L then ok t64
+  else if t64 < Time.of_seconds 0L then error Timestamp_add
+  else ok t64
 
 let ( -? ) x y =
   record_trace Timestamp_sub (Period_repr.of_seconds (Time.diff x y))
+
+let ( - ) x y =
+  Time.of_seconds Int64.(sub (Time.to_seconds x) (Period_repr.to_seconds y))

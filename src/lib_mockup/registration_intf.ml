@@ -24,7 +24,13 @@
 (*****************************************************************************)
 
 (** Type of a mockup environment *)
-type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+type t = {
+  chain : Chain_id.t;
+  rpc_context : Tezos_protocol_environment.rpc_context;
+  protocol_data : bytes;
+}
+
+type mockup_context = t
 
 module type PROTOCOL = sig
   val hash : Protocol_hash.t
@@ -65,7 +71,7 @@ module type MOCKUP = sig
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
 
   val init :
-    cctxt:Tezos_client_base.Client_context.full ->
+    cctxt:Tezos_client_base.Client_context.printer ->
     parameters:parameters ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
@@ -79,7 +85,7 @@ module type S = sig
 
   module type PROTOCOL = PROTOCOL
 
-  type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+  type mockup_context = t
 
   type mockup_environment = (module MOCKUP)
 

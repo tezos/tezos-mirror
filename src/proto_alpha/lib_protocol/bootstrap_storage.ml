@@ -23,37 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc
-
-let init_account ctxt
+let init_account (ctxt, balance_updates)
     ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
     =
   let contract = Contract_repr.implicit_contract public_key_hash in
-  Contract_storage.credit ctxt contract amount >>=? fun ctxt ->
-  match public_key with
+  Token.transfer
+    ~origin:Protocol_migration
+    ctxt
+    `Bootstrap
+    (`Contract contract)
+    amount
+  >>=? fun (ctxt, new_balance_updates) ->
+  (match public_key with
   | Some public_key ->
-      Contract_storage.reveal_manager_key ctxt public_key_hash public_key
+      Contract_manager_storage.reveal_manager_key
+        ctxt
+        public_key_hash
+        public_key
       >>=? fun ctxt -> Delegate_storage.set ctxt contract (Some public_key_hash)
-  | None -> return ctxt
+  | None -> return ctxt)
+  >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
 
-let init_contract ~typecheck ctxt
+let init_contract ~typecheck (ctxt, balance_updates)
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, contract) ->
   typecheck ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate
     ctxt
-    contract
-    ~balance:amount
     ~prepaid_bootstrap_storage:true
+    contract
     ~script
-    ~delegate
+  >>=? fun ctxt ->
+  (match delegate with
+  | None -> return ctxt
+  | Some delegate -> Delegate_storage.init ctxt contract delegate)
+  >>=? fun ctxt ->
+  let origin = Receipt_repr.Protocol_migration in
+  Token.transfer ~origin ctxt `Bootstrap (`Contract contract) amount
+  >|=? fun (ctxt, new_balance_updates) ->
+  (ctxt, new_balance_updates @ balance_updates)
 
-let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
+let init ctxt ~typecheck ?no_reward_cycles accounts contracts =
   let nonce = Operation_hash.hash_string ["Un festival de GADT."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  List.fold_left_es init_account ctxt accounts >>=? fun ctxt ->
-  List.fold_left_es (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
+  List.fold_left_es init_account (ctxt, []) accounts
+  >>=? fun (ctxt, account_balance_updates) ->
+  List.fold_left_es (init_contract ~typecheck) (ctxt, []) contracts
+  >>=? fun (ctxt, contract_balance_updates) ->
   (match no_reward_cycles with
   | None -> return ctxt
   | Some cycles ->
@@ -63,69 +80,34 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
       Raw_context.patch_constants ctxt (fun c ->
           {
             c with
-            baking_reward_per_endorsement = [Tez_repr.zero];
-            endorsement_reward = [Tez_repr.zero];
+            baking_reward_fixed_portion = Tez_repr.zero;
+            baking_reward_bonus_per_slot = Tez_repr.zero;
+            endorsing_reward_per_slot = Tez_repr.zero;
           })
       >>= fun ctxt ->
       (* Store the final reward. *)
       Storage.Ramp_up.Rewards.init
         ctxt
         (Cycle_repr.of_int32_exn (Int32.of_int cycles))
-        (constants.baking_reward_per_endorsement, constants.endorsement_reward))
-  >>=? fun ctxt ->
-  match ramp_up_cycles with
-  | None -> return ctxt
-  | Some cycles ->
-      (* Store pending ramp ups. *)
-      let constants = Raw_context.constants ctxt in
-      Tez_repr.(constants.block_security_deposit /? Int64.of_int cycles)
-      >>?= fun block_step ->
-      Tez_repr.(constants.endorsement_security_deposit /? Int64.of_int cycles)
-      >>?= fun endorsement_step ->
-      (* Start without security_deposit *)
-      Raw_context.patch_constants ctxt (fun c ->
-          {
-            c with
-            block_security_deposit = Tez_repr.zero;
-            endorsement_security_deposit = Tez_repr.zero;
-          })
-      >>= fun ctxt ->
-      List.fold_left_es
-        (fun ctxt cycle ->
-          Tez_repr.(block_step *? Int64.of_int cycle)
-          >>?= fun block_security_deposit ->
-          Tez_repr.(endorsement_step *? Int64.of_int cycle)
-          >>?= fun endorsement_security_deposit ->
-          let cycle = Cycle_repr.of_int32_exn (Int32.of_int cycle) in
-          Storage.Ramp_up.Security_deposits.init
-            ctxt
-            cycle
-            (block_security_deposit, endorsement_security_deposit))
-        ctxt
-        (1 --> (cycles - 1))
-      >>=? fun ctxt ->
-      (* Store the final security deposits. *)
-      Storage.Ramp_up.Security_deposits.init
-        ctxt
-        (Cycle_repr.of_int32_exn (Int32.of_int cycles))
-        ( constants.block_security_deposit,
-          constants.endorsement_security_deposit )
+        ( constants.baking_reward_fixed_portion,
+          constants.baking_reward_bonus_per_slot,
+          constants.endorsing_reward_per_slot ))
+  >|=? fun ctxt -> (ctxt, account_balance_updates @ contract_balance_updates)
 
 let cycle_end ctxt last_cycle =
   let next_cycle = Cycle_repr.succ last_cycle in
-  (Storage.Ramp_up.Rewards.find ctxt next_cycle >>=? function
-   | None -> return ctxt
-   | Some (baking_reward_per_endorsement, endorsement_reward) ->
-       Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle >>=? fun ctxt ->
-       Raw_context.patch_constants ctxt (fun c ->
-           {c with baking_reward_per_endorsement; endorsement_reward})
-       >|= ok)
-  >>=? fun ctxt ->
-  Storage.Ramp_up.Security_deposits.find ctxt next_cycle >>=? function
+  Storage.Ramp_up.Rewards.find ctxt next_cycle >>=? function
   | None -> return ctxt
-  | Some (block_security_deposit, endorsement_security_deposit) ->
-      Storage.Ramp_up.Security_deposits.remove_existing ctxt next_cycle
-      >>=? fun ctxt ->
+  | Some
+      ( baking_reward_fixed_portion,
+        baking_reward_bonus_per_slot,
+        endorsing_reward_per_slot ) ->
+      Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle >>=? fun ctxt ->
       Raw_context.patch_constants ctxt (fun c ->
-          {c with block_security_deposit; endorsement_security_deposit})
+          {
+            c with
+            baking_reward_fixed_portion;
+            baking_reward_bonus_per_slot;
+            endorsing_reward_per_slot;
+          })
       >|= ok

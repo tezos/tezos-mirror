@@ -46,3 +46,10 @@ val ( +? ) : time -> Period_repr.t -> time tzresult
 (** Returns the difference between two timestamps as a time span.
     This function fails when the difference is negative *)
 val ( -? ) : time -> time -> Period_repr.t tzresult
+
+(** [t - p] Returns a timestamps [p] seconds before [t].
+
+    Todo: This function should be made available in the environement rather than
+    implemented here.
+ *)
+val ( - ) : time -> Period_repr.t -> time

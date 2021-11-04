@@ -25,7 +25,7 @@
 
 open Tezos_protocol_environment
 
-type t
+type t = Tezos_context_memory.Context.t
 
 type _ Context.kind += Context : t Context.kind
 
@@ -34,3 +34,7 @@ val empty : Context.t
 val encoding : Context.t Data_encoding.t
 
 module M : CONTEXT with type t = t
+
+val wrap_memory_context : t -> Context.t
+
+val unwrap_memory_context : Context.t -> t

@@ -268,20 +268,6 @@ baking for user *bob*::
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
-Endorser
-~~~~~~~~
-
-The endorser is a daemon that, once connected to an account, computes
-the endorsing rights for that account and, upon reception of a new
-block, verifies the validity of the block and emits an endorsement
-operation.
-It can endorse for a specific account or if omitted it endorses for
-all accounts.
-
-::
-
-   tezos-endorser-alpha run
-
 Accuser
 ~~~~~~~
 

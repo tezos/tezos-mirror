@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +35,8 @@ type Environment.Error_monad.error += Cannot_parse_operation (* `Branch *)
 
 type Environment.Error_monad.error += Cannot_serialize_log
 
+type Environment.Error_monad.error += Cannot_retrieve_predecessor_level
+
 let () =
   Environment.Error_monad.register_error_kind
     `Branch
@@ -54,7 +57,15 @@ let () =
        provided gas"
     Data_encoding.empty
     (function Cannot_serialize_log -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_log)
+    (fun () -> Cannot_serialize_log) ;
+  Environment.Error_monad.register_error_kind
+    `Temporary
+    ~id:"cannot_retrieve_predecessor_level"
+    ~title:"Cannot retrieve predecessor level"
+    ~description:"Cannot retrieve predecessor level."
+    Data_encoding.empty
+    (function Cannot_retrieve_predecessor_level -> Some () | _ -> None)
+    (fun () -> Cannot_retrieve_predecessor_level)
 
 module Mempool = struct
   type nanotez = Q.t
@@ -75,6 +86,7 @@ module Mempool = struct
     minimal_nanotez_per_gas_unit : nanotez;
     minimal_nanotez_per_byte : nanotez;
     allow_script_failure : bool;
+    clock_drift : Period.t option;
   }
 
   let default_minimal_fees =
@@ -84,6 +96,13 @@ module Mempool = struct
 
   let default_minimal_nanotez_per_byte = Q.of_int 1000
 
+  (* If the drift is not specified, it will be the duration of round zero.
+     It allows only to spam with one future round.
+
+     /!\ Warning /!\ : current plugin implementation implies that this drift
+     cumulates with the accepted  drift regarding the current head's timestamp.
+  *)
+
   let config_encoding : config Data_encoding.t =
     let open Data_encoding in
     conv
@@ -92,22 +111,26 @@ module Mempool = struct
              minimal_nanotez_per_gas_unit;
              minimal_nanotez_per_byte;
              allow_script_failure;
+             clock_drift;
            } ->
         ( minimal_fees,
           minimal_nanotez_per_gas_unit,
           minimal_nanotez_per_byte,
-          allow_script_failure ))
+          allow_script_failure,
+          clock_drift ))
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
-             allow_script_failure ) ->
+             allow_script_failure,
+             clock_drift ) ->
         {
           minimal_fees;
           minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte;
           allow_script_failure;
+          clock_drift;
         })
-      (obj4
+      (obj5
          (dft "minimal_fees" Tez.encoding default_minimal_fees)
          (dft
             "minimal_nanotez_per_gas_unit"
@@ -117,7 +140,8 @@ module Mempool = struct
             "minimal_nanotez_per_byte"
             nanotez_enc
             default_minimal_nanotez_per_byte)
-         (dft "allow_script_failure" bool true))
+         (dft "allow_script_failure" bool true)
+         (opt "clock_drift" Period.encoding))
 
   let default_config =
     {
@@ -125,7 +149,57 @@ module Mempool = struct
       minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
       minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
       allow_script_failure = true;
+      clock_drift = None;
     }
+
+  type state = {
+    grandparent_level_start : Alpha_context.Timestamp.t option;
+    round_zero_duration : Period.t option;
+  }
+
+  let init config ?(validation_state : validation_state option) ~predecessor ()
+      =
+    ignore config ;
+    (match validation_state with
+    | None ->
+        return {grandparent_level_start = None; round_zero_duration = None}
+    | Some {ctxt; _} ->
+        let {
+          Tezos_base.Block_header.fitness = predecessor_fitness;
+          timestamp = predecessor_timestamp;
+          _;
+        } =
+          predecessor.Tezos_base.Block_header.shell
+        in
+        Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
+        >>?= fun grandparent_round ->
+        Alpha_context.Fitness.round_from_raw predecessor_fitness
+        >>?= fun predecessor_round ->
+        Alpha_context.(
+          let round_durations = Constants.round_durations ctxt in
+          let round_zero_duration =
+            Round.round_duration round_durations Round.zero
+          in
+          Round.level_offset_of_round
+            round_durations
+            ~round:Round.(succ grandparent_round)
+          >>?= fun proposal_level_offset ->
+          Round.level_offset_of_round round_durations ~round:predecessor_round
+          >>?= fun proposal_round_offset ->
+          Period.(add proposal_level_offset proposal_round_offset)
+          >>?= fun proposal_offset ->
+          return
+            {
+              grandparent_level_start =
+                Some Timestamp.(predecessor_timestamp - proposal_offset);
+              round_zero_duration = Some round_zero_duration;
+            }))
+    >|= Environment.wrap_tzresult
+
+  let on_flush config filter_state ?(validation_state : validation_state option)
+      ~predecessor () =
+    ignore filter_state ;
+    init config ?validation_state ~predecessor ()
 
   let get_manager_operation_gas_and_fee contents =
     let open Operation in
@@ -228,7 +302,215 @@ module Mempool = struct
       (function Wrong_operation -> Some () | _ -> None)
       (fun () -> Wrong_operation)
 
-  let pre_filter config ?validation_state_before
+  type Environment.Error_monad.error += Consensus_operation_in_far_future
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Branch
+      ~id:"prefilter.Consensus_operation_in_far_future"
+      ~title:"Consensus operation in far future"
+      ~description:"Consensus operation too far in the future are not accepted."
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Consensus operation too far in the future are not accepted.")
+      Data_encoding.unit
+      (function Consensus_operation_in_far_future -> Some () | _ -> None)
+      (fun () -> Consensus_operation_in_far_future)
+
+  (** {2} consensus operation filtering.
+
+     In Tenderbake, we increased a lot the number of consensus
+      operations, therefore it seems necessary to be able to filter consensus
+     operations that could be produced by a Byzantine baker mis-using
+     its right to produce operations in future rounds or levels.
+
+      We consider the situation where the head is at level [h_l],
+     round [h_r], and with timestamp [h_ts], with the predecessor of the head
+     being at round [hp_r].
+      We receive at a time [now] a consensus operation for level [op_l] and
+     round [op_r].
+
+       A consensus operation is considered too far in the future, and therefore filtered,
+      if the earliest possible starting time of its round is greater than the
+      current time plus a safety margin of [config.clock_drift].
+
+      To consider potential level 2 reorgs, we first compute the expected
+      timestamp of round zero at previous level [hp0_ts],
+
+      All ops at level p_l and round r' such that time(r') is greater than (now + drift) are
+     deemed too far in the future:
+
+                  h_r                          op_ts    now+drift     (h_l,r')
+     hp0_ts h_0   h_l                            |        |              |
+        +----+-----+---------+-------------------+--+-----+--------------+-----------
+             |     |         |                   |  |     |              |
+             |    h_ts     h_r end time          | now    |        earliest expected
+             |     |                             |        |        time of round r'
+             |<----op_r rounds duration -------->|        |
+                   |
+                   |<--------------- operations kept ---->|<-rejected----------...
+                   |
+                   |<-----------operations considered by the filter -----------...
+
+    For an operation on a proposal at the next level, we consider the minimum
+    starting time of the operation's round, obtained by assuming that the proposal
+    at the next level was built on top of a proposal at round 0 for the current
+    level, itself based on a proposal at round 0 of previous level.
+    Operations on proposal with higher levels are treated similarly.
+
+    All ops at the next level and round r' such that timestamp(r') > now+drift
+    are deemed too far in the future.
+
+                r=0     r=1   h_r      now     now+drift   (h_l+1,r')
+   hp0_ts h_0   h_l           h_l       |          |          |
+      +----+---- |-------+----+---------+----------+----------+----------
+           |     |       |    |                               |
+           |     t0      |   h_ts                      earliest expected
+           |     |       |    |                         time of round r'
+           |<--- |    earliest|                               |
+                 |  next level|                               |
+                 |       |<---------------------------------->|
+                                  round_offset(r')
+
+  *)
+
+  (** At a given level a consensus operation is acceptable if its earliest
+      expected timestamp, [op_earliest_ts] is below the current clock with an
+      accepted drift for the clock given by a configuration.  *)
+  let acceptable ~drift ~op_earliest_ts ~now_timestamp =
+    Timestamp.(
+      now_timestamp +? drift >|? fun now_drifted ->
+      op_earliest_ts <= now_drifted)
+
+  (** Check that an operation with the given [op_round], at level [op_level]
+      is likely to be correct, meaning it could have been produced before
+      now (+ the safety margin from configuration).
+
+      Given an operation at level greater or equal than/to the current level, we
+      compute the expected timestamp of the operation's round. If the operation
+      is at a greater level, we assume that it is based on the proposal at round
+      zero of the current level.
+
+      All operations whose (level, round) is lower than or equal to the current
+      head are deemed valid.
+      Note that in case where their is a high drift in the computer clock, they
+      might not have been considered valid by comparing their expected timestamp
+      to the clock.
+
+      This is a stricter than necessary filter as it will reject operations that
+      could be valid in the current timeframe if the proposal they endorse is
+      built over a predecessor of the current proposal that would be of lower
+      round than the current one.
+
+      What can we do that would be smarter: get current head's predecessor round
+      and timestamp to compute the timestamp t0 of a predecessor that would have
+      been proposed at round 0.
+
+      Timestamp of round at current level for an alternative head that would be
+      based on such proposal would be computed based on t0.
+      For level higher than current head, compute the round's earliest timestamp
+      if all proposal passed at round 0 starting from t0.
+  *)
+  let acceptable_op ~config ~round_durations ~round_zero_duration
+      ~proposal_level ~proposal_round ~proposal_timestamp
+      ~(proposal_predecessor_level_start : Timestamp.t) ~op_level ~op_round
+      ~now_timestamp =
+    if
+      Raw_level.(succ op_level < proposal_level)
+      || (op_level = proposal_level && op_round <= proposal_round)
+    then
+      (* Past and current round operations are not in the future *)
+      (* This case could be handled directly in `pre_filter_far_future_consensus_ops`
+         for a (slightly) better performance. *)
+      Ok true
+    else
+      (* If, by some tolerance on local clock drift, the timestamp of the
+         current head is itself in the future, we use this time instead of
+         now_timestamp *)
+      let now_timestamp = Timestamp.(max now_timestamp proposal_timestamp) in
+      (* Computing when the current level started. *)
+      let drift =
+        Option.value ~default:round_zero_duration config.clock_drift
+      in
+      (* We compute the earliest timestamp possible [op_earliest_ts] for the
+         operation's (level,round), as if all proposals were accepted at round 0
+         since the previous level. *)
+      (* Invariant: [op_level + 1 >= proposal_level] *)
+      let level_offset = Raw_level.(diff (succ op_level) proposal_level) in
+      Period.mult level_offset round_zero_duration >>? fun time_shift ->
+      Timestamp.(proposal_predecessor_level_start +? time_shift)
+      >>? fun earliest_op_level_start ->
+      (* computing the operations's round start from it's earliest
+         possible level start *)
+      Round.timestamp_of_another_round_same_level
+        round_durations
+        ~current_round:Round.zero
+        ~current_timestamp:earliest_op_level_start
+        ~considered_round:op_round
+      >>? fun op_earliest_ts ->
+      (* We finally check that the expected time of the operation is
+         acceptable *)
+      acceptable ~drift ~op_earliest_ts ~now_timestamp
+
+  let pre_filter_far_future_consensus_ops config
+      ~filter_state:({grandparent_level_start; round_zero_duration} : state)
+      ?validation_state_before
+      ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t
+      =
+    match
+      (grandparent_level_start, validation_state_before, round_zero_duration)
+    with
+    | (None, _, _) | (_, None, _) | (_, _, None) -> Lwt.return_true
+    | ( Some grandparent_level_start,
+        Some validation_state_before,
+        Some round_zero_duration ) -> (
+        let ctxt : t = validation_state_before.ctxt in
+        match validation_state_before.mode with
+        | Application _ | Partial_application _ | Full_construction _ ->
+            assert false
+        (* Prefilter is always applied in mempool mode aka Partial_construction *)
+        | Partial_construction {predecessor_round = proposal_round; _} -> (
+            (let proposal_timestamp =
+               Alpha_context.Timestamp.predecessor ctxt
+             in
+             let now_timestamp = Systime_os.now () |> Time.System.to_protocol in
+             let Level.{level; _} = Alpha_context.Level.current ctxt in
+             let proposal_level =
+               match Raw_level.pred level with
+               | None ->
+                   (* mempool level is set to the successor of the
+                      current head *)
+                   assert false
+               | Some proposal_level -> proposal_level
+             in
+             let round_durations = Constants.round_durations ctxt in
+             Lwt.return
+             @@ acceptable_op
+                  ~config
+                  ~round_durations
+                  ~round_zero_duration
+                  ~proposal_level
+                  ~proposal_round
+                  ~proposal_timestamp
+                  ~proposal_predecessor_level_start:grandparent_level_start
+                  ~op_level
+                  ~op_round
+                  ~now_timestamp)
+            >>= function
+            | Ok b -> Lwt.return b
+            | _ -> Lwt.return_false))
+
+  (** A quasi infinite amount of "valid" (pre)endorsements could be
+      sent by a committee member, one for each possible round number.
+
+      This filter rejects (pre)endorsements that refer to a round
+      that could not have been reached within the time span between
+      the last head's timestamp and the current local clock.
+
+      We add [config.clock_drift] time as a safety margin.
+  *)
+  let pre_filter config ~(filter_state : state) ?validation_state_before
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
@@ -236,48 +518,35 @@ module Mempool = struct
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
-    match contents with
-    | Single (Endorsement _) | Single (Failing_noop _) ->
-        `Refused [Environment.wrap_tzerror Wrong_operation]
-    | Single
-        (Endorsement_with_slot
-          {
-            endorsement =
-              {
-                protocol_data = {contents = Single (Endorsement {level}); _};
-                shell = {branch};
-              };
-            _;
-          }) -> (
-        match validation_state_before with
-        | None -> `Undecided
-        | Some {ctxt; mode; _} -> (
-            match mode with
-            | Partial_construction {predecessor} ->
-                if Block_hash.(predecessor = branch) then
-                  (* conensus operation for the current head. *)
-                  `Undecided
-                else
-                  let current_level = (Level.current ctxt).level in
-                  let delta = Raw_level.diff current_level level in
-                  if delta > 2l then
-                    (* consensus operation too far in the past. *)
-                    `Outdated [Environment.wrap_tzerror Outdated_endorsement]
-                  else
-                    (* consensus operation not too far in the past or in the
-                       future. *)
-                    `Branch_delayed
-                      [Environment.wrap_tzerror Outdated_endorsement]
-            | _ -> assert false))
+    (match contents with
+    | Single (Failing_noop _) ->
+        Lwt.return @@ `Refused [Environment.wrap_tzerror Wrong_operation]
+    | Single (Preendorsement consensus_content)
+    | Single (Endorsement consensus_content) ->
+        pre_filter_far_future_consensus_ops
+          ~filter_state
+          config
+          ?validation_state_before
+          consensus_content
+        >>= fun keep ->
+        if keep then Lwt.return `Undecided
+        else
+          Lwt.return
+          @@ `Branch_refused
+               [Environment.wrap_tzerror Consensus_operation_in_far_future]
     | Single (Seed_nonce_revelation _)
+    | Single (Double_preendorsement_evidence _)
     | Single (Double_endorsement_evidence _)
     | Single (Double_baking_evidence _)
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        `Undecided
-    | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes
+        Lwt.return @@ `Undecided
+    | Single (Manager_operation _) as op ->
+        Lwt.return @@ pre_filter_manager config op bytes
+    | Cons (Manager_operation _, _) as op ->
+        Lwt.return @@ pre_filter_manager config op bytes)
+    >>= fun res -> Lwt.return (res, filter_state)
 
   open Apply_results
 
@@ -303,16 +572,17 @@ module Mempool = struct
         | false -> Lwt.return_false
         | true -> post_filter_manager ctxt rest config)
 
-  let post_filter config ~validation_state_before:_
+  let post_filter config ~(filter_state : state) ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
-    match receipt with
+    (match receipt with
     | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
         match contents with
-        | Single_result (Endorsement_result _) ->
-            Lwt.return_false (* legacy format *)
-        | Single_result (Endorsement_with_slot_result _) -> Lwt.return_true
+        | Single_result (Preendorsement_result _) -> Lwt.return_true
+        | Single_result (Endorsement_result _) -> Lwt.return_true
         | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
+        | Single_result (Double_preendorsement_evidence_result _) ->
+            Lwt.return_true
         | Single_result (Double_endorsement_evidence_result _) ->
             Lwt.return_true
         | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
@@ -322,7 +592,8 @@ module Mempool = struct
         | Single_result (Manager_operation_result _) as op ->
             post_filter_manager ctxt op config
         | Cons_result (Manager_operation_result _, _) as op ->
-            post_filter_manager ctxt op config)
+            post_filter_manager ctxt op config))
+    >>= fun res -> Lwt.return (res, filter_state)
 end
 
 module View_helpers = struct
@@ -1095,7 +1366,8 @@ module RPC = struct
         ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
       (* this code is a duplicate of Apply without signature check *)
       let partial_precheck_manager_contents (type kind) ctxt
-          (op : kind Kind.manager contents) : context tzresult Lwt.t =
+          (op : kind Kind.manager contents) :
+          (context * Receipt.balance_updates) tzresult Lwt.t =
         let (Manager_operation
               {source; fee; counter; operation; gas_limit; storage_limit}) =
           op
@@ -1153,20 +1425,37 @@ module RPC = struct
         Contract.get_manager_key ctxt source >>=? fun _public_key ->
         (* signature check unplugged from here *)
         Contract.increment_counter ctxt source >>=? fun ctxt ->
-        Contract.spend ctxt (Contract.implicit_contract source) fee
+        let source_contract = Contract.implicit_contract source in
+        Token.transfer ctxt (`Contract source_contract) `Block_fees fee
       in
+      let open Apply_results in
       let rec partial_precheck_manager_contents_list :
           type kind.
           Alpha_context.t ->
           kind Kind.manager contents_list ->
-          context tzresult Lwt.t =
-       fun ctxt contents_list ->
+          payload_producer:Signature.Public_key_hash.t ->
+          (context
+          * ( kind Kind.manager,
+              Receipt.balance_updates )
+            prechecked_contents_list)
+          tzresult
+          Lwt.t =
+       fun ctxt contents_list ~payload_producer ->
         match contents_list with
-        | Single (Manager_operation _ as op) ->
-            partial_precheck_manager_contents ctxt op
-        | Cons ((Manager_operation _ as op), rest) ->
-            partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
-            partial_precheck_manager_contents_list ctxt rest
+        | Single contents ->
+            partial_precheck_manager_contents ctxt contents
+            >>=? fun (ctxt, balance_updates) ->
+            return (ctxt, PrecheckedSingle {contents; result = balance_updates})
+        | Cons (contents, rest) ->
+            partial_precheck_manager_contents ctxt contents
+            >>=? fun (ctxt, balance_updates) ->
+            partial_precheck_manager_contents_list ctxt rest ~payload_producer
+            >>=? fun (ctxt, prechecked_contents_list) ->
+            return
+              ( ctxt,
+                PrecheckedCons
+                  ( {contents; result = balance_updates},
+                    prechecked_contents_list ) )
       in
       let ret contents =
         ( Operation_data protocol_data,
@@ -1175,23 +1464,48 @@ module RPC = struct
       let operation : _ operation = {shell; protocol_data} in
       let hash = Operation.hash {shell; protocol_data} in
       let ctxt = Contract.init_origination_nonce ctxt hash in
-      let baker = Signature.Public_key_hash.zero in
+      let payload_producer = Signature.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
-          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
+          partial_precheck_manager_contents_list ctxt op ~payload_producer
+          >>=? fun (ctxt, prechecked_contents_list) ->
+          Apply.apply_manager_contents_list
+            ctxt
+            Optimized
+            ~payload_producer
+            chain_id
+            prechecked_contents_list
           >|= fun (_ctxt, result) -> ok @@ ret result
       | Cons (Manager_operation _, _) as op ->
-          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
+          partial_precheck_manager_contents_list ctxt op ~payload_producer
+          >>=? fun (ctxt, prechecked_contents_list) ->
+          Apply.apply_manager_contents_list
+            ctxt
+            Optimized
+            ~payload_producer
+            chain_id
+            prechecked_contents_list
           >|= fun (_ctxt, result) -> ok @@ ret result
       | _ ->
+          let predecessor_level =
+            match
+              Alpha_context.Level.pred ctxt (Alpha_context.Level.current ctxt)
+            with
+            | Some level -> level
+            | None -> assert false
+          in
+          Alpha_context.Round.get ctxt >>=? fun predecessor_round ->
           Apply.apply_contents_list
             ctxt
             chain_id
+            (Partial_construction
+               {
+                 predecessor_level;
+                 predecessor_round;
+                 grand_parent_round = Round.zero;
+               })
             Optimized
-            shell.branch
-            baker
+            ~payload_producer
             operation
             operation.protocol_data.contents
           >|=? fun (_ctxt, result) -> ret result
@@ -1220,13 +1534,19 @@ module RPC = struct
         let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
         Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
         >>=? fun (ctxt, dummy_contract) ->
-        Contract.originate
+        Contract.raw_originate
           ctxt
+          ~prepaid_bootstrap_storage:false
           dummy_contract
-          ~balance
-          ~delegate:None
           ~script:(script, None)
-        >>=? fun ctxt -> return (ctxt, dummy_contract)
+        >>=? fun ctxt ->
+        Token.transfer
+          ~origin:Simulation
+          ctxt
+          `Minted
+          (`Contract dummy_contract)
+          balance
+        >>=? fun (ctxt, _) -> return (ctxt, dummy_contract)
       in
       let script_entrypoint_type ctxt expr entrypoint =
         let ctxt = Gas.set_unlimited ctxt in
@@ -1870,8 +2190,9 @@ module RPC = struct
           ~description:"Forge the protocol-specific part of a block header"
           ~query:RPC_query.empty
           ~input:
-            (obj4
-               (req "priority" uint16)
+            (obj5
+               (req "payload_hash" Block_payload_hash.encoding)
+               (req "payload_round" Round.encoding)
                (opt "nonce_hash" Nonce_hash.encoding)
                (dft
                   "proof_of_work_nonce"
@@ -1896,7 +2217,8 @@ module RPC = struct
         S.protocol_data
         (fun
           ()
-          ( priority,
+          ( payload_hash,
+            payload_round,
             seed_nonce_hash,
             proof_of_work_nonce,
             liquidity_baking_escape_vote )
@@ -1905,7 +2227,8 @@ module RPC = struct
             (Data_encoding.Binary.to_bytes_exn
                Block_header.contents_encoding
                {
-                 priority;
+                 payload_hash;
+                 payload_round;
                  seed_nonce_hash;
                  proof_of_work_nonce;
                  liquidity_baking_escape_vote;
@@ -2033,8 +2356,8 @@ module RPC = struct
         ()
         ({branch}, Contents_list (Single operation))
 
-    let endorsement ctxt b ~branch ~level () =
-      operation ctxt b ~branch (Endorsement {level})
+    let endorsement ctxt b ~branch ~consensus_content () =
+      operation ctxt b ~branch (Endorsement consensus_content)
 
     let proposals ctxt b ~branch ~source ~period ~proposals () =
       operation ctxt b ~branch (Proposals {source; period; proposals})
@@ -2051,17 +2374,17 @@ module RPC = struct
     let double_baking_evidence ctxt block ~branch ~bh1 ~bh2 () =
       operation ctxt block ~branch (Double_baking_evidence {bh1; bh2})
 
-    let double_endorsement_evidence ctxt block ~branch ~op1 ~op2 ~slot () =
-      operation
-        ctxt
-        block
-        ~branch
-        (Double_endorsement_evidence {op1; op2; slot})
+    let double_endorsement_evidence ctxt block ~branch ~op1 ~op2 () =
+      operation ctxt block ~branch (Double_endorsement_evidence {op1; op2})
+
+    let double_preendorsement_evidence ctxt block ~branch ~op1 ~op2 () =
+      operation ctxt block ~branch (Double_preendorsement_evidence {op1; op2})
 
     let empty_proof_of_work_nonce =
       Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
-    let protocol_data ctxt block ~priority ?seed_nonce_hash
+    let protocol_data ctxt block ?(payload_hash = Block_payload_hash.zero)
+        ?(payload_round = Round.zero) ?seed_nonce_hash
         ?(proof_of_work_nonce = empty_proof_of_work_nonce)
         ~liquidity_baking_escape_vote () =
       RPC_context.make_call0
@@ -2069,7 +2392,8 @@ module RPC = struct
         ctxt
         block
         ()
-        ( priority,
+        ( payload_hash,
+          payload_round,
           seed_nonce_hash,
           proof_of_work_nonce,
           liquidity_baking_escape_vote )
@@ -2140,163 +2464,151 @@ module RPC = struct
         ({shell; protocol_data} : Block_header.raw)
   end
 
-  let requested_levels ~default ctxt cycles levels =
+  (* Compute the estimated starting time of a [round] at a future
+     [level], given the head's level [current_level], timestamp
+     [current_timestamp], and round [current_round]. Assumes blocks at
+     intermediate levels are produced at round 0. *)
+  let estimated_time round_durations ~current_level ~current_round
+      ~current_timestamp ~level ~round =
+    if Level.(level <= current_level) then Result.return_none
+    else
+      Round.of_int round >>? fun round ->
+      Round.timestamp_of_round
+        round_durations
+        ~round
+        ~predecessor_timestamp:current_timestamp
+        ~predecessor_round:current_round
+      >>? fun round_start_at_next_level ->
+      let step = Round.round_duration round_durations Round.zero in
+      let diff = Level.diff level current_level in
+      Period.mult (Int32.pred diff) step >>? fun delay ->
+      Timestamp.(round_start_at_next_level +? delay) >>? fun timestamp ->
+      Result.return_some timestamp
+
+  let requested_levels ~default_level ctxt cycles levels =
     match (levels, cycles) with
-    | ([], []) -> ok [default]
+    | ([], []) -> [default_level]
     | (levels, cycles) ->
         (* explicitly fail when requested levels or cycle are in the past...
-           or too far in the future... *)
-        let levels =
-          List.sort_uniq
-            Level.compare
-            (List.concat
-               (List.map (Level.from_raw ctxt) levels
-                :: List.map (Level.levels_in_cycle ctxt) cycles))
-        in
-        List.map_e
-          (fun level ->
-            let current_level = Level.current ctxt in
-            if Level.(level <= current_level) then ok (level, None)
-            else
-              Baking.earlier_predecessor_timestamp ctxt level
-              >|? fun timestamp -> (level, Some timestamp))
-          levels
+           or too far in the future...
+           TODO-TB: this old comment (from version Alpha) conflicts with
+           the specification of the RPCs that use this code.
+        *)
+        List.sort_uniq
+          Level.compare
+          (List.concat
+             (List.map (Level.from_raw ctxt) levels
+              :: List.map (Level.levels_in_cycle ctxt) cycles))
 
   module Baking_rights = struct
     type t = {
       level : Raw_level.t;
       delegate : Signature.Public_key_hash.t;
-      priority : int;
+      round : int;
       timestamp : Timestamp.t option;
     }
 
     let encoding =
       let open Data_encoding in
       conv
-        (fun {level; delegate; priority; timestamp} ->
-          (level, delegate, priority, timestamp))
-        (fun (level, delegate, priority, timestamp) ->
-          {level; delegate; priority; timestamp})
+        (fun {level; delegate; round; timestamp} ->
+          (level, delegate, round, timestamp))
+        (fun (level, delegate, round, timestamp) ->
+          {level; delegate; round; timestamp})
         (obj4
            (req "level" Raw_level.encoding)
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "priority" uint16)
+           (req "round" uint16)
            (opt "estimated_time" Timestamp.encoding))
+
+    let default_max_round = 64
 
     module S = struct
       open Data_encoding
 
-      let custom_root = RPC_path.(open_root / "helpers" / "baking_rights")
+      let path = RPC_path.(open_root / "helpers" / "baking_rights")
 
       type baking_rights_query = {
         levels : Raw_level.t list;
-        cycles : Cycle.t list;
+        cycle : Cycle.t option;
         delegates : Signature.Public_key_hash.t list;
-        max_priority : int option;
+        max_round : int option;
         all : bool;
       }
 
       let baking_rights_query =
         let open RPC_query in
-        query (fun levels cycles delegates max_priority all ->
-            {levels; cycles; delegates; max_priority; all})
+        query (fun levels cycle delegates max_round all ->
+            {levels; cycle; delegates; max_round; all})
         |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
-        |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
+        |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
         |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
                t.delegates)
-        |+ opt_field "max_priority" RPC_arg.int (fun t -> t.max_priority)
+        |+ opt_field "max_round" RPC_arg.int (fun t -> t.max_round)
         |+ flag "all" (fun t -> t.all)
         |> seal
 
       let baking_rights =
         RPC_service.get_service
           ~description:
-            "Retrieves the list of delegates allowed to bake a block.\n\
-             By default, it gives the best baking priorities for bakers that \
-             have at least one opportunity below the 64th priority for the \
-             next block.\n\
-             Parameters `level` and `cycle` can be used to specify the (valid) \
-             level(s) in the past or future at which the baking rights have to \
-             be returned. When asked for (a) whole cycle(s), baking \
-             opportunities are given by default up to the priority 8.\n\
-             Parameter `delegate` can be used to restrict the results to the \
-             given delegates. If parameter `all` is set, all the baking \
-             opportunities for each baker at each level are returned, instead \
-             of just the first one.\n\
-             Returns the list of baking slots. Also returns the minimal \
-             timestamps that correspond to these slots. The timestamps are \
-             omitted for levels in the past, and are only estimates for levels \
-             later that the next block, based on the hypothesis that all \
-             predecessor blocks were baked at the first priority."
+            (Format.sprintf
+               "Retrieves the list of delegates allowed to bake a block.\n\
+                By default, it gives the best baking opportunities (in terms \
+                of rounds) for bakers that have at least one opportunity below \
+                the %dth round for the next block.\n\
+                Parameters `level` and `cycle` can be used to specify the \
+                (valid) level(s) in the past or future at which the baking \
+                rights have to be returned.\n\
+                Parameter `delegate` can be used to restrict the results to \
+                the given delegates. If parameter `all` is set, all the baking \
+                opportunities for each baker at each level are returned, \
+                instead of just the first one.\n\
+                Returns the list of baking opportunities up to round %d. Also \
+                returns the minimal timestamps that correspond to these \
+                opportunities. The timestamps are omitted for levels in the \
+                past, and are only estimates for levels higher that the next \
+                block's, based on the hypothesis that all predecessor blocks \
+                were baked at the first round."
+               default_max_round
+               default_max_round)
           ~query:baking_rights_query
           ~output:(list encoding)
-          custom_root
+          path
     end
 
-    let baking_priorities ctxt max_prio (level, pred_timestamp) =
-      Baking.baking_priorities ctxt level >>=? fun contract_list ->
-      let rec loop l acc priority =
-        if Compare.Int.(priority > max_prio) then return (List.rev acc)
+    let baking_rights_at_level ctxt max_round level =
+      Baking.baking_rights ctxt level >>=? fun delegates ->
+      Round.get ctxt >>=? fun current_round ->
+      let current_level = Level.current ctxt in
+      let current_timestamp = Timestamp.current ctxt in
+      let round_durations = Constants.round_durations ctxt in
+      let rec loop l acc round =
+        if Compare.Int.(round > max_round) then return (List.rev acc)
         else
           let (Misc.LCons (pk, next)) = l in
           let delegate = Signature.Public_key.hash pk in
-          (match pred_timestamp with
-          | None -> Result.return_none
-          | Some pred_timestamp ->
-              Baking.minimal_time
-                (Constants.parametric ctxt)
-                ~priority
-                pred_timestamp
-              >|? fun t -> Some t)
+          estimated_time
+            round_durations
+            ~current_level
+            ~current_round
+            ~current_timestamp
+            ~level
+            ~round
           >>?= fun timestamp ->
-          let acc =
-            {level = level.level; delegate; priority; timestamp} :: acc
-          in
-          next () >>=? fun l -> loop l acc (priority + 1)
+          let acc = {level = level.level; delegate; round; timestamp} :: acc in
+          next () >>=? fun l -> loop l acc (round + 1)
       in
-      loop contract_list [] 0
-
-    let baking_priorities_of_delegates ctxt ~all ~max_prio delegates
-        (level, pred_timestamp) =
-      Baking.baking_priorities ctxt level >>=? fun contract_list ->
-      let rec loop l acc priority delegates =
-        match delegates with
-        | [] -> return (List.rev acc)
-        | _ :: _ -> (
-            if Compare.Int.(priority > max_prio) then return (List.rev acc)
-            else
-              let (Misc.LCons (pk, next)) = l in
-              next () >>=? fun l ->
-              match
-                List.partition
-                  (fun (pk', _) -> Signature.Public_key.equal pk pk')
-                  delegates
-              with
-              | ([], _) -> loop l acc (priority + 1) delegates
-              | ((_, delegate) :: _, delegates') ->
-                  (match pred_timestamp with
-                  | None -> Result.return_none
-                  | Some pred_timestamp ->
-                      Baking.minimal_time
-                        (Constants.parametric ctxt)
-                        ~priority
-                        pred_timestamp
-                      >|? fun t -> Some t)
-                  >>?= fun timestamp ->
-                  let acc =
-                    {level = level.level; delegate; priority; timestamp} :: acc
-                  in
-                  let delegates'' = if all then delegates else delegates' in
-                  loop l acc (priority + 1) delegates'')
-      in
-      loop contract_list [] 0 delegates
+      loop delegates [] 0
 
     let remove_duplicated_delegates rights =
       List.rev @@ fst
       @@ List.fold_left
            (fun (acc, previous) r ->
-             if Signature.Public_key_hash.Set.mem r.delegate previous then
-               (acc, previous)
+             if
+               Signature.Public_key_hash.Set.exists
+                 (Signature.Public_key_hash.equal r.delegate)
+                 previous
+             then (acc, previous)
              else
                (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
            ([], Signature.Public_key_hash.Set.empty)
@@ -2304,136 +2616,30 @@ module RPC = struct
 
     let register () =
       Registration.register0 ~chunked:true S.baking_rights (fun ctxt q () ->
-          requested_levels
-            ~default:
-              ( Level.succ ctxt (Level.current ctxt),
-                Some (Timestamp.current ctxt) )
-            ctxt
-            q.cycles
-            q.levels
-          >>?= fun levels ->
-          let max_priority =
-            match q.max_priority with
-            | Some max -> max
-            | None -> ( match q.cycles with [] -> 64 | _ :: _ -> 8)
+          let cycles =
+            match q.cycle with None -> [] | Some cycle -> [cycle]
           in
-          match q.delegates with
-          | [] ->
-              List.map_es (baking_priorities ctxt max_priority) levels
-              >|=? fun rights ->
-              let rights =
-                if q.all then rights
-                else List.map remove_duplicated_delegates rights
-              in
-              List.concat rights
-          | _ :: _ as delegates ->
-              List.filter_map_s
-                (fun delegate ->
-                  Alpha_context.Contract.get_manager_key ctxt delegate
-                  >>= function
-                  | Ok pk -> Lwt.return (Some (pk, delegate))
-                  | Error _ -> Lwt.return_none)
-                delegates
-              >>= fun delegates ->
-              List.map_es
-                (fun level ->
-                  baking_priorities_of_delegates
-                    ctxt
-                    ~all:q.all
-                    ~max_prio:max_priority
-                    delegates
-                    level)
-                levels
-              >|=? List.concat)
-
-    let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) ?(all = false)
-        ?max_priority block =
-      RPC_context.make_call0
-        S.baking_rights
-        ctxt
-        block
-        {levels; cycles; delegates; max_priority; all}
-        ()
-  end
-
-  module Endorsing_rights = struct
-    type t = {
-      level : Raw_level.t;
-      delegate : Signature.Public_key_hash.t;
-      slots : int list;
-      estimated_time : Time.t option;
-    }
-
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun {level; delegate; slots; estimated_time} ->
-          (level, delegate, slots, estimated_time))
-        (fun (level, delegate, slots, estimated_time) ->
-          {level; delegate; slots; estimated_time})
-        (obj4
-           (req "level" Raw_level.encoding)
-           (req "delegate" Signature.Public_key_hash.encoding)
-           (req "slots" (list uint16))
-           (opt "estimated_time" Timestamp.encoding))
-
-    module S = struct
-      open Data_encoding
-
-      let custom_root = RPC_path.(open_root / "helpers" / "endorsing_rights")
-
-      type endorsing_rights_query = {
-        levels : Raw_level.t list;
-        cycles : Cycle.t list;
-        delegates : Signature.Public_key_hash.t list;
-      }
-
-      let endorsing_rights_query =
-        let open RPC_query in
-        query (fun levels cycles delegates -> {levels; cycles; delegates})
-        |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
-        |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
-        |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
-               t.delegates)
-        |> seal
-
-      let endorsing_rights =
-        RPC_service.get_service
-          ~description:
-            "Retrieves the delegates allowed to endorse a block.\n\
-             By default, it gives the endorsement slots for delegates that \
-             have at least one in the next block.\n\
-             Parameters `level` and `cycle` can be used to specify the (valid) \
-             level(s) in the past or future at which the endorsement rights \
-             have to be returned. Parameter `delegate` can be used to restrict \
-             the results to the given delegates.\n\
-             Returns the list of endorsement slots. Also returns the minimal \
-             timestamps that correspond to these slots. The timestamps are \
-             omitted for levels in the past, and are only estimates for levels \
-             later that the next block, based on the hypothesis that all \
-             predecessor blocks were baked at the first priority."
-          ~query:endorsing_rights_query
-          ~output:(list encoding)
-          custom_root
-    end
-
-    let endorsement_slots ctxt (level, estimated_time) =
-      Baking.endorsement_rights ctxt level >|=? fun rights ->
-      Signature.Public_key_hash.Map.fold
-        (fun delegate (_, slots, _) acc ->
-          {level = level.level; delegate; slots; estimated_time} :: acc)
-        rights
-        []
-
-    let register () =
-      Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
-          requested_levels
-            ~default:(Level.current ctxt, Some (Timestamp.current ctxt))
-            ctxt
-            q.cycles
-            q.levels
-          >>?= fun levels ->
-          List.map_es (endorsement_slots ctxt) levels >|=? fun rights ->
+          let levels =
+            requested_levels
+              ~default_level:(Level.succ ctxt (Level.current ctxt))
+              ctxt
+              cycles
+              q.levels
+          in
+          let max_round =
+            match q.max_round with
+            | None -> default_max_round
+            | Some max_round ->
+                Compare.Int.min
+                  max_round
+                  (Constants.consensus_committee_size ctxt)
+          in
+          List.map_es (baking_rights_at_level ctxt max_round) levels
+          >|=? fun rights ->
+          let rights =
+            if q.all then rights
+            else List.map remove_duplicated_delegates rights
+          in
           let rights = List.concat rights in
           match q.delegates with
           | [] -> rights
@@ -2445,13 +2651,245 @@ module RPC = struct
               in
               List.filter is_requested rights)
 
-    let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) block =
+    let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(all = false)
+        ?max_round block =
+      RPC_context.make_call0
+        S.baking_rights
+        ctxt
+        block
+        {levels; cycle; delegates; max_round; all}
+        ()
+  end
+
+  module Endorsing_rights = struct
+    type delegate_rights = {
+      delegate : Signature.Public_key_hash.t;
+      first_slot : Slot.t;
+      endorsing_power : int;
+    }
+
+    type t = {
+      level : Raw_level.t;
+      delegates_rights : delegate_rights list;
+      estimated_time : Time.t option;
+    }
+
+    let delegate_rights_encoding =
+      let open Data_encoding in
+      conv
+        (fun {delegate; first_slot; endorsing_power} ->
+          (delegate, first_slot, endorsing_power))
+        (fun (delegate, first_slot, endorsing_power) ->
+          {delegate; first_slot; endorsing_power})
+        (obj3
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "first_slot" Slot.encoding)
+           (req "endorsing_power" uint16))
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun {level; delegates_rights; estimated_time} ->
+          (level, delegates_rights, estimated_time))
+        (fun (level, delegates_rights, estimated_time) ->
+          {level; delegates_rights; estimated_time})
+        (obj3
+           (req "level" Raw_level.encoding)
+           (req "delegates" (list delegate_rights_encoding))
+           (opt "estimated_time" Timestamp.encoding))
+
+    module S = struct
+      open Data_encoding
+
+      let path = RPC_path.(path / "endorsing_rights")
+
+      type endorsing_rights_query = {
+        levels : Raw_level.t list;
+        cycle : Cycle.t option;
+        delegates : Signature.Public_key_hash.t list;
+      }
+
+      let endorsing_rights_query =
+        let open RPC_query in
+        query (fun levels cycle delegates -> {levels; cycle; delegates})
+        |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
+        |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
+        |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
+               t.delegates)
+        |> seal
+
+      let endorsing_rights =
+        RPC_service.get_service
+          ~description:
+            "Retrieves the delegates allowed to endorse a block.\n\
+             By default, it gives the endorsing power for delegates that have \
+             at least one endorsing slot for the next block.\n\
+             Parameters `level` and `cycle` can be used to specify the (valid) \
+             level(s) in the past or future at which the endorsing rights have \
+             to be returned. Parameter `delegate` can be used to restrict the \
+             results to the given delegates.\n\
+             Returns the smallest endorsing slots and the endorsing power. \
+             Also returns the minimal timestamp that corresponds to endorsing \
+             at the given level. The timestamps are omitted for levels in the \
+             past, and are only estimates for levels higher that the next \
+             block's, based on the hypothesis that all predecessor blocks were \
+             baked at the first round."
+          ~query:endorsing_rights_query
+          ~output:(list encoding)
+          path
+    end
+
+    let endorsing_rights_at_level ctxt level =
+      Baking.endorsing_rights_by_first_slot ctxt level
+      >>=? fun (ctxt, rights) ->
+      Round.get ctxt >>=? fun current_round ->
+      let current_level = Level.current ctxt in
+      let current_timestamp = Timestamp.current ctxt in
+      let round_durations = Constants.round_durations ctxt in
+      estimated_time
+        round_durations
+        ~current_level
+        ~current_round
+        ~current_timestamp
+        ~level
+        ~round:0
+      >>?= fun estimated_time ->
+      let rights =
+        Slot.Map.fold
+          (fun first_slot (_pk, delegate, endorsing_power) acc ->
+            {delegate; first_slot; endorsing_power} :: acc)
+          rights
+          []
+      in
+      return {level = level.level; delegates_rights = rights; estimated_time}
+
+    let register () =
+      Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
+          let cycles =
+            match q.cycle with None -> [] | Some cycle -> [cycle]
+          in
+          let levels =
+            requested_levels
+              ~default_level:(Level.current ctxt)
+              ctxt
+              cycles
+              q.levels
+          in
+          List.map_es (endorsing_rights_at_level ctxt) levels
+          >|=? fun rights_per_level ->
+          match q.delegates with
+          | [] -> rights_per_level
+          | _ :: _ as delegates ->
+              List.filter_map
+                (fun rights_at_level ->
+                  let is_requested p =
+                    List.exists
+                      (Signature.Public_key_hash.equal p.delegate)
+                      delegates
+                  in
+                  match
+                    List.filter is_requested rights_at_level.delegates_rights
+                  with
+                  | [] -> None
+                  | delegates_rights ->
+                      Some {rights_at_level with delegates_rights})
+                rights_per_level)
+
+    let get ctxt ?(levels = []) ?cycle ?(delegates = []) block =
       RPC_context.make_call0
         S.endorsing_rights
         ctxt
         block
-        {levels; cycles; delegates}
+        {levels; cycle; delegates}
         ()
+  end
+
+  module Validators = struct
+    type t = {
+      level : Raw_level.t;
+      delegate : Signature.Public_key_hash.t;
+      slots : Slot.t list;
+    }
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun {level; delegate; slots} -> (level, delegate, slots))
+        (fun (level, delegate, slots) -> {level; delegate; slots})
+        (obj3
+           (req "level" Raw_level.encoding)
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "slots" (list Slot.encoding)))
+
+    module S = struct
+      open Data_encoding
+
+      let path = RPC_path.(path / "validators")
+
+      type validators_query = {
+        levels : Raw_level.t list;
+        delegates : Signature.Public_key_hash.t list;
+      }
+
+      let validators_query =
+        let open RPC_query in
+        query (fun levels delegates -> {levels; delegates})
+        |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
+        |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
+               t.delegates)
+        |> seal
+
+      let validators =
+        RPC_service.get_service
+          ~description:
+            "Retrieves the delegates allowed to endorse a block.\n\
+             By default, it gives the endorsing slots for delegates that have \
+             at least one in the next block.\n\
+             Parameter `level` can be used to specify the (valid) level(s) in \
+             the past or future at which the endorsement rights have to be \
+             returned. Parameter `delegate` can be used to restrict the \
+             results to the given delegates.\n\
+             Returns the list of endorsing slots. Also returns the minimal \
+             timestamps that correspond to these slots. The timestamps are \
+             omitted for levels in the past, and are only estimates for levels \
+             later that the next block, based on the hypothesis that all \
+             predecessor blocks were baked at the first round."
+          ~query:validators_query
+          ~output:(list encoding)
+          path
+    end
+
+    let endorsing_slots_at_level ctxt level =
+      Baking.endorsing_rights ctxt level >|=? fun (_, rights) ->
+      Signature.Public_key_hash.Map.fold
+        (fun delegate slots acc ->
+          {level = level.level; delegate; slots} :: acc)
+        rights
+        []
+
+    let register () =
+      Registration.register0 ~chunked:true S.validators (fun ctxt q () ->
+          let levels =
+            requested_levels
+              ~default_level:(Level.current ctxt)
+              ctxt
+              []
+              q.levels
+          in
+          List.map_es (endorsing_slots_at_level ctxt) levels >|=? fun rights ->
+          let rights = List.concat rights in
+          match q.delegates with
+          | [] -> rights
+          | _ :: _ as delegates ->
+              let is_requested p =
+                List.exists
+                  (Signature.Public_key_hash.equal p.delegate)
+                  delegates
+              in
+              List.filter is_requested rights)
+
+    let get ctxt ?(levels = []) ?(delegates = []) block =
+      RPC_context.make_call0 S.validators ctxt block {levels; delegates} ()
   end
 
   module S = struct
@@ -2484,6 +2922,16 @@ module RPC = struct
              (req "first" Raw_level.encoding)
              (req "last" Raw_level.encoding))
         RPC_path.(path / "levels_in_current_cycle")
+
+    let round =
+      RPC_service.get_service
+        ~description:
+          "Returns the round of the interrogated block, or the one of a block \
+           located `offset` blocks after in the chain (or before when \
+           negative). For instance, the next block if `offset` is 1."
+        ~query:RPC_query.empty
+        ~output:Round.encoding
+        RPC_path.(path / "round")
   end
 
   let register () =
@@ -2494,6 +2942,7 @@ module RPC = struct
     Big_map.register () ;
     Baking_rights.register () ;
     Endorsing_rights.register () ;
+    Validators.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         Lwt.return
           (Level.from_raw_with_offset
@@ -2513,7 +2962,9 @@ module RPC = struct
         | last :: default_first :: rest ->
             (* The [rev_levels] list is reversed, the last level is the head *)
             let first = List.last default_first rest in
-            return (Some (first.level, last.level)))
+            return (Some (first.level, last.level))) ;
+    Registration.register0 ~chunked:false S.round (fun ctxt () () ->
+        Round.get ctxt)
 
   let current_level ctxt ?(offset = 0l) block =
     RPC_context.make_call0 S.current_level ctxt block {offset} ()

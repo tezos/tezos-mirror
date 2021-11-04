@@ -328,7 +328,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
           | false -> return_some None
           | true ->
               Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key))) ;
-  register_opt_field ~chunked:false S.delegate Delegate.get ;
+  register_opt_field ~chunked:false S.delegate Delegate.find ;
   opt_register1 ~chunked:false S.counter (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None -> return_none
@@ -431,7 +431,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       do_big_map_get_all ?offset ?length ctxt id) ;
   register_field ~chunked:false S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
-      Delegate.get ctxt contract >>=? fun delegate ->
+      Delegate.find ctxt contract >>=? fun delegate ->
       (match Contract.is_implicit contract with
       | Some manager ->
           Contract.get_counter ctxt manager >>=? fun counter ->

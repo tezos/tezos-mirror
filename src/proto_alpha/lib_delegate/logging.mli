@@ -78,3 +78,6 @@ val block_header_tag : Block_header.t Tag.def
 
 val conflicting_endorsements_tag :
   (Kind.endorsement operation * Kind.endorsement operation) Tag.def
+
+val conflicting_preendorsements_tag :
+  (Kind.preendorsement operation * Kind.preendorsement operation) Tag.def

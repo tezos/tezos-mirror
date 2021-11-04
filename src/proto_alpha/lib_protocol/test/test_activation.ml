@@ -46,25 +46,26 @@ open Test_tez
 
 (* Generated commitments and secrets  *)
 
-(* Commitments are hard-coded in {Tezos_proto_alpha_parameters.Default_parameters} *)
-
-(* let commitments =
- *   List.map (fun (bpkh, a) ->
- *       Commitment_repr.{
- *         blinded_public_key_hash=Blinded_public_key_hash.of_b58check_exn bpkh ;
- *         amount = Tez_repr.of_mutez_exn (Int64.of_string a)}
- *     )
- *     [ ( "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ) ;
- *       ( "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ) ;
- *       ( "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428349" ) ;
- *       ( "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ) ;
- *       ( "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ) ;
- *       ( "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ) ;
- *       ( "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ) ;
- *       ( "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ) ;
- *       ( "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ) ;
- *       ( "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ) ;
- *     ] *)
+let commitments =
+  List.map
+    (fun (bpkh, a) ->
+      Commitment.
+        {
+          blinded_public_key_hash = Blinded_public_key_hash.of_b58check_exn bpkh;
+          amount = Tez.of_mutez_exn (Int64.of_string a);
+        })
+    [
+      ("btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343");
+      ("btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032");
+      ("btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428349");
+      ("btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031");
+      ("btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550");
+      ("btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555");
+      ("btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443");
+      ("btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525");
+      ("btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693");
+      ("btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478");
+    ]
 
 type secret_account = {
   account : public_key_hash;
@@ -170,7 +171,7 @@ let secrets () =
           "finger";
         ],
         "411dfef031eeecc506de71c9df9f8e44297cf5ba",
-        "217487035428348",
+        "217487035428349",
         "tz1SWBY7rWMutEuWS54Pt33MkzAS6eWkUuTc",
         "0AO6BzQNfN",
         "ctgnkvqm.kvtiybky@tezos.example.org" );
@@ -333,7 +334,7 @@ let secrets () =
 (** Helper: Create a genesis block with predefined commitments,
     accounts and balances. *)
 let activation_init () =
-  Context.init ~with_commitments:true 1 >|=? fun (b, cs) ->
+  Context.init ~consensus_threshold:0 ~commitments 1 >|=? fun (b, cs) ->
   secrets () |> fun ss -> (b, cs, ss)
 
 (** Verify the genesis block created by [activation_init] can be
@@ -414,7 +415,7 @@ let test_activation_and_transfer () =
   Op.activation (B blk) account activation_code >>=? fun operation ->
   Block.bake ~operation blk >>=? fun blk ->
   Context.Contract.balance (B blk) bootstrap_contract >>=? fun amount ->
-  Tez.( /? ) amount 2L >>?= fun half_amount ->
+  Test_tez.( /? ) amount 2L >>?= fun half_amount ->
   Context.Contract.balance (B blk) first_contract
   >>=? fun activated_amount_before ->
   Op.transaction (B blk) bootstrap_contract first_contract half_amount
@@ -438,7 +439,7 @@ let test_transfer_to_unactivated_then_activate () =
   in
   let unactivated_commitment_contract = Contract.implicit_contract account in
   Context.Contract.balance (B blk) bootstrap_contract >>=? fun b_amount ->
-  Tez.( /? ) b_amount 2L >>?= fun b_half_amount ->
+  b_amount /? 2L >>?= fun b_half_amount ->
   Incremental.begin_construction blk >>=? fun inc ->
   Op.transaction
     (I inc)

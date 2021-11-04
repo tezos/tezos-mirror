@@ -59,7 +59,7 @@ let test_unparse_view () =
   Alcotest.(check bytes) "didn't match" bef aft |> return
 
 let test_context () =
-  Context.init 3 >>=? fun (b, _cs) ->
+  Context.init ~consensus_threshold:0 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
 

@@ -51,12 +51,16 @@ module Revamped = struct
 
      Optionnaly, we can decide whether the block should be baked
      without taking the operations of the mempool. *)
-  let bake_for ~empty node client =
+  let bake_for ~empty ~protocol node client =
     let mempool_flush_waiter = Node.wait_for_request ~request:`Flush node in
     let* () =
       if empty then
         let* empty_mempool_file = Client.empty_mempool_file () in
-        Client.bake_for ~mempool:empty_mempool_file client
+        Client.bake_for
+          ~mempool:empty_mempool_file
+          ~monitor_node_mempool:false
+          ~protocol
+          client
       else Client.bake_for client
     in
     mempool_flush_waiter
@@ -97,7 +101,7 @@ module Revamped = struct
     Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
 
     log_step 4 "Bake a block with an empty mempool." ;
-    let* () = bake_for ~empty:true node client in
+    let* () = bake_for ~empty:true ~protocol node client in
     let* mempool_after_empty_block = RPC.get_mempool client in
 
     log_step 5 "Check that we did not lose any operation." ;
@@ -106,8 +110,8 @@ module Revamped = struct
     in
     Check.((mempool = mempool_after_empty_block) Mempool.typ ~error_msg) ;
 
-    log_step 6 "Inject endorsement operation." ;
-    let* () = Client.endorse_for client in
+    log_step 6 "Inject endorsement operations." ;
+    let* () = Client.endorse_for client ~protocol ~force:true in
     let* mempool_with_endorsement = RPC.get_mempool client in
 
     log_step 7 "Check endorsement is applied." ;
@@ -124,7 +128,7 @@ module Revamped = struct
     Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
 
     log_step 8 "Bake with an empty mempool twice." ;
-    let* () = repeat 2 (fun () -> bake_for ~empty:true node client) in
+    let* () = repeat 2 (fun () -> bake_for ~protocol ~empty:true node client) in
     let* last_mempool = RPC.get_mempool client in
 
     log_step 9 "Check endorsement is classified 'Outdated'." ;
@@ -357,21 +361,14 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_mempool ?endpoint client =
-  let mempool_str =
-    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
-  in
-  let mempool = Temp.file "mempool.json" in
-  let* _ =
-    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
-        Lwt_io.write oc mempool_str)
-  in
+  let* mempool = Client.empty_mempool_file () in
   Client.bake_for ?endpoint ~mempool client
 
 (** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
     will usually be the node corresponding to [client], but could be any
     node with a connection path to it). *)
-let bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
+let _bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
   let waiter = wait_for_flush node in
   let* () = bake_empty_mempool client in
   if log then
@@ -456,17 +453,16 @@ let ban_operation_branch_refused_reevaluated =
     JSON.(oph2 |> as_string)
     JSON.(oph |> as_string) ;
   let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
-  let empty_mempool_file = Temp.file "mempool.json" in
-  let* _ =
-    let empty_mempool =
-      {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
-    in
-    Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
-        Lwt_io.write oc empty_mempool)
-  in
+  let* empty_mempool_file = Client.empty_mempool_file () in
   let flush_waiter_1 = wait_for_flush node_1 in
   let flush_waiter_2 = wait_for_flush node_2 in
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () =
+    Client.bake_for
+      ~protocol
+      ~mempool:empty_mempool_file
+      ~monitor_node_mempool:false
+      client_1
+  in
   let* () = flush_waiter_1 and* () = flush_waiter_2 in
   Log.info "bake block to ensure mempool synchronisation" ;
   let* mempool_after_injections_1 =
@@ -657,11 +653,11 @@ let check_if_op_is_in_mempool client ~classification oph =
       let res =
         List.exists
           (fun c -> search_in ops c)
-          ["applied"; "branch_refused"; "branch_delayed"; "refused"]
+          ["applied"; "branch_refused"; "branch_delayed"; "refused"; "outdated"]
       in
       if res then Test.fail "%s found in mempool" oph else unit
 
-let get_endorsement_has_bytes client =
+let get_endorsement_has_bytes ~protocol client =
   let* mempool = RPC.get_mempool_pending_operations client in
   let open JSON in
   let ops_list = as_list (mempool |-> "applied") in
@@ -672,6 +668,7 @@ let get_endorsement_has_bytes client =
         Test.fail
           "Applied field of mempool should contain one and only one operation"
   in
+  let hash = JSON.get "hash" op |> as_string in
   let shell =
     let branch = JSON.as_string (JSON.get "branch" op) in
     match Data_encoding.Json.from_string (sf {|{"branch":"%s"}|} branch) with
@@ -684,15 +681,9 @@ let get_endorsement_has_bytes client =
     | [content] -> content
     | _ -> Test.fail "Contents should countain only one element"
   in
-  let endorsement = JSON.get "endorsement" contents in
   let slot = JSON.get "slot" contents |> JSON.as_int in
-  let level =
-    Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
-      (Int32.of_int
-         (JSON.get "operations" endorsement |> JSON.get "level" |> JSON.as_int))
-  in
-  let signature =
-    let signature = JSON.get "signature" endorsement |> JSON.as_string in
+  let get_signature op =
+    let signature = JSON.get "signature" op |> JSON.as_string in
     match Data_encoding.Json.from_string (sf {|"%s"|} signature) with
     | Ok s -> Data_encoding.Json.destruct Tezos_crypto.Signature.encoding s
     | Error e ->
@@ -701,42 +692,97 @@ let get_endorsement_has_bytes client =
           signature
           e
   in
-  let wrapped =
-    Tezos_protocol_alpha.Protocol.Operation_repr.
-      {
-        shell;
-        protocol_data =
-          Operation_data
-            {
-              contents =
-                Single
-                  (Endorsement_with_slot
-                     {
-                       endorsement =
-                         {
-                           shell;
-                           protocol_data =
-                             {
-                               contents =
-                                 Single
-                                   (Tezos_protocol_alpha.Protocol.Operation_repr
-                                    .Endorsement
-                                      {level});
-                               signature = Some signature;
-                             };
-                         };
-                       slot;
-                     });
-              signature = None;
-            };
-      }
-  in
   let wrapped_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Tezos_protocol_alpha.Protocol.Operation_repr.encoding
-      wrapped
+    match protocol with
+    | Protocol.Alpha ->
+        let signature = get_signature op in
+        let kind = JSON.get "kind" contents |> JSON.as_string in
+        if not (kind = "endorsement") then
+          Test.fail "Operation kind should be endorsement, got %s" kind ;
+        let level =
+          Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
+            (Int32.of_int (JSON.get "level" contents |> JSON.as_int))
+        in
+        let round =
+          let round = JSON.get "round" contents |> JSON.as_int in
+          match
+            Tezos_protocol_alpha.Protocol.Round_repr.of_int32
+              (Int32.of_int round)
+          with
+          | Ok round -> round
+          | Error _ ->
+              Test.fail
+                "Could not create a round with %d (from the mempool result) "
+                round
+        in
+        let block_payload_hash =
+          let block_payload_hash =
+            JSON.get "block_payload_hash" contents |> JSON.as_string
+          in
+          Tezos_protocol_alpha.Protocol.Block_payload_hash.of_b58check_exn
+            block_payload_hash
+        in
+        let wrapped =
+          Tezos_protocol_alpha.Protocol.Operation_repr.
+            {
+              shell;
+              protocol_data =
+                Operation_data
+                  {
+                    contents =
+                      Single
+                        (Endorsement {slot; round; level; block_payload_hash});
+                    signature = Some signature;
+                  };
+            }
+        in
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_protocol_alpha.Protocol.Operation_repr.encoding
+          wrapped
+    | Protocol.Granada | Protocol.Hangzhou ->
+        let endorsement = JSON.get "endorsement" contents in
+        let signature = get_signature endorsement in
+        let level =
+          Tezos_protocol_010_PtGRANAD.Protocol.Raw_level_repr.of_int32_exn
+            (Int32.of_int
+               (JSON.get "operations" endorsement
+               |> JSON.get "level" |> JSON.as_int))
+        in
+        let wrapped =
+          Tezos_protocol_010_PtGRANAD.Protocol.Operation_repr.
+            {
+              shell;
+              protocol_data =
+                Operation_data
+                  {
+                    contents =
+                      Single
+                        (Endorsement_with_slot
+                           {
+                             endorsement =
+                               {
+                                 shell;
+                                 protocol_data =
+                                   {
+                                     contents =
+                                       Single
+                                         (Tezos_protocol_010_PtGRANAD.Protocol
+                                          .Operation_repr
+                                          .Endorsement
+                                            {level});
+                                     signature = Some signature;
+                                   };
+                               };
+                             slot;
+                           });
+                    signature = None;
+                  };
+            }
+        in
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_protocol_010_PtGRANAD.Protocol.Operation_repr.encoding
+          wrapped
   in
-  let hash = JSON.get "hash" op |> as_string in
   Lwt.return (wrapped_bytes, hash)
 
 let wait_for_synch node =
@@ -753,12 +799,12 @@ let mempool_synchronisation client node =
   let* _ = RPC.mempool_request_operations client in
   waiter
 
-(** This test checks that futur endorsement are still propagated when
+(** This test checks that future endorsement are still propagated when
     the head is  incremented *)
-let propagation_futur_endorsement =
+let propagation_future_endorsement =
   let step1_msg =
     "Step 1: 3 nodes are initialised, chain connected and the protocol is \
-     activated"
+     activated."
   in
   let step2_msg = "Step 2: disconnect the nodes" in
   let step3_msg = "Step 3: bake one block on node_1" in
@@ -792,7 +838,7 @@ let propagation_futur_endorsement =
   in
   Protocol.register_test
     ~__FILE__
-    ~title:"Ensure that futur endorsement are propagated"
+    ~title:"Ensure that future endorsement are propagated"
     ~tags:["endorsement"; "mempool"; "branch_delayed"]
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
@@ -826,10 +872,10 @@ let propagation_futur_endorsement =
   let* () = Node_event_level.bake_wait_log node_1 client_1 in
   Log.info "%s" step3_msg ;
   let endorser_waiter = wait_for_injection node_1 in
-  let* () = Client.endorse_for client_1 in
+  let* () = Client.endorse_for client_1 ~force:true ~protocol in
   let* () = endorser_waiter in
   Log.info "%s" step4_msg ;
-  let* (bytes, hash) = get_endorsement_has_bytes client_1 in
+  let* (bytes, hash) = get_endorsement_has_bytes ~protocol client_1 in
   Log.info "%s" step5_msg ;
   let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
   Log.info "%s" step6_msg ;
@@ -1118,6 +1164,27 @@ let wait_for_banned_operation_injection node oph =
   in
   Node.wait_for node "banned_operation_encountered.v0" filter
 
+(** Bakes with an empty mempool to force synchronisation between nodes. *)
+let bake_empty_mempool ?protocol ?endpoint client =
+  let* mempool = Client.empty_mempool_file () in
+  Client.bake_for
+    ?protocol
+    ?endpoint
+    ~mempool
+    ~monitor_node_mempool:false
+    client
+
+(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
+    with an empty mempool, then waits for a [flush] event on [node] (which
+    will usually be the node corresponding to [client], but could be any
+    node with a connection path to it). *)
+let bake_empty_mempool_and_wait_for_flush ~protocol ?(log = false) client node =
+  let waiter = wait_for_flush node in
+  let* () = bake_empty_mempool ~protocol client in
+  if log then
+    Log.info "Baked for %s with an empty mempool." (Client.name client) ;
+  waiter
+
 (** This test bans an operation and tests the ban.
 
     Scenario:
@@ -1225,7 +1292,7 @@ let ban_operation =
     "Step 6: Bake on Node 2 with an empty mempool to force synchronisation \
      with Node 3. Check that the banned operation is not in the mempool of \
      Node 3." ;
-  let* () = bake_empty_mempool_and_wait_for_flush client_2 node_2 in
+  let* () = bake_empty_mempool_and_wait_for_flush ~protocol client_2 node_2 in
   let* _ = check_op_removed client_3 oph_to_ban in
   Log.info "Check that banned op is not in node_3" ;
   Log.info
@@ -1679,7 +1746,7 @@ let unban_all_operations =
   and wait3 = wait_for_arrival_of_ophash oph3 node_1 in
   let* _ = RPC.mempool_unban_all_operations client_1 in
   Log.info "All operations are now unbanned." ;
-  let* () = bake_empty_mempool client_1 in
+  let* () = bake_empty_mempool ~protocol client_1 in
   let* () = wait1 and* () = wait2 and* () = wait3 in
   Log.info "Step 5: Check that node 1 contains the right applied operations." ;
   let* final_ophs = get_and_log_applied client_1 in
@@ -1817,17 +1884,16 @@ let recycling_branch_refused =
   (* Step 7 *)
   (* Reconnect and sync nodes *)
   let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
-  let empty_mempool_file = Temp.file "mempool.json" in
-  let* _ =
-    let empty_mempool =
-      {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
-    in
-    Lwt_io.with_file ~mode:Lwt_io.Output empty_mempool_file (fun oc ->
-        Lwt_io.write oc empty_mempool)
-  in
+  let* empty_mempool_file = Client.empty_mempool_file () in
   let flush_waiter_1 = wait_for_flush node_1 in
   let flush_waiter_2 = wait_for_flush node_2 in
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () =
+    Client.bake_for
+      ~protocol
+      ~mempool:empty_mempool_file
+      ~monitor_node_mempool:false
+      client_1
+  in
   let* () = flush_waiter_1 and* () = flush_waiter_2 in
   Log.info "bake block to ensure mempool synchronisation" ;
   (* Step 8 *)
@@ -1861,7 +1927,9 @@ let recycling_branch_refused =
   let* () =
     repeat 2 (fun () ->
         Node_event_level.bake_wait_log
+          ~protocol
           ~mempool:empty_mempool_file
+          ~monitor_node_mempool:false
           node_2
           client_2)
   in
@@ -1873,7 +1941,13 @@ let recycling_branch_refused =
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
   (* Step 14 *)
   (* Check that branch_refused operation is set to be reclassified on new head*)
-  let* () = Client.bake_for ~mempool:empty_mempool_file client_1 in
+  let* () =
+    Client.bake_for
+      ~protocol
+      ~mempool:empty_mempool_file
+      ~monitor_node_mempool:false
+      client_1
+  in
   let* pending = bake_waiter_1 in
   if pending <> 2 then Test.fail "the two operations should be reclassified" ;
   unit
@@ -1968,7 +2042,7 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
             name
             classification
             (ops |-> classification |> encode))
-    ["branch_refused"; "branch_delayed"; "unprocessed"] ;
+    ["outdated"; "branch_refused"; "branch_delayed"; "unprocessed"] ;
   unit
 
 (** Waits for [node] to receive a notification from a peer of a mempool
@@ -2089,7 +2163,9 @@ let test_do_not_reclassify =
      with [node2]. Check that the mempool of [node1] has one applied and one \
      refused operation. Indeed, [node1] has the default filter config with \
      [minimal_fees] at 100 mutez." ;
-  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () =
+    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+  in
   let* () = waiter_arrival_node1 in
   let* () = check_mempool_ops ~log:true client1 ~applied:1 ~refused:1 in
   Log.info
@@ -2103,7 +2179,9 @@ let test_do_not_reclassify =
   let* _ = set_filter_no_fee_requirement client1 in
   let* () = inject_transfer Constant.bootstrap3 ~fee:5 in
   let waiter_notify_3_valid_ops = wait_for_notify_n_valid_ops node1 3 in
-  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () =
+    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+  in
   (* Wait for [node1] to receive a mempool containing 3 operations (the
      number of [applied] operations in [node2]), among which will figure
      the operation with fee 10 that has already been [refused] in [node1]. *)
@@ -2119,7 +2197,7 @@ let test_do_not_reclassify =
      operation of fee 1000 is included. Check that [node1] contains one \
      applied operation (fee 5) and one refused operation (fee 10), and that \
      [node2] contains 2 applied operations." ;
-  let* () = bake_wait_log node1 client1 in
+  let* () = bake_wait_log ~protocol node1 client1 in
   let* () = check_n_manager_ops_in_block ~log:true client1 1 in
   let* () = check_mempool_ops ~log:true client1 ~applied:1 ~refused:1 in
   let* () = check_mempool_ops ~log:true client2 ~applied:2 ~refused:0 in
@@ -2329,7 +2407,7 @@ let injecting_old_operation_fails =
   let step4 = "Forge an operation with the old branch" in
   let step5 = "Inject the operation and wait for failure" in
   let log_step = Log.info "Step %d: %s" in
-  let max_operations_ttl = 0 in
+  let max_operations_ttl = 1 in
   Protocol.register_test
     ~__FILE__
     ~title:"Injecting old operation fails"
@@ -2886,7 +2964,9 @@ let test_mempool_filter_operation_arrival =
   let* () = inject_transfers Constant.[bootstrap1; bootstrap2] feesA in
   let* () = check_mempool_ops_fees ~applied:appliedA2 ~refused:[] client2 in
   log_step 4 step4 ;
-  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () =
+    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+  in
   let* () = waiter_arrival_node1 in
   let* () =
     check_mempool_ops_fees ~applied:appliedA1 ~refused:refusedA1 client1
@@ -2900,7 +2980,9 @@ let test_mempool_filter_operation_arrival =
   in
   let waiterB = wait_for_arrival node1 in
   let* () = inject_transfers Constant.[bootstrap3; bootstrap4] feesB in
-  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () =
+    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+  in
   let* () = waiterB in
   let* () =
     check_mempool_ops_fees ~applied:appliedB1 ~refused:refusedB1 client1
@@ -2924,7 +3006,9 @@ let test_mempool_filter_operation_arrival =
       feesC
   in
   let* () = check_mempool_ops_fees ~applied:appliedC2 ~refused:[] client2 in
-  let* () = bake_empty_mempool_and_wait_for_flush ~log:true client1 node1 in
+  let* () =
+    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+  in
   let* () = waiterC in
   check_mempool_ops_fees ~applied:appliedC1 ~refused:refusedC1 client1
 
@@ -2988,7 +3072,7 @@ let test_request_operations_peer =
 let register ~protocols =
   Revamped.flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
-  propagation_futur_endorsement ~protocols ;
+  propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
   refetch_failed_operation ~protocols ;
   ban_operation ~protocols ;

@@ -24,14 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Internal representation of the Tez currency. Behaves mostly like a natural
-    number where number 1 represents 1/1,000,000 Tez (1 micro-Tez or mutez).
-    It's protected from ever becoming negative and overflowing by special
-    arithmetic functions, which fail in case something undesired would happen.
-    When divided, it's always rounded down to 1 mutez.
-
-    Internally encoded as [int64], which may be relevant to guard against
-    overflow errors. *)
 type t
 
 type tez = t
@@ -46,29 +38,12 @@ val fifty_cents : t
 
 val one : t
 
-(** Tez subtraction.
-
-    [a -? b] is the difference between [a] and [b] given that [b] is greater or
-    equal to [a]. Otherwise an error ([Subtraction underflow]) is returned. *)
 val ( -? ) : t -> t -> t tzresult
 
-(** Tez addition.
-
-    [a +? b] is the sum of [a] and [b] or an [Addition overflow] error in case
-    of overflow. *)
 val ( +? ) : t -> t -> t tzresult
 
-(** Tez multiplication by an integral factor.
-
-    [a *? m] is [a] multiplied by [m] (which must be non-negative) or a
-    [Multiplication_overflow] error. *)
 val ( *? ) : t -> int64 -> t tzresult
 
-(** Tez division by an integral divisor.
-
-    [a /? d] is [a] divided by [d] (which must be positive). Given that [d]
-    is positive, this function is safe. The result is rounded down to
-    1 mutez. *)
 val ( /? ) : t -> int64 -> t tzresult
 
 val to_mutez : t -> int64
@@ -83,9 +58,10 @@ val of_mutez_exn : int64 -> t
 (** It should only be used at toplevel for constants. *)
 val mul_exn : t -> int -> t
 
-val encoding : t Data_encoding.t
+(** It should only be used at toplevel for constants. *)
+val div_exn : t -> int -> t
 
-val to_int64 : t -> int64
+val encoding : t Data_encoding.t
 
 include Compare.S with type t := t
 

@@ -10,6 +10,11 @@ BLOCKS_PER_CYCLE = protocol.PARAMETERS['blocks_per_cycle']
 FIRST_PROTOCOL_BLOCK = 1
 TIMEOUT = 60
 
+ROUND_DURATION = 1
+ROUND_DURATIONS = [str(ROUND_DURATION), str(ROUND_DURATION)]
+TEST_DURATION = (FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE) * ROUND_DURATION
+NUM_NODES = 5
+
 
 @pytest.mark.incremental
 @pytest.mark.slow
@@ -31,20 +36,38 @@ class TestNonceSeedRevelation:
         immediately without waiting for current time."""
 
         node_params = constants.NODE_PARAMS + ['--history-mode', 'archive']
-        sandbox.add_node(0, params=node_params)
-        protocol.activate(sandbox.client(0), activate_in_the_past=True)
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        for i in range(NUM_NODES):
+            sandbox.add_node(i, params=node_params)
 
-    @pytest.mark.timeout(TIMEOUT)
+        # client setup
+        parameters = protocol.get_parameters()
+        parameters['round_durations'] = ROUND_DURATIONS
+        protocol.activate(sandbox.client(0), parameters=parameters)
+
+        # baker setup
+        # delegated_accounts = [f'bootstrap{i}' for i in range(1, 6)]
+        for i in range(NUM_NODES):
+            sandbox.add_baker(
+                i,
+                [f"bootstrap{i + 1}"],
+                proto=protocol.DAEMON,
+                log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+            )
+
+    @pytest.mark.timeout(2 * TEST_DURATION)
     def test_wait_for_two_cycles(self, sandbox: Sandbox):
         """Poll the node until target level is reached """
         target = FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE
-        while True:
-            time.sleep(3)  # sleep first to avoid useless first query
+        level = target - 1
+        while level < target:
+            time.sleep(
+                4 * ROUND_DURATION
+            )  # sleep first to avoid useless first query
             if sandbox.client(0).get_level() >= target:
                 break
         # No need to bake more
-        sandbox.rm_baker(0, proto=protocol.DAEMON)
+        for i in range(NUM_NODES):
+            sandbox.rm_baker(i, proto=protocol.DAEMON)
 
     def test_get_all_blocks(self, sandbox: Sandbox, session: dict):
         """Retrieve all blocks for two full cycles. """
@@ -64,13 +87,12 @@ class TestNonceSeedRevelation:
         # protocol, but because it is a protocol transition block, it
         # doesn't have the "cycle" and "cycle_position" metadata (unlike
         # the remaining blocks)
-        assert blocks[1]['metadata']['level_info']['cycle'] == 0
-        assert blocks[1]['metadata']['level_info']['cycle_position'] == 1
-        assert blocks[BLOCKS_PER_CYCLE]['metadata']['level_info']['cycle'] == 1
-        assert (
-            blocks[BLOCKS_PER_CYCLE]['metadata']['level_info']['cycle_position']
-            == 0
-        )
+        initial_block_level = blocks[1]['metadata']['level_info']
+        assert initial_block_level['cycle'] == 0
+        assert initial_block_level['cycle_position'] == 1
+        final_block_level = blocks[BLOCKS_PER_CYCLE]['metadata']['level_info']
+        assert final_block_level['cycle'] == 1
+        assert final_block_level['cycle_position'] == 0
 
     def test_collect_seed_nonce_hashes(self, session):
         """Collect nonce hashes in the block headers in the first cycle """

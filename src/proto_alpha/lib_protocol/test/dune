@@ -4,7 +4,8 @@
         test_gas_properties
         test_tez_repr
         liquidity_baking_pbt
-        test_script_comparison)
+        test_script_comparison
+        test_sampler)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -56,6 +57,11 @@
  (action (run %{exe:saturation_fuzzing.exe})))
 
 (rule
+ (alias runtest_sampler)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:test_sampler.exe})))
+
+(rule
  (alias runtest_test_script_comparison)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:test_script_comparison.exe})))
@@ -75,6 +81,7 @@
  (package tezos-protocol-alpha-tests)
  (deps
   (alias runtest_proto_alpha)
+  (alias runtest_sampler)
   (alias runtest_saturation_fuzzing)
   (alias runtest_test_tez_repr)
   (alias runtest_liquidity_baking_pbt)

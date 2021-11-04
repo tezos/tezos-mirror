@@ -25,6 +25,8 @@
 
 (** {2 Helper functions} *)
 
+module Public_key_map : Map.S with type key = Signature.Public_key.t
+
 type 'a lazyt = unit -> 'a
 
 type 'a lazy_list_t = LCons of 'a * 'a lazy_list_t tzresult Lwt.t lazyt

@@ -27,9 +27,29 @@
 (** Places where tez can be found in the ledger's state. *)
 type balance =
   | Contract of Contract_repr.t
-  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
-  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
-  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | Legacy_rewards of Signature.Public_key_hash.t * Cycle_repr.t
+  | Block_fees
+  | Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | Bonds of Signature.Public_key_hash.t
+  | NonceRevelation_rewards
+  | Double_signing_evidence_rewards
+  | Endorsing_rewards
+  | Baking_rewards
+  | Baking_bonuses
+  | Legacy_fees of Signature.Public_key_hash.t * Cycle_repr.t
+  | Storage_fees
+  | Double_signing_punishments
+  | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | Liquidity_baking_subsidies
+  | Burned
+  | Commitments of Blinded_public_key_hash.t
+  | Bootstrap
+  | Invoice
+  | Initial_commitments
+  | Minted
+
+(** Compares two balances. *)
+val compare_balance : balance -> balance -> int
 
 (** A credit or debit of tez to a balance. *)
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
@@ -39,6 +59,10 @@ type update_origin =
   | Block_application  (** Update from a block application *)
   | Protocol_migration  (** Update from a protocol migration *)
   | Subsidy  (** Update from an inflationary subsidy  *)
+  | Simulation  (** Simulation of an operation **)
+
+(** Compares two origins. *)
+val compare_update_origin : update_origin -> update_origin -> int
 
 (** A list of balance updates. Duplicates may happen.
     For example, an entry of the form [(Rewards (b,c), Credited am, ...)]
@@ -50,3 +74,6 @@ val balance_updates_encoding : balance_updates Data_encoding.t
 
 (** Remove zero-valued balances from a list of updates. *)
 val cleanup_balance_updates : balance_updates -> balance_updates
+
+(** Group updates by (balance x origin), and remove zero-valued balances. *)
+val group_balance_updates : balance_updates -> balance_updates tzresult

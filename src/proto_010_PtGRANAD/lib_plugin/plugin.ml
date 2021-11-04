@@ -73,6 +73,20 @@ module Mempool = struct
     allow_script_failure : bool;
   }
 
+  type state = unit
+
+  let init config ?(validation_state : validation_state option) ~predecessor ()
+      =
+    ignore config ;
+    ignore validation_state ;
+    ignore predecessor ;
+    return ()
+
+  let on_flush config filter_state ?(validation_state : validation_state option)
+      ~predecessor () =
+    ignore filter_state ;
+    init config ?validation_state ~predecessor ()
+
   let default_minimal_fees =
     match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
@@ -224,7 +238,7 @@ module Mempool = struct
       (function Wrong_operation -> Some () | _ -> None)
       (fun () -> Wrong_operation)
 
-  let pre_filter config ?validation_state_before
+  let pre_filter config ~filter_state ?validation_state_before
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
@@ -232,7 +246,7 @@ module Mempool = struct
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
-    match contents with
+    (match contents with
     | Single (Endorsement _) | Single (Failing_noop _) ->
         `Refused [Environment.wrap_tzerror Wrong_operation]
     | Single
@@ -273,7 +287,8 @@ module Mempool = struct
     | Single (Ballot _) ->
         `Undecided
     | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes
+    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes)
+    |> fun res -> Lwt.return (res, filter_state)
 
   open Apply_results
 
@@ -299,9 +314,9 @@ module Mempool = struct
         | false -> Lwt.return_false
         | true -> post_filter_manager ctxt rest config)
 
-  let post_filter config ~validation_state_before:_
+  let post_filter config ~filter_state ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
-    match receipt with
+    (match receipt with
     | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
         match contents with
@@ -318,7 +333,8 @@ module Mempool = struct
         | Single_result (Manager_operation_result _) as op ->
             post_filter_manager ctxt op config
         | Cons_result (Manager_operation_result _, _) as op ->
-            post_filter_manager ctxt op config)
+            post_filter_manager ctxt op config))
+    >>= fun res -> Lwt.return (res, filter_state)
 end
 
 module View_helpers = struct

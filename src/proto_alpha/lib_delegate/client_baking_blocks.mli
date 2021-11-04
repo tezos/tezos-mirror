@@ -37,9 +37,6 @@ type block_info = {
   proto_level : int;
   level : Raw_level.t;
   context : Context_hash.t;
-  predecessor_block_metadata_hash : Block_metadata_hash.t option;
-  predecessor_operations_metadata_hash :
-    Operation_metadata_list_list_hash.t option;
 }
 
 val info :

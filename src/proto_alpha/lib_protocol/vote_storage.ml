@@ -90,13 +90,16 @@ let listings_encoding =
 
 let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
-  Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll delegate (ctxt, total) ->
-      (* TODO use snapshots *)
-      let delegate = Signature.Public_key.hash delegate in
-      Storage.Vote.Listings.find ctxt delegate >|=? Option.value ~default:0l
-      >>=? fun count ->
-      Storage.Vote.Listings.add ctxt delegate (Int32.succ count) >|= fun ctxt ->
-      ok (ctxt, Int32.succ total))
+  Stake_storage.fold ctxt (ctxt, 0l) ~f:(fun (delegate, stake) (ctxt, total) ->
+      let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
+      let nb_rolls =
+        Int64.to_int32
+        @@ Int64.div
+             (Tez_repr.to_mutez stake)
+             (Tez_repr.to_mutez tokens_per_roll)
+      in
+      Storage.Vote.Listings.init ctxt delegate nb_rolls >|=? fun ctxt ->
+      (ctxt, Int32.add total nb_rolls))
   >>=? fun (ctxt, total) ->
   Storage.Vote.Listings_size.add ctxt total >>= fun ctxt -> return ctxt
 

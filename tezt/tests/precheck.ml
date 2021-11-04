@@ -115,7 +115,7 @@ let precheck_block =
     Test.fail "prechecking of block did not executed as expected"
   else return ()
 
-let forge_block ?client node ~key =
+let forge_block ~protocol ?client node ~key =
   Log.info "Creating another node to forge a block" ;
   let* client =
     match client with
@@ -132,7 +132,15 @@ let forge_block ?client node ~key =
   let* _ = Node.wait_for_level node2 node_level in
   let* node2_id = Node.wait_for_identity node2 in
   let* () = Client.Admin.kick_peer ~peer:node2_id client in
-  let* () = Client.bake_for ~key client2 in
+  let* () =
+    let open Protocol in
+    if protocol = Granada || protocol = Hangzhou then
+      Client.bake_for ~key client2
+    else
+      (* We want an empty block, in tenderbake, we can simply propose
+         so that there is no endorsement operations. *)
+      Client.propose_for ~key:[key] ~force:true client2
+  in
   let* shell =
     Client.shell_header client2 >>= fun shell ->
     JSON.parse ~origin:"forge_fake_block" shell |> return
@@ -167,7 +175,9 @@ let propagate_precheckable_bad_block =
   *)
   Log.info "Setting up the node topology" ;
   let n1 = Node.create [] in
-  let ring = Cluster.create ~name:"ring" 4 [Private_mode] in
+  let ring =
+    Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
+  in
   let n2 = List.hd ring in
   Cluster.ring ring ;
   Cluster.connect [n1] [n2] ;
@@ -185,7 +195,7 @@ let propagate_precheckable_bad_block =
            let* () = Client.bake_for ~key:bootstrap1 client in
            wait_for_cluster_at_level cluster i)
   in
-  let* block_header = forge_block ~client n1 ~key:bootstrap1 in
+  let* block_header = forge_block ~protocol ~client n1 ~key:bootstrap1 in
   (* Put a bad context *)
   Log.info "Crafting a block header with a bad context hash" ;
   let dummy_context_hash =

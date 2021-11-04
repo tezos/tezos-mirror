@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 open Protocol
+module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
+
 open Alpha_context
 
 type t = {
@@ -48,7 +50,8 @@ let validation_state {state; _} = state
 let level st = st.header.shell.level
 
 let rpc_context st =
-  let result = Alpha_context.finalize st.state.ctxt in
+  let fitness = (header st).shell.fitness in
+  let result = Alpha_context.finalize st.state.ctxt fitness in
   {
     Environment.Updater.block_hash = Block_hash.zero;
     block_header = {st.header.shell with fitness = result.fitness};
@@ -60,20 +63,32 @@ let rpc_ctxt =
 
 let alpha_ctxt st = st.state.ctxt
 
-let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
-    ?(policy = Block.By_priority priority) (predecessor : Block.t) =
+let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
+    ?(policy = Block.By_round 0) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
-  >>=? fun (delegate, priority, _timestamp) ->
-  Alpha_services.Delegate.Minimal_valid_time.get
-    Block.rpc_ctxt
-    predecessor
-    priority
-    0
-  >>=? fun real_timestamp ->
+  >>=? fun (delegate, round, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
+  Round.of_int round |> Environment.wrap_tzresult >>?= fun payload_round ->
   let timestamp = Option.value ~default:real_timestamp timestamp in
-  let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
-  let protocol_data = {Block_header.contents; signature = Signature.zero} in
+  (match seed_nonce_hash with
+  | Some _hash -> return seed_nonce_hash
+  | None -> (
+      Plugin.RPC.current_level ~offset:1l Block.rpc_ctxt predecessor
+      >|=? function
+      | {expected_commitment = true; _} -> Some (fst (Proto_Nonce.generate ()))
+      | {expected_commitment = false; _} -> None))
+  >>=? fun seed_nonce_hash ->
+  let contents =
+    Block.Forge.contents
+      ?seed_nonce_hash
+      ~payload_hash:Block_payload_hash.zero
+      ~payload_round
+      ()
+  in
+  let protocol_data =
+    if mempool_mode then None
+    else Some {Block_header.contents; signature = Signature.zero}
+  in
   let header =
     {
       Block_header.shell =
@@ -98,7 +113,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ~predecessor_level:predecessor.header.shell.level
     ~predecessor:predecessor.hash
     ~timestamp
-    ~protocol_data
+    ?protocol_data
     ()
   >|= fun state ->
   Environment.wrap_tzresult state >|? fun state ->

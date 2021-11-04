@@ -39,21 +39,21 @@ open Tztest
 module Test_tez_repr = struct
   (** Testing predefined units: zero, one_mutez etc *)
   let test_predefined_values () =
-    let zero_int64 = Tez_repr.to_int64 Tez_repr.zero in
+    let zero_int64 = Tez_repr.to_mutez Tez_repr.zero in
     Assert.equal_int64 ~loc:__LOC__ zero_int64 0L >>=? fun () ->
-    let one_mutez_int64 = Tez_repr.to_int64 Tez_repr.one_mutez in
+    let one_mutez_int64 = Tez_repr.to_mutez Tez_repr.one_mutez in
     Assert.equal_int64 ~loc:__LOC__ one_mutez_int64 1L >>=? fun () ->
-    let one_cent_int64 = Tez_repr.to_int64 Tez_repr.one_cent in
+    let one_cent_int64 = Tez_repr.to_mutez Tez_repr.one_cent in
     Assert.equal_int64 ~loc:__LOC__ one_cent_int64 10000L >>=? fun () ->
-    let fifty_cents_int64 = Tez_repr.to_int64 Tez_repr.fifty_cents in
+    let fifty_cents_int64 = Tez_repr.to_mutez Tez_repr.fifty_cents in
     Assert.equal_int64 ~loc:__LOC__ fifty_cents_int64 500000L >>=? fun () ->
-    let one_int64 = Tez_repr.to_int64 Tez_repr.one in
+    let one_int64 = Tez_repr.to_mutez Tez_repr.one in
     Assert.equal_int64 ~loc:__LOC__ one_int64 1000000L
 
   let test_subtract () =
     (Lwt.return @@ Tez_repr.(one -? zero)) >|= Environment.wrap_tzresult
     >>=? fun res ->
-    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_int64 res) 1000000L
+    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_mutez res) 1000000L
 
   let test_substract_underflow () =
     (Lwt.return @@ Tez_repr.(zero -? one)) >|= Environment.wrap_tzresult
@@ -64,7 +64,7 @@ module Test_tez_repr = struct
   let test_addition () =
     (Lwt.return @@ Tez_repr.(one +? zero)) >|= Environment.wrap_tzresult
     >>=? fun res ->
-    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_int64 res) 1000000L
+    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_mutez res) 1000000L
 
   let test_addition_overflow () =
     (Lwt.return @@ Tez_repr.(of_mutez_exn 0x7fffffffffffffffL +? one))
@@ -75,7 +75,7 @@ module Test_tez_repr = struct
 
   let test_mul () =
     (Lwt.return @@ Tez_repr.(zero *? 1L)) >|= Environment.wrap_tzresult
-    >>=? fun res -> Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_int64 res) 0L
+    >>=? fun res -> Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_mutez res) 0L
 
   let test_mul_overflow () =
     (Lwt.return @@ Tez_repr.(of_mutez_exn 0x7fffffffffffffffL *? 2L))
@@ -87,7 +87,7 @@ module Test_tez_repr = struct
   let test_div () =
     (Lwt.return @@ Tez_repr.(one *? 1L)) >|= Environment.wrap_tzresult
     >>=? fun res ->
-    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_int64 res) 1000000L
+    Assert.equal_int64 ~loc:__LOC__ (Tez_repr.to_mutez res) 1000000L
 
   let test_div_by_zero () =
     (Lwt.return @@ Tez_repr.(one /? 0L)) >|= Environment.wrap_tzresult
@@ -104,8 +104,8 @@ module Test_tez_repr = struct
     | Some tz ->
         Assert.equal_int64
           ~loc:__LOC__
-          (Tez_repr.to_int64 tz)
-          Tez_repr.(to_int64 one)
+          (Tez_repr.to_mutez tz)
+          Tez_repr.(to_mutez one)
     | None -> failwith "should have successfully converted 1000000L to tez"
 
   let test_of_mutez_negative () =
@@ -118,8 +118,8 @@ module Test_tez_repr = struct
       let tz = Tez_repr.of_mutez_exn 1000000L in
       Assert.equal_int64
         ~loc:__LOC__
-        (Tez_repr.to_int64 tz)
-        Tez_repr.(to_int64 one)
+        (Tez_repr.to_mutez tz)
+        Tez_repr.(to_mutez one)
     with e ->
       let msg = Printexc.to_string e and stack = Printexc.get_backtrace () in
       failwith "Unexpected exception: %s %s" msg stack

@@ -26,7 +26,8 @@
 (** Representation of block headers. *)
 
 type contents = {
-  priority : int;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
   liquidity_baking_escape_vote : bool;
@@ -57,9 +58,102 @@ val protocol_data_encoding : protocol_data Data_encoding.encoding
 
 val shell_header_encoding : shell_header Data_encoding.encoding
 
+type block_watermark = Block_header of Chain_id.t
+
+val to_watermark : block_watermark -> Signature.watermark
+
+val of_watermark : Signature.watermark -> block_watermark option
+
 (** The maximum size of block headers in bytes *)
 val max_header_length : int
 
 val hash : block_header -> Block_hash.t
 
 val hash_raw : raw -> Block_hash.t
+
+type error +=
+  | (* Permanent *)
+      Invalid_block_signature of
+      Block_hash.t * Signature.Public_key_hash.t
+  | (* Permanent *) Invalid_stamp
+  | (* Permanent *)
+      Invalid_payload_hash of {
+      expected : Block_payload_hash.t;
+      provided : Block_payload_hash.t;
+    }
+  | (* Permanent *)
+      Locked_round_after_block_round of {
+      locked_round : Round_repr.t;
+      round : Round_repr.t;
+    }
+  | (* Permanent *)
+      Invalid_payload_round of {
+      payload_round : Round_repr.t;
+      round : Round_repr.t;
+    }
+  | (* Permanent *)
+      Insufficient_locked_round_evidence of {
+      voting_power : int;
+      consensus_threshold : int;
+    }
+  | (* Permanent *) Invalid_commitment of {expected : bool}
+
+(** Checks if the header that would be built from the given components
+   is valid for the given difficulty. The signature is not passed as
+   it is does not impact the proof-of-work stamp. The stamp is checked
+   on the hash of a block header whose signature has been
+   zeroed-out. *)
+module Proof_of_work : sig
+  val check_hash : Block_hash.t -> int64 -> bool
+
+  val check_header_proof_of_work_stamp :
+    shell_header -> contents -> int64 -> bool
+
+  val check_proof_of_work_stamp :
+    proof_of_work_threshold:int64 -> block_header -> unit tzresult
+end
+
+(** [check_timestamp ctxt timestamp round predecessor_timestamp
+   predecessor_round] verifies that the block's timestamp and round
+   are coherent with the predecessor block's timestamp and
+   round. Fails with an error if that is not the case. *)
+val check_timestamp :
+  Round_repr.Durations.t ->
+  timestamp:Time.t ->
+  round:Round_repr.t ->
+  predecessor_timestamp:Time.t ->
+  predecessor_round:Round_repr.t ->
+  unit tzresult
+
+val check_signature : t -> Chain_id.t -> Signature.Public_key.t -> unit tzresult
+
+val begin_validate_block_header :
+  block_header:t ->
+  chain_id:Chain_id.t ->
+  predecessor_timestamp:Time.t ->
+  predecessor_round:Round_repr.t ->
+  fitness:Fitness_repr.t ->
+  timestamp:Time.t ->
+  delegate_pk:Signature.public_key ->
+  round_durations:Round_repr.Durations.t ->
+  proof_of_work_threshold:int64 ->
+  expected_commitment:bool ->
+  unit tzresult
+
+type locked_round_evidence = {
+  preendorsement_round : Round_repr.t;
+  preendorsement_count : int;
+}
+
+type checkable_payload_hash =
+  | No_check
+  | Expected_payload_hash of Block_payload_hash.t
+
+val finalize_validate_block_header :
+  block_header_contents:contents ->
+  round:Round_repr.t ->
+  fitness:Fitness_repr.t ->
+  checkable_payload_hash:checkable_payload_hash ->
+  locked_round_evidence:locked_round_evidence option ->
+  consensus_threshold:int ->
+  unit tzresult

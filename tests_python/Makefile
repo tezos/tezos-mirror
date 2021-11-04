@@ -53,6 +53,10 @@ alpha:
 	mkdir -p $(LOG_DIR)
 	poetry run pytest --log-dir=tmp --tb=no tests_alpha
 
+tenderbake:
+	mkdir -p $(LOG_DIR)
+	poetry run pytest --log-dir=tmp --tb=no -m tenderbake
+
 lint: pylint pycodestyle lint_black
 
 # Analyses that we want to run as part of pre-commit hook.

@@ -54,6 +54,156 @@ module Int_set = Set.Make (Compare.Int)
    Here are the fields on the [back] of the context:
 
  *)
+
+module Raw_consensus = struct
+  (** Consensus operations are indexed by their [initial slots]. Given
+      a delegate, the [initial slot] is the lowest slot assigned to
+      this delegate. *)
+
+  type t = {
+    current_endorsement_power : int;
+        (** Number of endorsement slots recorded for the current block. *)
+    allowed_endorsements :
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int)
+      Slot_repr.Map.t;
+        (** Endorsements rights for the current block. Only an endorsement
+            for the lowest slot in the block can be recorded. The map
+            associates to each initial slot the [pkh] associated to this
+            slot with its power. *)
+    allowed_preendorsements :
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int)
+      Slot_repr.Map.t;
+        (** Preendorsements rights for the current block. Only a preendorsement
+            for the lowest slot in the block can be recorded. The map
+            associates to each initial slot the [pkh] associated to this
+            slot with its power. *)
+    grand_parent_endorsements_seen : Signature.Public_key_hash.Set.t;
+        (** Record the endorsements already seen for the grand
+            parent. This only useful for the partial construction mode. *)
+    endorsements_seen : Slot_repr.Set.t;
+        (** Record the endorsements already seen. Only initial slots are indexed. *)
+    preendorsements_seen : Slot_repr.Set.t;
+        (** Record the preendorsements already seen. Only initial slots
+            are indexed. *)
+    locked_round_evidence : (Round_repr.t * int) option;
+        (** Associate for each round the [payload_hashes] seen and how
+            many people have seen it. *)
+    preendorsements_quorum_round : Round_repr.t option;
+        (** If there is a predeensorement quorum, record the round
+            associate with the quorum. *)
+    endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
+    grand_parent_branch : (Block_hash.t * Block_payload_hash.t) option;
+  }
+
+  (** Invariant:
+
+      - If [i \in endorsements_seen => \exists data, Int_map.find_opt allowed_endorsements i = Some data]
+
+      - If [i \in preendorsements_seen => \exists data, Int_map.find_opt allowed_preendorsements i = Some data]
+
+      - If [i \in endorsements_seen => included_endorsements > 0]
+
+  *)
+
+  let empty : t =
+    {
+      current_endorsement_power = 0;
+      allowed_endorsements = Slot_repr.Map.empty;
+      allowed_preendorsements = Slot_repr.Map.empty;
+      grand_parent_endorsements_seen = Signature.Public_key_hash.Set.empty;
+      endorsements_seen = Slot_repr.Set.empty;
+      preendorsements_seen = Slot_repr.Set.empty;
+      locked_round_evidence = None;
+      preendorsements_quorum_round = None;
+      endorsement_branch = None;
+      grand_parent_branch = None;
+    }
+
+  type error += Double_inclusion_of_consensus_operation
+
+  let () =
+    register_error_kind
+      `Branch
+      ~id:"operation.double_inclusion_of_consensus_operation"
+      ~title:"double inclusion of consensus operation"
+      ~description:"double inclusion of consensus operation"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Double inclusion of consensus operation")
+      Data_encoding.empty
+      (function
+        | Double_inclusion_of_consensus_operation -> Some () | _ -> None)
+      (fun () -> Double_inclusion_of_consensus_operation)
+
+  let record_grand_parent_endorsement t pkh =
+    error_when
+      (Signature.Public_key_hash.Set.mem pkh t.grand_parent_endorsements_seen)
+      Double_inclusion_of_consensus_operation
+    >|? fun () ->
+    {
+      t with
+      grand_parent_endorsements_seen =
+        Signature.Public_key_hash.Set.add pkh t.grand_parent_endorsements_seen;
+    }
+
+  let record_endorsement t ~initial_slot ~power =
+    error_when
+      (Slot_repr.Set.mem initial_slot t.endorsements_seen)
+      Double_inclusion_of_consensus_operation
+    >|? fun () ->
+    {
+      t with
+      current_endorsement_power = t.current_endorsement_power + power;
+      endorsements_seen = Slot_repr.Set.add initial_slot t.endorsements_seen;
+    }
+
+  let record_preendorsement ~initial_slot ~power round t =
+    error_when
+      (Slot_repr.Set.mem initial_slot t.preendorsements_seen)
+      Double_inclusion_of_consensus_operation
+    >|? fun () ->
+    let locked_round_evidence =
+      match t.locked_round_evidence with
+      | None -> Some (round, power)
+      | Some (_stored_round, evidences) ->
+          (* In mempool mode, round and stored_round can be different.
+             It doesn't matter in that case since quorum certificates
+             are not used in mempool.
+             For other cases [Apply.check_round] verifies it. *)
+          Some (round, evidences + power)
+    in
+    {
+      t with
+      locked_round_evidence;
+      preendorsements_seen =
+        Slot_repr.Set.add initial_slot t.preendorsements_seen;
+    }
+
+  let set_preendorsements_quorum_round round t =
+    match t.preendorsements_quorum_round with
+    | Some round' ->
+        (* If the rounds are different, an error should have already
+           been raised. *)
+        assert (Round_repr.equal round round') ;
+        t
+    | None -> {t with preendorsements_quorum_round = Some round}
+
+  let initialize_with_endorsements_and_preendorsements ~allowed_endorsements
+      ~allowed_preendorsements t =
+    {t with allowed_endorsements; allowed_preendorsements}
+
+  let locked_round_evidence t = t.locked_round_evidence
+
+  let endorsement_branch t = t.endorsement_branch
+
+  let grand_parent_branch t = t.grand_parent_branch
+
+  let set_endorsement_branch t endorsement_branch =
+    {t with endorsement_branch = Some endorsement_branch}
+
+  let set_grand_parent_branch t grand_parent_branch =
+    {t with grand_parent_branch = Some grand_parent_branch}
+end
+
 type back = {
   context : Context.t;
   constants : Constants_repr.parametric;
@@ -61,20 +211,21 @@ type back = {
   level : Level_repr.t;
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
-  fitness : Int64.t;
-  included_endorsements : int;
-  allowed_endorsements :
-    (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
   fees : Tez_repr.t;
-  rewards : Tez_repr.t;
-  storage_space_to_pay : Z.t option;
-  allocated_contracts : int option;
   origination_nonce : Contract_repr.origination_nonce option;
   temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
   remaining_block_gas : Gas_limit_repr.Arith.fp;
   unlimited_operation_gas : bool;
+  consensus : Raw_consensus.t;
+  non_consensus_operations : Operation_hash.t list;
+  sampler_state :
+    (Seed_repr.seed
+    * (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t)
+    Cycle_repr.Map.t;
+  stake_distribution_for_current_cycle :
+    Tez_repr.t Signature.Public_key_hash.Map.t option;
 }
 
 (*
@@ -101,13 +252,9 @@ let[@inline] context ctxt = ctxt.back.context
 
 let[@inline] current_level ctxt = ctxt.back.level
 
-let[@inline] storage_space_to_pay ctxt = ctxt.back.storage_space_to_pay
-
 let[@inline] predecessor_timestamp ctxt = ctxt.back.predecessor_timestamp
 
 let[@inline] current_timestamp ctxt = ctxt.back.timestamp
-
-let[@inline] current_fitness ctxt = ctxt.back.fitness
 
 let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
@@ -119,10 +266,6 @@ let[@inline] fees ctxt = ctxt.back.fees
 
 let[@inline] origination_nonce ctxt = ctxt.back.origination_nonce
 
-let[@inline] allowed_endorsements ctxt = ctxt.back.allowed_endorsements
-
-let[@inline] included_endorsements ctxt = ctxt.back.included_endorsements
-
 let[@inline] internal_nonce ctxt = ctxt.back.internal_nonce
 
 let[@inline] internal_nonces_used ctxt = ctxt.back.internal_nonces_used
@@ -131,22 +274,22 @@ let[@inline] remaining_block_gas ctxt = ctxt.back.remaining_block_gas
 
 let[@inline] unlimited_operation_gas ctxt = ctxt.back.unlimited_operation_gas
 
-let[@inline] rewards ctxt = ctxt.back.rewards
-
-let[@inline] allocated_contracts ctxt = ctxt.back.allocated_contracts
-
 let[@inline] temporary_lazy_storage_ids ctxt =
   ctxt.back.temporary_lazy_storage_ids
 
 let[@inline] remaining_operation_gas ctxt = ctxt.remaining_operation_gas
 
-let[@inline] update_remaining_operation_gas ctxt remaining_operation_gas =
-  {ctxt with remaining_operation_gas}
+let[@inline] non_consensus_operations ctxt = ctxt.back.non_consensus_operations
+
+let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
   update_back ctxt {ctxt.back with remaining_block_gas}
+
+let[@inline] update_remaining_operation_gas ctxt remaining_operation_gas =
+  {ctxt with remaining_operation_gas}
 
 let[@inline] update_unlimited_operation_gas ctxt unlimited_operation_gas =
   update_back ctxt {ctxt.back with unlimited_operation_gas}
@@ -157,21 +300,6 @@ let[@inline] update_context ctxt context =
 let[@inline] update_constants ctxt constants =
   update_back ctxt {ctxt.back with constants}
 
-let[@inline] update_fitness ctxt fitness =
-  update_back ctxt {ctxt.back with fitness}
-
-let[@inline] update_allowed_endorsements ctxt allowed_endorsements =
-  update_back ctxt {ctxt.back with allowed_endorsements}
-
-let[@inline] update_rewards ctxt rewards =
-  update_back ctxt {ctxt.back with rewards}
-
-let[@inline] raw_update_storage_space_to_pay ctxt storage_space_to_pay =
-  update_back ctxt {ctxt.back with storage_space_to_pay}
-
-let[@inline] update_allocated_contracts ctxt allocated_contracts =
-  update_back ctxt {ctxt.back with allocated_contracts}
-
 let[@inline] update_origination_nonce ctxt origination_nonce =
   update_back ctxt {ctxt.back with origination_nonce}
 
@@ -181,43 +309,24 @@ let[@inline] update_internal_nonce ctxt internal_nonce =
 let[@inline] update_internal_nonces_used ctxt internal_nonces_used =
   update_back ctxt {ctxt.back with internal_nonces_used}
 
-let[@inline] update_included_endorsements ctxt included_endorsements =
-  update_back ctxt {ctxt.back with included_endorsements}
-
 let[@inline] update_fees ctxt fees = update_back ctxt {ctxt.back with fees}
 
 let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids =
   update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
-let record_endorsement ctxt k =
-  match Signature.Public_key_hash.Map.find k (allowed_endorsements ctxt) with
-  | None -> assert false
-  | Some (_, _, true) -> assert false (* right already used *)
-  | Some (d, s, false) ->
-      let ctxt =
-        update_included_endorsements
-          ctxt
-          (included_endorsements ctxt + List.length s)
-      in
-      update_allowed_endorsements
-        ctxt
-        (Signature.Public_key_hash.Map.add
-           k
-           (d, s, true)
-           (allowed_endorsements ctxt))
+let[@inline] update_non_consensus_operations ctxt non_consensus_operations =
+  update_back ctxt {ctxt.back with non_consensus_operations}
 
-let init_endorsements ctxt allowed_endorsements' =
-  if Signature.Public_key_hash.Map.is_empty allowed_endorsements' then
-    assert false (* can't initialize to empty *)
-  else if Signature.Public_key_hash.Map.is_empty (allowed_endorsements ctxt)
-  then update_allowed_endorsements ctxt allowed_endorsements'
-  else assert false
+let[@inline] update_sampler_state ctxt sampler_state =
+  update_back ctxt {ctxt.back with sampler_state}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
 type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
+
+type error += Stake_distribution_not_set (* `Branch *)
 
 let () =
   let open Data_encoding in
@@ -249,7 +358,19 @@ let () =
        hard gas limit per block"
     empty
     (function Block_quota_exceeded -> Some () | _ -> None)
-    (fun () -> Block_quota_exceeded)
+    (fun () -> Block_quota_exceeded) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.stake_distribution_not_set"
+    ~title:"Stake distribution not set"
+    ~description:"The stake distribution for the current cycle is not set."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The stake distribution for the current cycle is not set.")
+    Data_encoding.(empty)
+    (function Stake_distribution_not_set -> Some () | _ -> None)
+    (fun () -> Stake_distribution_not_set)
 
 let fresh_internal_nonce ctxt =
   if Compare.Int.(internal_nonce ctxt >= 65_535) then
@@ -268,16 +389,15 @@ let record_internal_nonce ctxt k =
 let internal_nonce_already_recorded ctxt k =
   Int_set.mem k (internal_nonces_used ctxt)
 
-let set_current_fitness ctxt fitness = update_fitness ctxt fitness
+let get_collected_fees ctxt = fees ctxt
 
-let add_fees ctxt fees' = Tez_repr.(fees ctxt +? fees') >|? update_fees ctxt
+let credit_collected_fees_only_call_from_token ctxt fees' =
+  let previous = get_collected_fees ctxt in
+  Tez_repr.(previous +? fees') >|? fun fees -> update_fees ctxt fees
 
-let add_rewards ctxt rewards' =
-  Tez_repr.(rewards ctxt +? rewards') >|? update_rewards ctxt
-
-let get_rewards = rewards
-
-let get_fees = fees
+let spend_collected_fees_only_call_from_token ctxt fees' =
+  let previous = get_collected_fees ctxt in
+  Tez_repr.(previous -? fees') >|? fun fees -> update_fees ctxt fees
 
 type error += Undefined_operation_nonce (* `Permanent *)
 
@@ -378,33 +498,6 @@ let gas_consumed ~since ~until =
   | (Limited {remaining = before}, Limited {remaining = after}) ->
       Gas_limit_repr.Arith.sub before after
   | (_, _) -> Gas_limit_repr.Arith.zero
-
-let init_storage_space_to_pay ctxt =
-  match storage_space_to_pay ctxt with
-  | Some _ -> assert false
-  | None ->
-      let ctxt = raw_update_storage_space_to_pay ctxt (Some Z.zero) in
-      update_allocated_contracts ctxt (Some 0)
-
-let clear_storage_space_to_pay ctxt =
-  match (storage_space_to_pay ctxt, allocated_contracts ctxt) with
-  | (None, _) | (_, None) -> assert false
-  | (Some storage_space_to_pay, Some allocated_contracts) ->
-      let ctxt = raw_update_storage_space_to_pay ctxt None in
-      let ctxt = update_allocated_contracts ctxt None in
-      (ctxt, storage_space_to_pay, allocated_contracts)
-
-let update_storage_space_to_pay ctxt n =
-  match storage_space_to_pay ctxt with
-  | None -> assert false
-  | Some storage_space_to_pay ->
-      raw_update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
-
-let update_allocated_contracts_count ctxt =
-  match allocated_contracts ctxt with
-  | None -> assert false
-  | Some allocated_contracts ->
-      update_allocated_contracts ctxt (Some (succ allocated_contracts))
 
 type missing_key_kind = Get | Set | Del | Copy
 
@@ -633,9 +726,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   Raw_level_repr.of_int32 level >>?= fun level ->
-  Fitness_repr.to_int64 fitness >>?= fun fitness ->
   check_inited ctxt >>=? fun () ->
   get_constants ctxt >>=? fun constants ->
   get_cycle_eras ctxt >|=? fun cycle_eras ->
@@ -650,14 +742,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         level;
         predecessor_timestamp;
         timestamp;
-        fitness;
         cycle_eras;
-        allowed_endorsements = Signature.Public_key_hash.Map.empty;
-        included_endorsements = 0;
         fees = Tez_repr.zero;
-        rewards = Tez_repr.zero;
-        storage_space_to_pay = None;
-        allocated_contracts = None;
         origination_nonce = None;
         temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
         internal_nonce = 0;
@@ -666,6 +752,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
           Gas_limit_repr.Arith.fp
             constants.Constants_repr.hard_gas_limit_per_block;
         unlimited_operation_gas = true;
+        consensus = Raw_consensus.empty;
+        non_consensus_operations = [];
+        sampler_state = Cycle_repr.Map.empty;
+        stake_distribution_for_current_cycle = None;
       };
   }
 
@@ -717,65 +807,91 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp ~fitness ctxt =
+let prepare_first_block ~level ~timestamp ctxt =
   check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
   (match previous_proto with
   | Genesis param ->
       Raw_level_repr.of_int32 level >>?= fun first_level ->
       let cycle_era =
-        Level_repr.
-          {
-            first_level;
-            first_cycle = Cycle_repr.root;
-            blocks_per_cycle = param.constants.blocks_per_cycle;
-            blocks_per_commitment = param.constants.blocks_per_commitment;
-          }
+        {
+          Level_repr.first_level;
+          first_cycle = Cycle_repr.root;
+          blocks_per_cycle = param.constants.blocks_per_cycle;
+          blocks_per_commitment = param.constants.blocks_per_commitment;
+        }
       in
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
   | Hangzhou_011 ->
       get_previous_protocol_constants ctxt >>= fun c ->
+      let block_time = 30 in
+      Round_repr.Durations.create
+        ~round0:(Period_repr.of_seconds_exn (Int64.of_int block_time))
+        ~round1:(Period_repr.of_seconds_exn 45L)
+        ()
+      >>?= fun round_durations ->
       let constants =
+        let consensus_committee_size = 7000 in
+        let Constants_repr.Generated.
+              {
+                consensus_threshold;
+                baking_reward_fixed_portion;
+                baking_reward_bonus_per_slot;
+                endorsing_reward_per_slot;
+              } =
+          Constants_repr.Generated.generate
+            ~consensus_committee_size
+            ~blocks_per_minute:(60 / block_time)
+        in
         Constants_repr.
           {
-            minimal_block_delay = c.minimal_block_delay;
             preserved_cycles = c.preserved_cycles;
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
-            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
+            blocks_per_stake_snapshot = c.blocks_per_roll_snapshot;
             blocks_per_voting_period = c.blocks_per_voting_period;
-            time_between_blocks = c.time_between_blocks;
-            endorsers_per_block = c.endorsers_per_block;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
+            (* NB: it will still during the migration, but a bit later *)
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
-            block_security_deposit = c.block_security_deposit;
-            endorsement_security_deposit = c.endorsement_security_deposit;
-            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
-            endorsement_reward = c.endorsement_reward;
+            (* Same value as in the previous protocol. *)
+            max_operations_time_to_live = 120;
+            baking_reward_fixed_portion;
+            baking_reward_bonus_per_slot;
+            endorsing_reward_per_slot;
+            cost_per_byte = c.cost_per_byte;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
-            cost_per_byte = c.cost_per_byte;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            initial_endorsers = c.initial_endorsers;
-            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
             liquidity_baking_subsidy = c.liquidity_baking_subsidy;
-            liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
+            liquidity_baking_sunset_level =
+              (* preserve a lower level for testnets *)
+              (if Compare.Int32.(c.liquidity_baking_sunset_level = 2_032_928l)
+              then 2_244_609l
+              else c.liquidity_baking_sunset_level);
             liquidity_baking_escape_ema_threshold =
               c.liquidity_baking_escape_ema_threshold;
-            (* Same value as in the previous protocol. *)
-            max_operations_time_to_live = 120;
+            round_durations;
+            consensus_committee_size;
+            consensus_threshold;
+            minimal_participation_ratio = {numerator = 2; denominator = 3};
+            max_slashing_period = 2;
+            frozen_deposits_percentage = 10;
+            double_baking_punishment = Tez_repr.(mul_exn one 640);
+            ratio_of_frozen_deposits_slashed_per_double_endorsement =
+              {numerator = 1; denominator = 2};
+            delegate_selection = Random;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
-  prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
+  prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
   >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt
@@ -990,4 +1106,165 @@ module Cache = struct
   let future_cache_expectation c ~time_in_blocks =
     Context.Cache.future_cache_expectation (context c) ~time_in_blocks
     |> update_context c
+end
+
+let record_non_consensus_operation_hash ctxt operation_hash =
+  update_non_consensus_operations
+    ctxt
+    (operation_hash :: non_consensus_operations ctxt)
+
+let non_consensus_operations ctxt = List.rev (non_consensus_operations ctxt)
+
+let set_sampler_for_cycle ctxt cycle sampler_with_seed =
+  let map = sampler_state ctxt in
+  match Cycle_repr.Map.find cycle map with
+  | None ->
+      let map = Cycle_repr.Map.add cycle sampler_with_seed map in
+      Ok (update_sampler_state ctxt map)
+  | Some _ -> Error `Sampler_already_set
+
+let sampler_for_cycle ctxt cycle =
+  let map = sampler_state ctxt in
+  match Cycle_repr.Map.find cycle map with
+  | None -> Error `Sampler_not_set
+  | Some sampler -> Ok sampler
+
+let stake_distribution_for_current_cycle ctxt =
+  match ctxt.back.stake_distribution_for_current_cycle with
+  | None -> error Stake_distribution_not_set
+  | Some s -> ok s
+
+let init_stake_distribution_for_current_cycle ctxt
+    stake_distribution_for_current_cycle =
+  update_back
+    ctxt
+    {
+      ctxt.back with
+      stake_distribution_for_current_cycle =
+        Some stake_distribution_for_current_cycle;
+    }
+
+module type CONSENSUS = sig
+  type t
+
+  type 'value slot_map
+
+  type slot_set
+
+  type slot
+
+  type round
+
+  val allowed_endorsements :
+    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+
+  val allowed_preendorsements :
+    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+
+  val current_endorsement_power : t -> int
+
+  val initialize_consensus_operation :
+    t ->
+    allowed_endorsements:
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    allowed_preendorsements:
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    t
+
+  val record_grand_parent_endorsement :
+    t -> Signature.Public_key_hash.t -> t tzresult
+
+  val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
+
+  val record_preendorsement :
+    t -> initial_slot:slot -> power:int -> round -> t tzresult
+
+  val endorsements_seen : t -> slot_set
+
+  val get_preendorsements_quorum_round : t -> round option
+
+  val set_preendorsements_quorum_round : t -> round -> t
+
+  val locked_round_evidence : t -> (round * int) option
+
+  val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+
+  val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+
+  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+
+  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+end
+
+module Consensus :
+  CONSENSUS
+    with type t := t
+     and type slot := Slot_repr.t
+     and type 'a slot_map := 'a Slot_repr.Map.t
+     and type slot_set := Slot_repr.Set.t
+     and type round := Round_repr.t = struct
+  let[@inline] allowed_endorsements ctxt =
+    ctxt.back.consensus.allowed_endorsements
+
+  let[@inline] allowed_preendorsements ctxt =
+    ctxt.back.consensus.allowed_preendorsements
+
+  let[@inline] current_endorsement_power ctxt =
+    ctxt.back.consensus.current_endorsement_power
+
+  let[@inline] get_preendorsements_quorum_round ctxt =
+    ctxt.back.consensus.preendorsements_quorum_round
+
+  let[@inline] locked_round_evidence ctxt =
+    Raw_consensus.locked_round_evidence ctxt.back.consensus
+
+  let[@inline] update_consensus_with ctxt f =
+    {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
+
+  let[@inline] update_consensus_with_tzresult ctxt f =
+    f ctxt.back.consensus >|? fun consensus ->
+    {ctxt with back = {ctxt.back with consensus}}
+
+  let[@inline] initialize_consensus_operation ctxt ~allowed_endorsements
+      ~allowed_preendorsements =
+    update_consensus_with
+      ctxt
+      (Raw_consensus.initialize_with_endorsements_and_preendorsements
+         ~allowed_endorsements
+         ~allowed_preendorsements)
+
+  let[@inline] record_grand_parent_endorsement ctxt pkh =
+    update_consensus_with_tzresult ctxt (fun ctxt ->
+        Raw_consensus.record_grand_parent_endorsement ctxt pkh)
+
+  let[@inline] record_preendorsement ctxt ~initial_slot ~power round =
+    update_consensus_with_tzresult
+      ctxt
+      (Raw_consensus.record_preendorsement ~initial_slot ~power round)
+
+  let[@inline] record_endorsement ctxt ~initial_slot ~power =
+    update_consensus_with_tzresult
+      ctxt
+      (Raw_consensus.record_endorsement ~initial_slot ~power)
+
+  let[@inline] endorsements_seen ctxt = ctxt.back.consensus.endorsements_seen
+
+  let[@inline] set_preendorsements_quorum_round ctxt round =
+    update_consensus_with
+      ctxt
+      (Raw_consensus.set_preendorsements_quorum_round round)
+
+  let[@inline] endorsement_branch ctxt =
+    Raw_consensus.endorsement_branch ctxt.back.consensus
+
+  let[@inline] set_endorsement_branch ctxt branch =
+    update_consensus_with ctxt (fun ctxt ->
+        Raw_consensus.set_endorsement_branch ctxt branch)
+
+  let[@inline] grand_parent_branch ctxt =
+    Raw_consensus.grand_parent_branch ctxt.back.consensus
+
+  let[@inline] set_grand_parent_branch ctxt branch =
+    update_consensus_with ctxt (fun ctxt ->
+        Raw_consensus.set_grand_parent_branch ctxt branch)
 end

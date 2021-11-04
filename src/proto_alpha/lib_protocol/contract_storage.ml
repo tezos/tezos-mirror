@@ -31,8 +31,6 @@ type error +=
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
-      Unspendable_contract of Contract_repr.contract
-  | (* `Permanent *)
       Non_existing_contract of Contract_repr.contract
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
@@ -41,36 +39,12 @@ type error +=
       Signature.Public_key_hash.t
   | (* `Temporary *)
       Empty_transaction of Contract_repr.t (* `Temporary *)
-  | Inconsistent_hash of
-      Signature.Public_key.t
-      * Signature.Public_key_hash.t
-      * Signature.Public_key_hash.t
+  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Inconsistent_public_key of
-      Signature.Public_key.t * Signature.Public_key.t
-  | (* `Permanent *)
-      Failure of string (* `Permanent *)
-  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
-  | Unrevealed_manager_key of Contract_repr.t
-
+      Failure of string
 (* `Permanent *)
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"contract.unspendable_contract"
-    ~title:"Unspendable contract"
-    ~description:
-      "An operation tried to spend tokens from an unspendable contract"
-    ~pp:(fun ppf c ->
-      Format.fprintf
-        ppf
-        "The tokens of contract %a can only be spent by its script"
-        Contract_repr.pp
-        c)
-    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Unspendable_contract c -> Some c | _ -> None)
-    (fun c -> Unspendable_contract c) ;
   register_error_kind
     `Temporary
     ~id:"contract.balance_too_low"
@@ -151,28 +125,6 @@ let () =
     (fun c -> Non_existing_contract c) ;
   register_error_kind
     `Permanent
-    ~id:"contract.manager.inconsistent_hash"
-    ~title:"Inconsistent public key hash"
-    ~description:
-      "A revealed manager public key is inconsistent with the announced hash"
-    ~pp:(fun ppf (k, eh, ph) ->
-      Format.fprintf
-        ppf
-        "The hash of the manager public key %s is not %a as announced but %a"
-        (Signature.Public_key.to_b58check k)
-        Signature.Public_key_hash.pp
-        ph
-        Signature.Public_key_hash.pp
-        eh)
-    Data_encoding.(
-      obj3
-        (req "public_key" Signature.Public_key.encoding)
-        (req "expected_hash" Signature.Public_key_hash.encoding)
-        (req "provided_hash" Signature.Public_key_hash.encoding))
-    (function Inconsistent_hash (k, eh, ph) -> Some (k, eh, ph) | _ -> None)
-    (fun (k, eh, ph) -> Inconsistent_hash (k, eh, ph)) ;
-  register_error_kind
-    `Permanent
     ~id:"contract.manager.inconsistent_public_key"
     ~title:"Inconsistent public key"
     ~description:
@@ -199,36 +151,6 @@ let () =
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
     (fun s -> Failure s) ;
-  register_error_kind
-    `Branch
-    ~id:"contract.unrevealed_key"
-    ~title:"Manager operation precedes key revelation"
-    ~description:
-      "One tried to apply a manager operation without revealing the manager \
-       public key"
-    ~pp:(fun ppf s ->
-      Format.fprintf
-        ppf
-        "Unrevealed manager key for contract %a."
-        Contract_repr.pp
-        s)
-    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Unrevealed_manager_key s -> Some s | _ -> None)
-    (fun s -> Unrevealed_manager_key s) ;
-  register_error_kind
-    `Branch
-    ~id:"contract.previously_revealed_key"
-    ~title:"Manager operation already revealed"
-    ~description:"One tried to revealed twice a manager public key"
-    ~pp:(fun ppf s ->
-      Format.fprintf
-        ppf
-        "Previously revealed manager key for contract %a."
-        Contract_repr.pp
-        s)
-    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Previously_revealed_key s -> Some s | _ -> None)
-    (fun s -> Previously_revealed_key s) ;
   register_error_kind
     `Branch
     ~id:"implicit.empty_implicit_contract"
@@ -470,9 +392,9 @@ let update_script_lazy_storage c = function
   | None -> return (c, Z.zero)
   | Some diffs -> Lazy_storage_diff.apply c diffs
 
-let create_base c ?(prepaid_bootstrap_storage = false)
+let create_base c ~prepaid_bootstrap_storage
     (* Free space for bootstrap contracts *)
-      contract ~balance ~manager ~delegate ?script () =
+      contract ~balance ~manager ?script () =
   (match Contract_repr.is_implicit contract with
   | None -> return c
   | Some _ ->
@@ -482,12 +404,8 @@ let create_base c ?(prepaid_bootstrap_storage = false)
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
   (match manager with
   | Some manager ->
-      Storage.Contract.Manager.init c contract (Manager_repr.Hash manager)
+      Contract_manager_storage.init c contract (Manager_repr.Hash manager)
   | None -> return c)
-  >>=? fun c ->
-  (match delegate with
-  | None -> return c
-  | Some delegate -> Delegate_storage.init c contract delegate)
   >>=? fun c ->
   match script with
   | Some ({Script_repr.code; storage}, lazy_storage_diff) ->
@@ -513,26 +431,24 @@ let create_base c ?(prepaid_bootstrap_storage = false)
       Storage.Contract.Used_storage_space.init c contract total_size
   | None -> return c
 
-let raw_originate c ?prepaid_bootstrap_storage contract ~balance ~script
-    ~delegate =
+let raw_originate c ~prepaid_bootstrap_storage contract ~script =
   create_base
     c
-    ?prepaid_bootstrap_storage
+    ~prepaid_bootstrap_storage
     contract
-    ~balance
+    ~balance:Tez_repr.zero
     ~manager:None
-    ~delegate
     ~script
     ()
 
 let create_implicit c manager ~balance =
   create_base
     c
+    ~prepaid_bootstrap_storage:false
     (Contract_repr.implicit_contract manager)
     ~balance
     ~manager:(Some manager)
     ?script:None
-    ~delegate:None
     ()
 
 let delete c contract =
@@ -541,9 +457,9 @@ let delete c contract =
       (* For non implicit contract Big_map should be cleared *)
       failwith "Non implicit contracts cannot be removed"
   | Some _ ->
-      Delegate_storage.remove c contract >>=? fun c ->
+      Contract_delegate_storage.remove c contract >>=? fun c ->
       Storage.Contract.Balance.remove_existing c contract >>=? fun c ->
-      Storage.Contract.Manager.remove_existing c contract >>=? fun c ->
+      Contract_manager_storage.remove_existing c contract >>=? fun c ->
       Storage.Contract.Counter.remove_existing c contract >>=? fun c ->
       Storage.Contract.Code.remove c contract >>=? fun (c, _, _) ->
       Storage.Contract.Storage.remove c contract >>=? fun (c, _, _) ->
@@ -630,31 +546,6 @@ let get_counter c manager =
       | None -> failwith "get_counter")
   | Some v -> return v
 
-let get_manager_key c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.find c contract >>=? function
-  | None -> failwith "get_manager_key"
-  | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
-  | Some (Manager_repr.Public_key v) -> return v
-
-let is_manager_key_revealed c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.find c contract >>=? function
-  | None -> return_false
-  | Some (Manager_repr.Hash _) -> return_false
-  | Some (Manager_repr.Public_key _) -> return_true
-
-let reveal_manager_key c manager public_key =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.get c contract >>=? function
-  | Public_key _ -> fail (Previously_revealed_key contract)
-  | Hash v ->
-      let actual_hash = Signature.Public_key.hash public_key in
-      if Signature.Public_key_hash.equal actual_hash v then
-        let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.update c contract v
-      else fail (Inconsistent_hash (public_key, v, actual_hash))
-
 let get_balance c contract =
   Storage.Contract.Balance.find c contract >>=? function
   | None -> (
@@ -682,19 +573,20 @@ let update_script_storage c contract storage lazy_storage_diff =
   in
   Storage.Contract.Used_storage_space.update c contract new_size
 
-let spend c contract amount =
+let spend_only_call_from_token c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
   match Tez_repr.(balance -? amount) with
   | Error _ -> fail (Balance_too_low (contract, balance, amount))
   | Ok new_balance -> (
       Storage.Contract.Balance.update c contract new_balance >>=? fun c ->
-      Roll_storage.Contract.remove_amount c contract amount >>=? fun c ->
+      Contract_delegate_storage.remove_contract_stake c contract amount
+      >>=? fun c ->
       if Tez_repr.(new_balance > Tez_repr.zero) then return c
       else
         match Contract_repr.is_implicit contract with
         | None -> return c (* Never delete originated contracts *)
         | Some pkh -> (
-            Delegate_storage.get c contract >>=? function
+            Contract_delegate_storage.find c contract >>=? function
             | Some pkh' ->
                 if Signature.Public_key_hash.equal pkh pkh' then return c
                 else
@@ -704,7 +596,7 @@ let spend c contract amount =
                 (* Delete empty implicit contract *)
                 delete c contract))
 
-let credit c contract amount =
+let credit_only_call_from_token c contract amount =
   (if Tez_repr.(amount <> Tez_repr.zero) then return_unit
   else
     error_unless
@@ -720,7 +612,7 @@ let credit c contract amount =
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->
       Storage.Contract.Balance.update c contract balance >>=? fun c ->
-      Roll_storage.Contract.add_amount c contract amount
+      Contract_delegate_storage.add_contract_stake c contract amount
 
 let init c =
   Storage.Contract.Global_counter.init c Z.zero >>=? fun c ->
@@ -742,3 +634,14 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
     let to_pay = Z.sub new_storage_space already_paid_space in
     Storage.Contract.Paid_storage_space.update c contract new_storage_space
     >|=? fun c -> (to_pay, c)
+
+let update_balance ctxt contract f amount =
+  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
+  f balance amount >>?= fun new_balance ->
+  Storage.Contract.Balance.update ctxt contract new_balance
+
+let increase_balance_only_call_from_token ctxt contract amount =
+  update_balance ctxt contract Tez_repr.( +? ) amount
+
+let decrease_balance_only_call_from_token ctxt contract amount =
+  update_balance ctxt contract Tez_repr.( -? ) amount

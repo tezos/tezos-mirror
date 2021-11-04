@@ -154,11 +154,10 @@ let get_delegates (proto : protocol) context (header : Block_header.shell_header
       ~level
       ~predecessor_timestamp
       ~timestamp
-      ~fitness
     >|= Environment.wrap_tzresult
     >>=? fun (ctxt, _, _) ->
     Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-        Alpha_context.Roll.delegate_pubkey ctxt pkh
+        Alpha_context.Delegate.pubkey ctxt pkh
         >|= Environment.wrap_tzresult >>=? fun pk ->
         acc >>?= fun acc ->
         return ((pkh, pk) :: acc)
