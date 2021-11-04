@@ -26,10 +26,16 @@ faster than with a long-lived network.
 Get Free Funds
 ==============
 
-Test networks have a list of built-in accounts with some funds.
-You can obtain the key to these accounts from a faucet to claim the funds.
-All networks share the same faucet: https://faucet.tzalpha.net/.
-The keys obtained from this faucet can be used in all test networks.
+Test networks have a list of built-in accounts with some funds. You
+can obtain the key to these accounts from a faucet to claim the funds.
+Faucets can be accessed from https://teztnets.xyz/. Each of the test
+network listed there, including the active test networks described
+below, have independent faucets.
+
+**Caveat Emptor!**
+Testnets up to `granadanet` used to share the same faucet (formerly hosted at https://faucet.tzalpha.net/).
+The keys obtained from this faucet were shared between all test networks.
+This is no longer the case!
 
 Hangzhounet
 ===========
