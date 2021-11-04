@@ -163,13 +163,13 @@ let blockchain_network_hangzhounet =
   make_blockchain_network
     ~alias:"hangzhounet"
     {
-      time = Time.Protocol.of_notation_exn "2021-09-22T15:00:00Z";
+      time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
       block =
         Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis94ee4bjQDg5";
+          "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
       protocol =
         Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
     ~genesis_parameters:
       {
@@ -182,10 +182,10 @@ let blockchain_network_hangzhounet =
               );
             ];
       }
-    ~chain_name:"TEZOS_HANGZHOUNET_2021-09-22T15:00:00Z"
+    ~chain_name:"TEZOS_HANGZHOUNET_2021-11-04T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
-      [(8191l, "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r")]
+      [(8191l, "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx")]
     ~default_bootstrap_peers:
       [
         "hangzhounet.teztnets.xyz";
