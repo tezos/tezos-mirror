@@ -89,8 +89,8 @@ let double_bake =
   let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let common_ancestor = 0 in
-  let bootstrap1_key = Constant.bootstrap1.identity in
-  let bootstrap2_key = Constant.bootstrap2.identity in
+  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
+  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 1)
   and* _ = Node.wait_for_level node_2 (common_ancestor + 1) in
   Log.info "Both nodes are at level %d." (common_ancestor + 1) ;

@@ -34,8 +34,8 @@
 type key = {
   alias : string;
   public_key_hash : string;
-  public_key : string option;
-  secret_key : string option;
+  public_key : string;
+  secret_key : string;
 }
 
 (** [write_stresstest_sources_file accounts] returns the name of a

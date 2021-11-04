@@ -229,11 +229,11 @@ val version : t -> unit Lwt.t
 val spawn_version : t -> Process.t
 
 (** Run [tezos-client import secret key]. *)
-val import_secret_key : ?endpoint:endpoint -> t -> Constant.key -> unit Lwt.t
+val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
 val spawn_import_secret_key :
-  ?endpoint:endpoint -> t -> Constant.key -> Process.t
+  ?endpoint:endpoint -> t -> Account.key -> Process.t
 
 (** Run [tezos-client activate protocol].
 
@@ -392,7 +392,7 @@ val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 
 (** Same as [gen_and_show_keys] but returns a [Constant.key] instead of an
     [Account.key]. *)
-val gen_and_show_secret_keys : alias:string -> t -> Constant.key Lwt.t
+val gen_and_show_secret_keys : alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :

@@ -286,10 +286,10 @@ let operation_json_branch ~branch operations_json =
     branch
     operations_json
 
-let sign_operation_bytes ~watermark (signer : Constant.key) (msg : Bytes.t) =
+let sign_operation_bytes ~watermark (signer : Account.key) (msg : Bytes.t) =
   let open Tezos_crypto in
   let b58_secret_key =
-    match String.split_on_char ':' signer.secret with
+    match String.split_on_char ':' signer.secret_key with
     | ["unencrypted"; rest] -> rest
     | _ -> Test.fail "Could not parse secret key"
   in
@@ -413,7 +413,9 @@ let ban_operation_branch_refused_reevaluated =
   let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
   Log.info "nodes are at level 1" ;
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client_1
   in
   let counter = JSON.as_int counter in
   let* branch = RPC.get_branch client_1 in
@@ -424,8 +426,8 @@ let ban_operation_branch_refused_reevaluated =
       ~branch
       ~fee:1000
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:(counter + 1)
       ~signer:Constant.bootstrap1
       ~client:client_1
@@ -441,8 +443,8 @@ let ban_operation_branch_refused_reevaluated =
       ~branch
       ~fee:1000
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap3.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap3.public_key_hash
       ~counter:(counter + 1)
       ~signer:Constant.bootstrap1
       ~client:client_2
@@ -604,7 +606,9 @@ let run_batched_operation =
   (* Step 2 *)
   (* Get the counter and the current branch *)
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client_1
   in
   let counter = JSON.as_int counter in
   let* branch = RPC.get_branch client_1 in
@@ -618,8 +622,8 @@ let run_batched_operation =
       ~branch
       ~fee:1000 (* Minimal fees to successfully apply the transfer *)
       ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap2.identity
-      ~destination:Constant.bootstrap1.identity
+      ~source:Constant.bootstrap2.public_key_hash
+      ~destination:Constant.bootstrap1.public_key_hash
       ~counter
       ~signer:Constant.bootstrap2
       ~client:client_1
@@ -959,7 +963,9 @@ let forge_pre_filtered_operation =
   (* Step 2 *)
   (* Get the counter and the current branch *)
   let* base_counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client_1
   in
   let counter = JSON.as_int base_counter in
   let* branch = RPC.get_branch client_1 in
@@ -970,8 +976,8 @@ let forge_pre_filtered_operation =
       ~branch:(JSON.as_string branch)
       ~fee:1
       ~gas_limit:1040000
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:(counter + 1)
       ~signer:Constant.bootstrap1
       ~client:client_1
@@ -1066,7 +1072,9 @@ let refetch_failed_operation =
   (* Step 2 *)
   (* get counter and branches *)
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client_1
   in
   let counter = JSON.as_int counter in
   let* branch = RPC.get_branch client_1 in
@@ -1078,8 +1086,8 @@ let refetch_failed_operation =
       ~branch
       ~fee:1000 (* Minimal fees to successfully apply the transfer *)
       ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:(counter + 1)
       ~client:client_1
   in
@@ -1325,8 +1333,8 @@ let transfer_and_wait_for_arrival node client amount_int giver_key receiver_key
   let* () =
     Client.transfer
       ~amount:(Tez.of_int amount_int)
-      ~giver:Constant.(giver_key.alias)
-      ~receiver:Constant.(receiver_key.alias)
+      ~giver:Account.(giver_key.alias)
+      ~receiver:Account.(receiver_key.alias)
       client
   in
   let* () = wait_for in
@@ -1836,7 +1844,9 @@ let recycling_branch_refused =
   (* Step 3 *)
   (* Recover counter and branch *)
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client_1
   in
   let counter = JSON.as_int counter in
   let* branch = RPC.get_branch client_1 in
@@ -1849,8 +1859,8 @@ let recycling_branch_refused =
       ~branch
       ~fee:1000
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:(counter + 1)
       ~signer:Constant.bootstrap1
       ~client:client_1
@@ -1870,8 +1880,8 @@ let recycling_branch_refused =
       ~branch
       ~fee:1000
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap3.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap3.public_key_hash
       ~counter:(counter + 1)
       ~signer:Constant.bootstrap1
       ~client:client_2
@@ -2143,7 +2153,7 @@ let test_do_not_reclassify =
       Client.transfer
         ~wait:"0"
         ~amount:(Tez.of_int 1)
-        ~giver:from_key.Constant.alias
+        ~giver:from_key.Account.alias
         ~receiver:Constant.bootstrap5.alias
         ~fee:(Tez.of_mutez_int fee)
         client2
@@ -2250,8 +2260,8 @@ let test_pending_operation_version =
       ~branch
       ~fee:10
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:1
       ~signer:Constant.bootstrap1
       ~client:client_1
@@ -2359,7 +2369,9 @@ let force_operation_injection =
   let open Lwt in
   Log.info "%s" step3_msg ;
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client2
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client2
     >|= JSON.as_int
   in
   let* branch = RPC.get_branch client2 >|= JSON.as_string in
@@ -2369,8 +2381,8 @@ let force_operation_injection =
       ~branch
       ~fee:1000 (* Minimal fees to successfully apply the transfer *)
       ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap2.identity
-      ~destination:Constant.bootstrap1.identity
+      ~source:Constant.bootstrap2.public_key_hash
+      ~destination:Constant.bootstrap1.public_key_hash
       ~counter (* Invalid counter *)
       ~client:client2
   in
@@ -2431,7 +2443,9 @@ let injecting_old_operation_fails =
   let* _ = Node.wait_for_level node 1 in
   log_step 2 step2 ;
   let* counter =
-    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.public_key_hash
+      client
     >|= JSON.as_int
   in
   let* branch = RPC.get_branch client >|= JSON.as_string in
@@ -2450,8 +2464,8 @@ let injecting_old_operation_fails =
       ~branch
       ~fee:1000
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap3.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap3.public_key_hash
       ~counter:(counter + 1)
       ~client
   in
@@ -2787,8 +2801,8 @@ let inject_transfer ?(amount = 1) ?(giver_key = Constant.bootstrap1)
     Client.transfer
       ~wait:"0"
       ~amount:(Tez.of_int amount)
-      ~giver:giver_key.Constant.alias
-      ~receiver:receiver_key.Constant.alias
+      ~giver:giver_key.Account.alias
+      ~receiver:receiver_key.Account.alias
       ?fee:(Option.map Tez.of_mutez_int fee)
       client
   in
