@@ -5185,7 +5185,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           let stack = Item_t (res_ty, rest, annot) in
           typed ctxt loc instr stack
-      | _ -> (* TODO: fix injectivity of types *) assert false)
+      | _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
+             fix injectivity of types *)
+          assert false)
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t _, Item_t (Chest_t _, Item_t (Nat_t _, rest, _), _), _)
@@ -6525,8 +6528,10 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
           ids_to_copy,
           acc )
     | (_, Option_t (_, _), None) -> return (ctxt, None, ids_to_copy, acc)
-    | _ -> assert false
-   (* TODO: fix injectivity of types *)
+    | _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
+           fix injectivity of types *)
+        assert false
   in
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
@@ -6602,7 +6607,10 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
           | Fold_lazy_storage.Error -> ok (init, ctxt))
         m
         (ok (Fold_lazy_storage.Ok init, ctxt))
-  | _ -> (* TODO: fix injectivity of types *) assert false
+  | _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
+         fix injectivity of types *)
+      assert false
 
 let[@coq_axiom_with_reason "gadt"] collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
