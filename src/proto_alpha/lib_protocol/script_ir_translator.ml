@@ -110,8 +110,6 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
-let add_dip _ _ prev = prev
-
 (* ---- Error helpers -------------------------------------------------------*)
 
 let location = function
@@ -4205,13 +4203,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_DIP, [code], annot), Item_t (v, rest, stack_annot)) -> (
       error_unexpected_annot loc annot >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        (add_dip v stack_annot tc_context)
-        ctxt
-        ~legacy
-        code
-        rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy code rest
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed descr ->
@@ -4233,16 +4225,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
       let rec make_proof_argument :
           type a s.
-          int ->
-          tc_context ->
-          (a, s) stack_ty ->
-          (a, s) dipn_proof_argument tzresult Lwt.t =
-       fun n inner_tc_context stk ->
+          int -> (a, s) stack_ty -> (a, s) dipn_proof_argument tzresult Lwt.t =
+       fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) -> (
             non_terminal_recursion
               ?type_logger
-              inner_tc_context
+              tc_context
               ctxt
               ~legacy
               code
@@ -4257,7 +4246,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                     : (a, s) dipn_proof_argument)
             | Failed _ -> error (Fail_not_in_tail_position loc))
         | (false, Item_t (v, rest, annot)) ->
-            make_proof_argument (n - 1) (add_dip v annot tc_context) rest
+            make_proof_argument (n - 1) rest
             >|=? fun (Dipn_proof_argument (n', ctxt, descr, aft')) ->
             let kinfo' = {iloc = loc; kstack_ty = aft'} in
             let w = KPrefix (kinfo', n') in
@@ -4268,7 +4257,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                error (Bad_stack (loc, I_DIP, 1, whole_stack)))
       in
       error_unexpected_annot loc result_annot >>?= fun () ->
-      make_proof_argument n tc_context stack
+      make_proof_argument n stack
       >>=? fun (Dipn_proof_argument (n', ctxt, descr, aft)) ->
       let kinfo = {iloc = descr.loc; kstack_ty = descr.bef} in
       let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
@@ -4963,23 +4952,20 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               ~none:"default"
               entrypoint
           in
-          let get_toplevel_type :
-              tc_context -> ((a, s) judgement * context) tzresult = function
-            | Lambda -> error (Self_in_lambda loc)
-            | Toplevel {param_type; root_name; storage_type = _} ->
-                find_entrypoint param_type ~root_name entrypoint
-                >>? fun (_, Ex_ty param_type) ->
-                contract_t loc param_type ~annot:None >>? fun res_ty ->
-                let instr =
-                  {
-                    apply =
-                      (fun kinfo k -> ISelf (kinfo, param_type, entrypoint, k));
-                  }
-                in
-                let stack = Item_t (res_ty, stack, annot) in
-                typed_no_lwt ctxt loc instr stack
-          in
-          get_toplevel_type tc_context )
+          match tc_context with
+          | Lambda -> error (Self_in_lambda loc)
+          | Toplevel {param_type; root_name; storage_type = _} ->
+              find_entrypoint param_type ~root_name entrypoint
+              >>? fun (_, Ex_ty param_type) ->
+              contract_t loc param_type ~annot:None >>? fun res_ty ->
+              let instr =
+                {
+                  apply =
+                    (fun kinfo k -> ISelf (kinfo, param_type, entrypoint, k));
+                }
+              in
+              let stack = Item_t (res_ty, stack, annot) in
+              typed_no_lwt ctxt loc instr stack )
   | (Prim (loc, I_SELF_ADDRESS, [], annot), stack) ->
       parse_var_annot loc annot ~default:default_self_annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ISelf_address (kinfo, k))} in
