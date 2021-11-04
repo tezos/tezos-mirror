@@ -63,7 +63,7 @@ Granadanet
 - Run Docker image: ``wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Granadanet is a test network running the ``PtGRANAD`` protocol.
-Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
+Granadanet will run until Granada is rejected or replaced by another protocol on Mainnet.
 
 On Granadanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
