@@ -708,7 +708,7 @@ module Registration_section = struct
                ( Execution_context.make ~rng_state
                >>=? fun (ctxt, _step_constants) ->
                  Script_ir_translator.parse_instr
-                   Script_tc_context.Lambda
+                   Script_tc_context.data
                    ctxt
                    ~legacy:false
                    node

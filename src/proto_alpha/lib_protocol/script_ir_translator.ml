@@ -2643,7 +2643,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
       traced
       @@ parse_returning
-           Tc_context.Lambda
+           Tc_context.data
            ?type_logger
            ~stack_depth:(stack_depth + 1)
            ctxt
@@ -2874,7 +2874,7 @@ and parse_view_returning :
   parse_instr
     ?type_logger
     ~stack_depth:0
-    Tc_context.Lambda
+    Tc_context.view
     ctxt
     ~legacy
     view_code
@@ -4149,7 +4149,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
-        Tc_context.Lambda
+        (Tc_context.add_lambda tc_context)
         ?type_logger
         ~stack_depth:(stack_depth + 1)
         ctxt
@@ -4850,7 +4850,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
+           (Tc_context.toplevel storage_type arg_type root_name)
            ctxt
            ~legacy
            ?type_logger
@@ -4936,7 +4936,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> ISender (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack, annot) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_SELF, [], annot), stack) ->
+  | (Prim (loc, (I_SELF as prim), [], annot), stack) ->
       Lwt.return
         ( parse_entrypoint_annot loc annot ~default:default_self_annot
         >>? fun (annot, entrypoint) ->
@@ -4946,9 +4946,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               ~none:"default"
               entrypoint
           in
-          match tc_context with
-          | Tc_context.Lambda -> error (Self_in_lambda loc)
-          | Tc_context.Toplevel {param_type; root_name; storage_type = _} ->
+          let open Tc_context in
+          match tc_context.callsite with
+          | _ when is_in_lambda tc_context ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.Lambda, prim))
+          (* [Data] is for pushed instructions of lambda type. *)
+          | Data ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.Lambda, prim))
+          | View ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
+          | Toplevel {param_type; root_name; storage_type = _} ->
               find_entrypoint param_type ~root_name entrypoint
               >>? fun (_, Ex_ty param_type) ->
               contract_t loc param_type ~annot:None >>? fun res_ty ->
@@ -5680,7 +5690,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
+       Tc_context.(toplevel storage_type arg_type root_name)
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5810,7 +5820,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
-      (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
+      (Tc_context.toplevel storage_type arg_type root_name)
       ctxt
       ~legacy
       ~stack_depth:0

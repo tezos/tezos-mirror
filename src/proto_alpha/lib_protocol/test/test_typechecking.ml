@@ -868,7 +868,7 @@ let test_contract_not_packable () =
   >>=? fun () ->
   (* Test that elaboration of the [UNPACK unit] instruction succeeds *)
   (Script_ir_translator.parse_instr
-     Lambda
+     Script_tc_context.data
      ctxt
      ~legacy:false
      (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
@@ -879,7 +879,7 @@ let test_contract_not_packable () =
   >>=? fun () ->
   (* Test that elaboration of the [UNPACK (contract unit)] instruction fails *)
   Script_ir_translator.parse_instr
-    Lambda
+    Script_tc_context.data
     ctxt
     ~legacy:false
     (Prim (0, I_UNPACK, [contract_unit], []))

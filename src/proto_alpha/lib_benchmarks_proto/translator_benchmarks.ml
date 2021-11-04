@@ -361,7 +361,7 @@ module Typechecking_code : Benchmark.S = struct
           let result =
             Lwt_main.run
               (Script_ir_translator.parse_instr
-                 Script_tc_context.Lambda
+                 Script_tc_context.data
                  ctxt
                  ~legacy:false
                  (Micheline.root node)
@@ -435,7 +435,7 @@ module Unparsing_code : Benchmark.S = struct
         let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
         (* We parse the code just to check it is well-typed. *)
         Script_ir_translator.parse_instr
-          Script_tc_context.Lambda
+          Script_tc_context.data
           ctxt
           ~legacy:false
           (Micheline.root node)

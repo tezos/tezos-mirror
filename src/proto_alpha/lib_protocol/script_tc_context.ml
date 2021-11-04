@@ -23,11 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Lambda : t
+open Script_typed_ir
+
+type in_lambda = bool
+
+type callsite =
   | Toplevel : {
-      storage_type : 'sto Script_typed_ir.ty;
-      param_type : 'param Script_typed_ir.ty;
+      storage_type : 'sto ty;
+      param_type : 'param ty;
       root_name : Script_ir_annot.field_annot option;
     }
-      -> t
+      -> callsite
+  | View : callsite
+  | Data : callsite
+
+type t = {callsite : callsite; in_lambda : in_lambda}
+
+let init callsite = {callsite; in_lambda = false}
+
+let toplevel storage_type param_type root_name =
+  init (Toplevel {storage_type; param_type; root_name})
+
+let view = init View
+
+(* [data] is prefered over [toplevel] outside [Script_ir_translator], because
+   [toplevel] needs to setup a lot of information. *)
+let data = init Data
+
+let add_lambda tc_context = {tc_context with in_lambda = true}
+
+let is_in_lambda {callsite = _; in_lambda} = in_lambda

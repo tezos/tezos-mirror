@@ -23,11 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Lambda : t
+open Script_typed_ir
+
+(** This module defines the typechecking context used during the translation
+    from Michelson untyped nodes to typed nodes ([Script_ir_translator]).
+    The context keeps track of the origin of the code (top-level from a contract,
+    in a view, etc.), plus some information to allow or forbid instructions
+    given the context (no `SELF` in a lambda for example). *)
+
+(** Lambdas are a bit special when considering stateful instructions such as
+    [TRANSFER_TOKENS].
+    For instance, a view containing a [TRANSFER_TOKENS] is not OK, because
+    calling the view would transfer tokens from the view's owner.
+    However, a view returning a lambda containing a [TRANSFER_TOKENS] could be
+    considered OK, as the decision whether to execute it or not falls on
+    the view's caller, whose tokens would be transfered.
+    This type is used to keep track of whether we are inside a lambda: it is
+    [true] when inside a lambda, and [false] otherwise. *)
+type in_lambda = bool
+
+(** The calling context when parsing Michelson code: either a top-level contract
+    code, the code of a view, or code in data (when pushing a block of
+    instructions for example). *)
+type callsite =
   | Toplevel : {
-      storage_type : 'sto Script_typed_ir.ty;
-      param_type : 'param Script_typed_ir.ty;
+      storage_type : 'sto ty;
+      param_type : 'param ty;
       root_name : Script_ir_annot.field_annot option;
     }
-      -> t
+      -> callsite
+  | View : callsite
+  | Data : callsite
+
+type t = {callsite : callsite; in_lambda : in_lambda}
+
+val init : callsite -> t
+
+val toplevel : 'sto ty -> 'param ty -> Script_ir_annot.field_annot option -> t
+
+val view : t
+
+(** This value can be used outside the translation module as a simple context
+    when testing code, for example. *)
+val data : t
+
+val add_lambda : t -> t
+
+val is_in_lambda : t -> bool
