@@ -2950,8 +2950,7 @@ and parse_view_returning :
         serialize_stack_for_error ctxt stack_ty >>? fun (actual, ctxt) ->
         let expected_stack = Item_t (output_ty', Bot_t, None) in
         serialize_stack_for_error ctxt expected_stack
-        >>? fun (expected, _ctxt) ->
-        error (Ill_typed_view {loc; actual; expected})
+        >|? fun (expected, _ctxt) -> Ill_typed_view {loc; actual; expected}
       in
       match aft with
       | Item_t (ty, Bot_t, _) ->
@@ -2960,7 +2959,7 @@ and parse_view_returning :
             ( ty_eq ~legacy ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
               let view' = Ex_view (Lam (close_descr descr, view_code)) in
               (view', ctxt) )
-      | _ -> ill_type_view loc aft)
+      | _ -> ill_type_view loc aft >>? error)
 
 and typecheck_views :
     type storage.
