@@ -161,6 +161,16 @@ that could be valid in another branch.
 
 As a complement to the built-in classification mechanism above, which rejects operations that could flood the network with useless messages, there is a filtering mechanism implemented as a :doc:`protocol plugin <../active/plugins>`, that can be customized for each protocol version.
 
+The prevalidator ensures that a given manager can only have one
+Applied manager operation (e.g., transfers, contract calls) per block.
+This restriction only exists in the prevalidator, e.g., a baker can
+include more that one manager operation per manager in a block.
+Operations with a given manager will be temporarily refused
+(Branch Delayed) if the prevalidator has already classified as applied
+an operation with the same manager. This limitation was already
+present implicitely if you were using the `tezos-client` commands.
+Batches of operations can be used to get around this restriction.
+
 Distributed DB
 --------------
 .. _DDB_component:
