@@ -82,11 +82,14 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
   let annots_encoding =
     match semantics with
     | V0 | V1 ->
-        (* in V0 there was a bug whereby an empty list of annotation ([[]])
-           would be decoded as a list containing one empty string ([[""]]).
-           Thus, the special case for [semantics <> V0]) *)
         let split s =
-          if s = "" && semantics <> V0 then []
+          if s = "" then
+            if semantics = V0 then
+              (* in V0 there was a bug whereby an empty list of annotation ([[]])
+                 would be decoded as a list containing one empty string ([[""]]).
+                 Thus, the special case for [semantics <> V0]) *)
+              [""]
+            else []
           else
             let annots = String.split_on_char ' ' s in
             List.iter
