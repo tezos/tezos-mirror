@@ -23,23 +23,6 @@ be documented here either.
 Node
 ----
 
-- The default allocation policy for the OCaml runtime is set to ``2``
-  (also called ``best-fit``). The previous value was ``0``. This new
-  policy gives the best compromise in terms of performances and memory
-  consumption. This policy can be changed using the ``OCAMLRUNPARAM``
-  environment variable. For example, to set back this value to ``0``,
-  one can do ``OCAMLRUNPARAM="a=0"``. More information on this
-  environment variable in ``https://ocaml.org/manual/runtime.html``
-
-- Bumped the network version to 2.
-
-- Added early block advertisement based on a precheck mechanism to
-  improve the propagation time in the network. This mechanism is only
-  available for nodes with a network version of 2.
-
-- Fixed issue #1930: during decoding, the validity of Micheline
-  annotations is enforced.
-
 - The following RPCs output format changed:
   1. ``/workers/block_validator``,
   2. ``/workers/chain_validators``,
@@ -78,25 +61,6 @@ Node
    should make the `distributed_db` RAM consumption strongly
    correlated to the one of the mempool.
 
--  Improved the snapshot export mechanism by reducing both the export
-   time and the memory footprint.
-
--  Added new RPCs to inspect the storage status:
-
-   -  GET ``chains/main/levels/checkpoint``: checkpoint block hash and
-      level.
-   -  GET ``chains/main/levels/savepoint``: savepoint block hash and
-      level.
-   -  GET ``chains/main/levels/caboose``: caboose block hash and
-      level.
-   -  GET ``config/history_mode``: history mode of the node.
-
--  Deprecated the ``chains/main/checkpoint`` RPC.
-
--  The ``tezos-admin-client show current checkpoint`` command now only
-   outputs the current checkpoint. It no longer outputs the savepoint,
-   caboose and history mode.
-
 -  Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
    show fields of the filter configuration that were equal to their
    default value: e.g. if the configuration was the default one, it
@@ -119,11 +83,6 @@ Node
    affects the binary representation of errors or values that include errors
    inside. It may break the compatibility for tools that request binary-only
    answers from the node and parse the errors by hand.
-
-- Changed the ``/chains/<chain_id>/blocks/<block>/helpers/preapply``
-  RPC's backend so that the preapplication is done by the validator
-  process in order to cache the result in order to optimize the
-  potential following block application (of the same block).
 
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
@@ -166,6 +125,117 @@ Miscellaneous
 
 -  Added specific documentation pages about logging for users and
    developers.
+
+Version 11.0~rc2
+================
+
+-  Included fixes from version 10.3.
+
+Node
+----
+
+-  Added protocol Hangzhou2 (``PtHangz2``), which is a modified version
+   of Hangzhou (``PtHangzH``) with a number of critical bug fixes.
+
+-  Added a user-activated protocol override from Hangzhou
+   (``PtHangzH``) to Hangzhou2 (``PtHangz2``) on Mainnet. This
+   means that nodes using version 11.0~rc2 will activate Hangzhou2
+   instead of Hangzhou if Hangzhou was to be activated by the on-chain
+   governance process.
+
+-  As the Hangzhounet test network was restarted to use ``PtHangz2``
+   instead of ``PtHangzH``, the ``hangzhounet`` network alias now
+   contains the configuration to connect to this restarted
+   Hangzhounet.
+
+-  Bumped the network version to 2.
+
+-  Added early block advertisement based on a precheck mechanism to
+   improve the propagation time in the network. This mechanism is only
+   available for nodes with a network version of 2.
+
+-  The default allocation policy for the OCaml runtime is now ``2``
+   (also called ``best-fit``). The previous value was ``0``. This new
+   policy gives the best compromise in terms of performances and memory
+   consumption. This policy can be changed using the ``OCAMLRUNPARAM``
+   environment variable. For example, to set back this value to ``0``,
+   one can do ``OCAMLRUNPARAM="a=0"``. More information on this
+   environment variable can be found `here <https://ocaml.org/manual/runtime.html>`__.
+
+-  Improved the performance of the ``raw/bytes`` RPC call.
+   In particular, this prevents stack overflows that could happen
+   because of the flattened context if Hangzhou2 is activated.
+
+-  Improved the performance of the context flattening migration that
+   will happen if Hangzhou2 is activated. In particular, this reduces
+   how much memory is needed by this operation.
+
+-  Fixed issue #1930: during decoding, the validity of Micheline
+   annotations is enforced.
+
+-  Improved the snapshot export mechanism by reducing both the export
+   time and the memory footprint.
+
+-  Added new RPCs to inspect the storage status:
+
+   -  GET ``/chains/main/levels/checkpoint``: checkpoint block hash and
+      level.
+   -  GET ``/chains/main/levels/savepoint``: savepoint block hash and
+      level.
+   -  GET ``/chains/main/levels/caboose``: caboose block hash and
+      level.
+   -  GET ``/config/history_mode``: history mode of the node.
+
+-  Deprecated the ``/chains/main/checkpoint`` RPC. It may be deleted
+   starting from v12.0.
+
+-  The field ``backlog`` of the following RPCs is deprecated and may be
+   deleted starting from v12.0:
+
+   - ``/workers/block_validator``
+
+   - ``/workers/chain_validators``
+
+   - ``/workers/chain_validators/<chain_id>``
+
+   - ``/workers/chain_validator/<chain_id>/peer_validators``
+
+   - ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``
+
+   - ``/workers/prevalidators``
+
+-  The following paths of the node configuration format are deprecated
+   and may be deleted starting from v12.0:
+
+   - ``shell.chain_validator.limits.worker_backlog_size``
+
+   - ``shell.chain_validator.limits.worker_backlog_level``
+
+   - ``shell.peer_validator.limits.worker_backlog_size``
+
+   - ``shell.peer_validator.limits.worker_backlog_level``
+
+   - ``shell.prevalidator.limits.worker_backlog_size``
+
+   - ``shell.prevalidator.limits.worker_backlog_level``
+
+   - ``shell.block_validator.limits.worker_backlog_size``
+
+   - ``shell.block_validator.limits.worker_backlog_level``
+
+-  The ``tezos-admin-client show current checkpoint`` command now only
+   outputs the current checkpoint. It no longer outputs the savepoint,
+   caboose and history mode.
+
+-  When calling the
+   ``/chains/<chain_id>/blocks/<block>/helpers/preapply`` RPC, the
+   preapplication is now done by the external validator process
+   instead of the main node process. This allows the external
+   validator to cache the result. If later the block is applied, this
+   cache is then used to optimize the application of the block.
+
+-  Fixed an inconsistency of the cache internal counter between the
+   baker and the node when the cache has been emptied.
 
 Version 11.0~rc1
 ================
