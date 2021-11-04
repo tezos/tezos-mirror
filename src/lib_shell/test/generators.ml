@@ -29,12 +29,12 @@ let add_if_not_present classification oph op t =
   Prevalidator_classification.(
     if not (is_in_mempool oph t) then add classification oph op t)
 
-let string_gen = QCheck2.Gen.string
+let string_gen = QCheck2.Gen.small_string ?gen:None
 
 let block_hash_gen : Block_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ key = opt (string_size (0 -- 64))
-  and+ path = list_size (0 -- 100) string_gen in
+  and+ path = list_size (0 -- 10) string_gen in
   Block_hash.hash_string ?key path
 
 (** A generator of operations.
@@ -116,7 +116,7 @@ let unrefused_classification_gen : classification QCheck2.Gen.t =
 
 let parameters_gen : parameters QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ map_size_limit = 1 -- 100 in
+  let+ map_size_limit = 1 -- 30 in
   let on_discarded_operation _ = () in
   {map_size_limit; on_discarded_operation}
 
