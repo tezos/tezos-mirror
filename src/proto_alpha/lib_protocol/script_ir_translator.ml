@@ -399,8 +399,9 @@ let rec unparse_stack_uncarbonated :
       (strip_locations uty, unparse_var_annot annot) :: urest
 
 let serialize_stack_for_error ctxt stack_ty =
-  (* FIXME: unbounded uncarbonated computations are dangerous! *)
-  ok (unparse_stack_uncarbonated stack_ty, ctxt)
+  match Gas.level ctxt with
+  | Unaccounted -> ok (unparse_stack_uncarbonated stack_ty, ctxt)
+  | Limited _ -> ok ([], ctxt)
 
 let name_of_ty : type a. a ty -> type_annot option = function
   | Unit_t meta -> meta.annot
