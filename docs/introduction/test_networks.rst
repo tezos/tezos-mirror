@@ -31,6 +31,22 @@ You can obtain the key to these accounts from a faucet to claim the funds.
 All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
+Hangzhounet
+===========
+
+- Built-in network alias: ``hangzhounet`` (see :ref:`builtin_networks`)
+
+  * Available from version 11.0~rc2.
+
+- Run Docker image: ``wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Hangzhounet is a test network running the ``PtHangz2`` protocol.
+Hangzhounet will run until Hangzhou is rejected or replaced by another protocol on Mainnet.
+
+On Hangzhounet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
 Granadanet
 ==========
 
