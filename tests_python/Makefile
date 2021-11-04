@@ -35,7 +35,7 @@ PYCODESTYLE_OPTIONS=\
 # black is configured in pyproject.toml
 BLACK=poetry run black
 
-SRCS?=process daemons launchers client tools scripts tests_*  examples codec conftest.py
+SRCS?=pytest_plugins process daemons launchers client tools scripts tests_*  examples codec conftest.py
 
 LOG_DIR=tmp
 

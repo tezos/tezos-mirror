@@ -256,5 +256,4 @@ if [ -z "$SILENCE_REMINDER" ]; then
   echo "Generated src/proto_${version}_${short_hash}. Don't forget to:"
   echo ""
   echo "  dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version} ${short_hash}"
-  echo "  ./scripts/update_integration_test.sh"
 fi

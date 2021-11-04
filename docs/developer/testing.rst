@@ -454,9 +454,10 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   We run one job per ``pytest`` test file whose tests are marked
-   ``slow``. We run one job regrouping the set of
-   ``pytest``\ s per protocol that are not marked ``slow``.
+   Python tests are grouped in a number of batch jobs (chosen in ``.gitlab/ci/integration.yml``). This number is
+   chosen to keep the duration of job each lower under 10 minutes on
+   average, and to accommodate the addition of new protocol test
+   suites.
 
 Tezt integration and regression tests
    Tezt tests are grouped in 3 batch jobs. New tests increases the
@@ -479,8 +480,14 @@ properly specified in the :src:`.gitlab-ci.yml` file. The procedure
 for doing this depends on the type of test you've added:
 
 Python integration and regression tests
-  Run ``./scripts/update_integration_test.sh`` in Tezos home. This
-  will include your new test in :src:`.gitlab-ci.yml`.
+  New Pytest tests will be included automatically in the CI.
+  To rebalance the Pytest batches based on a previous pipeline,
+  run (from the root of the Tezos repository):
+  ``cd tests_python && poetry run ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
+  setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
+  and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
+  (e.g. `391861162 <https://gitlab.com/tezos/tezos/-/pipelines/391861162>`_).
+  and then commit the resulting :src:`tests_python/test-results.xml`.
 
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.

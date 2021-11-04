@@ -11,6 +11,10 @@ import os
 import tempfile
 from typing import Optional, Iterator
 import pytest
+
+# Should only be used for type hints
+import _pytest
+
 from pytest_regtest import (
     register_converter_pre,
     deregister_converter_pre,
@@ -21,6 +25,8 @@ from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
 from tools.utils import bake
 from client.client import Client
+
+pytest_plugins = ("pytest_plugins.job_selection",)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -187,7 +193,7 @@ def encrypted_account_with_tez(client: Client):
     bake(client, bake_for="bootstrap1")
 
 
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: _pytest.config.argparsing.Parser) -> None:
     parser.addoption("--log-dir", action="store", help="specify log directory")
     parser.addoption(
         "--singleprocess",
