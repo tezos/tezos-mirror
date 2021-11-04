@@ -111,6 +111,14 @@ Node
   the default history modes as not equal to an history mode manually
   set to the same default value.
 
+- The prevalidator (which handles operations which have been received but not
+  yet included in a block) was made more restrictive: it now accepts a single
+  manager operation from a given manager for a given block. This limitation
+  was already present implicitely if you were using the `tezos-client` commands.
+  Batches of operations can be used to get around this restriction, see the
+  `multiple transfers` command to learn more. In addition, operations
+  rejected because of this limitation are solely delayed to a future block.
+
 Client
 ------
 
