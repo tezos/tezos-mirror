@@ -967,10 +967,16 @@ struct
 
   module Micheline = struct
     include Micheline
+    include Micheline_encoding
 
+    (* Note: we "lie" about canonical-v1 and actually use canonical-v2 behind
+       the protocol's back. Truly, the protocol shouldn't have access to
+       versions (it should just have access to plain canonical) and the
+       environment should ensure the stability. *)
     let canonical_encoding_v1 ~variant encoding =
-      canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding
+      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
 
+    (* For backwards compatibility, the version here is wrong *)
     let canonical_encoding ~variant encoding =
       canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
