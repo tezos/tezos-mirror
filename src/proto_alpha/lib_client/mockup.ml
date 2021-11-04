@@ -310,7 +310,7 @@ module Protocol_constants_overrides = struct
     | None -> ()
     | Some value -> Format.fprintf ppf "@[<h>%s: %a@]" name pp value
 
-  let apply_overrides (cctxt : Tezos_client_base.Client_context.full) (o : t)
+  let apply_overrides (cctxt : Tezos_client_base.Client_context.printer) (o : t)
       (c : Constants.parametric) : Constants.parametric tzresult Lwt.t =
     let open Format in
     let pp_print_int32 ppf i = fprintf ppf "%li" i in
@@ -866,7 +866,7 @@ let initial_context chain_id (header : Block_header.shell_header)
   >>=? fun context -> return context
 
 let mem_init :
-    cctxt:Tezos_client_base.Client_context.full ->
+    cctxt:Tezos_client_base.Client_context.printer ->
     parameters:Protocol_parameters.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
@@ -904,7 +904,7 @@ let mem_init :
       ~operations_hash:Operation_list_list_hash.zero
   in
   Protocol_constants_overrides.apply_overrides
-    cctxt
+    (cctxt :> Tezos_client_base.Client_context.printer)
     protocol_overrides
     parameters.constants
   >>=? fun protocol_custom ->
@@ -995,7 +995,7 @@ let () =
     module Protocol = Protocol_client_context.Lifted_protocol
     module Block_services = Protocol_client_context.Alpha_block_services
 
-    let directory = Plugin.RPC.rpc_services
+    let directory = Tezos_protocol_plugin_alpha.Plugin.RPC.rpc_services
 
     let init = mem_init
 
