@@ -95,7 +95,6 @@ let compose_descr :
 
 type tc_context =
   | Lambda : tc_context
-  | Dip : ('a, 's) stack_ty * tc_context -> tc_context
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
@@ -111,11 +110,7 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
-let add_dip ty annot prev =
-  match prev with
-  | Lambda | Toplevel _ ->
-      Dip (Item_t (ty, Item_t (unit_t ~annot:None, Bot_t, None), annot), prev)
-  | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
+let add_dip _ _ prev = prev
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -4968,10 +4963,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               ~none:"default"
               entrypoint
           in
-          let rec get_toplevel_type :
+          let get_toplevel_type :
               tc_context -> ((a, s) judgement * context) tzresult = function
             | Lambda -> error (Self_in_lambda loc)
-            | Dip (_, prev) -> get_toplevel_type prev
             | Toplevel {param_type; root_name; storage_type = _} ->
                 find_entrypoint param_type ~root_name entrypoint
                 >>? fun (_, Ex_ty param_type) ->

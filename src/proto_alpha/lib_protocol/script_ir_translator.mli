@@ -126,7 +126,6 @@ type ('a, 's, 'b, 'u) descr = {
 
 type tc_context =
   | Lambda : tc_context
-  | Dip : ('a, 's) Script_typed_ir.stack_ty * tc_context -> tc_context
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
