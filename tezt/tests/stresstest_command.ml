@@ -247,7 +247,7 @@ let test_stresstest_applied_1op =
     ~tags:["client"; "stresstest"; "stresstest_1op"; "applied"]
   @@ fun protocol ->
   let target_transfers = 10 in
-  let n_accounts = 2 * target_transfers in
+  let n_accounts = target_transfers in
   let* (node, client) =
     Client.init_with_protocol
       ~nodes_args:[Synchronisation_threshold 0; Connections 0]
@@ -399,7 +399,7 @@ let test_stresstest_applied_multiple_nodes_1op =
   @@ fun protocol ->
   let n_nodes = 3 in
   let target_transfers_per_node = 4 in
-  let accounts_per_node = 2 * target_transfers_per_node in
+  let accounts_per_node = target_transfers_per_node in
   let* (((first_node, first_client, _) as first_node_client_accounts), others) =
     init_nodes_star ~protocol ~n_nodes ~accounts_per_node ()
   in
