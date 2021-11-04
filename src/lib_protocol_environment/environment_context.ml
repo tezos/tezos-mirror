@@ -284,7 +284,7 @@ module Context = struct
       let start_loading_cache =
         declare_0
           ~section
-          ~level:Notice
+          ~level:Info
           ~name:"start_loading_cache"
           ~msg:"start loading cache now"
           ()
@@ -292,7 +292,7 @@ module Context = struct
       let stop_loading_cache =
         declare_0
           ~section
-          ~level:Notice
+          ~level:Info
           ~name:"stop_loading_cache"
           ~msg:"stop loading cache now"
           ()
