@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
 open Script_typed_ir
 
 (** This module defines the typechecking context used during the translation
@@ -70,3 +71,5 @@ val data : t
 val add_lambda : t -> t
 
 val is_in_lambda : t -> bool
+
+val check_not_in_view : Script.location -> t -> Script.prim -> unit tzresult

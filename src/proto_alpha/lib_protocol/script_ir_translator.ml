@@ -4774,17 +4774,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       let stack = Item_t (res_ty, rest, annot) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_TRANSFER_TOKENS, [], annot),
+  | ( Prim (loc, (I_TRANSFER_TOKENS as prim), [], annot),
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest, _), _), _)
     ) ->
-      check_item_ty ctxt p cp loc I_TRANSFER_TOKENS 1 4
-      >>?= fun (Eq, _, ctxt) ->
+      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
+      check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, _, ctxt) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ITransfer_tokens (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest, annot) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
-  | ( Prim (loc, I_SET_DELEGATE, [], annot),
+  | ( Prim (loc, (I_SET_DELEGATE as prim), [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
+      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ISet_delegate (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest, annot) in
@@ -4797,11 +4798,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> IImplicit_account (kinfo, k))} in
       let stack = Item_t (contract_unit_t, rest, annot) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
+  | ( Prim (loc, (I_CREATE_CONTRACT as prim), [(Seq _ as code)], annot),
       Item_t
         ( Option_t (Key_hash_t _, _),
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
+      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
       parse_two_var_annot loc annot >>?= fun (op_annot, addr_annot) ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
