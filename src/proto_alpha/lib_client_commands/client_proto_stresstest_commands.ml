@@ -257,14 +257,22 @@ let unnormalize_source src_org =
   | Wallet_pkh -> Wallet_pkh src_org.source.pkh
   | Wallet_alias alias -> Wallet_alias alias
 
-let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
-    =
+(** Samples from [state.pool]. Used to generate the destination of a
+    transfer, and its source only when [state.shuffled_pool] is [None]
+    meaning that [--single-op-per-pkh-per-block] is not set. *)
+let sample_any_source_from_pool state rng_state =
+  let idx = Random.State.int rng_state state.pool_size in
+  match List.nth state.pool idx with
+  | None -> assert false
+  | Some src_org -> Lwt.return src_org.source
+
+(** Generates the source of a transfer. If [state.shuffled_pool] has a
+    value (meaning that [--single-op-per-pkh-per-block] is active) then
+    it is sampled from there, otherwise from [state.pool]. *)
+let rec sample_source_from_pool state rng_state
+    (cctxt : Protocol_client_context.full) =
   match state.shuffled_pool with
-  | None -> (
-      let idx = Random.State.int rng_state state.pool_size in
-      match List.nth state.pool idx with
-      | None -> assert false
-      | Some src_org -> Lwt.return src_org.source)
+  | None -> sample_any_source_from_pool state rng_state
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
       debug_msg (fun () ->
@@ -281,12 +289,12 @@ let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
-      sample_from_pool state rng_state cctxt
+      sample_source_from_pool state rng_state cctxt
 
 let random_seed rng_state =
   Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng_state 256))
 
-let generate_fresh pool rng_state =
+let generate_fresh_source pool rng_state =
   let seed = random_seed rng_state in
   let (pkh, pk, sk) = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
@@ -306,7 +314,7 @@ let on_new_head (cctxt : Protocol_client_context.full) f =
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     (parameters : parameters) (state : state) rng_state =
-  sample_from_pool state rng_state cctxt >>= fun src ->
+  sample_source_from_pool state rng_state cctxt >>= fun src ->
   Alpha_services.Contract.balance
     cctxt
     (chain, block)
@@ -326,8 +334,8 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     let fresh =
       Random.State.float rng_state 1.0 < parameters.fresh_probability
     in
-    (if fresh then Lwt.return (generate_fresh state rng_state)
-    else sample_from_pool state rng_state cctxt)
+    (if fresh then Lwt.return (generate_fresh_source state rng_state)
+    else sample_any_source_from_pool state rng_state)
     >>= fun dest ->
     let amount =
       match parameters.strategy with
