@@ -108,7 +108,11 @@ end) : Internal_event.SINK with type t = t = struct
                     match Internal_event.Level.of_string two with
                     | Some s -> s
                     | None ->
-                        Fmt.failwith "Wrong level name: %S in argument %S" two s
+                        Format.kasprintf
+                          Stdlib.failwith
+                          "Wrong level name: %S in argument %S"
+                          two
+                          s
                   in
                   let section =
                     match one with
@@ -118,7 +122,11 @@ end) : Internal_event.SINK with type t = t = struct
                           (String.split_on_char '.' one)
                   in
                   (section, lvl)
-              | _ -> Fmt.failwith "Wrong section-level entry: %S" s
+              | _ ->
+                  Format.kasprintf
+                    Stdlib.failwith
+                    "Wrong section-level entry: %S"
+                    s
             in
             let pairs = List.map parse_section l in
             match base_level with
@@ -127,7 +135,8 @@ end) : Internal_event.SINK with type t = t = struct
                 match Internal_event.Level.of_string lvl with
                 | Some l -> (Internal_event.Section.empty, l) :: pairs
                 | None ->
-                    Fmt.failwith
+                    Format.kasprintf
+                      Stdlib.failwith
                       "Wrong level name %S in level-at-least argument"
                       lvl)
           in
@@ -168,7 +177,7 @@ end) : Internal_event.SINK with type t = t = struct
                 let chopped =
                   if ext = "" then path else Filename.chop_extension path
                 in
-                Fmt.str "%s-%d%s" chopped (Unix.getpid ()) ext
+                Format.asprintf "%s-%d%s" chopped (Unix.getpid ()) ext
               else path
             in
             protect (fun () ->
@@ -240,7 +249,7 @@ end) : Internal_event.SINK with type t = t = struct
         | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
             let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
-            Fmt.str "%d:%s," (String.length bytes) bytes
+            Format.asprintf "%d:%s," (String.length bytes) bytes
       in
       lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
       output_one output to_write >>= function

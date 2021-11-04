@@ -37,4 +37,4 @@ let from_string str : Script.expr =
       raise Expression_from_string) ;
   ast.expanded
 
-let to_string c = Fmt.str "%a" Michelson_v1_printer.print_expr c
+let to_string c = Format.asprintf "%a" Michelson_v1_printer.print_expr c

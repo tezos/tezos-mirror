@@ -4,6 +4,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   uri
+  fmt
   qcheck-alcotest
   alcotest
   alcotest-lwt

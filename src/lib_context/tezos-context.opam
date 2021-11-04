@@ -11,6 +11,7 @@ depends: [
   "irmin" { >= "2.8.0" }
   "irmin-pack" { >= "2.8.0" }
   "tezos-shell-services"
+  "fmt"
   "logs"
   "digestif" { >= "0.7.3" }
   "tezos-stdlib-unix"

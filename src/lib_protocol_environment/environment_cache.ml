@@ -120,7 +120,8 @@ let pp_cache fmt {index; map; size; limit; counter; _} =
 
 let invalid_arg_with_callstack msg =
   let cs = Printexc.get_callstack 15 in
-  Fmt.invalid_arg
+  Format.kasprintf
+    invalid_arg
     "Internal error: %s\nCall stack:\n%s\n"
     msg
     (Printexc.raw_backtrace_to_string cs)

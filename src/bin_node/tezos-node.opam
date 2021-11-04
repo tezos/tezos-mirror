@@ -40,6 +40,7 @@ depends: [
   "tezos-protocol-plugin-011-PtHangz2-registerer"
   "tezos-protocol-plugin-alpha-registerer"
   "cmdliner"
+  "fmt"
   "lwt-exit"
   "tls" { >= "0.10" }
   "cstruct"
