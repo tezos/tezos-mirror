@@ -101,7 +101,9 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
             Lwt_utils_unix.create_dir base_dir >>= fun () ->
             let filename = self#filename alias_name in
             let json = Data_encoding.Json.construct encoding list in
-            Lwt_utils_unix.Json.write_file filename json)
+            let filename_tmp = filename ^ "_tmp" in
+            Lwt_utils_unix.Json.write_file filename_tmp json >>=? fun () ->
+            Lwt_unix.rename filename_tmp filename >>= fun () -> return_unit)
         >|= record_trace_eval (fun () ->
                 error_of_fmt "could not write the %s alias file." alias_name)
   end
