@@ -91,6 +91,69 @@ let test_stresstest_implicit =
   let _ = Client.stresstest client in
   waiter
 
+(** Tests the various possible formats to provide sources to the
+    [stresstest] command: alias, public key hash, or explicit key. *)
+let test_stresstest_sources_format =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"stresstest sources format"
+    ~tags:["client"]
+  @@ fun protocol ->
+  let transfers = 30 in
+  let* (node, client) =
+    Client.init_with_protocol
+      ~nodes_args:
+        [
+          Synchronisation_threshold 0; Connections 0; Disable_operations_precheck;
+        ]
+      `Client
+      ~protocol
+      ()
+  in
+  let waiter = wait_for_n_injections transfers node in
+  let* () =
+    Constant.(
+      Client.stresstest
+        ~source_aliases:[bootstrap1.alias; bootstrap2.alias]
+        ~source_pkhs:[bootstrap3.public_key_hash]
+        ~source_accounts:[bootstrap1; bootstrap4]
+        ~transfers
+        client)
+  in
+  let* () = waiter in
+  let* mempool_ops = RPC.get_mempool_pending_operations client in
+  let actual_sources =
+    let open JSON in
+    mempool_ops |-> "applied" |> as_list
+    |> List.fold_left
+         (fun sources op ->
+           String_set.add
+             (op |-> "contents" |=> 0 |-> "source" |> as_string)
+             sources)
+         String_set.empty
+  in
+  let expected_sources =
+    List.map
+      (fun bootstrap -> bootstrap.Account.public_key_hash)
+      Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4]
+    |> String_set.of_list
+  in
+  (if not (String_set.equal actual_sources expected_sources) then
+   let pp_sources fmt sources =
+     Format.(pp_print_seq pp_print_string fmt (String_set.to_seq sources))
+   in
+   let msg =
+     Format.asprintf
+       "Set of sources is %a, expected %a."
+       pp_sources
+       actual_sources
+       pp_sources
+       expected_sources
+   in
+   Test.fail "%s" msg) ;
+  unit
+
 let register ~protocols =
   test_stresstest_explicit ~protocols ;
-  test_stresstest_implicit ~protocols
+  test_stresstest_implicit ~protocols ;
+  test_stresstest_sources_format ~protocols
