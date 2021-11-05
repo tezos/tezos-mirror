@@ -68,6 +68,10 @@ let none = Lwt.return_none
 
 let some = Lwt.return_some
 
+let mandatory name = function
+  | None -> failwith ("no value for " ^ name)
+  | Some x -> x
+
 let range a b =
   let rec range ?(acc = []) a b =
     if b < a then acc else range ~acc:(b :: acc) a (b - 1)
