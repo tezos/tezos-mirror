@@ -1455,7 +1455,11 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module Nonce_legacy = struct
+  module Nonce_legacy :
+    Non_iterable_indexed_data_storage
+      with type key := Level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t = struct
     open Level_repr
 
     type context = Raw_context.t
