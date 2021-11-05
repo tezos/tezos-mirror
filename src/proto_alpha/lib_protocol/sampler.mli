@@ -29,7 +29,7 @@
   *)
 
 (** [Mass] is the module type describing the measure associated to points. *)
-module type Mass = sig
+module type SMass = sig
   (** [t] is the type describing the measure associated to points. *)
   type t
 
@@ -92,7 +92,7 @@ end
 module Internal_for_tests : sig
   (** [Make(Mass)] instantiates a module allowing to creates
       samplers for [Mass]-valued finite measures. *)
-  module Make : functor (Mass : Mass) -> S with type mass = Mass.t
+  module Make : functor (Mass : SMass) -> S with type mass = Mass.t
 end
 
 include S with type mass = Int64.t

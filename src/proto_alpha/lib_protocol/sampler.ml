@@ -30,7 +30,7 @@
 
 *)
 
-module type Mass = sig
+module type SMass = sig
   type t
 
   val encoding : t Data_encoding.t
@@ -64,7 +64,7 @@ module type S = sig
   val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
 end
 
-module Make (Mass : Mass) : S with type mass = Mass.t = struct
+module Make (Mass : SMass) : S with type mass = Mass.t = struct
   type mass = Mass.t
 
   type 'a t = {
@@ -184,7 +184,7 @@ module Internal_for_tests = struct
   module Make = Make
 end
 
-module Mass : Mass with type t = int64 = struct
+module Mass : SMass with type t = int64 = struct
   type t = int64
 
   let encoding = Data_encoding.int64

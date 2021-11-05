@@ -143,7 +143,7 @@ let state =
     |]
 
 module Make_test (Mass : sig
-  include Mass
+  include SMass
 
   val to_float : t -> float
 end) (S : sig
@@ -190,7 +190,7 @@ end
 
 (* Testing the alias sampler with float-valued measures *)
 
-module Probability_mass_float : Mass with type t = float = struct
+module Probability_mass_float : SMass with type t = float = struct
   type t = float
 
   let encoding = Data_encoding.float
@@ -226,7 +226,7 @@ module Test_float =
 
 (* Testing the alias sampler with Z-valued measures *)
 
-module Probability_mass_z : Mass with type t = Z.t = struct
+module Probability_mass_z : SMass with type t = Z.t = struct
   let encoding = Data_encoding.z
 
   include Z
