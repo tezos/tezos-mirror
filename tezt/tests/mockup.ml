@@ -522,9 +522,10 @@ let test_origination_from_unrevealed_fees =
     Client.import_secret_key
       client
       {
-        identity = "";
         alias = "originator";
-        secret =
+        public_key_hash = "";
+        public_key = "";
+        secret_key =
           "unencrypted:edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
       }
   in
@@ -561,7 +562,7 @@ let test_multiple_transfers =
   let batch_line =
     `O
       [
-        ("destination", `String Constant.bootstrap1.identity);
+        ("destination", `String Constant.bootstrap1.public_key_hash);
         ("amount", `String "0.02");
       ]
   in

@@ -46,8 +46,8 @@ val inject_transfer :
   ?amount:int ->
   ?fee:int ->
   ?gas_limit:int ->
-  ?source:Constant.key ->
-  ?destination:Constant.key ->
+  ?source:Account.key ->
+  ?destination:Account.key ->
   Client.t ->
   string Lwt.t
 
@@ -57,8 +57,8 @@ val inject_transfers :
   ?amount:int ->
   ?fee:int ->
   ?gas_limit:int ->
-  ?source:Constant.key ->
-  ?destination:Constant.key ->
+  ?source:Account.key ->
+  ?destination:Account.key ->
   node:Node.t ->
   number_of_operations:int ->
   Client.t ->

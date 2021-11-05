@@ -90,8 +90,8 @@ let transfer_and_wait_for_injection node client amount_int giver_key
   let* () =
     Client.transfer
       ~amount:(Tez.of_int amount_int)
-      ~giver:Constant.(giver_key.alias)
-      ~receiver:Constant.(receiver_key.alias)
+      ~giver:Account.(giver_key.alias)
+      ~receiver:Account.(receiver_key.alias)
       client
   in
   let* () = wait_for in

@@ -113,7 +113,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   (* Shutting down node_2 to make an activation on node_1 only. *)
   let* () = Node.terminate node_2 in
   let activation_promise_node_1 = wait_for_protocol_table_update node_1 in
-  let* () = Client.bake_for ~key:Constant.bootstrap1.identity client_1 in
+  let* () = Client.bake_for ~key:Constant.bootstrap1.public_key_hash client_1 in
   let* () =
     check_protocol_activation
       ~migrate_from
@@ -129,7 +129,7 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   let* () = Node.wait_for_ready node_2 in
   let activation_promise_node_2 = wait_for_protocol_table_update node_2 in
   (* Bake the activation block with a different key to ensure divergence. *)
-  let* () = Client.bake_for ~key:Constant.bootstrap2.identity client_2 in
+  let* () = Client.bake_for ~key:Constant.bootstrap2.public_key_hash client_2 in
   let* () =
     check_protocol_activation
       ~migrate_from

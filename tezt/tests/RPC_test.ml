@@ -712,8 +712,8 @@ let test_mempool protocol ?endpoint client =
       ~branch
       ~fee:10
       ~gas_limit:1040
-      ~source:Constant.bootstrap1.identity
-      ~destination:Constant.bootstrap2.identity
+      ~source:Constant.bootstrap1.public_key_hash
+      ~destination:Constant.bootstrap2.public_key_hash
       ~counter:1
       ~signer:Constant.bootstrap1
       ~client

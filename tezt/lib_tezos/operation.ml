@@ -25,7 +25,7 @@
 
 let get_next_counter ~source client =
   let open Lwt.Infix in
-  RPC.Contracts.get_counter ~contract_id:source.Constant.identity client
+  RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
   >|= JSON.as_int >|= succ
 
 let get_branch client =
@@ -37,13 +37,13 @@ let json_of_transfer_operation_content ~amount ~fee ~gas_limit ~counter ~source
   `O
     [
       ("kind", `String "transaction");
-      ("source", `String source.Constant.identity);
+      ("source", `String source.Account.public_key_hash);
       ("fee", `String (string_of_int fee));
       ("counter", `String (string_of_int counter));
       ("gas_limit", `String (string_of_int gas_limit));
       ("storage_limit", `String "0");
       ("amount", `String (string_of_int amount));
-      ("destination", `String destination.Constant.identity);
+      ("destination", `String destination.Account.public_key_hash);
     ]
 
 let json_of_operation ~branch operation_content_json =
@@ -89,10 +89,11 @@ let bytes_of_hex hex = Hex.to_bytes (`Hex hex)
 let sign_operation ~watermark ~signer op_hex =
   let open Tezos_crypto in
   let sk =
-    match String.split_on_char ':' signer.Constant.secret with
+    match String.split_on_char ':' signer.Account.secret_key with
     | ["unencrypted"; b58_secret_key] ->
         Signature.Secret_key.of_b58check_exn b58_secret_key
-    | _ -> Test.fail "Could not parse secret key: '%s'" signer.Constant.secret
+    | _ ->
+        Test.fail "Could not parse secret key: '%s'" signer.Account.secret_key
   in
   let bytes = bytes_of_hex op_hex in
   let signature = Signature.(sign ~watermark sk bytes) in

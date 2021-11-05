@@ -207,7 +207,7 @@ type state = {
   protocol : Tezos_crypto.Protocol_hash.t;
   sandbox_client : Tezt_tezos.Client.t;
   sandbox_node : Tezt_tezos.Node.t;
-  counters : (Constant.key, int) Hashtbl.t;
+  counters : (Account.key, int) Hashtbl.t;
 }
 
 let bootstraps =
@@ -255,10 +255,10 @@ let encode_unsigned_operation_to_binary state op =
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
 
-let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
+let sign_operation_bytes (signer : Account.key) (msg : Bytes.t) =
   let open Tezos_crypto in
   let b58_secret_key =
-    match String.split_on_char ':' signer.secret with
+    match String.split_on_char ':' signer.secret_key with
     | ["unencrypted"; rest] -> rest
     | _ -> Test.fail "Could not parse secret key"
   in
@@ -321,13 +321,13 @@ let sample_next_transfer_for state ~fee ~branch ~account =
             [
               {
                 kind = "transaction";
-                source = account.Constant.identity;
+                source = account.Account.public_key_hash;
                 fee = string_of_int fee;
                 counter = string_of_int (get_next_counter state account);
                 gas_limit = string_of_int 2000;
                 storage_limit = string_of_int 0;
                 amount = string_of_int amount;
-                destination = receiver.Constant.identity;
+                destination = receiver.Account.public_key_hash;
               };
             ];
           signature = None;

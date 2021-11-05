@@ -73,7 +73,7 @@ let encoding_prefix = daemon_name
 type parameter_overrides = (string list * string option) list
 
 let write_parameter_file :
-    ?additional_bootstrap_accounts:(Constant.key * int option) list ->
+    ?additional_bootstrap_accounts:(Account.key * int option) list ->
     base:(string, t) Either.t ->
     parameter_overrides ->
     string Lwt.t =
@@ -99,10 +99,10 @@ let write_parameter_file :
     in
     let additional_bootstrap_accounts =
       List.map
-        (fun ((account : Constant.key), default_balance) ->
+        (fun ((account : Account.key), default_balance) ->
           `A
             [
-              `String account.identity;
+              `String account.public_key_hash;
               `String
                 (string_of_int
                    (Option.fold

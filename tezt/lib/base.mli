@@ -60,6 +60,13 @@ val none : 'a option Lwt.t
 (** Same as [Lwt.return_some]. *)
 val some : 'a -> 'a option Lwt.t
 
+(** Get the value of an option that must not be [None].
+
+    Usage: [mandatory name option]
+
+    [name] is used in the error message if [option] is [None]. *)
+val mandatory : string -> 'a option -> 'a
+
 (** {2 Lists} *)
 
 (** Make a list of all integers between two integers.

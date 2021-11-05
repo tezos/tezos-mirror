@@ -286,11 +286,11 @@ let spawn_version client = spawn_command client ["--version"]
 
 let version client = spawn_version client |> Process.check
 
-let spawn_import_secret_key ?endpoint client (key : Constant.key) =
+let spawn_import_secret_key ?endpoint client (key : Account.key) =
   spawn_command
     ?endpoint
     client
-    ["import"; "secret"; "key"; key.alias; key.secret]
+    ["import"; "secret"; "key"; key.alias; key.secret_key]
 
 let import_secret_key ?endpoint client key =
   spawn_import_secret_key ?endpoint client key |> Process.check
@@ -513,52 +513,36 @@ let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
 
 let gen_keys ~alias client = spawn_gen_keys ~alias client |> Process.check
 
-let spawn_show_address ?(show_secret = true) ~alias client =
-  spawn_command client
-  @@
-  if show_secret then ["show"; "address"; alias; "--show-secret"]
-  else ["show"; "address"; alias]
+let spawn_show_address ~alias client =
+  spawn_command client ["show"; "address"; alias; "--show-secret"]
 
-let show_address ?show_secret ~alias client =
+let show_address ~alias client =
   let extract_key (client_output : string) : Account.key =
     let public_key_hash =
-      match client_output =~* rex "Hash: ?(\\w*)" with
-      | None ->
-          Test.fail "Cannot extract key from client_output: %s" client_output
-      | Some hash -> hash
+      client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
     in
-    let public_key = client_output =~* rex "Public Key: ?(\\w*)" in
+    let public_key =
+      client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
+    in
     let secret_key =
-      client_output =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
+      client_output
+      =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
+      |> mandatory "secret key"
     in
     {alias; public_key_hash; public_key; secret_key}
   in
   let* output =
-    spawn_show_address ?show_secret ~alias client
-    |> Process.check_and_read_stdout
+    spawn_show_address ~alias client |> Process.check_and_read_stdout
   in
   return @@ extract_key output
 
 let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
-  show_address ~show_secret:true ~alias client
+  show_address ~alias client
 
 let gen_and_show_secret_keys ~alias client =
   let* () = gen_keys ~alias client in
-  let* key = show_address ~show_secret:true ~alias client in
-  match key.secret_key with
-  | None ->
-      failwith
-        (sf
-           "Client.gen_and_show_keys should have created a secret key for %s"
-           alias)
-  | Some sk ->
-      return
-        {
-          Constant.identity = key.public_key_hash;
-          alias;
-          secret = sf "unencrypted:%s" sk;
-        }
+  show_address ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
@@ -778,15 +762,14 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash -> return hash
 
 let write_bootstrap_stresstest_sources_file client =
-  let keys : Constant.key list =
+  let keys : Account.key list =
     List.filter
-      (fun {Constant.alias; _} -> alias <> "activator")
+      (fun {Account.alias; _} -> alias <> "activator")
       Constant.all_secret_keys
   in
   let* (accounts : Account.key list) =
     Lwt_list.map_s
-      (fun (account : Constant.key) ->
-        show_address ~show_secret:true ~alias:account.alias client)
+      (fun (account : Account.key) -> show_address ~alias:account.alias client)
       keys
   in
   Account.write_stresstest_sources_file accounts

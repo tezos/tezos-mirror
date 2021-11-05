@@ -27,25 +27,17 @@
 type key = {
   alias : string;
   public_key_hash : string;
-  public_key : string option;
-  secret_key : string option;
+  public_key : string;
+  secret_key : string;
 }
 
 let write_stresstest_sources_file (accounts : key list) =
   let account_to_json (account : key) =
-    let mandatory name = function
-      | None ->
-          Test.fail
-            "Cannot convert account to JSON for the stresstest command: field \
-             %s is None"
-            name
-      | Some value -> value
-    in
     `O
       [
         ("pkh", `String account.public_key_hash);
-        ("pk", `String (account.public_key |> mandatory "public_key"));
-        ("sk", `String (account.secret_key |> mandatory "secret_key"));
+        ("pk", `String account.public_key);
+        ("sk", `String account.secret_key);
       ]
   in
   let accounts_json_obj = `A (List.map account_to_json accounts) in

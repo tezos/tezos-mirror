@@ -83,7 +83,7 @@ type parameter_overrides = (string list * string option) list
     - [additional_bootstrap_accounts] (with their optional default balance) are
       added to the list of bootstrap accounts of the protocol. *)
 val write_parameter_file :
-  ?additional_bootstrap_accounts:(Constant.key * int option) list ->
+  ?additional_bootstrap_accounts:(Account.key * int option) list ->
   base:(string, t) Either.t ->
   parameter_overrides ->
   string Lwt.t
