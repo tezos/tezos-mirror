@@ -193,12 +193,12 @@ That’s it. You now have two MRs:
 Merging the MR
 --------------
 
-This section is for the merge team. It is the last step in the lifetime
+This section is for the :doc:`Octez merge team <merge_team>`. It is the last step in the lifetime
 of the MRs you have opened. Understanding the basics of this process may
 help you when communicating with the reviewers and the mergers of your
 MR. Understanding all the minutiae and details is not necessary. For
 this reason, this final section is addressed to whichever member of the
-merge team takes care of this MR (you).
+Octez merge team takes care of this MR (you).
 
 After the iterative review-comment-edit process has reached a satisfying
 fixpoint, you can merge the two MRs opened by the developer. To avoid
