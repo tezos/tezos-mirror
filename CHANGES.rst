@@ -362,7 +362,7 @@ Docker Images
    If you use ``tezos-docker-manager.sh``, it will expose this port only to
    other Octez containers.
    In summary, you can now call all RPCs if you use Docker images, without
-   compromising security as long as you do not explicitely expose the RPC port.
+   compromising security as long as you do not explicitly expose the RPC port.
 
 Version 10.3
 ============
@@ -442,7 +442,7 @@ Node
    optional flag ``--auto-repair`` to fix those specific corruptions
    by adding back missing entries.
 
--  Fixed an RPC inconsistency where, after a migration occured, the
+-  Fixed an RPC inconsistency where, after a migration occurred, the
    metadata from blocks returned by RPCs would return inconsistent
    data (blocks prior to a migration from a protocol A to B would
    return that their current protocol is A and next protocol is B

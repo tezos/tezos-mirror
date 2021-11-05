@@ -80,7 +80,7 @@ Delphinet
 
 Delphinet was a test network running the Delphi protocol.
 Following the activation of the Edo protocol replacing Delphi on Mainnet,
-Delphinet stopped being maintained on Febuary 28th, 2021 (the bootstrap baker
+Delphinet stopped being maintained on February 28th, 2021 (the bootstrap baker
 will no longer be producing blocks).
 
 Dalphanet

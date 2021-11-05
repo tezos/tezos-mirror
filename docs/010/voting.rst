@@ -149,7 +149,7 @@ Client Commands
 ---------------
 
 Tezos' client provides a command to show the status of a voting period.
-It displays different informations for different kind of periods, as
+It displays different information for different kind of periods, as
 in the following samples::
 
   $ tezos-client show voting period
