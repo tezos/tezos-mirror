@@ -332,11 +332,6 @@ and get_all_workload_data_files directory =
   in
   loop []
 
-and workload_admits_model model workload_data =
-  let measure = Measure.load ~filename:workload_data in
-  match measure with
-  | Measure.Measurement ((module Bench), _) -> List.mem_assoc model Bench.models
-
 let cull_outliers_cmd workload_data nsigmas save_file =
   let measure = Measure.load ~filename:workload_data in
   match measure with

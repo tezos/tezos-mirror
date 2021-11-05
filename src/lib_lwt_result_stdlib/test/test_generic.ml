@@ -65,8 +65,6 @@ module Testing = struct
       | Ok o -> "ok(" ^ f o ^ ")"
       | Error e -> "error(" ^ g e ^ ")"
 
-    let str = Fun.id
-
     let unit _ = "()"
 
     let t _ _ = "T"
@@ -76,10 +74,6 @@ module Testing = struct
     let e n m = if n = m then Error m else Ok ()
 
     let es n m = Lwt.return @@ if n = m then Error m else Ok ()
-
-    let exn n m = if n = m then raise (Nope m) else ()
-
-    let exn_s n m = Lwt.return @@ if n = m then raise (Nope m) else ()
 
     let exn_es n m = Lwt.return_ok @@ if n = m then raise (Nope m) else ()
 
@@ -103,10 +97,6 @@ module Testing = struct
 
     let es n _acc m = Lwt.return @@ if n = m then Error m else Ok m
 
-    let exn n m = if n = m then raise (Nope m) else m
-
-    let exn_s n _acc m = Lwt.return @@ if n = m then raise (Nope m) else m
-
     let exn_es n _acc m = Lwt.return_ok @@ if n = m then raise (Nope m) else m
 
     let exn_now _ _ = raise (Nope 2048)
@@ -129,10 +119,6 @@ module Testing = struct
     let e n m = if n = m then Error m else Ok (m + 1000)
 
     let es n m = Lwt.return @@ if n = m then Error m else Ok (m + 1000)
-
-    let exn n m = if n = m then raise (Nope m) else m + 1000
-
-    let exn_s n m = Lwt.return @@ if n = m then raise (Nope m) else m + 1000
 
     let exn_es n m = Lwt.return_ok @@ if n = m then raise (Nope m) else m + 1000
 

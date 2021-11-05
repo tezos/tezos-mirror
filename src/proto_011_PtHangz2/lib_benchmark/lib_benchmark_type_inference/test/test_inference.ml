@@ -269,28 +269,6 @@ end
 module Test6 = struct
   open Instructions
 
-  let program_str =
-    "parameter unit ;\n\
-     storage unit ;\n\
-     code { PUSH int 0 ;\n\
-    \       PUSH int 100 ;\n\
-    \       SWAP ;\n\
-    \       DROP ;\n\
-    \       DROP ;\n\
-    \       DROP ;\n\
-    \       PUSH unit Unit ;\n\
-    \       PUSH bool False ;\n\
-    \       PUSH unit Unit ;\n\
-    \       PUSH int 4073851221413541140 ;\n\
-    \       PUSH string \"n\" ;\n\
-    \       PUSH string \"k\" ;\n\
-    \       PUSH int 13919897678870462893 ;\n\
-    \       PUSH int 100 ;\n\
-    \       ABS ;\n\
-    \       DROP ;\n\
-    \       DIP { CONCAT } ;\n\
-    \       COMPARE }"
-
   (* We remove a chunk from a well-typed program to make it ill-typed, and
      expect the type inference to fail *)
   let program =

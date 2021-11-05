@@ -216,6 +216,7 @@ let rec repeat f n =
 
 (* ----------------------------------------------------- *)
 
+(*
 let print_block b =
   Printf.printf
     "%6i %s\n"
@@ -225,7 +226,7 @@ let print_block b =
 let print_block_h chain bh =
   Store.Block.read_block_opt chain bh >|= WithExceptions.Option.get ~loc:__LOC__
   >|= fun b -> print_block b
-
+*)
 (* returns the predecessor at distance one, reading the header *)
 let linear_predecessor chain_store (bh : Block_hash.t) :
     Block_hash.t option Lwt.t =

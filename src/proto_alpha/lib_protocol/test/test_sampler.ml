@@ -42,26 +42,6 @@ module Int = struct
   let hash = Hashtbl.hash
 end
 
-let pp_array pp_elt fmtr array =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ",")
-    pp_elt
-    fmtr
-    (Array.to_list array)
-
-let compare_array cmp (a1 : 'a array) (a2 : 'a array) =
-  let c = Int.compare (Array.length a1) (Array.length a2) in
-  if c <> 0 then c
-  else
-    let exception Not_equal of int in
-    try
-      for i = 0 to Array.length a1 - 1 do
-        let c = cmp a1.(i) a2.(i) in
-        if c <> 0 then raise (Not_equal c) else ()
-      done ;
-      0
-    with Not_equal c -> c
-
 let equal_array elt_eq arr1 arr2 =
   Array.length arr1 = Array.length arr2
   && Stdlib.List.for_all2 elt_eq (Array.to_list arr1) (Array.to_list arr2)
@@ -139,9 +119,6 @@ let pp_dist pp fmtr dist =
     (fun fmtr (elt, w) -> Format.fprintf fmtr "(%a, %f)" pp elt (Q.to_float w))
     fmtr
     l
-
-let l1 (dist : ('a * Q.t) array) pmf =
-  Array.fold_left (fun acc (n, q) -> Q.(acc + abs (pmf n - q))) Q.zero dist
 
 let linf (dist : ('a * Q.t) array) pmf =
   Array.fold_left (fun acc (n, q) -> Q.(max acc (abs (pmf n - q)))) Q.zero dist

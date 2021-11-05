@@ -54,8 +54,6 @@ type key = Context.key
 let equal_key : key -> key -> bool =
  fun (a : string list) (b : string list) -> Stdlib.( = ) a b
 
-type value = Context.value
-
 (** Using [QCheck.small_list] for performance reasons: using [QCheck.list] here
     makes the file 40 times slower, which is not acceptable. *)
 let key_arb = QCheck.small_list QCheck.string

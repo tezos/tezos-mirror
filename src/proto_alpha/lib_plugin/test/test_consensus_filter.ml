@@ -91,10 +91,6 @@ module Generator = struct
     decorate ?prefix ?suffix Int32.to_string
     @@ map ~rev:Int32.to_int Int32.of_int small_nat
 
-  let small_signed_64 ?prefix ?suffix () =
-    decorate ?prefix ?suffix Int64.to_string
-    @@ map ~rev:Int64.to_int Int64.of_int small_signed_int
-
   let small_signed_32 ?prefix ?suffix () =
     decorate ?prefix ?suffix Int32.to_string
     @@ map ~rev:Int32.to_int Int32.of_int small_signed_int
@@ -487,7 +483,7 @@ let test_not_acceptable_next_level =
             ~now_timestamp
          >|? not))
 
-let tests =
+let () =
   Alcotest.run
     "Filter"
     [

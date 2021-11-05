@@ -791,6 +791,7 @@ let () =
             test_map_remove_add;
             test_map_add_remove;
             test_flush;
+            test_is_applied;
             test_is_in_mempool;
             test_none;
           ];

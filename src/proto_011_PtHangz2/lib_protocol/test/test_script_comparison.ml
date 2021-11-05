@@ -355,7 +355,7 @@ let test_pack_unpack =
         (Some x)
         (unpack_comparable_data ty (pack_comparable_data ty x)))
 
-let tests =
+let () =
   Alcotest.run
     "Script_comparison"
     [
