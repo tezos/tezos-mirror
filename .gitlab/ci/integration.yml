@@ -56,17 +56,6 @@ script:snapshot_alpha_and_link:
 ## Stage: run OCaml integration tests                     ##
 ############################################################
 
-integration:sandboxes:voting:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile voting_demo_noops
-  artifacts:
-    paths:
-      - flextesa-voting-demo-noops
-      - $BISECT_FILE
-    expire_in: 1 day
-    when: always
-
 integration:sandboxes:acc-endorsement:
   extends: .integration_template
   script:
