@@ -70,6 +70,7 @@ let () =
       ("timelock", Test_timelock.tests);
       ("script typed ir size", Test_script_typed_ir_size.tests);
       ("ticket storage", Test_ticket_storage.tests);
+      ("ticket scanner", Test_ticket_scanner.tests);
       ("fitness", Test_fitness.tests);
       ("round", Test_round_repr.tests);
       ("participation monitoring", Test_participation.tests);
