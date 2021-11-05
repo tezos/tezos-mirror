@@ -1004,11 +1004,14 @@ struct
     include Micheline
     include Micheline_encoding
 
-    let canonical_encoding_v1 ~variant encoding =
-      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
-
+    (* The environment exposes a single canonical encoding for Micheline
+       expression. For env-V4, it is encoding-v2 because this is the most
+       recent, most correct-at-time-of-writing encoding. For backwards
+       compatibility reason, you should never upgrade (nor downgrade) this.
+       Future fixes and improvements of the encoding should be made available in
+       future environments only. *)
     let canonical_encoding ~variant encoding =
-      canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
+      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
   module Updater = struct
