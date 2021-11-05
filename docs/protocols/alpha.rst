@@ -44,10 +44,6 @@ Michelson
 Bug Fixes
 ---------
 
-- Fix `a bug <https://marigold.dev/blog/communicating-about-view-issue-hangzhou/>`_ in the semantics of views, where step constants
-  ``BALANCE``, ``AMOUNT``, ``SENDER``, ``SELF``, and ``SELF_ADDRESS`` would not
-  be restored after returning from a view (MR :gl:`!3654`)
-
 Minor Changes
 -------------
 
