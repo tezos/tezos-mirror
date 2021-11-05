@@ -58,6 +58,7 @@ type run_params = {
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
+  self : Contract.t option;
 }
 
 val run_view :

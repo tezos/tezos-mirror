@@ -143,6 +143,7 @@ type run_params = {
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
+  self : Contract.t option;
 }
 
 let run_view (cctxt : #Protocol_client_context.rpc_context)
@@ -179,6 +180,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     balance;
     storage;
     entrypoint;
+    self;
   } =
     params
   in
@@ -197,6 +199,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~self
     ~now
     ~level
 
@@ -210,6 +213,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     balance;
     storage;
     entrypoint;
+    self;
   } =
     params
   in
@@ -228,6 +232,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~chain_id
     ~source
     ~payer
+    ~self
     ~now
     ~level
 

@@ -1563,10 +1563,11 @@ module RPC = struct
              (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
-             (opt "gas" Gas.Arith.z_integral_encoding)
+             (opt "self" Contract.encoding)
              (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
-          (obj3
+          (obj4
              (opt "unparsing_mode" unparsing_mode_encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding)
              (opt "now" Script_timestamp.encoding)
              (opt "level" Script_int.n_encoding))
 
@@ -2127,6 +2128,13 @@ module RPC = struct
       let ctxt = Cache.Admin.future_cache_expectation ctxt ~time_in_blocks in
       run_operation_service ctxt () (op, chain_id)
 
+    (* A convenience type for return values of [ensure_contracts_exist] below. *)
+    type run_code_addresses = {
+      self : Contract.t;
+      payer : Contract.t;
+      source : Contract.t;
+    }
+
     let register () =
       let originate_dummy_contract ctxt script balance =
         let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
@@ -2145,6 +2153,19 @@ module RPC = struct
           (`Contract dummy_contract)
           balance
         >>=? fun (ctxt, _) -> return (ctxt, dummy_contract)
+      in
+      let ensure_contracts_exist ctxt script balance src_opt pay_opt self_opt =
+        (match self_opt with
+        | None -> originate_dummy_contract ctxt script balance
+        | Some s -> return (ctxt, s))
+        >>=? fun (ctxt, self) ->
+        let (source, payer) =
+          match (src_opt, pay_opt) with
+          | (None, None) -> (self, self)
+          | (Some c, None) | (None, Some c) -> (c, c)
+          | (Some src, Some pay) -> (src, pay)
+        in
+        return (ctxt, {self; source; payer})
       in
       let script_entrypoint_type ctxt expr entrypoint =
         let ctxt = Gas.set_unlimited ctxt in
@@ -2176,24 +2197,23 @@ module RPC = struct
               amount,
               balance,
               chain_id,
-              source,
-              payer,
-              gas,
+              source_opt,
+              payer_opt,
+              self_opt,
               entrypoint ),
-            (unparsing_mode, now, level) )
+            (unparsing_mode, gas, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
+          ensure_contracts_exist
+            ctxt
+            {storage; code}
+            balance
+            source_opt
+            payer_opt
+            self_opt
+          >>=? fun (ctxt, {self; source; payer}) ->
           let gas =
             match gas with
             | Some gas -> gas
@@ -2212,16 +2232,7 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {
-              source;
-              payer;
-              self = dummy_contract;
-              amount;
-              balance;
-              chain_id;
-              now;
-              level;
-            }
+            {source; payer; self; amount; balance; chain_id; now; level}
           in
           Script_interpreter.execute
             ctxt
@@ -2251,24 +2262,23 @@ module RPC = struct
               amount,
               balance,
               chain_id,
-              source,
-              payer,
-              gas,
+              source_opt,
+              payer_opt,
+              self_opt,
               entrypoint ),
-            (unparsing_mode, now, level) )
+            (unparsing_mode, gas, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
+          ensure_contracts_exist
+            ctxt
+            {storage; code}
+            balance
+            source_opt
+            payer_opt
+            self_opt
+          >>=? fun (ctxt, {self; source; payer}) ->
           let gas =
             match gas with
             | Some gas -> gas
@@ -2287,16 +2297,7 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {
-              source;
-              payer;
-              self = dummy_contract;
-              amount;
-              balance;
-              chain_id;
-              now;
-              level;
-            }
+            {source; payer; self; amount; balance; chain_id; now; level}
           in
           let module Unparsing_mode = struct
             let unparsing_mode = unparsing_mode
@@ -2566,8 +2567,8 @@ module RPC = struct
                   [] ) ))
 
     let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ~script
-        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
-        ctxt block =
+        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~self ~now
+        ~level ctxt block =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -2581,13 +2582,13 @@ module RPC = struct
             chain_id,
             source,
             payer,
-            gas,
+            self,
             entrypoint ),
-          (unparsing_mode, now, level) )
+          (unparsing_mode, gas, now, level) )
 
     let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now
-        ~level ctxt block =
+        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~self
+        ~now ~level ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -2601,9 +2602,9 @@ module RPC = struct
             chain_id,
             source,
             payer,
-            gas,
+            self,
             entrypoint ),
-          (unparsing_mode, now, level) )
+          (unparsing_mode, gas, now, level) )
 
     let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level ?source
         ?payer ~unparsing_mode ctxt block =
