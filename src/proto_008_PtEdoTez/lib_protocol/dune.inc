@@ -402,7 +402,9 @@ include Tezos_raw_protocol_008_PtEdoTez.Main
 
 (library
  (name tezos_protocol_008_PtEdoTez_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-008-PtEdoTez)
  (libraries
       tezos-protocol-environment

@@ -131,7 +131,9 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_protocol_demo_counter_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-demo-counter)
  (libraries
       tezos-protocol-environment
