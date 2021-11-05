@@ -12,8 +12,8 @@ depends: [
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "lwt" { >= "5.4.0" }
-  "alcotest" { with-test & >= "1.1.0" }
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest" { with-test & >= "1.5.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
   "lwt_log" {with-test}
   "bigstring" {with-test}
   "tezos-test-helpers" {with-test}

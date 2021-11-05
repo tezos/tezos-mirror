@@ -18,7 +18,7 @@ depends: [
   "tezos-context"
   "tezos-event-logging"
   "bls12-381-unix" {with-test}
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" {with-test}
   "lwt" { with-test & >= "5.4.0" }

@@ -10,14 +10,14 @@ depends: [
   "tezos-base"
   "irmin" { >= "2.8.0" }
   "irmin-pack" { >= "2.8.0" }
+  "bigstringaf" { >= "0.2.0" }
   "tezos-shell-services"
   "fmt"
   "logs"
   "digestif" { >= "0.7.3" }
   "tezos-stdlib-unix"
-  "bigstringaf" { >= "0.2.0" }
-  "vector" { with-test }
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "vector" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
