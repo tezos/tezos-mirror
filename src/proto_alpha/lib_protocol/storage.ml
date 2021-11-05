@@ -27,34 +27,32 @@ open Storage_functors
 open Storage_sigs
 
 module Encoding = struct
-  module UInt16 = struct
+  module UInt16 : VALUE with type t = int = struct
     type t = int
 
     let encoding = Data_encoding.uint16
   end
 
-  module Int32 = struct
+  module Int32 : VALUE with type t = Int32.t = struct
     type t = Int32.t
 
     let encoding = Data_encoding.int32
   end
 
-  module Int64 = struct
+  module Int64 : VALUE with type t = Int64.t = struct
     type t = Int64.t
 
     let encoding = Data_encoding.int64
   end
 
-  module Z = struct
+  module Z : VALUE with type t = Z.t = struct
     type t = Z.t
 
     let encoding = Data_encoding.z
   end
 end
 
-module Int31_index : sig
-  include INDEX with type t = int
-end = struct
+module Int31_index : INDEX with type t = int = struct
   type t = int
 
   let path_length = 1
