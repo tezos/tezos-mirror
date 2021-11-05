@@ -26,10 +26,32 @@ faster than with a long-lived network.
 Get Free Funds
 ==============
 
-Test networks have a list of built-in accounts with some funds.
-You can obtain the key to these accounts from a faucet to claim the funds.
-All networks share the same faucet: https://faucet.tzalpha.net/.
-The keys obtained from this faucet can be used in all test networks.
+Test networks have a list of built-in accounts with some funds. You
+can obtain the key to these accounts from a faucet to claim the funds.
+Faucets can be accessed from https://teztnets.xyz/. Each of the test
+network listed there, including the active test networks described
+below, have independent faucets.
+
+**Caveat Emptor!**
+Testnets up to `granadanet` used to share the same faucet (formerly hosted at https://faucet.tzalpha.net/).
+The keys obtained from this faucet were shared between all test networks.
+This is no longer the case!
+
+Hangzhounet
+===========
+
+- Built-in network alias: ``hangzhounet`` (see :ref:`builtin_networks`)
+
+  * Available from version 11.0~rc2.
+
+- Run Docker image: ``wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Hangzhounet is a test network running the ``PtHangz2`` protocol.
+Hangzhounet will run until Hangzhou is rejected or replaced by another protocol on Mainnet.
+
+On Hangzhounet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Granadanet
 ==========
@@ -41,7 +63,7 @@ Granadanet
 - Run Docker image: ``wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Granadanet is a test network running the ``PtGRANAD`` protocol.
-Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
+Granadanet will run until Granada is rejected or replaced by another protocol on Mainnet.
 
 On Granadanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
