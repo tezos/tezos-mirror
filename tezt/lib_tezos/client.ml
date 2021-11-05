@@ -513,13 +513,10 @@ let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
 
 let gen_keys ~alias client = spawn_gen_keys ~alias client |> Process.check
 
-let spawn_show_address ?(show_secret = true) ~alias client =
-  spawn_command client
-  @@
-  if show_secret then ["show"; "address"; alias; "--show-secret"]
-  else ["show"; "address"; alias]
+let spawn_show_address ~alias client =
+  spawn_command client ["show"; "address"; alias; "--show-secret"]
 
-let show_address ?show_secret ~alias client =
+let show_address ~alias client =
   let extract_key (client_output : string) : Account.key =
     let public_key_hash =
       client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
@@ -535,18 +532,17 @@ let show_address ?show_secret ~alias client =
     {alias; public_key_hash; public_key; secret_key}
   in
   let* output =
-    spawn_show_address ?show_secret ~alias client
-    |> Process.check_and_read_stdout
+    spawn_show_address ~alias client |> Process.check_and_read_stdout
   in
   return @@ extract_key output
 
 let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
-  show_address ~show_secret:true ~alias client
+  show_address ~alias client
 
 let gen_and_show_secret_keys ~alias client =
   let* () = gen_keys ~alias client in
-  show_address ~show_secret:true ~alias client
+  show_address ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
@@ -773,8 +769,7 @@ let write_bootstrap_stresstest_sources_file client =
   in
   let* (accounts : Account.key list) =
     Lwt_list.map_s
-      (fun (account : Account.key) ->
-        show_address ~show_secret:true ~alias:account.alias client)
+      (fun (account : Account.key) -> show_address ~alias:account.alias client)
       keys
   in
   Account.write_stresstest_sources_file accounts

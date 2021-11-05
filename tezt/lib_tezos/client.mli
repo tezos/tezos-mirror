@@ -378,10 +378,10 @@ val propose_for :
   unit Lwt.t
 
 (** Run [tezos-client show address]. *)
-val show_address : ?show_secret:bool -> alias:string -> t -> Account.key Lwt.t
+val show_address : alias:string -> t -> Account.key Lwt.t
 
 (** Same as [show_address], but do not wait for the process to exit. *)
-val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
+val spawn_show_address : alias:string -> t -> Process.t
 
 (** Run [tezos-client gen keys]. *)
 val gen_keys : alias:string -> t -> unit Lwt.t
