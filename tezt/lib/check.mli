@@ -131,6 +131,12 @@ val tuple3 : 'a typ -> 'b typ -> 'c typ -> ('a * 'b * 'c) typ
     If all item types are comparable, the result is comparable in lexicographic order. *)
 val tuple4 : 'a typ -> 'b typ -> 'c typ -> 'd typ -> ('a * 'b * 'c * 'd) typ
 
+(** Make a 5-tuple type.
+
+    If all item types are comparable, the result is comparable in lexicographic order. *)
+val tuple5 :
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> ('a * 'b * 'c * 'd * 'e) typ
+
 (** Make a type by encoding to another.
 
     Usage: [convert encode typ]

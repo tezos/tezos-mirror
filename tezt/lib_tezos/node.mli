@@ -330,6 +330,13 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
+(** Get the current known level of a node.
+
+    Returns [0] if the node is not running or if no [node_chain_validator] event
+    was received yet. This makes this function equivalent to [wait_for_level node 0]
+    except that it does not actually wait for the level to be known. *)
+val get_level : t -> int
+
 (** Wait for the node to read its identity.
 
     More precisely, wait until a [read_identity] event occurs.

@@ -92,6 +92,14 @@ let () =
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register () ;
+  Voting.register
+    ~from_protocol:Granada
+    ~to_protocol:(Known Hangzhou)
+    ~loser_protocols:[Alpha] ;
+  Voting.register
+    ~from_protocol:Granada
+    ~to_protocol:Injected_test
+    ~loser_protocols:[Alpha; Hangzhou] ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
