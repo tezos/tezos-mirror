@@ -221,20 +221,21 @@ let () =
    The level offset of round r is the sum of the durations of the rounds up
    until round r - 1. In other words, when r > 0
 
-     level_offset_of_round(0)   = 0
-     level_offset_of_round(r+1) = level_offset_of_round(r) + round_duration(r)
+     raw_level_offset_of_round(0)   = 0
+     raw_level_offset_of_round(r+1) =
+       raw_level_offset_of_round(r) + round_duration(r)
 
 Hence
 
-     level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
+     raw_level_offset_of_round(r) = Σ_{k=0}^{r-1} (round_duration(k))
 
    After unfolding the series, the same function can be finally explicited into
 
-     level_offset_of_round(0) = 0
-     level_offset_of_round(r) = r * first_round_duration
+     raw_level_offset_of_round(0) = 0
+     raw_level_offset_of_round(r) = r * first_round_duration
                                 + 1/2 * r * (r - 1) * delay_increment_per_round
 *)
-let level_offset_of_round round_durations ~round =
+let raw_level_offset_of_round round_durations ~round =
   if Compare.Int32.(round = zero) then ok Int64.zero
   else
     let sum_durations =
@@ -362,7 +363,7 @@ let round_and_offset round_durations ~level_offset =
                (sqrt discr))
             (double delay_increment_per_round)
       in
-      level_offset_of_round round_durations ~round:(Int64.to_int32 round)
+      raw_level_offset_of_round round_durations ~round:(Int64.to_int32 round)
       >>? fun current_level_offset ->
       ok
         {
@@ -388,7 +389,7 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
   >>? fun start_of_current_level ->
   (* Finally, we sum the durations of the rounds at the current level l until
      reaching current [round]. *)
-  level_offset_of_round round_durations ~round >>? fun level_offset ->
+  raw_level_offset_of_round round_durations ~round >>? fun level_offset ->
   let level_offset = Period_repr.of_seconds_exn level_offset in
   Time_repr.(start_of_current_level +? level_offset)
 
@@ -403,9 +404,9 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     Complexity: O(|round_durations|). *)
 let timestamp_of_another_round_same_level round_durations ~current_timestamp
     ~current_round ~considered_round =
-  level_offset_of_round round_durations ~round:considered_round
+  raw_level_offset_of_round round_durations ~round:considered_round
   >>? fun target_offset ->
-  level_offset_of_round round_durations ~round:current_round
+  raw_level_offset_of_round round_durations ~round:current_round
   >>? fun current_offset ->
   ok
   @@ Time_repr.of_seconds
@@ -472,7 +473,7 @@ let round_of_timestamp round_durations ~predecessor_timestamp ~predecessor_round
   >>? fun round_and_offset -> ok round_and_offset.round
 
 let level_offset_of_round round_durations ~round =
-  level_offset_of_round round_durations ~round >>? fun offset ->
+  raw_level_offset_of_round round_durations ~round >>? fun offset ->
   ok (Period_repr.of_seconds_exn offset)
 
 module Internals_for_test = struct
