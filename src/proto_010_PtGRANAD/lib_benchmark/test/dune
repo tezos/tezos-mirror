@@ -19,8 +19,10 @@
 
 (rule
   (alias runtest)
+  (package tezos-benchmark-010-PtGRANAD)
   (action (run %{exe:test_sampling_data.exe} 1234)))
 
 (rule
   (alias runtest)
+  (package tezos-benchmark-010-PtGRANAD)
   (action (run %{exe:test_sampling_code.exe} 1234)))
