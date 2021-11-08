@@ -182,7 +182,7 @@ module Durations = struct
             | None -> Error "The provided round durations are not increasing."
             | Some rounds -> Ok rounds)
         | [] | [_] ->
-            Error "Round durations are expected to have at least two elements")
+            Error "Round durations are expected to have at least two elements.")
       (Data_encoding.list Period_repr.encoding)
 
   let round_duration round_durations round =
@@ -197,7 +197,7 @@ module Durations = struct
                 if Compare.Int32.(i = 0l) then d
                 else loop (Int32.pred i) d ultimate ds
             | [] ->
-                (* The last element of the list is the ultimate *)
+                (* The last element of the list is the ultimate. *)
                 let last = Period_repr.to_seconds ultimate in
                 let last_but_one = Period_repr.to_seconds penultimate in
                 let diff = Int64.sub last last_but_one in
@@ -208,7 +208,7 @@ module Durations = struct
           in
           loop (Int32.sub round 2l) duration1 duration0 durations
     | _ ->
-        (* Durations are at least length 2, so this should not happen *)
+        (* Durations are at least length 2, so this should not happen. *)
         assert false
 
   let first = function h :: _ -> h | _ -> assert false
@@ -235,7 +235,7 @@ let () =
     necessarily a positive number. *)
 let level_offset_of_round (round_durations : Durations.t) ~round =
   (* Auxiliary function to return a pair of the last element of the
-     list and the sum the [round - 1]-th first elements of
+     list and the sum of the [round - 1]-th first elements of
      [round_durations]. *)
   let rec last_and_sum_loop round_durations ~round ~sum_acc =
     match round_durations with
@@ -408,10 +408,10 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
      its last round [predecessor_round]. *)
   Time_repr.(predecessor_timestamp +? pred_round_duration)
   >>? fun start_of_current_level ->
+  (* Finally, we sum the durations of the rounds at the current level l until
+     reaching current [round]. *)
   level_offset_of_round round_durations ~round >>? fun level_offset ->
   let level_offset = Period_repr.of_seconds_exn level_offset in
-  (* Finally, we sum of round durations of current level l until
-     reaching current [round]. *)
   Time_repr.(start_of_current_level +? level_offset)
 
 (** Unlike [timestamp_of_round], this function gets the starting time
