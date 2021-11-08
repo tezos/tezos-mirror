@@ -47,11 +47,11 @@ let () =
     `Permanent
     ~id:"negative_round"
     ~title:"Negative round"
-    ~description:"Round cannot be build out of negative int32."
+    ~description:"Round cannot be built out of negative int32."
     ~pp:(fun ppf i ->
       Format.fprintf
         ppf
-        "Negative round cannot be build out of negative int32 (%ld)"
+        "Negative round cannot be built out of negative int32 (%ld)"
         i)
     (obj1 (req "Negative_round" int32))
     (function Negative_round i -> Some i | _ -> None)
@@ -61,11 +61,11 @@ let () =
     ~id:"round_overflow"
     ~title:"Round overflow"
     ~description:
-      "Round cannot be build out of integer greater than maximum int32 value."
+      "Round cannot be built out of integer greater than maximum int32 value."
     ~pp:(fun ppf i ->
       Format.fprintf
         ppf
-        "Round cannot be build out of integer greater than maximum int32 value \
+        "Round cannot be built out of integer greater than maximum int32 value \
          (%Ld)"
         i)
     (obj1 (req "Negative_round" int64))
