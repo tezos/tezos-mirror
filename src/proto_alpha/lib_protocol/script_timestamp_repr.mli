@@ -63,3 +63,6 @@ val sub_delta : t -> z num -> t
 val to_zint : t -> Z.t
 
 val of_zint : Z.t -> t
+
+(* Timestamps are encoded exactly as Z. *)
+val encoding : t Data_encoding.encoding

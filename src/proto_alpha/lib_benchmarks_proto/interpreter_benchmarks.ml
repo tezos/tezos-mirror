@@ -2846,6 +2846,8 @@ module Registration_section = struct
               self = zero;
               amount = Tez.zero;
               chain_id = Chain_id.zero;
+              now = Script_timestamp.of_zint Z.zero;
+              level = Script_int.zero_n;
             }
           in
           let cont = KView_exit (step_constants, KNil) in

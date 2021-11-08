@@ -480,6 +480,8 @@ module Script_timestamp : sig
   val to_zint : t -> Z.t
 
   val of_zint : Z.t -> t
+
+  val encoding : t Data_encoding.encoding
 end
 
 module Script : sig

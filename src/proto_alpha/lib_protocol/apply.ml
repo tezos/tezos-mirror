@@ -839,9 +839,14 @@ let apply_manager_operation_content :
               in
               (ctxt, result, []) )
       | Some (script, script_ir) ->
+          let now = Script_timestamp.now ctxt in
+          let level =
+            (Level.current ctxt).level |> Raw_level.to_int32
+            |> Script_int.of_int32 |> Script_int.abs
+          in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = destination; amount; chain_id}
+            {source; payer; self = destination; amount; chain_id; now; level}
           in
           Script_interpreter.execute
             ctxt
@@ -2154,6 +2159,11 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
        match script with
        | None -> fail (Script_tc_errors.No_such_entrypoint "default")
        | Some (script, script_ir) -> (
+           let now = Script_timestamp.now ctxt in
+           let level =
+             (Level.current ctxt).level |> Raw_level.to_int32
+             |> Script_int.of_int32 |> Script_int.abs
+           in
            let step_constants =
              let open Script_interpreter in
              (* Using dummy values for source, payer, and chain_id
@@ -2165,6 +2175,8 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                self = liquidity_baking_cpmm_contract;
                amount = liquidity_baking_subsidy;
                chain_id = Chain_id.zero;
+               now;
+               level;
              }
            in
            let parameter =

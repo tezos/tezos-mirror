@@ -135,3 +135,7 @@ val unparsing_mode_arg :
 val enforce_indentation_flag : (bool, full) Clic.arg
 
 val display_names_flag : (bool, full) Clic.arg
+
+val level_arg : (Script_int.n Script_int.num option, full) Clic.arg
+
+val now_arg : (Script_timestamp.t option, full) Clic.arg

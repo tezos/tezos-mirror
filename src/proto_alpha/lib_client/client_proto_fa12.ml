@@ -969,6 +969,8 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ?gas
     ~entrypoint
     ~unparsing_mode
+    ~now:None
+    ~level:None
 
 let () =
   Data_encoding.(

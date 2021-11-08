@@ -33,6 +33,8 @@ type step_constants = {
   self : Contract.t;
   amount : Tez.t;
   chain_id : Chain_id.t;
+  now : Script_timestamp.t;
+  level : Script_int.n Script_int.num;
 }
 
 (* Preliminary definitions. *)

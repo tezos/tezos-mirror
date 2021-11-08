@@ -102,6 +102,8 @@ let commands () =
       ~doc:"balance of run contract in \xEA\x9C\xA9"
       ~default:"4_000_000"
   in
+  let now_arg = Client_proto_args.now_arg in
+  let level_arg = Client_proto_args.level_arg in
   let resolve_max_gas cctxt block = function
     | None ->
         Alpha_services.Constants.all cctxt (cctxt#chain, block)
@@ -233,7 +235,7 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args9
+      (args11
          trace_stack_switch
          amount_arg
          balance_arg
@@ -242,7 +244,9 @@ let commands () =
          no_print_source_flag
          run_gas_limit_arg
          entrypoint_arg
-         (unparsing_mode_arg ~default:"Readable"))
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
       (prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
@@ -258,7 +262,9 @@ let commands () =
              no_print_source,
              gas,
              entrypoint,
-             unparsing_mode )
+             unparsing_mode,
+             now,
+             level )
            program
            storage
            input
@@ -273,17 +279,15 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~amount
-            ~balance
-            ~program
-            ~storage
-            ~input
-            ~unparsing_mode
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
+            {
+              amount = Some amount;
+              balance;
+              program;
+              storage;
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              entrypoint;
+            }
           >>= fun res ->
           print_trace_result cctxt ~show_source ~parsed:program res
         else
@@ -291,17 +295,15 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~amount
-            ~balance
-            ~program
-            ~storage
-            ~input
-            ~unparsing_mode
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
+            {
+              amount = Some amount;
+              balance;
+              program;
+              storage;
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              entrypoint;
+            }
           >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
@@ -925,11 +927,13 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a TZIP-4 view."
-      (args4
+      (args6
          source_arg
          payer_arg
          run_gas_limit_arg
-         (unparsing_mode_arg ~default:"Readable"))
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
       (prefixes ["run"; "tzip4"; "view"]
       @@ param ~name:"entrypoint" ~desc:"the name of the view" string_parameter
       @@ prefixes ["on"; "contract"]
@@ -939,7 +943,7 @@ let commands () =
       @@ prefixes ["with"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop)
-      (fun (source, payer, gas, unparsing_mode)
+      (fun (source, payer, gas, unparsing_mode, now, level)
            entrypoint
            (_, contract)
            input
@@ -950,13 +954,11 @@ let commands () =
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
-          ?gas
-          ~contract
-          ~entrypoint
-          ~input
-          ?source
-          ?payer
-          ~unparsing_mode
-          ()
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            entrypoint;
+          }
         >>= fun res -> print_view_result cctxt res);
   ]

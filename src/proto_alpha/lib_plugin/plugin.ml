@@ -880,7 +880,10 @@ module RPC = struct
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
              (dft "entrypoint" string "default"))
-          (obj1 (opt "unparsing_mode" unparsing_mode_encoding))
+          (obj3
+             (opt "unparsing_mode" unparsing_mode_encoding)
+             (opt "now" Script_timestamp.encoding)
+             (opt "level" Script_int.n_encoding))
 
       let run_code_output_encoding =
         conv
@@ -932,7 +935,7 @@ module RPC = struct
 
       let run_view_encoding =
         let open Data_encoding in
-        obj8
+        obj10
           (req "contract" Contract.encoding)
           (req "entrypoint" string)
           (req "input" Script.expr_encoding)
@@ -941,6 +944,8 @@ module RPC = struct
           (opt "payer" Contract.encoding)
           (opt "gas" Gas.Arith.z_integral_encoding)
           (req "unparsing_mode" unparsing_mode_encoding)
+          (opt "now" Script_timestamp.encoding)
+          (opt "level" Script_int.n_encoding)
 
       let run_code =
         RPC_service.post_service
@@ -1581,7 +1586,7 @@ module RPC = struct
               payer,
               gas,
               entrypoint ),
-            unparsing_mode )
+            (unparsing_mode, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
@@ -1601,9 +1606,19 @@ module RPC = struct
             | None -> Constants.hard_gas_limit_per_operation ctxt
           in
           let ctxt = Gas.set_limit ctxt gas in
+          let now =
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          in
+          let level =
+            match level with
+            | None ->
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
+          in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
+            {source; payer; self = dummy_contract; amount; chain_id; now; level}
           in
           Script_interpreter.execute
             ctxt
@@ -1637,7 +1652,7 @@ module RPC = struct
               payer,
               gas,
               entrypoint ),
-            unparsing_mode )
+            (unparsing_mode, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
@@ -1657,9 +1672,19 @@ module RPC = struct
             | None -> Constants.hard_gas_limit_per_operation ctxt
           in
           let ctxt = Gas.set_limit ctxt gas in
+          let now =
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          in
+          let level =
+            match level with
+            | None ->
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
+          in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
+            {source; payer; self = dummy_contract; amount; chain_id; now; level}
           in
           let module Unparsing_mode = struct
             let unparsing_mode = unparsing_mode
@@ -1691,7 +1716,9 @@ module RPC = struct
             source,
             payer,
             gas,
-            unparsing_mode )
+            unparsing_mode,
+            now,
+            level )
         ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
@@ -1723,9 +1750,27 @@ module RPC = struct
               gas
           in
           let ctxt = Gas.set_limit ctxt gas in
+          let now =
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          in
+          let level =
+            match level with
+            | None ->
+                (Level.current ctxt).level |> Raw_level.to_int32
+                |> Script_int.of_int32 |> Script_int.abs
+            | Some z -> z
+          in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = contract; amount = Tez.zero; chain_id}
+            {
+              source;
+              payer;
+              self = contract;
+              amount = Tez.zero;
+              chain_id;
+              now;
+              level;
+            }
           in
           let parameter =
             View_helpers.make_view_parameter
@@ -1905,7 +1950,8 @@ module RPC = struct
                   [] ) ))
 
     let run_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script ~storage
-        ~input ~amount ~balance ~chain_id ~source ~payer ctxt block =
+        ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level ctxt block
+        =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -1921,10 +1967,11 @@ module RPC = struct
             payer,
             gas,
             entrypoint ),
-          unparsing_mode )
+          (unparsing_mode, now, level) )
 
     let trace_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script
-        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ctxt block =
+        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
+        ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -1940,10 +1987,10 @@ module RPC = struct
             payer,
             gas,
             entrypoint ),
-          unparsing_mode )
+          (unparsing_mode, now, level) )
 
-    let run_view ?gas ~contract ~entrypoint ~input ~chain_id ?source ?payer
-        ~unparsing_mode ctxt block =
+    let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level ?source
+        ?payer ~unparsing_mode ctxt block =
       RPC_context.make_call0
         S.run_view
         ctxt
@@ -1956,7 +2003,9 @@ module RPC = struct
           source,
           payer,
           gas,
-          unparsing_mode )
+          unparsing_mode,
+          now,
+          level )
 
     let typecheck_code ?gas ?legacy ~script ctxt block =
       RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)

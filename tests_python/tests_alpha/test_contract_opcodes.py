@@ -1479,6 +1479,44 @@ class TestContractOpcodes:
         )
         assert run_script_res.storage == str(int(1000000 * balance))
 
+    def test_now(self, client_regtest: ClientRegression):
+        """Test that the --now flag of 'tezos-client run script' affects the
+        value returned by the NOW instruction. See also
+        test_contract_onchain_opcodes.py for a complementary test of the NOW
+        instruction."""
+        client = client_regtest
+        contract = 'store_now.tz'
+        initial_storage = '"2017-07-13T09:19:01Z"'
+        now = '2021-10-13T10:16:52Z'
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        run_script_res = client.run_script(
+            contract,
+            storage=initial_storage,
+            inp='Unit',
+            now=now,
+            trace_stack=True,
+        )
+        assert run_script_res.storage == f'"{now}"'
+
+    def test_level(self, client_regtest: ClientRegression):
+        """Test that the --level flag of 'tezos-client run script' affects the
+        value returned by the LEVEL instruction. See also
+        test_contract_onchain_opcodes.py for a complementary test of the LEVEL
+        instuction."""
+        client = client_regtest
+        contract = 'level.tz'
+        initial_storage = '9999999'
+        level = 10
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        run_script_res = client.run_script(
+            contract,
+            storage=initial_storage,
+            inp='Unit',
+            level=level,
+            trace_stack=True,
+        )
+        assert run_script_res.storage == f'{level}'
+
     @pytest.mark.parametrize(
         "contract,param,storage,expected,big_map_diff",
         [  # FORMAT: assert_output contract_file storage input expected_result

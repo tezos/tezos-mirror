@@ -107,3 +107,7 @@ let logxor x y = Z.logxor x y
 let logand x y = Z.logand x y
 
 let lognot x = Z.lognot x
+
+let z_encoding : z num Data_encoding.encoding = Data_encoding.z
+
+let n_encoding : n num Data_encoding.encoding = Data_encoding.n

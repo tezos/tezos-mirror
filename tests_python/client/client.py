@@ -244,6 +244,8 @@ class Client:
         inp: str,
         amount: float = None,
         balance: float = None,
+        now: str = None,
+        level: int = None,
         trace_stack: bool = False,
         gas: int = None,
         file: bool = True,
@@ -265,6 +267,10 @@ class Client:
             cmd += ['-z', '%.6f' % amount]
         if balance is not None:
             cmd += ['--balance', '%.6f' % balance]
+        if now is not None:
+            cmd += ['--now', now]
+        if level is not None:
+            cmd += ['--level', f'{level}']
         if trace_stack:
             cmd += ['--trace-stack']
         if gas is not None:

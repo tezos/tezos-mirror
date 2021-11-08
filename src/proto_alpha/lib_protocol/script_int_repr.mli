@@ -153,3 +153,9 @@ val logand : _ num -> n num -> n num
 
 (** Applies a boolean xor operation to each bit. *)
 val logxor : n num -> n num -> n num
+
+(** Naturals are encoded using Data_encoding.n *)
+val n_encoding : n num Data_encoding.encoding
+
+(** Integers are encoded using Data_encoding.z *)
+val z_encoding : z num Data_encoding.encoding

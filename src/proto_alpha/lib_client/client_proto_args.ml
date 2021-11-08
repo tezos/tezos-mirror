@@ -262,6 +262,37 @@ let default_fee_arg =
     ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
     (tez_parameter "--default-fee")
 
+let level_kind =
+  parameter (fun _ s ->
+      match Option.bind (Script_int.of_string s) Script_int.is_nat with
+      | Some n -> return n
+      | None -> failwith "invalid level (must be a positive number)")
+
+let level_arg =
+  arg
+    ~long:"level"
+    ~placeholder:"level"
+    ~doc:"Set the level to be returned by the LEVEL instruction"
+    level_kind
+
+let timestamp_parameter =
+  parameter (fun _ s ->
+      match Script_timestamp.of_string s with
+      | Some time -> return time
+      | None ->
+          failwith
+            "invalid timestamp, must be either a RFC 3339 string or a number \
+             of seconds since epoch.")
+
+let now_arg =
+  arg
+    ~long:"now"
+    ~placeholder:"timestamp"
+    ~doc:
+      "Set the timestamp to be returned by the NOW instruction. Allowed format \
+       are RFC 3339 (YYYY-MM-DDTHH:MM:SSZ) or number of seconds since epoch."
+    timestamp_parameter
+
 let gas_limit_kind =
   parameter (fun _ s ->
       try
