@@ -249,12 +249,16 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
 
-    def typecheck(self, contract: str, file: bool = True, legacy=False) -> str:
+    def typecheck(
+        self, contract: str, file: bool = True, legacy=False, details=False
+    ) -> str:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
         params = ['typecheck', 'script', contract]
         if legacy:
             params += ['--legacy']
+        if details:
+            params += ['--details']
         return self.run(params)
 
     def typecheck_data(self, data: str, typ: str, legacy=False) -> str:
