@@ -1,0 +1,37 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/tez_add_sub.tz]
+
+Well typed
+Gas remaining: 1039986.225 units remaining
+{ parameter (pair mutez mutez) ;
+  storage (option (pair mutez mutez)) ;
+  code { CAR
+         /* [ @parameter pair mutez mutez ] */ ;
+         DUP
+         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+         DUP
+         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
+            : @parameter pair mutez mutez ] */ ;
+         CAR
+         /* [ mutez : @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+         DIP { CDR /* [ mutez : @parameter pair mutez mutez ] */ }
+         /* [ mutez : mutez : @parameter pair mutez mutez ] */ ;
+         ADD
+         /* [ mutez : @parameter pair mutez mutez ] */ ;
+         DIP { DUP
+               /* [ @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+               CAR
+               /* [ mutez : @parameter pair mutez mutez ] */ ;
+               DIP { CDR /* [ mutez ] */ }
+               /* [ mutez : mutez ] */ ;
+               SUB_MUTEZ
+               /* [ option mutez ] */ ;
+               ASSERT_SOME }
+         /* [ mutez : @some mutez ] */ ;
+         PAIR
+         /* [ pair mutez (mutez @some) ] */ ;
+         SOME
+         /* [ option (pair mutez (mutez @some)) ] */ ;
+         NIL operation
+         /* [ list operation : option (pair mutez (mutez @some)) ] */ ;
+         PAIR
+         /* [ pair (list operation) (option (pair mutez (mutez @some))) ] */ } }

@@ -1,0 +1,71 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/spawn_identities.tz]
+
+Well typed
+Gas remaining: 1039971.200 units remaining
+{ parameter nat ;
+  storage (list address) ;
+  code { /* [ pair (string @parameter) (string @storage) ] */
+         DUP
+         /* [ list operation : @parameter string ] */ ;
+         CAR
+         /* [ @parameter nat : pair (nat @parameter) (list @storage address) ] */ ;
+         DIP { CDR
+               /* [ @storage list address ] */ ;
+               NIL operation
+               /* [ list operation : @storage list address ] */ }
+         /* [ pair (list operation) (string @parameter) ] */ ;
+         PUSH bool
+              True
+         /* [ bool : @parameter nat : list operation : @storage list address ] */ ;
+         LOOP { DUP
+                /* [ @parameter nat : @parameter nat : list operation : @storage list address ] */ ;
+                PUSH nat
+                     0
+                /* [ nat : @parameter nat : @parameter nat : list operation
+                   : @storage list address ] */ ;
+                CMPEQ ;
+                IF { PUSH bool
+                          False
+                     /* [ bool : @parameter nat : list operation : @storage list address ] */ }
+                   { PUSH nat 1
+                     /* [ nat : @parameter nat : list operation : @storage list address ] */ ;
+                     SWAP
+                     /* [ @parameter nat : nat : list operation : @storage list address ] */ ;
+                     SUB
+                     /* [ int : list operation : @storage list address ] */ ;
+                     ABS
+                     /* [ nat : list operation : @storage list address ] */ ;
+                     PUSH string "init"
+                     /* [ string : nat : list operation : @storage list address ] */ ;
+                     PUSH mutez
+                          5000000
+                     /* [ mutez : string : nat : list operation : @storage list address ] */ ;
+                     NONE key_hash
+                     /* [ option key_hash : mutez : string : nat : list operation
+                        : @storage list address ] */ ;
+                     CREATE_CONTRACT
+                       { parameter string ;
+                         storage string ;
+                         code { CAR ; NIL operation ; PAIR } }
+                     /* [ operation : address : nat : list operation : @storage list address ] */ ;
+                     SWAP
+                     /* [ address : operation : nat : list operation : @storage list address ] */ ;
+                     DIP { SWAP
+                           /* [ nat : operation : list operation : @storage list address ] */ ;
+                           DIP { CONS /* [ list operation : @storage list address ] */ }
+                           /* [ nat : list operation : @storage list address ] */ }
+                     /* [ address : nat : list operation : @storage list address ] */ ;
+                     SWAP
+                     /* [ nat : address : list operation : @storage list address ] */ ;
+                     DIP { SWAP
+                           /* [ list operation : address : @storage list address ] */ ;
+                           DIP { CONS /* [ list address ] */ }
+                           /* [ list operation : list address ] */ }
+                     /* [ nat : list operation : list address ] */ ;
+                     PUSH bool True
+                     /* [ bool : nat : list operation : list address ] */ } }
+         /* [ @parameter nat : list operation : @storage list address ] */ ;
+         DROP
+         /* [ list operation : @storage list address ] */ ;
+         PAIR
+         /* [ pair (list operation) (list @storage address) ] */ } }

@@ -1,0 +1,71 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/cps_fact.tz]
+
+Well typed
+Gas remaining: 1039973.219 units remaining
+{ storage nat ;
+  parameter nat ;
+  code { UNPAIR
+         /* [ @parameter nat : @storage nat ] */ ;
+         DIP { SELF
+               /* [ @self contract nat : @storage nat ] */ ;
+               ADDRESS
+               /* [ @self.address address : @storage nat ] */ ;
+               SENDER
+               /* [ @sender address : @self.address address : @storage nat ] */ ;
+               IFCMPEQ
+                 { /* [ @storage nat ] */ }
+                 { DROP /* [] */ ; PUSH @storage nat 1 /* [ @storage nat ] */ } }
+         /* [ @parameter nat : @storage nat ] */ ;
+         DUP
+         /* [ @parameter nat : @parameter nat : @storage nat ] */ ;
+         PUSH nat 1
+         /* [ nat : @parameter nat : @parameter nat : @storage nat ] */ ;
+         IFCMPGE
+           { DROP
+             /* [ @storage nat ] */ ;
+             NIL operation
+             /* [ list operation : @storage nat ] */ ;
+             PAIR
+             /* [ pair (list operation) (nat @storage) ] */ }
+           { PUSH nat 1
+             /* [ nat : @parameter nat : @storage nat ] */ ;
+             SWAP
+             /* [ @parameter nat : nat : @storage nat ] */ ;
+             SUB @parameter
+             /* [ @parameter int : @storage nat ] */ ;
+             ISNAT
+             /* [ @parameter option nat : @storage nat ] */ ;
+             IF_NONE
+               { NIL operation
+                 /* [ list operation : @storage nat ] */ ;
+                 PAIR
+                 /* [ pair (list operation) (nat @storage) ] */ }
+               { DUP
+                 /* [ @parameter.some nat : @parameter.some nat : @storage nat ] */ ;
+                 DIP { PUSH nat 1
+                       /* [ nat : @parameter.some nat : @storage nat ] */ ;
+                       ADD
+                       /* [ nat : @storage nat ] */ ;
+                       MUL @storage
+                       /* [ @storage nat ] */ }
+                 /* [ @parameter.some nat : @storage nat ] */ ;
+                 SWAP
+                 /* [ @storage nat : @parameter.some nat ] */ ;
+                 DIP { DIP { SELF
+                             /* [ @self contract nat ] */ ;
+                             PUSH mutez 0
+                             /* [ mutez : @self contract nat ] */ }
+                       /* [ @parameter.some nat : mutez : @self contract nat ] */ ;
+                       TRANSFER_TOKENS
+                       /* [ operation ] */ ;
+                       NIL operation
+                       /* [ list operation : operation ] */ ;
+                       SWAP
+                       /* [ operation : list operation ] */ ;
+                       CONS
+                       /* [ list operation ] */ }
+                 /* [ @storage nat : list operation ] */ ;
+                 SWAP
+                 /* [ list operation : @storage nat ] */ ;
+                 PAIR
+                 /* [ pair (list operation) (nat @storage) ] */ } } } }
