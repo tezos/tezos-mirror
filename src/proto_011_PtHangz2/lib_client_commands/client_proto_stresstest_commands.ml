@@ -30,7 +30,7 @@ type transfer_strategy =
   | Fixed_amount of {mutez : Tez.t}  (** Amount to transfer *)
   | Evaporation of {fraction : float}
       (** Maximum fraction of current wealth to transfer.
-      Minimum amount is 1 mutez regardless of total wealth. *)
+          Minimum amount is 1 mutez regardless of total wealth. *)
 
 type parameters = {
   seed : int;
@@ -47,15 +47,24 @@ type parameters = {
       (** total number of transfers to perform; unbounded if None *)
   single_op_per_pkh_per_block : bool;
       (** if true, a single operation will be injected by pkh by block to
-      improve the chance for the injected operations to be included in the
-      next block **)
+          improve the chance for the injected operations to be included in the
+          next block *)
 }
+
+type origin = Explicit | Wallet_pkh | Wallet_alias of string
 
 type source = {
   pkh : public_key_hash;
   pk : public_key;
   sk : Signature.secret_key;
 }
+
+type input_source =
+  | Explicit of source
+  | Wallet_alias of string
+  | Wallet_pkh of public_key_hash
+
+type source_origin = {source : source; origin : origin}
 
 type transfer = {
   src : source;
@@ -69,9 +78,9 @@ type transfer = {
 type state = {
   current_head_on_start : Block_hash.t;
   counters : (Block_hash.t * Z.t) Signature.Public_key_hash.Table.t;
-  mutable pool : source list;
+  mutable pool : source_origin list;
   mutable pool_size : int;
-  (* [Some l] if [single_op_per_pkh_per_block] is true *)
+      (** [Some l] if [single_op_per_pkh_per_block] is true *)
   mutable shuffled_pool : source list option;
   mutable last_block : Block_hash.t;
   new_block_condition : unit Lwt_condition.t;
@@ -104,19 +113,34 @@ let default_parameters =
     single_op_per_pkh_per_block = false;
   }
 
-let source_encoding =
+let input_source_encoding =
   let open Data_encoding in
-  conv
-    (fun {pkh; pk; sk} -> (pkh, pk, sk))
-    (fun (pkh, pk, sk) -> {pkh; pk; sk})
-    (obj3
-       (req "pkh" Signature.Public_key_hash.encoding)
-       (req "pk" Signature.Public_key.encoding)
-       (req "sk" Signature.Secret_key.encoding))
+  union
+    [
+      case
+        ~title:"explicit"
+        (Tag 0)
+        (obj3
+           (req "pkh" Signature.Public_key_hash.encoding)
+           (req "pk" Signature.Public_key.encoding)
+           (req "sk" Signature.Secret_key.encoding))
+        (function Explicit {pkh; pk; sk} -> Some (pkh, pk, sk) | _ -> None)
+        (fun (pkh, pk, sk) -> Explicit {pkh; pk; sk});
+      case
+        ~title:"alias"
+        (Tag 1)
+        (obj1 (req "alias" Data_encoding.string))
+        (function Wallet_alias alias -> Some alias | _ -> None)
+        (fun alias -> Wallet_alias alias);
+      case
+        ~title:"pkh"
+        (Tag 2)
+        (obj1 (req "pkh" Signature.Public_key_hash.encoding))
+        (function Wallet_pkh pkh -> Some pkh | _ -> None)
+        (fun pkh -> Wallet_pkh pkh);
+    ]
 
-let source_list_encoding =
-  let open Data_encoding in
-  list source_encoding
+let input_source_list_encoding = Data_encoding.list input_source_encoding
 
 let injected_operations_encoding =
   let open Data_encoding in
@@ -143,6 +167,95 @@ let parse_strategy s =
       | fraction -> Ok (Evaporation {fraction}))
   | _ -> Error "invalid argument"
 
+(** This command uses two different data structures for sources:
+    - The in-output files one,
+    - The normalized one.
+
+    The data structure used for in-output files does not directly contain the
+    data required to forge operations. For efficiency purposes, the sources are
+    converted into a normalized data structure that contains all the required
+    data to forge operations and the format originally used to be able to
+    revert this conversion. *)
+
+(** [normalize_source cctxt src] converts [src] from in-output data structure
+    to normalized one. If the conversion fails, [None] is returned and a
+    warning message is printed in [cctxt].
+
+    Only unencrypted and encrypted sources from the wallet of [cctxt] are
+    supported. *)
+let normalize_source cctxt =
+  let sk_of_sk_uri sk_uri =
+    match
+      Signature.Secret_key.of_b58check
+        (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
+    with
+    | Ok sk -> Lwt.return_some sk
+    | Error _ -> (
+        Tezos_signer_backends.Encrypted.decrypt cctxt sk_uri >>= function
+        | Error _ -> Lwt.return_none
+        | Ok sk -> Lwt.return_some sk)
+  in
+  let key_from_alias alias =
+    let warning msg alias =
+      cctxt#warning msg alias >>= fun () -> Lwt.return_none
+    in
+    (Client_keys.alias_keys cctxt alias >>= function
+     | Error _ | Ok None -> warning "Alias \"%s\" not found in the wallet" alias
+     | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
+         warning
+           "Alias \"%s\" does not contain public or secret key and could not \
+            be used for stresstest"
+           alias
+     | Ok (Some (pkh, Some pk, Some sk_uri)) -> (
+         sk_of_sk_uri sk_uri >>= function
+         | None ->
+             warning
+               "Cannot extract the secret key form the alias \"%s\" of the \
+                wallet"
+               alias
+         | Some sk ->
+             Lwt.return_some
+               {source = {pkh; pk; sk}; origin = Wallet_alias alias}))
+    >>= function
+    | None -> warning "Source given as alias \"%s\" ignored" alias
+    | key -> Lwt.return key
+  in
+  let key_from_wallet pkh =
+    let warning msg pkh =
+      cctxt#warning msg Signature.Public_key_hash.pp pkh >>= fun () ->
+      Lwt.return_none
+    in
+    (Client_keys.get_key cctxt pkh >>= function
+     | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
+     | Ok (alias, pk, sk_uri) -> (
+         sk_of_sk_uri sk_uri >>= function
+         | None ->
+             cctxt#warning
+               "Cannot extract the secret key form the pkh \"%a\" (alias: \
+                \"%s\") of the wallet"
+               Signature.Public_key_hash.pp
+               pkh
+               alias
+             >>= fun () -> Lwt.return_none
+         | Some sk ->
+             Lwt.return_some {source = {pkh; pk; sk}; origin = Wallet_pkh}))
+    >>= function
+    | None -> warning "Source given as pkh \"%a\" ignored" pkh
+    | key -> Lwt.return key
+  in
+  function
+  | Explicit source -> Lwt.return_some {source; origin = Explicit}
+  | Wallet_alias alias -> key_from_alias alias
+  | Wallet_pkh pkh -> key_from_wallet pkh
+
+(** [unnormalize_source src_org] converts [src_org] from normalized data
+    structure to in-output one. *)
+let unnormalize_source src_org =
+  match src_org.origin with
+  | Explicit -> Explicit src_org.source
+  | Wallet_pkh -> Wallet_pkh src_org.source.pkh
+  | Wallet_alias alias -> Wallet_alias alias
+
 let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
     =
   match state.shuffled_pool with
@@ -150,7 +263,7 @@ let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
       let idx = Random.State.int rng_state state.pool_size in
       match List.nth state.pool idx with
       | None -> assert false
-      | Some src -> Lwt.return src)
+      | Some src_org -> Lwt.return src_org.source)
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
       debug_msg (fun () ->
@@ -175,10 +288,10 @@ let random_seed rng_state =
 let generate_fresh pool rng_state =
   let seed = random_seed rng_state in
   let (pkh, pk, sk) = Signature.generate_key ~seed () in
-  let fresh = {pkh; pk; sk} in
+  let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   pool.pool <- fresh :: pool.pool ;
   pool.pool_size <- pool.pool_size + 1 ;
-  fresh
+  fresh.source
 
 (* [on_new_head cctxt f] calls [f head] each time there is a new head
    received by the streamed RPC /monitor/heads/main *)
@@ -189,7 +302,7 @@ let on_new_head (cctxt : Protocol_client_context.full) f =
   return_unit
 
 (* We perform rejection sampling of valid sources.
-   We could maintain a local cache of existing contracts with sufficient balance.  *)
+   We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     (parameters : parameters) (state : state) rng_state =
   sample_from_pool state rng_state cctxt >>= fun src ->
@@ -286,7 +399,11 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
   if not (Block_hash.equal branch state.last_block) then (
     state.last_block <- branch ;
     if Option.is_some state.shuffled_pool then
-      state.shuffled_pool <- Some (List.shuffle ~rng_state state.pool)) ;
+      state.shuffled_pool <-
+        Some
+          (List.shuffle
+             ~rng_state
+             (List.map (fun src_org -> src_org.source) state.pool))) ;
   let freshest_counter =
     match
       Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
@@ -392,12 +509,12 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       in
       Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
       return_unit
-  | Error trace ->
+  | Error e ->
       debug_msg (fun () ->
           cctxt#message
             "inject_transfer: error, op not injected: %a"
             Error_monad.pp_print_trace
-            trace)
+            e)
       >>= fun () -> return_unit
 
 let save_injected_operations (cctxt : Protocol_client_context.full) state =
@@ -414,11 +531,11 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   in
   cctxt#message "writing injected operations in file %s" path >>= fun () ->
   Lwt_utils_unix.Json.write_file path json >>= function
-  | Error trace ->
+  | Error e ->
       cctxt#message
         "could not write injected operations json file: %a"
         Error_monad.pp_print_trace
-        trace
+        e
   | Ok _ -> Lwt.return_unit
 
 let stat_on_exit (cctxt : Protocol_client_context.full) state =
@@ -535,7 +652,11 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       (fun () ->
         on_new_head cctxt (fun (block, _) ->
             state.last_block <- block ;
-            state.shuffled_pool <- Some (List.shuffle ~rng_state state.pool) ;
+            state.shuffled_pool <-
+              Some
+                (List.shuffle
+                   ~rng_state
+                   (List.map (fun src_org -> src_org.source) state.pool)) ;
             Lwt_condition.broadcast state.new_block_condition () ;
             Lwt.return_unit))
       (fun trace ->
@@ -710,13 +831,17 @@ let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
 let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
     =
-  let json = Data_encoding.Json.construct source_list_encoding state.pool in
+  let json =
+    Data_encoding.Json.construct
+      input_source_list_encoding
+      (List.map unnormalize_source state.pool)
+  in
   let catch_write_error = function
-    | Error trace ->
+    | Error e ->
         cctxt#message
           "could not write back json file: %a"
           Error_monad.pp_print_trace
-          trace
+          e
     | Ok () -> Lwt.return_unit
   in
   match pool_source with
@@ -753,10 +878,7 @@ let generate_random_transactions =
     @@ param
          ~name:"sources.json"
          ~desc:
-           "List of accounts from which to perform transfers in JSON format. \
-            The input JSON must be an array of objects of the form \
-            '[{\"pkh\":pkh;\"pk\":pk;\"sk\":sk}; ...]' with the pkh, pk and sk \
-            encoded in B58 form."
+           {|List of accounts from which to perform transfers in JSON format. The input JSON must be an array of objects of the form {"pkh":"<pkh>","pk":"<pk>","sk":"<sk>"} or  {"alias":"<alias from wallet>"} or {"pkh":"<pkh from wallet>"} with the pkh, pk and sk encoded in B58 form."|}
          json_file_or_text_parameter
     @@ stop)
     (fun ( seed,
@@ -794,12 +916,13 @@ let generate_random_transactions =
       in
       match
         Data_encoding.Json.destruct
-          source_list_encoding
+          input_source_list_encoding
           (json_of_pool_source sources_json)
       with
       | exception _ -> cctxt#error "Could not decode list of sources"
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
+          List.filter_map_p (normalize_source cctxt) sources >>= fun sources ->
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
@@ -811,7 +934,10 @@ let generate_random_transactions =
               pool_size = List.length sources;
               shuffled_pool =
                 (if parameters.single_op_per_pkh_per_block then
-                 Some (List.shuffle ~rng_state sources)
+                 Some
+                   (List.shuffle
+                      ~rng_state
+                      (List.map (fun src_org -> src_org.source) sources))
                 else None);
               last_block = current_head_on_start;
               new_block_condition = Lwt_condition.create ();
@@ -822,8 +948,8 @@ let generate_random_transactions =
             Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _retcode ->
                 stat_on_exit cctxt state >>= function
                 | Ok () -> Lwt.return_unit
-                | Error trace ->
-                    cctxt#message "Error: %a" Error_monad.pp_print_trace trace)
+                | Error e ->
+                    cctxt#message "Error: %a" Error_monad.pp_print_trace e)
           in
           let save_pool () = save_pool_callback cctxt sources_json state in
           (* Register a callback for saving the pool when the tool is interrupted
