@@ -41,9 +41,12 @@ type candidate = {
 
 val candidate_encoding : candidate Data_encoding.t
 
+type voting_power = int
+
 type event =
-  | Prequorum_reached of candidate * Kind.preendorsement operation list
-  | Quorum_reached of candidate * Kind.endorsement operation list
+  | Prequorum_reached of
+      candidate * voting_power * Kind.preendorsement operation list
+  | Quorum_reached of candidate * voting_power * Kind.endorsement operation list
 
 (** {1 Constructors}*)
 

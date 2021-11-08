@@ -349,12 +349,18 @@ let timeout_kind_encoding =
         (fun at_round -> Time_to_bake_next_level {at_round});
     ]
 
+type voting_power = int
+
 type event =
   | New_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate * Kind.preendorsement operation list
+      Operation_worker.candidate
+      * voting_power
+      * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate * Kind.endorsement operation list
+      Operation_worker.candidate
+      * voting_power
+      * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -370,28 +376,31 @@ let event_encoding =
       case
         (Tag 1)
         ~title:"Prequorum_reached"
-        (tup2
+        (tup3
            Operation_worker.candidate_encoding
+           Data_encoding.int31
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
-          | Prequorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+          | Prequorum_reached (candidate, voting_power, ops) ->
+              Some (candidate, voting_power, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
+        (fun (candidate, voting_power, ops) ->
           Prequorum_reached
-            (candidate, Operation_pool.filter_preendorsements ops));
+            (candidate, voting_power, Operation_pool.filter_preendorsements ops));
       case
         (Tag 2)
         ~title:"Quorum_reached"
-        (tup2
+        (tup3
            Operation_worker.candidate_encoding
+           Data_encoding.int31
            (Data_encoding.list (dynamic_size Operation.encoding)))
         (function
-          | Quorum_reached (candidate, ops) ->
-              Some (candidate, List.map Operation.pack ops)
+          | Quorum_reached (candidate, voting_power, ops) ->
+              Some (candidate, voting_power, List.map Operation.pack ops)
           | _ -> None)
-        (fun (candidate, ops) ->
-          Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
+        (fun (candidate, voting_power, ops) ->
+          Quorum_reached
+            (candidate, voting_power, Operation_pool.filter_endorsements ops));
       case
         (Tag 3)
         ~title:"Timeout"
@@ -668,7 +677,8 @@ let pp_block_info fmt
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d@ payload: %a@]"
+     protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
+     payload: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -810,20 +820,23 @@ let pp_event fmt = function
         "new proposal received: %a"
         pp_block_info
         proposal.block
-  | Prequorum_reached (candidate, preendos) ->
+  | Prequorum_reached (candidate, voting_power, preendos) ->
       Format.fprintf
         fmt
-        "pre-quorum reached (%d preendorsements) for %a (round: %a)"
+        "pre-quorum reached with %d preendorsements (power: %d) for %a at \
+         round %a"
         (List.length preendos)
+        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
-  | Quorum_reached (candidate, endos) ->
+  | Quorum_reached (candidate, voting_power, endos) ->
       Format.fprintf
         fmt
-        "quorum reached (%d endorsements) for %a (round: %a)"
+        "quorum reached with %d endorsements (power: %d) for %a at round %a"
         (List.length endos)
+        voting_power
         Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp

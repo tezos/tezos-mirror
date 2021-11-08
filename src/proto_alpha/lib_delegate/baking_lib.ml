@@ -250,7 +250,7 @@ let endorsement_quorum state =
   if
     Compare.Int.(
       power >= state.global_state.constants.parametric.consensus_threshold)
-  then Some endorsements
+  then Some (power, endorsements)
   else None
 
 (* Here's the sketch of the algorithm:
@@ -283,7 +283,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   | Some _ -> propose_at_next_level ~minimal_timestamp state
   | None -> (
       match endorsement_quorum state with
-      | Some endorsement_qc ->
+      | Some (voting_power, endorsement_qc) ->
           let state =
             {
               state with
@@ -304,7 +304,8 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
           in
           State_transitions.step
             state
-            (Baking_state.Quorum_reached (candidate, endorsement_qc))
+            (Baking_state.Quorum_reached
+               (candidate, voting_power, endorsement_qc))
           >>= do_action
           (* this will register the elected block *)
           >>=? fun state -> propose_at_next_level ~minimal_timestamp state

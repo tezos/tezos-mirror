@@ -599,7 +599,6 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
         (candidate.hash, latest_proposal.block.hash))
     >>= fun () -> do_nothing state
   else
-    Events.(emit prequorum_reached latest_proposal.block.hash) >>= fun () ->
     let prequorum =
       {
         level = latest_proposal.block.shell.level;
@@ -640,7 +639,6 @@ let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
         (candidate.hash, latest_proposal.block.hash))
     >>= fun () -> do_nothing state
   else
-    Events.(emit quorum_reached latest_proposal.block.hash) >>= fun () ->
     let new_level_state =
       match state.level_state.elected_block with
       | None ->
@@ -688,13 +686,14 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | (Awaiting_preendorsements, New_proposal block_info) ->
       Events.(emit new_head_while_waiting_for_qc ()) >>= fun () ->
       handle_new_proposal state block_info
-  | (Awaiting_preendorsements, Prequorum_reached (candidate, preendorsement_qc))
-    ->
+  | ( Awaiting_preendorsements,
+      Prequorum_reached (candidate, _voting_power, preendorsement_qc) ) ->
       prequorum_reached_when_awaiting_preendorsements
         state
         candidate
         preendorsement_qc
-  | (Awaiting_endorsements, Quorum_reached (candidate, endorsement_qc)) ->
+  | ( Awaiting_endorsements,
+      Quorum_reached (candidate, _voting_power, endorsement_qc) ) ->
       quorum_reached_when_waiting_endorsements state candidate endorsement_qc
   (* Unreachable cases *)
   | (Idle, (Prequorum_reached _ | Quorum_reached _))

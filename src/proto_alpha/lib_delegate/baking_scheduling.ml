@@ -170,16 +170,20 @@ let rec wait_next_event ~timeout loop_state =
       loop_state.last_future_block_event <- None ;
       return_some (New_proposal proposal)
   | `QC_reached
-      (Some (Operation_worker.Prequorum_reached (candidate, preendorsement_qc)))
-    ->
+      (Some
+        (Operation_worker.Prequorum_reached
+          (candidate, voting_power, preendorsement_qc))) ->
       loop_state.last_get_qc_event <- None ;
       (* TODO: pass the candidate to add a consistency check *)
-      return_some (Prequorum_reached (candidate, preendorsement_qc))
+      return_some
+        (Prequorum_reached (candidate, voting_power, preendorsement_qc))
   | `QC_reached
-      (Some (Operation_worker.Quorum_reached (candidate, endorsement_qc))) ->
+      (Some
+        (Operation_worker.Quorum_reached
+          (candidate, voting_power, endorsement_qc))) ->
       loop_state.last_get_qc_event <- None ;
       (* TODO: pass the candidate to add a consistency check *)
-      return_some (Quorum_reached (candidate, endorsement_qc))
+      return_some (Quorum_reached (candidate, voting_power, endorsement_qc))
   | `Timeout e -> return_some (Timeout e)
 
 (** From the current [state], the function returns an optional
