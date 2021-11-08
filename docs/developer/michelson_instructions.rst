@@ -6,13 +6,7 @@ From time to time a need arises to enrich Michelson language with an additional
 instruction. It might be an intimidating task, especially to someone who is not
 very familiar with the interpreter code. Thus, here is a quick tutorial
 outlining the most important steps required to add a new Michelson instruction.
-
-Michelson scripts, types, and values are written in a concrete syntax called
-:doc:`Micheline`. This concrete syntax is parametrized by the type of
-/primitives/. This lets each version of the Tezos protocol enumerate the
-Michelson primitives independently of the other versions so that new primitives
-for new types and instructions can be added without changing Micheline.
-Michelson distinguishes 4 types of primitives:
+Each instruction consists of the following elements:
 
 1. a primitive
 2. an internal representation (or IR for short)
