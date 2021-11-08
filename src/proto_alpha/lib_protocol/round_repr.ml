@@ -324,10 +324,11 @@ let () =
 
 type round_and_offset = {round : int32; offset : Period_repr.t}
 
-(** complexity linear in the resulting round.
-
-    Could do better by growing the considered round exponentially and then
-   refining by dichotomy.  *)
+(** Complexity: in the worst case, O(log max_int)*O(|round_durations|^2).
+    Normally, [level_offset] is small enough for [check_first] to
+    return the searched round, thus the binary search will not be performed.
+    [check_first] can be made to run in O(round_duration) but it is kept
+    this way for simplicity given that currently |round_durations| = 2. *)
 let round_and_offset round_durations ~level_offset =
   let level_offset_in_seconds = Period_repr.to_seconds level_offset in
   let rec check_first ~max_round round =
@@ -395,8 +396,7 @@ let round_and_offset round_durations ~level_offset =
   | Some result -> ok result
   | None -> bin_search (Int32.of_int n) right_bound
 
-(** Complexity: Constant time if [round_duration] and [level_offset_of_round] are in
-   constant time *)
+(** Complexity: O(|round_durations|). *)
 let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     ~round =
   let pred_round_duration =
@@ -422,8 +422,7 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     [round_durations] description, some [current_round], and its
     starting time [current_timestamp].
 
-    Complexity: Constant time if [round_duration] and
-    [level_offset_of_round] are in constant time *)
+    Complexity: O(|round_durations|). *)
 let timestamp_of_another_round_same_level round_durations ~current_timestamp
     ~current_round ~considered_round =
   level_offset_of_round round_durations ~round:considered_round
