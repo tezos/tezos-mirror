@@ -1087,8 +1087,9 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    : (context * Receipt.balance_updates) tzresult Lwt.t =
+let precheck_manager_contents (type kind) ctxt ~(check_limit_in_block : bool)
+    (op : kind Kind.manager contents) :
+    (context * Receipt.balance_updates) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -1100,7 +1101,9 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
                                  }) =
     op
   in
-  Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
+  (if check_limit_in_block then Gas.consume_limit_in_block ctxt gas_limit
+  else Gas.check_limit_is_valid ctxt gas_limit >|? fun () -> ctxt)
+  >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   let source_contract = Contract.implicit_contract source in
@@ -1332,20 +1335,22 @@ let rec precheck_manager_contents_list :
     type kind.
     Alpha_context.t ->
     kind Kind.manager contents_list ->
+    check_limit_in_block:bool ->
     (context
     * (kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
     tzresult
     Lwt.t =
- fun ctxt contents_list ->
+ fun ctxt contents_list ~check_limit_in_block ->
   match[@coq_match_with_default] contents_list with
   | Single contents ->
-      precheck_manager_contents ctxt contents
+      precheck_manager_contents ctxt ~check_limit_in_block contents
       >>=? fun (ctxt, balance_updates) ->
       return (ctxt, PrecheckedSingle {contents; result = balance_updates})
   | Cons (contents, rest) ->
-      precheck_manager_contents ctxt contents
+      precheck_manager_contents ctxt ~check_limit_in_block contents
       >>=? fun (ctxt, balance_updates) ->
-      precheck_manager_contents_list ctxt rest >>=? fun (ctxt, results) ->
+      precheck_manager_contents_list ctxt rest ~check_limit_in_block
+      >>=? fun (ctxt, results) ->
       return
         (ctxt, PrecheckedCons ({contents; result = balance_updates}, results))
 
@@ -1930,6 +1935,11 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
+  let check_limit_in_block =
+    match apply_mode with
+    | Partial_construction _ -> false
+    | Full_construction _ | Application _ -> true
+  in
   match[@coq_match_with_default] contents_list with
   | Single (Preendorsement consensus_content) ->
       validate_consensus_contents
@@ -2051,7 +2061,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt op
+      precheck_manager_contents_list ctxt op ~check_limit_in_block
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
@@ -2062,7 +2072,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         prechecked_contents_list
       >|= ok
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt op
+      precheck_manager_contents_list ctxt op ~check_limit_in_block
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
