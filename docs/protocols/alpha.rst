@@ -59,7 +59,7 @@ Minor Changes
 
 - Fix interface of Hex. (MR :gl:`!3267`)
 
-- Update migration for I protocol. (MR :gl:`!3668`)
+- Update migration for protocol "I". (MR :gl:`!3668`)
 
 - Make `max_operations_ttl` a parametric constant of the protocol, now called `max_operations_time_to_live`. (MR :gl:`!3709`)
 
