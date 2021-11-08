@@ -50,7 +50,7 @@ module Cache_costs = struct
 
   (* Cost of calling [Environment_cache.find].
      This overapproximates [cache_find] slightly. *)
-  let _cache_find = cache_update
+  let cache_find = cache_update
 end
 
 type index = int
@@ -214,9 +214,7 @@ let register_exn (type cvalue)
 
     let find ctxt id =
       let cache_size_in_bytes = size ctxt in
-      Raw_context.consume_gas
-        ctxt
-        (Cache_costs.cache_update ~cache_size_in_bytes)
+      Raw_context.consume_gas ctxt (Cache_costs.cache_find ~cache_size_in_bytes)
       >>?= fun ctxt ->
       Admin.find ctxt (mk ~id) >>= function
       | None -> return None
