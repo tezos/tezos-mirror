@@ -124,7 +124,7 @@ end = struct
     (* default locked_round = 0 < block_round = 1 for this aux function *)
       ~block_round:0
       ~loc:__LOC__
-      ~post_process:(Error ("Locked round not less than round", `Permanent))
+      ~post_process:(Error ("Locked round not smaller than round", `Permanent))
       ()
 
   (** KO: because we announce a locked_round, but we don't provide the
