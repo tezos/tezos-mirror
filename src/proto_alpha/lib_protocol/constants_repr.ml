@@ -380,32 +380,33 @@ let check_constants constants =
   error_unless
     Compare.Int.(constants.consensus_committee_size > 0)
     (Invalid_protocol_constants
-       "the consensus committee size must be higher than 0.")
+       "The consensus committee size must be strictly greater than 0.")
   >>? fun () ->
   error_unless
     Compare.Int.(
       constants.consensus_threshold >= 0
       && constants.consensus_threshold <= constants.consensus_committee_size)
     (Invalid_protocol_constants
-       "the consensus threshold must be higher than 0 and less or equal the \
-        consensus commitee size.")
+       "The consensus threshold must be greater than or equal to 0 and less \
+        than or equal to the consensus commitee size.")
   >>? fun () ->
   error_unless
     (let {numerator; denominator} = constants.minimal_participation_ratio in
      Compare.Int.(numerator >= 0 && denominator > 0))
     (Invalid_protocol_constants
-       "The minimal participation ratio must be a positive valid ratio.")
+       "The minimal participation ratio must be a non-negative valid ratio.")
   >>? fun () ->
   error_unless
     Compare.Int.(
       constants.minimal_participation_ratio.numerator
       <= constants.minimal_participation_ratio.denominator)
     (Invalid_protocol_constants
-       "the minimal participation ratio must be less or equal than 100%.")
+       "The minimal participation ratio must be less than or equal to 100%.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.max_slashing_period > 0)
-    (Invalid_protocol_constants "the unfreeze delay must be higher than 0.")
+    (Invalid_protocol_constants
+       "The unfreeze delay must be strictly greater than 0.")
   >>? fun () ->
   (* The [frozen_deposits_percentage] should be a percentage *)
   error_unless
@@ -413,11 +414,13 @@ let check_constants constants =
       constants.frozen_deposits_percentage > 0
       && constants.frozen_deposits_percentage <= 100)
     (Invalid_protocol_constants
-       "the frozen percentage ratio must be higher than 0 and less than 100.")
+       "The frozen percentage ratio must be strictly greater than 0 and less \
+        or equal than 100.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.double_baking_punishment >= zero)
-    (Invalid_protocol_constants "the double baking punishment must be positive.")
+    (Invalid_protocol_constants
+       "The double baking punishment must be non-negative.")
   >>? fun () ->
   error_unless
     (let {numerator; denominator} =
@@ -426,7 +429,7 @@ let check_constants constants =
      Compare.Int.(numerator >= 0 && denominator > 0))
     (Invalid_protocol_constants
        "The ratio of frozen deposits ratio slashed per double endorsement must \
-        be a positive valid ratio.")
+        be a non-negative valid ratio.")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
@@ -438,8 +441,7 @@ module Generated = struct
   }
 
   let generate ~consensus_committee_size ~blocks_per_minute =
-    let committee_size_third = consensus_committee_size / 3 in
-    let consensus_threshold = (2 * committee_size_third) + 1 in
+    let consensus_threshold = (consensus_committee_size * 2 / 3) + 1 in
     (* As in previous protocols, we set the maximum total rewards per minute to
        be 80 tez. *)
     let rewards_per_minute = Tez_repr.(mul_exn one 80) in
@@ -455,7 +457,9 @@ module Generated = struct
       consensus_threshold;
       baking_reward_fixed_portion = rewards_quarter;
       baking_reward_bonus_per_slot =
-        Tez_repr.div_exn rewards_quarter committee_size_third;
+        Tez_repr.div_exn
+          rewards_quarter
+          (consensus_committee_size - consensus_threshold);
       endorsing_reward_per_slot =
         Tez_repr.div_exn rewards_half consensus_committee_size;
     }
