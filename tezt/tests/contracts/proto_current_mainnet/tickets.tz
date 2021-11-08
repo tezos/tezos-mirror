@@ -1,0 +1,3 @@
+parameter unit;
+storage (list (ticket string));
+code { CDR ; PUSH nat 1 ; PUSH string "Red" ; TICKET ; CONS ; NIL operation; PAIR }
