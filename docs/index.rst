@@ -154,6 +154,7 @@ in the :ref:`introduction <howtoget>`.
    active/sapling
    active/voting
    active/liquidity_baking
+   active/plugins
    active/glossary
    active/cli-commands
    active/rpc
@@ -169,6 +170,7 @@ in the :ref:`introduction <howtoget>`.
    011/voting
    011/liquidity_baking
    011/timelock
+   011/plugins
    011/glossary
    011/cli-commands
    011/rpc
@@ -185,6 +187,7 @@ in the :ref:`introduction <howtoget>`.
    alpha/liquidity_baking
    alpha/timelock
    alpha/global_constants
+   alpha/plugins
    alpha/glossary
    alpha/cli-commands
    alpha/rpc

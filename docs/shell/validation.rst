@@ -128,9 +128,10 @@ the chain validator will propagate this information to its associated
 *prevalidator*, and may decide to kill or spawn the test network
 according to the protocol's decision.
 
+.. _prevalidator_component:
+
 Prevalidator
 ------------
-.. _prevalidator_component:
 
 To each chain validator is associated a *prevalidator* (this may become
 an option in the future, to allow running nodes on machines with less
@@ -154,6 +155,8 @@ temporarily refused. A malicious peer could easily flood the mempool
 with such operations, so they are put in a bounded set. Another
 bounded set is also kept for a third kind of non-inclusion: operations
 that could be valid in another branch.
+
+As a complement to the built-in classification mechanism above, which rejects operations that could flood the network with useless messages, there is a filtering mechanism implemented as a :doc:`protocol plugin <../active/plugins>`, that can be customized for each protocol version.
 
 Distributed DB
 --------------
