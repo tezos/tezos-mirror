@@ -87,7 +87,7 @@ let payload_encoding =
 let pp_payload fmt {votes_payload; anonymous_payload; managers_payload} =
   Format.fprintf
     fmt
-    "payload: [votes: %d, anonymous: %d, managers: %d]"
+    "[votes: %d, anonymous: %d, managers: %d]"
     (List.length votes_payload)
     (List.length anonymous_payload)
     (List.length managers_payload)
