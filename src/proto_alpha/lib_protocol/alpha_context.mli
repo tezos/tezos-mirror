@@ -103,6 +103,8 @@ module Tez : sig
 
   val ( -? ) : tez -> tez -> tez tzresult
 
+  val sub_opt : tez -> tez -> tez option
+
   val ( +? ) : tez -> tez -> tez tzresult
 
   val ( *? ) : tez -> int64 -> tez tzresult
@@ -572,6 +574,7 @@ module Script : sig
     | I_SLICE
     | I_STEPS_TO_QUOTA
     | I_SUB
+    | I_SUB_MUTEZ
     | I_SWAP
     | I_TRANSFER_TOKENS
     | I_SET_DELEGATE

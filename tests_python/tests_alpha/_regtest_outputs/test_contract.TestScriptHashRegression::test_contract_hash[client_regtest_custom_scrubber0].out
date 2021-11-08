@@ -1,6 +1,6 @@
 tests_alpha/test_contract.py::TestScriptHashRegression::test_contract_hash[client_regtest_custom_scrubber0]
 
-exprvMpUfcC7hMdJYPY7D7a1R835h9LxR1JDXAYMa1DiHURr2PoMcs	[CONTRACT_PATH]/attic/accounts.tz
+exprvFK4dJmFGinHHBe92WR4kA7L8WSBQQYDigmyVCyKpiQHCXe9fk	[CONTRACT_PATH]/attic/accounts.tz
 expruucsMyaSmmP5gmkFWjJfv4a52FQV5EGaf3XpHoeXHQgyJgMJfF	[CONTRACT_PATH]/attic/add1.tz
 exprvEM4Lvihz6jFYszxazuQQPsHjxA4J54tfLeowwDkY1jjTi8Qft	[CONTRACT_PATH]/attic/add1_list.tz
 exprta1x6QtexpFktejHoB1KwuMQRXePhgre9rDiJ3GDSZCqb3vtqL	[CONTRACT_PATH]/attic/after_strategy.tz
@@ -21,7 +21,7 @@ expruavAC89RfrZxSrYwdoA6Wr5ghwdUSns8SNaHcng1JRcqR1dwpR	[CONTRACT_PATH]/attic/dis
 expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod	[CONTRACT_PATH]/attic/empty.tz
 exprubD7VQHa8qeqRsFByes3ANZ24mvUnqW3qKAsKVUCncjxYEXtGp	[CONTRACT_PATH]/attic/fail_amount.tz
 expruYCfXuFoyakdWc3C6Np5ojQrGLDMMN6btVbVEAc97MJzpQYVrm	[CONTRACT_PATH]/attic/faucet.tz
-exprtrmofsqXxiLHqJi9gcXNsywWoYHtp8WAGsqzHbWo3MjkZnfmc3	[CONTRACT_PATH]/attic/forward.tz
+expruuvYJkV5YndLNMHFg54yDF1HG6AP4zMsui7RgQBLr6vCZVBVYt	[CONTRACT_PATH]/attic/forward.tz
 exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL	[CONTRACT_PATH]/attic/id.tz
 exprujqMuqia1zKuReMgjumpsn8XAJ5N6RWaoz3kZpLNRUyyQXwrtY	[CONTRACT_PATH]/attic/infinite_loop.tz
 exprtoE9fvqNeHngkFPopZv412GoqoZ57HgaCi2XFR7YxkwPpvHXBZ	[CONTRACT_PATH]/attic/insertion_sort.tz
@@ -268,7 +268,7 @@ exprvStWRo24QuETruMmMqkmLme6UAMHuTRNNq9Lq65oFgUvQmJGPV	[CONTRACT_PATH]/opcodes/s
 exprtZPsTsBtNf9hjv7Yfda2EV4Sz3iaHpk4NkYHcKteXbsyQ9d6pH	[CONTRACT_PATH]/opcodes/str_id.tz
 exprv4UZUuBDCZZjtW5kaezZjaKqpi1GN6vxHsvQNNkFktnaEbDb1M	[CONTRACT_PATH]/opcodes/sub_timestamp_delta.tz
 expruVuXhQmoBMzZjPeY7VQSuJxefBBTuPyNR7PGnYhwouo9zKg3T1	[CONTRACT_PATH]/opcodes/subset.tz
-exprtkETLPUQ2EqTdgteuJN7XC25xCTSuEhQjz1NJiXWwAPJvDL9pG	[CONTRACT_PATH]/opcodes/tez_add_sub.tz
+exprtz2jbsXuMMPAXYAGJZqjuBp8iF38XadE3YuZoC2W5NkyhhHMuq	[CONTRACT_PATH]/opcodes/tez_add_sub.tz
 exprugbVFDGWcSSozyN3EK3AcdwtPeES3ao45HNogWc5V8fsJ8NsSP	[CONTRACT_PATH]/opcodes/ticket_bad.tz
 exprtvedUmBuu66gdQXWpEJNQBU96bnUVQmrWWLAbcdsCLV4Rwa34K	[CONTRACT_PATH]/opcodes/ticket_big_store.tz
 expruqx789AMcKUYwDeeeRvSnwdCw8gMVvWA6vuzPzBQwBM2qcDXJB	[CONTRACT_PATH]/opcodes/ticket_join.tz

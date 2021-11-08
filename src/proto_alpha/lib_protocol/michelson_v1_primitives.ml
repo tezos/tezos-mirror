@@ -121,6 +121,7 @@ type prim =
   | I_SLICE
   | I_STEPS_TO_QUOTA
   | I_SUB
+  | I_SUB_MUTEZ
   | I_SWAP
   | I_TRANSFER_TOKENS
   | I_SET_DELEGATE
@@ -210,9 +211,9 @@ let namespace = function
   | I_PAIRING_CHECK | I_PUSH | I_READ_TICKET | I_RENAME | I_RIGHT
   | I_SAPLING_EMPTY_STATE | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS
   | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
-  | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SWAP
-  | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT | I_UNPACK
-  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST ->
+  | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ
+  | I_SWAP | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT
+  | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST ->
       Instr_namespace
   | T_address | T_big_map | T_bool | T_bytes | T_chain_id | T_contract | T_int
   | T_key | T_key_hash | T_lambda | T_list | T_map | T_mutez | T_nat | T_never
@@ -322,6 +323,7 @@ let string_of_prim = function
   | I_SLICE -> "SLICE"
   | I_STEPS_TO_QUOTA -> "STEPS_TO_QUOTA"
   | I_SUB -> "SUB"
+  | I_SUB_MUTEZ -> "SUB_MUTEZ"
   | I_SWAP -> "SWAP"
   | I_TRANSFER_TOKENS -> "TRANSFER_TOKENS"
   | I_SET_DELEGATE -> "SET_DELEGATE"
@@ -476,6 +478,7 @@ let prim_of_string = function
   | "SLICE" -> ok I_SLICE
   | "STEPS_TO_QUOTA" -> ok I_STEPS_TO_QUOTA
   | "SUB" -> ok I_SUB
+  | "SUB_MUTEZ" -> ok I_SUB_MUTEZ
   | "SWAP" -> ok I_SWAP
   | "TRANSFER_TOKENS" -> ok I_TRANSFER_TOKENS
   | "SET_DELEGATE" -> ok I_SET_DELEGATE
@@ -735,14 +738,16 @@ let prim_encoding =
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
          ("GET_AND_UPDATE", I_GET_AND_UPDATE);
-         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_011 addition *)
          ("chest", T_chest);
          ("chest_key", T_chest_key);
          ("OPEN_CHEST", I_OPEN_CHEST);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          ("VIEW", I_VIEW);
          ("view", K_view);
          ("constant", H_constant);
+         (* Alpha_012 addition *)
+         ("SUB_MUTEZ", I_SUB_MUTEZ);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]

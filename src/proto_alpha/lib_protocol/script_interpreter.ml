@@ -757,6 +757,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ISub_tez (_, k) ->
           let x = accu in
           let (y, stack) = stack in
+          let res = Tez.sub_opt x y in
+          (step [@ocaml.tailcall]) g gas k ks res stack
+      | ISub_tez_legacy (_, k) ->
+          let x = accu in
+          let (y, stack) = stack in
           Tez.(x -? y) >>?= fun res ->
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMul_teznat (kinfo, k) ->

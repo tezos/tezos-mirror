@@ -125,6 +125,7 @@ type prim =
   | I_SLICE
   | I_STEPS_TO_QUOTA
   | I_SUB
+  | I_SUB_MUTEZ
   | I_SWAP
   | I_TRANSFER_TOKENS
   | I_SET_DELEGATE

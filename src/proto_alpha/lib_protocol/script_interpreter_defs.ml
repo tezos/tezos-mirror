@@ -250,6 +250,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IBytes_size _ -> Interp_costs.bytes_size
   | IAdd_tez _ -> Interp_costs.add_tez
   | ISub_tez _ -> Interp_costs.sub_tez
+  | ISub_tez_legacy _ -> Interp_costs.sub_tez_legacy
   | IOr _ -> Interp_costs.bool_or
   | IAnd _ -> Interp_costs.bool_and
   | IXor _ -> Interp_costs.bool_xor

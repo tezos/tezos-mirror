@@ -1801,15 +1801,15 @@ for under/overflows.
     > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
--  ``SUB``
+-  ``SUB_MUTEZ``
 
 ::
 
-    :: mutez : mutez : 'S   ->   mutez : 'S
+    :: mutez : mutez : 'S   ->   option mutez : 'S
 
-    > SUB / x : y : S  =>  [FAILED]
+    > SUB_MUTEZ / x : y : S  =>  None
         iff   x < y
-    > SUB / x : y : S  =>  (x - y) : S
+    > SUB_MUTEZ / x : y : S  =>  Some (x - y) : S
 
 -  ``MUL``
 

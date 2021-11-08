@@ -607,6 +607,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | ISub_tez :
+      (Tez.t, Tez.t * 's) kinfo * (Tez.t option, 's, 'r, 'f) kinstr
+      -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
+  | ISub_tez_legacy :
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | IMul_teznat :
@@ -1287,6 +1290,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IDiff_timestamps (kinfo, _) -> kinfo
   | IAdd_tez (kinfo, _) -> kinfo
   | ISub_tez (kinfo, _) -> kinfo
+  | ISub_tez_legacy (kinfo, _) -> kinfo
   | IMul_teznat (kinfo, _) -> kinfo
   | IMul_nattez (kinfo, _) -> kinfo
   | IEdiv_teznat (kinfo, _) -> kinfo
@@ -1475,6 +1479,7 @@ let kinstr_rewritek :
   | IDiff_timestamps (kinfo, k) -> IDiff_timestamps (kinfo, f.apply k)
   | IAdd_tez (kinfo, k) -> IAdd_tez (kinfo, f.apply k)
   | ISub_tez (kinfo, k) -> ISub_tez (kinfo, f.apply k)
+  | ISub_tez_legacy (kinfo, k) -> ISub_tez_legacy (kinfo, f.apply k)
   | IMul_teznat (kinfo, k) -> IMul_teznat (kinfo, f.apply k)
   | IMul_nattez (kinfo, k) -> IMul_nattez (kinfo, f.apply k)
   | IEdiv_teznat (kinfo, k) -> IEdiv_teznat (kinfo, f.apply k)
@@ -1670,6 +1675,10 @@ let lambda_t loc l r ~annot =
 
 let option_t loc t ~annot =
   Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {annot; size})
+
+let option_mutez'_t meta =
+  let {annot; size = _} = meta in
+  Option_t (mutez_t ~annot, {annot = None; size = Type_size.two})
 
 let option_string'_t meta =
   let {annot; size = _} = meta in
@@ -1867,6 +1876,7 @@ let kinstr_traverse i init f =
     | IDiff_timestamps (_, k) -> (next [@ocaml.tailcall]) k
     | IAdd_tez (_, k) -> (next [@ocaml.tailcall]) k
     | ISub_tez (_, k) -> (next [@ocaml.tailcall]) k
+    | ISub_tez_legacy (_, k) -> (next [@ocaml.tailcall]) k
     | IMul_teznat (_, k) -> (next [@ocaml.tailcall]) k
     | IMul_nattez (_, k) -> (next [@ocaml.tailcall]) k
     | IEdiv_teznat (_, k) -> (next [@ocaml.tailcall]) k

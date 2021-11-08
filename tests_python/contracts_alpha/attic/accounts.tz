@@ -39,7 +39,7 @@ code { DUP; CAR;
                            # Ensure funds are available
                            DIP{ CMPLT @not_enough }; SWAP;
                            IF { PUSH string "Not enough funds"; FAILWITH }
-                              { SUB @new_balance; DIP{ DUP; DIP{ SWAP }}; DUP;
+                              { SUB_MUTEZ @new_balance; ASSERT_SOME; DIP{ DUP; DIP{ SWAP }}; DUP;
                                 # Delete account if balance is 0
                                 PUSH @zero mutez 0; CMPEQ @null_balance;
                                 IF { DROP; NONE @new_balance mutez }
