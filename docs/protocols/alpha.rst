@@ -61,7 +61,7 @@ Minor Changes
 
 - Update migration for I protocol. (MR :gl:`!3668`)
 
-- Make `max_op_ttl` a parametric constant of the protocol. (MR :gl:`!3709`)
+- Make `max_operations_ttl` a parametric constant of the protocol, now called `max_operations_time_to_live`. (MR :gl:`!3709`)
 
 - ``NOW`` and ``LEVEL`` are now passed to the Michelson interpreter as
   step constants instead of being read from the context each time
