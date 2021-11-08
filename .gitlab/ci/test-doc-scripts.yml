@@ -26,6 +26,22 @@ install_bin_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   extends: .install_bin_ubuntu_template
 
+.install_bin_rc_ubuntu_template:
+  extends:
+    - .default_settings_template
+    - .base-test-doc-scripts-template
+    - .rules_template__development_documentation
+  script:
+    - bash ./docs/introduction/install-bin-rc-ubuntu.sh
+
+install_bin_rc_bionic:
+  image: public.ecr.aws/lts/ubuntu:18.04_stable
+  extends: .install_bin_rc_ubuntu_template
+
+install_bin_rc_focal:
+  image: public.ecr.aws/lts/ubuntu:20.04_stable
+  extends: .install_bin_rc_ubuntu_template
+
 .install_bin_fedora_template:
   extends:
     - .default_settings_template
@@ -41,6 +57,22 @@ install_bin_fedora_33:
 install_bin_fedora_34:
   image: fedora:34
   extends: .install_bin_fedora_template
+
+.install_bin_rc_fedora_template:
+  extends:
+    - .default_settings_template
+    - .base-test-doc-scripts-template
+    - .rules_template__development_documentation
+  script:
+    - bash ./docs/introduction/install-bin-rc-fedora.sh
+
+install_bin_rc_fedora_33:
+  image: fedora:33
+  extends: .install_bin_rc_fedora_template
+
+install_bin_rc_fedora_34:
+  image: fedora:34
+  extends: .install_bin_rc_fedora_template
 
 .install_opam_ubuntu_template:
   extends:

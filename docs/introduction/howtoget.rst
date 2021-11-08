@@ -73,8 +73,24 @@ binaries and their dependencies using a package manager, as follows.
 Ubuntu Launchpad PPA with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
-Currently it supports Focal and Bionic versions. In order to add the PPA repository to your machine and install the binaries, run the following commands:
+If you're using Ubuntu, you can install packages with Tezos binaries from a Launchpad PPA.
+Currently it supports Focal and Bionic versions.
+
+In order to add the stable release PPA repository to your machine, run:
+
+.. literalinclude:: install-bin-ubuntu.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Alternatively, to add the release candidates PPA instead, run:
+
+.. literalinclude:: install-bin-rc-ubuntu.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-ubuntu.sh
    :language: shell
@@ -90,8 +106,24 @@ by ``apt-get update``.
 Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 33 and 34. In order to add the Copr repository to your machine and install the binaries, run the following commands:
+If you're using Fedora, you can install packages with Tezos binaries from a Copr repository.
+Currently it supports Fedora 33 and 34.
+
+In order to add the stable Copr repository to your machine, run:
+
+.. literalinclude:: install-bin-fedora.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Alternatively, to add the release candidates Copr repository instead, run:
+
+.. literalinclude:: install-bin-rc-fedora.sh
+   :language: shell
+   :start-after: [setup repository]
+   :end-before: [install tezos]
+
+Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
