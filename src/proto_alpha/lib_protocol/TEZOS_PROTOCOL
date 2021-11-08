@@ -124,6 +124,7 @@
         "Ticket_token",
         "Ticket_balance_key",
         "Ticket_lazy_storage_diff",
+        "Ticket_balance_migration_for_j",
 
         "Script_interpreter_defs",
         "Script_interpreter",

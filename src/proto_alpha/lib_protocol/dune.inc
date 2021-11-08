@@ -144,6 +144,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
+   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -286,6 +287,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
+   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -428,6 +430,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
+   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -592,6 +595,7 @@ include Tezos_raw_protocol_alpha.Main
    Ticket_token
    Ticket_balance_key
    Ticket_lazy_storage_diff
+   Ticket_balance_migration_for_j
    Script_interpreter_defs
    Script_interpreter
    Sc_rollup_operations
@@ -775,6 +779,7 @@ include Tezos_raw_protocol_alpha.Main
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
+   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
