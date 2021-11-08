@@ -739,6 +739,43 @@ let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
 let filter_map_p f l = rev_map_p f l |> Lwt.map rev_filter_some
 
+let concat_map_s f xs =
+  let open Lwt_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_e f xs =
+  let open Result_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_es f xs =
+  let open Lwt_result_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_p f xs = Lwt.map flatten @@ Lwt_syntax.all (map f xs)
+
+let concat_map_ep f xs =
+  let open Lwt_result_syntax in
+  let+ r = all (map f xs) in
+  flatten r
+
 let rec fold_right_e f l acc =
   let open Result_syntax in
   match l with

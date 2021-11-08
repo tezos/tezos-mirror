@@ -63,6 +63,11 @@ module Make (Monad : Traced_sigs.Monad.S) :
 
   let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
+  let concat_map_ep f xs =
+    let open Lwt_traced_result_syntax in
+    let+ r = all (map f xs) in
+    flatten r
+
   let for_all_ep f l = rev_map_ep f l |> Lwt_result.map (for_all Fun.id)
 
   let exists_ep f l = rev_map_ep f l |> Lwt_result.map (exists Fun.id)
