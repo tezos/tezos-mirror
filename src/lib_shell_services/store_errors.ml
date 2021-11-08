@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type error +=
-  | Block_not_found of Block_hash.t
+  | Block_not_found of {hash : Block_hash.t; distance : int}
   | Bad_level of {head_level : Int32.t; given_level : Int32.t}
   | Block_metadata_not_found of Block_hash.t
   | Cannot_switch_history_mode of {
@@ -47,11 +47,18 @@ let () =
     ~id:"store.not_found"
     ~title:"Block not found"
     ~description:"Block not found"
-    ~pp:(fun ppf block_hash ->
-      Format.fprintf ppf "Cannot find block %a" Block_hash.pp block_hash)
-    Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding))
-    (function Block_not_found block_hash -> Some block_hash | _ -> None)
-    (fun block_hash -> Block_not_found block_hash) ;
+    ~pp:(fun ppf (block_hash, distance) ->
+      Format.fprintf
+        ppf
+        "Cannot find block at distance %d from block %a."
+        distance
+        Block_hash.pp
+        block_hash)
+    Data_encoding.(
+      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int8))
+    (function
+      | Block_not_found {hash; distance} -> Some (hash, distance) | _ -> None)
+    (fun (hash, distance) -> Block_not_found {hash; distance}) ;
   register_error_kind
     `Permanent
     ~id:"store.bad_level"

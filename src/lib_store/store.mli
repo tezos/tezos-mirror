@@ -586,6 +586,9 @@ module Chain : sig
   (** The abstract type for testchain. *)
   type testchain
 
+  (** A type alias of a block identifier. *)
+  type block_identifier = Block_services.block
+
   (** [global_store chain_store] returns the global store of
       [chain_store] allowing to retrieve global infos.*)
   val global_store : chain_store -> store
@@ -690,6 +693,15 @@ module Chain : sig
   (** [mempool chain_store] returns the mempool associated to the
       [chain_store]. *)
   val mempool : chain_store -> Mempool.t Lwt.t
+
+  (** [block_of_identifier chain_store identifier] tries to return the block
+      of the given [identifier] inside the given [chain_store]. *)
+  val block_of_identifier :
+    chain_store -> block_identifier -> Block.t tzresult Lwt.t
+
+  (** [block_of_identifier_opt chain_store identifier] optional version of [block_of_identifier]. *)
+  val block_of_identifier_opt :
+    chain_store -> block_identifier -> Block.t option Lwt.t
 
   (** [set_mempool chain_store ~head mempool] sets the [mempool] of
       the [chain_store]. Does nothing if [head] is not current_head

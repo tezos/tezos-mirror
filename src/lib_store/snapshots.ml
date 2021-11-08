@@ -1962,86 +1962,23 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
      the future. In this particular case, the last allowed fork level of
      the current head is chosen. *)
   let retrieve_export_block chain_store block =
-    (* Returns the [offset]th successor of the given block [hash]. The
-       given [offset] is assumed to be negative. *)
-    let get_successor hash offset =
-      Store.Block.read_block_opt chain_store hash >>= function
-      | None -> fail (Invalid_export_block {block = None; reason = `Unknown})
-      | Some b ->
-          Store.Chain.current_head chain_store >>= fun current_head ->
-          let head_level = Store.Block.level current_head in
-          let block_level = Store.Block.level b in
-          let distance =
-            Int32.(to_int (sub head_level (sub block_level (of_int offset))))
-          in
-          if distance < 0 then
-            fail (Invalid_export_block {block = None; reason = `Unknown})
-          else
-            Store.Block.read_block
-              chain_store
-              ~distance
-              (Store.Block.hash current_head)
-    in
     (match block with
-    | `Hash (h, distance) -> (
-        if distance < 0 then get_successor h distance
-        else
-          Store.Block.read_block_opt chain_store ~distance h >>= function
-          | None ->
-              fail (Invalid_export_block {block = Some h; reason = `Unknown})
-          | Some block -> return block)
-    | `Head distance -> (
-        Store.Chain.current_head chain_store >>= fun current_head ->
-        Store.Block.read_block_opt
-          chain_store
-          ~distance
-          (Store.Block.hash current_head)
-        >>= function
-        | Some block -> return block
-        | None -> fail (Invalid_export_block {block = None; reason = `Unknown}))
-    | `Level i -> (
-        Store.Block.read_block_by_level_opt chain_store i >>= function
-        | Some block -> return block
-        | None -> fail (Invalid_export_block {block = None; reason = `Unknown}))
     | `Genesis ->
+        (* Exporting the genesis block does not make sense. *)
         fail
           (Invalid_export_block
              {
                block = Some (Store.Chain.genesis chain_store).Genesis.block;
                reason = `Genesis;
              })
-    | `Alias (`Caboose, distance) ->
+    | `Alias (`Caboose, distance) when distance >= 0 ->
         (* With the caboose, we do not allow to use the ~/- as it is a
            non sense. Additionally, it is not allowed to export the
            caboose block. *)
-        Store.Chain.caboose chain_store >>= fun (caboose_hash, _) ->
-        if distance < 0 then get_successor caboose_hash distance
-        else
-          fail
-            (Invalid_export_block {block = Some caboose_hash; reason = `Caboose})
-    | `Alias (`Checkpoint, distance) -> (
-        Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
-        if distance < 0 then get_successor checkpoint_hash distance
-        else
-          Store.Block.read_block_opt chain_store checkpoint_hash >>= function
-          | Some checkpoint_block ->
-              (* The checkpoint is known: we should have its context and
-                 caboose should be low enough to retrieve enough
-                 blocks. *)
-              if distance = 0 then return checkpoint_block
-              else Store.Block.read_block chain_store checkpoint_hash ~distance
-          | None ->
-              fail
-                (Invalid_export_block
-                   {block = Some checkpoint_hash; reason = `Unknown}))
-    | `Alias (`Savepoint, distance) ->
-        Store.Chain.savepoint chain_store
-        >>= fun (savepoint_hash, savepoint_level) ->
-        if distance < 0 then get_successor savepoint_hash distance
-        else
-          Store.Block.read_block_by_level
-            chain_store
-            Int32.(sub savepoint_level (of_int distance)))
+        Store.Chain.caboose chain_store >>= fun (hash, _) ->
+        fail (Invalid_export_block {block = Some hash; reason = `Caboose})
+    | _ -> Store.Chain.block_of_identifier chain_store block)
+    |> trace (Invalid_export_block {block = None; reason = `Unknown})
     >>=? fun export_block ->
     check_export_block_validity chain_store export_block
     >>=? fun (pred_block, minimum_level_needed) ->
