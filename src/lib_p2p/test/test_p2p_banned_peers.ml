@@ -114,6 +114,7 @@ let test_clear _ =
 (* flaky test, see below *)
 
 let _test_gc _ =
+  let open Lwt_syntax in
   let set =
     P2p_acl.create
       ~peer_id_size:10
@@ -122,7 +123,7 @@ let _test_gc _ =
   in
   List.iter (fun (_, addr) -> P2p_acl.IPGreylist.add set addr) peers ;
   (* 1.0 is an overapproximation of 0.1 :) *)
-  Lwt_unix.sleep 1.0 >>= fun () ->
+  let* () = Lwt_unix.sleep 1.0 in
   List.iter
     (fun (_peer, addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr))
@@ -133,7 +134,9 @@ let () =
   let init_logs = lazy (Internal_event_unix.init ()) in
   let wrap (n, f) =
     Alcotest_lwt.test_case n `Quick (fun _ () ->
-        Lazy.force init_logs >>= fun () -> f ())
+        let open Lwt_syntax in
+        let* () = Lazy.force init_logs in
+        f ())
   in
   Alcotest_lwt.run
     ~argv:[|""|]

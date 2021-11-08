@@ -43,27 +43,30 @@ type ('msg, 'peer, 'conn) t = {
 }
 
 let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
+  let open Lwt_syntax in
   let open P2p_answerer in
   let request_info =
     P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
   in
-  Lwt.pause () >>= fun () ->
-  protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) >>= function
+  let* () = Lwt.pause () in
+  let* r = protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) in
+  match r with
   | Ok (_, Bootstrap) -> (
-      callback.bootstrap request_info >>= function
+      let* r = callback.bootstrap request_info in
+      match r with
       | Ok () -> worker_loop t callback
       | Error _ -> Error_monad.cancel_with_exceptions t.canceler)
   | Ok (_, Advertise points) ->
-      callback.advertise request_info points >>= fun () ->
+      let* () = callback.advertise request_info points in
       worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
-      callback.swap_request request_info point peer >>= fun () ->
+      let* () = callback.swap_request request_info point peer in
       worker_loop t callback
   | Ok (_, Swap_ack (point, peer)) ->
-      callback.swap_ack request_info point peer >>= fun () ->
+      let* () = callback.swap_ack request_info point peer in
       worker_loop t callback
   | Ok (size, Message msg) ->
-      callback.message request_info size msg >>= fun () ->
+      let* () = callback.message request_info size msg in
       worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Error_monad.cancel_with_exceptions t.canceler
@@ -72,13 +75,16 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       Error_monad.cancel_with_exceptions t.canceler
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error err ->
-      Events.(emit unexpected_error) err >>= fun () ->
+      let* () = Events.(emit unexpected_error) err in
       Error_monad.cancel_with_exceptions t.canceler
 
 let shutdown t =
+  let open Lwt_syntax in
   match t.worker with
   | None -> Lwt.return_unit
-  | Some w -> Error_monad.cancel_with_exceptions t.canceler >>= fun () -> w
+  | Some w ->
+      let* () = Error_monad.cancel_with_exceptions t.canceler in
+      w
 
 let write_swap_ack t point peer_id =
   P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
@@ -130,22 +136,29 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
   t
 
 let pipe_exn_handler = function
-  | Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
+  | Lwt_pipe.Closed -> Lwt_tzresult_syntax.fail P2p_errors.Connection_closed
   | exc -> Lwt.fail exc
 
 (* see [Lwt_pipe.Maybe_bounded.pop] *)
 
 let read t =
+  let open Lwt_tzresult_syntax in
   Lwt.catch
     (fun () ->
-      Lwt_pipe.Maybe_bounded.pop t.messages >>= fun (s, msg) ->
-      Events.(emit bytes_popped_from_queue) (s, (P2p_socket.info t.conn).peer_id)
-      >>= fun () -> return msg)
+      let*! (s, msg) = Lwt_pipe.Maybe_bounded.pop t.messages in
+      let*! () =
+        Events.(emit bytes_popped_from_queue)
+          (s, (P2p_socket.info t.conn).peer_id)
+      in
+      return msg)
     pipe_exn_handler
 
 let is_readable t =
+  let open Lwt_tzresult_syntax in
   Lwt.catch
-    (fun () -> Lwt_pipe.Maybe_bounded.peek t.messages >>= fun _ -> return_unit)
+    (fun () ->
+      let*! _ = Lwt_pipe.Maybe_bounded.peek t.messages in
+      return_unit)
     pipe_exn_handler
 
 let write t msg = P2p_socket.write t.conn (Message msg)

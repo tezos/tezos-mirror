@@ -70,13 +70,14 @@ let () =
    In [propagation_tzresult] a random [node] is selected to fail with an error.
    Then it is checked that the result of [Node.detach_nodes] is an error. *)
 let propagation_tzresult points =
+  let open Lwt_tzresult_syntax in
   let x = Random.int (List.length points) in
-  Node.detach_nodes
-    (fun i _ -> if x = i then Error_monad.fail Some_error else return_unit)
-    points
-  >>= function
-  | Ok () -> Error_monad.fail Invalid_test_result
-  | Error _ -> return_unit
+  let*! r =
+    Node.detach_nodes
+      (fun i _ -> if x = i then Error_monad.fail Some_error else return_unit)
+      points
+  in
+  match r with Ok () -> fail Invalid_test_result | Error _ -> return_unit
 
 let points = ref []
 
@@ -91,12 +92,14 @@ let wrap n f =
   Alcotest.test_case n `Quick (fun () ->
       Lwt_main.run
         (let rec aux n f =
-           f () >>= function
+           let open Lwt_syntax in
+           let* r = f () in
+           match r with
            | Ok () -> Lwt.return_unit
            | Error
                (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
              ->
-               Event.(emit port_conflicts) () >>= fun () ->
+               let* () = Event.(emit port_conflicts) () in
                gen_points () ;
                aux n f
            | Error error ->

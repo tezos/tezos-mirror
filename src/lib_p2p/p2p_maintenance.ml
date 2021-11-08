@@ -98,12 +98,13 @@ let classify pool private_mode start_time seen_points point pi =
     with points in [contactable]. It returns the number of established
     connections *)
 let establish t contactable =
+  let open Lwt_syntax in
   let try_to_connect count point =
-    protect ~canceler:t.canceler (fun () ->
-        P2p_connect_handler.connect t.connect_handler point)
-    >|= function
-    | Ok _ -> succ count
-    | Error _ -> count
+    let+ r =
+      protect ~canceler:t.canceler (fun () ->
+          P2p_connect_handler.connect t.connect_handler point)
+    in
+    match r with Ok _ -> succ count | Error _ -> count
   in
   List.fold_left_s try_to_connect 0 contactable
 
@@ -148,14 +149,17 @@ let connectable t start_time expected seen_points =
         and try to connect to [n] of them. *)
 let rec try_to_contact_loop t start_time ~seen_points min_to_contact
     max_to_contact =
+  let open Lwt_syntax in
   if min_to_contact <= 0 then Lwt.return_true
   else
     let (candidates, seen_points) =
       connectable t start_time max_to_contact seen_points
     in
-    if candidates = [] then Lwt.pause () >>= fun () -> Lwt.return_false
+    if candidates = [] then
+      let* () = Lwt.pause () in
+      Lwt.return_false
     else
-      establish t candidates >>= fun established ->
+      let* established = establish t candidates in
       try_to_contact_loop
         t
         start_time
@@ -188,23 +192,23 @@ let try_to_contact t min_to_contact max_to_contact =
 let ask_for_more_contacts t =
   if t.config.private_mode then
     protect ~canceler:t.canceler (fun () ->
-        Lwt_unix.sleep
-          (Ptime.Span.to_float_s t.config.time_between_looking_for_peers)
-        >>= fun () -> return_unit)
+        Lwt_result.ok
+        @@ Lwt_unix.sleep
+             (Ptime.Span.to_float_s t.config.time_between_looking_for_peers))
   else (
     broadcast_bootstrap_msg t ;
     Option.iter P2p_discovery.wakeup t.discovery ;
     protect ~canceler:t.canceler (fun () ->
-        Lwt.pick
-          [
-            P2p_trigger.wait_new_peer t.triggers;
-            P2p_trigger.wait_new_point t.triggers;
-            (* TODO exponential back-off, or wait for the existence
-               of a non grey-listed peer? *)
-            Lwt_unix.sleep
-              (Ptime.Span.to_float_s t.config.time_between_looking_for_peers);
-          ]
-        >>= fun () -> return_unit))
+        Lwt_result.ok
+        @@ Lwt.pick
+             [
+               P2p_trigger.wait_new_peer t.triggers;
+               P2p_trigger.wait_new_point t.triggers;
+               (* TODO exponential back-off, or wait for the existence
+                  of a non grey-listed peer? *)
+               Lwt_unix.sleep
+                 (Ptime.Span.to_float_s t.config.time_between_looking_for_peers);
+             ]))
 
 (** Selects [n] random connections. Ignore connections to
     nodes who are both private and trusted. *)
@@ -223,6 +227,7 @@ let random_connections pool n =
     2. tries *forever* to achieve a number of connections
        between `min_threshold` and `max_threshold`. *)
 let rec do_maintain t =
+  let open Lwt_result_syntax in
   let n_connected = P2p_pool.active_connections t.pool in
   if n_connected < t.bounds.min_threshold then too_few_connections t n_connected
   else if t.bounds.max_threshold < n_connected then
@@ -230,46 +235,51 @@ let rec do_maintain t =
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
-    Events.(emit maintenance_ended) () >>= fun () -> return_unit)
+    let*! () = Events.(emit maintenance_ended) () in
+    return_unit)
 
 and too_few_connections t n_connected =
+  let open Lwt_result_syntax in
   (* try and contact new peers *)
-  Events.(emit too_few_connections) n_connected >>= fun () ->
+  let*! () = Events.(emit too_few_connections) n_connected in
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
-  try_to_contact t min_to_contact max_to_contact >>= fun success ->
-  (if success then return_unit else ask_for_more_contacts t) >>=? fun () ->
+  let*! success = try_to_contact t min_to_contact max_to_contact in
+  let* () = if success then return_unit else ask_for_more_contacts t in
   do_maintain t
 
 and too_many_connections t n_connected =
+  let open Lwt_syntax in
   (* kill random connections *)
   let n = n_connected - t.bounds.max_target in
-  Events.(emit too_many_connections) n >>= fun () ->
+  let* () = Events.(emit too_many_connections) n in
   let connections = random_connections t.pool n in
-  List.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
+  let* () = List.iter_p P2p_conn.disconnect connections in
+  do_maintain t
 
 let rec worker_loop t =
-  (let n_connected = P2p_pool.active_connections t.pool in
-   if
-     n_connected < t.bounds.min_threshold
-     || t.bounds.max_threshold < n_connected
-   then do_maintain t
-   else
-     (if not t.config.private_mode then send_swap_request t ;
-      return_unit)
-     >>=? fun () ->
-     protect ~canceler:t.canceler (fun () ->
-         Lwt.pick
-           [
-             Systime_os.sleep t.config.maintenance_idle_time;
-             Lwt_condition.wait t.please_maintain;
-             (* when asked *)
-             P2p_trigger.wait_too_few_connections t.triggers;
-             (* limits *)
-             P2p_trigger.wait_too_many_connections t.triggers;
-           ]
-         >>= fun () -> return_unit))
-  >>= function
+  let open Lwt_syntax in
+  let* r =
+    let n_connected = P2p_pool.active_connections t.pool in
+    if
+      n_connected < t.bounds.min_threshold
+      || t.bounds.max_threshold < n_connected
+    then do_maintain t
+    else (
+      if not t.config.private_mode then send_swap_request t ;
+      protect ~canceler:t.canceler (fun () ->
+          Lwt_result.ok
+          @@ Lwt.pick
+               [
+                 Systime_os.sleep t.config.maintenance_idle_time;
+                 Lwt_condition.wait t.please_maintain;
+                 (* when asked *)
+                 P2p_trigger.wait_too_few_connections t.triggers;
+                 (* limits *)
+                 P2p_trigger.wait_too_many_connections t.triggers;
+               ]))
+  in
+  match r with
   | Ok () -> worker_loop t
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
@@ -321,8 +331,9 @@ let maintain t =
   wait
 
 let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
-  Error_monad.cancel_with_exceptions canceler >>= fun () ->
-  Option.iter_s P2p_discovery.shutdown discovery >>= fun () ->
-  maintain_worker >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Error_monad.cancel_with_exceptions canceler in
+  let* () = Option.iter_s P2p_discovery.shutdown discovery in
+  let* () = maintain_worker in
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit

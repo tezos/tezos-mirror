@@ -86,10 +86,14 @@ type t = {
 }
 
 let rec worker_loop st =
+  let open Lwt_syntax in
   let (Connect_handler connect_handler) = st.connect_handler in
-  Lwt.pause () >>= fun () ->
-  protect ~canceler:st.canceler (fun () -> P2p_fd.accept st.socket >>= return)
-  >>= function
+  let* () = Lwt.pause () in
+  let* r =
+    protect ~canceler:st.canceler (fun () ->
+        Lwt_result.ok @@ P2p_fd.accept st.socket)
+  in
+  match r with
   | Ok (fd, addr) ->
       let point =
         match addr with
@@ -111,10 +115,11 @@ let rec worker_loop st =
              _,
              _ ))
        :: _ as err) ->
-      Events.(emit incoming_error) (err, "system") >>= fun () ->
+      let* () = Events.(emit incoming_error) (err, "system") in
       (* These are temporary system errors, giving some time for the system to
          recover *)
-      Lwt_unix.sleep 5. >>= fun () -> worker_loop st
+      let* () = Lwt_unix.sleep 5. in
+      worker_loop st
   | Error
       (Exn
          (Unix.Unix_error
@@ -141,32 +146,36 @@ let rec worker_loop st =
              _ ))
        :: _ as err) ->
       (* These are socket-specific errors, ignoring. *)
-      Events.(emit incoming_error) (err, "socket") >>= fun () -> worker_loop st
+      let* () = Events.(emit incoming_error) (err, "socket") in
+      worker_loop st
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error err -> Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
+  let open Lwt_syntax in
   Lwt.catch
     (fun () ->
       let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
       Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-      Lwt_unix.bind
-        main_socket
-        Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
-      >>= fun () ->
+      let* () =
+        Lwt_unix.bind
+          main_socket
+          Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
+      in
       Lwt_unix.listen main_socket backlog ;
-      return main_socket)
+      Lwt_tzresult_syntax.return main_socket)
     (function
       | Unix.Unix_error (err, _, _) ->
-          fail
+          Lwt_tzresult_syntax.fail
           @@ Failed_to_open_listening_socket
                {reason = err; address = addr; port}
       | exn -> Lwt.fail exn)
 
 let create ?addr ~backlog connect_handler port =
+  let open Lwt_tzresult_syntax in
   Lwt.catch
     (fun () ->
-      create_listening_socket ~backlog ?addr port >>=? fun socket ->
+      let* socket = create_listening_socket ~backlog ?addr port in
       let canceler = Lwt_canceler.create () in
       let st =
         {
@@ -177,14 +186,14 @@ let create ?addr ~backlog connect_handler port =
         }
       in
       Lwt_canceler.on_cancel canceler (fun () ->
-          st.worker >>= fun () ->
-          Lwt_utils_unix.safe_close socket >>= function
-          | Error trace -> Events.(emit unexpected_error_closing_socket) trace
-          | Ok () -> Lwt.return_unit) ;
+          let*! () = st.worker in
+          let*! r = Lwt_utils_unix.safe_close socket in
+          Result.iter_error_s Events.(emit unexpected_error_closing_socket) r) ;
       return st)
     (fun exn ->
-      let error = Error_monad.Exn exn in
-      Events.(emit incoming_connection_error) error >>= fun () -> fail error)
+      let error = error_of_exn exn in
+      let*! () = Events.(emit incoming_connection_error) error in
+      fail error)
 
 let activate st =
   st.worker <-

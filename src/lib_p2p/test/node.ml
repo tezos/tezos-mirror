@@ -122,19 +122,23 @@ type t = {
 
 (** Syncing inside the detached process *)
 let sync (node : t) =
+  let open Lwt_result_syntax in
   incr node.iteration ;
-  Event.(emit sync_iteration) !(node.iteration) >>= fun () ->
-  Process.Channel.push node.channel () >>=? fun () ->
+  let*! () = Event.(emit sync_iteration) !(node.iteration) in
+  let* () = Process.Channel.push node.channel () in
   Process.Channel.pop node.channel
 
 (** Syncing from the main process everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
-  List.iter_ep (fun p -> Process.receive p) nodes >>=? fun () ->
-  List.iter_ep (fun p -> Process.send p ()) nodes >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = List.iter_ep (fun p -> Process.receive p) nodes in
+  let* () = List.iter_ep (fun p -> Process.send p ()) nodes in
   sync_nodes nodes
 
 let sync_nodes nodes =
-  sync_nodes nodes >>= function
+  let open Lwt_result_syntax in
+  let*! r = sync_nodes nodes in
+  match r with
   | Ok () | Error (Exn End_of_file :: _) -> return_unit
   | Error _ as err -> Lwt.return err
 
@@ -196,8 +200,10 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
          port)
     ~canceler
     (fun channel ->
+      let open Lwt_result_syntax in
       let timer ti =
-        Lwt_unix.sleep ti >>= fun () -> Event.(emit process_timeout) ()
+        let*! () = Lwt_unix.sleep ti in
+        Event.(emit process_timeout) ()
       in
       with_timeout
         ~canceler
@@ -208,8 +214,9 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           let trigger = P2p_trigger.create () in
           let watcher = Lwt_watcher.create_input () in
           let log event = Lwt_watcher.notify watcher event in
-          P2p_pool.create pool_config peer_meta_config ~log trigger
-          >>= fun pool ->
+          let*! pool =
+            P2p_pool.create pool_config peer_meta_config ~log trigger
+          in
           let answerer = lazy (P2p_protocol.create_private ()) in
           let connect_handler =
             P2p_connect_handler.create
@@ -223,18 +230,20 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               ~log
               ~answerer
           in
-          Lwt_list.map_p
-            (fun point ->
-              P2p_pool.Points.info pool point
-              |> Option.iter (fun info ->
-                     P2p_point_state.set_private info false) ;
-              Lwt.return_unit)
-            trusted_points
-          >>= fun _ ->
-          P2p_welcome.create ~backlog:10 connect_handler ~addr port
-          >>=? fun welcome ->
+          let*! _ =
+            Lwt_list.map_p
+              (fun point ->
+                P2p_pool.Points.info pool point
+                |> Option.iter (fun info ->
+                       P2p_point_state.set_private info false) ;
+                Lwt.return_unit)
+              trusted_points
+          in
+          let* welcome =
+            P2p_welcome.create ~backlog:10 connect_handler ~addr port
+          in
           P2p_welcome.activate welcome ;
-          Event.(emit node_ready) port >>= fun () ->
+          let*! () = Event.(emit node_ready) port in
           let node =
             {
               iteration;
@@ -247,17 +256,18 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               points = all_points;
             }
           in
-          sync node >>=? fun () ->
+          let* () = sync node in
           (* Sync interaction 1 *)
-          f node >>=? fun () ->
-          Event.(emit shutting_down) () >>= fun () ->
-          P2p_welcome.shutdown welcome >>= fun () ->
+          let* () = f node in
+          let*! () = Event.(emit shutting_down) () in
+          let*! () = P2p_welcome.shutdown welcome in
           (* Here P2p_pool.tear_down_connections is called instead of
              P2p_pool.destroy because there is not data-dir and it is required
              to save the known peers list. *)
-          P2p_pool.tear_down_connections pool >>= fun () ->
-          P2p_io_scheduler.shutdown sched >>= fun () ->
-          Event.(emit bye) () >>= fun () -> return_unit))
+          let*! () = P2p_pool.tear_down_connections pool in
+          let*! () = P2p_io_scheduler.shutdown sched in
+          let*! () = Event.(emit bye) () in
+          return_unit))
 
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.
@@ -271,34 +281,36 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
 let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config
     ?(trusted = fun _ points -> points) run_node points =
+  let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  Lwt_list.mapi_s
-    (fun n _ ->
-      let prefix = Option.map (fun f -> f n) prefix in
-      let p2p_versions = Option.map (fun f -> f n) p2p_versions in
-      let msg_config = Option.map (fun f -> f n) msg_config in
-      let min_connections = Option.map (fun f -> f n) min_connections in
-      let max_connections = Option.map (fun f -> f n) max_connections in
-      let max_incoming_connections =
-        Option.map (fun f -> f n) max_incoming_connections
-      in
-      let ((addr, port), other_points) = List.select n points in
-      detach_node
-        ?prefix
-        ?p2p_versions
-        ?timeout
-        ?min_connections
-        ?max_connections
-        ?max_incoming_connections
-        ?msg_config
-        canceler
-        (run_node n)
-        (trusted n points)
-        other_points
-        addr
-        port)
-    points
-  >>= fun nodes ->
-  Lwt.return @@ Error_monad.Tzresult_syntax.all nodes >>=? fun nodes ->
+  let*! nodes =
+    List.mapi_s
+      (fun n _ ->
+        let prefix = Option.map (fun f -> f n) prefix in
+        let p2p_versions = Option.map (fun f -> f n) p2p_versions in
+        let msg_config = Option.map (fun f -> f n) msg_config in
+        let min_connections = Option.map (fun f -> f n) min_connections in
+        let max_connections = Option.map (fun f -> f n) max_connections in
+        let max_incoming_connections =
+          Option.map (fun f -> f n) max_incoming_connections
+        in
+        let ((addr, port), other_points) = List.select n points in
+        detach_node
+          ?prefix
+          ?p2p_versions
+          ?timeout
+          ?min_connections
+          ?max_connections
+          ?max_incoming_connections
+          ?msg_config
+          canceler
+          (run_node n)
+          (trusted n points)
+          other_points
+          addr
+          port)
+      points
+  in
+  let*? nodes = Error_monad.Tzresult_syntax.all nodes in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes

@@ -90,7 +90,8 @@ let create ~peer_id_size ~ip_size ~ip_cleanup_delay =
   in
   let delay = Time.System.Span.multiply_exn (1. /. 16.) ip_cleanup_delay in
   let rec cleanup_loop () =
-    Systime_os.sleep delay >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Systime_os.sleep delay in
     Bloomer.countdown bloomer ;
     cleanup_loop ()
   in

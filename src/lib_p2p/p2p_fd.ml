@@ -45,11 +45,12 @@ type t = {
 
 let create =
   let counter = ref 0 in
-  function
-  | fd ->
-      incr counter ;
-      let t = {fd; id = !counter; nread = 0; nwrit = 0} in
-      Events.(emit create_fd) t.id >>= fun () -> Lwt.return t
+  fun fd ->
+    let open Lwt_syntax in
+    incr counter ;
+    let t = {fd; id = !counter; nread = 0; nwrit = 0} in
+    let* () = Events.(emit create_fd) t.id in
+    Lwt.return t
 
 let string_of_sockaddr addr =
   match addr with
@@ -66,30 +67,37 @@ let socket proto kind arg =
      fd)
 
 let close t =
-  Events.(emit close_fd) (t.id, t.nread, t.nwrit) >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Events.(emit close_fd) (t.id, t.nread, t.nwrit) in
   Lwt_utils_unix.safe_close t.fd
 
 let read t buf pos len =
-  Events.(emit try_read) (t.id, len) >>= fun () ->
-  Lwt_unix.read t.fd buf pos len >>= fun nread ->
+  let open Lwt_syntax in
+  let* () = Events.(emit try_read) (t.id, len) in
+  let* nread = Lwt_unix.read t.fd buf pos len in
   t.nread <- t.nread + nread ;
-  Events.(emit read_fd) (t.id, nread, t.nread) >>= fun () -> Lwt.return nread
+  let* () = Events.(emit read_fd) (t.id, nread, t.nread) in
+  Lwt.return nread
 
 let write t buf =
+  let open Lwt_syntax in
   let len = Bytes.length buf in
-  Events.(emit try_write) (t.id, len) >>= fun () ->
-  Lwt_utils_unix.write_bytes t.fd buf >>= fun () ->
+  let* () = Events.(emit try_write) (t.id, len) in
+  let* () = Lwt_utils_unix.write_bytes t.fd buf in
   t.nwrit <- t.nwrit + len ;
-  Events.(emit written_fd) (t.id, len, t.nwrit) >>= fun () -> Lwt.return_unit
+  let* () = Events.(emit written_fd) (t.id, len, t.nwrit) in
+  Lwt.return_unit
 
 let connect t saddr =
-  Events.(emit connect_fd) (t.id, string_of_sockaddr saddr) >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Events.(emit connect_fd) (t.id, string_of_sockaddr saddr) in
   Lwt_unix.connect t.fd saddr
 
 let accept sock =
-  Lwt_unix.accept sock >>= fun (fd, saddr) ->
-  create fd >>= fun t ->
-  Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) >>= fun () ->
+  let open Lwt_syntax in
+  let* (fd, saddr) = Lwt_unix.accept sock in
+  let* t = create fd in
+  let* () = Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) in
   Lwt.return (t, saddr)
 
 module Table = Hashtbl.Make (struct

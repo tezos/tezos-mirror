@@ -97,9 +97,9 @@ let test_mk_buffer_safe =
     lengths
 
 let cancel_and_assert_success canceler =
-  Lwt_canceler.cancel canceler >|= function
-  | Ok _ -> ()
-  | Error _ -> assert false
+  let open Lwt_syntax in
+  let* r = Lwt_canceler.cancel canceler in
+  match r with Ok _ -> Lwt.return_unit | Error _ -> assert false
 
 let easy_mk_readable ?maxlength ?fresh_buf_size ?size () =
   let read_buffer = Circular_buffer.create ?maxlength ?fresh_buf_size () in
@@ -107,6 +107,7 @@ let easy_mk_readable ?maxlength ?fresh_buf_size ?size () =
   P2p_buffer_reader.mk_readable ~read_buffer ~read_queue
 
 let test_read_waits_for_data =
+  let open Lwt_syntax in
   Alcotest.test_case "read hangs if there is no data to read" `Quick
   @@ fun () ->
   let readable = easy_mk_readable () in
@@ -117,12 +118,13 @@ let test_read_waits_for_data =
       cancelled := true ;
       Lwt.return_unit) ;
   let schedule () : _ Lwt.t =
-    Lwt_unix.sleep 0.3 >>= fun () -> cancel_and_assert_success canceler
+    let* () = Lwt_unix.sleep 0.3 in
+    cancel_and_assert_success canceler
   in
   Lwt_main.run
     (Lwt.dont_wait schedule (fun exn ->
          Alcotest.failf "Schedule execution failed: %s" (Printexc.to_string exn)) ;
-     P2p_buffer_reader.read ~canceler readable buffer >>= fun res ->
+     let* res = P2p_buffer_reader.read ~canceler readable buffer in
      assert (Result.is_error res) ;
      Lwt.return_unit) ;
   assert (!cancelled = true)
