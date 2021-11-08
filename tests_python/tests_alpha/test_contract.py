@@ -378,17 +378,24 @@ class TestExecutionOrdering:
         assert client.get_storage(storer) == '"{}"'.format(expected)
 
 
-@pytest.mark.slow
 @pytest.mark.contract
-class TestContracts:
-    """Test type checking and execution of a bunch of contracts"""
+@pytest.mark.regression
+class TestTypecheck:
+    """Regression testing of Michelson typechecking"""
 
     @pytest.mark.parametrize("contract", all_contracts())
-    def test_typecheck(self, client: Client, contract):
+    def test_typecheck(self, client_regtest: Client, contract):
+        client = client_regtest
         assert contract.endswith(
             '.tz'
         ), "test contract should have .tz extension"
-        client.typecheck(os.path.join(CONTRACT_PATH, contract))
+        client.typecheck(os.path.join(CONTRACT_PATH, contract), details=True)
+
+
+@pytest.mark.slow
+@pytest.mark.contract
+class TestContracts:
+    """Test type checking errors"""
 
     @pytest.mark.parametrize("contract", all_legacy_contracts())
     def test_deprecated_typecheck_breaks(self, client, contract):
