@@ -107,6 +107,12 @@ type ('a, 's) judgement =
 val close_descr :
   ('a, 'b, 'c, 'd) descr -> ('a, 'b, 'c, 'd) Script_typed_ir.kdescr
 
+(** Flag that drives unparsing of typed values to nodes.
+    - [Optimized_legacy] must be kept backward-compatible in order to compute
+      valid hashes (of big map keys).
+    - [Optimized] may be used as long as the result can be read by parse_data.
+    - [Readable] produces with [string] values instead of [bytes] when feasible.
+*)
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
@@ -241,6 +247,13 @@ val unparse_data :
   'a ->
   (Script.node * context) tzresult Lwt.t
 
+val unparse_comparable_data :
+  context ->
+  unparsing_mode ->
+  'a Script_typed_ir.comparable_ty ->
+  'a ->
+  (Script.node * context) tzresult Lwt.t
+
 val unparse_code :
   context ->
   unparsing_mode ->
@@ -323,6 +336,11 @@ val parse_ty :
 
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
+
+val unparse_comparable_ty :
+  context ->
+  'a Script_typed_ir.comparable_ty ->
+  (Script.node * context) tzresult
 
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty

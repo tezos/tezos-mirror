@@ -1389,6 +1389,8 @@ val kinstr_rewritek :
 
 val ty_size : 'a ty -> 'a Type_size.t
 
+val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
+
 val unit_t : annot:type_annot option -> unit ty
 
 val int_t : annot:type_annot option -> z num ty

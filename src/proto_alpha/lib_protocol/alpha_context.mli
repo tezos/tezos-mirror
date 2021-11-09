@@ -678,6 +678,10 @@ module Script : sig
   val unit_parameter : lazy_expr
 
   val strip_locations_cost : node -> Gas.cost
+
+  val strip_annotations_cost : node -> Gas.cost
+
+  val strip_annotations : node -> node
 end
 
 module Constants : sig
