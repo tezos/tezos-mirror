@@ -259,29 +259,30 @@ let compare_balance ba bb =
   | (_, _) ->
       let index b =
         match b with
-        | Contract _ -> 0l
-        | Legacy_rewards _ -> 1l
-        | Block_fees -> 2l
-        | Legacy_deposits _ -> 3l
-        | Deposits _ -> 4l
-        | NonceRevelation_rewards -> 5l
-        | Double_signing_evidence_rewards -> 6l
-        | Endorsing_rewards -> 7l
-        | Baking_rewards -> 8l
-        | Baking_bonuses -> 9l
-        | Legacy_fees _ -> 10l
-        | Storage_fees -> 11l
-        | Double_signing_punishments -> 12l
-        | Lost_endorsing_rewards _ -> 13l
-        | Liquidity_baking_subsidies -> 14l
-        | Burned -> 15l
-        | Commitments _ -> 16l
-        | Bootstrap -> 17l
-        | Invoice -> 18l
-        | Initial_commitments -> 19l
-        | Minted -> 20l
+        | Contract _ -> 0
+        | Legacy_rewards _ -> 1
+        | Block_fees -> 2
+        | Legacy_deposits _ -> 3
+        | Deposits _ -> 4
+        | NonceRevelation_rewards -> 5
+        | Double_signing_evidence_rewards -> 6
+        | Endorsing_rewards -> 7
+        | Baking_rewards -> 8
+        | Baking_bonuses -> 9
+        | Legacy_fees _ -> 10
+        | Storage_fees -> 11
+        | Double_signing_punishments -> 12
+        | Lost_endorsing_rewards _ -> 13
+        | Liquidity_baking_subsidies -> 14
+        | Burned -> 15
+        | Commitments _ -> 16
+        | Bootstrap -> 17
+        | Invoice -> 18
+        | Initial_commitments -> 19
+        | Minted -> 20
+        (* don't forget to add parameterized cases in the first part of the function *)
       in
-      Int32.compare (index ba) (index bb)
+      Compare.Int.compare (index ba) (index bb)
 
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
