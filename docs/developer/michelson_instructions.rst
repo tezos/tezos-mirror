@@ -6,6 +6,7 @@ From time to time a need arises to enrich Michelson language with an additional
 instruction. It might be an intimidating task, especially to someone who is not
 very familiar with the interpreter code. Thus, here is a quick tutorial
 outlining the most important steps required to add a new Michelson instruction.
+outlining the most important steps required to add a new Michelson instruction.
 
 Adding a new instruction requires providing the following elements (detailed in the rest of this document):
 
