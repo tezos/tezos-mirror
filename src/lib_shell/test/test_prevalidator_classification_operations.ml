@@ -248,11 +248,13 @@ module Block = struct
         assert false
     | Ok hash -> hash
 
+  (** Returns the [hash] field of a {!t} *)
+  let to_hash (blk : t) = blk.hash
+
   let tools : t Classification.block_tools =
-    let hash block = block.hash in
     let operations block = List.map (List.map snd) block.operations in
     let all_operation_hashes block = List.map (List.map fst) block.operations in
-    {hash; operations; all_operation_hashes}
+    {hash = to_hash; operations; all_operation_hashes}
 
   let to_string t =
     let ops_list_to_string ops =
@@ -756,7 +758,7 @@ module Recyle_operations = struct
       List.map to_ops blocks |> List.concat |> oph_op_list_to_map
     in
     let both f (a, b) = (f a, f b) in
-    let blocks_hashes = List.map (fun (blk : Block.t) -> blk.hash) blocks in
+    let blocks_hashes = List.map Block.to_hash blocks in
     let block_hash_t =
       (* For classification and pending, put 50% of them in live_blocks.
          For the remaining 50%, generate branch randomly, so likely outside
@@ -825,9 +827,7 @@ module Recyle_operations = struct
       |> force_opt ~loc:__LOC__
     in
     let live_blocks : Block_hash.Set.t =
-      Tree.values tree
-      |> List.map (fun (blk : Block.t) -> blk.hash)
-      |> Block_hash.Set.of_list
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     (* This is inherited from the behavior of [handle_live_operations] *)
     let expected_from_tree : Operation_hash.Set.t =
@@ -888,9 +888,7 @@ module Recyle_operations = struct
              handle_branch_refused ) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
     let live_blocks : Block_hash.Set.t =
-      Tree.values tree
-      |> List.map (fun (blk : Block.t) -> blk.hash)
-      |> Block_hash.Set.of_list
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     let expected : Operation.t Op_map.t =
       Classification.Internal_for_tests.to_map
