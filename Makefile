@@ -30,6 +30,19 @@ current_ocaml_version := $(shell opam exec -- ocamlc -version)
 all:
 	@$(MAKE) build PROFILE=dev
 
+.PHONY: build-parameters
+build-parameters:
+	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
+	@for p in $(active_protocol_directories) ; do \
+	   mkdir -p src/proto_$$p/parameters ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
+	 done
+
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
@@ -48,10 +61,7 @@ endif
 		$(foreach p, $(active_protocol_directories), \
 		  $(shell if [ ! -z $(wildcard src/proto_$(p)/bin_endorser/*.ml) ]; then \
 		             echo src/proto_$(p)/bin_endorser/main_endorser_$(p).exe; fi)) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe)
 	@cp -f _build/default/src/bin_node/main.exe tezos-node
 	@cp -f _build/default/src/bin_validation/main_validator.exe tezos-validator
 	@cp -f _build/default/src/bin_client/main_client.exe tezos-client
@@ -67,11 +77,8 @@ endif
 	      cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
 	   fi ; \
 	   cp -f _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
-	   mkdir -p src/proto_$$p/parameters ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
 	 done
+	@$(MAKE) build-parameters
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
 endif
