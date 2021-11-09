@@ -19,6 +19,11 @@ This protocol requires a different protocol environment than Hangzhou.
 It requires protocol environment V4, compared to V3 for Hangzhou.
 (MR :gl:`!3468`)
 
+Tenderbake
+----------
+
+- A replacement of Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
+
 Tickets Strengthening
 ---------------------
 
@@ -39,10 +44,6 @@ Michelson
 Bug Fixes
 ---------
 
-- Fix `a bug <https://marigold.dev/blog/communicating-about-view-issue-hangzhou/>`_ in the semantics of views, where step constants
-  ``BALANCE``, ``AMOUNT``, ``SENDER``, ``SELF``, and ``SELF_ADDRESS`` would not
-  be restored after returning from a view (MR :gl:`!3654`)
-
 Minor Changes
 -------------
 
@@ -54,10 +55,19 @@ Minor Changes
 
 - Remove the optional entrypoint in ticketer address. (MR :gl:`!3570`)
 
+- Make delegate optional for bootstrap contracts. (MR :gl:`!3584`)
+
+- Fix interface of Hex. (MR :gl:`!3267`)
+
+- Update migration for protocol "I". (MR :gl:`!3668`)
+
+- Make `max_operations_ttl` a parametric constant of the protocol, now called `max_operations_time_to_live`. (MR :gl:`!3709`)
+
 - ``NOW`` and ``LEVEL`` are now passed to the Michelson interpreter as
   step constants instead of being read from the context each time
   these instructions are executed. (MR :gl:`!3524`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
-  :gl:`!3622`, :gl:`!3631`, :gl:`!3630`)
+  :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
+  :gl:`!3529`, :gl:`!3739``, :gl:`!3741`, :gl:`!3695`, :gl:`!3763`)
