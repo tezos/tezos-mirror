@@ -158,6 +158,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         identity;
         proof_of_work_target;
         listening_port = Some port;
+        advertised_port = Some port;
         private_mode;
         reconnection_config = P2p_point_state.Info.default_reconnection_config;
         min_connections = unopt min_connections;
