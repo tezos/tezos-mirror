@@ -34,8 +34,11 @@ module type FILTER = sig
 
     val default_config : config
 
+    (** Internal state of the prevalidator filter *)
     type state
 
+    (** [init config ?validation_state ~predecessor] is called once when
+        a prevalidator starts. *)
     val init :
       config ->
       ?validation_state:Proto.validation_state ->
@@ -43,6 +46,9 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
+    (** [on_flush config state ?validation_state ~predecessor] is called when
+        a flush in the prevalidator is triggered. It resets part of the
+        [state]. *)
     val on_flush :
       config ->
       state ->
@@ -76,6 +82,16 @@ module type FILTER = sig
       | `Undecided ]
       Lwt.t
 
+    (** [pre_filter config ~filter_state ?validation_state_before operation_data]
+        is called on arrival of an operation and after a flush of
+        the prevalidator. This function calls the [pre_filter] in the protocol
+        plugin and returns [`Undecided] if no error occurs during checking of
+        the [operation_data]. We classify an operation that pass the prefilter
+        as [`Undecided] since we do not know yet if the operation is applicable
+        or not. If an error occurs during the checks, this function returns an error
+        corresponding to the kind of the error returned by the protocol.
+        This function both takes a [state] as parameter and
+        returns a [state], because it can update it while executing. *)
     val pre_filter :
       config ->
       filter_state:state ->
@@ -89,6 +105,16 @@ module type FILTER = sig
       * state)
       Lwt.t
 
+    (** [post_filter config ~filter_state ~validation_state_before
+        ~validation_state_after (operation_data, operation_receipt)]
+        is called after a call to
+        [Prevalidation.apply_operation] in the prevalidator, on operations that
+        did not fail. It calls the [post_filter] function in the protocol
+        plugin and returns [`Applied] if no error occurs during the checking of
+        the [operation_receipt]. If an error occurs during the checks, returns
+        an error corresponding to the kind of the error returned by the
+        protocol. This function both takes a [state] as parameter and
+        returns a [state], because it can update it while executing. *)
     val post_filter :
       config ->
       filter_state:state ->

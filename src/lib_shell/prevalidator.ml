@@ -305,6 +305,7 @@ module type T = sig
   type types_state = {
     shell : types_state_shell;
     mutable filter_state : Filter.Mempool.state;
+        (** Internal state of the filter in the plugin *)
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       (Classification.classification
