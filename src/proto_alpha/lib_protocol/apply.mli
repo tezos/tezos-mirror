@@ -210,6 +210,18 @@ val apply_contents_list :
   'kind contents_list ->
   (t * 'kind contents_result_list) tzresult Lwt.t
 
+(** [precheck_manager_contents_list validation_state contents_list]
+    Returns an updated context, and a list of prechecked contents
+    containing balance updates for fees related to each manager
+    operation in [contents_list]. *)
+val precheck_manager_contents_list :
+  t ->
+  'kind Kind.manager contents_list ->
+  (context
+  * ('kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
+  tzresult
+  Lwt.t
+
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
 val value_of_key : t -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
@@ -225,3 +237,25 @@ val are_endorsements_required : t -> level:Raw_level.t -> bool tzresult Lwt.t
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
   endorsing_power:int -> minimum:int -> unit tzresult Lwt.t
+
+(** [check_manager_signature validation_state op raw_operation]
+    The function starts by retrieving the public key hash [pkh] of the manager
+    operation. In case the operation is batched, the function also checks that
+    the sources are all the same.
+    Once the [pkh] is retrieved, the function looks for its associated public
+    key. For that, the manager operation is inspected to check if it contains
+    a public key revelation. If not, the public key is searched in the context.
+
+    @return [Error Invalid_signature] if the signature check fails
+    @return [Error Unrevealed_manager_key] if the manager has not yet been
+    revealed
+    @return [Error Failure "get_manager_key"] if the key is not found in the
+    context
+    @return [Error Inconsistent_sources] if the operations in a batch are not
+    from the same manager *)
+val check_manager_signature :
+  t ->
+  Chain_id.t ->
+  'a Kind.manager contents_list ->
+  'b operation ->
+  (unit, error trace) result Lwt.t
