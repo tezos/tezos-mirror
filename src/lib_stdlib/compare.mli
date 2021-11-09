@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -135,6 +136,47 @@ module Option (P : COMPARABLE) : S with type t = P.t option
 
 module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
   S with type t = (Ok.t, Error.t) result
+
+(** {2 List lengths}
+
+    Helpers for more readable {!Stdlib.List.compare_lengths} and
+    {!Stdlib.List.compare_length_with}. *)
+
+module List_length_with : sig
+  val ( = ) : 'a list -> int -> bool
+
+  val ( <> ) : 'a list -> int -> bool
+
+  val ( < ) : 'a list -> int -> bool
+
+  val ( <= ) : 'a list -> int -> bool
+
+  val ( >= ) : 'a list -> int -> bool
+
+  val ( > ) : 'a list -> int -> bool
+
+  val compare : 'a list -> int -> int
+
+  val equal : 'a list -> int -> bool
+end
+
+module List_lengths : sig
+  val ( = ) : 'a list -> 'b list -> bool
+
+  val ( <> ) : 'a list -> 'b list -> bool
+
+  val ( < ) : 'a list -> 'b list -> bool
+
+  val ( <= ) : 'a list -> 'b list -> bool
+
+  val ( >= ) : 'a list -> 'b list -> bool
+
+  val ( > ) : 'a list -> 'b list -> bool
+
+  val compare : 'a list -> 'b list -> int
+
+  val equal : 'a list -> 'b list -> bool
+end
 
 (** {2 Building blocks} *)
 
