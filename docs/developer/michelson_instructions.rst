@@ -6,19 +6,15 @@ From time to time a need arises to enrich Michelson language with an additional
 instruction. It might be an intimidating task, especially to someone who is not
 very familiar with the interpreter code. Thus, here is a quick tutorial
 outlining the most important steps required to add a new Michelson instruction.
+outlining the most important steps required to add a new Michelson instruction.
 
-Michelson scripts, types, and values are written in a concrete syntax called
-:doc:`Micheline`. This concrete syntax is parametrized by the type of
-/primitives/. This lets each version of the Tezos protocol enumerate the
-Michelson primitives independently of the other versions so that new primitives
-for new types and instructions can be added without changing Micheline.
-Michelson distinguishes 4 types of primitives:
+Adding a new instruction requires providing the following elements (detailed in the rest of this document):
 
-1. a primitive
-2. an internal representation (or IR for short)
-3. a translation rule
-4. an execution rule
-5. a gas cost model
+1. :ref:`a primitive <add_mich_primitive>`
+2. :ref:`an internal representation <add_mich_ir>` (or IR for short)
+3. :ref:`a translation rule <script_translator>`
+4. :ref:`an execution rule <add_mich_execution_rule>`
+5. :ref:`a gas cost model <add_mich_gas_model>`
 
 Once all of the above are provided, we may try compiling the protocol. We will
 most likely encounter some non-exhaustive pattern matching errors, but after the
@@ -31,6 +27,8 @@ are public.
 
 For each function and data type mentioned on this page there is a pointer to the source
 code file where it can be found.
+
+.. _add_mich_primitive:
 
 Michelson primitives
 --------------------
@@ -115,6 +113,8 @@ This is a recurring pattern within the interpreter: type parameters
 corresponding to types of Michelson stacks usually come in pairs. As we will
 shortly see, the first parameter in these pairs always corresponds to the type
 of element at the top of the stack; the other – to the remainder of the stack.
+
+.. _add_mich_ir:
 
 Internal representation (IR)
 ----------------------------
@@ -306,6 +306,8 @@ other program branch might have, effectively treating them as if they had type
 ``forall 'a. 'a``. In fact, this is precisely the type that Michelson
 specification assigns to the ``FAILWITH`` instruction.
 
+.. _add_mich_execution_rule:
+
 The interpreter
 ---------------
 
@@ -376,6 +378,8 @@ The step constants passed to the function along with the context contain some
 important information about the transaction itself, like the sender and the
 target, the amount transferred and so on. See ``step_constants`` type definition
 in :src:`src/proto_alpha/lib_protocol/script_interpreter.ml` for more details.
+
+.. _add_mich_gas_model:
 
 The Gas model
 -------------
