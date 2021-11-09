@@ -294,6 +294,8 @@ module Mempool = struct
     | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes)
     |> fun res -> Lwt.return (res, filter_state)
 
+  let precheck ~validation_state:_ _ _ = Lwt.return `Undecided
+
   open Apply_results
 
   let rec post_filter_manager :
