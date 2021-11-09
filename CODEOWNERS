@@ -55,6 +55,7 @@
 #
 # @arvidnl = Arvid Jakobsson
 # @camlspotter = Jun Furuse
+# @hhugo1 = Hugo Heuzard
 # @igarnier = Ilias Garnier
 # @klakplok = Benjamin Canou
 # @lthms = Thomas Letan
@@ -77,7 +78,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
+* @arvidnl @camlspotter @hhugo1 @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
 
 # CODEOWNERS Owners
 #
