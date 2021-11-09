@@ -304,7 +304,7 @@ other program branch might have, effectively treating them as if they had type
 ``forall 'a. 'a``. In fact, this is precisely the type that Michelson
 specification assigns to the ``FAILWITH`` instruction.
 
-.. add_mich_execution_rule:
+.. _add_mich_execution_rule:
 
 The interpreter
 ---------------
