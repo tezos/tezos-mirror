@@ -560,29 +560,72 @@ let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
     Operation_hash.Set.t =
   List.concat blocks |> List.concat |> Operation_hash.Set.of_list
 
+(** [is_subset m1 m2] returns whether all bindings of [m1] are in [m2].
+    In other words, it returns whether [m2] is a superset of [m1]. *)
+let is_subset (m1 : Operation.t Op_map.t) (m2 : Operation.t Op_map.t) =
+  let rec go (m1_seq : (Operation_hash.t * Operation.t) Seq.t) =
+    match m1_seq () with
+    | Seq.Nil -> true
+    | Seq.Cons ((m1_key, m1_value), m1_rest) -> (
+        match Op_map.find m1_key m2 with
+        | None -> (* A key in [m1] that is not in [m2] *) false
+        | Some m2_value -> Operation.equal m1_value m2_value && go m1_rest)
+  in
+  go (Op_map.to_seq m1)
+
 module Handle_operations = struct
-  (** Test that [handle_live_operations] returns an empty map
-      of operations when [is_branch_alive] rules
-      out all operations *)
-  let test_handle_live_operations_live_blocks_all_outdated =
+  (** Test that operations returned by [handle_live_operations]
+      are all in the alive branch. *)
+  let test_handle_live_operations_is_branch_alive =
+    (* Like [Generators.chain_tools_gen], but also picks a random subset of
+       blocks from the tree to pass an interesting value to [is_branch_alive].
+       Could be in [chain_tools_gen] itself, but only used in this test. So
+       it would be overkill. *)
+    let gen =
+      let open QCheck.Gen in
+      let* (chain, tree, pair_blocks_opt, old_mempool) =
+        Generators.chain_tools_gen ?blocks:None
+      in
+      let* live_blocks =
+        sublist (Tree.values tree)
+        >|= List.map (fun (blk : Block.t) -> blk.hash)
+      in
+      return
+        ( chain,
+          tree,
+          pair_blocks_opt,
+          old_mempool,
+          Block_hash.Set.of_list live_blocks )
+    in
+    let arb = QCheck.make gen in
     QCheck.Test.make
-      ~name:
-        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is empty"
-      Arbitraries.chain_tools_arb
-    @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
+      ~name:"[handle_live_operations] is a subset of alive blocks"
+      arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool, live_blocks) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let expected_superset : Operation.t Op_map.t =
+      (* Take all blocks *)
+      Tree.values tree
+      (* Keep only the ones in live_blocks *)
+      |> List.filter (fun (blk : Block.t) ->
+             Block_hash.Set.mem blk.hash live_blocks)
+      (* Then extract (oph, op) pairs from them *)
+      |> List.map (fun (blk : Block.t) -> blk.operations)
+      |> List.concat |> List.concat |> List.to_seq |> Op_map.of_seq
+    in
     let actual : Operation.t Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
         ~block_store:Block.tools
         ~chain
         ~from_branch
         ~to_branch
-        ~is_branch_alive:(Fun.const false)
+        ~is_branch_alive:(fun blk_hash ->
+          Block_hash.Set.mem blk_hash live_blocks)
         old_mempool
       |> Lwt_main.run
     in
-    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
+    qcheck_cond ~pp:op_map_pp ~cond:is_subset actual expected_superset ()
 
   (** Test that operations returned by [handle_live_operations] is
       the union of 1/ operations from its last argument (a map) and 2/
@@ -784,7 +827,7 @@ module Recyle_operations = struct
 
   (** Test that {!Classification.recycle_operations} returns an empty map when
       live blocks are empty. This test lifts
-      {!Handle_operations.test_handle_live_operations_live_blocks_all_outdated}
+      {!Handle_operations.test_handle_live_operations_is_branch_alive}
       to [recycle_operations]. *)
   let test_recycle_operations_empty_live_blocks =
     QCheck.Test.make
@@ -934,7 +977,7 @@ let () =
         qcheck_wrap
           Handle_operations.
             [
-              test_handle_live_operations_live_blocks_all_outdated;
+              test_handle_live_operations_is_branch_alive;
               test_handle_live_operations_path_spec;
               test_handle_live_operations_clear;
               test_handle_live_operations_inject;
