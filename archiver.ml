@@ -148,7 +148,7 @@ let load filename encoding empty =
   | true -> (
       Lwt_utils_unix.Json.read_file filename >>=? fun json ->
       try return (Data_encoding.Json.destruct encoding json)
-      with exn -> Lwt.return (Error_monad.error_exn exn))
+      with exn -> Lwt.return (Error_monad.error_with_exn exn))
 
 let write filename encoding value =
   Lwt_utils_unix.create_dir (Filename.dirname filename) >>= fun () ->
@@ -284,7 +284,7 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
             Block_hash.pp
             block_hash
             block_level
-            Error_monad.pp_print_error
+            Error_monad.pp_print_trace
             err))
   <&>
   let filename = filename_of_level path block_level in
@@ -314,7 +314,7 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
            Block_hash.pp
            block_hash
            block_level
-           Error_monad.pp_print_error
+           Error_monad.pp_print_trace
            err)
 
 let dump_received path ?unaccurate level items =
@@ -367,7 +367,7 @@ let dump_received path ?unaccurate level items =
         (Format.asprintf
            "@[Failed to dump endorsements at level %li :@ @[%a@]@]"
            level
-           Error_monad.pp_print_error
+           Error_monad.pp_print_trace
            err)
 
 type chunk =

@@ -29,7 +29,7 @@ open Tezos_protocol_010_PtGRANAD
 let print_failures f =
   f >|= function
   | Ok () -> ()
-  | Error e -> Error_monad.pp_print_error Format.err_formatter e
+  | Error e -> Error_monad.pp_print_trace Format.err_formatter e
 
 let dump_my_current_endorsements cctxt ~full block level ops =
   Protocol.Delegate_services.Endorsing_rights.get
@@ -128,7 +128,7 @@ let blocks_loop cctxt =
   Shell_services.Monitor.valid_blocks cctxt ~chains:[cctxt#chain] ()
   >>= function
   | Error e ->
-      let () = Error_monad.pp_print_error Format.err_formatter e in
+      let () = Error_monad.pp_print_trace Format.err_formatter e in
       Lwt.return_unit
   | Ok (block_stream, _stopper) ->
       Lwt_stream.iter_p
@@ -141,7 +141,7 @@ let blocks_loop cctxt =
             ~block:(`Hash (hash, 0))
             0
           >|= function
-          | Error e -> Error_monad.pp_print_error Format.err_formatter e
+          | Error e -> Error_monad.pp_print_trace Format.err_formatter e
           | Ok ops ->
               let timestamp =
                 header.Block_header.shell.Block_header.timestamp
@@ -187,7 +187,7 @@ let blocks_loop cctxt =
 let endorsements_loop cctxt =
   Shell_services.Monitor.heads cctxt cctxt#chain >>= function
   | Error e ->
-      let () = Error_monad.pp_print_error Format.err_formatter e in
+      let () = Error_monad.pp_print_trace Format.err_formatter e in
       Lwt.return_unit
   | Ok (head_stream, _stopper) ->
       Lwt_stream.iter_p
