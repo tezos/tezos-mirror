@@ -26,8 +26,9 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe
+    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe
     Subject:      Unit tests [Prevalidator_classification.Internal_for_tests.handle_live_operations]
+                  and [Prevalidator_classification.recyle_operations]
 *)
 
 open Lib_test.Qcheck_helpers
@@ -930,7 +931,7 @@ let () =
     "Prevalidator"
     [
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'handle_operations' *)
+         dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe -- test 'handle_operations' *)
       ( "handle_operations",
         qcheck_wrap
           Handle_operations.
@@ -941,7 +942,7 @@ let () =
               test_handle_live_operations_inject;
             ] );
       (* Run only first two tests (for example) with:
-         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'recycle_operations' '0..2'*)
+         dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe -- test 'recycle_operations' '0..2'*)
       ( "recycle_operations",
         qcheck_wrap
           Recyle_operations.
