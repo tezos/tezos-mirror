@@ -222,7 +222,7 @@ let era_of_cycle ~cycle_eras cycle =
   in
   aux cycle_eras
 
-(* precondition: level belong to era *)
+(* precondition: [level] belongs to [era] *)
 let level_from_raw_with_era era ~first_level_in_alpha_family level =
   let {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment} =
     era
@@ -244,7 +244,7 @@ let level_from_raw_with_era era ~first_level_in_alpha_family level =
   in
   {level; level_position; cycle; cycle_position; expected_commitment}
 
-let level_from_raw_aux ~cycle_eras level =
+let level_from_raw_aux_exn ~cycle_eras level =
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
     | [] -> assert false
@@ -253,7 +253,38 @@ let level_from_raw_aux ~cycle_eras level =
   let era = era_of_level ~cycle_eras level in
   level_from_raw_with_era era ~first_level_in_alpha_family level
 
-let from_raw ~cycle_eras l = level_from_raw_aux ~cycle_eras l
+let from_raw ~cycle_eras l = level_from_raw_aux_exn ~cycle_eras l
+
+type error += Level_not_in_alpha of Raw_level_repr.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"level_not_in_alpha"
+    ~title:"Level not in Alpha family"
+    ~description:"Level not in Alpha family"
+    ~pp:(fun ppf level ->
+      Format.fprintf
+        ppf
+        "Level %a is not in the Alpha family of protocols."
+        Raw_level_repr.pp
+        level)
+    Data_encoding.(obj1 (req "level" Raw_level_repr.encoding))
+    (function Level_not_in_alpha level -> Some level | _ -> None)
+    (fun level -> Level_not_in_alpha level)
+
+let level_from_raw_aux ~cycle_eras level =
+  let first_level_in_alpha_family =
+    match List.rev cycle_eras with
+    | [] -> assert false
+    | {first_level; _} :: _ -> first_level
+  in
+  error_when
+    Raw_level_repr.(level < first_level_in_alpha_family)
+    (Level_not_in_alpha level)
+  >|? fun () ->
+  let era = era_of_level ~cycle_eras level in
+  level_from_raw_with_era era ~first_level_in_alpha_family level
 
 type error += Negative_level_and_offset_sum of int32 * int32
 
@@ -266,7 +297,7 @@ let () =
     ~pp:(fun ppf (level, offset) ->
       Format.fprintf
         ppf
-        "Sum of level : %ld and offset : %ld is negative"
+        "Sum of level (%ld) and offset (%ld) is negative."
         level
         offset)
     Data_encoding.(obj2 (req "level" int32) (req "offset" int32))
@@ -275,12 +306,14 @@ let () =
       | _ -> None)
     (fun (level, offset) -> Negative_level_and_offset_sum (level, offset))
 
-let from_raw_with_offset ~cycle_eras ~offset l =
-  let res = Raw_level_repr.(of_int32 (Int32.add (to_int32 l) offset)) in
+let from_raw_with_offset ~cycle_eras ~offset raw_level =
+  let res = Raw_level_repr.(of_int32 (Int32.add (to_int32 raw_level) offset)) in
   match res with
-  | Ok l -> Ok (level_from_raw_aux ~cycle_eras l)
+  | Ok level -> level_from_raw_aux ~cycle_eras level
   | Error _ ->
-      error (Negative_level_and_offset_sum (Raw_level_repr.to_int32 l, offset))
+      error
+        (Negative_level_and_offset_sum
+           (Raw_level_repr.to_int32 raw_level, offset))
 
 let first_level_in_cycle_from_eras ~cycle_eras cycle =
   let first_level_in_alpha_family =
