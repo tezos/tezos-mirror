@@ -64,6 +64,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     mutable net_port : int;
+    advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
     default_expected_pow : int;
@@ -105,6 +106,8 @@ let wait node =
 let name node = node.name
 
 let net_port node = node.persistent_state.net_port
+
+let advertised_net_port node = node.persistent_state.advertised_net_port
 
 let rpc_host node = node.persistent_state.rpc_host
 
@@ -387,7 +390,8 @@ let wait_for_request ~request node =
   wait_for node event_name filter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
+    ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
+    ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -418,6 +422,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
       {
         data_dir;
         net_port;
+        advertised_net_port;
         rpc_host;
         rpc_port;
         arguments;
@@ -474,6 +479,13 @@ let runlike_command_arguments node command arguments =
         ("0.0.0.0:", "0.0.0.0:")
   in
   let arguments = node.persistent_state.arguments @ arguments in
+
+  let command_args = make_arguments arguments in
+  let command_args =
+    match node.persistent_state.advertised_net_port with
+    | None -> command_args
+    | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
+  in
   command
   ::
   "--data-dir"
@@ -485,9 +497,7 @@ let runlike_command_arguments node command arguments =
   (net_addr ^ string_of_int node.persistent_state.net_port)
   ::
   "--rpc-addr"
-  ::
-  (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
-  :: make_arguments arguments
+  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
 
 let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
     =
@@ -537,8 +547,8 @@ let replay ?on_terminate ?event_level ?(blocks = ["head"]) node arguments =
   let arguments = runlike_command_arguments node "replay" arguments @ blocks in
   do_runlike_command ?on_terminate ?event_level node arguments
 
-let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
-    ?rpc_port ?event_level arguments =
+let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
+    ?advertised_net_port ?rpc_host ?rpc_port ?event_level arguments =
   let node =
     create
       ?runner
@@ -548,6 +558,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
       ?data_dir
       ?event_pipe
       ?net_port
+      ?advertised_net_port
       ?rpc_host
       ?rpc_port
       arguments
