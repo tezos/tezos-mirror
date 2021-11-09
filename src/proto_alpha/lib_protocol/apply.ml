@@ -1332,12 +1332,11 @@ let rec precheck_manager_contents_list :
     type kind.
     Alpha_context.t ->
     kind Kind.manager contents_list ->
-    payload_producer:Signature.Public_key_hash.t ->
     (context
     * (kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
     tzresult
     Lwt.t =
- fun ctxt contents_list ~payload_producer ->
+ fun ctxt contents_list ->
   match[@coq_match_with_default] contents_list with
   | Single contents ->
       precheck_manager_contents ctxt contents
@@ -1346,8 +1345,7 @@ let rec precheck_manager_contents_list :
   | Cons (contents, rest) ->
       precheck_manager_contents ctxt contents
       >>=? fun (ctxt, balance_updates) ->
-      precheck_manager_contents_list ctxt rest ~payload_producer
-      >>=? fun (ctxt, results) ->
+      precheck_manager_contents_list ctxt rest >>=? fun (ctxt, results) ->
       return
         (ctxt, PrecheckedCons ({contents; result = balance_updates}, results))
 
@@ -2053,7 +2051,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt op ~payload_producer
+      precheck_manager_contents_list ctxt op
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
@@ -2064,7 +2062,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         prechecked_contents_list
       >|= ok
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt op ~payload_producer
+      precheck_manager_contents_list ctxt op
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
