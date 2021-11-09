@@ -26,20 +26,20 @@
 let levels_per_folder = 4096l
 
 module Endorsement = struct
-  type t =
-    { delegate : Signature.public_key_hash;
-      reception_time : Time.System.t option;
-      errors : error list;
-      block_inclusion : Block_hash.t list
-    }
+  type t = {
+    delegate : Signature.public_key_hash;
+    reception_time : Time.System.t option;
+    errors : error list;
+    block_inclusion : Block_hash.t list;
+  }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { delegate; reception_time; errors; block_inclusion } ->
+      (fun {delegate; reception_time; errors; block_inclusion} ->
         (delegate, reception_time, errors, block_inclusion))
       (fun (delegate, reception_time, errors, block_inclusion) ->
-        { delegate; reception_time; errors; block_inclusion })
+        {delegate; reception_time; errors; block_inclusion})
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "reception_time" Time.System.encoding)
@@ -48,20 +48,20 @@ module Endorsement = struct
 end
 
 module Block = struct
-  type t =
-    { hash : Block_hash.t;
-      timestamp : Time.Protocol.t;
-      reception_time : Time.System.t;
-      nonce : unit option
-    }
+  type t = {
+    hash : Block_hash.t;
+    timestamp : Time.Protocol.t;
+    reception_time : Time.System.t;
+    nonce : unit option;
+  }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { hash; reception_time; timestamp; nonce } ->
+      (fun {hash; reception_time; timestamp; nonce} ->
         (hash, reception_time, timestamp, nonce))
       (fun (hash, reception_time, timestamp, nonce) ->
-        { hash; reception_time; timestamp; nonce })
+        {hash; reception_time; timestamp; nonce})
       (obj4
          (req "hash" Block_hash.encoding)
          (req "reception_time" Time.System.encoding)
@@ -72,30 +72,32 @@ end
 module Anomaly = struct
   type problem = Missed | Forgotten | Sequestered | Incorrect
 
-  type t =
-    { level : Int32.t;
-      delegate : Signature.Public_key_hash.t;
-      problem : problem
-    }
+  type t = {
+    level : Int32.t;
+    delegate : Signature.Public_key_hash.t;
+    problem : problem;
+  }
 
   let problem_encoding =
     Data_encoding.string_enum
-      [ ("missed", Missed);
+      [
+        ("missed", Missed);
         ("forgotten", Forgotten);
         ("sequestered", Sequestered);
-        ("incorrect", Incorrect) ]
+        ("incorrect", Incorrect);
+      ]
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { level; delegate; problem } -> (level, delegate, problem))
-      (fun (level, delegate, problem) -> { level; delegate; problem })
+      (fun {level; delegate; problem} -> (level, delegate, problem))
+      (fun (level, delegate, problem) -> {level; delegate; problem})
       (obj3
          (req "level" int32)
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "problem" problem_encoding))
 
-  let rec insert_in_ordered_list ({ level; delegate; _ } as anomaly) = function
+  let rec insert_in_ordered_list ({level; delegate; _} as anomaly) = function
     | [] -> [anomaly]
     | head :: tail as l ->
         if Compare.Int32.(head.level < level) then anomaly :: l
@@ -106,25 +108,25 @@ module Anomaly = struct
         else head :: insert_in_ordered_list anomaly tail
 end
 
-type t =
-  { blocks : Block.t list;
-    endorsements : Endorsement.t list;
-    unaccurate : bool
-  }
+type t = {
+  blocks : Block.t list;
+  endorsements : Endorsement.t list;
+  unaccurate : bool;
+}
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun { blocks; endorsements; unaccurate } ->
+    (fun {blocks; endorsements; unaccurate} ->
       (blocks, endorsements, unaccurate))
     (fun (blocks, endorsements, unaccurate) ->
-      { blocks; endorsements; unaccurate })
+      {blocks; endorsements; unaccurate})
     (obj3
        (dft "blocks" (list Block.encoding) [])
        (dft "endorsements" (list Endorsement.encoding) [])
        (dft "unaccurate" bool false))
 
-let empty = { blocks = []; endorsements = []; unaccurate = true }
+let empty = {blocks = []; endorsements = []; unaccurate = true}
 
 let dirname_of_level prefix level =
   let base = Int32.mul (Int32.div level levels_per_folder) levels_per_folder in
@@ -146,7 +148,7 @@ let load filename encoding empty =
   | true -> (
       Lwt_utils_unix.Json.read_file filename >>=? fun json ->
       try return (Data_encoding.Json.destruct encoding json)
-      with exn -> Lwt.return (Error_monad.error_exn exn) )
+      with exn -> Lwt.return (Error_monad.error_exn exn))
 
 let write filename encoding value =
   Lwt_utils_unix.create_dir (Filename.dirname filename) >>= fun () ->
@@ -154,7 +156,7 @@ let write filename encoding value =
     filename
     (Data_encoding.Json.construct encoding value)
 
-module StringMap = Map.Make(Compare.String)
+module StringMap = Map.Make (Compare.String)
 
 let files_in_use = ref StringMap.empty
 
@@ -162,7 +164,7 @@ let get_file_mutex filename =
   match StringMap.find filename !files_in_use with
   | None ->
       let x = Lwt_mutex.create () in
-      let () = files_in_use := StringMap.add filename  x !files_in_use in
+      let () = files_in_use := StringMap.add filename x !files_in_use in
       x
   | Some x -> x
 
@@ -171,8 +173,9 @@ let drop_file_mutex filename =
     StringMap.filter
       (fun name mutex ->
         not
-          ( String.equal name filename
-          && not (Lwt_mutex.is_locked mutex) && Lwt_mutex.is_empty mutex) )
+          (String.equal name filename
+          && (not (Lwt_mutex.is_locked mutex))
+          && Lwt_mutex.is_empty mutex))
       !files_in_use
 
 let dump_anomalies path level anomalies =
@@ -198,22 +201,20 @@ let extract_anomalies path level infos =
   else
     let anomalies =
       List.fold_left
-        (fun acc
-             Endorsement.{ delegate; reception_time; errors; block_inclusion } ->
+        (fun acc Endorsement.{delegate; reception_time; errors; block_inclusion} ->
           match errors with
           | _ :: _ ->
-              Anomaly.{ level; delegate; problem = Anomaly.Incorrect } :: acc
+              Anomaly.{level; delegate; problem = Anomaly.Incorrect} :: acc
           | [] -> (
               match (reception_time, block_inclusion) with
               | (None, []) ->
-                  Anomaly.{ level; delegate; problem = Anomaly.Missed } :: acc
+                  Anomaly.{level; delegate; problem = Anomaly.Missed} :: acc
               | (Some _, []) ->
-                  Anomaly.{ level; delegate; problem = Anomaly.Forgotten }
-                  :: acc
+                  Anomaly.{level; delegate; problem = Anomaly.Forgotten} :: acc
               | (None, _ :: _) ->
-                  Anomaly.{ level; delegate; problem = Anomaly.Sequestered }
+                  Anomaly.{level; delegate; problem = Anomaly.Sequestered}
                   :: acc
-              | (Some _, _ :: _) -> acc ))
+              | (Some _, _ :: _) -> acc))
         []
         infos.endorsements
     in
@@ -233,7 +234,7 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
          List.fold_left
            (fun (acc, missing)
                 Endorsement.(
-                  { delegate; reception_time; errors; block_inclusion } as en) ->
+                  {delegate; reception_time; errors; block_inclusion} as en) ->
              match
                List.partition
                  (fun pkh -> Signature.Public_key_hash.equal pkh delegate)
@@ -241,10 +242,11 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
              with
              | (_ :: _, missing') ->
                  ( Endorsement.
-                     { delegate;
+                     {
+                       delegate;
                        reception_time;
                        errors;
-                       block_inclusion = block_hash :: block_inclusion
+                       block_inclusion = block_hash :: block_inclusion;
                      }
                    :: acc,
                    missing' )
@@ -256,17 +258,18 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
          List.fold_left
            (fun acc delegate ->
              Endorsement.
-               { delegate;
+               {
+                 delegate;
                  reception_time = None;
                  errors = [];
-                 block_inclusion = [block_hash]
+                 block_inclusion = [block_hash];
                }
              :: acc)
            updated_known
            unknown
        in
        let out_infos =
-         { blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate }
+         {blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate}
        in
        write filename encoding out_infos >>=? fun () ->
        extract_anomalies path endorsements_level out_infos)
@@ -289,15 +292,16 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
   Lwt_mutex.with_lock mutex (fun () ->
       load filename encoding empty >>=? fun infos ->
       let blocks =
-        Block.{ hash = block_hash; reception_time; timestamp; nonce = None }
+        Block.{hash = block_hash; reception_time; timestamp; nonce = None}
         :: infos.blocks
       in
       write
         filename
         encoding
-        { blocks;
+        {
+          blocks;
           endorsements = infos.endorsements;
-          unaccurate = infos.unaccurate
+          unaccurate = infos.unaccurate;
         })
   >>= fun out ->
   let () = drop_file_mutex filename in
@@ -322,7 +326,7 @@ let dump_received path ?unaccurate level items =
         List.fold_left
           (fun (acc, missing)
                Endorsement.(
-                 { delegate; reception_time; errors; block_inclusion } as en) ->
+                 {delegate; reception_time; errors; block_inclusion} as en) ->
             match
               List.partition
                 (fun (pkh, _, _) ->
@@ -335,8 +339,7 @@ let dump_received path ?unaccurate level items =
                   | Some _ -> (reception_time, errors)
                   | None -> (time, err)
                 in
-                ( Endorsement.
-                    { delegate; reception_time; errors; block_inclusion }
+                ( Endorsement.{delegate; reception_time; errors; block_inclusion}
                   :: acc,
                   missing' )
             | ([], _) -> (en :: acc, missing))
@@ -346,14 +349,13 @@ let dump_received path ?unaccurate level items =
       let endorsements =
         List.fold_left
           (fun acc (delegate, errors, reception_time) ->
-            Endorsement.
-              { delegate; reception_time; errors; block_inclusion = [] }
+            Endorsement.{delegate; reception_time; errors; block_inclusion = []}
             :: acc)
           updated_known
           unknown
       in
       let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
-      let out_infos = { blocks = infos.blocks; endorsements; unaccurate } in
+      let out_infos = {blocks = infos.blocks; endorsements; unaccurate} in
       write filename encoding out_infos >>=? fun () ->
       extract_anomalies path level out_infos)
   >>= fun out ->
