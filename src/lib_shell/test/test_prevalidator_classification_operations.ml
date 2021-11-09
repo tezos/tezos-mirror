@@ -826,9 +826,17 @@ module Recyle_operations = struct
   let arb = QCheck.make gen
 
   (** Test that {!Classification.recycle_operations} returns an empty map when
-      live blocks are empty. This test lifts
+      live blocks are empty.
+
+      We do not lift the test
       {!Handle_operations.test_handle_live_operations_is_branch_alive}
-      to [recycle_operations]. *)
+      to [recycle_operations] (checking that operations returned by
+      [recycle_operations] are all in [live_blocks]), because we have
+      to account for operations in [classification] and [pending], and
+      we don't have the assumption that their branch are disjoint from
+      each other and from branches in [tree] (because generation
+      is partly random for them). This makes lifting
+      the [handle_operations] test quite heavy. We don't do that. *)
   let test_recycle_operations_empty_live_blocks =
     QCheck.Test.make
       ~name:"[recycle_operations ~live_blocks:empty] is empty"
