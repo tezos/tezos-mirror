@@ -747,15 +747,6 @@ let () =
     (function
       | Ill_typed_contract (expr, type_map) -> Some (expr, type_map) | _ -> None)
     (fun (expr, type_map) -> Ill_typed_contract (expr, type_map)) ;
-  (* Cannot serialize error *)
-  register_error_kind
-    `Temporary
-    ~id:"michelson_v1.cannot_serialize_error"
-    ~title:"Not enough gas to serialize error"
-    ~description:"The error was too big to be serialized with the provided gas"
-    Data_encoding.empty
-    (function Cannot_serialize_error -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_error) ;
   (* Deprecated instruction *)
   register_error_kind
     `Permanent

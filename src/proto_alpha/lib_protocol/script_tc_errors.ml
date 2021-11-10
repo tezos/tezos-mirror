@@ -182,9 +182,6 @@ type error += Ill_formed_type of string option * Script.expr * Script.location
 
 type error += Ill_typed_contract : Script.expr * type_map -> error
 
-(* Gas related errors *)
-type error += Cannot_serialize_error
-
 (* Deprecation errors *)
 type error += Deprecated_instruction of prim
 
