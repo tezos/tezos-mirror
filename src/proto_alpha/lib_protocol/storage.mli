@@ -580,11 +580,16 @@ module Commitments :
 
 (** Ramp up rewards *)
 module Ramp_up : sig
+  type reward = {
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
+  }
+
   module Rewards :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value := Tez_repr.t * Tez_repr.t * Tez_repr.t
-      (* baking rewards fixed portion * baking reward bonus per slot * validator reward per slot *)
+       and type value := reward
        and type t := Raw_context.t
 end
 
