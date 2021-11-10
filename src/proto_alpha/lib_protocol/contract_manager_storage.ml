@@ -26,10 +26,11 @@
 type error +=
   | (* `Branch *) Unrevealed_manager_key of Contract_repr.t
   | (* `Permanent *)
-      Inconsistent_hash of
-      Signature.Public_key.t
-      * Signature.Public_key_hash.t
-      * Signature.Public_key_hash.t
+      Inconsistent_hash of {
+      public_key : Signature.Public_key.t;
+      expected_hash : Signature.Public_key_hash.t;
+      provided_hash : Signature.Public_key_hash.t;
+    }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
 
 let () =
@@ -69,8 +70,12 @@ let () =
         (req "public_key" Signature.Public_key.encoding)
         (req "expected_hash" Signature.Public_key_hash.encoding)
         (req "provided_hash" Signature.Public_key_hash.encoding))
-    (function Inconsistent_hash (k, eh, ph) -> Some (k, eh, ph) | _ -> None)
-    (fun (k, eh, ph) -> Inconsistent_hash (k, eh, ph)) ;
+    (function
+      | Inconsistent_hash {public_key; expected_hash; provided_hash} ->
+          Some (public_key, expected_hash, provided_hash)
+      | _ -> None)
+    (fun (public_key, expected_hash, provided_hash) ->
+      Inconsistent_hash {public_key; expected_hash; provided_hash}) ;
   register_error_kind
     `Branch
     ~id:"contract.previously_revealed_key"
@@ -104,7 +109,10 @@ let reveal_manager_key c manager public_key =
       if Signature.Public_key_hash.equal actual_hash v then
         let v = Manager_repr.Public_key public_key in
         Storage.Contract.Manager.update c contract v
-      else fail (Inconsistent_hash (public_key, v, actual_hash))
+      else
+        fail
+          (Inconsistent_hash
+             {public_key; expected_hash = v; provided_hash = actual_hash})
 
 let get_manager_key ?error ctxt pkh =
   let contract = Contract_repr.implicit_contract pkh in
