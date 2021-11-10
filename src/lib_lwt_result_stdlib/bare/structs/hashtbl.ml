@@ -164,15 +164,17 @@ struct
   let iter_with_waiting_es f t =
     iter_es
       (fun (k, p) ->
+        let open Lwt_result_syntax in
         Lwt.try_bind
           (fun () -> p)
-          (function Error _ -> LwtResult.return_unit | Ok v -> f k v)
-          (fun _ -> LwtResult.return_unit))
+          (function Error _ -> return_unit | Ok v -> f k v)
+          (fun _ -> return_unit))
       (T.to_seq t)
 
   let fold_with_waiting_es f t init =
     fold_left_es
       (fun acc (k, p) ->
+        let open Lwt_result_syntax in
         Lwt.try_bind
           (fun () -> p)
           (function Error _ -> return acc | Ok v -> f k v acc)
@@ -194,14 +196,15 @@ struct
       init
 
   let iter_with_waiting_ep f t =
-    Monad.join_ep
+    let open Lwt_result_syntax in
+    join
     @@ fold_promises
          (fun k p acc ->
            let promise =
              Lwt.try_bind
                (fun () -> p)
-               (function Error _ -> LwtResult.return_unit | Ok v -> f k v)
-               (fun _ -> LwtResult.return_unit)
+               (function Error _ -> return_unit | Ok v -> f k v)
+               (fun _ -> return_unit)
            in
            promise :: acc)
          t

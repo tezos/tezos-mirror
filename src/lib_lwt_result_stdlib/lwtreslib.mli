@@ -307,9 +307,10 @@ let load_config file =
      (fun trace ->
         Trace.cons "cannot load configuration file" trace)
    @@ begin
-     open_file >>=? fun file ->
-     read_lines file >>=? fun lines ->
-     parse_config lines >>=? fun json ->
+     let open Lwt_result_syntax in
+     let* file = open_file in
+     let* lines = read_lines file in
+     let* json = parse_config lines in
      make_dictionary json
    end
 ]}

@@ -557,8 +557,7 @@ module Consensus = struct
           (uri, endpoint))
         endpoints_and_rogueness
     in
-    Consensus.consensus input validating_endpoints >|= get_ok
-    >>= fun consensus_reached ->
+    Consensus.consensus input validating_endpoints >>= fun consensus_reached ->
     Lwt.return
     @@ qcheck_eq ~pp:Format.pp_print_bool consensus_expected consensus_reached
 end

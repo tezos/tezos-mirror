@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 module Inttbl = Hashtbl.Make (struct
   type t = int
@@ -50,7 +50,7 @@ type state = {
 
 let worker_loop state () =
   let rec inner sleep time_at_entry =
-    sleep >>= fun () ->
+    let* () = sleep in
     let sleep = Lwt_unix.sleep state.refresh_interval in
     let now = Mtime_clock.elapsed () in
     let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms time_at_entry) in

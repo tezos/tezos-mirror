@@ -236,13 +236,34 @@ module type MONAD_EXTENSION = sig
 
   val return_false : (bool, 'e) result Lwt.t
 
-  (** more defaulting to trace *)
-  val fail : 'error -> ('a, 'error trace) result Lwt.t
+  (** more globals *)
+  val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
-  val error : 'error -> ('a, 'error trace) result
+  val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
-  (* NOTE: Right now we leave this [pp_print_trace] named as is. Later on we
-     might rename it to [pp_print_trace]. *)
+  val ok : 'a -> ('a, 'e) result
+
+  val error : 'e -> ('a, 'e trace) result
+
+  val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+
+  val fail : 'e -> ('a, 'e trace) result Lwt.t
+
+  val ( >>=? ) :
+    ('a, 'e) result Lwt.t ->
+    ('a -> ('b, 'e) result Lwt.t) ->
+    ('b, 'e) result Lwt.t
+
+  val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+
+  val ( >>?= ) :
+    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+  val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
+
+  (* Pretty-prints an error trace. *)
   val pp_print_trace : Format.formatter -> error trace -> unit
 
   (** Pretty-prints the top error of a trace *)

@@ -26,25 +26,24 @@
 open Support.Lib.Monad
 
 let assert_eq_s pa pb =
-  let open Lwt.Infix in
-  pa >>= fun a ->
-  pb >>= fun b ->
+  let open Lwt_syntax in
+  let* a = pa and* b = pb in
   assert (a = b) ;
-  Lwt.return_unit
+  return_unit
 
 let assert_err e = e = Error ()
 
 let assert_err_s e =
-  let open Lwt.Infix in
-  e >>= fun e ->
+  let open Lwt_syntax in
+  let* e = e in
   assert (e = Error ()) ;
-  Lwt.return_unit
+  return_unit
 
 let assert_err_p e =
-  let open Lwt.Infix in
-  e >>= fun e ->
+  let open Lwt_syntax in
+  let* e = e in
   assert (e = Error (Support.Test_trace.make ())) ;
-  Lwt.return_unit
+  return_unit
 
 module ListGen = struct
   include Support.Lib.List
@@ -105,9 +104,9 @@ module Init = struct
     ()
 
   let init_e () =
-    assert (assert_err @@ init_e ~when_negative_length:() (-10) ok) ;
-    assert (init_e ~when_negative_length:() 0 ok = nil_e) ;
-    assert (init_e ~when_negative_length:() 11 ok = ok @@ up 10) ;
+    assert (assert_err @@ init_e ~when_negative_length:() (-10) Result.ok) ;
+    assert (init_e ~when_negative_length:() 0 Result.ok = nil_e) ;
+    assert (init_e ~when_negative_length:() 11 Result.ok = Result.ok @@ up 10) ;
     ()
 
   let init_s _ () =
@@ -279,8 +278,8 @@ module Partition = struct
     assert (partition_result [] = ([], [])) ;
     assert (partition_result [Ok 0] = ([0], [])) ;
     assert (partition_result [Error 0] = ([], [0])) ;
-    assert (partition_result (map ok (up 11)) = (up 11, [])) ;
-    assert (partition_result (map (fun x -> Error x) (up 11)) = ([], up 11)) ;
+    assert (partition_result (map Result.ok (up 11)) = (up 11, [])) ;
+    assert (partition_result (map Result.error (up 11)) = ([], up 11)) ;
     assert (
       let input = map (fun x -> if cond x then Ok x else Error x) (up 101) in
       partition_result input = (filter_ok input, filter_error input)) ;
@@ -309,14 +308,17 @@ module Fold = struct
     assert (x = Error 3)
 
   let test_fold_left_map_s _ () =
-    assert_eq_s
-      (fold_left_map_s (fun _ _ -> assert false) 0 [])
-      (Lwt.return (0, []))
-    >>= fun () ->
-    assert_eq_s
-      (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
-      (Lwt.return (list_sum, list))
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      assert_eq_s
+        (fold_left_map_s (fun _ _ -> assert false) 0 [])
+        (Lwt.return (0, []))
+    in
+    let* () =
+      assert_eq_s
+        (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
+        (Lwt.return (list_sum, list))
+    in
     let p =
       fold_left_map_s
         (fun a b -> if a < 3 then Lwt.return (a + 1, b) else Lwt.fail Exit)
@@ -327,14 +329,18 @@ module Fold = struct
     Lwt.return ()
 
   let test_fold_left_map_es _ () =
-    assert_eq_s
-      (fold_left_map_es (fun _ _ -> assert false) 0 [])
-      (return (0, []))
-    >>= fun () ->
-    assert_eq_s
-      (fold_left_map_es (fun a b -> return (a + b, b)) 0 list)
-      (return (list_sum, list))
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      assert_eq_s
+        (fold_left_map_es (fun _ _ -> assert false) 0 [])
+        (return_ok (0, []))
+    in
+    let* () =
+      assert_eq_s
+        (fold_left_map_es (fun a b -> return_ok (a + b, b)) 0 list)
+        (return_ok (list_sum, list))
+    in
+    let open Lwt_result_syntax in
     assert_eq_s
       (fold_left_map_es
          (fun s x -> if x < 3 then return (s, x) else fail x)

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt
-
 (* The buffer is just an array of bytes.
    We remember the segment which is full in the buffer. *)
 type t = {
@@ -180,11 +178,12 @@ let write ~maxlen ~fill_using t =
   if maxlen = 0 then
     Lwt.return {offset = t.data_end; length = 0; buf = t.buffer}
   else
+    let open Lwt.Syntax in
     let (buf, offset) = get_buf_with_offset t maxlen in
     let maxlen =
       if buf == t.buffer then maxlen else min t.fresh_buf_size maxlen
     in
-    fill_using buf offset maxlen >>= fun written ->
+    let* written = fill_using buf offset maxlen in
     if written > maxlen then
       invalid_arg "Circular_buffer.write: written more bytes than maxlen" ;
     if t.buffer == buf then (

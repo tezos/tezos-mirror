@@ -169,7 +169,8 @@ let encoding encoder () =
                       (x' :> int)
                       x))))
   in
-  join_ep (List.map check_encode_decode [0; 7373737373; max_int - 1])
+  Error_monad.Lwt_tzresult_syntax.join
+    (List.map check_encode_decode [0; 7373737373; max_int - 1])
 
 let tests =
   [

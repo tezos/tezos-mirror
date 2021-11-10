@@ -30,7 +30,7 @@ module Make (Monad : Traced_sigs.Monad.S) :
   let iter_ep f seq =
     let rec iter_ep f seq acc =
       match seq () with
-      | Nil -> Monad.join_ep acc
+      | Nil -> Monad.Lwt_traced_result_syntax.join acc
       | Cons (item, seq) -> iter_ep f seq (Lwt.apply f item :: acc)
     in
     iter_ep f seq []

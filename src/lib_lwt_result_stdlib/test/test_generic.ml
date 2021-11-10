@@ -293,19 +293,21 @@ struct
 end
 
 let flip_e seq_e =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_e.fold_left (fun acc item -> item :: acc) [] seq_e
-  >|? List.rev >|? List.to_seq
+  let open Support.Lib.Monad.Result_syntax in
+  let+ r = Support.Lib.Seq_e.fold_left (fun acc item -> item :: acc) [] seq_e in
+  List.to_seq (List.rev r)
 
 let flip_s seq_s =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_s.fold_left (fun acc item -> item :: acc) [] seq_s
-  >|= List.rev >|= List.to_seq
+  let open Support.Lib.Monad.Lwt_syntax in
+  let+ r = Support.Lib.Seq_s.fold_left (fun acc item -> item :: acc) [] seq_s in
+  List.to_seq (List.rev r)
 
 let flip_es seq_es =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_es.fold_left (fun acc item -> item :: acc) [] seq_es
-  >|=? List.rev >|=? List.to_seq
+  let open Support.Lib.Monad.Lwt_result_syntax in
+  let+ r =
+    Support.Lib.Seq_es.fold_left (fun acc item -> item :: acc) [] seq_es
+  in
+  List.to_seq (List.rev r)
 
 module SeqMapTest = MakeMapperTest (struct
   include SeqGen

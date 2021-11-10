@@ -724,6 +724,12 @@ struct
     let catch_s ?catch_only f =
       Result.catch_s ?catch_only f
       >|= Result.map_error (fun e -> error_of_exn e)
+
+    let both_e = Tzresult_syntax.both
+
+    let join_e = Tzresult_syntax.join
+
+    let all_e = Tzresult_syntax.all
   end
 
   let () =

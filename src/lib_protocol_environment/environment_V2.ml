@@ -591,6 +591,12 @@ struct
 
     (* Shouldn't be used, only to keep the same environment interface *)
     let classify_error error = (find_info_of_error error).category
+
+    let both_e = Tzresult_syntax.both
+
+    let join_e = Tzresult_syntax.join
+
+    let all_e = Tzresult_syntax.all
   end
 
   let () =

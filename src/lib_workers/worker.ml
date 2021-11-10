@@ -448,33 +448,38 @@ struct
         Lwt_dropbox.close message_box
 
   let pop (type a) (w : a t) =
+    let open Lwt_syntax in
     let pop_queue message_queue =
       match w.timeout with
-      | None -> Lwt_pipe.Bounded.pop message_queue >>= fun m -> return_some m
+      | None ->
+          let* m = Lwt_pipe.Bounded.pop message_queue in
+          return_some m
       | Some timeout ->
           Lwt_pipe.Bounded.pop_with_timeout
             (Systime_os.sleep timeout)
             message_queue
-          >>= fun m -> return m
     in
     let pop_unbounded_queue message_queue =
       match w.timeout with
-      | None -> Lwt_pipe.Unbounded.pop message_queue >>= fun m -> return_some m
+      | None ->
+          let* m = Lwt_pipe.Unbounded.pop message_queue in
+          return_some m
       | Some timeout ->
           Lwt_pipe.Unbounded.pop_with_timeout
             (Systime_os.sleep timeout)
             message_queue
-          >>= fun m -> return m
     in
     match w.buffer with
     | Queue_buffer message_queue -> pop_unbounded_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
     | Dropbox_buffer message_box -> (
         match w.timeout with
-        | None -> Lwt_dropbox.take message_box >>= fun m -> return_some m
+        | None ->
+            let* m = Lwt_dropbox.take message_box in
+            return_some m
         | Some timeout ->
             Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
-            >>= fun m -> return m)
+        )
 
   let trigger_shutdown w = Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -483,13 +488,18 @@ struct
   let lwt_emit w (status : Logger.status) =
     let (module LogEvent) = w.logEvent in
     let time = Systime_os.now () in
-    LogEvent.emit
-      ~section:(Internal_event.Section.make_sanitized Name.base)
-      (fun () -> Time.System.stamp ~time status)
-    >>= function
-    | Ok () -> Lwt.return_unit
-    | Error el ->
-        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_trace el
+    Lwt.bind
+      (LogEvent.emit
+         ~section:(Internal_event.Section.make_sanitized Name.base)
+         (fun () -> Time.System.stamp ~time status))
+      (function
+        | Ok () -> Lwt.return_unit
+        | Error el ->
+            Format.kasprintf
+              Lwt.fail_with
+              "Worker_event.emit: %a"
+              pp_print_trace
+              el)
 
   let log_event w evt = lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
 
@@ -524,6 +534,7 @@ struct
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
     let do_close errs =
+      let open Lwt_syntax in
       let t0 =
         match w.status with
         | Running t0 -> t0
@@ -531,12 +542,12 @@ struct
       in
       w.status <- Closing (t0, Systime_os.now ()) ;
       close w ;
-      Error_monad.cancel_with_exceptions w.canceler >>= fun () ->
+      let* () = Error_monad.cancel_with_exceptions w.canceler in
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Handlers.on_close w >>= fun () ->
+      let* () = Handlers.on_close w in
       Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
-      Lwt.return_unit
+      return_unit
     in
     let rec loop () =
       (* The call to [protect] here allows the call to [pop] (responsible
@@ -551,61 +562,91 @@ struct
          processed, the processing eventually resolves, at which point a
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
-      (protect ~canceler:w.canceler (fun () -> pop w) >>=? function
-       | None -> Handlers.on_no_request w
-       | Some (pushed, Message (request, u)) -> (
-           let current_request = Request.view request in
-           let treated_time = Systime_os.now () in
-           w.current_request <- Some (pushed, treated_time, current_request) ;
-           match u with
-           | None ->
-               Handlers.on_request w request >>=? fun res ->
-               let completed_time = Systime_os.now () in
-               let treated = Ptime.diff treated_time pushed in
-               let completed = Ptime.diff completed_time treated_time in
-               w.current_request <- None ;
-               let status = Worker_types.{pushed; treated; completed} in
-               Handlers.on_completion w request res status >>= fun () ->
-               lwt_emit w (Request (current_request, status, None))
-               >>= fun () -> return_unit
-           | Some u ->
-               Handlers.on_request w request >>= fun res ->
-               Lwt.wakeup_later u res ;
-               Lwt.return res >>=? fun res ->
-               let completed_time = Systime_os.now () in
-               let treated = Ptime.diff treated_time pushed in
-               let completed = Ptime.diff completed_time treated_time in
-               let status = Worker_types.{pushed; treated; completed} in
-               w.current_request <- None ;
-               Handlers.on_completion w request res status >>= fun () ->
-               lwt_emit w (Request (current_request, status, None))
-               >>= fun () -> return_unit))
-      >>= function
-      | Ok () -> loop ()
-      | Error (Canceled :: _)
-      | Error (Exn Lwt.Canceled :: _)
-      | Error (Exn Lwt_pipe.Closed :: _)
-      | Error (Exn Lwt_dropbox.Closed :: _) ->
-          lwt_emit w Terminated >>= fun () -> do_close None
-      | Error errs -> (
-          (match w.current_request with
-          | Some (pushed, treated_time, request) ->
-              let completed_time = Systime_os.now () in
-              let treated = Ptime.diff treated_time pushed in
-              let completed = Ptime.diff completed_time treated_time in
-              w.current_request <- None ;
-              Handlers.on_error
-                w
-                request
-                Worker_types.{pushed; treated; completed}
-                errs
-          | None -> assert false)
-          >>= function
+      Lwt.bind
+        Lwt_tzresult_syntax.(
+          let* popped =
+            protect ~canceler:w.canceler (fun () -> lwt_ok @@ pop w)
+          in
+          match popped with
+          | None -> Handlers.on_no_request w
+          | Some (pushed, Message (request, u)) -> (
+              let current_request = Request.view request in
+              let treated_time = Systime_os.now () in
+              w.current_request <- Some (pushed, treated_time, current_request) ;
+              match u with
+              | None ->
+                  let* res = Handlers.on_request w request in
+                  let completed_time = Systime_os.now () in
+                  let treated = Ptime.diff treated_time pushed in
+                  let completed = Ptime.diff completed_time treated_time in
+                  w.current_request <- None ;
+                  let status = Worker_types.{pushed; treated; completed} in
+                  let* () =
+                    lwt_ok @@ Handlers.on_completion w request res status
+                  in
+                  let* () =
+                    lwt_ok
+                    @@ lwt_emit w (Request (current_request, status, None))
+                  in
+                  return_unit
+              | Some u ->
+                  let* res =
+                    (* [res] is a promise of a result (i.e., it is within the
+                       LwtResult combined monad. But the side effect [wakeup]
+                       needs to happen regardless of success (Ok) or failure
+                       (Error). To that end, we treat it locally like a regular
+                       promise (which happens to carry a [result]) within the Lwt
+                       monad. *)
+                    let open Lwt_syntax in
+                    let* res = Handlers.on_request w request in
+                    Lwt.wakeup_later u res ;
+                    return res
+                  in
+                  let completed_time = Systime_os.now () in
+                  let treated = Ptime.diff treated_time pushed in
+                  let completed = Ptime.diff completed_time treated_time in
+                  let status = Worker_types.{pushed; treated; completed} in
+                  w.current_request <- None ;
+                  let* () =
+                    lwt_ok @@ Handlers.on_completion w request res status
+                  in
+                  let* () =
+                    lwt_ok
+                    @@ lwt_emit w (Request (current_request, status, None))
+                  in
+                  return_unit))
+        Lwt_syntax.(
+          function
           | Ok () -> loop ()
-          | Error (Timeout :: _ as errs) ->
-              lwt_emit w Terminated >>= fun () -> do_close (Some errs)
-          | Error errs ->
-              lwt_emit w (Crashed errs) >>= fun () -> do_close (Some errs))
+          | Error (Canceled :: _)
+          | Error (Exn Lwt.Canceled :: _)
+          | Error (Exn Lwt_pipe.Closed :: _)
+          | Error (Exn Lwt_dropbox.Closed :: _) ->
+              let* () = lwt_emit w Terminated in
+              do_close None
+          | Error errs -> (
+              let* r =
+                match w.current_request with
+                | Some (pushed, treated_time, request) ->
+                    let completed_time = Systime_os.now () in
+                    let treated = Ptime.diff treated_time pushed in
+                    let completed = Ptime.diff completed_time treated_time in
+                    w.current_request <- None ;
+                    Handlers.on_error
+                      w
+                      request
+                      Worker_types.{pushed; treated; completed}
+                      errs
+                | None -> assert false
+              in
+              match r with
+              | Ok () -> loop ()
+              | Error (Timeout :: _ as errs) ->
+                  let* () = lwt_emit w Terminated in
+                  do_close (Some errs)
+              | Error errs ->
+                  let* () = lwt_emit w (Crashed errs) in
+                  do_close (Some errs)))
     in
     loop ()
 
@@ -663,10 +704,10 @@ struct
         }
       in
       Nametbl.add table.instances name w ;
-      (if id_name = base_name then lwt_emit w (Started None)
-      else lwt_emit w (Started (Some name_s)))
-      >>= fun () ->
-      Handlers.on_launch w name parameters >>=? fun state ->
+      let open Lwt_tzresult_syntax in
+      let started = if id_name = base_name then None else Some name_s in
+      let* () = lwt_ok @@ lwt_emit w (Started started) in
+      let* state = Handlers.on_launch w name parameters in
       w.status <- Running (Systime_os.now ()) ;
       w.state <- Some state ;
       w.worker <-
@@ -682,8 +723,10 @@ struct
        immediately because no hooks are registered on the canceler. However, the
        worker ([w.worker]) resolves only once the ongoing request has resolved
        (if any) and some clean-up operations have completed. *)
-    lwt_emit w Triggering_shutdown >>= fun () ->
-    Error_monad.cancel_with_exceptions w.canceler >>= fun () -> w.worker
+    let open Lwt_syntax in
+    let* () = lwt_emit w Triggering_shutdown in
+    let* () = Error_monad.cancel_with_exceptions w.canceler in
+    w.worker
 
   let state w =
     match (w.state, w.status) with
