@@ -382,7 +382,7 @@ participation of a selfish baker does not have an impact.
 .. _cs_constants_alpha:
 
 Consensus protocol parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------
 
 .. list-table::
    :widths: 55 25

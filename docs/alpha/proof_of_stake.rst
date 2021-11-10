@@ -39,7 +39,7 @@ A delegate participates in consensus and in governance with a weight
 proportional with their delegated stake, which includes the balances
 of all the accounts that delegate to it, and also the balance of the
 delegate itself. To participate in consensus or in governance, a
-delegate needs to have at a minimal stake, which is given by the
+delegate needs to have at least a minimal stake, which is given by the
 ``TOKENS_PER_ROLL`` :ref:`protocol constant
 <protocol_constants_alpha>`.
 

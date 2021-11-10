@@ -273,7 +273,7 @@ that cycle.
 .. _cs_constants_010:
 
 Consensus protocol parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------
 
 In this section we map the above notation to their corresponding parameter
 values.
