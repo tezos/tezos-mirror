@@ -709,7 +709,7 @@ struct
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+      Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
@@ -761,11 +761,11 @@ struct
       let+ r = Result.catch_s ?catch_only f in
       Result.map_error (fun e -> error_of_exn e) r
 
-    let both_e = Tzresult_syntax.both
+    let both_e = Result_syntax.tzboth
 
-    let join_e = Tzresult_syntax.join
+    let join_e = Result_syntax.tzjoin
 
-    let all_e = Tzresult_syntax.all
+    let all_e = Result_syntax.tzall
   end
 
   let () =
