@@ -867,8 +867,10 @@ let prepare_first_block ~level ~timestamp ctxt =
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
-            tokens_per_roll = c.tokens_per_roll;
-            (* NB: it will still during the migration, but a bit later *)
+            tokens_per_roll =
+              (* NB: the old value is used during the migration, and
+                 changed to a new value there *)
+              c.tokens_per_roll;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             (* Same value as in the previous protocol. *)
