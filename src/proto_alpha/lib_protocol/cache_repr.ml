@@ -80,12 +80,15 @@ let string_of_internal_identifier {namespace; id} =
   namespace ^ String.make 1 separator ^ id
 
 let internal_identifier_of_string raw =
-  match String.split_on_char separator raw with
-  | [] -> assert false
-  | namespace :: id ->
-      (* An identifier may contain [separator], hence we concatenate
-         possibly splitted parts of [id]. *)
-      {namespace = sanitize namespace; id = String.concat "" id}
+  match String.index_opt raw separator with
+  | None -> assert false
+  | Some index ->
+      {
+        namespace = String.sub raw 0 index;
+        id =
+          (let delim_idx = index + 1 in
+           String.sub raw delim_idx (String.length raw - delim_idx));
+      }
 
 let internal_identifier_of_key key =
   let raw = Raw_context.Cache.identifier_of_key key in
