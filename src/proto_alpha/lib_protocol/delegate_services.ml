@@ -377,3 +377,6 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
+
+let participation ctxt block pkh =
+  RPC_context.make_call1 S.participation ctxt block pkh () ()
