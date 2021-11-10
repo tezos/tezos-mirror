@@ -95,8 +95,7 @@ let to_slot round ~committee_size =
   Slot_repr.of_int_do_not_use_except_for_parameters slot
 
 let encoding =
-  let open Data_encoding in
-  conv_with_guard
+  Data_encoding.conv_with_guard
     (fun i -> i)
     (fun i ->
       match of_int32 i with
@@ -167,8 +166,8 @@ module Durations = struct
         check_ordered other_rounds >>? fun () ->
         ok (round0 :: round1 :: other_rounds)
 
-  let create_opt ?(other_rounds = []) ~round0 ~round1 () =
-    match create ~other_rounds ~round0 ~round1 () with
+  let create_opt ?other_rounds ~round0 ~round1 () =
+    match create ?other_rounds ~round0 ~round1 () with
     | Ok v -> Some v
     | Error _ -> None
 
@@ -208,7 +207,9 @@ module Durations = struct
           in
           loop (Int32.sub round 2l) duration1 duration0 durations
     | _ ->
-        (* Durations are at least length 2, so this should not happen. *)
+        (* TODO: https://gitlab.com/nomadic-labs/tezos/-/issues/565
+           the assert false can be avoided.
+        *)
         assert false
 
   let first = function h :: _ -> h | _ -> assert false
@@ -361,12 +362,12 @@ let round_and_offset round_durations ~level_offset =
     else Int32.max_int
   in
   let rec bin_search min_r max_r =
-    let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
-    if Compare.Int32.(min_r = right_bound) then
+    if Compare.Int32.(min_r >= right_bound) then
       error (Level_offset_too_high level_offset)
     else if Compare.Int32.(min_r = Int32.pred max_r) then
       bin_search min_r (Int32.succ max_r)
     else
+      let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
       level_offset_of_round round_durations ~round:(Int32.succ round)
       >>? fun next_level_offset ->
       if
