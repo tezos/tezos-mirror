@@ -106,4 +106,10 @@ val grace_period :
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int32 shell_tzresult Lwt.t
 
+val participation :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Delegate.participation_info shell_tzresult Lwt.t
+
 val register : unit -> unit
