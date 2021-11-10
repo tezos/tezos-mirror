@@ -1073,6 +1073,121 @@ end) : Test = struct
   let tests = [filter_map_p; filter_map_ep]
 end
 
+module TestConcatmapAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.CONCATMAP_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_concat_map (arith, consta, constb, input) =
+    Stdlib.List.concat_map (ConcatMapOf.fns Fun.id arith consta constb) input
+
+  let concat_map =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        eq
+          (M.concat_map
+             (ConcatMapOf.fns M.of_list arith consta constb)
+             (M.of_list input)
+          |> M.to_list)
+          (with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_e =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_e, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Result_syntax in
+        eq_e
+          (let+ r =
+             M.concat_map_e
+               (ConcatMapEOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Ok (with_stdlib_concat_map (arith, consta, constb, input))))
+
+  let concat_map_s =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_s, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r =
+             M.concat_map_s
+               (ConcatMapSOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_es =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_es, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r =
+             M.concat_map_es
+               (ConcatMapESOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return_ok
+          @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let tests = [concat_map; concat_map_e; concat_map_s; concat_map_es]
+end
+
+module TestConcatmappAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.CONCATMAP_PARALLEL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_concat_map (arith, consta, constb, input) =
+    Stdlib.List.concat_map (ConcatMapOf.fns Fun.id arith consta constb) input
+
+  let concat_map_p =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_p, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r =
+             M.concat_map_p
+               (ConcatMapSOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_ep =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_ep, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r =
+             M.concat_map_ep
+               (ConcatMapESOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return_ok
+          @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let tests = [concat_map_p; concat_map_ep]
+end
+
 module TestFindStdlibList (M : sig
   include BASE
 

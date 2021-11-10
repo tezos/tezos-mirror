@@ -123,6 +123,10 @@ module FilterMapOf = struct
     if cond const elt then Some (fn const elt) else None
 end
 
+module ConcatMapOf = struct
+  let fns of_list fn consta constb elt = of_list [fn consta elt; fn constb elt]
+end
+
 (* error-aware wrappers *)
 
 module IterEOf = struct
@@ -214,6 +218,11 @@ module FilterMapEOf = struct
   let fns_e cond fn const elt =
     let+ b = cond const elt in
     if b then Some (fn const elt) else None
+end
+
+module ConcatMapEOf = struct
+  let fns of_list fn consta constb elt =
+    Ok (of_list [fn consta elt; fn constb elt])
 end
 
 (* lwt-aware wrappers *)
@@ -311,6 +320,11 @@ module FilterMapSOf = struct
   let fns_s cond fn const elt =
     let+ b = cond const elt in
     if b then Some (fn const elt) else None
+end
+
+module ConcatMapSOf = struct
+  let fns of_list fn consta constb elt =
+    Lwt.return (of_list [fn consta elt; fn constb elt])
 end
 
 (* error-lwt-aware wrappers *)
@@ -491,6 +505,13 @@ module FilterMapESOf = struct
   let fns_es cond fn const elt =
     let+ b = cond const elt in
     if b then Some (fn const elt) else None
+end
+
+module ConcatMapESOf = struct
+  open Lwt_traced_result_syntax
+
+  let fns of_list fn consta constb elt =
+    return (of_list [fn consta elt; fn constb elt])
 end
 
 (* Data generators (we use lists of integers) *)

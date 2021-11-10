@@ -360,6 +360,35 @@ module type FILTERMAP_PARALLEL = sig
     ('b t, 'error trace) result Lwt.t
 end
 
+module type CONCATMAP_VANILLA = sig
+  type 'a t
+
+  val concat_map : ('a -> 'b t) -> 'a t -> 'b t
+end
+
+module type CONCATMAP_SEQUENTIAL = sig
+  include CONCATMAP_VANILLA
+
+  val concat_map_s : ('a -> 'b t Lwt.t) -> 'a t -> 'b t Lwt.t
+
+  val concat_map_e :
+    ('a -> ('b t, 'error) result) -> 'a t -> ('b t, 'error) result
+
+  val concat_map_es :
+    ('a -> ('b t, 'error) result Lwt.t) -> 'a t -> ('b t, 'error) result Lwt.t
+end
+
+module type CONCATMAP_PARALLEL = sig
+  type 'a t
+
+  val concat_map_p : ('a -> 'b t Lwt.t) -> 'a t -> 'b t Lwt.t
+
+  val concat_map_ep :
+    ('a -> ('b t, 'error trace) result Lwt.t) ->
+    'a t ->
+    ('b t, 'error trace) result Lwt.t
+end
+
 module type FIND_VANILLA = sig
   type 'a t
 

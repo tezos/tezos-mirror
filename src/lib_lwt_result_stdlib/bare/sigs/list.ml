@@ -581,6 +581,25 @@ module type S = sig
 
   val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  val concat_map : ('a -> 'b list) -> 'a list -> 'b list
+
+  val concat_map_s : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
+  val concat_map_e :
+    ('a -> ('b list, 'error) result) -> 'a list -> ('b list, 'error) result
+
+  val concat_map_es :
+    ('a -> ('b list, 'error) result Lwt.t) ->
+    'a list ->
+    ('b list, 'error) result Lwt.t
+
+  val concat_map_p : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
+  val concat_map_ep :
+    ('a -> ('b list, 'error) result Lwt.t) ->
+    'a list ->
+    ('b list, 'error list) result Lwt.t
+
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
   val fold_left_e :
