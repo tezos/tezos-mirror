@@ -33,7 +33,15 @@ val zero : t
 
 val succ : t -> t
 
+val max_value : t
+
 val of_int_do_not_use_except_for_parameters : int -> t
+
+(** [of_int i] creates a slot index from integer [i]
+
+    @raise Invalid_argument if [i < 0 || i > max_value]
+*)
+val of_int : int -> t
 
 val to_int : t -> int
 
