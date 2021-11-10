@@ -23,6 +23,159 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type S = sig
+  (** for substitution *)
+  type error
+
+  (** for substitution *)
+  type 'error trace
+
+  type tztrace = error trace
+
+  type 'a tzresult = ('a, tztrace) result
+
+  module Lwt_syntax : module type of TzLwtreslib.Monad.Lwt_syntax
+
+  module Result_syntax : sig
+    include module type of TzLwtreslib.Monad.Result_syntax
+
+    val tzfail : 'error -> ('a, 'error trace) result
+
+    val ( and* ) :
+      ('a, 'error trace) result ->
+      ('b, 'error trace) result ->
+      ('a * 'b, 'error trace) result
+
+    val ( and+ ) :
+      ('a, 'error trace) result ->
+      ('b, 'error trace) result ->
+      ('a * 'b, 'error trace) result
+
+    val tzjoin : (unit, 'error trace) result list -> (unit, 'error trace) result
+
+    val tzall : ('a, 'error trace) result list -> ('a list, 'error trace) result
+
+    val tzboth :
+      ('a, 'error trace) result ->
+      ('b, 'error trace) result ->
+      ('a * 'b, 'error trace) result
+  end
+
+  module Lwt_result_syntax : sig
+    include module type of TzLwtreslib.Monad.Lwt_result_syntax
+
+    val tzfail : 'error -> ('a, 'error trace) result Lwt.t
+
+    val ( and* ) :
+      ('a, 'error trace) result Lwt.t ->
+      ('b, 'error trace) result Lwt.t ->
+      ('a * 'b, 'error trace) result Lwt.t
+
+    val ( and+ ) :
+      ('a, 'error trace) result Lwt.t ->
+      ('b, 'error trace) result Lwt.t ->
+      ('a * 'b, 'error trace) result Lwt.t
+
+    val tzjoin :
+      (unit, 'error trace) result Lwt.t list ->
+      (unit, 'error trace) result Lwt.t
+
+    val tzall :
+      ('a, 'error trace) result Lwt.t list ->
+      ('a list, 'error trace) result Lwt.t
+
+    val tzboth :
+      ('a, 'error trace) result Lwt.t ->
+      ('b, 'error trace) result Lwt.t ->
+      ('a * 'b, 'error trace) result Lwt.t
+  end
+
+  val classify_trace : tztrace -> Error_classification.t
+
+  module Legacy_monad_globals : sig
+    val return : 'a -> ('a, 'e) result Lwt.t
+
+    val return_unit : (unit, 'e) result Lwt.t
+
+    val return_none : ('a option, 'e) result Lwt.t
+
+    val return_some : 'a -> ('a option, 'e) result Lwt.t
+
+    val return_nil : ('a list, 'e) result Lwt.t
+
+    val return_true : (bool, 'e) result Lwt.t
+
+    val return_false : (bool, 'e) result Lwt.t
+
+    val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+    val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+
+    val ok : 'a -> ('a, 'e) result
+
+    val error : 'e -> ('a, 'e trace) result
+
+    val ( >>? ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+    val ( >|? ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+
+    val fail : 'e -> ('a, 'e trace) result Lwt.t
+
+    val ( >>=? ) :
+      ('a, 'e) result Lwt.t ->
+      ('a -> ('b, 'e) result Lwt.t) ->
+      ('b, 'e) result Lwt.t
+
+    val ( >|=? ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+
+    val ( >>?= ) :
+      ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+    val ( >|?= ) : ('a, 'e) result -> ('a -> 'b Lwt.t) -> ('b, 'e) result Lwt.t
+  end
+
+  val pp_print_trace : Format.formatter -> tztrace -> unit
+
+  val pp_print_top_error_of_trace : Format.formatter -> tztrace -> unit
+
+  val trace_encoding : tztrace Data_encoding.t
+
+  val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
+
+  val record_trace : 'err -> ('a, 'err trace) result -> ('a, 'err trace) result
+
+  val trace :
+    'err -> ('b, 'err trace) result Lwt.t -> ('b, 'err trace) result Lwt.t
+
+  val record_trace_eval :
+    (unit -> 'err) -> ('a, 'err trace) result -> ('a, 'err trace) result
+
+  val trace_eval :
+    (unit -> 'err) ->
+    ('b, 'err trace) result Lwt.t ->
+    ('b, 'err trace) result Lwt.t
+
+  val error_unless : bool -> 'err -> (unit, 'err trace) result
+
+  val error_when : bool -> 'err -> (unit, 'err trace) result
+
+  val fail_unless : bool -> 'err -> (unit, 'err trace) result Lwt.t
+
+  val fail_when : bool -> 'err -> (unit, 'err trace) result Lwt.t
+
+  val unless :
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
+
+  val when_ :
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
+
+  val dont_wait :
+    (unit -> (unit, 'trace) result Lwt.t) ->
+    ('trace -> unit) ->
+    (exn -> unit) ->
+    unit
+end
+
 module Make (Error : sig
   type error = ..
 
@@ -31,9 +184,42 @@ end)
 (Trace : Sig.TRACE)
 (Monad : Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
            with type 'error trace := 'error Trace.trace) :
-  Sig.MONAD_EXTENSION
-    with type error := Error.error
-     and type 'error trace := 'error Trace.trace = struct
+  S with type error := Error.error and type 'error trace := 'error Trace.trace =
+struct
+  module Lwt_syntax = Monad.Lwt_syntax
+
+  module Result_syntax = struct
+    include Monad.Result_syntax
+
+    let tzfail = Monad.Traced_result_syntax.fail
+
+    let ( and* ) = Monad.Traced_result_syntax.( and* )
+
+    let ( and+ ) = Monad.Traced_result_syntax.( and+ )
+
+    let tzboth = Monad.Traced_result_syntax.both
+
+    let tzall = Monad.Traced_result_syntax.all
+
+    let tzjoin = Monad.Traced_result_syntax.join
+  end
+
+  module Lwt_result_syntax = struct
+    include Monad.Lwt_result_syntax
+
+    let tzfail = Monad.Lwt_traced_result_syntax.fail
+
+    let ( and* ) = Monad.Lwt_traced_result_syntax.( and* )
+
+    let ( and+ ) = Monad.Lwt_traced_result_syntax.( and+ )
+
+    let tzboth = Monad.Lwt_traced_result_syntax.both
+
+    let tzall = Monad.Lwt_traced_result_syntax.all
+
+    let tzjoin = Monad.Lwt_traced_result_syntax.join
+  end
+
   module Legacy_monad_globals = struct
     (* we default to exposing the combined monad syntax everywhere.
        We do the bulk of this by including [Lwt_traced_result_syntax] directly. *)
