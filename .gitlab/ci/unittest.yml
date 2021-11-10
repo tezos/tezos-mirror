@@ -77,6 +77,7 @@ unit:alpha:
       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
       src/proto_alpha/lib_benchmark.test_proto
       src/proto_alpha/lib_client.test_proto
+      src/proto_alpha/lib_plugin.test_proto
       src/proto_alpha/lib_protocol.test_proto
       src/proto_alpha/lib_delegate.test_proto
 
