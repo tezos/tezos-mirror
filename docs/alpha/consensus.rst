@@ -164,7 +164,7 @@ Delegates can set an upper limit to their frozen deposits with the
 commands ``tezos-client set deposit limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``tezos-client
 unset deposit limit for <delegate>``. These commands are implemented by
-using a new manager operation ``Set_deposit_limit``. When emitting such a
+using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting
 with ``c + PRESERVED_CYCLES + 1``; the new active stake is
 taken into account when computing the frozen deposit for cycle ``c+1``
