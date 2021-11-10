@@ -237,25 +237,31 @@ let balance_encoding =
            (fun ((), ()) -> Minted);
        ]
 
-let ( *? ) a b = if Compare.Int.(a = 0) then b else a
+let is_not_zero c = not (Compare.Int.equal c 0)
 
 let compare_balance ba bb =
   match (ba, bb) with
   | (Contract ca, Contract cb) -> Contract_repr.compare ca cb
   | (Legacy_rewards (pkha, ca), Legacy_rewards (pkhb, cb)) ->
-      Signature.Public_key_hash.compare pkha pkhb *? Cycle_repr.compare ca cb
+      let c = Signature.Public_key_hash.compare pkha pkhb in
+      if is_not_zero c then c else Cycle_repr.compare ca cb
   | (Legacy_deposits (pkha, ca), Legacy_deposits (pkhb, cb)) ->
-      Signature.Public_key_hash.compare pkha pkhb *? Cycle_repr.compare ca cb
+      let c = Signature.Public_key_hash.compare pkha pkhb in
+      if is_not_zero c then c else Cycle_repr.compare ca cb
   | (Deposits pkha, Deposits pkhb) ->
       Signature.Public_key_hash.compare pkha pkhb
   | ( Lost_endorsing_rewards (pkha, pa, ra),
       Lost_endorsing_rewards (pkhb, pb, rb) ) ->
-      Signature.Public_key_hash.compare pkha pkhb
-      *? Compare.Bool.(compare pa pb *? compare ra rb)
+      let c = Signature.Public_key_hash.compare pkha pkhb in
+      if is_not_zero c then c
+      else
+        let c = Compare.Bool.compare pa pb in
+        if is_not_zero c then c else Compare.Bool.compare ra rb
   | (Commitments bpkha, Commitments bpkhb) ->
       Blinded_public_key_hash.compare bpkha bpkhb
   | (Legacy_fees (pkha, ca), Legacy_fees (pkhb, cb)) ->
-      Signature.Public_key_hash.compare pkha pkhb *? Cycle_repr.compare ca cb
+      let c = Signature.Public_key_hash.compare pkha pkhb in
+      if is_not_zero c then c else Cycle_repr.compare ca cb
   | (_, _) ->
       let index b =
         match b with
@@ -381,7 +387,8 @@ module BalanceMap = Map.Make (struct
   type t = balance * update_origin
 
   let compare (ba, ua) (bb, ub) =
-    compare_balance ba bb *? compare_update_origin ua ub
+    let c = compare_balance ba bb in
+    if is_not_zero c then c else compare_update_origin ua ub
 end)
 
 let group_balance_updates balance_updates =
