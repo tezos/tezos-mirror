@@ -5,6 +5,6 @@
     Subject:      Entrypoint
  *)
 
-let _ =
+let () =
   Lwt_main.run
     (Alcotest_lwt.run "protocol_alpha" [("scenario", Test_scenario.tests)])
