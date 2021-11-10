@@ -37,7 +37,7 @@ let succ = Int32.succ
 
 let pp fmt i = Format.fprintf fmt "%ld" i
 
-type error += Negative_round of int32
+type error += Negative_round of int
 
 type error += Round_overflow of int
 
@@ -47,15 +47,15 @@ let () =
     `Permanent
     ~id:"negative_round"
     ~title:"Negative round"
-    ~description:"Round cannot be built out of negative int32."
+    ~description:"Round cannot be built out of negative integers."
     ~pp:(fun ppf i ->
       Format.fprintf
         ppf
-        "Negative round cannot be built out of negative int32 (%ld)"
+        "Negative round cannot be built out of negative integers (%Ld)"
         i)
-    (obj1 (req "Negative_round" int32))
-    (function Negative_round i -> Some i | _ -> None)
-    (fun i -> Negative_round i) ;
+    (obj1 (req "Negative_round" int64))
+    (function Negative_round i -> Some (Int64.of_int i) | _ -> None)
+    (fun i -> Negative_round (Int64.to_int i)) ;
   register_error_kind
     `Permanent
     ~id:"round_overflow"
@@ -72,16 +72,21 @@ let () =
     (function Round_overflow i -> Some (Int64.of_int i) | _ -> None)
     (fun i -> Round_overflow (Int64.to_int i))
 
-let of_int32 i = if i >= 0l then Ok i else error (Negative_round i) [@@inline]
+let of_int32 i =
+  if i >= 0l then Ok i else error (Negative_round (Int32.to_int i))
+  [@@inline]
 
 let pred r =
   let p = Int32.pred r in
   of_int32 p
 
 let of_int i =
-  let i32 = Int32.of_int i in
-  if Compare.Int.(Int32.to_int i32 = i) then of_int32 i32
-  else error (Round_overflow i)
+  if Compare.Int.(i < 0) then error (Negative_round i)
+  else
+    (* i is positive *)
+    let i32 = Int32.of_int i in
+    if Compare.Int.(Int32.to_int i32 = i) then Ok i32
+    else error (Round_overflow i)
 
 let to_int i32 =
   let i = Int32.to_int i32 in
