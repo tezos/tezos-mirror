@@ -136,6 +136,7 @@ let default_prevalidator_limits =
     operation_timeout = Time.System.Span.of_seconds_exn 10.;
     max_refused_operations = 1000;
     operations_batch_size = 50;
+    disable_precheck = false;
   }
 
 let default_peer_validator_limits =

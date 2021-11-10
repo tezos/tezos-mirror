@@ -199,6 +199,7 @@ type limits = {
   max_refused_operations : int;
   operation_timeout : Time.System.Span.t;
   operations_batch_size : int;
+  disable_precheck : bool;
 }
 
 (* Minimal delay between two mempool advertisements *)
@@ -519,21 +520,23 @@ module Make
 
   let precheck pv validation_state (op : Protocol.operation_data operation) =
     let validation_state = Prevalidation.validation_state validation_state in
-    Filter.Mempool.precheck ~validation_state op.raw.shell op.protocol_data
-    >|= function
-    | `Prechecked ->
-        (* The [precheck] optimization triggers: no need to call the
-            protocol [apply_operation]. *)
-        `Prechecked
-    | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
-      ->
-        (* Note that we don't need to distinguish some failure cases
-           of [Filter.Mempool.precheck], hence grouping them under `Fail. *)
-        `Fail errs
-    | `Undecided ->
-        (* The caller will need to call the protocol's [apply_operation]
-           function. *)
-        `Undecided
+    if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
+    else
+      Filter.Mempool.precheck ~validation_state op.raw.shell op.protocol_data
+      >|= function
+      | `Prechecked ->
+          (* The [precheck] optimization triggers: no need to call the
+              protocol [apply_operation]. *)
+          `Prechecked
+      | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
+        errs ->
+          (* Note that we don't need to distinguish some failure cases
+             of [Filter.Mempool.precheck], hence grouping them under `Fail. *)
+          `Fail err
+      | `Undecided ->
+          (* The caller will need to call the protocol's [apply_operation]
+             function. *)
+          `Undecided
 
   let classify_operation ~notifier pv filter_state validation_state mempool op
       oph =

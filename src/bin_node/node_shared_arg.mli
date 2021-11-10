@@ -57,6 +57,10 @@ type t = {
       (** enables the private mode, see
           https://tezos.gitlab.io/user/node-configuration.html#private-node *)
   disable_mempool : bool;
+  disable_mempool_precheck : bool;
+      (** If [disable_mempool_precheck] is [true] operations are executed by
+          the protocol before behing propagated. This flag is intended to be
+          used for testing and debugging. *)
   enable_testchain : bool;
   cors_origins : string list;
   cors_headers : string list;

@@ -875,11 +875,23 @@ let prevalidator_limits_encoding =
            Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
+           disable_precheck;
          } ->
-      (operation_timeout, max_refused_operations, operations_batch_size))
-    (fun (operation_timeout, max_refused_operations, operations_batch_size) ->
-      {operation_timeout; max_refused_operations; operations_batch_size})
-    (obj3
+      ( operation_timeout,
+        max_refused_operations,
+        operations_batch_size,
+        disable_precheck ))
+    (fun ( operation_timeout,
+           max_refused_operations,
+           operations_batch_size,
+           disable_precheck ) ->
+      {
+        operation_timeout;
+        max_refused_operations;
+        operations_batch_size;
+        disable_precheck;
+      })
+    (obj4
        (dft
           "operations_request_timeout"
           timeout_encoding
@@ -891,7 +903,11 @@ let prevalidator_limits_encoding =
        (dft
           "operations_batch_size"
           int31
-          default_shell.prevalidator_limits.operations_batch_size))
+          default_shell.prevalidator_limits.operations_batch_size)
+       (dft
+          "disable_precheck"
+          bool
+          default_shell.prevalidator_limits.disable_precheck))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -1214,6 +1230,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(private_mode = false) ?(disable_mempool = false)
+    ?(disable_mempool_precheck =
+      default_shell.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
@@ -1287,7 +1305,13 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     {
       peer_validator_limits = cfg.shell.peer_validator_limits;
       block_validator_limits = cfg.shell.block_validator_limits;
-      prevalidator_limits = cfg.shell.prevalidator_limits;
+      prevalidator_limits =
+        {
+          cfg.shell.prevalidator_limits with
+          disable_precheck =
+            cfg.shell.prevalidator_limits.disable_precheck
+            || disable_mempool_precheck;
+        };
       chain_validator_limits =
         (let synchronisation : Chain_validator.synchronisation_limits =
            {

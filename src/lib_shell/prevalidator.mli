@@ -49,10 +49,23 @@
  * used for separate chains (e.g., mainchain vs testchain). *)
 type t
 
+(** This record contains the differents limits and settings that can be updated
+    from a node configuration for a prevalidator *)
 type limits = {
   max_refused_operations : int;
+      (** The maximum number of operations tracked by the mempool for each of
+          the [refused], [branch delayed], [branch refused] and [outdated]
+          operation classifications. Default is [1000] *)
   operation_timeout : Time.System.Span.t;
+      (** The maximum time allowed to fetch the contents of an operation
+          advertised by a remote peer. Default is [10] seconds *)
   operations_batch_size : int;
+      (** Maximum number of pending operations processed (or classified) at the
+          end of each request to the prevalidator worker. Default is [50] *)
+  disable_precheck : bool;
+      (** If [disable_precheck] is [true] (default is [false]) operations are
+          executed by the protocol before being propagated. This flag is
+          intended to be used for testing and debugging. *)
 }
 
 (** Creates/tear-down a new prevalidator context. *)
