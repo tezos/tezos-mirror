@@ -1,5 +1,7 @@
+#! /usr/bin/env bash
+
 # TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-trap 'exit $?' ERR
+set -e
 set -x
 # [install prerequisites]
 dnf install -y dnf-plugins-core

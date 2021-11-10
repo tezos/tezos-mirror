@@ -1,4 +1,10 @@
-trap 'exit $?' ERR
+#! /usr/bin/env bash
+# shellcheck source=/dev/null
+# shellcheck disable=SC2154
+# shellcheck disable=SC2046
+# shellcheck disable=SC2086
+
+set -e
 set -x
 sudo apt-get update
 sudo apt-get install wget
