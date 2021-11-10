@@ -5,7 +5,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
 
 echo "## Checking installed dependencies..."
 echo
