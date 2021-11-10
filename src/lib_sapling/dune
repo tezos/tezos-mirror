@@ -24,7 +24,7 @@
    -open Tezos_error_monad.TzLwtreslib))
  (foreign_stubs
   (language c)
-  (flags (-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))
+  (flags (:standard -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))
   (names rustzcash_ctypes_c_stubs))
  (c_library_flags
   (-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs -lrustzcash -lpthread)))
