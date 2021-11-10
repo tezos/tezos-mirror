@@ -75,12 +75,12 @@ let take_int32 s bound =
   if Compare.Int32.(bound <= 0l) then invalid_arg "Seed_repr.take_int32"
     (* FIXME *)
   else
+    let drop_if_over =
+      Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
+    in
     let rec loop s =
       let (bytes, s) = take s in
       let r = Int32.abs (TzEndian.get_int32 bytes 0) in
-      let drop_if_over =
-        Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
-      in
       if Compare.Int32.(r >= drop_if_over) then loop s
       else
         let v = Int32.rem r bound in
@@ -92,12 +92,13 @@ let take_int64 s bound =
   if Compare.Int64.(bound <= 0L) then invalid_arg "Seed_repr.take_int64"
     (* FIXME *)
   else
+    let drop_if_over =
+      Int64.sub Int64.max_int (Int64.rem Int64.max_int bound)
+    in
+
     let rec loop s =
       let (bytes, s) = take s in
       let r = Int64.abs (TzEndian.get_int64 bytes 0) in
-      let drop_if_over =
-        Int64.sub Int64.max_int (Int64.rem Int64.max_int bound)
-      in
       if Compare.Int64.(r >= drop_if_over) then loop s
       else
         let v = Int64.rem r bound in

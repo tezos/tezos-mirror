@@ -52,10 +52,18 @@ val sequence : t -> int32 -> sequence
 (** Generates the next random value in the sequence *)
 val take : sequence -> bytes * sequence
 
-(** Generates the next random value as a bounded [int32] *)
+(** [take_int32 s bound] generates the next random value as a bounded [int32]
+
+    @param bound must be a positive integer
+    @raise Invalid_argument "Seed_repr.take_int32" if [bound] <= 0
+ *)
 val take_int32 : sequence -> int32 -> int32 * sequence
 
-(** Generates the next random value as a bounded [int64] *)
+(** [take_int64 s bound] generates the next random value as a bounded [int64]
+
+    @param bound must be a positive integer
+    @raise Invalid_argument "Seed_repr.take_int64" if [bound] <= 0
+ *)
 val take_int64 : sequence -> int64 -> int64 * sequence
 
 (** {2 Predefined seeds} *)
