@@ -29,7 +29,7 @@ module Selected_distribution_for_cycle = struct
   module Cache_client = struct
     type cached_value = (Signature.Public_key_hash.t * Tez_repr.t) list
 
-    let namespace = "stake_distribution"
+    let namespace = Cache_repr.create_namespace "stake_distribution"
 
     let cache_index = 1
 
@@ -68,7 +68,7 @@ module Delegate_sampler_state = struct
     type cached_value =
       (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
 
-    let namespace = "sampler_state"
+    let namespace = Cache_repr.create_namespace "sampler_state"
 
     let cache_index = 2
 

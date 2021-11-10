@@ -76,6 +76,8 @@ let sanitize namespace =
          separator)
   else namespace
 
+let create_namespace = sanitize
+
 let string_of_internal_identifier {namespace; id} =
   namespace ^ String.make 1 separator ^ id
 
@@ -84,6 +86,9 @@ let internal_identifier_of_string raw =
   | None -> assert false
   | Some index ->
       {
+        (* We do not need to call sanitize here since we stop at the first '@'
+            from index 0. It is a guarantee that there is no '@* between 0 and
+           (index - 1 ). *)
         namespace = String.sub raw 0 index;
         id =
           (let delim_idx = index + 1 in
@@ -101,12 +106,9 @@ let key_of_internal_identifier ~cache_index identifier =
 let make_key =
   let namespaces = ref [] in
   fun ~cache_index ~namespace ->
-    let namespace = sanitize namespace in
     if List.mem ~equal:String.equal namespace !namespaces then
       invalid_arg
-        (Format.sprintf
-           "Cache key namespace %s already exist."
-           (namespace :> string))
+        (Format.sprintf "Cache key namespace %s already exist." namespace)
     else (
       namespaces := namespace :: !namespaces ;
       fun ~id ->

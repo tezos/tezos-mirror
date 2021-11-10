@@ -962,7 +962,9 @@ module Cache : sig
       context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
   end
 
-  type namespace = string
+  type namespace = private string
+
+  val create_namespace : string -> namespace
 
   type identifier = string
 

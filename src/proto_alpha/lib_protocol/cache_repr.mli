@@ -135,7 +135,13 @@ end
 (** A client uses a unique namespace (represented as a string
      without '@') to avoid collision with the keys of other
      clients. *)
-type namespace = string
+type namespace = private string
+
+(** [create_namespace str] creates a valid namespace from [str]
+    
+    @raise Invalid_argument if [str] contains '@'
+ *)
+val create_namespace : string -> namespace
 
 (** A key is fully determined by a namespace and an identifier. *)
 type identifier = string
