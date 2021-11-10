@@ -9,7 +9,7 @@ NUM_NODES = 5  # because we assume 5 (bootstrap) accounts
 NUM_TEST_CYCLES = 4
 CYCLE_DUR = 10  # should be correlated with 'round_durations' below
 ROUND_DURATION = 4
-ROUND_DURATIONS = [str(ROUND_DURATION), str(ROUND_DURATION)]
+ROUND_DURATIONS = {"round0": str(ROUND_DURATION), "round1": str(ROUND_DURATION)}
 
 
 @pytest.mark.baker

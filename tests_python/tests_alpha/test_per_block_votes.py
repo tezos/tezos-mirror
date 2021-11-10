@@ -95,10 +95,10 @@ class TestAllPerBlockVotes:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         parameters = protocol.get_parameters()
-        parameters['round_durations'] = [
-            str(ROUND_DURATION),
-            str(ROUND_DURATION),
-        ]
+        parameters['round_durations'] = {
+            "round0": str(ROUND_DURATION),
+            "round1": str(ROUND_DURATION),
+        }
         protocol.activate(sandbox.client(0), parameters=parameters)
         sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
 

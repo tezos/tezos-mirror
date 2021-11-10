@@ -52,7 +52,7 @@ class TestManualBake:
         proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = copy.deepcopy(proto_params)
         duration = str(ROUND_DURATION)
-        parameters['round_durations'] = [duration, duration]
+        parameters['round_durations'] = {"round0": duration, "round1": duration}
         protocol.activate(
             sandbox.client(0),
             parameters=proto_params,

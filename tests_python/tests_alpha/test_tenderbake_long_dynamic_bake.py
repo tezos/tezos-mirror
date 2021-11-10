@@ -34,7 +34,10 @@ TIMEOUT = 6
 MAX_RETRY = 6
 TEST_DURATION = 300  # duration of the main loop
 FIRST_ROUND_DURATION = 1
-ROUND_DURATIONS = [str(FIRST_ROUND_DURATION), str(1 + FIRST_ROUND_DURATION)]
+ROUND_DURATIONS = {
+    "round0": str(FIRST_ROUND_DURATION),
+    "round1": str(1 + FIRST_ROUND_DURATION),
+}
 MAX_LEVEL_DURATION = 6  # that is, decision expected in at most 3 rounds
 EXPECTED_LEVEL = TEST_DURATION // MAX_LEVEL_DURATION
 

@@ -138,15 +138,27 @@ module Durations = struct
         | _ -> None)
       (fun (round, next_round) -> Non_increasing_rounds {round; next_round})
 
-  type t = Period_repr.t list
+  type t = {
+    round0 : Period_repr.t;
+    round1 : Period_repr.t;
+    other_rounds : Period_repr.t list;
+  }
 
-  let pp fmt l =
-    Format.(
-      pp_print_list
-        ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
-        Period_repr.pp)
+  let to_list {round0; round1; other_rounds} = round0 :: round1 :: other_rounds
+
+  let pp fmt t =
+    Format.fprintf
       fmt
-      l
+      "%a,@ %a,@ %a"
+      Period_repr.pp
+      t.round0
+      Period_repr.pp
+      t.round1
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+          Period_repr.pp)
+      t.other_rounds
 
   let rec check_ordered = function
     | [_] | [] -> Result.return_unit
@@ -157,19 +169,8 @@ module Durations = struct
         >>? fun () -> check_ordered rs
 
   let create ?(other_rounds = []) ~round0 ~round1 () =
-    error_when
-      Period_repr.(round1 < round0)
-      (Non_increasing_rounds {round = round0; next_round = round1})
-    >>? fun () ->
-    match other_rounds with
-    | [] -> ok [round0; round1]
-    | r :: _ ->
-        error_when
-          Period_repr.(round1 > r)
-          (Non_increasing_rounds {round = round1; next_round = r})
-        >>? fun () ->
-        check_ordered other_rounds >>? fun () ->
-        ok (round0 :: round1 :: other_rounds)
+    check_ordered (round0 :: round1 :: other_rounds) >>? fun () ->
+    ok {round0; round1; other_rounds}
 
   let create_opt ?other_rounds ~round0 ~round1 () =
     match create ?other_rounds ~round0 ~round1 () with
@@ -179,45 +180,47 @@ module Durations = struct
   let encoding =
     let open Data_encoding in
     conv_with_guard
-      (fun l -> l)
-      (function
-        | round0 :: round1 :: other_rounds -> (
-            match create_opt ~round0 ~round1 ~other_rounds () with
-            | None -> Error "The provided round durations are not increasing."
-            | Some rounds -> Ok rounds)
-        | [] | [_] ->
-            Error "Round durations are expected to have at least two elements.")
-      (Data_encoding.list Period_repr.encoding)
+      (fun {round0; round1; other_rounds} ->
+        ( round0,
+          round1,
+          match other_rounds with [] -> None | _ :: _ -> Some other_rounds ))
+      (fun (round0, round1, other_rounds) ->
+        match create_opt ~round0 ~round1 ?other_rounds () with
+        | None -> Error "The provided round durations are not increasing."
+        | Some rounds -> Ok rounds)
+      (obj3
+         (req "round0" Period_repr.encoding)
+         (req "round1" Period_repr.encoding)
+         (opt "other_rounds" (list Period_repr.encoding)))
 
-  let round_duration round_durations round =
+  let round_duration {round0; round1; other_rounds} round =
     assert (Compare.Int32.(round >= 0l)) ;
-    match round_durations with
-    | duration0 :: duration1 :: durations ->
-        if Compare.Int32.(round = 0l) then duration0
-        else if Compare.Int32.(round = 1l) then duration1
-        else
-          let rec loop i ultimate penultimate = function
-            | d :: ds ->
-                if Compare.Int32.(i = 0l) then d
-                else loop (Int32.pred i) d ultimate ds
-            | [] ->
-                (* The last element of the list is the ultimate. *)
-                let last = Period_repr.to_seconds ultimate in
-                let last_but_one = Period_repr.to_seconds penultimate in
-                let diff = Int64.sub last last_but_one in
-                assert (Compare.Int64.(diff >= 0L)) ;
-                let offset = Int32.succ i in
-                let duration = Int64.(add last (mul diff (of_int32 offset))) in
-                Period_repr.of_seconds_exn duration
-          in
-          loop (Int32.sub round 2l) duration1 duration0 durations
-    | _ ->
-        (* TODO: https://gitlab.com/nomadic-labs/tezos/-/issues/565
-           the assert false can be avoided.
-        *)
-        assert false
+    if Compare.Int32.(round = 0l) then round0
+    else if Compare.Int32.(round = 1l) then round1
+    else
+      let rec loop i ~ultimate ~penultimate = function
+        | d :: ds ->
+            if Compare.Int32.(i = 0l) then d
+            else loop (Int32.pred i) ~ultimate:d ~penultimate:ultimate ds
+        | [] ->
+            (* The last element of the list is the ultimate. *)
+            let last = Period_repr.to_seconds ultimate in
+            let last_but_one = Period_repr.to_seconds penultimate in
+            let diff = Int64.sub last last_but_one in
+            assert (Compare.Int64.(diff >= 0L)) ;
+            let offset = Int32.succ i in
+            let duration = Int64.(add last (mul diff (of_int32 offset))) in
+            Period_repr.of_seconds_exn duration
+      in
+      loop
+        (Int32.sub round 2l)
+        ~ultimate:round1
+        ~penultimate:round0
+        other_rounds
 
-  let first = function h :: _ -> h | _ -> assert false
+  let first {round0; _} = round0
+
+  let length {other_rounds; _} = List.length other_rounds + 2
 end
 
 type error += Round_too_high of int32
@@ -243,27 +246,30 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
   (* Auxiliary function to return a pair of the last element of the
      list and the sum of the [round - 1]-th first elements of
      [round_durations]. *)
-  let rec last_and_sum_loop round_durations ~round ~sum_acc =
-    match round_durations with
-    | [] -> assert false
-    | [last] when Compare.Int32.(round <> Int32.zero) ->
-        (last, Int64.add sum_acc (Period_repr.to_seconds last))
-    | d :: round_durations' ->
-        if Compare.Int32.(round = Int32.zero) then (d, sum_acc)
-        else
-          last_and_sum_loop
-            round_durations'
-            ~round:(Int32.pred round)
-            ~sum_acc:(Int64.add sum_acc (Period_repr.to_seconds d))
+  let last_and_sum_loop round_durations ~round =
+    let rec loop round_durations ~round ~sum_acc =
+      match round_durations with
+      | [] -> assert false
+      | [last] when Compare.Int32.(round <> Int32.zero) ->
+          (last, Int64.add sum_acc (Period_repr.to_seconds last))
+      | d :: round_durations' ->
+          if Compare.Int32.(round = Int32.zero) then (d, sum_acc)
+          else
+            loop
+              round_durations'
+              ~round:(Int32.pred round)
+              ~sum_acc:(Int64.add sum_acc (Period_repr.to_seconds d))
+    in
+    loop (Durations.to_list round_durations) ~round ~sum_acc:Int64.zero
   in
-  let parameters_len = Int32.of_int (List.length round_durations) in
+  let parameters_len = Int32.of_int (Durations.length round_durations) in
   if round < parameters_len then
     (* Let τ be the sequence of round durations (exactly as computed
        by function [duration_of_round]). We just sum the constants
        in [round_durations]:
        Σ_{k = 0}^{round - 1} (τ_k)
     *)
-    ok (snd (last_and_sum_loop round_durations ~round ~sum_acc:Int64.zero))
+    ok (snd (last_and_sum_loop round_durations ~round))
   else
     (* Instead of recursively adding durations given by calling
        function [round_duration], basic algebra gives the same result
@@ -283,11 +289,9 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
     (* 1. Sum the constants in [round_durations] until the last but
        one. *)
     let (round_durations_last, sum_round_durations) =
-      last_and_sum_loop
-        round_durations
-        ~round:(Int32.pred parameters_len)
-        ~sum_acc:Int64.zero
+      last_and_sum_loop round_durations ~round:(Int32.pred parameters_len)
     in
+
     (* 2. Compute the rest of the terms arithmetically (instead of
        recursively). *)
     let sum_after_round_durations =
@@ -396,7 +400,7 @@ let round_and_offset round_durations ~level_offset =
                      current_level_offset);
             }
   in
-  let n = List.length round_durations in
+  let n = Durations.length round_durations in
   check_first ~max_round:n 0l >>? fun res ->
   match res with
   | Some result -> ok result

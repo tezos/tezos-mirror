@@ -632,7 +632,7 @@ def _test_create_mockup_init_show_roundtrip(
                     'denominator': 5,
                     'numerator': 1,
                 },
-                'round_durations': ['0', '1'],
+                'round_durations': {"round0": '0', "round1": '1'},
                 'max_slashing_period': 12,
                 "blocks_per_voting_period": 65,
                 "blocks_per_stake_snapshot": 5,
