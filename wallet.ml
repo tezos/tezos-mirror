@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val launch : #Tezos_client_base.Client_context.wallet -> string -> unit Lwt.t
+module Map = Signature.Public_key_hash.Map
 
-val stop : unit -> unit
+type t = string Map.t
 
-val add_received :
-  ?unaccurate:bool ->
-  Int32.t ->
-  (Signature.Public_key_hash.t * error list * Time.System.t option) list ->
-  unit
+open Tezos_client_base
 
-val add_block :
-  Int32.t ->
-  Block_hash.t ->
-  Time.Protocol.t ->
-  Time.System.t ->
-  Signature.Public_key_hash.t list ->
-  unit
+(** Load a public key hash map from the client context  *)
+let of_context (wallet : #Tezos_client_base.Client_context.wallet) =
+  Client_keys.Public_key_hash.load wallet >>=? fun aliases ->
+  return
+  @@ List.fold_left
+       (fun acc (alias, key) -> Map.add key alias acc)
+       Map.empty
+       aliases
+
+(** give the alias of a public key hash  *)
+let alias_of_pkh t pkh = Map.find pkh t

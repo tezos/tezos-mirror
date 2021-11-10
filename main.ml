@@ -197,7 +197,7 @@ let endorsements_loop cctxt =
         head_stream
 
 let main cctxt prefix =
-  let dumper = Archiver.launch prefix in
+  let dumper = Archiver.launch cctxt prefix in
   let main =
     Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) >>= fun () ->
     let () = Archiver.stop () in

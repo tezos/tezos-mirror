@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val launch : #Tezos_client_base.Client_context.wallet -> string -> unit Lwt.t
+type t
 
-val stop : unit -> unit
+(** Load a public key hash map from the client context  *)
+val of_context : #Tezos_client_base.Client_context.wallet -> t tzresult Lwt.t
 
-val add_received :
-  ?unaccurate:bool ->
-  Int32.t ->
-  (Signature.Public_key_hash.t * error list * Time.System.t option) list ->
-  unit
-
-val add_block :
-  Int32.t ->
-  Block_hash.t ->
-  Time.Protocol.t ->
-  Time.System.t ->
-  Signature.Public_key_hash.t list ->
-  unit
+(** give the alias of a public key hash  *)
+val alias_of_pkh : t -> Signature.public_key_hash -> string option
