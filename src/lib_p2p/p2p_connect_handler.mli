@@ -75,9 +75,11 @@ type config = {
   reconnection_config : P2p_point_state.Info.reconnection_config;
       (** Delay granted to a peer to perform authentication. *)
   proof_of_work_target : Crypto_box.pow_target;
-      (** The greylisting configuration. *)
-  listening_port : P2p_addr.port option;
       (** The proof of work target we require from peers. *)
+  listening_port : P2p_addr.port option;
+      (** The TCP port on which the peer can be reached. *)
+  advertised_port : P2p_addr.port option;
+      (** The TCP port advertised to other peers, the default is listening_port. *)
 }
 
 (** [create ?p2p_version config pool message_config socket_meta_config
@@ -157,7 +159,7 @@ module Internal_for_tests : sig
       incoming:bool ->
       P2p_io_scheduler.connection ->
       P2p_point.Id.t ->
-      ?listening_port:int ->
+      ?advertised_port:int ->
       P2p_identity.t ->
       Network_version.t ->
       'conn P2p_params.conn_meta_config ->

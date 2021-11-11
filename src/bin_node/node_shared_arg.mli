@@ -48,6 +48,8 @@ type t = {
   no_bootstrap_peers : bool;
   listen_addr : string option;
       (** address to listen to connections from peers *)
+  advertised_net_port : int option;
+      (** port advertised for other peers to connect to *)
   discovery_addr : string option;
   rpc_listen_addrs : string list;
       (** a list of addresses to listen to RPC requests on *)
