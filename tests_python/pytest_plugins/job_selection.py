@@ -336,7 +336,7 @@ def pytest_collection_modifyitems(
         timings = {}
 
     print(
-        f"(job selection: {job_current+1}/{jobs_total} with "
+        f"(job selection: {job_current+1}/{jobs_total} with"
         + f" {len(timings)} timings from {prev_junit_xml})"
     )
 
