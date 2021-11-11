@@ -140,7 +140,7 @@ test-protocol-compile:
 	@dune build $(COVERAGE_OPTIONS) @runtest_compile_protocol
 	@dune build $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
-PROTO_LIBS := $(shell find src -name test -type d 2>/dev/null | grep src/proto_ | LC_COLLATE=C sort)
+PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d -exec test -f \{\}/dune \; -print 2>/dev/null | LC_COLLATE=C sort)
 PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
 PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
 
@@ -151,7 +151,7 @@ $(PROTO_TARGETS): %.test_proto:
 test-proto-unit: $(PROTO_TARGETS)
 
 # We do not run vendor tests because they are a no-op from dune
-NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -print | LC_COLLATE=C sort)
+NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -exec test -f \{\}/dune \; -print | LC_COLLATE=C sort)
 NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
 NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
 
