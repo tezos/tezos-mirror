@@ -177,7 +177,7 @@ def job_selection_dry_run(
     jobs_total: int,
     job_current: int,
     jobs_bags: List[Bag],
-    timing_items: List[Tuple[str, float]],
+    timings_selected_items: List[Tuple[str, float]],
 ) -> None:
     """
     Runs no tests but prints debugging information
@@ -230,7 +230,7 @@ def job_selection_dry_run(
         ['weight', 'class'],
         [
             [str(timedelta(seconds=item[1])), str(item[0])]
-            for item in timing_items[0:10]
+            for item in timings_selected_items[0:10]
         ],
     )
 
@@ -240,7 +240,7 @@ def job_selection_dry_run(
         ['weight', 'class'],
         [
             [str(timedelta(seconds=item[1])), str(item[0])]
-            for item in timing_items
+            for item in timings_selected_items
             if item[0] in jobs_bags[job_current]['items']
         ],
     )
@@ -249,22 +249,27 @@ def job_selection_dry_run(
 def job_selection(
     config: _pytest.config.Config,
     items: List[pytest.Item],
-    timings: Dict[str, float],
+    prev_timings: Dict[str, float],
     jobs_total: int,
     job_current: int,
     dry_run: bool,
 ) -> None:
-    # Give dummy values for tests lacking timings
+    # Only select timings for jobs that were previously collected,
+    # and give dummy values for collected tests lacking timings
+    timings_selected: Dict[str, float] = {}
     for item in items:
         junit_classname = classname_of_nodeid(config, item.nodeid)
-        if junit_classname not in timings:
-            timings[junit_classname] = DEFAULT_TEST_TIME
+        timings_selected[junit_classname] = prev_timings.get(
+            junit_classname, DEFAULT_TEST_TIME
+        )
 
     # Sort timings by descending time
-    timing_items = sorted(timings.items(), key=itemgetter(1), reverse=True)
+    timings_selected_items = sorted(
+        timings_selected.items(), key=itemgetter(1), reverse=True
+    )
 
     # Batch test classes
-    jobs_bags = knapsack(timing_items, jobs_total)
+    jobs_bags = knapsack(timings_selected_items, jobs_total)
 
     # Map classes to bags
     jobs_bags_rev = {
@@ -285,7 +290,9 @@ def job_selection(
     # Filter test items in place
     if dry_run:
         print("dry run")
-        job_selection_dry_run(jobs_total, job_current, jobs_bags, timing_items)
+        job_selection_dry_run(
+            jobs_total, job_current, jobs_bags, timings_selected_items
+        )
         items[:] = []
     else:
         items[:] = [item for item in items if select(item)]
@@ -331,15 +338,15 @@ def pytest_collection_modifyitems(
                 + '--prev-junit-xml does not exist'
             )
         else:
-            timings = read_prev_timings(prev_junit_xml)
+            prev_timings = read_prev_timings(prev_junit_xml)
     else:
-        timings = {}
+        prev_timings = {}
 
     print(
         f"(job selection: {job_current+1}/{jobs_total} with"
-        + f" {len(timings)} timings from {prev_junit_xml})"
+        + f" {len(prev_timings)} timings from {prev_junit_xml})"
     )
 
-    job_selection(config, items, timings, jobs_total, job_current, dry_run)
+    job_selection(config, items, prev_timings, jobs_total, job_current, dry_run)
 
     return None
