@@ -202,8 +202,8 @@ let add_field_annot a var = function
         (loc, prim, args, annots @ unparse_field_annot a @ unparse_var_annot var)
   | expr -> expr
 
-let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
-  function
+let rec unparse_comparable_ty_uncarbonated :
+    type a. a comparable_ty -> Script.node = function
   | Unit_key meta -> Prim (-1, T_unit, [], unparse_type_annot meta.annot)
   | Never_key meta -> Prim (-1, T_never, [], unparse_type_annot meta.annot)
   | Int_key meta -> Prim (-1, T_int, [], unparse_type_annot meta.annot)
@@ -221,8 +221,8 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
   | Address_key meta -> Prim (-1, T_address, [], unparse_type_annot meta.annot)
   | Chain_id_key meta -> Prim (-1, T_chain_id, [], unparse_type_annot meta.annot)
   | Pair_key ((l, al), (r, ar), meta) -> (
-      let tl = add_field_annot al None (unparse_comparable_ty l) in
-      let tr = add_field_annot ar None (unparse_comparable_ty r) in
+      let tl = add_field_annot al None (unparse_comparable_ty_uncarbonated l) in
+      let tr = add_field_annot ar None (unparse_comparable_ty_uncarbonated r) in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
       (* Note that the folding does not happen if the pair on the right has a
          field annotation because this annotation would be lost *)
@@ -231,12 +231,15 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
           Prim (-1, T_pair, tl :: ts, unparse_type_annot meta.annot)
       | _ -> Prim (-1, T_pair, [tl; tr], unparse_type_annot meta.annot))
   | Union_key ((l, al), (r, ar), meta) ->
-      let tl = add_field_annot al None (unparse_comparable_ty l) in
-      let tr = add_field_annot ar None (unparse_comparable_ty r) in
+      let tl = add_field_annot al None (unparse_comparable_ty_uncarbonated l) in
+      let tr = add_field_annot ar None (unparse_comparable_ty_uncarbonated r) in
       Prim (-1, T_or, [tl; tr], unparse_type_annot meta.annot)
   | Option_key (t, meta) ->
       Prim
-        (-1, T_option, [unparse_comparable_ty t], unparse_type_annot meta.annot)
+        ( -1,
+          T_option,
+          [unparse_comparable_ty_uncarbonated t],
+          unparse_type_annot meta.annot )
 
 let unparse_memo_size memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
@@ -302,17 +305,17 @@ let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
       let t = unparse_ty_uncarbonated ut in
       prim (T_list, [t], unparse_type_annot meta.annot)
   | Ticket_t (ut, meta) ->
-      let t = unparse_comparable_ty ut in
+      let t = unparse_comparable_ty_uncarbonated ut in
       prim (T_ticket, [t], unparse_type_annot meta.annot)
   | Set_t (ut, meta) ->
-      let t = unparse_comparable_ty ut in
+      let t = unparse_comparable_ty_uncarbonated ut in
       prim (T_set, [t], unparse_type_annot meta.annot)
   | Map_t (uta, utr, meta) ->
-      let ta = unparse_comparable_ty uta in
+      let ta = unparse_comparable_ty_uncarbonated uta in
       let tr = unparse_ty_uncarbonated utr in
       prim (T_map, [ta; tr], unparse_type_annot meta.annot)
   | Big_map_t (uta, utr, meta) ->
-      let ta = unparse_comparable_ty uta in
+      let ta = unparse_comparable_ty_uncarbonated uta in
       let tr = unparse_ty_uncarbonated utr in
       prim (T_big_map, [ta; tr], unparse_type_annot meta.annot)
   | Sapling_transaction_t (memo_size, meta) ->
@@ -331,6 +334,10 @@ let rec unparse_ty_uncarbonated : type a. a ty -> Script.node =
 let unparse_ty ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
   (unparse_ty_uncarbonated ty, ctxt)
+
+let unparse_comparable_ty ctxt comp_ty =
+  Gas.consume ctxt (Unparse_costs.unparse_comparable_type comp_ty)
+  >|? fun ctxt -> (unparse_comparable_ty_uncarbonated comp_ty, ctxt)
 
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
@@ -6295,7 +6302,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
   | None ->
       Big_map.fresh ~temporary ctxt >>=? fun (ctxt, id) ->
       Lwt.return
-        (let kt = unparse_comparable_ty key_type in
+        (let kt = unparse_comparable_ty_uncarbonated key_type in
          Gas.consume ctxt (Script.strip_locations_cost kt) >>? fun ctxt ->
          unparse_ty ctxt value_type >>? fun (kv, ctxt) ->
          Gas.consume ctxt (Script.strip_locations_cost kv) >|? fun ctxt ->

@@ -617,14 +617,13 @@ let rec dummy_type_generator depth =
     match dummy_type_generator (depth - 1) with
     | Ex_ty something -> Ex_ty (Michelson_types.list something)
 
-(* Generate combs; the size of a comb of depth d should be
-   d * 2 + 1. *)
-let rec dummy_comparable_type_generator depth =
+(* A dummy comparable type generator, sampling linear terms of a given size. *)
+let rec dummy_comparable_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if depth = 0 then Ex_comparable_ty (unit_key ~annot:None)
+  if size <= 0 then Ex_comparable_ty (unit_key ~annot:None)
   else
-    match dummy_comparable_type_generator (depth - 1) with
+    match dummy_comparable_type_generator (size - 2) with
     | Ex_comparable_ty r ->
         let l = unit_key ~annot:None in
         Ex_comparable_ty
@@ -765,3 +764,60 @@ module Unparse_type_benchmark : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)
+
+module Unparse_comparable_type_benchmark : Benchmark.S = struct
+  include Parse_type_shared
+
+  let name = "UNPARSE_COMPARABLE_TYPE"
+
+  let info = "Benchmarking unparse_comparable_ty"
+
+  let make_bench rng_state config () =
+    let open Error_monad in
+    let res =
+      Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
+      let ctxt = Gas_helpers.set_limit ctxt in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_comparable_type_generator size in
+      match ty with
+      | Ex_comparable_ty comp_ty ->
+          Environment.wrap_tzresult
+          @@ Script_ir_translator.unparse_comparable_ty ctxt comp_ty
+          >>? fun (_, ctxt') ->
+          let consumed =
+            Z.to_int
+              (Gas_helpers.fp_to_z
+                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
+          in
+          let workload = Type_workload {nodes = size; consumed} in
+          let closure () =
+            ignore (Script_ir_translator.unparse_comparable_ty ctxt comp_ty)
+          in
+          ok (Generator.Plain {workload; closure})
+    in
+    match res with
+    | Ok closure -> closure
+    | Error errs -> global_error name errs
+
+  let size_model =
+    Model.make
+      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
+      ~model:
+        (Model.affine
+           ~intercept:
+             (Free_variable.of_string (Format.asprintf "%s_const" name))
+           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen size_model)
+
+  let models = [("size_translator_model", size_model)]
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (make_bench rng_state config)
+end
+
+let () =
+  Registration_helpers.register (module Unparse_comparable_type_benchmark)

@@ -90,6 +90,8 @@ val strip_annotations : node -> node
 
 val strip_locations_cost : node -> Gas_limit_repr.cost
 
+val strip_annotations_cost : node -> Gas_limit_repr.cost
+
 module Micheline_size : sig
   type t = {
     nodes : Saturation_repr.may_saturate Saturation_repr.t;

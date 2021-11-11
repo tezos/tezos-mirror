@@ -109,3 +109,35 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Micheline_nodes_benchmark)
+
+module Script_repr_strip_annotations : Benchmark.S = struct
+  include Script_repr_shared_config
+
+  let name = "strip_annotations"
+
+  let info = "Benchmarking Script_repr.strip_annotations"
+
+  let strip_annotations_model =
+    Model.(
+      make
+        ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
+        ~model:(linear ~coeff:(Free_variable.of_string "nodes")))
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen strip_annotations_model)
+
+  let models = [("strip_annotations_model", strip_annotations_model)]
+
+  let create_benchmark rng_state () =
+    let node = Sampler.sample rng_state in
+    let closure () = ignore @@ Script_repr.strip_annotations node in
+    let micheline_nodes = Script_repr.micheline_nodes node in
+    Generator.Plain {workload = {micheline_nodes}; closure}
+
+  let create_benchmarks ~rng_state ~bench_num _cfg =
+    List.repeat bench_num (create_benchmark rng_state)
+end
+
+let () = Registration_helpers.register (module Script_repr_strip_annotations)
