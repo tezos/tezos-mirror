@@ -17,7 +17,20 @@ New Environment Version (V4)
 
 This protocol requires a different protocol environment than Hangzhou.
 It requires protocol environment V4, compared to V3 for Hangzhou.
-(MR :gl:`!3468`)
+(MRs :gl:`!3379`, :gl:`!3468`)
+
+- Move BLS12-381 to blst backend. (MR :gl:`!3296`)
+
+- Expose BLS signature module. (MR :gl:`!3470`)
+
+- Remove Error-monad compat layer. (MR :gl:`!3575`)
+
+- Allow different type of error categories in the different error monads.
+  (MR :gl:`!3664`)
+
+- Fix interface of Hex. (MR :gl:`!3267`)
+
+- Fix use of Micheline canonical encoding. (MR :gl:`!3764`)
 
 Tenderbake
 ----------
@@ -29,20 +42,24 @@ Tickets Strengthening
 
 - Add ticket-balance storage module. (MR :gl:`!3495`)
 
+- Add API for scanning values for tickets. (MR :gl:`!3591`)
+
 Michelson
 ---------
 
 - A new ``SUB_MUTEZ`` instruction has been added, it is similar to the
   ``mutez`` case of the ``SUB`` instruction but its return type is
   ``option mutez`` instead of ``mutez``. This allows subtracting
-  ``mutez`` values without failing in case of underflow.
+  ``mutez`` values without failing in case of underflow. (MR :gl:`!3079`)
 
 - The ``SUB`` instruction on type ``mutez`` is deprecated. It can be
   replaced by ``SUB_MUTEZ; ASSERT_SOME`` (and ``SUB; DROP`` can be
-  replaced by ``ASSERT_CMPGE``).
+  replaced by ``ASSERT_CMPGE``). (MR :gl:`!3079`)
 
 Bug Fixes
 ---------
+
+- Use Cache_costs.cache_find in cache find. (MR :gl:`!3752`)
 
 Minor Changes
 -------------
