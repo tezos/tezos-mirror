@@ -62,7 +62,6 @@ module Protocol_constants_overrides = struct
     minimal_participation_ratio : Constants.ratio option;
     consensus_committee_size : int option;
     consensus_threshold : int option;
-    delegate_selection : Constants.delegate_selection option;
     max_slashing_period : int option;
     frozen_deposits_percentage : int option;
     double_baking_punishment : Tez.t option;
@@ -108,8 +107,7 @@ module Protocol_constants_overrides = struct
                 c.delay_increment_per_round,
                 c.consensus_committee_size,
                 c.consensus_threshold ),
-              ( ( c.delegate_selection,
-                  c.minimal_participation_ratio,
+              ( ( c.minimal_participation_ratio,
                   c.max_slashing_period,
                   c.frozen_deposits_percentage,
                   c.double_baking_punishment,
@@ -145,8 +143,7 @@ module Protocol_constants_overrides = struct
                    delay_increment_per_round,
                    consensus_committee_size,
                    consensus_threshold ),
-                 ( ( delegate_selection,
-                     minimal_participation_ratio,
+                 ( ( minimal_participation_ratio,
                      max_slashing_period,
                      frozen_deposits_percentage,
                      double_baking_punishment,
@@ -186,7 +183,6 @@ module Protocol_constants_overrides = struct
           frozen_deposits_percentage;
           consensus_committee_size;
           consensus_threshold;
-          delegate_selection;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
           chain_id;
@@ -217,7 +213,7 @@ module Protocol_constants_overrides = struct
                (opt "hard_storage_limit_per_operation" z)
                (opt "quorum_min" int32))
             (merge_objs
-               (obj10
+               (obj9
                   (opt "quorum_max" int32)
                   (opt "min_proposal_quorum" int32)
                   (opt "liquidity_baking_subsidy" Tez.encoding)
@@ -229,10 +225,7 @@ module Protocol_constants_overrides = struct
                   (opt "consensus_committee_size" int31)
                   (opt "consensus_threshold" int31))
                (merge_objs
-                  (obj9
-                     (opt
-                        "delegate_selection"
-                        Constants.delegate_selection_encoding)
+                  (obj8
                      (opt
                         "minimal_participation_ratio"
                         Constants.ratio_encoding)
@@ -300,7 +293,6 @@ module Protocol_constants_overrides = struct
         consensus_committee_size = Some parametric.consensus_committee_size;
         (* mockup mode does not support endorsing commands *)
         consensus_threshold = Some 0;
-        delegate_selection = Some Random;
         max_slashing_period = Some parametric.max_slashing_period;
         frozen_deposits_percentage = Some parametric.frozen_deposits_percentage;
         double_baking_punishment = Some parametric.double_baking_punishment;
@@ -347,7 +339,6 @@ module Protocol_constants_overrides = struct
       (* Let consensus threshold be overridable for Tenderbake mockup
          simulator tests. *)
       consensus_threshold = None;
-      delegate_selection = None;
       max_slashing_period = None;
       frozen_deposits_percentage = None;
       double_baking_punishment = None;
@@ -614,8 +605,6 @@ module Protocol_constants_overrides = struct
              o.consensus_committee_size;
          consensus_threshold =
            Option.value ~default:c.consensus_threshold o.consensus_threshold;
-         delegate_selection =
-           Option.value ~default:c.delegate_selection o.delegate_selection;
          initial_seed_nonce =
            Option.value ~default:c.initial_seed_nonce o.initial_seed_nonce;
          preserved_cycles =

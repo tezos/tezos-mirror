@@ -702,10 +702,6 @@ module Constants : sig
   (** Fixed constants *)
   type fixed
 
-  type delegate_selection =
-    | Random
-    | Round_robin_over of Signature.Public_key.t list list
-
   val fixed_encoding : fixed Data_encoding.t
 
   val proof_of_work_nonce_size : int
@@ -760,7 +756,6 @@ module Constants : sig
     frozen_deposits_percentage : int;
     double_baking_punishment : Tez.t;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
-    delegate_selection : delegate_selection;
     initial_seed_nonce : bytes option;
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
@@ -848,8 +843,6 @@ module Constants : sig
   val tx_rollup_enable : context -> bool
 
   val tx_rollup_origination_size : context -> int
-
-  val delegate_selection_encoding : delegate_selection Data_encoding.t
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : parametric}
