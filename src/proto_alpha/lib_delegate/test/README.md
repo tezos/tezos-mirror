@@ -58,9 +58,10 @@ them will have (see the docs for `Mockup_simulator.run`):
 * It is also possible to control round durations, but it recommended to
   use at least 3 seconds (the default).
 * Finally, proposal slots can be controlled with the `delegate_selection`
-  field. Its value can either be `Random` for random selection of slots or
-  `Round_robin_over` with `Signature.public_key list list` inside. The
-  nested lists specify slot owners per level and round.
+  field. The nested lists specify slot owners per level and
+  round. Note that if not provided, a seed nonce will be bruteforced
+  to obtain the desired delegate selection.
+
 
 ```ocaml
   let open Mockup_simulator in
@@ -69,12 +70,22 @@ them will have (see the docs for `Mockup_simulator.run`):
       default_config with
       debug = true;
       delegate_selection =
-        Round_robin_over
-          [
-            (* round 0    round 1     round 2     round 3 *)
-            [bootstrap3; bootstrap4; bootstrap1; bootstrap2]; (* level 1 *)
-            [bootstrap1; bootstrap4; bootstrap2; bootstrap3]; (* level 2 *)
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap3);
+              (1l, bootstrap4);
+              (2l, bootstrap2);
+              (3l, bootstrap1);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
       timeout = 15;
     }
   in

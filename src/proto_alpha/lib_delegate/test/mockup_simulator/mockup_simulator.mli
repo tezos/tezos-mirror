@@ -138,8 +138,10 @@ type config = {
       (** Maximal duration of the test. If the test takes
                      longer to terminate it'll be aborted with an
                      error. *)
-  delegate_selection : Alpha_context.Constants.delegate_selection;
-      (** Selection strategy for delegates per level *)
+  delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
+      (** Desired selection of delegates per level/round *)
+  initial_seed_nonce : bytes option;
+      (** Optional initial seed nonce for protocol (used to control delegate selection) *)
   consensus_committee_size : int;
       (** Size of the committee for tenderbake in number of slots *)
   consensus_threshold : int;

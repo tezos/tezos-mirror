@@ -870,7 +870,7 @@ let deduce_baker_sk
   return secret_key
 
 (** Generate the two initial genesis blocks. *)
-let make_genesis_context ~delegate_selection ~round0 ~round1
+let make_genesis_context ~delegate_selection ~initial_seed_nonce ~round0 ~round1
     ~consensus_committee_size ~consensus_threshold accounts_with_secrets
     (total_accounts : int) =
   let default_constants = Mockup.Protocol_parameters.default_value.constants in
@@ -885,7 +885,7 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
   let constants =
     {
       default_constants with
-      delegate_selection;
+      initial_seed_nonce;
       consensus_committee_size;
       consensus_threshold;
       minimal_block_delay = Alpha_context.Period.of_seconds_exn (max 1L round0);
@@ -893,6 +893,67 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
         Alpha_context.Period.of_seconds_exn Int64.(max 1L (sub round1 round0));
     }
   in
+  let from_bootstrap_account i
+      ( (account : Protocol.Alpha_context.Parameters.bootstrap_account),
+        (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
+      Mockup.Parsed_account.t =
+    {
+      name = Format.sprintf "bootstrap%d" (i + 1);
+      sk_uri = secret.sk_uri;
+      amount = account.amount;
+    }
+  in
+  let bootstrap_accounts =
+    Data_encoding.Json.construct
+      (Data_encoding.list Mockup.Parsed_account.encoding)
+      (List.mapi from_bootstrap_account accounts_with_secrets)
+  in
+  List.map_e
+    (fun (level, round_delegates) ->
+      Raw_level_repr.of_int32 level >>? fun level ->
+      List.map_e
+        (fun (round, delegate) ->
+          Round_repr.of_int32 round >|? fun round -> (round, delegate))
+        round_delegates
+      >|? fun round_delegates -> (level, round_delegates))
+    delegate_selection
+  |> Environment.wrap_tzresult
+  >>?= fun delegate_selection ->
+  (match (delegate_selection, constants.initial_seed_nonce) with
+  | ([], _) -> return_none
+  | (selection, (Some _ as seed_nonce)) -> (
+      Faked_client_context.logger#warning "Checking provided seed nonce."
+      >>= fun () ->
+      Tenderbrute.check_seed_nonce
+        ~bootstrap_accounts_json:bootstrap_accounts
+        ~parameters:Mockup.Protocol_parameters.{default_value with constants}
+        ~seed_nonce
+        selection
+      >>=? function
+      | true -> return seed_nonce
+      | false ->
+          failwith
+            "Provided initial seed nonce does not match delegate selection")
+  | (_, None) ->
+      Faked_client_context.logger#warning
+        "No initial seed nonce provided, bruteforcing."
+      >>= fun () ->
+      Tenderbrute.bruteforce
+        ~max:100_000_000_000
+        ~bootstrap_accounts_json:bootstrap_accounts
+        ~parameters:Mockup.Protocol_parameters.{default_value with constants}
+        delegate_selection)
+  >>=? fun initial_seed_nonce ->
+  (match initial_seed_nonce with
+  | None -> Lwt.return_unit
+  | _ when initial_seed_nonce = constants.initial_seed_nonce -> Lwt.return_unit
+  | Some n ->
+      Faked_client_context.logger#warning
+        "Bruteforced seed nonce is %a, please save into your test."
+        Hex.pp
+        (Hex.of_bytes n))
+  >>= fun () ->
+  let constants = {constants with initial_seed_nonce} in
   let common_parameters =
     Mockup.Protocol_parameters.{default_value with constants}
   in
@@ -903,21 +964,6 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
       @@ Data_encoding.Binary.to_bytes_exn
            Mockup.Protocol_parameters.encoding
            parameters
-    in
-    let from_bootstrap_account i
-        ( (account : Protocol.Alpha_context.Parameters.bootstrap_account),
-          (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
-        Mockup.Parsed_account.t =
-      {
-        name = Format.sprintf "bootstrap%d" (i + 1);
-        sk_uri = secret.sk_uri;
-        amount = account.amount;
-      }
-    in
-    let bootstrap_accounts =
-      Data_encoding.Json.construct
-        (Data_encoding.list Mockup.Parsed_account.encoding)
-        (List.mapi from_bootstrap_account accounts_with_secrets)
     in
     Mockup.M.init
       ~cctxt:Faked_client_context.logger
@@ -995,7 +1041,8 @@ type config = {
   round0 : int64;
   round1 : int64;
   timeout : int;
-  delegate_selection : Alpha_context.Constants.delegate_selection;
+  delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
+  initial_seed_nonce : bytes option;
   consensus_committee_size : int;
   consensus_threshold : int;
 }
@@ -1008,7 +1055,8 @@ let default_config =
        exchange all the necessary messages. *)
     round1 = 3L (* No real need to increase round durations. *);
     timeout = 10;
-    delegate_selection = Random;
+    delegate_selection = [];
+    initial_seed_nonce = None;
     consensus_committee_size =
       Default_parameters.constants_mainnet.consensus_committee_size;
     consensus_threshold =
@@ -1062,6 +1110,7 @@ let run ?(config = default_config) bakers_spec =
     let all_delegates = List.map make_baking_delegate accounts_with_secrets in
     make_genesis_context
       ~delegate_selection:config.delegate_selection
+      ~initial_seed_nonce:config.initial_seed_nonce
       ~round0:config.round0
       ~round1:config.round1
       ~consensus_committee_size:config.consensus_committee_size
