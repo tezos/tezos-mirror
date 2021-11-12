@@ -1132,11 +1132,10 @@ let non_consensus_operations ctxt = List.rev (non_consensus_operations ctxt)
 
 let set_sampler_for_cycle ctxt cycle sampler_with_seed =
   let map = sampler_state ctxt in
-  match Cycle_repr.Map.find cycle map with
-  | None ->
-      let map = Cycle_repr.Map.add cycle sampler_with_seed map in
-      Ok (update_sampler_state ctxt map)
-  | Some _ -> Error `Sampler_already_set
+  if Cycle_repr.Map.mem cycle map then Error `Sampler_already_set
+  else
+    let map = Cycle_repr.Map.add cycle sampler_with_seed map in
+    Ok (update_sampler_state ctxt map)
 
 let sampler_for_cycle ctxt cycle =
   let map = sampler_state ctxt in

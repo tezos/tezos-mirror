@@ -25,7 +25,7 @@
 
 (**
 
-     Frequently used data should be kept in memory and persist along a
+     Frequently used data should be kept in memory and persisted along a
      chain of blocks. The caching mechanism allows the economic protocol
      to declare such data and to rely on a Least Recently Used strategy
      to keep the cache size under a fixed limit.
@@ -81,7 +81,7 @@ module Admin : sig
 
      In that case, a fresh collection of empty caches is reconstructed
      from the new [layout]. Notice that cache [key]s are invalidated
-     in that case, i.e., [find t k] will return [None]. *)
+     in that case, i.e. [find t k] will return [None]. *)
   val set_cache_layout : Raw_context.t -> size list -> Raw_context.t Lwt.t
 
   (** [sync ctxt ~cache_nonce] updates the context with the domain of
@@ -138,7 +138,7 @@ end
 type namespace = private string
 
 (** [create_namespace str] creates a valid namespace from [str]
-    
+
     @raise Invalid_argument if [str] contains '@'
  *)
 val create_namespace : string -> namespace
@@ -147,7 +147,6 @@ val create_namespace : string -> namespace
 type identifier = string
 
 (**
-
      To use the cache, a client must implement the [CLIENT]
      interface.
 
@@ -172,7 +171,7 @@ module type CLIENT = sig
 
        An error during the execution of this function is fatal as
        witnessed by its type: an error embedded in a [tzresult] is not
-       supposed to be catched by the protocol. *)
+       supposed to be caught by the protocol. *)
   val value_of_identifier :
     Raw_context.t -> identifier -> cached_value tzresult Lwt.t
 end
@@ -211,7 +210,7 @@ module type INTERFACE = sig
        cache, the oldest coming first. *)
   val list_identifiers : Raw_context.t -> (string * int) list
 
-  (** [identifier_rank ctxt identifier] returns the number of cached value
+  (** [identifier_rank ctxt identifier] returns the number of cached values
        older than the one of [identifier]; or, [None] if the [identifier] has
        no associated value in the subcache. *)
   val identifier_rank : Raw_context.t -> string -> int option

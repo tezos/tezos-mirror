@@ -136,7 +136,7 @@ module Admin = struct
   let key_rank context key = Raw_context.Cache.key_rank context key
 
   let value_of_key ctxt key =
-    (* [value_of_key] is a maintainance operation: it is typically run
+    (* [value_of_key] is a maintenance operation: it is typically run
        when a node reboots. For this reason, this operation is not
        carbonated. *)
     let ctxt = Raw_context.set_gas_unlimited ctxt in

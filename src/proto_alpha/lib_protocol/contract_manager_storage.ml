@@ -80,7 +80,7 @@ let () =
     `Branch
     ~id:"contract.previously_revealed_key"
     ~title:"Manager operation already revealed"
-    ~description:"One tried to revealed twice a manager public key"
+    ~description:"One tried to reveal twice a manager public key"
     ~pp:(fun ppf s ->
       Format.fprintf
         ppf
