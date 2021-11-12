@@ -30,7 +30,7 @@ type balance =
   | Legacy_rewards of Signature.Public_key_hash.t * Cycle_repr.t
   | Block_fees
   | Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
-  | Bonds of Signature.Public_key_hash.t
+  | Deposits of Signature.Public_key_hash.t
   | NonceRevelation_rewards
   | Double_signing_evidence_rewards
   | Endorsing_rewards

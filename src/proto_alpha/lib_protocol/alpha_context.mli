@@ -1432,7 +1432,7 @@ module Receipt : sig
     | Legacy_rewards of Signature.Public_key_hash.t * Cycle.t
     | Block_fees
     | Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
-    | Bonds of public_key_hash
+    | Deposits of public_key_hash
     | NonceRevelation_rewards
     | Double_signing_evidence_rewards
     | Endorsing_rewards
