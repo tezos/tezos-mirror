@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = int (* TODO-TB remake abstract (required index for storage) *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2057
+   remake abstract (required index for storage) *)
+type t = int
 
 val encoding : t Data_encoding.t
 
