@@ -79,6 +79,10 @@ let test_round_repr () =
 
 let ( >>>=? ) v f = v >|= Environment.wrap_tzresult >>=? f
 
+let ( >>>?= ) v f = v |> Environment.wrap_tzresult >>?= f
+
+let ( >>>? ) v f = v |> Environment.wrap_tzresult >>? f
+
 type round_test = {
   (* input: round; output: round duration *)
   round_duration : (int * int) list;
@@ -335,10 +339,11 @@ let round_of_timestamp_perf durations =
   in
   Environment.wrap_tzresult (loop 1000L) >>?= fun () -> return_unit
 
+let default_round_durations_list =
+  [[1L; 1L]; [1L; 2L]; [1L; 3L]; [2L; 3L]; [2L; 4L]]
+
 let test_round_of_timestamp_perf () =
-  List.iter_es
-    round_of_timestamp_perf
-    [[1L; 1L]; [1L; 2L]; [1L; 3L]; [2L; 3L]; [2L; 4L]]
+  List.iter_es round_of_timestamp_perf default_round_durations_list
 
 let timestamp_of_round_perf durations =
   let duration0 = Period.of_seconds_exn (Stdlib.List.hd durations) in
@@ -369,9 +374,7 @@ let timestamp_of_round_perf durations =
   Environment.wrap_tzresult (loop 1000l) >>?= fun () -> return_unit
 
 let test_timestamp_of_round_perf () =
-  List.iter_es
-    timestamp_of_round_perf
-    [[1L; 1L]; [1L; 2L]; [1L; 3L]; [2L; 3L]; [2L; 4L]]
+  List.iter_es timestamp_of_round_perf default_round_durations_list
 
 let test_error_is_triggered_for_too_high_timestamp () =
   let round_durations =
@@ -399,6 +402,105 @@ let test_error_is_triggered_for_too_high_timestamp () =
           error_info.title = "level offset too high")
   | Ok _ -> Assert.error ~loc:__LOC__ res (fun _ -> false)
 
+let rec ( --> ) i j =
+  (* [i; i+1; ...; j] *)
+  if Compare.Int.(i > j) then [] else i :: (succ i --> j)
+
+let ts_of_round_inverse durations round_int =
+  let round_durations =
+    Stdlib.Option.get
+    @@ Round.Durations.create_opt
+         ~round0:(Period.of_seconds_exn (Stdlib.List.nth durations 0))
+         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
+         ()
+  in
+  let predecessor_timestamp = Time.Protocol.epoch in
+  let predecessor_round = Round.zero in
+  Round.of_int round_int >>>?= fun round ->
+  Round.timestamp_of_round
+    round_durations
+    ~predecessor_timestamp
+    ~predecessor_round
+    ~round
+  >>>?= fun timestamp ->
+  Round.round_of_timestamp
+    round_durations
+    ~predecessor_timestamp
+    ~predecessor_round
+    ~timestamp
+  >>>?= fun round' ->
+  Round.to_int round' >>>?= fun round' ->
+  Assert.equal_int ~loc:__LOC__ round_int round'
+
+let test_ts_of_round_inverse () =
+  List.iter_es
+    (fun durations ->
+      List.iter_es
+        (ts_of_round_inverse durations)
+        ((0 --> 20) @ (60000 --> 60010)))
+    default_round_durations_list
+  >>=? fun () ->
+  List.iter_es
+    (ts_of_round_inverse [1L; 1L])
+    (List.map (fun i -> Int32.to_int Int32.max_int - i) (1 --> 20))
+
+let round_of_ts_inverse durations ts =
+  let round_durations =
+    Stdlib.Option.get
+    @@ Round.Durations.create_opt
+         ~round0:(Period.of_seconds_exn (Stdlib.List.nth durations 0))
+         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
+         ()
+  in
+  let predecessor_timestamp = Time.Protocol.epoch in
+  let predecessor_round = Round.zero in
+  let start_of_round timestamp =
+    Round.round_of_timestamp
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~timestamp
+    >>>? fun round ->
+    Round.timestamp_of_round
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~round
+    >>>? fun t -> ok t
+  in
+  Period.of_seconds_exn ts |> Timestamp.( +? ) predecessor_timestamp
+  >>>?= fun timestamp ->
+  start_of_round timestamp >>?= fun ts_start_of_round ->
+  Assert.leq_int64 ~loc:__LOC__ (Timestamp.to_seconds ts_start_of_round) ts
+  >>=? fun () ->
+  let pred ts = Period.of_seconds_exn 1L |> Timestamp.( - ) ts in
+  let rec iter ts =
+    start_of_round ts >>?= fun ts_start_of_round' ->
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Timestamp.to_seconds ts_start_of_round)
+      (Timestamp.to_seconds ts_start_of_round')
+    >>=? fun () ->
+    if Timestamp.(timestamp > ts_start_of_round) then iter (pred ts)
+    else return_unit
+  in
+  if Timestamp.(timestamp > ts_start_of_round) then iter (pred timestamp)
+  else return_unit
+
+let test_round_of_ts_inverse () =
+  List.iter_es
+    (fun durations ->
+      List.iter_es
+        (ts_of_round_inverse durations)
+        ((0 --> 20) @ (60000 --> 60010)))
+    default_round_durations_list
+  >>=? fun () ->
+  List.iter_es
+    (round_of_ts_inverse [1L; 1L])
+    (List.map
+       (fun i -> Int64.of_int (Int32.to_int Int32.max_int - i))
+       (0 --> 20))
+
 let tests =
   Tztest.
     [
@@ -411,4 +513,9 @@ let tests =
         "test level offset too high error is triggered"
         `Quick
         test_error_is_triggered_for_too_high_timestamp;
+      tztest "round_of_ts (ts_of_round r) = r" `Quick test_ts_of_round_inverse;
+      tztest
+        "ts_of_round (round_of_ts ts) <= ts"
+        `Quick
+        test_round_of_ts_inverse;
     ]
