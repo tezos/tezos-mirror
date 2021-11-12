@@ -73,6 +73,7 @@ module Protocol_constants_overrides = struct
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
+    initial_seed_nonce : bytes option option;
   }
 
   (** Shamefully copied from [Constants_repr.parametric_encoding] and adapted ([opt] instead of [req]). *)
@@ -114,7 +115,8 @@ module Protocol_constants_overrides = struct
                   c.double_baking_punishment,
                   c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                   c.chain_id,
-                  c.timestamp ),
+                  c.timestamp,
+                  c.initial_seed_nonce ),
                 (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
@@ -150,7 +152,8 @@ module Protocol_constants_overrides = struct
                      double_baking_punishment,
                      ratio_of_frozen_deposits_slashed_per_double_endorsement,
                      chain_id,
-                     timestamp ),
+                     timestamp,
+                     initial_seed_nonce ),
                    (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
         {
           preserved_cycles;
@@ -188,6 +191,7 @@ module Protocol_constants_overrides = struct
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
           chain_id;
           timestamp;
+          initial_seed_nonce;
           tx_rollup_enable;
           tx_rollup_origination_size;
         })
@@ -225,7 +229,7 @@ module Protocol_constants_overrides = struct
                   (opt "consensus_committee_size" int31)
                   (opt "consensus_threshold" int31))
                (merge_objs
-                  (obj8
+                  (obj9
                      (opt
                         "delegate_selection"
                         Constants.delegate_selection_encoding)
@@ -239,7 +243,8 @@ module Protocol_constants_overrides = struct
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                         Constants.ratio_encoding)
                      (opt "chain_id" Chain_id.encoding)
-                     (opt "initial_timestamp" Time.Protocol.encoding))
+                     (opt "initial_timestamp" Time.Protocol.encoding)
+                     (opt "initial_seed_nonce" (option bytes)))
                   (obj2
                      (opt "tx_rollup_enable" Data_encoding.bool)
                      (opt "tx_rollup_origination_size" int31))))))
@@ -307,6 +312,7 @@ module Protocol_constants_overrides = struct
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
+        initial_seed_nonce = Some parametric.initial_seed_nonce;
       }
 
   let no_overrides : t =
@@ -350,6 +356,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_origination_size = None;
       chain_id = None;
       timestamp = None;
+      initial_seed_nonce = None;
     }
 
   (** Existential wrapper to support heterogeneous lists/maps. *)
@@ -609,6 +616,8 @@ module Protocol_constants_overrides = struct
            Option.value ~default:c.consensus_threshold o.consensus_threshold;
          delegate_selection =
            Option.value ~default:c.delegate_selection o.delegate_selection;
+         initial_seed_nonce =
+           Option.value ~default:c.initial_seed_nonce o.initial_seed_nonce;
          preserved_cycles =
            Option.value ~default:c.preserved_cycles o.preserved_cycles;
          blocks_per_cycle =

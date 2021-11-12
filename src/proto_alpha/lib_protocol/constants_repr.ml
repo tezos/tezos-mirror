@@ -82,6 +82,8 @@ let ratio_encoding =
 let pp_ratio fmt {numerator; denominator} =
   Format.fprintf fmt "%d/%d" numerator denominator
 
+let nonce_encoding = Data_encoding.Fixed.bytes nonce_length
+
 let fixed_encoding =
   let open Data_encoding in
   let uint62 =
@@ -194,6 +196,7 @@ type parametric = {
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   delegate_selection : delegate_selection;
+  initial_seed_nonce : bytes option;
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
 }
@@ -234,7 +237,8 @@ let parametric_encoding =
                 c.frozen_deposits_percentage,
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                c.delegate_selection ),
+                c.delegate_selection,
+                c.initial_seed_nonce ),
               (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -268,7 +272,8 @@ let parametric_encoding =
                    frozen_deposits_percentage,
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                   delegate_selection ),
+                   delegate_selection,
+                   initial_seed_nonce ),
                  (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
       {
         preserved_cycles;
@@ -304,6 +309,7 @@ let parametric_encoding =
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
         delegate_selection;
+        initial_seed_nonce;
         tx_rollup_enable;
         tx_rollup_origination_size;
       })
@@ -345,7 +351,7 @@ let parametric_encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj6
+                (obj7
                    (req "minimal_participation_ratio" ratio_encoding)
                    (req "max_slashing_period" int31)
                    (req "frozen_deposits_percentage" int31)
@@ -353,7 +359,8 @@ let parametric_encoding =
                    (req
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       ratio_encoding)
-                   (dft "delegate_selection" delegate_selection_encoding Random))
+                   (dft "delegate_selection" delegate_selection_encoding Random)
+                   (opt "initial_seed_nonce" nonce_encoding))
                 (obj2
                    (req "tx_rollup_enable" bool)
                    (req "tx_rollup_origination_size" int31))))))

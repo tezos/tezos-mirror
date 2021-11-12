@@ -910,6 +910,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               {numerator = 1; denominator = 2};
             delegate_selection = Random;
+            initial_seed_nonce = None;
             tx_rollup_enable = false;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
             tx_rollup_origination_size = 60_000;
