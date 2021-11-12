@@ -61,8 +61,7 @@ module High_watermark = struct
       return (level, Some round)
     with exn ->
       failwith
-        "Failed to retrieve level and round of an endorsement or \
-         preendorsement: %s"
+        "Failed to retrieve level and round of a Tenderbake block: %s"
         (Printexc.to_string exn)
 
   let get_level_and_round_for_tenderbake_endorsement bytes =
