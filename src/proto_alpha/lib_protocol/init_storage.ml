@@ -134,7 +134,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       List.fold_left_es init_commitment (ctxt, []) param.commitments
       >>=? fun (ctxt, commitments_balance_updates) ->
       Storage.Stake.Last_snapshot.init ctxt 0 >>=? fun ctxt ->
-      Seed_storage.init ctxt >>=? fun ctxt ->
+      (match param.constants.initial_seed_nonce with
+      | None -> Ok None
+      | Some n -> Seed_repr.make_nonce n |> Result.map Option.some)
+      >>?= fun initial_seed_nonce ->
+      Seed_storage.init ?initial_seed_nonce ctxt >>=? fun ctxt ->
       Contract_storage.init ctxt >>=? fun ctxt ->
       Bootstrap_storage.init
         ctxt

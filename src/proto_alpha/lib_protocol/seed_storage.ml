@@ -106,14 +106,14 @@ let for_cycle ctxt cycle =
     (Unknown {oldest; cycle; latest})
   >>?= fun () -> Storage.Seed.For_cycle.get ctxt cycle
 
-let init ctxt =
+let init ?initial_seed ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   List.fold_left_es
     (fun (c, ctxt) seed ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Storage.Seed.For_cycle.init ctxt cycle seed >|=? fun ctxt -> (c + 1, ctxt))
     (0, ctxt)
-    (Seed_repr.initial_seeds (preserved + 2))
+    (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
   >|=? snd
 
 let cycle_end ctxt last_cycle =
