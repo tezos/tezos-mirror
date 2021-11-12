@@ -114,6 +114,7 @@ module Durations = struct
         round : Period_repr.t;
         next_round : Period_repr.t;
       }
+    | Round_durations_must_be_at_least_one_second of {round : Period_repr.t}
 
   let () =
     register_error_kind
@@ -169,6 +170,10 @@ module Durations = struct
         >>? fun () -> check_ordered rs
 
   let create ?(other_rounds = []) ~round0 ~round1 () =
+    error_when
+      Compare.Int64.(Period_repr.to_seconds round0 < 1L)
+      (Round_durations_must_be_at_least_one_second {round = round0})
+    >>? fun () ->
     check_ordered (round0 :: round1 :: other_rounds) >>? fun () ->
     ok {round0; round1; other_rounds}
 
