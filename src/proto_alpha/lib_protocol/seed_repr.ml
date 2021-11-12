@@ -142,9 +142,15 @@ let initial_nonce_hash_0 = hash initial_nonce_0
 
 let deterministic_seed seed = nonce seed zero_bytes
 
-let initial_seeds n =
+let initial_seeds ?initial_seed_nonce n =
   let[@coq_struct "i"] rec loop acc elt i =
     if Compare.Int.(i = 1) then List.rev (elt :: acc)
     else loop (elt :: acc) (deterministic_seed elt) (i - 1)
   in
-  loop [] (B (State_hash.hash_bytes [])) n
+  let first_seed = B (State_hash.hash_bytes []) in
+  let first_seed =
+    match initial_seed_nonce with
+    | Some n -> nonce first_seed n
+    | None -> first_seed
+  in
+  loop [] first_seed n

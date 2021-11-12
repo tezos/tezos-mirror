@@ -66,18 +66,6 @@ val take_int32 : sequence -> int32 -> int32 * sequence
  *)
 val take_int64 : sequence -> int64 -> int64 * sequence
 
-(** {2 Predefined seeds} *)
-
-val empty : seed
-
-(** Returns a new seed by hashing the one passed with a constant. *)
-val deterministic_seed : seed -> seed
-
-(** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
-    The first seed is a constant value. The kth seed is the hash of seed (k-1)
-    concatenated with a constant. *)
-val initial_seeds : int -> seed list
-
 (** {2 Entropy} *)
 
 (** A nonce for adding entropy to the generator *)
@@ -89,7 +77,7 @@ val nonce : seed -> nonce -> seed
 (** Use a byte sequence as a nonce *)
 val make_nonce : bytes -> nonce tzresult
 
-(** Compute the has of a nonce *)
+(** Compute the hash of a nonce *)
 val hash : nonce -> Nonce_hash.t
 
 (** [check_hash nonce hash] is true if the nonce correspond to the hash *)
@@ -97,6 +85,19 @@ val check_hash : nonce -> Nonce_hash.t -> bool
 
 (** For using nonce hashes as keys in the hierarchical database *)
 val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
+
+(** {2 Predefined seeds} *)
+
+val empty : seed
+
+(** Returns a new seed by hashing the one passed with a constant. *)
+val deterministic_seed : seed -> seed
+
+(** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
+    The first seed is a constant value. The kth seed is the hash of seed (k-1)
+    concatenated with a constant. If an [initial_seed_nonce] is provided, the
+    {i first} seed is created with added entropy (see {!nonce}). *)
+val initial_seeds : ?initial_seed_nonce:nonce -> int -> seed list
 
 (** {2 Predefined nonce} *)
 
