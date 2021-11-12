@@ -380,9 +380,9 @@ let () =
 
 let check_constants constants =
   error_unless
-    Compare.Int.(constants.consensus_committee_size > 0)
+    Compare.Int.(constants.consensus_committee_size > 3)
     (Invalid_protocol_constants
-       "The consensus committee size must be strictly greater than 0.")
+       "The consensus committee size must be strictly greater than 3.")
   >>? fun () ->
   error_unless
     Compare.Int.(
