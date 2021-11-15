@@ -137,6 +137,11 @@ Miscellaneous
 -  Added specific documentation pages about logging for users and
    developers.
 
+Version 11.0
+============
+
+No changes compared to 11.0~rc2.
+
 Version 11.0~rc2
 ================
 
