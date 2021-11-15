@@ -200,7 +200,7 @@ let pp_balance_updates ppf = function
                     pkh
                     Cycle.pp
                     l
-              | Bonds pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
+              | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
               | NonceRevelation_rewards -> "nonce revelation rewards"
               | Double_signing_evidence_rewards ->
                   "double signing evidence rewards"

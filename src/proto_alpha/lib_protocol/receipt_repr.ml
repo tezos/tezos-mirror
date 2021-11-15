@@ -29,7 +29,7 @@ type balance =
   | Legacy_rewards of Signature.Public_key_hash.t * Cycle_repr.t
   | Block_fees
   | Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
-  | Bonds of Signature.Public_key_hash.t
+  | Deposits of Signature.Public_key_hash.t
   | NonceRevelation_rewards
   | Double_signing_evidence_rewards
   | Endorsing_rewards
@@ -91,13 +91,13 @@ let balance_encoding =
            (fun ((), (), d, l) -> Legacy_deposits (d, l));
          case
            (Tag 4)
-           ~title:"Bonds"
+           ~title:"Deposits"
            (obj3
               (req "kind" (constant "freezer"))
               (req "category" (constant "deposits"))
               (req "delegate" Signature.Public_key_hash.encoding))
-           (function Bonds d -> Some ((), (), d) | _ -> None)
-           (fun ((), (), d) -> Bonds d);
+           (function Deposits d -> Some ((), (), d) | _ -> None)
+           (fun ((), (), d) -> Deposits d);
          case
            (Tag 5)
            ~title:"NonceRevelation_rewards"
@@ -246,7 +246,8 @@ let compare_balance ba bb =
       Signature.Public_key_hash.compare pkha pkhb *? Cycle_repr.compare ca cb
   | (Legacy_deposits (pkha, ca), Legacy_deposits (pkhb, cb)) ->
       Signature.Public_key_hash.compare pkha pkhb *? Cycle_repr.compare ca cb
-  | (Bonds pkha, Bonds pkhb) -> Signature.Public_key_hash.compare pkha pkhb
+  | (Deposits pkha, Deposits pkhb) ->
+      Signature.Public_key_hash.compare pkha pkhb
   | ( Lost_endorsing_rewards (pkha, pa, ra),
       Lost_endorsing_rewards (pkhb, pb, rb) ) ->
       Signature.Public_key_hash.compare pkha pkhb
@@ -262,7 +263,7 @@ let compare_balance ba bb =
         | Legacy_rewards _ -> 1l
         | Block_fees -> 2l
         | Legacy_deposits _ -> 3l
-        | Bonds _ -> 4l
+        | Deposits _ -> 4l
         | NonceRevelation_rewards -> 5l
         | Double_signing_evidence_rewards -> 6l
         | Endorsing_rewards -> 7l

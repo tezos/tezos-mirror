@@ -133,7 +133,7 @@ let credit ctxt dest amount origin =
       else return ctxt)
       >>=? fun ctxt ->
       Frozen_deposits_storage.credit_only_call_from_token ctxt delegate amount
-      >|=? fun ctxt -> (ctxt, Bonds delegate)
+      >|=? fun ctxt -> (ctxt, Deposits delegate)
   | `Block_fees ->
       Raw_context.credit_collected_fees_only_call_from_token ctxt amount
       >>?= fun ctxt -> return (ctxt, Block_fees)
@@ -198,7 +198,7 @@ let spend ctxt src amount origin =
       (if Tez_repr.(amount = zero) then return ctxt
       else
         Frozen_deposits_storage.spend_only_call_from_token ctxt delegate amount)
-      >>=? fun ctxt -> return (ctxt, Bonds delegate)
+      >>=? fun ctxt -> return (ctxt, Deposits delegate)
   | `Block_fees ->
       Raw_context.spend_collected_fees_only_call_from_token ctxt amount
       >>?= fun ctxt -> return (ctxt, Block_fees)
