@@ -99,24 +99,36 @@ let test_stresstest_sources_format =
   Protocol.register_test
     ~__FILE__
     ~title:"stresstest sources format"
-    ~tags:["client"]
+    ~tags:["client"; "stresstest"; "sources"]
   @@ fun protocol ->
   let transfers = 30 in
   let* (node, client) =
     Client.init_with_protocol
       ~nodes_args:
         [
-          Synchronisation_threshold 0; Connections 0; Disable_operations_precheck;
+          Synchronisation_threshold 0;
+          Connections 0;
+          Disable_operations_precheck;
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+             Stresstest command uses counters to inject a lot of operations with limited
+             number of bootstrap accounts. With precheck these operations are mostly
+             rejected because we don't apply the effect of operations in the
+             prevalidation context in mempool mode anymore. So, only the operation with
+             the correct counter is considered as Applied (without incrementing the
+             counter in the context). Once the issue is fixed, the
+             [Disable_operations_precheck] flag above can be removed. *)
         ]
+      ~additional_bootstrap_account_count:1
       `Client
       ~protocol
       ()
   in
+  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
   let waiter = wait_for_n_injections transfers node in
   let* () =
     Constant.(
       Client.stresstest
-        ~source_aliases:[bootstrap1.alias; bootstrap2.alias]
+        ~source_aliases:[bootstrap1.alias; bootstrap2.alias; bootstrap6.alias]
         ~source_pkhs:[bootstrap3.public_key_hash]
         ~source_accounts:[bootstrap1; bootstrap4]
         ~transfers
@@ -137,22 +149,21 @@ let test_stresstest_sources_format =
   let expected_sources =
     List.map
       (fun bootstrap -> bootstrap.Account.public_key_hash)
-      Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4]
+      Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap6]
     |> String_set.of_list
   in
-  (if not (String_set.equal actual_sources expected_sources) then
-   let pp_sources fmt sources =
-     Format.(pp_print_seq pp_print_string fmt (String_set.to_seq sources))
-   in
-   let msg =
-     Format.asprintf
-       "Set of sources is %a, expected %a."
-       pp_sources
-       actual_sources
-       pp_sources
-       expected_sources
-   in
-   Test.fail "%s" msg) ;
+  let pp_sources fmt sources =
+    Format.(
+      pp_print_seq
+        ~pp_sep:(fun fmt () -> fprintf fmt ", ")
+        pp_print_string
+        fmt
+        (String_set.to_seq sources))
+  in
+  Check.(
+    (actual_sources = expected_sources)
+      (equalable pp_sources String_set.equal)
+      ~error_msg:"Set of sources is %L; expected %R.") ;
   unit
 
 let check_n_applied_operations ?(log = false) ~expected client =
