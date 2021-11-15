@@ -167,11 +167,11 @@ test-python: all
 
 .PHONY: test-python-alpha
 test-python-alpha: all
-	@make -C tests_python alpha
+	@$(MAKE) -C tests_python alpha
 
 .PHONY: test-python-tenderbake
 test-python-tenderbake: all
-	@make -C tests_python tenderbake
+	@$(MAKE) -C tests_python tenderbake
 
 .PHONY: test-flextesa
 test-flextesa:
