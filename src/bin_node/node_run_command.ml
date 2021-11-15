@@ -243,10 +243,14 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
       >>=? fun trusted_points ->
+      let advertised_port : P2p_addr.port option =
+        Option.either config.p2p.advertised_net_port listening_port
+      in
       let p2p_config : P2p.config =
         {
           listening_addr;
           listening_port;
+          advertised_port;
           discovery_addr;
           discovery_port;
           trusted_points;

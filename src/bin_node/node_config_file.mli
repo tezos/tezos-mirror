@@ -61,6 +61,7 @@ and p2p = {
   expected_pow : float;
   bootstrap_peers : string list option;
   listen_addr : string option;
+  advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
   limits : P2p.limits;
@@ -116,6 +117,7 @@ val update :
   ?expected_pow:float ->
   ?bootstrap_peers:string list option ->
   ?listen_addr:string ->
+  ?advertised_net_port:int ->
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->

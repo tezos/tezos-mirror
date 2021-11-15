@@ -287,22 +287,38 @@ P2P parameters allow to customize aspects related to the :doc:`peer-to-peer netw
 Listening ports
 ~~~~~~~~~~~~~~~
 
-By default, the node listens to incoming connections from peers on port ``9732``, on any of the available network interfaces on the node's host.
-This behavior can be changed by passing an IP address and optionally a port number (``addr:port``), using either the ``--net-addr`` configuration option or the P2P ``listen-addr`` configuration parameter.
-Note that the IP address is only used for selecting an active network interface (technically, it is only passed to the ``bind()`` function of the socket API). Thus, it is currently not possible to advertise to peers a different port than the binding port.
+By default, the node listens to incoming connections from peers on port ``9732``,
+on any of the available network interfaces on the node's host.
+This behavior can be changed by passing an IP address and optionally a port number
+(``addr:port``), using either the ``--net-addr`` configuration option or the P2P
+``listen-addr`` configuration parameter.
+Note that the IP address is only used for selecting an active network interface
+(technically, it is only passed to the ``bind()`` function of the socket API).
+It is also possible to advertise to peers a different port than
+the binding port using ``--advertised-net-port`` configuration option or the P2P
+`advertised-net-port`` configuration parameter. Currently it is only possible to
+specify an advertised port, but not an IP address. 
 
 .. note::
 
     If the node is run on a machine ``M`` not disposing of a public IP address,
-    subject to NAT (network address translation), a port forwarding rule has
-    to be added on the NAT server ``S`` on the listening port ``p`` towards
-    machine ``M``: ``S:p -> M:p``.
+    subject to NAT, a port forwarding rule has
+    to be added on the NAT server ``S`` on the listening port towards
+    machine ``M``: ``S:p1 -> M:p2``, where ``p1`` is ``advertised-net-port`` and
+    ``p2`` is the port specified by ``listening-addr``. Alternatively, if the
+    ``advertised-net-port`` is not configured, ``p1`` must be the same as ``p2``.
+
     As a consequence, if a second node has to be run behind the
     same server on a machine ``M'`` (possibly the same as ``M``),
-    it should be configured to listen on a different port ``p'``, to
-    allow defining another forwarding rule for it: ``S:p' -> M':p'``.
+    it should be configured to listen on a different port ``p2'``, to
+    allow defining another forwarding rule for it: ``S:p1' -> M':p2'``, where
+    ``p1'`` is ``advertised-net-port`` configured for the second node ``M'``.
 
-    Many routers can be configured with UPnP to open ports dynamically, so the port forwarding can be initiated by the internal host without any manual modification on the router. This is not possible for corporate networks with UPnP disabled, but is typically handy for home routers, or other networks where this option is available.
+    Many routers can be configured with UPnP to open ports dynamically, so the
+    port forwarding can be initiated by the internal host without any manual
+    modification on the router. This is not possible for corporate networks with
+    UPnP disabled, but is typically handy for home routers, or other networks
+    where this option is available.
 
 Private node
 ~~~~~~~~~~~~

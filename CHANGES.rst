@@ -93,6 +93,8 @@ Node
   fields can be used to override the values normally returned by the
   ``NOW`` and ``LEVEL`` instructions.
 
+- Add a new CLI & config option ``advertised-net-port``.
+
 Client
 ------
 

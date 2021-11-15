@@ -41,6 +41,7 @@ type config = {
   reconnection_config : P2p_point_state.Info.reconnection_config;
   proof_of_work_target : Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
+  advertised_port : P2p_addr.port option;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) dependencies = {
@@ -64,7 +65,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     incoming:bool ->
     P2p_io_scheduler.connection ->
     P2p_point.Id.t ->
-    ?listening_port:int ->
+    ?advertised_port:int ->
     P2p_identity.t ->
     Network_version.t ->
     'conn_meta P2p_params.conn_meta_config ->
@@ -291,7 +292,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         ~incoming
         scheduled_conn
         point
-        ?listening_port:t.config.listening_port
+        ?advertised_port:t.config.advertised_port
         t.config.identity
         t.announced_version
         t.conn_meta_config)
@@ -630,7 +631,7 @@ module Internal_for_tests = struct
       incoming:bool ->
       P2p_io_scheduler.connection ->
       P2p_point.Id.t ->
-      ?listening_port:int ->
+      ?advertised_port:int ->
       P2p_identity.t ->
       Network_version.t ->
       'conn_meta P2p_params.conn_meta_config ->
@@ -660,7 +661,7 @@ module Internal_for_tests = struct
              ~incoming:_
              _
              _
-             ?listening_port:_
+             ?advertised_port:_
              _
              _
              _ ->
@@ -699,6 +700,7 @@ module Internal_for_tests = struct
     in
     let proof_of_work_target = Crypto_box.make_pow_target 0. in
     let listening_port = Some 9732 in
+    let advertised_port = None in
     {
       incoming_app_message_queue_size;
       private_mode;
@@ -714,6 +716,7 @@ module Internal_for_tests = struct
       reconnection_config;
       proof_of_work_target;
       listening_port;
+      advertised_port;
     }
 
   (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through

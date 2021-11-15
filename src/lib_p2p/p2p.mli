@@ -80,6 +80,10 @@ type config = {
   listening_addr : P2p_addr.t option;
       (** When incoming connections are accepted, precise on which
       IP address the node listen (default: [[::]]). *)
+  advertised_port : P2p_addr.port option;
+      (** If incoming connections accepted, specifying the TCP port other peers
+      should use to connect to this peer (default: listening_port). Can be used
+      when this peer is behind NAT. *)
   discovery_port : P2p_addr.port option;
       (** Tells if local peer discovery is enabled, specifying the TCP port
       on which the peer can be reached (default: [10732]) *)

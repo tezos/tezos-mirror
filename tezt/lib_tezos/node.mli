@@ -115,6 +115,7 @@ val create :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   argument list ->
@@ -161,6 +162,9 @@ val name : t -> string
 
 (** Get the network port given as [--net-addr] to a node. *)
 val net_port : t -> int
+
+(** Get the network port given as [--advertised-net-port] to a node. *)
+val advertised_net_port : t -> int option
 
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
@@ -399,6 +403,7 @@ val init :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?event_level:string ->

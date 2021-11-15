@@ -63,6 +63,7 @@ let default_p2p : P2p.config =
   {
     listening_port = None;
     listening_addr = Some (P2p_addr.of_string_exn "[::]");
+    advertised_port = None;
     discovery_port = None;
     discovery_addr = Some Ipaddr.V4.any;
     trusted_points = [];
