@@ -241,21 +241,26 @@ let spend ctxt src amount origin =
       >>= fun ctxt -> return (ctxt, Legacy_rewards (delegate, cycle)))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Debited amount, origin))
 
-let transfer_n ?(origin = Receipt_repr.Block_application) ctxt sources
-    destination =
-  List.fold_left_es
-    (fun (ctxt, total, debit_logs) (source, amount) ->
-      spend ctxt source amount origin >>=? fun (ctxt, debit_log) ->
-      Tez_repr.(amount +? total) >>?= fun total ->
-      return (ctxt, total, debit_log :: debit_logs))
-    (ctxt, Tez_repr.zero, [])
-    sources
-  >>=? fun (ctxt, amount, debit_logs) ->
-  credit ctxt destination amount origin >|=? fun (ctxt, credit_log) ->
-  (* Make sure the order of balance updates is : debit logs in the order of
-     of the parameter [sources], and then the credit log. *)
-  let balance_updates = List.rev (credit_log :: debit_logs) in
-  (ctxt, Receipt_repr.cleanup_balance_updates balance_updates)
+let transfer_n ?(origin = Receipt_repr.Block_application) ctxt src dest =
+  let sources = List.filter (fun (_, am) -> Tez_repr.(am <> zero)) src in
+  match sources with
+  | [] ->
+      (* Avoid accessing context data when there is nothing to transfer. *)
+      return (ctxt, [])
+  | _ :: _ ->
+      List.fold_left_es
+        (fun (ctxt, total, debit_logs) (source, amount) ->
+          spend ctxt source amount origin >>=? fun (ctxt, debit_log) ->
+          Tez_repr.(amount +? total) >>?= fun total ->
+          return (ctxt, total, debit_log :: debit_logs))
+        (ctxt, Tez_repr.zero, [])
+        sources
+      >>=? fun (ctxt, amount, debit_logs) ->
+      credit ctxt dest amount origin >|=? fun (ctxt, credit_log) ->
+      (* Make sure the order of balance updates is : debit logs in the order of
+         of the parameter [src], and then the credit log. *)
+      let balance_updates = List.rev (credit_log :: debit_logs) in
+      (ctxt, balance_updates)
 
 let transfer ?(origin = Receipt_repr.Block_application) ctxt src dest amount =
   transfer_n ~origin ctxt [(src, amount)] dest

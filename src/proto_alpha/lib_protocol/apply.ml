@@ -814,16 +814,24 @@ let apply_manager_operation_content :
                  enough gas for complete deserialization cost *)
       >>?=
       fun (parameter, ctxt) ->
-      Option.fold
-        (Contract.is_implicit destination)
-        ~none:return_false
-        ~some:(fun _ -> Contract.allocated ctxt destination >|=? not)
+      (match Contract.is_implicit destination with
+      | None ->
+          (if Tez.(amount = zero) then
+           (* Detect potential call to non existent contract. *)
+           Contract.must_exist ctxt destination
+          else return_unit)
+          >>=? fun () ->
+          (* Since the contract is originated, nothing will be allocated
+             or the next transfer of tokens will fail. *)
+          return_false
+      | Some _ ->
+          (* Transfers of zero to implicit accounts are forbidden. *)
+          error_when Tez.(amount = zero) (Empty_transaction destination)
+          >>?= fun () ->
+          (* If the implicit contract is not yet allocated at this point then
+             the next transfer of tokens will allocate it. *)
+          Contract.allocated ctxt destination >|=? not)
       >>=? fun allocated_destination_contract ->
-      error_when
-        (Tez.(amount = zero)
-        && Option.is_some (Contract.is_implicit destination))
-        (Empty_transaction destination)
-      >>?= fun () ->
       Token.transfer ctxt (`Contract source) (`Contract destination) amount
       >>=? fun (ctxt, balance_updates) ->
       Script_cache.find ctxt destination >>=? fun (ctxt, cache_key, script) ->

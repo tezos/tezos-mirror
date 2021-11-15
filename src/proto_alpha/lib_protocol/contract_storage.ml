@@ -581,18 +581,19 @@ let spend_only_call_from_token c contract amount =
                 (* Delete empty implicit contract *)
                 delete c contract))
 
+(* [Tez_repr.(amount <> zero)] is a precondition of this function. It ensures that
+   no entry associating a null balance to an implicit contract exists in the map
+   [Storage.Contract.Balance]. *)
 let credit_only_call_from_token c contract amount =
-  if Tez_repr.(amount <> Tez_repr.zero) then
-    Storage.Contract.Balance.find c contract >>=? function
-    | None -> (
-        match Contract_repr.is_implicit contract with
-        | None -> fail (Non_existing_contract contract)
-        | Some manager -> create_implicit c manager ~balance:amount)
-    | Some balance ->
-        Tez_repr.(amount +? balance) >>?= fun balance ->
-        Storage.Contract.Balance.update c contract balance >>=? fun c ->
-        Contract_delegate_storage.add_contract_stake c contract amount
-  else must_exist c contract >>=? fun () -> return c
+  Storage.Contract.Balance.find c contract >>=? function
+  | None -> (
+      match Contract_repr.is_implicit contract with
+      | None -> fail (Non_existing_contract contract)
+      | Some manager -> create_implicit c manager ~balance:amount)
+  | Some balance ->
+      Tez_repr.(amount +? balance) >>?= fun balance ->
+      Storage.Contract.Balance.update c contract balance >>=? fun c ->
+      Contract_delegate_storage.add_contract_stake c contract amount
 
 let init c =
   Storage.Contract.Global_counter.init c Z.zero >>=? fun c ->

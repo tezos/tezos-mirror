@@ -377,12 +377,6 @@ let balance_updates_encoding =
              (merge_objs balance_encoding balance_update_encoding)
              update_origin_encoding))
 
-let cleanup_balance_updates balance_updates =
-  List.filter
-    (fun (_, (Credited update | Debited update), _) ->
-      not (Tez_repr.equal update Tez_repr.zero))
-    balance_updates
-
 module BalanceMap = Map.Make (struct
   type t = balance * update_origin
 

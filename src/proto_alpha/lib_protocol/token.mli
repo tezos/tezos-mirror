@@ -95,8 +95,8 @@ val balance : Raw_context.t -> container -> Tez_repr.t tzresult Lwt.t
     as though [transfer src dest amount] was invoked for each pair
     [(src, amount)] in [sources], however a single balance update is generated
     for the total amount transferred to [dest].
-    When [sources] is an empty list, the function behaves as though [sources] was
-    mapped to [[(`Minted, Tez.zero)]]. *)
+    When [sources] is an empty list, the function does nothing to the context,
+    and returns an empty list of balance updates. *)
 val transfer_n :
   ?origin:Receipt_repr.update_origin ->
   Raw_context.t ->
