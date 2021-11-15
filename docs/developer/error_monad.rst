@@ -1,5 +1,3 @@
-.. _error_monad:
-
 The Error Monad
 ===============
 
@@ -7,7 +5,7 @@ This has been adapted from a blog post on *michelson-lang.com*.
 
 If you’re not familiar with monads, go take a few minutes and read a
 tutorial. I personally got a lot out of this
-`paper <http://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf>`__
+`paper <https://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf>`__
 by Philip Wadler, but there are a ton of others available online. Find
 one that works for you. The error monad isn’t terribly scary as Monads
 go, so once you feel like you understand the gist, come on back and see
@@ -148,7 +146,7 @@ variant type to do this. Extensible variants allow us to add a new case
 to a variant type at the cost of exhaustivity checking. We’re going to
 need two new mechanisms to make this work well. The first is an error
 registration scheme. In the actual error monad, this involves the
-:ref:`data encoding module<data_encoding>`,
+:doc:`data encoding module <data_encoding>`,
 which is how all data is encoded/decoded in Tezos. Since you can declare
 arbitrary new errors, we’ll have a way of adding a printer for each error.
 

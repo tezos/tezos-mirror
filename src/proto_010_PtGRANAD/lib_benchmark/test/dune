@@ -17,22 +17,12 @@
          -open Tezos_benchmark_type_inference_010_PtGRANAD
          -open Tezos_benchmark_010_PtGRANAD)))
 
-(alias
-  (name buildtest)
-  (deps test_sampling_data.exe test_sampling_code.exe))
-
-(alias
-  (name runtest_micheline_rewriting_data)
+(rule
+  (alias runtest)
+  (package tezos-benchmark-010-PtGRANAD)
   (action (run %{exe:test_sampling_data.exe} 1234)))
 
-(alias
-  (name runtest_micheline_rewriting_code)
-  (action (run %{exe:test_sampling_code.exe} 1234)))
-
-
-(alias
-  (name runtest)
+(rule
+  (alias runtest)
   (package tezos-benchmark-010-PtGRANAD)
-  (deps (alias runtest_micheline_rewriting_data)
-        (alias runtest_micheline_rewriting_code)
-  ))
+  (action (run %{exe:test_sampling_code.exe} 1234)))

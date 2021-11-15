@@ -64,6 +64,8 @@ let zero = 0
 
 let one = 1
 
+let two = 2
+
 let () =
   Data_encoding.Registration.register ~pp:Name.pp Name.encoding ;
   Data_encoding.Registration.register ~pp encoding

@@ -73,6 +73,7 @@ end
 
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
+module Script_string = Script_string_repr
 module Script_int = Script_int_repr
 
 module Script_timestamp = struct
@@ -183,8 +184,22 @@ module Contract = struct
   let unset_origination_nonce = Raw_context.unset_origination_nonce
 end
 
+module Global_constants_storage = Global_constants_storage
+
 module Big_map = struct
-  include Lazy_storage_kind.Big_map
+  module Big_map = Lazy_storage_kind.Big_map
+
+  module Id = struct
+    type t = Big_map.Id.t
+
+    let encoding = Big_map.Id.encoding
+
+    let rpc_arg = Big_map.Id.rpc_arg
+
+    let parse_z = Big_map.Id.parse_z
+
+    let unparse_to_z = Big_map.Id.unparse_to_z
+  end
 
   let fresh ~temporary c = Lazy_storage.fresh Big_map ~temporary c
 
@@ -202,15 +217,45 @@ module Big_map = struct
     | None -> return (c, None)
     | Some kt ->
         Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
+
+  type update = Big_map.update = {
+    key : Script_repr.expr;
+    key_hash : Script_expr_hash.t;
+    value : Script_repr.expr option;
+  }
+
+  type updates = Big_map.updates
+
+  type alloc = Big_map.alloc = {
+    key_type : Script_repr.expr;
+    value_type : Script_repr.expr;
+  }
 end
 
 module Sapling = struct
-  include Lazy_storage_kind.Sapling_state
+  module Sapling_state = Lazy_storage_kind.Sapling_state
+
+  module Id = struct
+    type t = Sapling_state.Id.t
+
+    let encoding = Sapling_state.Id.encoding
+
+    let rpc_arg = Sapling_state.Id.rpc_arg
+
+    let parse_z = Sapling_state.Id.parse_z
+
+    let unparse_to_z = Sapling_state.Id.unparse_to_z
+  end
+
   include Sapling_repr
   include Sapling_storage
   include Sapling_validator
 
   let fresh ~temporary c = Lazy_storage.fresh Sapling_state ~temporary c
+
+  type updates = Sapling_state.updates
+
+  type alloc = Sapling_state.alloc = {memo_size : Sapling_repr.Memo_size.t}
 end
 
 module Receipt = Receipt_repr
@@ -296,13 +341,9 @@ let record_internal_nonce = Raw_context.record_internal_nonce
 let internal_nonce_already_recorded =
   Raw_context.internal_nonce_already_recorded
 
-let add_deposit = Raw_context.add_deposit
-
 let add_fees = Raw_context.add_fees
 
 let add_rewards = Raw_context.add_rewards
-
-let get_deposits = Raw_context.get_deposits
 
 let get_fees = Raw_context.get_fees
 
@@ -312,3 +353,196 @@ let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
+
+module Cache = struct
+  type index = int
+
+  type size = int
+
+  type identifier = string
+
+  type namespace = string
+
+  let compare_namespace = Compare.String.compare
+
+  type internal_identifier = {namespace : namespace; id : identifier}
+
+  let separator = '@'
+
+  let sanitize namespace =
+    if String.contains namespace separator then
+      invalid_arg
+        (Format.asprintf
+           "Invalid cache namespace: '%s'. Character %c is forbidden."
+           namespace
+           separator)
+    else namespace
+
+  let string_of_internal_identifier {namespace; id} =
+    namespace ^ String.make 1 separator ^ id
+
+  let internal_identifier_of_string raw =
+    match String.split_on_char separator raw with
+    | [] -> assert false
+    | namespace :: id ->
+        (* An identifier may contain [separator], hence we concatenate
+           possibly splitted parts of [id]. *)
+        {namespace = sanitize namespace; id = String.concat "" id}
+
+  let internal_identifier_of_key key =
+    let raw = Raw_context.Cache.identifier_of_key key in
+    internal_identifier_of_string raw
+
+  let key_of_internal_identifier ~cache_index identifier =
+    let raw = string_of_internal_identifier identifier in
+    Raw_context.Cache.key_of_identifier ~cache_index raw
+
+  let make_key =
+    let namespaces = ref [] in
+    fun ~cache_index ~namespace ->
+      let namespace = sanitize namespace in
+      if List.mem ~equal:String.equal namespace !namespaces then
+        invalid_arg
+          (Format.sprintf
+             "Cache key namespace %s already exist."
+             (namespace :> string))
+      else (
+        namespaces := namespace :: !namespaces ;
+        fun ~id ->
+          let identifier = {namespace; id} in
+          key_of_internal_identifier ~cache_index identifier)
+
+  module NamespaceMap = Map.Make (struct
+    type t = namespace
+
+    let compare = compare_namespace
+  end)
+
+  type partial_key_handler = t -> string -> Context.Cache.value tzresult Lwt.t
+
+  let value_of_key_handlers : partial_key_handler NamespaceMap.t ref =
+    ref NamespaceMap.empty
+
+  module Admin = struct
+    include Raw_context.Cache
+
+    let list_keys context ~cache_index =
+      Raw_context.Cache.list_keys context ~cache_index
+
+    let key_rank context key = Raw_context.Cache.key_rank context key
+
+    let value_of_key ctxt key =
+      (* [value_of_key] is a maintainance operation: it is typically run
+         when a node reboots. For this reason, this operation is not
+         carbonated. *)
+      let ctxt = Gas.set_unlimited ctxt in
+      let {namespace; id} = internal_identifier_of_key key in
+      match NamespaceMap.find namespace !value_of_key_handlers with
+      | Some value_of_key -> value_of_key ctxt id
+      | None ->
+          failwith
+            (Format.sprintf
+               "No handler for key `%s%c%s'"
+               namespace
+               separator
+               id)
+  end
+
+  module type CLIENT = sig
+    val cache_index : int
+
+    val namespace : namespace
+
+    type cached_value
+
+    val value_of_identifier : t -> identifier -> cached_value tzresult Lwt.t
+  end
+
+  module type INTERFACE = sig
+    type cached_value
+
+    val update : t -> identifier -> (cached_value * int) option -> t tzresult
+
+    val find : t -> identifier -> cached_value option tzresult Lwt.t
+
+    val list_identifiers : t -> (identifier * int) list
+
+    val identifier_rank : t -> identifier -> int option
+
+    val size : context -> size
+
+    val size_limit : context -> size
+  end
+
+  let register_exn (type cvalue)
+      (module C : CLIENT with type cached_value = cvalue) :
+      (module INTERFACE with type cached_value = cvalue) =
+    if
+      Compare.Int.(
+        C.cache_index < 0
+        || C.cache_index >= List.length Constants_repr.cache_layout)
+    then invalid_arg "Cache index is invalid" ;
+    let mk = make_key ~cache_index:C.cache_index ~namespace:C.namespace in
+    (module struct
+      type cached_value = C.cached_value
+
+      type Admin.value += K of cached_value
+
+      let () =
+        let voi ctxt i =
+          C.value_of_identifier ctxt i >>=? fun v -> return (K v)
+        in
+        value_of_key_handlers :=
+          NamespaceMap.add C.namespace voi !value_of_key_handlers
+
+      let size ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size ctxt ~cache_index:C.cache_index
+
+      let size_limit ctxt =
+        Option.value ~default:max_int
+        @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
+
+      let update ctxt id v =
+        let cache_size_in_bytes = size ctxt in
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_update ~cache_size_in_bytes)
+        >|? fun ctxt ->
+        let v = Option.map (fun (v, size) -> (K v, size)) v in
+        Admin.update ctxt (mk ~id) v
+
+      let find ctxt id =
+        let cache_size_in_bytes = size ctxt in
+        Raw_context.consume_gas
+          ctxt
+          (Cache_costs.cache_update ~cache_size_in_bytes)
+        >>?= fun ctxt ->
+        Admin.find ctxt (mk ~id) >>= function
+        | None -> return None
+        | Some (K v) -> return (Some v)
+        | _ ->
+            (* This execution path is impossible because all the keys of
+               C's namespace (which is unique to C) are constructed with
+               [K]. This [assert false] could have been pushed into the
+               environment in exchange for extra complexity. The
+               argument that justifies this [assert false] seems
+               simple enough to keep the current design though. *)
+            assert false
+
+      let list_identifiers ctxt =
+        Admin.list_keys ctxt ~cache_index:C.cache_index |> function
+        | None ->
+            (* `cache_index` is valid. *)
+            assert false
+        | Some list ->
+            List.filter_map
+              (fun (key, age) ->
+                let {namespace; id} = internal_identifier_of_key key in
+                if String.equal namespace C.namespace then Some (id, age)
+                else None)
+              list
+
+      let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
+    end)
+end

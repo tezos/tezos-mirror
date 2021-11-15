@@ -30,12 +30,13 @@
    Subject: Test the proxy server: [big_map_get] is aimed at testing the
             big map RPC and comparing performances with a node. Other
             tests test the proxy server alone.
+   Dependencies: tezt/tests/proxy.ml
   *)
 
 (** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ?bake ~protocol () =
-  let* client =
+  let* (node, client) =
     Client.init_activate_bake
       ?nodes_args
       ?parameter_file
@@ -44,15 +45,57 @@ let init ?nodes_args ?parameter_file ?bake ~protocol () =
       ~protocol
       ()
   in
-  let* (node, proxy_server) =
-    match Client.get_mode client with
-    | Client (Some (Node node)) ->
-        let* proxy_server = Proxy_server.init node in
-        return (node, proxy_server)
-    | _ -> Test.fail "Client mode should be Client (Some (Node _))"
-  in
+  let* proxy_server = Proxy_server.init node in
   Client.set_mode (Client (Some (Proxy_server proxy_server))) client ;
   return (node, proxy_server, client)
+
+(* An event handler that checks that the 'split_key' heuristic of the
+   proxy mode is correctly implemented. In this case, the test
+   is that the proxy server requests the content of the context
+   [/big_maps/index/4] as soon a it receives a request for a *longer* path
+   such as [big_maps/index/4/contents/HASH/len]. If not, the proxy
+   server will perform multiple requests of the form [/big_maps/index/4/...]
+   in a sequence, and this handler will fail, because it checks
+   that normalized requests occur only once. To see this in action,
+   execute this test in a terminal with TEZOS_LOG set as follows:
+
+   export TEZOS_LOG="*proxy_rpc*->debug; proxy_getter->debug; proxy_services->debug"
+
+   and look for log lines like these ones:
+
+   [proxy_server1] proxy_getter: Cache miss (get):
+   [proxy_server1] proxy_getter:   (big_maps/index/4/contents/cdd4c905017896384895ed1bedc894abb078d002aff3b5c4f213b30ca884a2b8/len)
+   [proxy_server1] proxy_getter: split_key heuristic triggers, getting big_maps/index/4/contents instead of
+   [proxy_server1] proxy_getter:   big_maps/index/4/contents/cdd4c905017896384895ed1bedc894abb078d002aff3b5c4f213b30ca884a2b8/len
+
+   Note that this handler cannot be attached to all proxy server tests,
+   because it only works in tests
+   in which the proxy server doesn't discard data attached to
+   symbolic block identifiers (like head). If the proxy discards data,
+   then it will do multiple times the same request, which breaks the
+   property checked by this handler. *)
+let heuristic_event_handler () : Proxy_server.event -> unit =
+  let seens = ref String_set.empty in
+  let event_to_path json =
+    let fail = Test.fail "Unexpected JSON within %s (%d)" (JSON.encode json) in
+    match JSON.unannotate json with
+    | `A sub ->
+        List.map (function `String segment -> segment | _ -> fail 1) sub
+    | _ -> fail 2
+  in
+  fun event ->
+    (* kind=true: because we are interested in "Get" events,
+       see [Proxy_getter] *)
+    if event.name = "cache_miss.v0" && JSON.(event.value |-> "kind" |> as_bool)
+    then
+      let segments = event_to_path JSON.(event.value |-> "key") in
+      let normalized = Proxy.normalize segments |> String.concat "/" in
+      if String_set.mem normalized !seens then
+        Test.fail
+          "Request of the form %s/... done twice. Last request is %s"
+          normalized
+        @@ String.concat "/" segments
+      else seens := String_set.add normalized !seens
 
 (** [readonly_client] only performs reads to the node's storage, while
     [client] has full access *)
@@ -66,19 +109,17 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         (["time_between_blocks"], Some "[\"60\"]");
       ]
   in
-  let* client =
+  let* (node, client) =
     Client.init_activate_bake ~parameter_file ~protocol `Client ()
-  in
-  let node =
-    match Client.get_mode client with
-    | Client (Some (Node node)) -> node
-    | _ -> Test.fail "Unexpected client mode"
   in
   let* (endpoint : Client.endpoint option) =
     match mode with
     | `Node -> return None
     | `Proxy_server ->
-        let* proxy_server = Proxy_server.init node in
+        (* We want Debug level events, for [heuristic_event_handler]
+           to work properly *)
+        let* proxy_server = Proxy_server.init ~event_level:"debug" node in
+        Proxy_server.on_event proxy_server @@ heuristic_event_handler () ;
         return @@ Some (Client.Proxy_server proxy_server)
   in
   let nb_gets = Option.value ~default:big_map_size nb_gets in
@@ -118,7 +159,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       | None ->
           Log.warn
             "Need to compute expr of key %s: prefer to put this in \
-             Big_map_perf_data"
+             Proxy_server_test_data"
             index ;
           compute_index_expr index
       | Some res -> Lwt.return res
@@ -153,7 +194,7 @@ let test_equivalence =
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
   let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
-  check_equivalence ~tz_log protocol alt_mode clients
+  check_equivalence ~tz_log alt_mode clients
 
 let register ~protocols =
   let register mode =

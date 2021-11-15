@@ -1,5 +1,6 @@
 (library
  (name tezos_client_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-008-PtEdo2Zk)
  (libraries tezos-base
             tezos-protocol-008-PtEdo2Zk

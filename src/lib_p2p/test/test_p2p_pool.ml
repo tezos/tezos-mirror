@@ -189,7 +189,7 @@ module Garbled = struct
         true
     | Ok _ -> false
     | Error err ->
-        log_info "Unexpected error: %a@." pp_print_error err ;
+        log_info "Unexpected error: %a@." pp_print_trace err ;
         false
 
   let write_bad_all conns =
@@ -746,7 +746,7 @@ let wrap n f =
                 gen_points () ;
                 aux n f
             | Error error ->
-                Format.kasprintf Stdlib.failwith "%a" pp_print_error error
+                Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
           in
           aux n f ))
 

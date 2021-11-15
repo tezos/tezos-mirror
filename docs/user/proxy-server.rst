@@ -1,12 +1,10 @@
-.. _proxy-server:
-
 Proxy server
 ------------
 
 This page describes the *proxy server*, a readonly frontend to ``tezos-node``
 which is designed to lower the load of nodes. It is named after two things:
 
-* The :ref:`proxy mode<proxy-mode>` of the client on which it builds upon.
+* The :doc:`proxy mode<proxy>` of the client on which it builds upon.
 * Regular HTTP proxies, as proxy servers are meant to be deployed
   in front of a node, to lower the node's load.
 
@@ -25,7 +23,7 @@ Example with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this section, we show examples of usage of a proxy server when using
-the :ref:`sandboxed node<sandboxed-mode>`. For convenience we repeat
+the :doc:`sandboxed node<sandbox>`. For convenience we repeat
 instructions for the sandboxed mode here, but refer the reader to the
 sandboxed mode page for further details. First, edit
 ``src/proto_alpha/parameters/sandbox-parameters.json``
@@ -69,7 +67,7 @@ To avoid warnings being printed in upcoming commands (optional):
 You're now ready to use a proxy server. Open a third terminal, and
 launch a proxy server as shown below. We specify debug variables
 in ``TEZOS_LOG`` to have debug output showing what the proxy server
-is doing (see the :ref:`proxy mode<proxy-mode>` page for more details).
+is doing (see the :doc:`proxy mode<proxy>` page for more details).
 
 ::
 
@@ -96,16 +94,16 @@ In the proxy server's terminal, you should see this output (tree sizes may vary)
 
     Apr 21 11:10:07.474 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
     Apr 21 11:10:07.474 - alpha.proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:10:07.476 - proxy_getter: Cache miss: (v1;constants)
-    Apr 21 11:10:07.476 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1;constants
+    Apr 21 11:10:07.476 - proxy_getter: Cache miss: (v1/constants)
+    Apr 21 11:10:07.476 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
     Apr 21 11:10:07.476 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
     Apr 21 11:10:07.477 - alpha.proxy_rpc: received tree of size 2
-    Apr 21 11:10:07.477 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:10:07.477 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_balance_updates)
     Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_operation_results)
     Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
-    Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts;index)
+    Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts/index)
     Apr 21 11:10:07.478 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
     Apr 21 11:10:07.479 - alpha.proxy_rpc: received tree of size 115
 
@@ -139,23 +137,23 @@ In the meantime, in the proxy server's terminal, you should see:
 
     Apr 21 11:14:04.262 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
     Apr 21 11:14:04.263 - alpha.proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1;constants)
-    Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1;constants
+    Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1/constants)
+    Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
     Apr 21 11:14:04.266 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
     Apr 21 11:14:04.266 - alpha.proxy_rpc: received tree of size 2
-    Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_balance_updates)
     Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_operation_results)
     Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
-    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts;index)
+    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts/index)
     Apr 21 11:14:04.268 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
     Apr 21 11:14:04.269 - alpha.proxy_rpc: received tree of size 115
-    Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1;constants)
-    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1;cycle_eras)
+    Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1/constants)
+    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_balance_updates)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_operation_results)
-    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts;index)
+    Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts/index)
 
 The last four lines show that the proxy server is answering the request
 without delegating anything to the node: there is no ``alpha.proxy_rpc`` line.
@@ -255,6 +253,6 @@ The proxy server is a project led by
 `smelc <https://gitlab.com/smelc>`_ and `Sir4ur0n <https://gitlab.com/Sir4ur0n>`_.
 To contact us:
 
-* We are on the `Tezos-dev slack <tezos-dev.slack.com>`_, or
+* We are on the `Tezos-dev slack <https://tezos-dev.slack.com>`_, or
 * create an issue on `Tezos' Gitlab <https://gitlab.com/tezos/tezos/-/issues>`_
   and assign it to us.

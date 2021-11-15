@@ -1,22 +1,5 @@
-(executables
- (names test_registration)
- (libraries tezos-error-monad
-            data-encoding
-            lwt.unix
-            alcotest-lwt)
- (flags (:standard -open Tezos_error_monad)))
-
-(rule
- (alias buildtest)
- (deps test_registration.exe)
- (action (progn)))
-
-(rule
- (alias runtest_registration)
- (action (run %{exe:test_registration.exe})))
-
-(rule
- (alias runtest)
+(test
+ (name test_registration)
  (package tezos-error-monad)
- (deps (alias runtest_registration))
- (action (progn)))
+ (libraries tezos-error-monad data-encoding lwt.unix alcotest-lwt)
+ (flags (:standard -open Tezos_error_monad)))

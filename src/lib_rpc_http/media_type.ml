@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,13 +60,15 @@ let json =
         match Data_encoding.Json.from_string body with
         | Error _ as err -> err
         | Ok json -> (
-            try Ok (Data_encoding.Json.destruct enc json)
-            with Data_encoding.Json.Cannot_destruct (_, exn) ->
-              Error
-                (Format.asprintf
-                   "%a"
-                   (fun fmt -> Data_encoding.Json.print_error fmt)
-                   exn)));
+            try Ok (Data_encoding.Json.destruct enc json) with
+            | (Stack_overflow | Out_of_memory) as exc -> raise exc
+            | Data_encoding.Json.Cannot_destruct (_, exc) ->
+                Error
+                  (Format.asprintf
+                     "%a"
+                     (fun fmt -> Data_encoding.Json.print_error fmt)
+                     exc)
+            | exc -> Error (Printexc.to_string exc)));
   }
 
 let bson =
@@ -110,25 +113,25 @@ let bson =
         | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
             Error (Format.asprintf "(at offset: %d) %s" pos msg)
         | bson -> (
-            try Ok (Data_encoding.Bson.destruct enc bson)
-            with Data_encoding.Json.Cannot_destruct (_, exn) ->
-              Error
-                (Format.asprintf
-                   "%a"
-                   (fun fmt -> Data_encoding.Json.print_error fmt)
-                   exn)));
+            try Ok (Data_encoding.Bson.destruct enc bson) with
+            | (Stack_overflow | Out_of_memory) as exc -> raise exc
+            | Data_encoding.Json.Cannot_destruct (_, exc) ->
+                Error
+                  (Format.asprintf
+                     "%a"
+                     (fun fmt -> Data_encoding.Json.print_error fmt)
+                     exc)
+            | exc -> Error (Printexc.to_string exc)));
   }
 
 let octet_stream =
-  let construct enc v =
-    Bytes.to_string @@ Data_encoding.Binary.to_bytes_exn enc v
-  in
+  let construct enc v = Data_encoding.Binary.to_string_exn enc v in
   {
     name = Cohttp.Accept.MediaType ("application", "octet-stream");
     q = Some 200;
     pp =
       (fun enc ppf raw ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string raw) with
+        match Data_encoding.Binary.of_string enc raw with
         | Error re ->
             Format.fprintf
               ppf
@@ -148,7 +151,7 @@ let octet_stream =
         Seq.return (Bytes.unsafe_of_string s, 0, String.length s));
     destruct =
       (fun enc s ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string s) with
+        match Data_encoding.Binary.of_string enc s with
         | Error re ->
             Error
               (Format.asprintf

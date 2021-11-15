@@ -59,9 +59,4 @@ let failing_noop_must_fail_when_injected () =
           | _ -> false)
 
 let tests =
-  [
-    Test_services.tztest
-      "injection fails"
-      `Quick
-      failing_noop_must_fail_when_injected;
-  ]
+  [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]

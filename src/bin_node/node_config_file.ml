@@ -78,6 +78,22 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     default_bootstrap_peers;
   }
 
+(* The script in scripts/user_activated_upgrade.sh patches the following lines
+   when it needs to set the user activated upgrade levels for Mainnet. *)
+(* BEGIN_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)
+let mainnet_user_activated_upgrades =
+  [
+    (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
+    (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP");
+  ]
+
+(* END_PATCHING_ZONE_FOR_MAINNET_USER_ACTIVATED_UPGRADES *)
+(* it patches the following lines when it needs to set the user activated
+   upgrade levels for a sandbox. *)
+(* BEGIN_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)
+let sandbox_user_activated_upgrades = []
+(* END_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)
+
 let blockchain_network_mainnet =
   let giganode_1 = "116.202.172.21" in
   let giganode_2 = "95.216.45.62" in
@@ -96,88 +112,17 @@ let blockchain_network_mainnet =
     ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
-    ~user_activated_upgrades:
-      [
-        (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
-        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP");
-      ]
+    ~user_activated_upgrades:mainnet_user_activated_upgrades
     ~user_activated_protocol_overrides:
       [
         ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" );
         ( "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq",
           "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" );
+        ( "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
+          "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
       ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
-
-let blockchain_network_edo2net =
-  make_blockchain_network
-    ~alias:"edo2net"
-    {
-      time = Time.Protocol.of_notation_exn "2021-02-11T14:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisdae8bZxCCxh";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_EDO2NET_2021-02-11T14:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      [
-        "edonet.tezos.co.il";
-        "188.40.128.216:29732";
-        "51.79.165.131";
-        "edo2net.kaml.fr";
-        "edonet2.smartpy.io";
-        "edonetb.boot.tezostaquito.io";
-      ]
-
-let blockchain_network_florencenet =
-  make_blockchain_network
-    ~alias:"florencenet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-03-04T20:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BMFCHw1mv3A71KpTuGD3MoFnkHk9wvTYjUzuR9QqiUumKGFG6pM";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_FLORENCENOBANET_2021-03-04T20:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      [
-        "florencenoba.tznode.net";
-        "florencenobanet.kaml.fr";
-        "florencenobanet.tezos.co.il";
-        "florencenobanet.boot.tez.ie";
-        "florencenobanet.smartpy.io:9733";
-      ]
 
 let blockchain_network_granadanet =
   make_blockchain_network
@@ -214,6 +159,42 @@ let blockchain_network_granadanet =
         "granadanet.tznode.net";
       ]
 
+let blockchain_network_hangzhounet =
+  make_blockchain_network
+    ~alias:"hangzhounet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_HANGZHOUNET_2021-11-04T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(8191l, "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx")]
+    ~default_bootstrap_peers:
+      [
+        "hangzhounet.teztnets.xyz";
+        "hangzhounet.kaml.fr";
+        "hangzhounet.smartpy.io";
+        "hangzhounet.tezos.co.il";
+        "hangzhounet.boot.tez.ie";
+      ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -241,6 +222,7 @@ let blockchain_network_sandbox =
       }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:sandbox_user_activated_upgrades
 
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
@@ -311,10 +293,8 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (12, blockchain_network_edo2net);
-    (13, blockchain_network_florencenet);
-    (* 14 was Florencenet with Baking Accounts. *)
     (15, blockchain_network_granadanet);
+    (16, blockchain_network_hangzhounet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
@@ -449,7 +429,7 @@ let default_rpc =
     cors_origins = [];
     cors_headers = [];
     tls = None;
-    acl = RPC_server.Acl.default_policy;
+    acl = RPC_server.Acl.empty_policy;
   }
 
 let default_shell =
@@ -861,7 +841,7 @@ let rpc : rpc Data_encoding.t =
           "acl"
           ~description:"A list of RPC ACLs for specific listening addresses."
           RPC_server.Acl.policy_encoding
-          RPC_server.Acl.default_policy))
+          RPC_server.Acl.empty_policy))
 
 let worker_limits_encoding default_size default_level =
   let open Data_encoding in
@@ -1218,6 +1198,19 @@ module Event = struct
       ~msg:"failed to convert {addr} to an ipv4 address"
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
+
+  let all_rpc_allowed =
+    declare_1
+      ~level:Error
+      ~section
+      ~name:"all_rpc_allowed"
+      ~msg:"FULL access to RPC enabled; this is very risky."
+      ~pp1:
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+            P2p_point.Id.pp_addr_port_id)
+      ("addresses", Data_encoding.(list P2p_point.Id.addr_port_id_encoding))
 end
 
 let string_of_json_encoding_error exn =
@@ -1258,6 +1251,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     cfg.disable_config_validation || disable_config_validation
   in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
+  (if List.compare_length_with allow_all_rpc 1 >= 0 then
+   Event.(emit all_rpc_allowed allow_all_rpc)
+  else Lwt.return_unit)
+  >>= fun () ->
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in

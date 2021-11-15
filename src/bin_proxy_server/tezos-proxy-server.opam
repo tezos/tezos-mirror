@@ -8,7 +8,6 @@ license: "MIT"
 depends: [
   "tezos-tooling"
   "dune" { >= "2.0" }
-  "bls12-381-unix"
   "cmdliner"
   "lwt-exit"
   "tezos-base"

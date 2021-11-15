@@ -415,11 +415,11 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
             Ok ()
         | Backtracked (_, Some errs) ->
             record_trace
-              (failure "The transfer simulation failed.")
+              (error_of_fmt "The transfer simulation failed.")
               (Error (Environment.wrap_tztrace errs))
         | Failed (_, errs) ->
             record_trace
-              (failure "The transfer simulation failed.")
+              (error_of_fmt "The transfer simulation failed.")
               (Error (Environment.wrap_tztrace errs))
       in
       List.fold_left

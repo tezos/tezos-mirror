@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Environment
-    Invocation:   dune build @src/lib_protocol_environment/runtest_mem_context
+    Invocation:   dune build @src/lib_protocol_environment/runtest
     Dependencies: src/lib_protocol_environment/test/assert.ml
     Subject:      Low-level operations on memory contexts.
 *)
@@ -318,7 +318,7 @@ let test_trees {genesis = ctxt; _} =
  *
  * These tests are important for [Test_mem_context_array_theory] that
  * relies on this function. We don't want the tests of [keys] to be
- * in [Test_mem_context_array_theory] because it uses Crowbar.
+ * in [Test_mem_context_array_theory] because it uses [QCheck].
  *
  * We need [keys] to be correct, because it's at the core of checking
  * the second axiom of array theory in [Test_mem_context_array_theory].

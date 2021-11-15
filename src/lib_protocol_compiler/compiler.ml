@@ -36,6 +36,8 @@ let () = Clflags.unsafe_string := false
 let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
   String.Hashtbl.create ~random:true 42
 
+let default_load = !Persistent_env.Persistent_signature.load
+
 (* Set hook *)
 let () =
   Persistent_env.Persistent_signature.load :=
@@ -98,6 +100,8 @@ let tezos_protocol_env =
       tezos_protocol_environment_sigs__V1_cmi );
     ( "Tezos_protocol_environment_sigs__V2",
       tezos_protocol_environment_sigs__V2_cmi );
+    ( "Tezos_protocol_environment_sigs__V3",
+      tezos_protocol_environment_sigs__V3_cmi );
   ]
 
 let register_env =
@@ -196,7 +200,7 @@ let main {compile_ml; pack_objects; link_shared} =
     match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
     | Ok (hash, proto) -> (hash, proto)
     | Error err ->
-        Format.eprintf "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err ;
+        Format.eprintf "Failed to read TEZOS_PROTOCOL: %a" pp_print_trace err ;
         exit 2
   in
   let real_hash = Protocol.hash protocol in

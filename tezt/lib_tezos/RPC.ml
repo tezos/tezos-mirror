@@ -55,9 +55,20 @@ let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
   let data = `O [("bootstrapped", `Bool bootstrapped)] in
   Client.rpc ?endpoint ?hooks ~data PATCH path client
 
+let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "is_bootstrapped"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
 let get_checkpoint ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "checkpoint"] in
   Client.rpc ?endpoint ?hooks GET path client
+
+let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    client =
+  let path =
+    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
+  in
+  Lwt.(Client.rpc ?endpoint ?hooks GET path client >|= JSON.as_string)
 
 let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?(offset = 0) client =
@@ -76,6 +87,22 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
   Client.rpc ?endpoint ?hooks GET path client
+
+let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "ban_operation"] in
+  Client.rpc ?endpoint ~data POST path client
+
+let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "unban_operation"] in
+  Client.rpc ?endpoint ~data POST path client
+
+let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
+  let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
+  Client.rpc ?endpoint POST path client
+
+let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "filter"] in
+  Client.rpc ?endpoint ?hooks ~data POST path client
 
 let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
     client =
@@ -100,6 +127,26 @@ let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
   let path =
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+  in
+  Client.rpc ?endpoint ?hooks GET path client
+
+type ctxt_type = Bytes | Json
+
+let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
+
+let get_context_value ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    ?(ctxt_type = Json) ~value_path client =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      ctxt_type_to_string ctxt_type;
+    ]
+    @ value_path
   in
   Client.rpc ?endpoint ?hooks GET path client
 
@@ -446,11 +493,6 @@ module Votes = struct
   let get_ballot_list ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       client =
     let path = sub_path ~chain ~block "ballot_list" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_period_kind ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") client =
-    let path = sub_path ~chain ~block "current_period_kind" in
     Client.rpc ?endpoint ?hooks GET path client
 
   let get_ballots ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =

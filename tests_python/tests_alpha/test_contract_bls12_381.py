@@ -79,6 +79,7 @@ MUL_CLASSES = [G1, G2, Fr]
 NEG_CLASSES = [G1, G2, Fr]
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 @pytest.mark.regression
 class TestBls12_381:

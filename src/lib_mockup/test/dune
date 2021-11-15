@@ -1,39 +1,15 @@
-(executables
+(tests
  (names
    test_mockup_args
    test_fuzzing_mockup_args
    test_persistence)
  (libraries
+   tezos-base-test-helpers
    tezos_mockup
    tezos_mockup_registration
    tezos-client-base
-   tezos-test-services
    qcheck-alcotest
-   tezos-test-helpers
    alcotest-lwt)
- (flags
-  (:standard -open Tezos_base__TzPervasives)))
-
-(rule
- (alias runtest_mockup_args)
- (action
-  (run %{exe:test_mockup_args.exe})))
-
-(rule
- (alias runtest_fuzzing_mockup_args)
- (action
-  (run %{exe:test_fuzzing_mockup_args.exe})))
-
-(rule
- (alias runtest_persistence)
- (action
-  (run %{exe:test_persistence.exe})))
-
-(rule
- (alias runtest)
  (package tezos-mockup)
- (deps
-  (alias runtest_mockup_args)
-  (alias runtest_fuzzing_mockup_args)
-  (alias runtest_persistence))
- (action (progn)))
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_base_test_helpers)))

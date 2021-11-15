@@ -69,6 +69,6 @@ val wait : t -> unit tzresult Lwt.t
 val cancel : t -> unit Lwt.t
 
 (** [length pipeline] returns the number of the headers and blocks fetched *)
-val length : t -> Peer_validator_worker_state.Worker_state.pipeline_length
+val length : t -> Peer_validator_worker_state.pipeline_length
 
-val length_zero : Peer_validator_worker_state.Worker_state.pipeline_length
+val length_zero : Peer_validator_worker_state.pipeline_length

@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_split_string
 
 Node is bootstrapped.
-Estimated gas: 1425.201 units (will add 100 for safety)
+Estimated gas: 1438.304 units (will add 100 for safety)
 Estimated storage: 511 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000638
+    Fee to the baker: ꜩ0.000639
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1526
+    Gas limit: 1539
     Storage limit: 531 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000638
-      fees(the baker who will include this operation,3) ... +ꜩ0.000638
+      [CONTRACT_HASH] ................ -ꜩ0.000639
+      fees(the baker who will include this operation,3) ... +ꜩ0.000639
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -55,7 +55,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 254 bytes
         Paid storage size diff: 254 bytes
-        Consumed gas: 1425.201
+        Consumed gas: 1438.304
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0635
           [CONTRACT_HASH] ... -ꜩ0.06425
@@ -66,7 +66,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as split_string.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 2287.984 units (will add 100 for safety)
+Estimated gas: 2093.742 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -77,13 +77,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.0005
+    Fee to the baker: ꜩ0.000481
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2388
+    Gas limit: 2194
     Storage limit: 38 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.0005
-      fees(the baker who will include this operation,3) ... +ꜩ0.0005
+      [CONTRACT_HASH] ................ -ꜩ0.000481
+      fees(the baker who will include this operation,3) ... +ꜩ0.000481
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -93,14 +93,14 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" }
       Storage size: 272 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 2287.984
+      Consumed gas: 2093.742
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.0045
 
 Injected block [BLOCK_HASH]
 { "a" ; "b" ; "c" }
 Node is bootstrapped.
-Estimated gas: 2290.102 units (will add 100 for safety)
+Estimated gas: 1206.601 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -111,13 +111,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000501
+    Fee to the baker: ꜩ0.000392
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2391
+    Gas limit: 1307
     Storage limit: 38 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000501
-      fees(the baker who will include this operation,3) ... +ꜩ0.000501
+      [CONTRACT_HASH] ................ -ꜩ0.000392
+      fees(the baker who will include this operation,3) ... +ꜩ0.000392
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -127,7 +127,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" ; "d" ; "e" ; "f" }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 2290.102
+      Consumed gas: 1206.601
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.0045
 

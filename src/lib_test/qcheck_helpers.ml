@@ -47,18 +47,61 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
           pp
           actual
 
+let qcheck_eq_tests ~eq ~arb ~eq_name =
+  let reflexivity_test =
+    QCheck.Test.make
+      ~name:(Printf.sprintf "%s is reflexive: forall t, %s t t" eq_name eq_name)
+      arb
+      (fun t ->
+        if eq t t then true
+        else
+          QCheck.Test.fail_reportf
+            "@[<v 2>[%s t t] should hold, but it doesn't!@,\
+             [t] is printed above if you provided a pretty printer in the \
+             arbitrary@]"
+            eq_name)
+  in
+  let symmetry_test =
+    QCheck.Test.make
+      ~name:
+        (Printf.sprintf
+           "%s is symmetric: forall t1 t2, %s t1 t2 = %s t2 t1"
+           eq_name
+           eq_name
+           eq_name)
+      QCheck.(pair arb arb)
+      (fun (t1, t2) ->
+        if Bool.equal (eq t1 t2) (eq t2 t1) then true
+        else
+          QCheck.Test.fail_reportf
+            "@[<v 2>[%s t1 t2 = %s t2 t1] should hold, but it doesn't!@,\
+             [t1] and [t2] are printed above if you provided a pretty printer \
+             in the arbitrary@]"
+            eq_name
+            eq_name)
+  in
+  (* We don't test transitivity (i.e. (t1 = t2 && t2 = t3) ==> t1 = t3),
+   * because there is little chance to generate [t1], [t2], and [t3] such
+   * that the left-hand side holds. We could generate them such that
+   * there are relations between them (for example take [t1 = t2]), but
+   * then the test degenerates to reflexivity and symmetry. *)
+  [reflexivity_test; symmetry_test]
+
 let qcheck_eq' ?pp ?cmp ?eq ~expected ~actual () =
   qcheck_eq ?pp ?cmp ?eq expected actual
 
-let int64_range a b =
-  let int64_range_gen st =
-    let range = Int64.sub b a in
-    let raw_val = Random.State.int64 st range in
-    let res = Int64.add a raw_val in
-    assert (a <= res && res <= b) ;
-    res
-  in
-  QCheck.int64 |> QCheck.set_gen int64_range_gen
+let int64_range_gen a b st =
+  let range = Int64.sub b a in
+  let raw_val = Random.State.int64 st range in
+  let res = Int64.add a raw_val in
+  assert (a <= res && res <= b) ;
+  res
+
+let int64_range a b = QCheck.int64 |> QCheck.set_gen (int64_range_gen a b)
+
+let int_strictly_positive_gen = QCheck.Gen.int_range 1
+
+let int64_strictly_positive_gen = int64_range_gen 1L
 
 let endpoint_arb =
   let open QCheck in

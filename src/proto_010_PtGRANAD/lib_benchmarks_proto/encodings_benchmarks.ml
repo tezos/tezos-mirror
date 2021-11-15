@@ -44,12 +44,9 @@ module Micheline_common = struct
 
   let pp_phase fmtr (phase : phase) =
     match phase with
-    | Trace_production ->
-        Format.fprintf fmtr "trace production"
-    | In_protocol ->
-        Format.fprintf fmtr "in protocol"
-    | Global ->
-        Format.fprintf fmtr "global"
+    | Trace_production -> Format.fprintf fmtr "trace production"
+    | In_protocol -> Format.fprintf fmtr "in protocol"
+    | Global -> Format.fprintf fmtr "global"
 
   let pp_error fmtr = function
     | Bad_micheline {benchmark_name; micheline; phase} ->
@@ -82,11 +79,13 @@ module Micheline_common = struct
 
   let workload_to_vector (workload : workload) =
     let keys =
-      [ ("encoding_micheline_traversal", Size.to_float workload.size.traversal);
+      [
+        ("encoding_micheline_traversal", Size.to_float workload.size.traversal);
         ("encoding_micheline_int_bytes", Size.to_float workload.size.int_bytes);
         ( "encoding_micheline_string_bytes",
           Size.to_float workload.size.string_bytes );
-        ("encoding_micheline_bytes", Size.to_float workload.bytes) ]
+        ("encoding_micheline_bytes", Size.to_float workload.bytes);
+      ]
     in
     Sparse_vec.String.of_list keys
 
@@ -129,8 +128,8 @@ module Encoding_micheline : Benchmark.S = struct
 
   let info = "Benchmarking strip_location + encoding of Micheline to bytes"
 
-  let micheline_serialization_trace
-      (micheline_node : Alpha_context.Script.node) =
+  let micheline_serialization_trace (micheline_node : Alpha_context.Script.node)
+      =
     match
       Data_encoding.Binary.to_bytes
         Protocol.Script_repr.expr_encoding
@@ -150,10 +149,8 @@ module Encoding_micheline : Benchmark.S = struct
     let node = Micheline.root node in
     let workload =
       match micheline_serialization_trace node with
-      | None ->
-          Micheline_common.bad_micheline name node Trace_production
-      | Some trace ->
-          trace
+      | None -> Micheline_common.bad_micheline name node Trace_production
+      | Some trace -> trace
     in
     let closure () =
       try
@@ -169,10 +166,8 @@ module Encoding_micheline : Benchmark.S = struct
     match
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
     with
-    | Data {term; typ = _} ->
-        encoding_micheline_benchmark term
-    | _ ->
-        assert false
+    | Data {term; typ = _} -> encoding_micheline_benchmark term
+    | _ -> assert false
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
@@ -185,8 +180,7 @@ module Encoding_micheline : Benchmark.S = struct
             | Michelson_generation.Code {term; bef = _} ->
                 fun () -> encoding_micheline_benchmark term)
           terms
-    | None ->
-        List.repeat bench_num (make_bench rng_state config)
+    | None -> List.repeat bench_num (make_bench rng_state config)
 
   let models = models name
 end
@@ -226,10 +220,8 @@ module Decoding_micheline : Benchmark.S = struct
     let node = Micheline.root node in
     let workload =
       match micheline_deserialization_trace encoded with
-      | None ->
-          bad_micheline name node Trace_production
-      | Some trace ->
-          trace
+      | None -> bad_micheline name node Trace_production
+      | Some trace -> trace
     in
     let closure () =
       try
@@ -245,10 +237,8 @@ module Decoding_micheline : Benchmark.S = struct
     match
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
     with
-    | Data {term; typ = _} ->
-        decoding_micheline_benchmark term
-    | _ ->
-        assert false
+    | Data {term; typ = _} -> decoding_micheline_benchmark term
+    | _ -> assert false
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
@@ -261,8 +251,7 @@ module Decoding_micheline : Benchmark.S = struct
             | Michelson_generation.Code {term; bef = _} ->
                 fun () -> decoding_micheline_benchmark term)
           terms
-    | None ->
-        List.repeat bench_num (make_bench rng_state config)
+    | None -> List.repeat bench_num (make_bench rng_state config)
 
   let models = models name
 end
@@ -324,17 +313,15 @@ module BLS = struct
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
          ~name:"ENCODING_BLS_G1"
-         ~to_bytes:Bls12_381.G1.Uncompressed.to_bytes
-         ~generator:(fun rng_state ->
-           Bls12_381.G1.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G1.to_bytes
+         ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
          ~name:"ENCODING_BLS_G2"
-         ~to_bytes:Bls12_381.G2.Uncompressed.to_bytes
-         ~generator:(fun rng_state ->
-           Bls12_381.G2.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G2.to_bytes
+         ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
@@ -348,19 +335,17 @@ module BLS = struct
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_BLS_G1"
-         ~to_bytes:Bls12_381.G1.Uncompressed.to_bytes
-         ~from_bytes:Bls12_381.G1.Uncompressed.of_bytes_exn
-         ~generator:(fun rng_state ->
-           Bls12_381.G1.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G1.to_bytes
+         ~from_bytes:Bls12_381.G1.of_bytes_exn
+         ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_BLS_G2"
-         ~to_bytes:Bls12_381.G2.Uncompressed.to_bytes
-         ~from_bytes:Bls12_381.G2.Uncompressed.of_bytes_exn
-         ~generator:(fun rng_state ->
-           Bls12_381.G2.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G2.to_bytes
+         ~from_bytes:Bls12_381.G2.of_bytes_exn
+         ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register

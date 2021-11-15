@@ -69,7 +69,7 @@ module Nonces = struct
       ~level:Warning
       ~name:"cannot_retrieve_block_header"
       ~msg:"cannot retrieve block {block} header associated to nonce: {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("block", Data_encoding.string)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
@@ -122,7 +122,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"invalid_level_conversion"
       ~msg:"invalid level conversion: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let double_endorsement_detected =
@@ -209,7 +209,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"fetch_operations_error"
       ~msg:"error while fetching operations in block {hash} {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("hash", Block_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
@@ -227,7 +227,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"accuser_block_error"
       ~msg:"error while processing block {hash} {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("hash", Block_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
@@ -251,7 +251,7 @@ module Baking_scheduling = struct
       ~level:Error
       ~name:"daemon_error"
       ~msg:"{worker}: error while baking: {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("worker", Data_encoding.string)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
@@ -328,7 +328,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"context_fetch_error"
       ~msg:"error while fetching current context: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let reopen_context =
@@ -345,7 +345,7 @@ module Baking_forge = struct
       ~level:Debug
       ~name:"baking_rejected_invalid_operation"
       ~msg:"client-side validation: filtered invalid operation {hash} {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("hash", Operation_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
@@ -373,6 +373,7 @@ module Baking_forge = struct
       ~msg:
         "found {valid_count} valid operations ({refused_count} refused) for \
          timestamp {timestamp} (fitness {fitness})"
+      ~pp4:Fitness.pp
       ("valid_count", Data_encoding.int31)
       ("refused_count", Data_encoding.int31)
       ("timestamp", Time.System.encoding)
@@ -384,7 +385,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"block_conversion_failed"
       ~msg:"error on raw_level conversion: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let block_injection_failed =
@@ -396,7 +397,7 @@ module Baking_forge = struct
         "error while injecting block; included operations: {operations}; \
          errors: {errors}"
       ~pp1:(Format.pp_print_list Operation.pp)
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("operations", Data_encoding.(list @@ dynamic_size Operation.encoding))
       ("errors", Error_monad.trace_encoding)
 
@@ -407,7 +408,7 @@ module Baking_forge = struct
       ~name:"built_invalid_block_error"
       ~msg:
         "shell-side validation: error while prevalidating operations: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let try_baking =
@@ -439,7 +440,7 @@ module Baking_forge = struct
       ~msg:
         "client-side validation: error while filtering invalid operations: \
          {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let waiting_before_injection =
@@ -474,6 +475,7 @@ module Baking_forge = struct
       ~msg:
         "injecting block (priority {priority}, fitness {fitness}) for {client} \
          after {predecessor}"
+      ~pp2:Fitness.pp
       ("priority", Data_encoding.int31)
       ("fitness", Fitness.encoding)
       ("client", Data_encoding.string)
@@ -489,6 +491,7 @@ module Baking_forge = struct
         "injected block {block_hash} for {client} after {predecessor} (level \
          {level}, priority {priority}, fitness {fitness}, operations \
          {operations})"
+      ~pp6:Fitness.pp
       ~pp7:Format.(pp_print_list Operation.pp)
       ("block_hash", Block_hash.encoding)
       ("client", Data_encoding.string)
@@ -504,7 +507,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"baking_slot_fetch_errors"
       ~msg:"error while fetching baking possibilities: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let no_slot_found =
@@ -537,7 +540,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"read_nonce_fail"
       ~msg:"cannot read nonces: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let nonce_retrieval_fail =
@@ -546,7 +549,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"nonce_retrieval_fail"
       ~msg:"cannot retrieve unrevealed nonces: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let nonce_injection_fail =
@@ -555,7 +558,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"nonce_injection_fail"
       ~msg:"cannot inject nonces: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let retrying_on_error =
@@ -564,7 +567,7 @@ module Baking_forge = struct
       ~level:Error
       ~name:"retrying_on_error"
       ~msg:"retrying after baking error {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let endorsement_received =
@@ -627,7 +630,7 @@ module Baking_forge = struct
       ~name:"per_block_vote_file_error"
       ~level:Notice
       ~msg:"Error reading the block vote file: {errors}"
-      ~pp1:pp_print_error_first
+      ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let liquidity_baking_escape =
@@ -760,7 +763,7 @@ module Endorsement = struct
       ~level:Error
       ~name:"error_while_endorsing"
       ~msg:"error while injecting endorsement for baker {baker}: {errors}"
-      ~pp2:pp_print_error_first
+      ~pp2:pp_print_top_error_of_trace
       ("baker", Client_keys.Public_key_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end

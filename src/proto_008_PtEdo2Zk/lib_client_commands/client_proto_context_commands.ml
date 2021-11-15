@@ -1334,7 +1334,7 @@ let commands network () =
           >>= fun () -> return_unit);
       command
         ~group:binary_description
-        ~desc:"Describe unsigned block header"
+        ~desc:"Describe unsigned operation"
         no_options
         (fixed ["describe"; "unsigned"; "operation"])
         (fun () (cctxt : Protocol_client_context.full) ->
@@ -1506,7 +1506,7 @@ let commands network () =
                                | _ -> true)
                         |> String.concat " "
                         |> String.map (function '\n' | '\t' -> ' ' | c -> c))
-                  | el -> cctxt#message "Error:@ %a" pp_print_error el)
+                  | el -> cctxt#message "Error:@ %a" pp_print_trace el)
                   >>= fun () -> failwith "Failed to submit proposals"));
       command
         ~group

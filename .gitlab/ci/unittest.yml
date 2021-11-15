@@ -16,7 +16,6 @@ test-script-gen-genesis:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: test
-  needs: ["build"]
   before_script:
     - . ./scripts/version.sh
   retry: 2
@@ -27,8 +26,10 @@ test-script-gen-genesis:
 
 .unit_test_template:
   extends: .test_template
+  variables:
+    ARCH: ""
   artifacts:
-    name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
     paths:
       - test_results
     reports:
@@ -36,78 +37,66 @@ test-script-gen-genesis:
     expire_in: 1 day
     when: always
 
-# this section is updated using the script scripts/update_unit_test.sh
-##BEGIN_UNITTEST##
-unit:008_PtEdo2Zk:
+.unit_test_template_x86_64:
   extends: .unit_test_template
-  script:
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+  needs: ["build_x86_64"]
+  variables:
+    ARCH: "x86_64"
 
-unit:009_PsFLoren:
+.unit_test_template_arm64:
   extends: .unit_test_template
-  script:
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
+  needs: ["build_arm64"]
+  variables:
+    ARCH: "arm64"
+  tags:
+    - arm64
 
 unit:010_PtGRANAD:
+  extends: .unit_test_template_x86_64
+  script:
+    - >
+      make
+      src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_010_PtGRANAD/lib_benchmark.test_proto
+      src/proto_010_PtGRANAD/lib_client.test_proto
+      src/proto_010_PtGRANAD/lib_protocol.test_proto
+
+unit:011_PtHangz2:
   extends: .unit_test_template
   script:
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference 010_PtGRANAD_lib_benchmark_lib_benchmark_type_inference
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark 010_PtGRANAD_lib_benchmark
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_client 010_PtGRANAD_lib_client
-    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_protocol 010_PtGRANAD_lib_protocol
+     - >
+       make
+       src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
+       src/proto_011_PtHangz2/lib_benchmark.test_proto
+       src/proto_011_PtHangz2/lib_client.test_proto
+       src/proto_011_PtHangz2/lib_protocol.test_proto
 
 unit:alpha:
-  extends: .unit_test_template
+  extends: .unit_test_template_x86_64
   script:
-    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark/lib_benchmark_type_inference alpha_lib_benchmark_lib_benchmark_type_inference
-    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark alpha_lib_benchmark
-    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
-    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+     - >
+       make
+       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
+       src/proto_alpha/lib_benchmark.test_proto
+       src/proto_alpha/lib_client.test_proto
+       src/proto_alpha/lib_protocol.test_proto
 
-unit:non-proto:
-  extends: .unit_test_template
+unit:non-proto-x86_64:
+  extends: .unit_test_template_x86_64
   script:
-    - scripts/test_wrapper.sh src/bin_client client
-    - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
-    - scripts/test_wrapper.sh src/lib_base base
-    - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
-    - scripts/test_wrapper.sh src/lib_benchmark benchmark
-    - scripts/test_wrapper.sh src/lib_clic clic
-    - scripts/test_wrapper.sh src/lib_client_base client_base
-    - scripts/test_wrapper.sh src/lib_client_base_unix client_base_unix
-    - scripts/test_wrapper.sh src/lib_context context
-    - scripts/test_wrapper.sh src/lib_crypto crypto
-    - scripts/test_wrapper.sh src/lib_error_monad error_monad
-    - scripts/test_wrapper.sh src/lib_hacl_glue/js hacl_glue_js
-    - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
-    - scripts/test_wrapper.sh src/lib_micheline micheline
-    - scripts/test_wrapper.sh src/lib_mockup mockup
-    - scripts/test_wrapper.sh src/lib_p2p p2p
-    - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
-    - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
-    - scripts/test_wrapper.sh src/lib_proxy proxy
-    - scripts/test_wrapper.sh src/lib_proxy_server_config proxy_server_config
-    - scripts/test_wrapper.sh src/lib_requester requester
-    - scripts/test_wrapper.sh src/lib_rpc_http rpc_http
-    - scripts/test_wrapper.sh src/lib_sapling sapling
-    - scripts/test_wrapper.sh src/lib_shell shell
-    - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
-    - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
-    - scripts/test_wrapper.sh src/lib_stdlib stdlib
-    - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
-    - scripts/test_wrapper.sh src/lib_store store
-    - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
-    - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
-##END_UNITTEST##
+    - make test-nonproto-unit
+
+unit:non-proto-arm64:
+  extends: .unit_test_template_arm64
+  script:
+    - make test-nonproto-unit
 
 unit:js_components:
-  extends: .test_template
+  extends: .unit_test_template_x86_64
   script:
     - dune build @runtest_js
 
 unit:protocol_compiles:
-  extends: .test_template
+  extends: .unit_test_template_x86_64
   script:
     - dune build @runtest_compile_protocol

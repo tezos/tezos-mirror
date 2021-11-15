@@ -42,13 +42,38 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
+(** This test file is factored out on the Client mode. In Light mode we need some special care regarding waiting for all the nodes to be in sync, otherwise the commands fail as it looks like some nodes are rogue. *)
+let node_wait_for_level level client =
+  match Client.get_mode client with
+  | Light (_min_agreement, nodes) ->
+      Lwt_list.iter_p
+        (function
+          | Client.Node node ->
+              Lwt.map (Fun.const ()) @@ Node.wait_for_level node level
+          | _ -> Lwt.return_unit)
+        nodes
+  | Mockup -> assert false (* This file does not use Mockup mode *)
+  | Client (Some (Client.Node node)) | Proxy (Client.Node node) ->
+      let* _ = Node.wait_for_level node level in
+      Lwt.return_unit
+  | Client _ | Proxy _ -> Lwt.return_unit
+
+(** [make_client_bake_for ()] returns a function similar to {!Client.bake_for} which additionally keeps track of the current level, and in Light mode, waits for all nodes to be in sync after baking. *)
+let make_client_bake_for () =
+  let current_level = ref 1 in
+  fun client ->
+    let* () = Client.bake_for client in
+    current_level := !current_level + 1 ;
+    node_wait_for_level !current_level client
+
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
 let check_rpc ~group_name ~protocols ~test_mode_tag
     ~(rpcs :
        (string
        * (?endpoint:Client.endpoint -> Client.t -> unit Lwt.t)
-       * Protocol.parameter_overrides option)
+       * Protocol.parameter_overrides option
+       * Node.argument list option)
        list) () =
   let (client_mode_tag, title_tag) =
     match test_mode_tag with
@@ -58,7 +83,7 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
     | `Proxy -> (`Proxy, "proxy")
   in
   List.iter
-    (fun (sub_group, rpc, parameter_overrides) ->
+    (fun (sub_group, rpc, parameter_overrides, node_parameters) ->
       Protocol.register_regression_test
         ~__FILE__
         ~title:
@@ -87,24 +112,21 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
             true
         | `Client | `Light | `Proxy -> false
       in
-      let* client =
+      let* (node, client) =
         Client.init_activate_bake
           ?parameter_file
+          ?nodes_args:node_parameters
           ~bake
           ~protocol
           client_mode_tag
           ()
       in
       let* endpoint =
-        match (Client.get_mode client, test_mode_tag) with
-        | (Client.Client (Some (Node node)), `Client)
-        | (Client.Light (_, Node node :: _), `Light)
-        | (Client.Proxy (Node node), `Proxy) ->
-            return Client.(Node node)
-        | (Client.Client (Some (Node node)), `Client_with_proxy_server) ->
+        match test_mode_tag with
+        | `Client | `Light | `Proxy -> return Client.(Node node)
+        | `Client_with_proxy_server ->
             let* proxy_server = Proxy_server.init node in
             return Client.(Proxy_server proxy_server)
-        | _ -> Test.fail "Unexpected state"
       in
       let* _ = rpc ?endpoint:(Some endpoint) client in
       unit)
@@ -112,6 +134,7 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
 
 (* Test the contracts RPC. *)
 let test_contracts ?endpoint client =
+  let client_bake_for = make_client_bake_for () in
   let test_implicit_contract contract_id =
     let* _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
@@ -149,7 +172,7 @@ let test_contracts ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   let* () = test_implicit_contract simple_implicit_key.public_key_hash in
   let* () =
     Lwt_list.iter_s
@@ -182,11 +205,11 @@ let test_contracts ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   let* () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let* _ =
     RPC.Contracts.get_delegate
@@ -254,7 +277,7 @@ let test_contracts ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   Log.info "Test advanced originated contract" ;
@@ -268,7 +291,7 @@ let test_contracts ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   let* () = test_originated_contract originated_contract_advanced in
   let unique_big_map_key =
     Ezjsonm.value_from_string
@@ -349,11 +372,12 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_deactivated
+    RPC.Delegates.spawn_get_deactivated
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_delegated_balance
@@ -364,25 +388,28 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts
+    RPC.Delegates.spawn_get_delegated_contracts
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance
+    RPC.Delegates.spawn_get_frozen_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle
+    RPC.Delegates.spawn_get_frozen_balance_by_cycle
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_grace_period
@@ -393,18 +420,20 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_staking_balance
+    RPC.Delegates.spawn_get_staking_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_voting_power
+    RPC.Delegates.spawn_get_voting_power
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   unit
 
@@ -521,10 +550,11 @@ let test_delegates_current_mainnet ?endpoint client =
 
 (* Test the votes RPC for protocol Alpha. *)
 let test_votes_alpha ?endpoint client =
+  let client_bake_for = make_client_bake_for () in
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   (* RPC calls *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -536,12 +566,12 @@ let test_votes_alpha ?endpoint client =
   let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
+  let* () = client_bake_for client in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   (* RPC calls again *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -557,15 +587,15 @@ let test_votes_alpha ?endpoint client =
 
 (* Test the votes RPC for the current Mainnet protocol. *)
 let test_votes_current_mainnet ?endpoint client =
+  let client_bake_for = make_client_bake_for () in
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   (* RPC calls *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_period_kind ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
@@ -573,17 +603,16 @@ let test_votes_current_mainnet ?endpoint client =
   let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
+  let* () = client_bake_for client in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = Client.bake_for client in
+  let* () = client_bake_for client in
   (* RPC calls again *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_period_kind ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
@@ -599,6 +628,156 @@ let test_others ?endpoint client =
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
   let* _ = RPC.get_endorsing_rights ?endpoint ~hooks client in
   let* _ = RPC.get_levels_in_current_cycle ?endpoint ~hooks client in
+  unit
+
+let mempool_hooks =
+  let replace_variable string =
+    let replacements =
+      [
+        ("edsig\\w{94}", "[SIGNATURE]");
+        ("sig\\w{93}", "[SIGNATURE]");
+        ("o\\w{50}", "[OPERATION_HASH]");
+        ("B\\w{50}", "[BRANCH_HASH]");
+      ]
+    in
+    List.fold_left
+      (fun string (replace, by) ->
+        Base.replace_string ~all:true (rex replace) ~by string)
+      string
+      replacements
+  in
+  {
+    Tezos_regression.hooks with
+    on_log = (fun output -> replace_variable output |> hooks.on_log);
+  }
+
+let get_client_port client =
+  match
+    Client.get_mode client |> Client.mode_to_endpoint
+    |> Option.map Client.rpc_port
+  with
+  | Some port -> port
+  | None ->
+      Test.fail
+        "Client for mempool rpc tests should be initialized with a node or a \
+         proxy server only. Both have an endpoint and hence a RPC port so this \
+         should not happen."
+
+(* Test the mempool RPCs *)
+(* In this test, we create an applied operation and three operations that fails
+   to be applied. Each one of this failed operation has a different
+   classification to test every possibilities of the monitor_operations and
+   pending_operations RPCs. The errors classification are the following :
+   - Branch_refused (Branch error classification in protocol)
+   - Branch_delayed (Temporary)
+   - Refused (Permanent)
+
+   The main goal is to have a record of the encoding of the different
+   operations returned by the RPC calls. This allows
+   us to detect undesired changes. *)
+let test_mempool ?endpoint client =
+  let open Lwt in
+  let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
+  let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
+  let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
+  let level = 1 in
+  let* _ = Node.wait_for_level node level in
+  let* node1_identity = Node.wait_for_identity node in
+  let* () = Client.Admin.kick_peer ~peer:node1_identity client in
+  let* _ = Mempool.bake_empty_mempool client in
+  let monitor_path =
+    (* To test the monitor_operations rpc we use curl since the client does
+       not support streaming RPCs yet. *)
+    sf
+      "http://localhost:%d/chains/main/mempool/monitor_operations?applied=true&branch_delayed=true&refused=true&branch_refused=true"
+      (get_client_port client)
+  in
+  let proc_monitor =
+    (* monitor_operation rpc must be lanched before adding operations in order
+       to record them. *)
+    Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
+  in
+  (* Refused operation after the reclassification following the flush. *)
+  let* branch = RPC.get_branch client >|= JSON.as_string in
+  let* _ =
+    Mempool.forge_and_inject_operation
+      ~branch
+      ~fee:10
+      ~gas_limit:1040
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:1
+      ~signer:Constant.bootstrap1
+      ~client
+  in
+  (* Applied operation. *)
+  let* _ =
+    Client.transfer
+      ?endpoint
+      ~amount:Tez.(of_int 2)
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:Constant.bootstrap3.alias
+      client
+  in
+  (* This operation as the same giver as the previous one and so the same
+     counter. It is applied on a different branch since we bake an empty block
+     on the other endpoint. Once the nodes will be synced this operation will
+     be classified as Branch_refused because its counter is in the past on the
+     other endpoint. *)
+  let* _ =
+    Client.transfer
+      ~endpoint:(Client.Node node)
+      ~amount:Tez.(of_int 2)
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:Constant.bootstrap3.alias
+      client
+  in
+  (* Branch_delayed operation after the empty baking. *)
+  let* _ = Client.endorse_for ?endpoint client in
+  (* Reconnect and sync nodes to force branch_refused operation and delay of
+     endorsement. *)
+  let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
+  let flush_waiter = Node_event_level.wait_for_flush node in
+  let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
+  let* _ = flush_waiter in
+  let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  let* _ =
+    RPC.get_mempool_pending_operations ?endpoint ~hooks:mempool_hooks client
+  in
+  (* We spawn a second monitor_operation RPC that monitor operations
+     reclassified with errors. *)
+  let proc_monitor =
+    Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
+  in
+  let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
+  let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1765
+
+     Once openapi-diff is integrated, this test could be removed. *)
+  (* Call describe on mempool RPCs and record the output. *)
+  let describe_path =
+    sf
+      "http://localhost:%d/describe/chains/main/mempool?recurse=yes"
+      (get_client_port client)
+  in
+  let message = Log.quote_shell_command "curl" ["-s"; describe_path] in
+  Regression.capture ("\n" ^ message) ;
+  let proc_describe = Process.spawn "curl" ["-s"; describe_path] in
+  let* output = Process.check_and_read_stdout proc_describe in
+  (* To ease the reading of the output (which is expected to be a JSON
+     value), we prettify the output. It makes easier to interpret
+     regressions. *)
+  let prettified_output =
+    output
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1766
+
+       End of line characters are trimmed because the /describe/ RPC may
+       introduce them in string litteral which seems forbidden by the JSON
+       standard. *)
+    |> replace_string ~all:true (rex "\n") ~by:""
+    |> JSON.parse ~origin:message |> JSON.encode
+  in
+  Regression.capture prettified_output ;
   unit
 
 let start_with_acl address acl =
@@ -659,6 +838,25 @@ let test_blacklist address () =
   let* _success_resp = Client.rpc GET ["network"; "connections"] client in
   unit
 
+let test_no_service_at_valid_prefix address () =
+  let node = Node.create ~rpc_host:address [] in
+  let endpoint = Client.(Node node) in
+  let* () = Node.config_init node [] in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  let* client = Client.init ~endpoint () in
+  let* () =
+    Client.spawn_rpc GET ["chains"; "main"] client
+    |> Process.check_error
+         ~exit_code:1
+         ~msg:
+           (rex
+              "Fatal error:\n\
+              \  No service found at this URL (but this is a valid prefix)*\n\
+               *")
+  in
+  unit
+
 let register () =
   let register_alpha test_mode_tag =
     check_rpc
@@ -666,19 +864,30 @@ let register () =
       ~protocols:[Protocol.Alpha]
       ~test_mode_tag
       ~rpcs:
-        [
-          ("contracts", test_contracts, None);
-          ("delegates", test_delegates_alpha, None);
-          ( "votes",
-            test_votes_alpha,
-            Some
-              (* reduced periods duration to get to testing vote period faster *)
-              [
-                (["blocks_per_cycle"], Some "4");
-                (["blocks_per_voting_period"], Some "4");
-              ] );
-          ("others", test_others, None);
-        ]
+        ([
+           ("contracts", test_contracts, None, None);
+           ("delegates", test_delegates_alpha, None, None);
+           ( "votes",
+             test_votes_alpha,
+             Some
+               (* reduced periods duration to get to testing vote period faster *)
+               [
+                 (["blocks_per_cycle"], Some "4");
+                 (["blocks_per_voting_period"], Some "4");
+               ],
+             None );
+           ("others", test_others, None, None);
+         ]
+        @
+        match test_mode_tag with
+        | `Client_with_proxy_server | `Light -> []
+        | _ ->
+            [
+              ( "mempool",
+                test_mempool,
+                None,
+                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
+            ])
       ()
   in
   let register_current_mainnet test_mode_tag =
@@ -687,19 +896,30 @@ let register () =
       ~protocols:[Protocol.current_mainnet]
       ~test_mode_tag
       ~rpcs:
-        [
-          ("contracts", test_contracts, None);
-          ("delegates", test_delegates_current_mainnet, None);
-          ( "votes",
-            test_votes_current_mainnet,
-            Some
-              (* reduced periods duration to get to testing vote period faster *)
-              [
-                (["blocks_per_cycle"], Some "4");
-                (["blocks_per_voting_period"], Some "4");
-              ] );
-          ("others", test_others, None);
-        ]
+        ([
+           ("contracts", test_contracts, None, None);
+           ("delegates", test_delegates_current_mainnet, None, None);
+           ( "votes",
+             test_votes_current_mainnet,
+             Some
+               (* reduced periods duration to get to testing vote period faster *)
+               [
+                 (["blocks_per_cycle"], Some "4");
+                 (["blocks_per_voting_period"], Some "4");
+               ],
+             None );
+           ("others", test_others, None, None);
+         ]
+        @
+        match test_mode_tag with
+        | `Client_with_proxy_server | `Light -> []
+        | _ ->
+            [
+              ( "mempool",
+                test_mempool,
+                None,
+                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
+            ])
       ()
   in
   let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
@@ -723,5 +943,10 @@ let register () =
         ~__FILE__
         ~title:(mk_title "blacklist" addr)
         ~tags:["rpc"; "acl"]
-        (test_blacklist addr))
+        (test_blacklist addr) ;
+      Test.register
+        ~__FILE__
+        ~title:(mk_title "no_service_at_valid_prefix" addr)
+        ~tags:["rpc"]
+        (test_no_service_at_valid_prefix addr))
     addresses

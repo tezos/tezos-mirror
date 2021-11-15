@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Mockup wallet library
-    Invocation:   dune build @runtest_mockup_wallet
+    Invocation:   dune build @src/lib_client_base_unix/runtest
     Subject:      Unit tests of the Mockup wallet library
 *)
 
@@ -35,7 +35,6 @@ open Tezos_error_monad.Error_monad
 open Tezos_stdlib_unix
 open Tezos_client_base
 open Tezos_client_base_unix
-open Tezos_test_services
 
 let default_bootstrap_accounts_names =
   List.map (fun i -> "bootstrap" ^ string_of_int i) (1 -- 5)
@@ -94,7 +93,7 @@ let validate_accounts_names key_list accounts_names =
 (** When no bootstrap accounts file is provided, then the wallet is
     populated with the default bootstrap accounts *)
 let test_no_bootstrap_accounts_file_populates_defaults =
-  Test_services.tztest
+  Tztest.tztest
     "When no bootstrap accounts file is provided, then the wallet is populated \
      with the default bootstrap accounts"
     `Quick
@@ -117,7 +116,7 @@ let test_no_bootstrap_accounts_file_populates_defaults =
 (** When a valid bootstrap accounts file is provided, then the wallet is
     populated with its content *)
 let test_with_valid_bootstrap_accounts_file_populates =
-  Test_services.tztest
+  Tztest.tztest
     "When a valid bootstrap accounts file is provided, then the wallet is \
      populated with its content"
     `Quick

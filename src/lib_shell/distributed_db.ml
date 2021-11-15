@@ -102,7 +102,7 @@ let active_peer_ids p2p () =
     (P2p.connections p2p)
 
 let raw_try_send p2p peer_id msg =
-  match P2p.find_connection p2p peer_id with
+  match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> ()
   | Some conn -> ignore (P2p.try_send p2p conn msg : bool)
 
@@ -175,14 +175,14 @@ let activate
               P2p.send p2p conn (Get_current_branch chain_id) :: acc)
         in
         Error_monad.dont_wait
-          (fun exc ->
-            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+          (fun () -> join_ep sends)
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               trace)
-          (fun () -> join_ep sends) ;
+          (fun exc ->
+            Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
         Chain_id.Table.add active_chains chain_id local_db ;
         local_db
   in
@@ -203,11 +203,11 @@ let deactivate chain_db =
       chain_db.reader_chain_db.active_connections
   in
   Error_monad.dont_wait
-    (fun exc ->
-      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+    (fun () -> sends)
     (fun trace ->
-      Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_error trace)
-    (fun () -> sends) ;
+      Format.eprintf "Uncaught error: %a\n%!" Error_monad.pp_print_trace trace)
+    (fun exc ->
+      Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
   Distributed_db_requester.Raw_operation.shutdown
     chain_db.reader_chain_db.operation_db
   >>= fun () ->
@@ -222,7 +222,7 @@ let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
 
 let disconnect {global_db = {p2p; _}; _} peer_id =
-  match P2p.find_connection p2p peer_id with
+  match P2p.find_connection_by_peer_id p2p peer_id with
   | None -> Lwt.return_unit
   | Some conn -> P2p.disconnect p2p conn
 
@@ -278,6 +278,13 @@ let inject_operation chain_db h op =
     chain_db.reader_chain_db.operation_db
     h
     op
+
+let inject_prechecked_block chain_db hash block_header operations =
+  Store.Block.store_prechecked_block
+    chain_db.reader_chain_db.chain_store
+    ~hash
+    ~block_header
+    ~operations
 
 let commit_protocol db h p =
   Store.Protocol.store db.disk h p >>= fun res ->
@@ -441,6 +448,25 @@ module Advertise = struct
       P2p_peer.Table.iter
         (fun _receiver_id conn -> send_mempool conn)
         chain_db.reader_chain_db.active_connections
+
+  let prechecked_head chain_db ?(mempool = Mempool.empty) header =
+    let p2p = chain_db.global_db.p2p in
+    let acceptable_version conn =
+      let {Network_version.distributed_db_version; _} =
+        P2p.negotiated_version p2p conn
+      in
+      Distributed_db_version.compare
+        distributed_db_version
+        Distributed_db_version.two
+      >= 0
+    in
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
+    let msg = Message.Current_head (chain_id, header, mempool) in
+    P2p_peer.Table.iter
+      (fun _ conn ->
+        if acceptable_version conn then ignore (P2p.try_send p2p conn msg)
+        else ())
+      chain_db.reader_chain_db.active_connections
 
   let current_branch chain_db =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in

@@ -35,6 +35,11 @@ module type TREE = sig
   include Tezos_context_sigs.Context.TREE
 end
 
+module type HASH_VERSION = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.HASH_VERSION
+end
+
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
@@ -55,4 +60,49 @@ module type S = sig
 
   val fork_test_chain :
     t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+
+  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+
+  val get_hash_version : t -> Context_hash.Version.t
+end
+
+(* Copy of sigs/v3/context.mli:CACHE *)
+module type CACHE = sig
+  type t
+
+  type size
+
+  type index
+
+  type identifier
+
+  type key
+
+  type value = ..
+
+  val key_of_identifier : cache_index:index -> identifier -> key
+
+  val identifier_of_key : key -> identifier
+
+  val pp : Format.formatter -> t -> unit
+
+  val find : t -> key -> value option Lwt.t
+
+  val set_cache_layout : t -> size list -> t Lwt.t
+
+  val update : t -> key -> (value * size) option -> t
+
+  val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
+
+  val clear : t -> t
+
+  val list_keys : t -> cache_index:index -> (key * size) list option
+
+  val key_rank : t -> key -> int option
+
+  val future_cache_expectation : t -> time_in_blocks:int -> t
+
+  val cache_size : t -> cache_index:index -> size option
+
+  val cache_size_limit : t -> cache_index:index -> size option
 end

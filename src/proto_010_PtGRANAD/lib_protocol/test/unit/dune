@@ -8,15 +8,14 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-010-PtGRANAD-parameters
-            tezos-test-services)
+            tezos-base-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base_test_helpers
                    -open Tezos_micheline
                    -open Tezos_client_010_PtGRANAD
                    -open Tezos_protocol_010_PtGRANAD
                    -open Tezos_protocol_environment_010_PtGRANAD
-                   -open Tezos_test_services
-                   -open Tezos_010_PtGRANAD_test_helpers
-                   -open Test_services)))
+                   -open Tezos_010_PtGRANAD_test_helpers)))
 
 (rule
  (alias runtest)

@@ -37,5 +37,8 @@ module Network : sig
     RPC_service.t
 end
 
+val history_mode :
+  ([`GET], unit, unit, unit, unit, History_mode.t, error trace) RPC_service.raw
+
 val user_activated_upgrades :
   #RPC_context.simple -> User_activated.upgrades tzresult Lwt.t

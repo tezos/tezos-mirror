@@ -1,6 +1,8 @@
 """Defines a special role, :gl:, for referring to GitLab objects (merge
 requests, issues, etc)."""
 
+# pylint: disable=dangerous-default-value
+
 import re
 
 from docutils import nodes
@@ -69,9 +71,7 @@ def expand_gitlab_shortlink(
     return expansions
 
 
-def gitlab_role(
-    _name, rawtext, text, lineno, inliner, options={}, _content=[]
-):
+def gitlab_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     """Implements the :gl: GitLab special reference role"""
     parts = re.match("^([^<>]*)<([^<]*)>$", text)
     if parts:

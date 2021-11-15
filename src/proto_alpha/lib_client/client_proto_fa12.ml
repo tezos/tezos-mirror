@@ -93,9 +93,9 @@ let () =
     ~title:"The given contract does not implement the FA1.2 interface"
     ~description:
       "An FA1.2 command has referenced a smart contract whose script does not \
-       implement at least one FA1.2 entrypoint, or with an incompatible type. \n\
-       See \
-       https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md \
+       implement at least one FA1.2 entrypoint, or with an incompatible type. \
+       See TZIP-7 \
+       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md) \
        for documentation on FA1.2."
     ~pp:(fun ppf (name, ty) ->
       Format.fprintf
@@ -197,9 +197,9 @@ let () =
     ~title:"The allowance change is unsafe"
     ~description:
       "An FA1.2 non-zero allowance change failed because the current allowance \
-       is non-zero.\n\
-       More explanation on why such allowance change is unsafe, please look at \
-       https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve."
+       is non-zero. For more explanation on why such allowance change is \
+       unsafe, please look at TZIP-7 \
+       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve)."
     ~pp:(fun ppf previous ->
       Format.fprintf
         ppf
@@ -225,7 +225,9 @@ let () =
         expr)
     Data_encoding.(
       obj2
-        (req "location" Tezos_micheline.Micheline.canonical_location_encoding)
+        (req
+           "location"
+           Tezos_micheline.Micheline_encoding.canonical_location_encoding)
         (req "value" Script.expr_encoding))
     (function Unexpected_error (loc, expr) -> Some (loc, expr) | _ -> None)
     (fun (loc, expr) -> Unexpected_error (loc, expr))
@@ -844,7 +846,7 @@ let tez_of_string_exn index field s =
   match Tez.of_string s with
   | Some t -> ok t
   | None ->
-      generic_error
+      error_with
         "Invalid %s notation at entry %i, field \"%s\": %s"
         Client_proto_args.tez_sym
         index

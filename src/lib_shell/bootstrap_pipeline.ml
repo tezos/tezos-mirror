@@ -432,12 +432,18 @@ let rec validation_worker_loop pipeline =
         Block_validator.validate
           ~canceler:pipeline.canceler
           ~notify_new_block:pipeline.notify_new_block
+          ~precheck_and_notify:false
           pipeline.block_validator
           pipeline.chain_db
           hash
           header
-          operations)
-    >>=? fun _block ->
+          operations
+        >>= function
+        | Block_validator.Invalid errs | Invalid_after_precheck errs ->
+            (* Cancel the pipeline if a block is invalid *)
+            Lwt.return_error errs
+        | Valid -> return_unit)
+    >>=? fun () ->
     Bootstrap_pipeline_event.(emit validated_block) (hash, pipeline.peer_id)
     >>= fun () -> return_unit )
   >>= function
@@ -551,12 +557,12 @@ let cancel pipeline =
   Lwt_canceler.cancel pipeline.canceler >>= fun _res -> wait_workers pipeline
 
 let length pipeline =
-  Peer_validator_worker_state.Worker_state.
+  Peer_validator_worker_state.
     {
       fetched_header_length = Lwt_pipe.length pipeline.fetched_headers;
       fetched_block_length = Lwt_pipe.length pipeline.fetched_blocks;
     }
 
 let length_zero =
-  Peer_validator_worker_state.Worker_state.
+  Peer_validator_worker_state.
     {fetched_header_length = 0; fetched_block_length = 0}

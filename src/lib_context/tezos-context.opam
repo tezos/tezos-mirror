@@ -8,11 +8,12 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
-  "irmin" { >= "2.7.1" }
-  "irmin-pack" { >= "2.7.1" }
-  "digestif" {>= "0.7.3"}
+  "irmin" { >= "2.8.0" }
+  "irmin-pack" { >= "2.8.0" }
   "tezos-shell-services"
   "tezos-stdlib-unix"
+  "bigstringaf" { >= "0.2.0" }
+  "vector" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [

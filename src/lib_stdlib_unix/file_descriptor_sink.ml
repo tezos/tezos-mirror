@@ -99,9 +99,12 @@ end) : Internal_event.SINK with type t = t = struct
         let fresh = flag "fresh" in
         (match Uri.get_query_param uri "chmod" with
         | Some n -> (
-            try return (int_of_string n)
-            with _ ->
-              fail_parsing "Access-rights parameter should be an integer: %S" n)
+            match int_of_string_opt n with
+            | Some i -> return i
+            | None ->
+                fail_parsing
+                  "Access-rights parameter should be an integer: %S"
+                  n)
         | None -> return 0o600)
         >>=? fun rights ->
         match Uri.path uri with
@@ -113,7 +116,7 @@ end) : Internal_event.SINK with type t = t = struct
                 let chopped =
                   if ext = "" then path else Filename.chop_extension path
                 in
-                Fmt.strf "%s-%d%s" chopped (Unix.getpid ()) ext
+                Fmt.str "%s-%d%s" chopped (Unix.getpid ()) ext
               else path
             in
             protect (fun () ->

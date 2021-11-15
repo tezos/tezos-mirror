@@ -39,6 +39,6 @@ let test_overflow_add () =
 
 let tests =
   [
-    Test_services.tztest "non-overflowing addition" `Quick test_nominal_add;
-    Test_services.tztest "overflowing addition" `Quick test_overflow_add;
+    Tztest.tztest "non-overflowing addition" `Quick test_nominal_add;
+    Tztest.tztest "overflowing addition" `Quick test_overflow_add;
   ]

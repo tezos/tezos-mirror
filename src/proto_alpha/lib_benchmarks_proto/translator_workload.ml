@@ -62,17 +62,13 @@ let encoding : t Data_encoding.t =
 
 let pp_kind fmtr (kind : kind) =
   match kind with
-  | Parsing ->
-      Format.pp_print_string fmtr "Parsing"
-  | Unparsing ->
-      Format.pp_print_string fmtr "Unparsing"
+  | Parsing -> Format.pp_print_string fmtr "Parsing"
+  | Unparsing -> Format.pp_print_string fmtr "Unparsing"
 
 let pp_code_or_data fmtr (x : code_or_data) =
   match x with
-  | Code ->
-      Format.pp_print_string fmtr "Code"
-  | Data ->
-      Format.pp_print_string fmtr "Data"
+  | Code -> Format.pp_print_string fmtr "Code"
+  | Data -> Format.pp_print_string fmtr "Data"
 
 let pp fmtr (trace : t) =
   match trace with
@@ -100,10 +96,12 @@ let workload_to_sparse_vec (trace : t) =
   in
   let n s = name ^ "_" ^ s in
   let vars =
-    [ (n "traversal", Size.to_float traversal);
+    [
+      (n "traversal", Size.to_float traversal);
       (n "int_bytes", Size.to_float int_bytes);
       (n "string_bytes", Size.to_float string_bytes);
-      (n "gas", Size.to_float consumed) ]
+      (n "gas", Size.to_float consumed);
+    ]
   in
   Sparse_vec.String.of_list vars
 
@@ -121,31 +119,31 @@ let data_typechecker_workload ctxt t_kind micheline_node ex_ty =
             micheline_node
         |> Lwt.map Environment.wrap_tzresult
         >>= fun res ->
-        match res with
-        | Ok (_res, ctxt_after) ->
-            let micheline_size = Size.of_micheline micheline_node in
-            let consumed =
-              Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
-            in
-            let trace =
-              Typechecker_workload
-                {
-                  t_kind;
-                  code_or_data = Data;
-                  micheline_size;
-                  consumed =
-                    Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
-                }
-            in
-            Lwt.return (Some trace)
-        | Error errors ->
-            Tezos_client_alpha.Michelson_v1_error_reporter.report_errors
-              ~details:true
-              ~show_source:true
-              Format.err_formatter
-              errors ;
-            Format.eprintf "@." ;
-            Lwt.return None )
+          match res with
+          | Ok (_res, ctxt_after) ->
+              let micheline_size = Size.of_micheline micheline_node in
+              let consumed =
+                Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
+              in
+              let trace =
+                Typechecker_workload
+                  {
+                    t_kind;
+                    code_or_data = Data;
+                    micheline_size;
+                    consumed =
+                      Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
+                  }
+              in
+              Lwt.return (Some trace)
+          | Error errors ->
+              Michelson_v1_error_reporter.report_errors
+                ~details:true
+                ~show_source:true
+                Format.err_formatter
+                errors ;
+              Format.eprintf "@." ;
+              Lwt.return None )
 
 let code_typechecker_workload (ctxt : Protocol.Alpha_context.context)
     (t_kind : kind) (code : Protocol.Alpha_context.Script.node)
@@ -162,27 +160,27 @@ let code_typechecker_workload (ctxt : Protocol.Alpha_context.context)
         stack_ty
     |> Lwt.map Environment.wrap_tzresult
     >>= fun res ->
-    match res with
-    | Ok (_res, ctxt_after) ->
-        let micheline_size = Size.of_micheline code in
-        let consumed =
-          Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
-        in
-        let trace =
-          Typechecker_workload
-            {
-              t_kind;
-              code_or_data = Code;
-              micheline_size;
-              consumed = Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
-            }
-        in
-        Lwt.return (Some trace)
-    | Error errs ->
-        Tezos_client_alpha.Michelson_v1_error_reporter.report_errors
-          ~details:true
-          ~show_source:true
-          Format.err_formatter
-          errs ;
-        Format.eprintf "@." ;
-        Lwt.return None )
+      match res with
+      | Ok (_res, ctxt_after) ->
+          let micheline_size = Size.of_micheline code in
+          let consumed =
+            Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
+          in
+          let trace =
+            Typechecker_workload
+              {
+                t_kind;
+                code_or_data = Code;
+                micheline_size;
+                consumed = Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
+              }
+          in
+          Lwt.return (Some trace)
+      | Error errs ->
+          Michelson_v1_error_reporter.report_errors
+            ~details:true
+            ~show_source:true
+            Format.err_formatter
+            errs ;
+          Format.eprintf "@." ;
+          Lwt.return None )

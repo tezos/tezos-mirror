@@ -44,7 +44,7 @@ struct
 
   let of_bytes s =
     match H.of_bytes_opt s with
-    | None -> generic_error "of_bytes (%s)" H.name
+    | None -> error_with "of_bytes (%s)" H.name
     | Some pk -> Ok pk
 
   let of_string_exn s =
@@ -54,7 +54,7 @@ struct
 
   let of_string s =
     match H.of_string_opt s with
-    | None -> generic_error "of_string (%s)" H.name
+    | None -> error_with "of_string (%s)" H.name
     | Some pk -> Ok pk
 
   let to_hex s = Hex.of_string (H.to_string s)
@@ -68,7 +68,7 @@ struct
 
   let of_hex s =
     match of_hex_opt s with
-    | None -> generic_error "of_hex (%s)" H.name
+    | None -> error_with "of_hex (%s)" H.name
     | Some pk -> ok pk
 end
 
@@ -91,10 +91,7 @@ struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error
-          "Failed to read a b58check_encoding data (%s): %S"
-          H.name
-          s
+        error_with "Failed to read a b58check_encoding data (%s): %S" H.name s
 
   let to_b58check s = Base58.simple_encode H.b58check_encoding s
 

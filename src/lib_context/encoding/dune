@@ -1,5 +1,6 @@
 (library
  (name tezos_context_encoding)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-context.encoding)
  (libraries tezos-base
             irmin

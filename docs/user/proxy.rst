@@ -1,5 +1,3 @@
-.. _proxy-mode:
-
 Proxy mode
 ----------
 
@@ -9,7 +7,7 @@ This page describes the *proxy* mode, a mode where the client
 performs protocol RPCs locally. For the computations to be correct,
 the proxy client requests the data it needs from the node, and uses
 this data locally to perform its own computations
-(see the :ref:`mockup mode<mockup-mode>` for an entirely local mode).
+(see the :doc:`mockup mode <mockup>` for an entirely local mode).
 
 This mode's purpose is to relieve the node
 from some long computations when estimating gas or asking for baking rights
@@ -24,7 +22,7 @@ pass ``--mode proxy`` to ``tezos-client``.
 
 Because computations done locally are protocol dependent, the proxy mode does not support all protocols.
 It is expected than, at any given time, the proxy mode supports ``Alpha`` and the three protocols before that.
-In doubt, execute ``find src/ -name "proxy.ml" | grep 'proto_'`` to find the supported protocols.
+In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the proxy client, it
 tries to match the node's protocol. On the one hand, this is handy when
@@ -36,7 +34,7 @@ Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this section, we show examples of usage of the proxy mode when using
-the :ref:`sandboxed node<sandboxed-mode>`. For convenience we repeat
+the :doc:`sandboxed node <sandbox>`. For convenience we repeat
 instructions for the sandboxed mode here, but refer the reader to the
 sandboxed mode page for further details. In a terminal,
 start a sandboxed node:

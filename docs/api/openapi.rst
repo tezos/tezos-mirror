@@ -1,5 +1,3 @@
-.. _openapi_specification:
-
 OpenAPI Specification
 =====================
 
@@ -28,19 +26,6 @@ Their OpenAPI specification can be found at:
 - `rpc-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO nomadic-labs/tezos#462: add/remove section(s)
-
-Florence RPCs
--------------
-
-The OpenAPI specification for RPCs which are specific to the Florence
-protocol can be found at:
-
-- `florence-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-openapi.json>`_
-
-The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Florence protocol can be found at:
-
-- `florence-mempool-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-mempool-openapi.json>`_
 
 Granada RPCs
 -------------

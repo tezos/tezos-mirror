@@ -67,35 +67,37 @@ type type_name =
   | `TTicket ]
 
 let all_type_names : type_name array =
-  [| `TUnit;
-     `TInt;
-     `TNat;
-     `TSignature;
-     `TString;
-     `TBytes;
-     `TMutez;
-     `TKey_hash;
-     `TKey;
-     `TTimestamp;
-     `TAddress;
-     `TBool;
-     `TPair;
-     `TUnion;
-     `TLambda;
-     `TOption;
-     `TList;
-     `TSet;
-     `TMap;
-     `TBig_map;
-     `TContract;
-     `TSapling_transaction;
-     `TSapling_state;
-     `TOperation;
-     `TChain_id;
-     `TBls12_381_g1;
-     `TBls12_381_g2;
-     `TBls12_381_fr;
-     `TTicket |]
+  [|
+    `TUnit;
+    `TInt;
+    `TNat;
+    `TSignature;
+    `TString;
+    `TBytes;
+    `TMutez;
+    `TKey_hash;
+    `TKey;
+    `TTimestamp;
+    `TAddress;
+    `TBool;
+    `TPair;
+    `TUnion;
+    `TLambda;
+    `TOption;
+    `TList;
+    `TSet;
+    `TMap;
+    `TBig_map;
+    `TContract;
+    `TSapling_transaction;
+    `TSapling_state;
+    `TOperation;
+    `TChain_id;
+    `TBls12_381_g1;
+    `TBls12_381_g2;
+    `TBls12_381_fr;
+    `TTicket;
+  |]
 
 type atomic_type_name =
   [ `TUnit
@@ -121,24 +123,26 @@ type atomic_type_name =
 let (_ : atomic_type_name -> type_name) = fun x -> (x :> type_name)
 
 let all_atomic_type_names : atomic_type_name array =
-  [| `TUnit;
-     `TInt;
-     `TNat;
-     `TSignature;
-     `TString;
-     `TBytes;
-     `TMutez;
-     `TKey_hash;
-     `TKey;
-     `TTimestamp;
-     `TAddress;
-     `TBool;
-     `TSapling_transaction;
-     `TSapling_state;
-     `TChain_id;
-     `TBls12_381_g1;
-     `TBls12_381_g2;
-     `TBls12_381_fr |]
+  [|
+    `TUnit;
+    `TInt;
+    `TNat;
+    `TSignature;
+    `TString;
+    `TBytes;
+    `TMutez;
+    `TKey_hash;
+    `TKey;
+    `TTimestamp;
+    `TAddress;
+    `TBool;
+    `TSapling_transaction;
+    `TSapling_state;
+    `TChain_id;
+    `TBls12_381_g1;
+    `TBls12_381_g2;
+    `TBls12_381_fr;
+  |]
 
 type comparable_type_name =
   [ `TUnit
@@ -162,40 +166,44 @@ type comparable_type_name =
 let (_ : comparable_type_name -> type_name) = fun x -> (x :> type_name)
 
 let all_comparable_type_names : comparable_type_name array =
-  [| `TUnit;
-     `TInt;
-     `TNat;
-     `TSignature;
-     `TString;
-     `TBytes;
-     `TMutez;
-     `TBool;
-     `TKey_hash;
-     `TKey;
-     `TTimestamp;
-     `TChain_id;
-     `TAddress;
-     `TPair;
-     `TUnion;
-     `TOption |]
+  [|
+    `TUnit;
+    `TInt;
+    `TNat;
+    `TSignature;
+    `TString;
+    `TBytes;
+    `TMutez;
+    `TBool;
+    `TKey_hash;
+    `TKey;
+    `TTimestamp;
+    `TChain_id;
+    `TAddress;
+    `TPair;
+    `TUnion;
+    `TOption;
+  |]
 
 type 'a comparable_and_atomic = 'a
   constraint 'a = [< comparable_type_name] constraint 'a = [< atomic_type_name]
 
 let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
-  [| `TUnit;
-     `TInt;
-     `TNat;
-     `TSignature;
-     `TString;
-     `TBytes;
-     `TMutez;
-     `TBool;
-     `TKey_hash;
-     `TKey;
-     `TTimestamp;
-     `TChain_id;
-     `TAddress |]
+  [|
+    `TUnit;
+    `TInt;
+    `TNat;
+    `TSignature;
+    `TString;
+    `TBytes;
+    `TMutez;
+    `TBool;
+    `TKey_hash;
+    `TKey;
+    `TTimestamp;
+    `TChain_id;
+    `TAddress;
+  |]
 
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
@@ -297,80 +305,49 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     let type_of_atomic_type_name (at_tn : atomic_type_name) :
         Script_ir_translator.ex_ty =
       match at_tn with
-      | `TString ->
-          Ex_ty (String_t None)
-      | `TNat ->
-          Ex_ty (Nat_t None)
-      | `TKey ->
-          Ex_ty (Key_t None)
-      | `TBytes ->
-          Ex_ty (Bytes_t None)
-      | `TBool ->
-          Ex_ty (Bool_t None)
-      | `TAddress ->
-          Ex_ty (Address_t None)
-      | `TTimestamp ->
-          Ex_ty (Timestamp_t None)
-      | `TKey_hash ->
-          Ex_ty (Key_hash_t None)
-      | `TMutez ->
-          Ex_ty (Mutez_t None)
-      | `TSignature ->
-          Ex_ty (Signature_t None)
-      | `TUnit ->
-          Ex_ty (Unit_t None)
-      | `TInt ->
-          Ex_ty (Int_t None)
-      | `TSapling_state ->
-          Ex_ty (Sapling_state_t (memo_size, None))
-      | `TSapling_transaction ->
-          Ex_ty (Sapling_transaction_t (memo_size, None))
-      | `TChain_id ->
-          Ex_ty (Chain_id_t None)
-      | `TBls12_381_g1 ->
-          Ex_ty (Bls12_381_g1_t None)
-      | `TBls12_381_g2 ->
-          Ex_ty (Bls12_381_g2_t None)
-      | `TBls12_381_fr ->
-          Ex_ty (Bls12_381_fr_t None)
+      | `TString -> Ex_ty (String_t None)
+      | `TNat -> Ex_ty (Nat_t None)
+      | `TKey -> Ex_ty (Key_t None)
+      | `TBytes -> Ex_ty (Bytes_t None)
+      | `TBool -> Ex_ty (Bool_t None)
+      | `TAddress -> Ex_ty (Address_t None)
+      | `TTimestamp -> Ex_ty (Timestamp_t None)
+      | `TKey_hash -> Ex_ty (Key_hash_t None)
+      | `TMutez -> Ex_ty (Mutez_t None)
+      | `TSignature -> Ex_ty (Signature_t None)
+      | `TUnit -> Ex_ty (Unit_t None)
+      | `TInt -> Ex_ty (Int_t None)
+      | `TSapling_state -> Ex_ty (Sapling_state_t (memo_size, None))
+      | `TSapling_transaction -> Ex_ty (Sapling_transaction_t (memo_size, None))
+      | `TChain_id -> Ex_ty (Chain_id_t None)
+      | `TBls12_381_g1 -> Ex_ty (Bls12_381_g1_t None)
+      | `TBls12_381_g2 -> Ex_ty (Bls12_381_g2_t None)
+      | `TBls12_381_fr -> Ex_ty (Bls12_381_fr_t None)
 
     let comparable_type_of_comparable_atomic_type_name
         (cmp_tn : 'a comparable_and_atomic) :
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
-      | `TString ->
-          Ex_comparable_ty (String_key None)
-      | `TNat ->
-          Ex_comparable_ty (Nat_key None)
-      | `TBytes ->
-          Ex_comparable_ty (Bytes_key None)
-      | `TBool ->
-          Ex_comparable_ty (Bool_key None)
-      | `TAddress ->
-          Ex_comparable_ty (Address_key None)
-      | `TTimestamp ->
-          Ex_comparable_ty (Timestamp_key None)
-      | `TKey_hash ->
-          Ex_comparable_ty (Key_hash_key None)
-      | `TMutez ->
-          Ex_comparable_ty (Mutez_key None)
-      | `TInt ->
-          Ex_comparable_ty (Int_key None)
-      | `TUnit ->
-          Ex_comparable_ty (Unit_key None)
-      | `TSignature ->
-          Ex_comparable_ty (Signature_key None)
-      | `TKey ->
-          Ex_comparable_ty (Key_key None)
-      | `TChain_id ->
-          Ex_comparable_ty (Chain_id_key None)
+      | `TString -> Ex_comparable_ty (String_key None)
+      | `TNat -> Ex_comparable_ty (Nat_key None)
+      | `TBytes -> Ex_comparable_ty (Bytes_key None)
+      | `TBool -> Ex_comparable_ty (Bool_key None)
+      | `TAddress -> Ex_comparable_ty (Address_key None)
+      | `TTimestamp -> Ex_comparable_ty (Timestamp_key None)
+      | `TKey_hash -> Ex_comparable_ty (Key_hash_key None)
+      | `TMutez -> Ex_comparable_ty (Mutez_key None)
+      | `TInt -> Ex_comparable_ty (Int_key None)
+      | `TUnit -> Ex_comparable_ty (Unit_key None)
+      | `TSignature -> Ex_comparable_ty (Signature_key None)
+      | `TKey -> Ex_comparable_ty (Key_key None)
+      | `TChain_id -> Ex_comparable_ty (Chain_id_key None)
 
     let rec m_type ~max_depth : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in
       let open M in
       if max_depth = 0 then
         (* let* at_tn = uniform_atomic_type_name in
-        return (type_of_atomic_type_name at_tn) *)
+           return (type_of_atomic_type_name at_tn) *)
         let_star uniform_atomic_type_name (fun at_tn ->
             return (type_of_atomic_type_name at_tn))
       else
@@ -382,7 +359,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             | `TPair ->
                 let max_depth = max_depth - 1 in
                 (*let* Ex_ty left = m_type ~max_depth in
-                let* Ex_ty right = m_type ~max_depth in*)
+                  let* Ex_ty right = m_type ~max_depth in*)
                 let_star (m_type ~max_depth) (fun (Ex_ty left) ->
                     let_star (m_type ~max_depth) (fun (Ex_ty right) ->
                         return
@@ -392,14 +369,14 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             | `TLambda ->
                 let max_depth = max_depth - 1 in
                 (*let* Ex_ty domain = m_type ~max_depth in
-                let* Ex_ty range = m_type ~max_depth in*)
+                  let* Ex_ty range = m_type ~max_depth in*)
                 let_star (m_type ~max_depth) (fun (Ex_ty domain) ->
                     let_star (m_type ~max_depth) (fun (Ex_ty range) ->
                         return @@ Ex_ty (Lambda_t (domain, range, None))))
             | `TUnion ->
                 let max_depth = max_depth - 1 in
                 (* let* Ex_ty left = m_type ~max_depth in
-                let* Ex_ty right = m_type ~max_depth in *)
+                   let* Ex_ty right = m_type ~max_depth in *)
                 let_star (m_type ~max_depth) (fun (Ex_ty left) ->
                     let_star (m_type ~max_depth) (fun (Ex_ty right) ->
                         return
@@ -412,7 +389,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             | `TMap ->
                 let max_depth = max_depth - 1 in
                 (* let* Ex_comparable_ty key = m_comparable_type ~max_depth in
-                let* Ex_ty elt = m_type ~max_depth in *)
+                   let* Ex_ty elt = m_type ~max_depth in *)
                 let_star
                   (m_comparable_type ~max_depth)
                   (fun (Ex_comparable_ty key) ->
@@ -433,8 +410,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
                   (fun (Ex_ty elt) -> return (Ex_ty (List_t (elt, None))))
             | `TTicket ->
                 (* let* Ex_comparable_ty contents =
-                  m_comparable_type ~max_depth:(max_depth - 1)
-                in*)
+                     m_comparable_type ~max_depth:(max_depth - 1)
+                   in*)
                 let_star
                   (m_comparable_type ~max_depth:(max_depth - 1))
                   (fun (Ex_comparable_ty contents) ->
@@ -455,14 +432,12 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         (* let* cmp_tn = uniform_comparable_type_name in *)
         let_star uniform_comparable_type_name (fun cmp_tn ->
             match cmp_tn with
-            | `TString ->
-                return (Ex_comparable_ty (String_key None))
-            | `TNat ->
-                return (Ex_comparable_ty (Nat_key None))
+            | `TString -> return (Ex_comparable_ty (String_key None))
+            | `TNat -> return (Ex_comparable_ty (Nat_key None))
             | `TPair ->
                 let max_depth = max_depth - 1 in
                 (*let* Ex_comparable_ty l = m_comparable_type ~max_depth in
-                let* Ex_comparable_ty r = m_comparable_type ~max_depth in*)
+                  let* Ex_comparable_ty r = m_comparable_type ~max_depth in*)
                 let_star
                   (m_comparable_type ~max_depth)
                   (fun (Ex_comparable_ty l) ->
@@ -472,12 +447,11 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
                         return
                           (Ex_comparable_ty
                              (Pair_key ((l, None), (r, None), None)))))
-            | `TKey ->
-                return (Ex_comparable_ty (Key_key None))
+            | `TKey -> return (Ex_comparable_ty (Key_key None))
             | `TUnion ->
                 let max_depth = max_depth - 1 in
                 (* let* Ex_comparable_ty l = m_comparable_type ~max_depth in
-                let* Ex_comparable_ty r = m_comparable_type ~max_depth in *)
+                   let* Ex_comparable_ty r = m_comparable_type ~max_depth in *)
                 let_star
                   (m_comparable_type ~max_depth)
                   (fun (Ex_comparable_ty l) ->
@@ -494,26 +468,16 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
                   (m_comparable_type ~max_depth)
                   (fun (Ex_comparable_ty t) ->
                     return (Ex_comparable_ty (Option_key (t, None))))
-            | `TBytes ->
-                return (Ex_comparable_ty (Bytes_key None))
-            | `TChain_id ->
-                return (Ex_comparable_ty (Chain_id_key None))
-            | `TBool ->
-                return (Ex_comparable_ty (Bool_key None))
-            | `TAddress ->
-                return (Ex_comparable_ty (Address_key None))
-            | `TTimestamp ->
-                return (Ex_comparable_ty (Timestamp_key None))
-            | `TKey_hash ->
-                return (Ex_comparable_ty (Key_hash_key None))
-            | `TMutez ->
-                return (Ex_comparable_ty (Mutez_key None))
-            | `TSignature ->
-                return (Ex_comparable_ty (Signature_key None))
-            | `TUnit ->
-                return (Ex_comparable_ty (Unit_key None))
-            | `TInt ->
-                return (Ex_comparable_ty (Int_key None)))
+            | `TBytes -> return (Ex_comparable_ty (Bytes_key None))
+            | `TChain_id -> return (Ex_comparable_ty (Chain_id_key None))
+            | `TBool -> return (Ex_comparable_ty (Bool_key None))
+            | `TAddress -> return (Ex_comparable_ty (Address_key None))
+            | `TTimestamp -> return (Ex_comparable_ty (Timestamp_key None))
+            | `TKey_hash -> return (Ex_comparable_ty (Key_hash_key None))
+            | `TMutez -> return (Ex_comparable_ty (Mutez_key None))
+            | `TSignature -> return (Ex_comparable_ty (Signature_key None))
+            | `TUnit -> return (Ex_comparable_ty (Unit_key None))
+            | `TInt -> return (Ex_comparable_ty (Int_key None)))
   end
 
   (* Type-directed generation of random values. *)
@@ -528,30 +492,18 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       let open Script_typed_ir in
       fun typ ->
         match typ with
-        | Never_t _ ->
-            assert false
-        | Unit_t _ ->
-            M.return ()
-        | Int_t _ ->
-            Michelson_base.int
-        | Nat_t _ ->
-            Michelson_base.nat
-        | Signature_t _ ->
-            Michelson_base.signature
-        | String_t _ ->
-            Michelson_base.string
-        | Bytes_t _ ->
-            Michelson_base.bytes
-        | Mutez_t _ ->
-            Michelson_base.tez
-        | Key_hash_t _ ->
-            Crypto_samplers.pkh
-        | Key_t _ ->
-            Crypto_samplers.pk
-        | Timestamp_t _ ->
-            Michelson_base.timestamp
-        | Bool_t _ ->
-            Michelson_base.bool
+        | Never_t _ -> assert false
+        | Unit_t _ -> M.return ()
+        | Int_t _ -> Michelson_base.int
+        | Nat_t _ -> Michelson_base.nat
+        | Signature_t _ -> Michelson_base.signature
+        | String_t _ -> Michelson_base.string
+        | Bytes_t _ -> Michelson_base.bytes
+        | Mutez_t _ -> Michelson_base.tez
+        | Key_hash_t _ -> Crypto_samplers.pkh
+        | Key_t _ -> Crypto_samplers.pk
+        | Timestamp_t _ -> Michelson_base.timestamp
+        | Bool_t _ -> Michelson_base.bool
         | Address_t _ ->
             fun rng_state ->
               ( Alpha_context.Contract.implicit_contract
@@ -560,7 +512,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
             M.(
               (* let* left_v = value left_t in
-              let* right_v = value right_t in *)
+                 let* right_v = value right_t in *)
               let_star (value left_t) (fun left_v ->
                   let_star (value right_t) (fun right_v ->
                       return (left_v, right_v))))
@@ -568,32 +520,21 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             fun rng_state ->
               if Michelson_base.bool rng_state then L (value left_t rng_state)
               else R (value right_t rng_state)
-        | Lambda_t (arg_ty, ret_ty, _) ->
-            generate_lambda arg_ty ret_ty
+        | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
         | Option_t (ty, _) ->
             fun rng_state ->
               if Michelson_base.bool rng_state then None
               else Some (value ty rng_state)
-        | List_t (elt_ty, _) ->
-            generate_list elt_ty
-        | Set_t (elt_ty, _) ->
-            generate_set elt_ty
-        | Map_t (key_ty, val_ty, _) ->
-            generate_map key_ty val_ty
-        | Contract_t (arg_ty, _) ->
-            generate_contract arg_ty
-        | Operation_t _ ->
-            generate_operation
-        | Big_map_t (key_ty, val_ty, _) ->
-            generate_big_map key_ty val_ty
-        | Chain_id_t _ ->
-            M.return Chain_id.zero
-        | Bls12_381_g1_t _ ->
-            generate_bls12_381_g1
-        | Bls12_381_g2_t _ ->
-            generate_bls12_381_g2
-        | Bls12_381_fr_t _ ->
-            generate_bls12_381_fr
+        | List_t (elt_ty, _) -> generate_list elt_ty
+        | Set_t (elt_ty, _) -> generate_set elt_ty
+        | Map_t (key_ty, val_ty, _) -> generate_map key_ty val_ty
+        | Contract_t (arg_ty, _) -> generate_contract arg_ty
+        | Operation_t _ -> generate_operation
+        | Big_map_t (key_ty, val_ty, _) -> generate_big_map key_ty val_ty
+        | Chain_id_t _ -> M.return Chain_id.zero
+        | Bls12_381_g1_t _ -> generate_bls12_381_g1
+        | Bls12_381_g2_t _ -> generate_bls12_381_g2
+        | Bls12_381_fr_t _ -> generate_bls12_381_fr
         | Ticket_t (contents_ty, _) ->
             let ty = comparable_downcast contents_ty in
             generate_ticket ty
@@ -664,25 +605,22 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         let open TzPervasives in
         let result =
           Lwt_main.run
-            ( Execution_context.make ~rng_state
-            >>=? fun (ctxt, _) ->
-            let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
-            (* Cannot have big maps under big maps *)
-            let opt_elt_ty = Option_t (elt_ty, None) in
-            let map = generate_map key_ty opt_elt_ty rng_state in
-            Script_ir_translator.map_fold
-              (fun k v acc ->
-                acc
-                >>=? fun (bm, ctxt_acc) ->
-                Script_ir_translator.big_map_update ctxt_acc k v bm)
-              map
-              (return (big_map, ctxt))
-            >|= Environment.wrap_tzresult
-            >>=? fun (big_map, _) -> return big_map )
+            ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+              let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
+              (* Cannot have big maps under big maps *)
+              let opt_elt_ty = Option_t (elt_ty, None) in
+              let map = generate_map key_ty opt_elt_ty rng_state in
+              Script_ir_translator.map_fold
+                (fun k v acc ->
+                  acc >>=? fun (bm, ctxt_acc) ->
+                  Script_ir_translator.big_map_update ctxt_acc k v bm)
+                map
+                (return (big_map, ctxt))
+              >|= Environment.wrap_tzresult
+              >>=? fun (big_map, _) -> return big_map )
         in
         match result with
-        | Ok x ->
-            x
+        | Ok x -> x
         | Error e ->
             Format.eprintf
               "%a@."
@@ -699,8 +637,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       let_star (value (Address_t None)) (fun addr -> return (arg_ty, addr))
 
     and generate_operation :
-        ( Alpha_context.packed_internal_operation
-        * Alpha_context.Lazy_storage.diffs option )
+        (Alpha_context.packed_internal_operation
+        * Alpha_context.Lazy_storage.diffs option)
         sampler =
      fun rng_state ->
       let transfer = generate_transfer_tokens rng_state in
@@ -708,39 +646,28 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
     and generate_transfer_tokens :
         Alpha_context.packed_internal_operation sampler =
-     fun _rng_state ->
-      Stdlib.failwith "generate_transfer_tokens: unimplemented"
+     fun _rng_state -> Stdlib.failwith "generate_transfer_tokens: unimplemented"
 
     and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
      fun rng_state ->
-      let b =
-        Bls12_381.G1.Uncompressed.(to_bytes (random ~state:rng_state ()))
-      in
+      let b = Bls12_381.G1.(to_bytes (random ~state:rng_state ())) in
       match Environment.Bls12_381.G1.of_bytes_opt b with
-      | Some x ->
-          x
-      | None ->
-          assert false
+      | Some x -> x
+      | None -> assert false
 
     and generate_bls12_381_g2 : Environment.Bls12_381.G2.t sampler =
      fun rng_state ->
-      let b =
-        Bls12_381.G2.Uncompressed.(to_bytes (random ~state:rng_state ()))
-      in
+      let b = Bls12_381.G2.(to_bytes (random ~state:rng_state ())) in
       match Environment.Bls12_381.G2.of_bytes_opt b with
-      | Some x ->
-          x
-      | None ->
-          assert false
+      | Some x -> x
+      | None -> assert false
 
     and generate_bls12_381_fr : Environment.Bls12_381.Fr.t sampler =
      fun rng_state ->
       let b = Bls12_381.Fr.(to_bytes (random ~state:rng_state ())) in
       match Environment.Bls12_381.Fr.of_bytes_opt b with
-      | Some x ->
-          x
-      | None ->
-          assert false
+      | Some x -> x
+      | None -> assert false
 
     and generate_ticket :
         type a. a Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
@@ -757,8 +684,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     let comparable ty = value (comparable_downcast ty)
 
     (* Random stack generation. *)
-    let rec stack :
-        type a b. (a, b) Script_typed_ir.stack_ty -> (a * b) sampler =
+    let rec stack : type a b. (a, b) Script_typed_ir.stack_ty -> (a * b) sampler
+        =
       let open M in
       let open Script_typed_ir in
       fun stack_ty ->
@@ -769,7 +696,6 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             let* tl = stack tl in *)
             let_star (value ty) (fun elt ->
                 let_star (stack tl) (fun tl -> return ((elt, tl) : a * b)))
-        | Bot_t ->
-            return (EmptyCell, EmptyCell)
+        | Bot_t -> return (EmptyCell, EmptyCell)
   end
 end

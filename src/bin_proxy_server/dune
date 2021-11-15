@@ -4,6 +4,7 @@
 
 (executables
  (names main_proxy_server)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-proxy-server)
  (package tezos-proxy-server)
  (libraries tezos-base
@@ -54,13 +55,38 @@
             (select void_for_linking-009-PsFLoren from
               (tezos-client-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
               (-> void_for_linking-009-PsFLoren.empty))
+            (select void_for_linking-010-PtGRANAD from
+              (tezos-client-010-PtGRANAD -> void_for_linking-010-PtGRANAD.empty)
+              (-> void_for_linking-010-PtGRANAD.empty))
+            (select void_for_linking-011-PtHangz2 from
+              (tezos-client-011-PtHangz2 -> void_for_linking-011-PtHangz2.empty)
+              (-> void_for_linking-011-PtHangz2.empty))
 
             (select void_for_linking-alpha from
               (tezos-client-alpha -> void_for_linking-alpha.empty)
               (-> void_for_linking-alpha.empty))
             (select void_for_linking-demo-counter from
               (tezos-client-demo-counter -> void_for_linking-demo-counter.empty)
-              (-> void_for_linking-demo-counter.empty)))
+              (-> void_for_linking-demo-counter.empty))
+
+            (select void_for_linking-007-PsDELPH1-protocol-plugin from
+              (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
+              (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))
+            (select void_for_linking-008-PtEdo2Zk-protocol-plugin from
+              (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty)
+              (-> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty))
+            (select void_for_linking-009-PsFLoren-protocol-plugin from
+              (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-009-PsFLoren-protocol-plugin.empty)
+              (-> void_for_linking-009-PsFLoren-protocol-plugin.empty))
+            (select void_for_linking-010-PtGRANAD-protocol-plugin from
+              (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-010-PtGRANAD-protocol-plugin.empty)
+              (-> void_for_linking-010-PtGRANAD-protocol-plugin.empty))
+            (select void_for_linking-011-PtHangz2-protocol-plugin from
+              (tezos-protocol-plugin-011-PtHangz2 -> void_for_linking-011-PtHangz2-protocol-plugin.empty)
+              (-> void_for_linking-011-PtHangz2-protocol-plugin.empty))
+            (select void_for_linking-alpha-protocol-plugin from
+              (tezos-protocol-plugin-alpha -> void_for_linking-alpha-protocol-plugin.empty)
+              (-> void_for_linking-alpha-protocol-plugin.empty)))
 
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
@@ -82,14 +108,14 @@
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-009-PsFLoren.empty "")
+   (write-file void_for_linking-010-PtGRANAD.empty "")
+   (write-file void_for_linking-011-PtHangz2.empty "")
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
-   (write-file void_for_linking-baking-alpha.empty "")
-   (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-baking-009-PsFLoren.empty "")
+   (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
+   (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin.empty "")
+   (write-file void_for_linking-009-PsFLoren-protocol-plugin.empty "")
+   (write-file void_for_linking-010-PtGRANAD-protocol-plugin.empty "")
+   (write-file void_for_linking-011-PtHangz2-protocol-plugin.empty "")
+   (write-file void_for_linking-alpha-protocol-plugin.empty "")
 )))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

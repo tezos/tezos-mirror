@@ -1,4 +1,4 @@
-(executables
+(tests
  (names test_rewriting)
  (libraries tezos-micheline
             tezos-micheline-rewriting
@@ -6,19 +6,5 @@
             tezos-error-monad
             tezos-client-alpha
             alcotest-lwt)
- (flags (:standard -open Tezos_micheline)))
-
-(rule
- (alias buildtest)
- (deps test_rewriting.exe)
- (action (progn)))
-
-(rule
- (alias runtest_test_rewriting)
- (action (run %{exe:test_rewriting.exe})))
-
-(rule
- (alias runtest)
  (package tezos-micheline-rewriting)
- (deps (alias runtest_test_rewriting))
- (action (progn)))
+ (flags (:standard -open Tezos_micheline)))

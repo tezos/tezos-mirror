@@ -30,137 +30,31 @@
     Subject:      Basic behaviors of the API for generic resource
                   fetching/requesting service. Instantiating the [Requester]
                   functor with simple mocks.
-   
+
                   [Memory_table] and [Disk_table] are hash tables from string
                   to int.
-                  [Precheck] either accepts or reject notified values based on
-                  a boolean validation clue [Precheck.param], regardless of
+                  [Probe] either accepts or reject notified values based on
+                  a boolean validation clue [Probe.param], regardless of
                   the key.
                   [Request] simply logs the requests made to [Request.send],
                   and considers only a unique, statically defined, active peer.
 *)
 
-(** Setup mocks *)
+open Lib_test.Testable
+open Lib_test.Assert
+open Lib_test.Lwt_assert
+open Tztestable
+include Shared
 
-type test_key = string
+let precheck_pass = true
 
-type test_value = int
+let precheck_fail = false
 
-type test_precheck_param = bool
+(** Requester-specific Alcotest testable instantiations *)
 
-module Test_hash_key = struct
-  type t = test_key
+let testable_test_value : Parameters.value Alcotest.testable = Alcotest.int
 
-  let name = "test_key_hashes"
-
-  let pp ppf v = Format.fprintf ppf "%s" v
-
-  let encoding = Data_encoding.string
-
-  module Logging = struct
-    let tag = Tag.def ~doc:"Operation hashes" "operation_hashes" pp
-  end
-end
-
-module Test_disk_table_hash = struct
-  include Hashtbl.Make (struct
-    type t = test_key
-
-    let hash = Hashtbl.hash
-
-    let equal s1 s2 = s1 = s2
-  end)
-
-  type store = test_value t
-
-  type value = test_value
-
-  let known (st : store) (k : test_key) = Lwt.return (mem st k)
-
-  let not_found = Error_monad.error_of_exn Not_found
-
-  let read st k = Lwt.return (Option.to_result ~none:not_found (find st k))
-
-  let read_opt st k = Lwt.return (find st k)
-end
-
-module Test_memory_table = Hashtbl.MakeSeeded (struct
-  type t = test_key
-
-  let hash = Hashtbl.seeded_hash
-
-  let equal s1 s2 = s1 = s2
-end)
-
-(* A PRECHECK that validates all values iff its precheck param is true
-   *)
-let (precheck_pass : test_precheck_param) = true
-
-let (precheck_fail : test_precheck_param) = false
-
-module Test_precheck = struct
-  type key = test_key
-
-  type param = test_precheck_param
-
-  type notified_value = test_value
-
-  type value = test_value
-
-  let precheck (_ : key) (p : param) (nv : notified_value) =
-    if p = precheck_pass then Some nv else None
-end
-
-(* an instantiation of REQUEST that does nothing except register
-   incoming requests *)
-module Test_request = struct
-  type key = test_key
-
-  type param = unit
-
-  let initial_delay = Time.System.Span.of_seconds_exn 0.01
-
-  let active (_ : param) = P2p_peer.Set.of_list [P2p_peer.Id.zero]
-
-  let registered_requests : (param * P2p_peer.Id.t * key list) list ref = ref []
-
-  let send (requester : param) (id : P2p_peer.Id.t) (kl : key list) =
-    registered_requests := (requester, id, kl) :: !registered_requests ;
-    ()
-
-  let clear_registered_requests () = registered_requests := []
-end
-
-module Test_Requester :
-  Requester.FULL_REQUESTER
-    with type key := test_key
-     and type store := Test_disk_table_hash.store
-     and type value := test_value
-     and type notified_value := test_value
-     and type request_param = Test_request.param
-     and type param = Test_precheck.param =
-  Requester.Make (Test_hash_key) (Test_disk_table_hash) (Test_memory_table)
-    (Test_request)
-    (Test_precheck)
-
-let init_full_requester_disk ?global_input () :
-    Test_Requester.t * Test_disk_table_hash.store =
-  let (st : Test_disk_table_hash.store) = Test_disk_table_hash.create 16 in
-  let (rc : Test_request.param) = () in
-  let requester = Test_Requester.create ?global_input rc st in
-  (requester, st)
-
-let init_full_requester ?global_input () : Test_Requester.t =
-  fst (init_full_requester_disk ?global_input ())
-
-(** [] extends [Test_services] with Requester-specific
-   Alcotest testable instantiations *)
-
-open Test_services
-
-let testable_test_value : test_value Alcotest.testable = Alcotest.int
-
-let testable_test_key : test_key Alcotest.testable = Alcotest.string
+let testable_test_key : Parameters.key Alcotest.testable = Alcotest.string
 
 (** Test helpers *)
 
@@ -196,7 +90,7 @@ let test_full_requester_create _ () =
     notified values.
 *)
 let test_full_requester_create_with_global_input _ () =
-  let (global_input : (test_key * test_value) Lwt_watcher.input) =
+  let (global_input : (Parameters.key * Parameters.value) Lwt_watcher.input) =
     Lwt_watcher.create_input ()
   in
   let (stream, stopper) = Lwt_watcher.create_stream global_input in

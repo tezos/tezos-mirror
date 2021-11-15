@@ -31,6 +31,13 @@ let block_param ~name ~desc t =
     (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
     t
 
+let operation_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (Operation_hash.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   let group =
@@ -83,19 +90,52 @@ let commands () =
       no_options
       (fixed ["show"; "current"; "checkpoint"])
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Chain.checkpoint cctxt ~chain:cctxt#chain ()
-        >>=? fun (block_header, save_point, caboose, history_mode) ->
+        Shell_services.Chain.Levels.checkpoint cctxt ~chain:cctxt#chain ()
+        >>=? fun (checkpoint_hash, checkpoint_level) ->
         cctxt#message
-          "@[<v 0>Checkpoint: %s@,\
-           Checkpoint level: %ld@,\
-           History mode: %a@,\
-           Savepoint level: %ld@,\
-           Caboose level: %ld@]"
-          (Block_header.to_b58check block_header)
-          block_header.shell.level
-          History_mode.pp
-          history_mode
-          save_point
-          caboose
+          "@[<v 0>Checkpoint: %a@,Checkpoint level: %ld@]"
+          Block_hash.pp
+          checkpoint_hash
+          checkpoint_level
         >>= fun () -> return ());
+    command
+      ~group
+      ~desc:
+        "Remove an operation from the mempool if present, reverting its effect \
+         if it was applied. Add it to the set of banned operations to prevent \
+         it from being fetched/processed/injected in the future. Note: If the \
+         baker has already received the operation, then it's necessary to \
+         restart it to flush the operation from it."
+      no_options
+      (prefixes ["ban"; "operation"]
+      @@ operation_param ~name:"operation" ~desc:"hash of operation to ban"
+      @@ stop)
+      (fun () op_hash (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.ban_operation cctxt ~chain:cctxt#chain op_hash
+        >>=? fun () ->
+        cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
+        >>= fun () -> return ());
+    command
+      ~group
+      ~desc:
+        "Remove an operation from the set of banned operations (nothing \
+         happens if it was not banned)."
+      no_options
+      (prefixes ["unban"; "operation"]
+      @@ operation_param ~name:"operation" ~desc:"hash of operation to unban"
+      @@ stop)
+      (fun () op_hash (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.unban_operation cctxt ~chain:cctxt#chain op_hash
+        >>=? fun () ->
+        cctxt#message "Operation %a is now unbanned." Operation_hash.pp op_hash
+        >>= fun () -> return ());
+    command
+      ~group
+      ~desc:"Clear the set of banned operations."
+      no_options
+      (fixed ["unban"; "all"; "operations"])
+      (fun () (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.unban_all_operations cctxt ~chain:cctxt#chain ()
+        >>=? fun () ->
+        cctxt#message "All operations are now unbanned." >>= fun () -> return ());
   ]

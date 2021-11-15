@@ -42,6 +42,47 @@ type config = {
   listening_port : P2p_addr.port option;
 }
 
+type ('msg, 'peer_meta, 'conn_meta) dependencies = {
+  pool_greylist_peer :
+    ('msg, 'peer_meta, 'conn_meta) P2p_pool.t -> P2p_peer.Id.t -> unit;
+      (** [P2p_pool.greylist_peer] *)
+  peer_state_info_trusted :
+    ( ('msg, 'peer_meta, 'conn_meta) P2p_conn.t,
+      'peer_meta,
+      'conn_meta )
+    P2p_peer_state.Info.t ->
+    bool;
+      (** [P2p_peer_state.Info.trusted] *)
+  point_state_info_trusted :
+    ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
+      (** [P2p_point_state.Info.trusted] *)
+  fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;  (** [P2p_fd.connect] *)
+  socket_authenticate :
+    canceler:Lwt_canceler.t ->
+    proof_of_work_target:Crypto_box.pow_target ->
+    incoming:bool ->
+    P2p_io_scheduler.connection ->
+    P2p_point.Id.t ->
+    ?listening_port:int ->
+    P2p_identity.t ->
+    Network_version.t ->
+    'conn_meta P2p_params.conn_meta_config ->
+    ('conn_meta P2p_connection.Info.t
+    * 'conn_meta P2p_socket.authenticated_connection)
+    tzresult
+    Lwt.t;
+      (** [P2p_socket.authenticate] *)
+  socket_accept :
+    ?incoming_message_queue_size:int ->
+    ?outgoing_message_queue_size:int ->
+    ?binary_chunks_size:int ->
+    canceler:Lwt_canceler.t ->
+    'conn_meta P2p_socket.authenticated_connection ->
+    'msg P2p_message.t Data_encoding.t ->
+    ('msg P2p_message.t, 'conn_meta) P2p_socket.t tzresult Lwt.t;
+      (** [P2p_socket.accept] *)
+}
+
 type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config;
   pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
@@ -57,10 +98,21 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) P2p_conn.t -> unit) list;
   answerer : 'msg P2p_answerer.t Lazy.t;
+  dependencies : ('msg, 'peer_meta, 'conn_meta) dependencies;
 }
 
 let create ?(p2p_versions = P2p_version.supported) config pool message_config
     conn_meta_config io_sched triggers ~log ~answerer =
+  let dependencies =
+    {
+      pool_greylist_peer = P2p_pool.greylist_peer;
+      peer_state_info_trusted = P2p_peer_state.Info.trusted;
+      point_state_info_trusted = P2p_point_state.Info.trusted;
+      fd_connect = P2p_fd.connect;
+      socket_authenticate = P2p_socket.authenticate;
+      socket_accept = P2p_socket.accept;
+    }
+  in
   {
     config;
     conn_meta_config;
@@ -80,6 +132,7 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     log;
     pool;
     answerer;
+    dependencies;
   }
 
 let config t = t.config
@@ -98,7 +151,9 @@ let create_connection t p2p_conn id_point point_info peer_info
   in
   let messages = Lwt_pipe.create ?size () in
   let greylister () =
-    P2p_pool.greylist_peer t.pool (P2p_peer_state.Info.peer_id peer_info)
+    t.dependencies.pool_greylist_peer
+      t.pool
+      (P2p_peer_state.Info.peer_id peer_info)
   in
   let conn =
     P2p_conn.create
@@ -155,9 +210,9 @@ let is_acceptable t connection_point_info peer_info incoming version =
     && (not
           (Option.fold
              ~none:false
-             ~some:P2p_point_state.Info.trusted
+             ~some:t.dependencies.point_state_info_trusted
              connection_point_info))
-    && not (P2p_peer_state.Info.trusted peer_info)
+    && not (t.dependencies.peer_state_info_trusted peer_info)
   in
   if unexpected then (
     Events.(emit__dont_wait__use_with_care peer_rejected) () ;
@@ -228,7 +283,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   protect
     ~canceler
     (fun () ->
-      P2p_socket.authenticate
+      t.dependencies.socket_authenticate
         ~canceler
         ~proof_of_work_target:t.config.proof_of_work_target
         ~incoming
@@ -376,7 +431,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       protect
         ~canceler
         (fun () ->
-          P2p_socket.accept
+          t.dependencies.socket_accept
             ?incoming_message_queue_size:t.config.incoming_message_queue_size
             ?outgoing_message_queue_size:t.config.outgoing_message_queue_size
             ?binary_chunks_size:t.config.binary_chunks_size
@@ -423,14 +478,18 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         | ((addr, _), Some (_, port)) -> (addr, Some port)
         | (id_point, None) -> id_point
       in
-      return
-        (create_connection
-           t
-           conn
-           id_point
-           connection_point_info
-           peer_info
-           version)
+      let conn =
+        create_connection
+          t
+          conn
+          id_point
+          connection_point_info
+          peer_info
+          version
+      in
+      let peer_id = P2p_peer_state.Info.peer_id peer_info in
+      Events.(emit new_connection) (fst id_point, snd id_point, peer_id)
+      >>= fun () -> return conn
 
 let authenticate t ?point_info canceler fd point =
   let scheduled_conn = P2p_io_scheduler.register t.io_sched fd in
@@ -457,23 +516,15 @@ let accept t fd point =
     || P2p_pool.Points.banned t.pool point
   then
     Error_monad.dont_wait
+      (fun () -> P2p_fd.close fd)
+      (fun trace ->
+        Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-      (fun trace ->
-        Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
-      (fun () -> P2p_fd.close fd)
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add t.incoming point canceler ;
-    Lwt_utils.dont_wait
-      (fun exc ->
-        P2p_point.Table.remove t.incoming point ;
-        P2p_pool.greylist_addr t.pool (fst point) ;
-        Format.eprintf
-          "Uncaught exception on incoming connection from %a: %s\n%!"
-          P2p_point.Id.pp
-          point
-          (Printexc.to_string exc))
+    Lwt.dont_wait
       (fun () ->
         with_timeout
           ~canceler
@@ -482,6 +533,14 @@ let accept t fd point =
         >>= fun _ ->
         P2p_point.Table.remove t.incoming point ;
         Lwt.return_unit)
+      (fun exc ->
+        P2p_point.Table.remove t.incoming point ;
+        P2p_pool.greylist_addr t.pool (fst point) ;
+        Format.eprintf
+          "Uncaught exception on incoming connection from %a: %s\n%!"
+          P2p_point.Id.pp
+          point
+          (Printexc.to_string exc))
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
@@ -504,7 +563,8 @@ let connect ?timeout t point =
       let point_info = P2p_pool.register_point t.pool point in
       let ((addr, port) as point) = P2p_point_state.Info.point point_info in
       fail_unless
-        ((not t.config.private_mode) || P2p_point_state.Info.trusted point_info)
+        ((not t.config.private_mode)
+        || t.dependencies.point_state_info_trusted point_info)
         P2p_errors.Private_mode
       >>=? fun () ->
       fail_unless_disconnected_point point_info >>=? fun () ->
@@ -517,7 +577,7 @@ let connect ?timeout t point =
         ~canceler
         (fun () ->
           t.log (Outgoing_connection point) ;
-          P2p_fd.connect fd uaddr >>= fun () -> return_unit)
+          t.dependencies.fd_connect fd uaddr >>= fun () -> return_unit)
         ~on_error:(fun err ->
           Events.(emit connect_error) (point, err) >>= fun () ->
           let timestamp = Systime_os.now () in
@@ -527,7 +587,7 @@ let connect ?timeout t point =
             point_info ;
           (P2p_fd.close fd >>= function
            | Error trace ->
-               Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+               Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
                Lwt.return_unit
            | Ok () -> Lwt.return_unit)
           >>= fun () ->
@@ -547,3 +607,179 @@ let destroy t =
   P2p_point.Table.iter_p
     (fun _point canceler -> Error_monad.cancel_with_exceptions canceler)
     t.incoming
+
+module Internal_for_tests = struct
+  type nonrec ('msg, 'peer_meta, 'conn_meta) dependencies =
+        ('msg, 'peer_meta, 'conn_meta) dependencies = {
+    pool_greylist_peer :
+      ('msg, 'peer_meta, 'conn_meta) P2p_pool.t -> P2p_peer.Id.t -> unit;
+    peer_state_info_trusted :
+      ( ('msg, 'peer_meta, 'conn_meta) P2p_conn.t,
+        'peer_meta,
+        'conn_meta )
+      P2p_peer_state.Info.t ->
+      bool;
+    point_state_info_trusted :
+      ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
+    fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;
+    socket_authenticate :
+      canceler:Lwt_canceler.t ->
+      proof_of_work_target:Crypto_box.pow_target ->
+      incoming:bool ->
+      P2p_io_scheduler.connection ->
+      P2p_point.Id.t ->
+      ?listening_port:int ->
+      P2p_identity.t ->
+      Network_version.t ->
+      'conn_meta P2p_params.conn_meta_config ->
+      ('conn_meta P2p_connection.Info.t
+      * 'conn_meta P2p_socket.authenticated_connection)
+      tzresult
+      Lwt.t;
+    socket_accept :
+      ?incoming_message_queue_size:int ->
+      ?outgoing_message_queue_size:int ->
+      ?binary_chunks_size:int ->
+      canceler:Lwt_canceler.t ->
+      'conn_meta P2p_socket.authenticated_connection ->
+      'msg P2p_message.t Data_encoding.t ->
+      ('msg P2p_message.t, 'conn_meta) P2p_socket.t tzresult Lwt.t;
+  }
+
+  let mock_dependencies default_metadata =
+    {
+      pool_greylist_peer = (fun _ _ -> ());
+      peer_state_info_trusted = (fun _ -> true);
+      point_state_info_trusted = (fun _ -> true);
+      fd_connect = (fun _ _ -> Lwt.return_unit);
+      socket_authenticate =
+        (fun ~canceler:_
+             ~proof_of_work_target:_
+             ~incoming:_
+             _
+             _
+             ?listening_port:_
+             _
+             _
+             _ ->
+          let connection_info =
+            P2p_connection.Internal_for_tests.Info.mock default_metadata
+          in
+          let authenticated_connection =
+            P2p_socket.Internal_for_tests.mock_authenticated_connection
+              default_metadata
+          in
+          return (connection_info, authenticated_connection));
+      socket_accept =
+        (fun ?incoming_message_queue_size:_
+             ?outgoing_message_queue_size:_
+             ?binary_chunks_size:_
+             ~canceler:_
+             authenticated_connection
+             _encoding ->
+          return (P2p_socket.Internal_for_tests.mock authenticated_connection));
+    }
+
+  let dumb_config : config =
+    let incoming_app_message_queue_size = None in
+    let private_mode = true in
+    let min_connections = 10 in
+    let max_connections = 10 in
+    let max_incoming_connections = 20 in
+    let incoming_message_queue_size = None in
+    let outgoing_message_queue_size = None in
+    let binary_chunks_size = None in
+    let identity = P2p_identity.generate_with_pow_target_0 () in
+    let connection_timeout = Time.System.Span.of_seconds_exn 10. in
+    let authentication_timeout = Time.System.Span.of_seconds_exn 5. in
+    let reconnection_config =
+      P2p_point_state.Info.default_reconnection_config
+    in
+    let proof_of_work_target = Crypto_box.make_pow_target 0. in
+    let listening_port = Some 9732 in
+    {
+      incoming_app_message_queue_size;
+      private_mode;
+      min_connections;
+      max_connections;
+      max_incoming_connections;
+      incoming_message_queue_size;
+      outgoing_message_queue_size;
+      binary_chunks_size;
+      identity;
+      connection_timeout;
+      authentication_timeout;
+      reconnection_config;
+      proof_of_work_target;
+      listening_port;
+    }
+
+  (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through
+      this encoding. Any test that requires it should provide a valid encoding in whatever mock needs it directly.
+
+      The use of [assert false] rather than raising an error is to let developers have the stack trace, in case of test failure. *)
+  let make_crashing_encoding () : 'a Data_encoding.t =
+    Data_encoding.conv
+      (fun _ -> assert false)
+      (fun _ -> assert false)
+      Data_encoding.unit
+
+  let conn_meta_config_default () =
+    P2p_params.
+      {
+        conn_meta_encoding = make_crashing_encoding ();
+        conn_meta_value = (fun () -> assert false);
+        private_node = (fun _ -> false);
+      }
+
+  let message_config_default () =
+    P2p_params.
+      {
+        encoding = [];
+        chain_name = Distributed_db_version.Name.of_string "";
+        distributed_db_versions = [Distributed_db_version.zero];
+      }
+
+  let create ?(config = dumb_config) ?(log = fun _ -> ())
+      ?(triggers = P2p_trigger.create ())
+      ?(io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ())
+      ?(announced_version = Network_version.Internal_for_tests.mock ())
+      ?(conn_meta_config = conn_meta_config_default ())
+      ?(message_config = message_config_default ())
+      ?(custom_p2p_versions = [P2p_version.zero])
+      ?(encoding = make_crashing_encoding ())
+      ?(incoming = P2p_point.Table.create ~random:true 53)
+      ?(new_connection_hook = [])
+      ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
+      ('msg, 'peer_meta, 'conn_meta) t =
+    let pool =
+      match pool with
+      | `Pool pool -> pool
+      | `Make_default_pool default_peer_meta ->
+          P2p_pool.Internal_for_tests.create
+            (make_crashing_encoding ())
+            default_peer_meta
+    in
+    let dependencies =
+      match dependencies with
+      | `Dependencies dependencies -> dependencies
+      | `Make_default_dependencies default_conn_meta ->
+          mock_dependencies default_conn_meta
+    in
+    {
+      config;
+      pool;
+      log;
+      triggers;
+      io_sched;
+      announced_version;
+      conn_meta_config;
+      message_config;
+      custom_p2p_versions;
+      encoding;
+      incoming;
+      new_connection_hook;
+      answerer;
+      dependencies;
+    }
+end

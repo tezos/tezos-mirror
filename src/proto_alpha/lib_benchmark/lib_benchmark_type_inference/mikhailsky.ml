@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_alpha.Protocol
+open Protocol
 
 exception Term_contains_holes
 
@@ -38,11 +38,12 @@ struct
   let pp = Mikhailsky_prim.pp
 end
 
-include Micheline_with_hash_consing.Make
-          (Mikhailsky_signature)
-          (struct
-            let initial_size = None
-          end)
+include
+  Micheline_with_hash_consing.Make
+    (Mikhailsky_signature)
+    (struct
+      let initial_size = None
+    end)
 
 module Path = Path.With_hash_consing (struct
   let initial_size = None
@@ -69,24 +70,15 @@ let rec parse_ty :
     Type.Base.t =
  fun ~allow_big_map ~allow_operation ~allow_contract node ->
   match node with
-  | Prim (_loc, T_unit, [], _annot) ->
-      Type.unit
-  | Prim (_loc, T_int, [], _annot) ->
-      Type.int
-  | Prim (_loc, T_nat, [], _annot) ->
-      Type.nat
-  | Prim (_loc, T_string, [], _annot) ->
-      Type.string
-  | Prim (_loc, T_bytes, [], _annot) ->
-      Type.bytes
-  | Prim (_loc, T_bool, [], _annot) ->
-      Type.bool
-  | Prim (_loc, T_key_hash, [], _annot) ->
-      Type.key_hash
-  | Prim (_loc, T_timestamp, [], _annot) ->
-      Type.timestamp
-  | Prim (_loc, T_mutez, [], _annot) ->
-      Type.mutez
+  | Prim (_loc, T_unit, [], _annot) -> Type.unit
+  | Prim (_loc, T_int, [], _annot) -> Type.int
+  | Prim (_loc, T_nat, [], _annot) -> Type.nat
+  | Prim (_loc, T_string, [], _annot) -> Type.string
+  | Prim (_loc, T_bytes, [], _annot) -> Type.bytes
+  | Prim (_loc, T_bool, [], _annot) -> Type.bool
+  | Prim (_loc, T_key_hash, [], _annot) -> Type.key_hash
+  | Prim (_loc, T_timestamp, [], _annot) -> Type.timestamp
+  | Prim (_loc, T_mutez, [], _annot) -> Type.mutez
   | Prim (_loc, T_option, [ut], _annot) ->
       let ty = parse_ty ~allow_big_map ~allow_operation ~allow_contract ut in
       Type.option ty
@@ -124,28 +116,17 @@ exception Ill_formed_mikhailsky
 
 let rec map_var f (x : Type.Base.t) =
   match x.node with
-  | Unit_t ->
-      prim T_unit [] []
-  | Var_t v ->
-      f v
-  | Int_t ->
-      prim T_int [] []
-  | Nat_t ->
-      prim T_nat [] []
-  | Bool_t ->
-      prim T_bool [] []
-  | String_t ->
-      prim T_string [] []
-  | Bytes_t ->
-      prim T_bytes [] []
-  | Key_hash_t ->
-      prim T_key_hash [] []
-  | Timestamp_t ->
-      prim T_timestamp [] []
-  | Mutez_t ->
-      prim T_mutez [] []
-  | Key_t ->
-      prim T_key [] []
+  | Unit_t -> prim T_unit [] []
+  | Var_t v -> f v
+  | Int_t -> prim T_int [] []
+  | Nat_t -> prim T_nat [] []
+  | Bool_t -> prim T_bool [] []
+  | String_t -> prim T_string [] []
+  | Bytes_t -> prim T_bytes [] []
+  | Key_hash_t -> prim T_key_hash [] []
+  | Timestamp_t -> prim T_timestamp [] []
+  | Mutez_t -> prim T_mutez [] []
+  | Key_t -> prim T_key [] []
   | Option_t ty ->
       let mty = map_var f ty in
       prim T_option [mty] []
@@ -182,22 +163,17 @@ let unparse_ty (x : Type.Base.t) =
    Erases annotations, introduces types where missing. *)
 let rec to_michelson (n : node) =
   match n with
-  | Micheline.Int (_, i) ->
-      Micheline.Int (0, i)
+  | Micheline.Int (_, i) -> Micheline.Int (0, i)
   | Micheline.Prim (_, head, [term], _)
     when Mikhailsky_prim.kind head = Annot_kind && head <> A_Lambda ->
       to_michelson term
-  | Micheline.Prim (_, I_Hole, _, _) ->
-      raise Term_contains_holes
-  | Micheline.Prim (_, D_Hole, _, _) ->
-      raise Term_contains_holes
+  | Micheline.Prim (_, I_Hole, _, _) -> raise Term_contains_holes
+  | Micheline.Prim (_, D_Hole, _, _) -> raise Term_contains_holes
   | Micheline.Prim (_, head, subterms, annots) ->
       let head = Mikhailsky_prim.to_michelson head in
       Micheline.Prim (0, head, List.map to_michelson subterms, annots)
-  | Micheline.String (_, s) ->
-      Micheline.String (0, s)
-  | Micheline.Bytes (_, b) ->
-      Micheline.Bytes (0, b)
+  | Micheline.String (_, s) -> Micheline.String (0, s)
+  | Micheline.Bytes (_, b) -> Micheline.Bytes (0, b)
   | Micheline.Seq (_, subterms) ->
       Micheline.Seq (0, List.map to_michelson subterms)
 
@@ -207,12 +183,9 @@ let to_michelson (n : node) : Script_repr.expr =
 let rec size : node -> int =
  fun node ->
   match node with
-  | Micheline.Int (_, _) ->
-      1
-  | Micheline.String (_, _) ->
-      1
-  | Micheline.Bytes (_, _) ->
-      1
+  | Micheline.Int (_, _) -> 1
+  | Micheline.String (_, _) -> 1
+  | Micheline.Bytes (_, _) -> 1
   | Micheline.Prim (_, _, subterms, _) ->
       List.fold_left (fun acc n -> acc + size n) 1 subterms
   | Micheline.Seq (_, subterms) ->
@@ -404,13 +377,11 @@ module Data = struct
   let map elts = prim A_Map [seq elts] []
 
   let timestamp ts =
-    let z =
-      Tezos_protocol_alpha.Protocol.Alpha_context.Script_timestamp.to_zint ts
-    in
+    let z = Protocol.Alpha_context.Script_timestamp.to_zint ts in
     prim A_Timestamp [int z] []
 
-  let mutez (tz : Tezos_protocol_alpha.Protocol.Alpha_context.Tez.tez) =
-    let i = Tezos_protocol_alpha.Protocol.Alpha_context.Tez.to_mutez tz in
+  let mutez (tz : Protocol.Alpha_context.Tez.tez) =
+    let i = Protocol.Alpha_context.Tez.to_mutez tz in
     prim A_Mutez [int (Z.of_int64 i)] []
 
   let key_hash kh =

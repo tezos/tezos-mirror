@@ -305,9 +305,11 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
+    let sinks_to_close = !active in
+    active := [] ;
     List.iter_es
       (fun (Active {sink; definition; _}) -> close_one sink definition)
-      !active
+      sinks_to_close
 
   let handle def section v =
     let handle (type a) sink definition =
@@ -471,7 +473,7 @@ module Simple = struct
                Instead we just print the error on stderr. *)
             Format.eprintf
               "@[<hv 2>Failed to send event:@ %a@]@."
-              Error_monad.pp_print_error
+              Error_monad.pp_print_trace
               trace ;
             Lwt.return_unit)
       (fun exc ->
@@ -482,9 +484,10 @@ module Simple = struct
         Lwt.return_unit)
 
   let emit__dont_wait__use_with_care simple_event parameters =
-    Lwt_utils.dont_wait
-      (fun exc -> raise exc) (* emit never lets exceptions escape *)
+    Lwt.dont_wait
       (fun () -> emit simple_event parameters)
+      (fun exc -> raise exc)
+  (* emit never lets exceptions escape *)
 
   let make_section names =
     match names with
@@ -1246,7 +1249,7 @@ module Legacy_logging = struct
             Event.emit ~section (fun () -> Definition.make ?tags level message)
             >>= function
             | Ok () -> Lwt.return_unit
-            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_error el)
+            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
           fmt
       else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
   end
@@ -1387,7 +1390,7 @@ module Error_event = struct
             Format.kasprintf
               Lwt_log_core.error
               "Error while emitting error logging event !! %a"
-              pp_print_error
+              pp_print_trace
               el)
 end
 

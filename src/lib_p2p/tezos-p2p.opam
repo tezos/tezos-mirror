@@ -10,9 +10,11 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-p2p-services"
-  "tezos-test-services" { with-test }
+  "tezos-test-helpers" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "astring" { with-test }
+  "tezos-base-test-helpers" { with-test }
+  "tezos-event-logging-test-helpers" { with-test }
   "lwt"
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { >= "0.3" & < "0.4" }

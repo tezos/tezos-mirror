@@ -56,7 +56,7 @@ module Make_minimal (K : Name) = struct
   let of_string s =
     match of_string_opt s with
     | None ->
-        generic_error
+        error_with
           "%s.of_string: wrong string size (%d instead of %d)"
           K.name
           (String.length s)
@@ -111,7 +111,7 @@ module Make_minimal (K : Name) = struct
   let of_bytes s =
     match of_bytes_opt s with
     | Some x -> Ok x
-    | None -> generic_error "Failed to deserialize a hash (%s)" K.name
+    | None -> error_with "Failed to deserialize a hash (%s)" K.name
 
   let to_bytes (Blake2b.Hash h) = h
 

@@ -33,6 +33,7 @@ let gc_stat_encoding =
            major_words;
            minor_collections;
            major_collections;
+           forced_major_collections;
            heap_words;
            heap_chunks;
            live_words;
@@ -49,7 +50,8 @@ let gc_stat_encoding =
           promoted_words,
           major_words,
           minor_collections,
-          major_collections ),
+          major_collections,
+          forced_major_collections ),
         ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
           ( free_blocks,
             largest_free,
@@ -61,7 +63,8 @@ let gc_stat_encoding =
              promoted_words,
              major_words,
              minor_collections,
-             major_collections ),
+             major_collections,
+             forced_major_collections ),
            ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
              ( free_blocks,
                largest_free,
@@ -75,6 +78,7 @@ let gc_stat_encoding =
         major_words;
         minor_collections;
         major_collections;
+        forced_major_collections;
         heap_words;
         heap_chunks;
         live_words;
@@ -88,12 +92,13 @@ let gc_stat_encoding =
         stack_size;
       })
     (merge_objs
-       (obj5
+       (obj6
           (req "minor_words" float)
           (req "promoted_words" float)
           (req "major_words" float)
           (req "minor_collections" int31)
-          (req "major_collections" int31))
+          (req "major_collections" int31)
+          (req "forced_major_collections" int31))
        (merge_objs
           (obj5
              (req "heap_words" int31)

@@ -46,10 +46,7 @@ module Make_value (V : ENCODED_VALUE) = struct
   let of_bytes b =
     match Data_encoding.Binary.of_bytes V.encoding b with
     | Error re ->
-        generic_error
-          "Cannot parse data: %a"
-          Data_encoding.Binary.pp_read_error
-          re
+        error_with "Cannot parse data: %a" Data_encoding.Binary.pp_read_error re
     | Ok v -> ok v
 
   let to_bytes v =

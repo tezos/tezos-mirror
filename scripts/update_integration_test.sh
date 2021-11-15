@@ -1,6 +1,9 @@
 #! /bin/sh
 
-# See `update_unit_test.sh` for documentation.
+# Usage: ./scripts/update_integration_test.sh
+
+# This script is for automatically updating the tests in
+# `.gitlab/ci/integration.yml`. This script specifically updates the integration tests.
 
 set -e
 
@@ -9,10 +12,13 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
+# 1: Extract the beginning of the CI configuration file. Everything up to the
+# line ##BEGIN_INTEGRATION_PYTHON## is added to the temporary file.
 csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
+# 2. Find each test add the matching incantation to a temporary file.
 for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' | LC_COLLATE=C sort); do
     PROTO_DIR_BASE=${PROTO_DIR##tests_python/tests_}
 
@@ -48,6 +54,7 @@ EOF
 
 done
 
+# add a job for the examples
 cat >> $tmp <<EOF
 integration:examples:
   extends: .integration_python_template
@@ -58,8 +65,11 @@ integration:examples:
   stage: test
 EOF
 
+# 3: Extract the end of the CI configuration file. Everything after the line
+# ##END_INTEGRATION_PYTHON## is added to the temporary file.
 csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" %##END_INTEGRATION_PYTHON##%
 cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 
+# 4: The temporary file is swapped in place of the CI configuration file.
 mv $tmp "$src_dir/.gitlab/ci/integration.yml"

@@ -1,12 +1,10 @@
-# Tezos
+# Tezos Octez implementation
 
 ## Introduction
 
-Tezos is a distributed consensus platform with meta-consensus
-capability. Tezos not only comes to consensus about the state of its ledger,
-like Bitcoin or Ethereum. It also comes to consensus about how the
-protocol and the nodes should adapt and upgrade. For more information about
-the project, see https://tezos.com.
+Tezos is a blockchain that offers both  _consensus_ and _meta-consensus_, by which we mean that Tezos comes to consensus both about the state of its ledger, and  _also_ about how the
+protocol and the nodes should adapt and upgrade.
+For more information about the project, see https://tezos.com.
 
 ## Getting started
 
@@ -19,12 +17,15 @@ available at https://tezos.gitlab.io/.
 
 ## The Tezos software
 
-This git repository contains:
+This repository hosts **Octez**, an implementation of the Tezos blockchain.
+**Octez** provides a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
+
+In more detail, this git repository contains:
 - the source code, in directory src/
 - tests (mainly system tests):
   * in a Python testing and execution framework, under tests_python/
   * in an OCaml system testing framework for Tezos called Tezt, under tezt/
-- the developer documentation of the Tezos softwarer, under docs/
+- the developer documentation of the Tezos software, under docs/
 - a few third-party libraries, adapted for Tezos, under vendors/
 
 The Tezos software may run either on the nodes of
@@ -37,7 +38,7 @@ online at https://tezos.gitlab.io/. This documentation is always in
 sync with the master branch which may however be slightly
 desynchronized with the code running on the live networks.
 
-The source code of Tezos is placed under the [MIT Open Source
+The source code of Octez is placed under the [MIT Open Source
 License](https://opensource.org/licenses/MIT).
 
 ## Contributing

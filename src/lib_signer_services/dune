@@ -1,5 +1,6 @@
 (library
  (name tezos_signer_services)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-signer-services)
  (libraries tezos-base
             tezos-client-base

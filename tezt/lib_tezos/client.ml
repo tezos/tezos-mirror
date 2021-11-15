@@ -48,6 +48,8 @@ type t = {
   mutable mode : mode;
 }
 
+let name t = t.name
+
 let base_dir t = t.base_dir
 
 let get_mode t = t.mode
@@ -96,27 +98,23 @@ let sources_file client =
   | Mockup | Client _ | Proxy _ -> assert false
   | Light _ -> client.base_dir // "sources.json"
 
+let mode_to_endpoint = function
+  | Client None | Mockup | Light (_, []) -> None
+  | Client (Some endpoint) | Light (_, endpoint :: _) | Proxy endpoint ->
+      Some endpoint
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
    that contains a list of endpoints.
 *)
 let endpoint_arg ?(endpoint : endpoint option) client =
-  match (client.mode, endpoint) with
-  | (Mockup, _) | (Client None, None) | (Light (_, []), _) -> []
-  | (Client _, Some endpoint)
-  | (Client (Some endpoint), None)
-  | (Light (_, endpoint :: _), None)
-  | (Light _, Some endpoint)
-  | (Proxy _, Some endpoint)
-  | (Proxy endpoint, None) ->
-      [
-        "--endpoint";
-        Printf.sprintf
-          "http://%s:%d"
-          (address ~hostname:true endpoint)
-          (rpc_port endpoint);
-      ]
+  let either o1 o2 = match (o1, o2) with (Some _, _) -> o1 | _ -> o2 in
+  (* pass [?endpoint] first: it has precedence over client.mode *)
+  match either endpoint (mode_to_endpoint client.mode) with
+  | None -> []
+  | Some e ->
+      ["--endpoint"; sf "http://%s:%d" (address ~hostname:true e) (rpc_port e)]
 
 let mode_arg client =
   match client.mode with
@@ -159,13 +157,14 @@ let url_encode str =
   Buffer.reset buffer ;
   result
 
-type meth = GET | PUT | POST | PATCH
+type meth = GET | PUT | POST | PATCH | DELETE
 
 let string_of_meth = function
   | GET -> "get"
   | PUT -> "put"
   | POST -> "post"
   | PATCH -> "patch"
+  | DELETE -> "delete"
 
 type path = string list
 
@@ -219,6 +218,11 @@ let shell_header ?endpoint ?chain ?block client =
   spawn_shell_header ?endpoint ?chain ?block client
   |> Process.check_and_read_stdout
 
+let level ?endpoint ?chain ?block client =
+  let* shell = shell_header ?endpoint ?chain ?block client in
+  let json = JSON.parse ~origin:"level" shell in
+  JSON.get "level" json |> JSON.as_int |> return
+
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 
@@ -260,6 +264,10 @@ module Admin = struct
   let kick_peer ?endpoint ~peer client =
     spawn_kick_peer ?endpoint ~peer client |> Process.check
 end
+
+let spawn_version client = spawn_command client ["--version"]
+
+let version client = spawn_version client |> Process.check
 
 let spawn_import_secret_key ?endpoint client (key : Constant.key) =
   spawn_command
@@ -376,8 +384,10 @@ let show_address ?show_secret ~alias client =
           Test.fail "Cannot extract key from client_output: %s" client_output
       | Some hash -> hash
     in
-    let public_key = client_output =~* rex "Public key: ?(\\w*)" in
-    let secret_key = client_output =~* rex "Secret key: ?(\\w*)" in
+    let public_key = client_output =~* rex "Public Key: ?(\\w*)" in
+    let secret_key =
+      client_output =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
+    in
     {alias; public_key_hash; public_key; secret_key}
   in
   let* output =
@@ -391,7 +401,7 @@ let gen_and_show_keys ~alias client =
   show_address ~show_secret:true ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?arg ~amount ~giver ~receiver client =
+    ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
   spawn_command
     ?endpoint
     client
@@ -413,10 +423,14 @@ let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
         ~none:[]
         ~some:(fun s -> ["--storage-limit"; string_of_int s])
         storage_limit
+    @ Option.fold
+        ~none:[]
+        ~some:(fun s -> ["--counter"; string_of_int s])
+        counter
     @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
 
-let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg
-    ~amount ~giver ~receiver client =
+let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?counter
+    ?arg ~amount ~giver ~receiver client =
   spawn_transfer
     ?endpoint
     ?wait
@@ -424,6 +438,7 @@ let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg
     ?fee
     ?gas_limit
     ?storage_limit
+    ?counter
     ?arg
     ~amount
     ~giver
@@ -556,6 +571,65 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash -> return hash
 
+let spawn_stresstest ?endpoint ?tps ~sources ~transfers client =
+  let tps_arg =
+    Option.map (fun (tps : int) -> ["--tps"; Int.to_string tps]) tps
+    |> Option.value ~default:[]
+  in
+  spawn_command ?endpoint client
+  @@ [
+       "stresstest";
+       "transfer";
+       "using";
+       sources;
+       "--transfers";
+       Int.to_string transfers;
+     ]
+  @ tps_arg
+
+let stresstest ?endpoint ?tps ~sources ~transfers client =
+  spawn_stresstest ?endpoint ?tps ~sources ~transfers client |> Process.check
+
+let spawn_run_script ~src ~storage ~input client =
+  spawn_command
+    client
+    ["run"; "script"; src; "on"; "storage"; storage; "and"; "input"; input]
+
+let run_script ~src ~storage ~input client =
+  let* client_output =
+    spawn_run_script ~src ~storage ~input client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "storage\n(.*)" with
+  | None ->
+      Test.fail
+        "Cannot extract new storage from client_output: %s"
+        client_output
+  | Some storage -> return @@ String.trim storage
+
+let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
+    =
+  spawn_command
+    client
+    (["--wait"; wait]
+    @ ["register"; "global"; "constant"; value; "from"; src]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+        burn_cap)
+
+let register_global_constant ?wait ?burn_cap ~src ~value client =
+  let* client_output =
+    spawn_register_global_constant ?wait ?burn_cap ~src ~value client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "Global address: (expr\\w{50})" with
+  | None ->
+      Test.fail
+        "Cannot extract constant hash from client_output: %s"
+        client_output
+  | Some hash -> return hash
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
@@ -603,14 +677,65 @@ let normalize_data ?mode ?legacy ~data ~typ client =
   spawn_normalize_data ?mode ?legacy ~data ~typ client
   |> Process.check_and_read_stdout
 
-let spawn_list_mockup_protocols client =
-  spawn_command client (mode_arg client @ ["list"; "mockup"; "protocols"])
+let spawn_normalize_script ?mode ~script client =
+  let mode_to_string = function
+    | Readable -> "Readable"
+    | Optimized -> "Optimized"
+    | Optimized_legacy -> "Optimized_legacy"
+  in
+  let mode_cmd =
+    Option.map mode_to_string mode
+    |> Option.map (fun s -> ["--unparsing-mode"; s])
+  in
+  let cmd =
+    ["normalize"; "script"; script] @ Option.value ~default:[] mode_cmd
+  in
+  spawn_command client cmd
 
-let list_mockup_protocols client =
-  let process = spawn_list_mockup_protocols client in
+let normalize_script ?mode ~script client =
+  spawn_normalize_script ?mode ~script client |> Process.check_and_read_stdout
+
+let spawn_typecheck_script ~script ?(details = false) ?(emacs = false)
+    ?(no_print_source = false) ?gas ?(legacy = false) client =
+  let gas_cmd =
+    Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
+  in
+  let cmd =
+    ["typecheck"; "script"; script]
+    @ Option.value ~default:[] gas_cmd
+    @ (if details then ["--details"] else [])
+    @ (if emacs then ["--emacs"] else [])
+    @ (if no_print_source then ["--no-print-source"] else [])
+    @ if legacy then ["--legacy"] else []
+  in
+  spawn_command client cmd
+
+let typecheck_script ~script ?(details = false) ?(emacs = false)
+    ?(no_print_source = false) ?gas ?(legacy = false) client =
+  spawn_typecheck_script
+    ~script
+    ~details
+    ~emacs
+    ~no_print_source
+    ?gas
+    ~legacy
+    client
+  |> Process.check_and_read_stdout
+
+let spawn_list_protocols mode client =
+  let mode_str =
+    match mode with
+    | `Mockup -> "mockup"
+    | `Light -> "light"
+    | `Proxy -> "proxy"
+  in
+  spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
+
+let list_protocols mode client =
+  let process = spawn_list_protocols mode client in
   let* () = Process.check process
   and* output = Lwt_io.read (Process.stdout process) in
-  return (String.split_on_char '\n' output)
+  return (String.split_on_char '\n' output |> List.filter (fun s -> s <> ""))
 
 let spawn_migrate_mockup ~next_protocol client =
   spawn_command
@@ -619,6 +744,12 @@ let spawn_migrate_mockup ~next_protocol client =
 
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
+
+let spawn_sign_block client block_hex ~delegate =
+  spawn_command client ["sign"; "block"; block_hex; "for"; delegate]
+
+let sign_block client block_hex ~delegate =
+  spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?endpoint () in
@@ -640,6 +771,19 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   set_mode Mockup client ;
   return client
 
+let write_sources_file ~min_agreement ~uris client =
+  (* Create a services.json file in the base directory with correctly
+     JSONified data *)
+  Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
+      let obj =
+        `O
+          [
+            ("min_agreement", `Float min_agreement);
+            ("uris", `A (List.map (fun s -> `String s) uris));
+          ]
+      in
+      Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     ?(nodes_args = []) () =
   let filter_node_arg = function
@@ -650,11 +794,9 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     List.filter_map filter_node_arg nodes_args
     @ Node.[Connections 1; Synchronisation_threshold 0]
   in
-  let* nodes =
-    let* node1 = Node.init ~name:"node1" nodes_args
-    and* node2 = Node.init ~name:"node2" nodes_args in
-    return [node1; node2]
-  in
+  let* node1 = Node.init ~name:"node1" nodes_args
+  and* node2 = Node.init ~name:"node2" nodes_args in
+  let nodes = [node1; node2] in
   let client =
     create_with_mode
       ?path
@@ -664,26 +806,15 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?base_dir
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
-  (* Create a services.json file in the base directory with correctly
-     JSONified data *)
   let* () =
-    Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
-        let obj =
-          `O
-            [
-              ("min_agreement", `Float min_agreement);
-              ( "uris",
-                `A
-                  (List.map
-                     (fun node ->
-                       `String
-                         (Printf.sprintf
-                            "http://localhost:%d"
-                            (Node.rpc_port node)))
-                     nodes) );
-            ]
-        in
-        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+    write_sources_file
+      ~min_agreement
+      ~uris:
+        (List.map
+           (fun node ->
+             sf "http://%s:%d" (Node.rpc_host node) (Node.rpc_port node))
+           nodes)
+      client
   in
   let json = JSON.parse_file (sources_file client) in
   Log.info "%s" @@ JSON.encode json ;
@@ -700,7 +831,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       (fun peer -> Admin.connect_address ~peer client)
       (List.tl nodes)
   in
-  return (client, nodes)
+  return (client, node1, node2)
 
 let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
@@ -721,12 +852,13 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
         Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
+      let* _ = Node.wait_for_level node 1 in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node, client)
   | `Light ->
-      let* (client, _) =
+      let* (client, node1, _) =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node1, client)

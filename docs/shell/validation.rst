@@ -1,5 +1,3 @@
-.. _validation:
-
 The validation subsystem
 ========================
 
@@ -14,6 +12,54 @@ the :ref:`distributed DB<DDB_component>`.
 
 |Tezos validation diagram|
 
+Concepts
+--------
+
+Before presenting these three components, we define some basic concepts.
+
+Block
+~~~~~
+
+The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
+Blocks conceptually contain a header and a list of operations.
+In the implementation, the list of operations in the block is represented as the hash of the Merkle tree containing them.
+
+The header itself decomposes into a shell header (common to all protocols) and a protocol-specific header.
+
+Fitness
+~~~~~~~
+
+To each block, we associate a measure of fitness which determines the quality of the chain leading to that block.
+This measure is computed by the consensus protocol.
+The shell changes the head of the chain to the valid block that has the highest fitness.
+
+The fitness belongs to the shell part of the block header.
+The shell does not know the exact representation of the fitness, except that it has a total order on it.
+
+Shell header
+~~~~~~~~~~~~
+
+The shell header contains:
+
+-  ``level``: the height of the block, from the genesis block.
+-  ``proto``: number of protocol changes since genesis (modulo 256).
+-  ``predecessor``: the hash of the preceding block.
+-  ``timestamp``: the timestamp at which the block is claimed to have
+   been created.
+-  ``validation_pass``: number of validation passes. Indeed, operations
+   included in a block may be validated in several passes. This enables some
+   kind of operations (e.g., consensus operations) to be validated in priority.
+-  ``operations_hash``: Hash of the list of lists (actually root hashes of
+   Merkle trees) of operations included in the block. There is one list of
+   operations per validation pass.
+-  ``fitness``: a sequence of sequences of unsigned bytes, shortlex-ordered (by
+   length and then lexicographically). It represents the claimed fitness
+   of the chain ending in this block.
+-  ``context``: the hash of the state of the context after application of
+   this block.
+
+The rest of this page presents the three components of the validation subsystem.
+
 .. _validator_component:
 
 Validator
@@ -22,7 +68,7 @@ Validator
 The validator is the component responsible for checking that blocks
 coming from the network or a baker are valid, w.r.t. the rules defined
 by the economic protocol, and for selecting the block that it
-considers to be the current head of the blockchain.
+considers to be the current head of the blockchain, based on its fitness.
 
 The validator is written as a collection of workers: local event loops
 communicating with each other via message passing. Workers are spawned

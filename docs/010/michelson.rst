@@ -1,10 +1,8 @@
-.. _michelson_010:
-
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
 This specification gives a detailed formal semantics of the Michelson
-language, and a short explanation of how smart contracts are executed
+language and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
 The language is stack-based, with high level data types and primitives,
@@ -13,7 +11,7 @@ several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
 
 A Michelson program is a series of instructions that are run in
-sequence: each instruction receives as input the stack resulting of the
+sequence: each instruction receives as input the stack resulting from the
 previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
@@ -55,7 +53,7 @@ Intra-transaction semantics
 
 Alongside their tokens, smart contracts keep a piece of storage. Both
 are ruled by a specific logic specified by a Michelson program. A
-transaction to smart contract will provide an input value and in
+transaction to a smart contract will provide an input value and in
 option some tokens, and in return, the smart contract can modify its
 storage and transfer its tokens.
 
@@ -71,7 +69,7 @@ not be caught by the type system (e.g. gas exhaustion).
 A bit of polymorphism can be used at contract level, with a
 lightweight system of named entrypoints: instead of an input value,
 the contract can be called with an entrypoint name and an argument,
-and these two component are transformed automatically in a simple and
+and these two components are transformed automatically in a simple and
 deterministic way to an input value. This feature is available both
 for users and from Michelson code. See the dedicated section.
 
@@ -161,7 +159,8 @@ In any case, when a failure happens, either total success or total
 failure is guaranteed. If a transaction (internal or external) fails,
 then the whole sequence fails and all the effects up to the failure
 are reverted. These transactions can still be included in blocks, and
-the transaction fees given to the implicit account who baked the block.
+the transaction fees are given to the implicit account who baked the
+block.
 
 Language semantics
 ------------------
@@ -193,8 +192,8 @@ The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
 selected using the following process. First, the toplevel structure of
 the program must match the syntax pattern. This is quite simple since
-there is only a few non trivial patterns to deal with instruction
-sequences, and the rest is made of trivial pattern that match one
+there are only a few non-trivial patterns to deal with instruction
+sequences, and the rest is made of trivial patterns that match one
 specific instruction. Then, the initial stack must match the initial
 stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
@@ -221,7 +220,7 @@ form.
 
     where (intermediate program) / (intermediate stack)  =>  (partial result)
 
-This means that this rules applies in case interpreting the intermediate
+This means that this rule applies in case interpreting the intermediate
 state on the left gives the pattern on the right.
 
 The left hand sign of the ``=>`` sign is constructed from elements of
@@ -303,6 +302,9 @@ using the following shortcut:
 The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
+
+.. _michelson_type_system:
+.. _michelson_type_system_010:
 
 Introduction to the type system and notations
 ---------------------------------------------
@@ -1486,6 +1488,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _OperationsOnBigMaps:
 .. _OperationsOnBigMaps_010:
 
 Big maps have three possible representations. A map literal is always
@@ -1863,6 +1866,7 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
+.. _MichelsonSetDelegate:
 .. _MichelsonSetDelegate_010:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
@@ -2006,7 +2010,7 @@ Special operations
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
--  ``LEVEL``: Push the current block level.
+-  ``LEVEL``: Push the level of the current transaction's block.
 
 ::
 
@@ -2204,7 +2208,7 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :ref:`Sapling integration<sapling_dev_010>` page for a more
+Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 
 -  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
@@ -2230,6 +2234,7 @@ comprehensive description of the Sapling protocol.
         with memo_size `ms`
 
 
+.. _MichelsonTickets:
 .. _MichelsonTickets_010:
 
 Operations on tickets
@@ -2293,7 +2298,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
 
-:ref:`005_babylon` deprecated the following instructions. Because no smart
+:doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
@@ -2549,6 +2554,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
+.. _ConcreteSyntax:
 .. _ConcreteSyntax_010:
 
 The concrete language is very close to the formal notation of the
@@ -2561,7 +2567,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called :ref:`Micheline`.
+This simple five cases notation is called :doc:`../shell/micheline`.
 
 Constants
 ~~~~~~~~~
@@ -3094,6 +3100,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 .. _SpecialAnnotations_010:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions

@@ -39,8 +39,7 @@ module Hash_Properties (Desc : sig
 end)
 (X : Hacl.Hash.S) =
 struct
-  let pp_bytes fmt d =
-    Format.fprintf fmt "\"%s\"" (String.escaped @@ Bytes.to_string d)
+  let pp_bytes fmt d = Format.fprintf fmt "%S" (Bytes.unsafe_to_string d)
 
   (** Verifies equivalence between the hash of [msg_s] obtained through the
       direct and incremental interface of [X].

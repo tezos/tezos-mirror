@@ -26,12 +26,18 @@
 
 module Request : sig
   type 'a t =
-    | Flush : Block_hash.t * Block_hash.Set.t * Operation_hash.Set.t -> unit t
+    | Flush :
+        Block_hash.t
+        * Chain_validator_worker_state.Event.update
+        * Block_hash.Set.t
+        * Operation_hash.Set.t
+        -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
+    | Ban : Operation_hash.t -> unit t
 
   type view = View : _ t -> view
 
@@ -42,16 +48,38 @@ module Request : sig
   val pp : Format.formatter -> view -> unit
 end
 
+(** Indicates how an operation hash has been encountered:
+    + [Injected]         : The corresponding operation has been directly
+                           injected into the node.
+    + [Notified peer_id] : The hash is present in a mempool advertised by
+                           [peer_id].
+    + [Arrived]          : The node was fetching and has just received the
+                           corresponding operation.
+
+    [Other] serves as default value for an argument, but in practice it is
+    not used atm (June 2021).
+
+    This module is used in {!Event.Banned_operation_encountered}. *)
+module Operation_encountered : sig
+  type situation =
+    | Injected
+    | Arrived
+    | Notified of P2p_peer_id.t option
+    | Other
+
+  type t = situation * Operation_hash.t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
+
+   This module should be removed once backlogs will be removed from
+   the RPC /worker/prevalidators. *)
 module Event : sig
-  type t =
-    | Request of
-        (Request.view * Worker_types.request_status * error list option)
-    | Invalid_mempool_filter_configuration
-    | Unparsable_operation of Operation_hash.t
-    | Processing_n_operations of int
-    | Fetching_operation of Operation_hash.t
-    | Operation_included of Operation_hash.t
-    | Operations_not_flushed of int
+  type t = unit
 
   type view = t
 
@@ -62,19 +90,4 @@ module Event : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
-end
-
-module Worker_state : sig
-  type view = {
-    head : Block_hash.t;
-    timestamp : Time.System.t;
-    fetching : Operation_hash.Set.t;
-    pending : Operation_hash.Set.t;
-    applied : Operation_hash.t list;
-    delayed : Operation_hash.Set.t;
-  }
-
-  val encoding : view Data_encoding.t
-
-  val pp : Format.formatter -> view -> unit
 end

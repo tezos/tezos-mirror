@@ -9,6 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "ringo-lwt"
   "tezos-base"
+  "tezos-clic"
   "tezos-client-base"
   "tezos-mockup-proxy"
   "tezos-protocol-environment"
@@ -16,9 +17,9 @@ depends: [
   "tezos-shell-services"
   "tezos-context"
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "crowbar" { with-test }
-  "tezos-test-services" { with-test }
   "tezos-test-helpers" { with-test }
+  "tezos-base-test-helpers" { with-test }
+  "tezos-shell-services-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
 ]
 build: [

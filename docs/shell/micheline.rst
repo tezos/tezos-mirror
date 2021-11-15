@@ -1,5 +1,3 @@
-.. _micheline:
-
 Micheline
 =========
 
@@ -161,7 +159,7 @@ Micheline nodes can be converted to JSON and binary formats. The JSON
 conversion is useful for example to interact with a Tezos node using
 RPCs. The binary encoding is used to store Micheline nodes in blocks.
 
-Both forms of serialization are achieved using :ref:`data_encoding`.
+Both forms of serialization are achieved using :doc:`../developer/data_encoding`.
 
 Locations
 ~~~~~~~~~
@@ -262,7 +260,7 @@ and ``canonical_location`` is an alias of ``int``.
 If we know an encoding for the ``'p`` primitives, we can derive an
 encoding for ``'p canonical`` using the ``canonical_encoding``
 function and then produce JSON and binary outputs using the functions
-from :ref:`data_encoding`.
+from :doc:`../developer/data_encoding`.
 
 In the other direction, from a ``'p canonical`` produced by an
 encoding, either we know how to map its canonical locations to file
@@ -306,7 +304,6 @@ languages:
   it is incomplete as it does not support annotations.
 
 - An online converter between Micheline files and their JSON encoding
-  (improperly called "Michelson"):
-  https://smart-contracts-micheline-michelson-translator-for-tezos.scalac.io
+  (improperly called "Michelson")
   developed as part of Cryptonomic hackathon and documented here:
-  https://scalac.io/we-hakked-tezos-and-created-a-micheline-michelson-translator/
+  https://scalac.io/blog/we-hakked-tezos-and-created-a-micheline-michelson-translator/

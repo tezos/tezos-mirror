@@ -65,8 +65,6 @@ val init : validator_environment -> validator_kind -> t tzresult Lwt.t
    registered Lwt_exit.clean_up_callback). *)
 val close : t -> unit Lwt.t
 
-val restore_context_integrity : t -> int option tzresult Lwt.t
-
 (** [apply_block bvp predecessor header os] checks the liveness of
     the operations and then call [Block_validation.apply] *)
 val apply_block :
@@ -76,6 +74,26 @@ val apply_block :
   Block_header.t ->
   Operation.t list list ->
   Block_validation.result tzresult Lwt.t
+
+val preapply_block :
+  t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
+  protocol_data:bytes ->
+  timestamp:Time.Protocol.t ->
+  Operation.t list list ->
+  (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
+(** [precheck_block bvp chain_store ~predecessor header hash os] is a
+   wrapper for [Block_validation.precheck]. *)
+val precheck_block :
+  t ->
+  Store.chain_store ->
+  predecessor:Store.Block.t ->
+  Block_header.t ->
+  Block_hash.t ->
+  Operation.t trace trace ->
+  unit tzresult Lwt.t
 
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 

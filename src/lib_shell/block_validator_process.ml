@@ -48,8 +48,6 @@ module type S = sig
 
   val close : t -> unit Lwt.t
 
-  val restore_context_integrity : t -> int option tzresult Lwt.t
-
   val apply_block :
     t ->
     Store.chain_store ->
@@ -58,6 +56,30 @@ module type S = sig
     Block_header.t ->
     Operation.t list list ->
     Block_validation.result tzresult Lwt.t
+
+  val preapply_block :
+    t ->
+    chain_id:Chain_id.t ->
+    timestamp:Time.Protocol.t ->
+    protocol_data:bytes ->
+    live_blocks:Block_hash.Set.t ->
+    live_operations:Operation_hash.Set.t ->
+    predecessor_shell_header:Block_header.shell_header ->
+    predecessor_hash:Block_hash.t ->
+    predecessor_max_operations_ttl:int ->
+    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+    Operation.t list list ->
+    (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
+  val precheck_block :
+    t ->
+    Store.chain_store ->
+    predecessor:Store.Block.t ->
+    Block_header.t ->
+    Block_hash.t ->
+    Operation.t trace trace ->
+    unit tzresult Lwt.t
 
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
@@ -117,6 +139,15 @@ module Internal_validator_process = struct
     chain_store : Store.chain_store;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
+    (*
+       The cache must be updated by the component that owns the
+       context, i.e., the component that has the writing permissions
+       on the context. In the shell, this component is the block
+       validator process. For this reason, we maintain the collection
+       of caches passed from one block to the next one here.
+    *)
+    mutable cache : Environment_context.Context.block_cache option;
+    mutable preapply_result : (Block_validation.apply_result * Context.t) option;
   }
 
   let init
@@ -124,7 +155,13 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     Events.(emit init ()) >>= fun () ->
     return
-      {chain_store; user_activated_upgrades; user_activated_protocol_overrides}
+      {
+        chain_store;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+        cache = None;
+        preapply_result = None;
+      }
 
   let close _ = Events.(emit close ())
 
@@ -167,14 +204,100 @@ module Internal_validator_process = struct
     >>=? fun env ->
     let now = Systime_os.now () in
     let block_hash = Block_header.hash block_header in
+    let predecessor_context_hash = Store.Block.context_hash predecessor in
     Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
-    Block_validation.apply env block_header operations >>=? fun result ->
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache -> `Inherited (block_cache, predecessor_context_hash)
+    in
+    Block_validation.apply
+      ?cached_result:validator.preapply_result
+      env
+      block_header
+      operations
+      ~cache
+    >>=? fun {result; cache} ->
     let timespan =
       let then_ = Systime_os.now () in
       Ptime.diff then_ now
     in
+    validator.cache <- Some {context_hash = block_header.shell.context; cache} ;
+    validator.preapply_result <- None ;
     Events.(emit validation_success (block_hash, timespan)) >>= fun () ->
     return result
+
+  let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
+      ~live_operations ~predecessor_shell_header ~predecessor_hash
+      ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash operations =
+    let context_index =
+      Store.context_index (Store.Chain.global_store validator.chain_store)
+    in
+    let context_hash = predecessor_shell_header.Block_header.context in
+    (Context.checkout context_index context_hash >>= function
+     | None ->
+         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
+     | Some ctx -> return ctx)
+    >>=? fun predecessor_context ->
+    let user_activated_upgrades = validator.user_activated_upgrades in
+    let user_activated_protocol_overrides =
+      validator.user_activated_protocol_overrides
+    in
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_shell_header.context)
+    in
+    Block_validation.preapply
+      ~chain_id
+      ~cache
+      ~user_activated_upgrades
+      ~user_activated_protocol_overrides
+      ~timestamp
+      ~protocol_data
+      ~live_blocks
+      ~live_operations
+      ~predecessor_context
+      ~predecessor_shell_header
+      ~predecessor_hash
+      ~predecessor_max_operations_ttl
+      ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash
+      operations
+    >>=? fun (result, apply_result) ->
+    validator.preapply_result <- Some apply_result ;
+    return result
+
+  let precheck_block validator chain_store ~predecessor header _hash operations
+      =
+    let chain_id = Store.Chain.chain_id chain_store in
+    let context_index =
+      Store.context_index (Store.Chain.global_store validator.chain_store)
+    in
+    let predecessor_block_header = Store.Block.header predecessor in
+    let context_hash = predecessor_block_header.Block_header.shell.context in
+    (Context.checkout context_index context_hash >>= function
+     | None ->
+         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
+     | Some ctx -> return ctx)
+    >>=? fun predecessor_context ->
+    let cache =
+      match validator.cache with
+      | None -> `Lazy
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_block_header.shell.context)
+    in
+    let predecessor_block_hash = Store.Block.hash predecessor in
+    Block_validation.precheck
+      ~chain_id
+      ~predecessor_block_header
+      ~predecessor_block_hash
+      ~predecessor_context
+      ~cache
+      header
+      operations
 
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
@@ -189,10 +312,6 @@ module Internal_validator_process = struct
     let forked_header = Store.Block.header forking_block in
     Store.Block.context validator.chain_store forking_block >>=? fun context ->
     Block_validation.init_test_chain context forked_header
-
-  let restore_context_integrity validator =
-    let context_index = get_context_index validator.chain_store in
-    Lwt.return (Context.restore_integrity context_index)
 end
 
 (** Block validation using an external process *)
@@ -518,15 +637,14 @@ module External_validator_process = struct
             vp.validator_process <- Uninitialized ;
             Events.(emit process_exited_abnormally status) >>= fun () ->
             return res)
-      (function
-        | errors ->
-            (match process#state with
-            | Running -> Lwt.return_unit
-            | Exited status ->
-                Events.(emit process_exited_abnormally status) >>= fun () ->
-                vp.validator_process <- Uninitialized ;
-                Lwt.return_unit)
-            >>= fun () -> Lwt.return (error_exn errors))
+      (fun exn ->
+        (match process#state with
+        | Running -> Lwt.return_unit
+        | Exited status ->
+            Events.(emit process_exited_abnormally status) >>= fun () ->
+            vp.validator_process <- Uninitialized ;
+            Lwt.return_unit)
+        >>= fun () -> fail_with_exn exn)
 
   let init
       ({user_activated_upgrades; user_activated_protocol_overrides} :
@@ -574,6 +692,45 @@ module External_validator_process = struct
     in
     send_request validator request Block_validation.result_encoding
 
+  let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
+      ~live_operations ~predecessor_shell_header ~predecessor_hash
+      ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash operations =
+    let request =
+      External_validation.Preapply
+        {
+          chain_id;
+          timestamp;
+          protocol_data;
+          live_blocks;
+          live_operations;
+          predecessor_shell_header;
+          predecessor_hash;
+          predecessor_max_operations_ttl;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          operations;
+        }
+    in
+    send_request validator request Block_validation.preapply_result_encoding
+
+  let precheck_block validator chain_store ~predecessor header hash operations =
+    let chain_id = Store.Chain.chain_id chain_store in
+    let predecessor_block_header = Store.Block.header predecessor in
+    let predecessor_block_hash = Store.Block.hash predecessor in
+    let request =
+      External_validation.Precheck
+        {
+          chain_id;
+          predecessor_block_header;
+          predecessor_block_hash;
+          header;
+          operations;
+          hash;
+        }
+    in
+    send_request validator request Data_encoding.unit
+
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
@@ -585,10 +742,6 @@ module External_validator_process = struct
       External_validation.Fork_test_chain {context_hash; forked_header}
     in
     send_request validator request Block_header.encoding
-
-  let restore_context_integrity validator =
-    let request = External_validation.Restore_context_integrity in
-    send_request validator request Data_encoding.(option int31)
 
   let close vp =
     Events.(emit close ()) >>= fun () ->
@@ -667,9 +820,6 @@ let init validator_environment validator_kind =
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
 
-let restore_context_integrity (E {validator_process = (module VP); validator}) =
-  VP.restore_context_integrity validator
-
 let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
   Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
@@ -691,9 +841,44 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
     header
     operations
 
+let precheck_block (E {validator_process = (module VP); validator}) chain_store
+    ~predecessor header operations =
+  VP.precheck_block validator chain_store ~predecessor header operations
+
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
 
 let init_test_chain (E {validator_process = (module VP); validator})
     forked_block =
   VP.init_test_chain validator forked_block
+
+let preapply_block (E {validator_process = (module VP); validator} : t)
+    chain_store ~predecessor ~protocol_data ~timestamp operations =
+  let chain_id = Store.Chain.chain_id chain_store in
+  Store.Chain.compute_live_blocks chain_store ~block:predecessor
+  >>=? fun (live_blocks, live_operations) ->
+  let predecessor_shell_header = Store.Block.shell_header predecessor in
+  let predecessor_hash = Store.Block.hash predecessor in
+  let predecessor_block_metadata_hash =
+    Store.Block.block_metadata_hash predecessor
+  in
+  let predecessor_ops_metadata_hash =
+    Store.Block.all_operations_metadata_hash predecessor
+  in
+  Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
+  let predecessor_max_operations_ttl =
+    Store.Block.max_operations_ttl metadata
+  in
+  VP.preapply_block
+    validator
+    ~chain_id
+    ~timestamp
+    ~protocol_data
+    ~live_blocks
+    ~live_operations
+    ~predecessor_shell_header
+    ~predecessor_hash
+    ~predecessor_max_operations_ttl
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
+    operations

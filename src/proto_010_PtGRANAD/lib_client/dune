@@ -1,5 +1,6 @@
 (library
  (name tezos_client_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-010-PtGRANAD)
  (libraries tezos-base
             tezos-protocol-010-PtGRANAD

@@ -74,7 +74,7 @@ let commands () =
       (args1 (RawContractAlias.force_switch ()))
       (fixed ["forget"; "all"; "contracts"])
       (fun force cctxt ->
-        fail_unless force (failure "this can only used with option -force")
+        fail_unless force (error_of_fmt "this can only used with option -force")
         >>=? fun () -> RawContractAlias.set cctxt []);
     command
       ~group

@@ -71,8 +71,11 @@ let test_roundtrip_strings () = List.iter test_roundtrip_string inputs
 
 let tests =
   [
-    ("hash hex/dehex", `Quick, test_roundtrip_hexs);
-    ("hash print/parse", `Quick, test_roundtrip_strings);
+    ( "blake2b-encodings",
+      [
+        ("hash hex/dehex", `Quick, test_roundtrip_hexs);
+        ("hash print/parse", `Quick, test_roundtrip_strings);
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("blake2b", tests)]
+let tests_lwt = []

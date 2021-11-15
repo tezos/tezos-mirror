@@ -30,6 +30,8 @@
    Subject: Tests of the client's --mode proxy.
   *)
 
+let ( >|= ) = Lwt.( >|= )
+
 (** [matches re s] checks if [s] matches [re]. Note in particular that this supports multiline strings. *)
 let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false
 
@@ -213,30 +215,28 @@ let test_context_suffix_no_rpc ?query_string path =
   assert (List.length context_queries >= 2) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
+let paths =
+  [
+    (["helpers"; "baking_rights"], []);
+    (["helpers"; "baking_rights"], [("all", "true")]);
+    (["context"; "contracts"], []);
+    (["context"; "delegates"], []);
+    (["context"; "nonces"; "3"], []);
+    (["helpers"; "endorsing_rights"], []);
+    (["votes"; "current_period"], []);
+    (["votes"; "successor_period"], []);
+    (["votes"; "total_voting_power"], []);
+    (["votes"; "ballot_list"], []);
+    (["votes"; "ballots"], []);
+    (["votes"; "current_proposal"], []);
+    (["votes"; "current_quorum"], []);
+    (["votes"; "listings"], []);
+    (["votes"; "proposals"], []);
+  ]
+
 let test_context_suffix_no_rpc ~protocols =
   let iter l f = List.iter f l in
   iter protocols @@ fun protocol ->
-  let paths =
-    (match protocol with
-    | Protocol.Alpha -> []
-    | _ -> [(["votes"; "current_period_kind"], [])])
-    @ [
-        (["helpers"; "baking_rights"], []);
-        (["helpers"; "baking_rights"], [("all", "true")]);
-        (["context"; "delegates"], []);
-        (["context"; "nonces"; "3"], []);
-        (["helpers"; "endorsing_rights"], []);
-        (["votes"; "current_period"], []);
-        (["votes"; "successor_period"], []);
-        (["votes"; "total_voting_power"], []);
-        (["votes"; "ballot_list"], []);
-        (["votes"; "ballots"], []);
-        (["votes"; "current_proposal"], []);
-        (["votes"; "current_quorum"], []);
-        (["votes"; "listings"], []);
-        (["votes"; "proposals"], []);
-      ]
-  in
   iter paths @@ fun (sub_path, query_string) ->
   test_context_suffix_no_rpc
     ~query_string
@@ -466,37 +466,34 @@ module Location = struct
   (** Check the output of [rpc get] on a number on RPC between two
       clients are equivalent. One of them is a vanilla client ([--mode client]) while the
       other client uses an alternative mode ([--mode proxy]). *)
-  let check_equivalence ?tz_log protocol alt_mode {vanilla; alternative} =
+  let check_equivalence ?tz_log alt_mode {vanilla; alternative} =
     let alt_mode_string = alt_mode_to_string alt_mode in
     let compared =
       let add_rpc_path_prefix rpc_path =
         "chains" :: chain_id :: "blocks" :: block_id :: rpc_path
       in
-      (match protocol with
-      | Protocol.Alpha -> []
-      | _ -> [(add_rpc_path_prefix ["votes"; "current_period_kind"], [])])
-      @ [
-          (add_rpc_path_prefix ["context"; "constants"], []);
-          (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
-          (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
-          (add_rpc_path_prefix ["helpers"; "current_level"], []);
-          (add_rpc_path_prefix ["minimal_valid_time"], []);
-          (add_rpc_path_prefix ["context"; "constants"], []);
-          (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
-          (add_rpc_path_prefix ["context"; "delegates"], []);
-          (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
-          (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
-          (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
-          (add_rpc_path_prefix ["votes"; "current_period"], []);
-          (add_rpc_path_prefix ["votes"; "successor_period"], []);
-          (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
-          (add_rpc_path_prefix ["votes"; "ballot_list"], []);
-          (add_rpc_path_prefix ["votes"; "ballots"], []);
-          (add_rpc_path_prefix ["votes"; "current_proposal"], []);
-          (add_rpc_path_prefix ["votes"; "current_quorum"], []);
-          (add_rpc_path_prefix ["votes"; "listings"], []);
-          (add_rpc_path_prefix ["votes"; "proposals"], []);
-        ]
+      [
+        (add_rpc_path_prefix ["context"; "constants"], []);
+        (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
+        (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
+        (add_rpc_path_prefix ["helpers"; "current_level"], []);
+        (add_rpc_path_prefix ["minimal_valid_time"], []);
+        (add_rpc_path_prefix ["context"; "constants"], []);
+        (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
+        (add_rpc_path_prefix ["context"; "delegates"], []);
+        (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
+        (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
+        (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
+        (add_rpc_path_prefix ["votes"; "current_period"], []);
+        (add_rpc_path_prefix ["votes"; "successor_period"], []);
+        (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
+        (add_rpc_path_prefix ["votes"; "ballot_list"], []);
+        (add_rpc_path_prefix ["votes"; "ballots"], []);
+        (add_rpc_path_prefix ["votes"; "current_proposal"], []);
+        (add_rpc_path_prefix ["votes"; "current_quorum"], []);
+        (add_rpc_path_prefix ["votes"; "listings"], []);
+        (add_rpc_path_prefix ["votes"; "proposals"], []);
+      ]
     in
     let perform (rpc_path, query_string) =
       let* (vanilla_out, vanilla_err) =
@@ -577,8 +574,150 @@ module Location = struct
     let* (node, alternative) = init ~protocol () in
     let* vanilla = Client.init ~endpoint:(Node node) () in
     let clients = {vanilla; alternative} in
-    check_equivalence protocol alt_mode clients
+    check_equivalence alt_mode clients
 end
+
+module Equalable_String_set : Check.EQUALABLE with type t = String_set.t =
+struct
+  type t = String_set.t
+
+  let equal = String_set.equal
+
+  let pp fmt set =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "|")
+      Format.pp_print_string
+      fmt
+      (String_set.elements set)
+end
+
+let string_set = Check.equalable_module (module Equalable_String_set)
+
+let show_mode mode = match mode with `Proxy -> "proxy" | `Light -> "light"
+
+(** Test that, at any point in time, the proxy mode and the light mode
+    supports the same list of protocols as the mockup (genesis being
+    ignored). The point it to help release managers, protocol freezing,
+    protocol support drop; to not forget a component. *)
+let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
+  let mode_str = show_mode mode in
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "%s supported protocols are the same as the mockup protocols"
+         mode_str)
+    ~tags:["client"; mode_str; "list"; "protocols"]
+  @@ fun () ->
+  let client = Client.create () in
+  let* mockup_protocols =
+    Client.list_protocols `Mockup client >|= String_set.of_list
+  in
+  let* mode_protocols =
+    Client.list_protocols mode client
+    (* Filter out Genesis, which the mockup doesn't support; but which light and
+       proxy modes do. We want to compare the other protocols. *)
+    >|= List.filter (fun str -> str =~! rex "Genesis.*")
+    >|= String_set.of_list
+  in
+  let error_msg =
+    "Mockup protocols list is %L, but " ^ mode_str ^ " protocols list is %R"
+  in
+  Check.((mockup_protocols = mode_protocols) string_set ~error_msg) ;
+  unit
+
+(** Test that, at any point in time, the proxy mode and the light mode
+    support Alpha and at least three other protocols (genesis being ignored).
+    This is stated in the public documentation. *)
+let test_support_four_protocols (mode : [< `Proxy | `Light]) =
+  let mode_str = show_mode mode in
+  Test.register
+    ~__FILE__
+    ~title:(sf "%s supports alpha and at least 3 immutable protocols" mode_str)
+    ~tags:["client"; mode_str; "list"; "protocols"]
+  @@ fun () ->
+  let client = Client.create () in
+  let* mode_protocols =
+    Client.list_protocols mode client
+    >|= (* Filter out Genesis. We are interested in other protocols. *)
+    List.filter (fun str -> str =~! rex "Genesis.*")
+    >|= String_set.of_list
+  in
+  let non_alpha_protocols =
+    String_set.filter (fun str -> str =~! rex "^ProtoALpha.*") mode_protocols
+  in
+  let alpha_error_msg =
+    Format.asprintf
+      "Alpha should be supported, but it's not found in the list of protocols: \
+       %a"
+      Equalable_String_set.pp
+      mode_protocols
+  in
+  Check.(
+    (String_set.cardinal non_alpha_protocols
+    = String_set.cardinal mode_protocols - 1)
+      int
+      ~error_msg:alpha_error_msg) ;
+  let error_msg =
+    Format.asprintf
+      "%s should support at least three non-alpha protocols, but non-alpha \
+       supported protocols are %a"
+      mode_str
+      Equalable_String_set.pp
+      non_alpha_protocols
+  in
+  let nb_non_alpha_protocols = String_set.cardinal non_alpha_protocols in
+  Check.((nb_non_alpha_protocols >= 3) int ~error_msg) ;
+  unit
+
+let register_protocol_independent () =
+  test_supported_protocols_like_mockup `Proxy ;
+  test_support_four_protocols `Proxy
+
+let normalize = function
+  | "big_maps" :: "index" :: i :: "contents" :: _ ->
+      ["big_maps"; "index"; i; "contents"]
+  | "contracts" :: "index" :: i :: _ -> ["contracts"; "index"; i]
+  | "cycle" :: i :: _ -> ["cycle"; i]
+  | "rolls" :: "owner" :: "snapshot" :: i :: j :: _ ->
+      ["rolls"; "owner"; "snapshot"; i; j]
+  | "v1" :: _ -> ["v1"]
+  | x -> x
+
+let test_split_key_heuristic =
+  let rpc_path_regexp = rex {|.*proxy_getter: Cache miss \(get\): \((.*)\)|} in
+  let env = String_map.singleton "TEZOS_LOG" "proxy_getter->debug" in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Proxy) split_key heuristic"
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
+  let* (_, client) = init ~protocol () in
+  let test_one (path, query_string) =
+    let full_path = "chains" :: "main" :: "blocks" :: "head" :: path in
+    let* stderr =
+      Client.spawn_rpc ~env ~query_string Client.GET full_path client
+      |> Process.check_and_read_stderr
+    in
+    let lines = String.split_on_char '\n' stderr in
+    let context_queries =
+      List.filter_map (fun line -> line =~* rpc_path_regexp) lines
+    in
+    let seens = ref String_set.empty in
+    let check_query path =
+      let segments = String.split_on_char '/' path in
+      let normalized = normalize segments |> String.concat "/" in
+      if String_set.mem normalized !seens then
+        Test.fail
+          "Request of the form %s/... done twice. Last request is %s"
+          normalized
+          path
+      else seens := String_set.add normalized !seens
+    in
+    List.iter check_query context_queries ;
+    unit
+  in
+  Lwt_list.iter_s test_one paths
 
 let register ~protocols =
   test_bake ~protocols ;
@@ -587,4 +726,5 @@ let register ~protocols =
   test_context_suffix_no_rpc ~protocols ;
   test_cache_at_most_once ~protocols ;
   Location.test_locations_proxy ~protocols ;
-  Location.test_compare_proxy ~protocols
+  Location.test_compare_proxy ~protocols ;
+  test_split_key_heuristic ~protocols

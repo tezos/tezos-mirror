@@ -11,7 +11,7 @@ sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config lib
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
-./rustup-init.sh --profile minimal --default-toolchain 1.44.0 -y
+./rustup-init.sh --profile minimal --default-toolchain 1.52.1 -y
 # [source cargo]
 source $HOME/.cargo/env
 # [get sources]

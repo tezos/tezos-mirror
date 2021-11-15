@@ -46,8 +46,8 @@ type status = Chain_validator_worker_state.Event.synchronisation_status =
    is validated or if a peer sends a block which is already known as
    valid. In the following, we denote such a block as a
    `candidate`. The heuristic maintains a set of candidates such that
-   there is at most one candidate per peer. Given a peer, the heuristic
-   always keeps the most recent candidate.
+   there is at most one candidate per peer. Given a peer, the
+   heuristic always keeps the most recent candidate.
 
     The heuristic works as follows:
 
@@ -80,20 +80,110 @@ type status = Chain_validator_worker_state.Event.synchronisation_status =
 
     This heuristic should be used with a small [threshold]: Between 2
    and 10. Other values should be used with care and are mostly here
-   for testing or debugging purpose. *)
+   for testing or debugging purpose.
 
-(** internal state of the bootstrap_heuristic *)
-type t
+    Following the {e separation of concerns} principle, the heuristic
+   exports two modules:
 
-(** [update t (timestamp, peer)] updates [t] according the
-   heuristic above. The [timestamp] should come from a valid block,
-   and the [peer] should be the one who sent the block. *)
-val update : t -> Time.Protocol.t * P2p_peer.Id.t -> unit
+    - The [Core] module contains all the logic behind the heuristic
+   described above and can be used as such.
 
-(** [get_status t] gives the current status according of the bootstrap
-   heuristic described above. *)
-val get_status : t -> status
+    - The [Bootstrapping] module provides facility to register
+   callbacks when the status of the heuristic changes, and in
+   particular defines a [bootstrapped] flag which is set to [true] if
+   the heuristic was synchronised at least once.
 
-(** [create ~threshold ~sync_latency] initializes the heuristic with
-   these two parameters *)
-val create : threshold:int -> latency:int -> t
+
+  *)
+
+(** {2 Core}
+
+    This module is [Lwt] agnostic and implements all the logic
+    behind the synchronisation heuristic.  *)
+module Core : sig
+  (** Internal state of the bootstrap_heuristic *)
+  type t
+
+  (** [create ~threshold ~latency ()] initializes the heuristic with these two
+      parameters *)
+  val create : threshold:int -> latency:int -> t
+
+  (** [update t (timestamp, peer)] updates [t] according to the
+      heuristic above. The [timestamp] should come from a valid block,
+      and the [peer] should be the one who sent the block. *)
+  val update : t -> Time.Protocol.t * P2p_peer.Id.t -> unit
+
+  (** [get_status t] is the current status according of the bootstrap
+      heuristic described above. *)
+  val get_status : t -> status
+end
+
+(** {2 Bootstrapping }
+
+    This module inherits from [Core] and handle a bootstrapped flag as
+    well as [Lwt] callbacks when the status of heuristic or the
+    bootstrap flag changes.
+
+    The bootstrap flag is set to [true] in two cases:
+
+    - When the core heuristic status is [Synchronised] for the first
+      time
+
+    - When [force_bootstrapped state b] is called with [b = true]
+
+    Only the function [force_bootstrapped] can set the boolean flag to
+    [false]. *)
+module Bootstrapping : sig
+  type t
+
+  (** [create ?when_bootstrapped_changes ?when_status_changes ~threshold ~latency ()]
+      is a wrapper around [Core.create ~threshold ~latency ()].
+
+      - [when_status_changes] is a callback called immediately when the status
+        changes (as a result of some calls to {!update}) and when the status is
+        first set (as a result of calling {!activate}).
+
+      - [when_bootstrapped_changes] is a callback called immediately when the
+        bootstrap flagged changes (as a result of some calls to {!update} or to
+        {!force_bootstrapped}) or when the flag is first set (as a result of
+        calling {!activate}). *)
+  val create :
+    ?when_bootstrapped_changes:(bool -> unit Lwt.t) ->
+    ?when_status_changes:(status -> unit Lwt.t) ->
+    threshold:int ->
+    latency:int ->
+    unit ->
+    t
+
+  (** [activate state] activates the heuristics. It sets the status and the
+      bootstrap flag to their initial values (which depend on the initial value
+      of [threshold]) and calls the [when_status_changes] and
+      [when_bootstrapped_changes] callbacks with these initial values.
+
+      This function is intended to be used once, after the call to [create]
+      and before the first call to [update].  *)
+  val activate : t -> unit Lwt.t
+
+  (** [update state candidate] is a wrapper around [Core.update]. If
+      an [update] changes the status of the core heuristic, the
+      [when_status_changes] callback is called. Similarly, if an [update]
+      changes the bootstrap flag, the [when_bootstrapped_changes] callback is
+      called. *)
+  val update : t -> Time.Protocol.t * P2p_peer.Id.t -> unit Lwt.t
+
+  (** [get_status state] is a wrapper around [Core.get_status]. *)
+  val get_status : t -> status
+
+  (** [is_bootstrapped state] returns the value of the bootstrap flag. *)
+  val is_bootstrapped : t -> bool
+
+  (** [force_bootstrapped state b] forces the status of the bootstrap flag. If
+      the value of the flag changes as a result, the callback
+      [when_bootstrapped_changes] is called. *)
+  val force_bootstrapped : t -> bool -> unit Lwt.t
+
+  (** [bootstrapped state] is a promise that becomes fulfilled when the current
+      bootstrap flag becomes [true]. If the bootstrap flag is already [true],
+      the promise is already resolved. *)
+  val bootstrapped : t -> unit Lwt.t
+end

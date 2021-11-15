@@ -11,13 +11,23 @@ misc_checks:
     - make check-python-linting
     # python checks
     - make -C tests_python typecheck
-    # check the static-build patch applies cleanly
-    - git apply packaging/build/static_libs.patch
     # Ensure that all unit tests are restricted to their opam package
     # (change 'tezos-test-helpers' to one the most elementary packages of
     # the repo if you add "internal" dependencies to tezos-test-helpers)
+    # check that the hack-module patch applies cleanly
+    - git apply devtools/protocol-print/add-hack-module.patch
     - dune runtest -p tezos-test-helpers ||
       echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
+
+check_docs_python:
+  extends: .build_template
+  stage: test
+  needs: []
+  before_script:
+    - cd docs
+    - poetry install
+  script:
+    - make lint
 
 check_precommit_hook:
   extends: .build_template
@@ -49,9 +59,16 @@ sanity_ci:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: sanity_ci
-  needs: ["build"]
+  needs: ["build_x86_64"]
   before_script:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
     - src/tooling/lint.sh --check-gitlab-ci-yml
+
+docker-hadolint:
+  image: hadolint/hadolint:latest-debian
+  stage: sanity_ci
+  script:
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile

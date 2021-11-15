@@ -324,7 +324,7 @@ let sources_parameter () =
           failwith
             "Can't parse the file specified by --sources as JSON: %s@,%a"
             path
-            pp_print_error
+            pp_print_trace
             errs
       | Ok json -> (
           try
@@ -355,10 +355,9 @@ let wait_parameter () =
       match wait with
       | "no" | "none" -> return_none
       | _ -> (
-          try
-            let w = int_of_string wait in
-            if 0 <= w then return_some w else fail (Invalid_wait_arg wait)
-          with _ -> fail (Invalid_wait_arg wait)))
+          match int_of_string_opt wait with
+          | Some w when 0 <= w -> return_some w
+          | None | Some _ -> fail (Invalid_wait_arg wait)))
 
 let protocol_parameter () =
   parameter (fun _ arg ->
@@ -492,7 +491,8 @@ let sources_arg () =
     ~short:'s'
     ~placeholder:"path"
     ~doc:
-      {|path to JSON file containing sources for --mode light. Example file content: {"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+      ("path to JSON file containing sources for --mode light. Example file \
+        content: " ^ Tezos_proxy.Light.example_sources)
     (sources_parameter ())
 
 let remote_signer_arg () =
@@ -539,7 +539,7 @@ let read_config_file config_file =
       failwith
         "Can't parse the configuration file as a JSON: %s@,%a"
         config_file
-        pp_print_error
+        pp_print_trace
         errs
   | Ok cfg_json -> (
       try return @@ Cfg_file.from_json cfg_json
@@ -626,14 +626,14 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
   fail_on_non_mockup_dir cctxt >>=? fun () ->
   fail_when
     (Sys.file_exists bootstrap_accounts_file)
-    (failure
+    (error_of_fmt
        "Config file to write value of --%s exists already: %s"
        mockup_bootstrap_accounts
        bootstrap_accounts_file)
   >>=? fun () ->
   fail_when
     (Sys.file_exists protocol_constants_file)
-    (failure
+    (error_of_fmt
        "Config file to write value of --%s exists already: %s"
        mockup_protocol_constants
        protocol_constants_file)
@@ -883,6 +883,43 @@ let build_endpoint addr port tls =
   |> updatecomp Uri.with_port port
   |> updatecomp Uri.with_scheme scheme
 
+let light_mode_checks mode endpoint sources =
+  match (mode, sources) with
+  | (`Mode_client, None) | (`Mode_mockup, None) | (`Mode_proxy, None) ->
+      (* No --mode light, no --sources; good *)
+      return_unit
+  | (`Mode_client, Some _) | (`Mode_mockup, Some _) | (`Mode_proxy, Some _) ->
+      (* --sources without the light mode: wrong *)
+      failwith
+        "--sources is specified whereas mode is %s. --sources should only be \
+         used with --mode light."
+      @@ client_mode_to_string mode
+  | (`Mode_light, None) ->
+      (* --mode light without --sources: wrong *)
+      failwith
+        "--mode light requires passing --sources. Example --sources file: %s"
+        Tezos_proxy.Light.example_sources
+  | (`Mode_light, Some sources) ->
+      let sources_uris = Tezos_proxy.Light.sources_config_to_uris sources in
+      if List.mem ~equal:Uri.equal endpoint sources_uris then return_unit
+      else
+        let uri_to_json_string uri =
+          Uri.to_string uri |> Printf.sprintf "\"%s\""
+        in
+        failwith
+          "Value of --endpoint is %a. Therefore, this URI MUST be in field \
+           'uris' of --sources (whose value is: [%s]). If you did not specify \
+           --endpoint, it is being defaulted; you may hereby specify \
+           --endpoint %a to fix this error."
+          Uri.pp
+          endpoint
+          (String.concat ", " @@ List.map uri_to_json_string sources_uris)
+          (* By the check done in Light.mk_sources_config, [sources_uris]
+             cannot be empty, but we don't rely on this here, by using
+             pp_print_option. *)
+          (Format.pp_print_option Uri.pp)
+          (List.hd sources_uris)
+
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
   >>=? fun ( ( base_dir,
@@ -994,6 +1031,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
          "@{<warning>Warning:@}  the --addr --port --tls options are now \
           deprecated; use --endpoint instead\n" ;
        pp_print_flush err_formatter ()))) ;
+  light_mode_checks client_mode endpoint sources >>=? fun () ->
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =

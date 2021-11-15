@@ -44,6 +44,12 @@ type u = Ezjsonm.value
     It is used in error messages (see the comment in the Decoding section). *)
 type t
 
+(** Raise [Error].
+
+    The [JSON.t] argument is used to annotate the error message with
+    the location of the JSON value. *)
+val error : t -> ('a, unit, string, 'b) format4 -> 'a
+
 (** Annotate a JSON AST with its origin. *)
 val annotate : origin:string -> u -> t
 
@@ -122,6 +128,11 @@ val update : string -> (t -> t) -> t -> t
 
 (** Test whether a JSON value is [`Null]. *)
 val is_null : t -> bool
+
+(** Return [None] if a JSON value is [`Null], [Some] otherwise.
+
+    Example: [JSON.(json |> as_opt |> Option.map read_record)] *)
+val as_opt : t -> t option
 
 (** Get the value from a [`Bool] node.
 

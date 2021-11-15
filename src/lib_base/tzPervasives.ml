@@ -58,7 +58,6 @@ module Genesis = Genesis
 module Operation = Operation
 module Protocol = Protocol
 module Test_chain_status = Test_chain_status
-module Preapply_result = Preapply_result
 module Block_locator = Block_locator
 module Mempool = Mempool
 module P2p_addr = P2p_addr

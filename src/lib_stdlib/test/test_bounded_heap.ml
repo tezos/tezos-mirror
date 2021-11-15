@@ -26,7 +26,7 @@
 (** Testing
     _______
 
-    Invocation: dune build @src/lib_stdlib/test/runtest_bounded_heap
+    Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
 module B = Bounded_heap.Make (Int)

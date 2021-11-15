@@ -9,16 +9,18 @@ dev-repo: "git+https://gitlab.com/nomadic-labs/tezos.git"
 license: "MIT"
 depends: [
   "conf-rust" {build}
-  "dune" {build & >= "1.7"}
+  "dune" {build & >= "2.0"}
   "hex"
   "ctypes"
   "ctypes-foreign"
-  "data-encoding" { >= "0.3" & < "0.4" }
+  "integers"
+  "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"
   "tezos-error-monad"
-  "tezos-test-services" { with-test }
+  "tezos-rust-libs" { = "1.1" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "tezos-base-test-helpers" { with-test }
 ]
 build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
 run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]

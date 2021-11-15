@@ -4,26 +4,28 @@ set -e
 
 bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
-: ${BIN_DIR:="/usr/local/bin"}
-: ${DATA_DIR:="/var/run/tezos"}
+: "${BIN_DIR:="/usr/local/bin"}"
+: "${DATA_DIR:="/var/run/tezos"}"
 
-: ${NODE_HOST:="node"}
-: ${NODE_RPC_PORT:="8732"}
+: "${NODE_HOST:="node"}"
+: "${NODE_RPC_PORT:="8732"}"
 
-: ${PROTOCOL:="unspecified-PROTOCOL-variable"}
+: "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 
-node="$BIN_DIR/tezos-node"
-client="$BIN_DIR/tezos-client"
-admin_client="$BIN_DIR/tezos-admin-client"
-baker="$BIN_DIR/tezos-baker-$PROTOCOL"
-endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
-accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
-signer="$BIN_DIR/tezos-signer"
+# export all these variables to be used in the inc script
+export node="$BIN_DIR/tezos-node"
+export client="$BIN_DIR/tezos-client"
+export admin_client="$BIN_DIR/tezos-admin-client"
+export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
+export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
+export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
+export signer="$BIN_DIR/tezos-signer"
 
-client_dir="$DATA_DIR/client"
-node_dir="$DATA_DIR/node"
-node_data_dir="$node_dir/data"
+export client_dir="$DATA_DIR/client"
+export node_dir="$DATA_DIR/node"
+export node_data_dir="$node_dir/data"
 
+# shellcheck disable=SC1090
 . "$bin_dir/entrypoint.inc.sh"
 
 command=${1:-tezos-node}

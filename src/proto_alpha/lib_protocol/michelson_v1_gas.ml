@@ -164,26 +164,26 @@ module Cost_of = struct
       S.safe_int 49_700 + (v0 + (v0 lsr 3))
 
     (* model N_IComb *)
-    (* Approximating 3.315655 x term *)
+    (* Approximating 3.531001 x term *)
     (* Note: size >= 2, so the cost is never 0 *)
     let cost_N_IComb size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      (S.safe_int 3 * v0) + (v0 lsr 2)
+      (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
 
     (* model N_IComb_get *)
-    (* Approximating 0.531991 x term *)
+    (* Approximating 0.573180 x term *)
     let cost_N_IComb_get size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 5 + (v0 lsr 1) + (v0 lsr 5)
+      S.safe_int 30 + (v0 lsr 1) + (v0 lsr 4)
 
     (* model N_IComb_set *)
-    (* Approximating 1.268749 x term *)
+    (* Approximating 1.365745 x term *)
     let cost_N_IComb_set size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 10 + (v0 + (v0 lsr 2))
+      S.safe_int 10 + (v0 + (v0 lsr 2) + (v0 lsr 3))
 
     (* Model N_ICompare *)
     (* Approximating 0.024413 x term *)
@@ -247,6 +247,9 @@ module Cost_of = struct
       let open S_syntax in
       let v0 = S.safe_int size in
       S.safe_int 20 + (v0 + (v0 lsr 1) + (v0 lsr 3))
+
+    (* model N_IView *)
+    let cost_N_IView = S.safe_int 1370
 
     (* model N_IDrop *)
     let cost_N_IDrop = S.safe_int 10
@@ -553,6 +556,14 @@ module Cost_of = struct
     (* model N_INow *)
     let cost_N_INow = S.safe_int 25
 
+    (* model N_IOpen_chest *)
+    (* 612000 + chest * 19 + time * 19050 *)
+    let cost_N_IOpen_chest ~chest ~time =
+      let open S_syntax in
+      let v0 = S.safe_int chest in
+      let v1 = S.safe_int time in
+      S.safe_int 612_000 + (S.safe_int 19 * v0) + (S.safe_int 19050 * v1)
+
     (* model N_IOr *)
     let cost_N_IOr = S.safe_int 15
 
@@ -673,11 +684,11 @@ module Cost_of = struct
     let cost_N_ITransfer_tokens = S.safe_int 30
 
     (* model N_IUncomb *)
-    (* Approximating 3.772151 x term *)
+    (* Approximating 3.944710 x term *)
     let cost_N_IUncomb size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 25 + (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 2)
+      S.safe_int 25 + (S.safe_int 4 * v0)
 
     (* model N_IUnpair *)
     let cost_N_IUnpair = S.safe_int 10
@@ -837,6 +848,16 @@ module Cost_of = struct
     (* model DECODING_SIGNATURE_secp256k1 *)
     let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 30
 
+    (* model DECODING_Chest_key *)
+    let cost_DECODING_Chest_key = S.safe_int 7200
+
+    (* model DECODING_Chest *)
+    (* Approximating 0.039349 x term *)
+    let cost_DECODING_Chest ~bytes =
+      let open S_syntax in
+      let v0 = S.safe_int bytes in
+      S.safe_int 7400 + (v0 lsr 5) + (v0 lsr 7)
+
     (* model ENCODING_CHAIN_ID *)
     let cost_ENCODING_CHAIN_ID = S.safe_int 50
 
@@ -866,6 +887,16 @@ module Cost_of = struct
 
     (* model ENCODING_SIGNATURE_secp256k1 *)
     let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 40
+
+    (* model ENCODING_Chest_key *)
+    let cost_ENCODING_Chest_key = S.safe_int 13500
+
+    (* model ENCODING_Chest *)
+    (* Approximating 0.120086 x term *)
+    let cost_ENCODING_Chest ~plaintext_size =
+      let open S_syntax in
+      let v0 = S.safe_int plaintext_size in
+      S.safe_int 16630 + (v0 lsr 3)
 
     (* model TIMESTAMP_READABLE_DECODING *)
     let cost_TIMESTAMP_READABLE_DECODING = S.safe_int 120
@@ -1033,10 +1064,12 @@ module Cost_of = struct
 
     let concat_string_pair s1 s2 =
       atomic_step_cost
-        (cost_N_IConcat_string_pair (String.length s1) (String.length s2))
+        (cost_N_IConcat_string_pair
+           (Script_string.length s1)
+           (Script_string.length s2))
 
     let slice_string s =
-      atomic_step_cost (cost_N_ISlice_string (String.length s))
+      atomic_step_cost (cost_N_ISlice_string (Script_string.length s))
 
     let string_size = atomic_step_cost cost_N_IString_size
 
@@ -1146,6 +1179,8 @@ module Cost_of = struct
     let loop_left = atomic_step_cost cost_N_ILoop_left
 
     let dip = atomic_step_cost cost_N_IDip
+
+    let view = atomic_step_cost cost_N_IView
 
     let check_signature (pkey : Signature.public_key) b =
       let cost =
@@ -1282,6 +1317,11 @@ module Cost_of = struct
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
+    let open_chest ~chest ~time =
+      let plaintext = Timelock.get_plaintext_size chest in
+      let log_time = Z.log2 Z.(add one time) in
+      atomic_step_cost (cost_N_IOpen_chest ~chest:plaintext ~time:log_time)
+
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
 
@@ -1298,7 +1338,8 @@ module Cost_of = struct
     let compare_signature = atomic_step_cost (S.safe_int 92)
 
     let compare_string s1 s2 =
-      atomic_step_cost (cost_N_ICompare (String.length s1) (String.length s2))
+      atomic_step_cost
+        (cost_N_ICompare (Script_string.length s1) (Script_string.length s2))
 
     let compare_bytes b1 b2 =
       atomic_step_cost (cost_N_ICompare (Bytes.length b1) (Bytes.length b2))
@@ -1339,7 +1380,7 @@ module Cost_of = struct
 
     let compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
-      let[@coq_axiom_with_reason "gadt"] rec compare :
+      let rec compare :
           type a.
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
@@ -1394,6 +1435,29 @@ module Cost_of = struct
         | Return -> cost
       in
       compare ty x y Gas.free Return
+     [@@coq_axiom_with_reason "non top-level mutually recursive function"]
+
+    let view_mem (elt : Script_string.t)
+        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+      let open S_syntax in
+      let per_elt_cost =
+        compare (Script_typed_ir.string_key ~annot:None) elt elt
+      in
+      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (log2 size *@ per_elt_cost))
+
+    let view_get = view_mem
+
+    let view_update (elt : Script_string.t)
+        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+      let open S_syntax in
+      let per_elt_cost =
+        compare (Script_typed_ir.string_key ~annot:None) elt elt
+      in
+      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
     let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
       let open S_syntax in
@@ -1632,15 +1696,18 @@ module Cost_of = struct
     (* Reasonable estimate. *)
     let contract = Gas.(S.safe_int 2 *@ public_key_readable)
 
-    (* Assuming unflattened storage: /contracts/hash1/.../hash6/key/balance,
-       balance stored on 64 bits *)
+    (* Balance stored at /contracts/index/hash/balance, on 64 bits *)
     let contract_exists =
-      Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:9 ~read_bytes:8
+      Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:4 ~read_bytes:8
 
     (* Constructing proof arguments consists in a decreasing loop in the result
        monad, allocating at each step. We charge a reasonable overapproximation. *)
     let proof_argument n =
       atomic_step_cost (S.mul (S.safe_int n) (S.safe_int 50))
+
+    let chest_key = atomic_step_cost cost_DECODING_Chest_key
+
+    let chest ~bytes = atomic_step_cost (cost_DECODING_Chest ~bytes)
   end
 
   module Unparsing = struct
@@ -1744,5 +1811,10 @@ module Cost_of = struct
       let nfs = List.length d.nullifiers in
       let cms = List.length d.commitments_and_ciphertexts in
       atomic_step_cost (cost_SAPLING_DIFF_ENCODING ~nfs ~cms)
+
+    let chest_key = atomic_step_cost cost_ENCODING_Chest_key
+
+    let chest ~plaintext_size =
+      atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
   end
 end

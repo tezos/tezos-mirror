@@ -1,9 +1,7 @@
-(executables
- (names
-   test_time
-   test_p2p_addr
-   test_protocol
- )
+(tests
+ (names test_time test_protocol)
+ (package tezos-base)
+ (modules test_time test_protocol)
  (libraries
    tezos-base
    tezos-base.unix
@@ -16,40 +14,22 @@
           -open Tezos_error_monad
         )))
 
-(rule
- (alias buildtest)
- (deps
-   test_time.exe
-   test_p2p_addr.exe
-   test_protocol.exe
- )
- (action (progn)))
-
-(rule
- (alias runtest_time)
- (action (run %{exe:test_time.exe})))
-(rule
- (alias runtest_p2p_addr)
- (action (run %{exe:test_p2p_addr.exe})))
-(rule
- (alias runtest_protocol)
- (action (run %{exe:test_protocol.exe})))
-
-(rule
- (alias runtest)
- (package tezos-base)
- (deps
-   (alias runtest_time)
-   (alias runtest_p2p_addr)
-   (alias runtest_protocol)
- )
- (action (progn)))
-
-(rule
- (alias runtest_p2p_addr)
+(tests
+ (names test_p2p_addr)
  (package tezos-base)
  (deps
    (file points.ok)
    (file points.ko)
    )
- (action (progn)))
+ (modules test_p2p_addr)
+ (libraries
+   tezos-base
+   tezos-base.unix
+   data-encoding
+   qcheck-alcotest
+   tezos-test-helpers
+ )
+ (flags (:standard
+          -open Tezos_base
+          -open Tezos_error_monad
+        )))

@@ -1,5 +1,11 @@
+; build static executable with --profile static
+(env
+ (static (flags (:standard
+                  -ccopt -static
+                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
 (executables
  (names main_signer)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-signer)
  (package tezos-signer)
  (libraries tezos-base

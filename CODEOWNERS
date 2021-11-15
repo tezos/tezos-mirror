@@ -1,0 +1,90 @@
+# CODEOWNERS
+
+# This file declares which users are qualified to review and approve changes to
+# specific files or paths in this repository. It helps contributors to identify
+# whom to consult for assistance on merge requests.
+
+# To understand the syntax and semantics of this file, see:
+#   https://docs.gitlab.com/ee/user/project/code_owners.html
+#
+# Note that rules defined later in the file take precedence over the rules
+# defined earlier.
+
+
+# ************************************
+# Insert code owner declarations here!
+# ************************************
+
+/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @hai-nguyen-van @lthms @raphoo_
+
+/src/bin_codec               @raphael-proust
+/src/bin_node                @romain.nl
+/src/bin_proxy_server        @Sir4ur0n @smelc
+/src/bin_snoop               @lrand
+
+/src/lib_base                @raphael-proust
+/src/lib_benchmark           @lrand
+/src/lib_context             @smelc
+/src/lib_error_monad         @raphael-proust
+/src/lib_mockup              @Sir4ur0n @smelc
+/src/lib_mockup_proxy        @Sir4ur0n @smelc
+/src/lib_protocol_environment @raphael-proust
+/src/lib_proxy               @Sir4ur0n @smelc
+/src/lib_proxy_server_config @Sir4ur0n @smelc
+/src/lib_rpc*                @smelc @raphael-proust
+/src/lib_shell_benchmarks    @lrand
+/src/lib_stdlib*             @raphael-proust
+/src/lib_test                @Sir4ur0n
+/src/lib_version             @romain.nl
+/src/lib_event_logging       @romain.nl
+/src/openapi                 @romain.nl
+/src/proto_*/lib_benchmark   @lrand
+/src/proto_*/lib_benchmarks_proto @lrand
+
+/scripts                     @romain.nl
+/scripts/pre_commit          @smelc
+
+/tests_python                @smelc
+
+/tezt                        @romain.nl @Sir4ur0n @smelc
+
+/.gitlab                     @romain.nl @raphael-proust
+
+# Merge Team
+#
+# These users are, as members of the Merge Team, permitted to act as authorities on any code.
+#
+# @arvidnl = Arvid Jakobsson
+# @camlspotter = Jun Furuse
+# @igarnier = Ilias Garnier
+# @klakplok = Benjamin Canou
+# @lthms = Thomas Letan
+# @mbouaziz = Mehdi Bouaziz
+# @murbard = Arthur B.
+# @NicVolanschi = Nic Volanschi
+# @paracetamolo = Marco Stronati
+# @pirbo = Pierre Boutillier
+# @pmetzger = Perry E. Metzger
+# @rafoo_ = Raphaël Cauderlier
+# @raphael-proust = Raphaël Proust
+# @romain.nl = Romain
+# @Saroupille = François Thiré
+# @Sir4ur0n = Julien Debon
+# @smelc = Clément Hurlin
+# @smondet = Seb Mondet
+# @sventimir = Sventimir
+# @tomjack = Tom Jack
+# @vbotbol = vbot
+# @yrg = Yann Regis-Gianas
+#
+* @arvidnl @camlspotter @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @Sir4ur0n @smelc @smondet @sventimir @tomjack @vbotbol @yrg
+
+# CODEOWNERS Owners
+#
+# These users are authorized to change authorizations.
+#
+# Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
+#
+/CODEOWNERS         @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
+/docs/CODEOWNERS    @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
+/.gitlab/CODEOWNERS @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl

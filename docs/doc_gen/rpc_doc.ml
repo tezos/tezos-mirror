@@ -33,14 +33,14 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
-    ( "010",
+    ( "011",
+      "011 Hangzhou",
+      Some "/include/rpc_introduction.rst.inc",
+      "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
+    ( "",
       "010 Granada",
       Some "/include/rpc_introduction.rst.inc",
       "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV" );
-    ( "",
-      "009 Florence",
-      Some "/include/rpc_introduction.rst.inc",
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
   ]
 
 let pp_name ppf = function
@@ -292,6 +292,13 @@ module Description = struct
             (snd (Lazy.force service.output)))
   end
 
+  let pp_dynamic_tail fmt service =
+    List.last_opt service.Resto.Description.path
+    |> Option.iter (function
+           | Resto.Description.PDynamicTail {name; _} ->
+               Format.fprintf fmt "(/<%s>)*" name
+           | _ -> ())
+
   let rec pp prefix ppf dir =
     let open Resto.Description in
     match dir with
@@ -318,10 +325,12 @@ module Description = struct
     Rst.pp_ref ppf (ref_of_service (prefix, meth)) ;
     Format.fprintf
       ppf
-      "**%s %a%a**@\n@\n"
+      "**%s %a%a%a**@\n@\n"
       (Resto.string_of_meth meth)
       pp_name
       prefix
+      pp_dynamic_tail
+      service
       Query.pp_title
       service.query ;
     Tabs.pp ppf prefix service
@@ -356,8 +365,7 @@ let pp_document ppf descriptions version =
       Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
     descriptions
 
-let main node =
-  let required_version = Sys.argv.(1) in
+let make_index node required_version =
   let shell_dir = Node.build_rpc_directory node in
   let protocol_dirs =
     List.map
@@ -379,8 +387,6 @@ let main node =
           [".."; "<block_id>"],
           RPC_directory.map (fun () -> assert false)
           @@ Block_directory.build_raw_rpc_directory
-               ~user_activated_upgrades:[]
-               ~user_activated_protocol_overrides:[]
                (module Proto)
                (module Proto) ))
       protocols
@@ -400,5 +406,23 @@ let main node =
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
   return ()
+
+let make_default_acl _node =
+  let addr_of_string addr = P2p_point.Id.{addr; port = None; peer_id = None} in
+  let policy =
+    let open Tezos_rpc_http_server.RPC_server.Acl in
+    put_policy (addr_of_string "127.0.0.1", allow_all) empty_policy
+    |> put_policy (addr_of_string "any.public.address", secure)
+    |> Data_encoding.Json.construct policy_encoding
+  in
+  Data_encoding.Json.pp Format.std_formatter policy ;
+  return ()
+
+let main node =
+  let cmd = Sys.argv.(1) in
+  match cmd with
+  | "index" -> make_index node Sys.argv.(2)
+  | "acl" -> make_default_acl node
+  | _ -> raise (Invalid_argument cmd)
 
 let () = Lwt_main.run (Node_helpers.with_node main)

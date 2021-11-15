@@ -172,9 +172,10 @@ module Secret_key = struct
         let buf = Bytes.create (sk_size + pk_size) in
         blit_to_bytes sk buf ;
         blit_to_bytes pk ~pos:sk_size buf ;
-        Bytes.to_string buf)
+        Bytes.unsafe_to_string buf)
       ~of_raw:(fun buf ->
-        let sk = Bytes.(sub (of_string buf) 0 sk_size) in
+        let sk = Bytes.create sk_size in
+        Bytes.blit_string buf 0 sk 0 sk_size ;
         sk_of_bytes sk)
       ~wrap:(fun x -> Data x)
 
@@ -192,7 +193,7 @@ module Secret_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check s = Base58.simple_encode b58check_encoding s
 

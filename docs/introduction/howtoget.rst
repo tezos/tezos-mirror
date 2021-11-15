@@ -6,6 +6,7 @@ How to get Tezos
 ================
 
 In this how-to we explain how to get up-to-date binaries to run Tezos
+(more precisely, the "Octez" implementation of Tezos software)
 on any network (either on the mainnet or on one of the test networks).
 Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable files), including: a client, a node, a baker, and an endorser.
 
@@ -41,6 +42,10 @@ different memory footprint compared to dynamically-linked binaries. Also,
 compiling the sources in the official Tezos
 repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
+
+All our installation scenarios are tested daily, including by automated means, to ensure that they are correct and up to date.
+These tests are performed by applying scenarios in several standard environements, from scratch.
+However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
 
 .. _getting_static_binaries:
 
@@ -86,7 +91,7 @@ Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 32 and 33. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
+Currently it supports Fedora 33 and 34. In order to add the Copr repository to your machine and install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
@@ -116,27 +121,27 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Florencenet, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Granadanet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Florencenet test network with the latest release:
+For example, to run Tezos on the Granadanet test network with the latest release:
 
-.. literalinclude:: use-docker-florencenet.sh
+.. literalinclude:: use-docker-granadanet.sh
    :language: shell
-   :start-after: [get florencenet]
-   :end-before: [start florencenet]
+   :start-after: [get granadanet]
+   :end-before: [start granadanet]
 
 Alternatively, to run on Mainnet::
 
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the florencenet test network.
+In the following we assume you are running on the Granadanet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-florencenet.sh
+.. literalinclude:: use-docker-granadanet.sh
    :language: shell
-   :start-after: [start florencenet]
+   :start-after: [start granadanet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -145,23 +150,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``florencenet.sh`` will check for updates of the node and
+Every call to ``granadanet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./florencenet.sh restart
+    ./granadanet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./florencenet.sh --help`` for more information about the
-script. In particular see ``./florencenet.sh client --help`` or the
+See ``./granadanet.sh --help`` for more information about the
+script. In particular see ``./granadanet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./florencenet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./florencenet.sh admin-client``.
+executed by using ``./granadanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./granadanet.sh admin-client``.
 
 
 .. _building_with_opam:
@@ -188,6 +193,7 @@ developed in the future.
     If you build the binaries by using the following instructions inside a
     Docker container, you have to give extended privileges to this container,
     by passing option ``--privileged`` to the ``docker run`` command.
+
 
 Install OPAM
 ~~~~~~~~~~~~
@@ -252,7 +258,7 @@ Now, install all the binaries by:
   :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-endorser-009-PsFLoren``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
+install tezos-endorser-010-PtGRANAD``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 
@@ -316,7 +322,7 @@ Install Rust
 ~~~~~~~~~~~~
 
 Compiling Tezos requires the Rust compiler,
-version 1.44.0, and the Cargo package manager to be installed. If you
+version 1.52.1, and the Cargo package manager to be installed. If you
 have `rustup <https://rustup.rs/>`_ installed, it should work without
 any additional steps on your side. You can use `rustup
 <https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
@@ -432,7 +438,6 @@ command instead:
 
    * As a last resort, removing the ``_opam`` folder (as part of a ``git
      clean -dxf`` for example) allows to restart in a fresh environment.
-
 
 Compile
 ~~~~~~~

@@ -13,7 +13,7 @@ from typing import List
 import pytest
 from tools import utils, constants
 from client.client import Client
-from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH
+from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, ATTIC_CONTRACT_PATH
 
 
 def get_keys(client):
@@ -170,17 +170,16 @@ class TestMultisig:
             )
             utils.bake(client)
             expected_hash = (
-                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4\n'
+                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4'
             )
             assert expected_hash in client.run(
                 ['show', 'supported', 'multisig', 'hashes']
             )
             assert client.get_script_hash(msig['handle']) == expected_hash
             assert client.get_script_hash('dummy_msig') == expected_hash
-            assert (
-                client.hash_script(client.run(['show', 'multisig', 'script']))
-                == expected_hash
-            )
+            assert client.hash_script(
+                [client.run(['show', 'multisig', 'script'])]
+            ) == [(expected_hash, None)]
             assert client.get_balance('dummy_msig') == 100
 
     def test_transfer(self, msig, client: Client, session: dict):
@@ -594,3 +593,28 @@ class TestMultisig:
         assert_msig_storage_eq(client, new_storage, expected_storage)
         new_balance = client.get_balance(msig['handle'])
         assert new_balance == current_balance
+
+
+class TestUnsupportedMultisig:
+    """Verify that non-multisig contracts are rejected"""
+
+    def test_deploy_nonmultisig(self, client: Client):
+        contract = os.path.join(ATTIC_CONTRACT_PATH, 'id.tz')
+        client.originate(
+            'id',
+            0,
+            'bootstrap1',
+            contract,
+            args=['--burn-cap', '10.0', '--force', '--init', '""'],
+        )
+        utils.bake(client)
+
+        error_pattern = (
+            'The hash of this script is '
+            'exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL, '
+            'it was not found among in the list of known multisig '
+            'script hashes.'
+        )
+
+        with utils.assert_run_failure(error_pattern):
+            client.msig_transfer('id', 10, 'bootstrap2', 'bootstrap1', [])

@@ -71,8 +71,7 @@ module Raw = struct
       dk : Bytes.t;
     }
 
-    let of_bytes b =
-      try Some (R.to_zip32_expanded_spending_key b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_zip32_expanded_spending_key b)
 
     let to_bytes = R.of_zip32_expanded_spending_key
 
@@ -206,7 +205,7 @@ module Raw = struct
 
     let to_bytes = R.of_zip32_full_viewing_key
 
-    let of_bytes b = try Some (R.to_zip32_full_viewing_key b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_zip32_full_viewing_key b)
 
     let of_sk (sk : Spending_key.t) =
       Spending_key.
@@ -264,12 +263,10 @@ module Raw = struct
 
     let address_b58check_encoding =
       let to_raw address =
-        Bytes.to_string
-          (Data_encoding.Binary.to_bytes_exn address_encoding address)
+        Data_encoding.Binary.to_string_exn address_encoding address
       in
       let of_raw str =
-        Option.of_result
-        @@ Data_encoding.Binary.of_bytes address_encoding (Bytes.of_string str)
+        Data_encoding.Binary.of_string_opt address_encoding str
       in
       Base58.register_encoding
         ~prefix:Base58.Prefix.sapling_address
@@ -333,18 +330,22 @@ module Raw = struct
       R.ka_derivepublic Viewing_key.(address.diversifier) esk
 
     (* used to derive symmetric keys from the diffie hellman. *)
-    let kdf_key = Bytes.of_string "KDFSaplingForTezosV1"
+    let kdf_key = "KDFSaplingForTezosV1"
 
     (** Derives a symmetric key to be used to create the ciphertext on the
         sender side. *)
     let symkey_sender esk pkd =
-      let symkey = R.of_symkey @@ R.ka_agree_sender pkd esk in
-      let hash = Blake2B.(to_bytes @@ hash_bytes ~key:kdf_key [symkey]) in
+      let symkey =
+        Bytes.unsafe_to_string @@ R.of_symkey @@ R.ka_agree_sender pkd esk
+      in
+      let hash = Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey]) in
       Crypto_box.Secretbox.unsafe_of_bytes hash
 
     let symkey_receiver epk ivk =
-      let symkey = R.of_symkey @@ R.ka_agree_receiver epk ivk in
-      let hash = Blake2B.(to_bytes @@ hash_bytes ~key:kdf_key [symkey]) in
+      let symkey =
+        Bytes.unsafe_to_string @@ R.of_symkey @@ R.ka_agree_receiver epk ivk
+      in
+      let hash = Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey]) in
       Crypto_box.Secretbox.unsafe_of_bytes hash
 
     let symkey_out ovk (cv, cm, epk) =
@@ -423,7 +424,7 @@ module Raw = struct
   module CV = struct
     type t = R.cv
 
-    let of_bytes b = try Some (R.to_cv b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_cv b)
 
     let encoding =
       let open Data_encoding in
@@ -729,16 +730,15 @@ module Raw = struct
       @@ conv R.of_binding_sig R.to_binding_sig (Fixed.bytes 64)
 
     (* Create sighash for binding_sig *)
-    let hash_transaction inputs outputs key_string =
-      let key = Bytes.of_string key_string in
+    let hash_transaction inputs outputs key =
       let input_bytes =
-        List.map (Data_encoding.Binary.to_bytes_exn input_encoding) inputs
+        List.map (Data_encoding.Binary.to_string_exn input_encoding) inputs
       in
       let output_bytes =
-        List.map (Data_encoding.Binary.to_bytes_exn output_encoding) outputs
+        List.map (Data_encoding.Binary.to_string_exn output_encoding) outputs
       in
       let h =
-        Blake2B.(to_bytes (hash_bytes ~key (input_bytes @ output_bytes)))
+        Blake2B.(to_bytes (hash_string ~key (input_bytes @ output_bytes)))
       in
       R.to_sighash h
 

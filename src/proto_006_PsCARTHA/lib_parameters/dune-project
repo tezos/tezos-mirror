@@ -1,3 +1,0 @@
-(lang dune 2.0)
-(formatting (enabled_for ocaml))
-(name tezos-protocol-006-PsCARTHA-parameters)

@@ -37,5 +37,6 @@ module Make (Trace : Traced_sigs.Trace.S) = struct
   module Seq_e = Seq_e
   module Seq_s = Seq_s.Make (Monad)
   module Seq_es = Seq_es.Make (Monad) (Seq_e) (Seq_s)
+  module Unit = Bare_structs.Unit
   module WithExceptions = Bare_structs.WithExceptions
 end

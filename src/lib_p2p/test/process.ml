@@ -116,7 +116,7 @@ let handle_result ~value_encoding ~flags canceler f child_exit =
     ~on_error:(fun err ->
       lwt_log_error
         "@[<v 2>Detached process ended with error.@[%a@]@]@."
-        pp_print_error
+        pp_print_trace
         err
       >>= fun () ->
       send_result ~value_encoding ~flags child_exit (Error err) >>=? fun () ->
@@ -127,7 +127,7 @@ let handle_result ~value_encoding ~flags canceler f child_exit =
       lwt_log_error
         "@[<v 2>Unexpected error when handling detached function result: \
          @[%a@]@]@."
-        Error_monad.pp_print_error
+        Error_monad.pp_print_trace
         err
       >>= fun () -> Lwt.return 255
 
@@ -347,7 +347,7 @@ let pp_trace plural ppf err =
         "%s stopped by a %s !"
         (if plural then "were" else "was")
         (Option.value ~default:"Unknown signal" (signal_name n))
-  | err -> Format.fprintf ppf "failed with error:@ @[%a@]" pp_print_error err
+  | err -> Format.fprintf ppf "failed with error:@ @[%a@]" pp_print_trace err
 
 (* Print the trace of multiple detached process, grouped by identical traces *)
 let pp_grouped ppf plist pp_trace =

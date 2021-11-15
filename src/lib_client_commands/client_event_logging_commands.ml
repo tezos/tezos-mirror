@@ -66,7 +66,7 @@ let date_parameter option_name build =
         return (build t)
       with
       | Invalid_argument e -> failwith "In `%s %S`, %s" option_name s e
-      | e -> failwith "Exn: %a" pp_exn e)
+      | e -> failwith "Exn: %s" (Printexc.to_string e))
 
 let flat_pp pp o =
   Format.(
@@ -88,19 +88,15 @@ let commands () =
             ~doc:"Filter on event names"
             ~long:"names"
             ~placeholder:"LIST"
-            (parameter (fun _ s ->
-                 try return (String.split_on_char ',' s)
-                 with _ -> failwith "List of names cannot be parsed")))
+            (parameter (fun _ s -> return (String.split_on_char ',' s))))
          (arg
             ~doc:"Filter on event sections (use '_' for no-section)"
             ~long:"sections"
             ~placeholder:"LIST"
             (parameter (fun _ s ->
-                 try
-                   return
-                     (String.split_on_char ',' s
-                     |> List.map (function "_" -> None | other -> Some other))
-                 with _ -> failwith "List of sections cannot be parsed")))
+                 return
+                   (String.split_on_char ',' s
+                   |> List.map (function "_" -> None | other -> Some other)))))
          (arg
             ~doc:"Filter out events before DATE"
             ~long:"since"
@@ -121,9 +117,7 @@ let commands () =
       @@ param
            ~name:"Sink-Name"
            ~desc:"The URI of the SINK to query"
-           (parameter (fun _ s ->
-                try return (Uri.of_string s)
-                with _ -> failwith "Uri cannot be parsed"))
+           (parameter (fun _ s -> return (Uri.of_string s)))
       @@ stop)
       (fun ( only_names,
              only_sections,
@@ -151,7 +145,7 @@ let commands () =
                     Scriptable.output_row
                       scriptable
                       ~for_human:(fun () ->
-                        cctxt#message "Unknown: %s" path >>= fun () ->
+                        cctxt#error "Unknown: %s" path >>= fun () ->
                         Lwt_stream.iter_s
                           (fun line -> cctxt#message "    |%s" line)
                           (Lwt_io.lines_of_file path)
@@ -207,7 +201,7 @@ let commands () =
                 Scriptable.output
                   scriptable
                   ~for_human:(fun () ->
-                    cctxt#message
+                    cctxt#warning
                       "### Some things were not perfect:@.@[<2>%a@]"
                       (pp_print_list
                          ~pp_sep:(fun fmt () -> fprintf fmt "@.")

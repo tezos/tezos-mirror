@@ -63,17 +63,18 @@ module Id = struct
 
   let addr_port_id_to_string addr = Format.asprintf "%a" pp_addr_port_id addr
 
+  let addr_port_id_of_string_exn str =
+    match parse_addr_port_id str with
+    | Ok r -> r
+    | Error err ->
+        invalid_arg
+          (Format.asprintf
+             "Parsing of '%s' failed: %s.@."
+             str
+             (string_of_parsing_error err))
+
   let of_string_exn ?default_port str =
-    let {addr; port; _} =
-      match parse_addr_port_id str with
-      | Ok r -> r
-      | Error err ->
-          invalid_arg
-            (Format.asprintf
-               "Parsing of '%s' failed: %s.@."
-               str
-               (string_of_parsing_error err))
-    in
+    let {addr; port; _} = addr_port_id_of_string_exn str in
     let port =
       match (port, default_port) with
       | (Some port, _) -> port
@@ -101,6 +102,10 @@ module Id = struct
       + (*port separator*) 1 + (*size of port number*) 5)
     @@ def "p2p_point.id" ~description:"Identifier for a peer point"
     @@ conv to_string of_string_exn string
+
+  let addr_port_id_encoding =
+    let open Data_encoding in
+    conv addr_port_id_to_string addr_port_id_of_string_exn string
 
   let rpc_arg =
     RPC_arg.make

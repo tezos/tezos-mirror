@@ -25,6 +25,54 @@
 
 module Events = P2p_events.P2p_welcome
 
+type listening_socket_open_failure = {
+  reason : Unix.error;
+  address : P2p_addr.t;
+  port : int;
+}
+
+type error += Failed_to_open_listening_socket of listening_socket_open_failure
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"p2p.welcome.failed_to_open_listening_socket"
+    ~title:"Failed to open listening socket"
+    ~description:"The p2p listening socket could not be opened."
+    ~pp:(fun ppf (reason, address, port) ->
+      let tips ppf () =
+        match reason with
+        | Unix.EADDRINUSE ->
+            Format.fprintf
+              ppf
+              "Another tezos node is probably running on this address.@;\
+               Please choose another P2P port using --net-addr."
+        | _ -> Format.fprintf ppf ""
+      in
+      Format.fprintf
+        ppf
+        "@[<v 2>An error occured while initializing P2P server on this \
+         address: %a:%d.@;\
+         Reason: %s.@;\
+         %a@]"
+        P2p_addr.pp
+        address
+        port
+        (Unix.error_message reason)
+        tips
+        ())
+    Data_encoding.(
+      obj3
+        (req "reason" Unix_error.encoding)
+        (req "address" P2p_addr.encoding)
+        (req "port" uint16))
+    (function
+      | Failed_to_open_listening_socket {reason; address; port} ->
+          Some (reason, address, port)
+      | _ -> None)
+    (fun (reason, address, port) ->
+      Failed_to_open_listening_socket {reason; address; port})
+
 type connect_handler =
   | Connect_handler :
       ('msg, 'meta, 'meta_conn) P2p_connect_handler.t
@@ -98,19 +146,27 @@ let rec worker_loop st =
   | Error err -> Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
-  let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
-  Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-  Lwt_unix.bind
-    main_socket
-    Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
-  >>= fun () ->
-  Lwt_unix.listen main_socket backlog ;
-  Lwt.return main_socket
+  Lwt.catch
+    (fun () ->
+      let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
+      Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
+      Lwt_unix.bind
+        main_socket
+        Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
+      >>= fun () ->
+      Lwt_unix.listen main_socket backlog ;
+      return main_socket)
+    (function
+      | Unix.Unix_error (err, _, _) ->
+          fail
+          @@ Failed_to_open_listening_socket
+               {reason = err; address = addr; port}
+      | exn -> Lwt.fail exn)
 
 let create ?addr ~backlog connect_handler port =
   Lwt.catch
     (fun () ->
-      create_listening_socket ~backlog ?addr port >>= fun socket ->
+      create_listening_socket ~backlog ?addr port >>=? fun socket ->
       let canceler = Lwt_canceler.create () in
       let st =
         {
@@ -125,10 +181,10 @@ let create ?addr ~backlog connect_handler port =
           Lwt_utils_unix.safe_close socket >>= function
           | Error trace -> Events.(emit unexpected_error_closing_socket) trace
           | Ok () -> Lwt.return_unit) ;
-      Lwt.return st)
+      return st)
     (fun exn ->
-      Events.(emit incoming_connection_error) (Error_monad.Exn exn)
-      >>= fun () -> Lwt.fail exn)
+      let error = Error_monad.Exn exn in
+      Events.(emit incoming_connection_error) error >>= fun () -> fail error)
 
 let activate st =
   st.worker <-

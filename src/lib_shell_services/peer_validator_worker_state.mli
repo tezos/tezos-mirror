@@ -44,6 +44,7 @@ module Event : sig
     | New_head_validation_end of block_received
     | Ignoring_head of block_received
     | Ignoring_previously_validated_block of block_received
+    | Ignoring_prechecked_block of block_received
     | Ignoring_invalid_block of block_received
     | Missing_new_head_predecessor of block_received
     | Ignoring_branch_with_invalid_locator of block_received
@@ -52,6 +53,7 @@ module Event : sig
     | Processing_new_head of block_received
     | Processing_new_branch of block_received
     | Terminating_worker of {peer : P2p_peer.Id.t; reason : string}
+    | Ignoring_prechecked_invalid_block of block_received
 
   type view = t
 
@@ -64,21 +66,6 @@ module Event : sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Worker_state : sig
-  type pipeline_length = {
-    fetched_header_length : int;
-    fetched_block_length : int;
-  }
+type pipeline_length = {fetched_header_length : int; fetched_block_length : int}
 
-  val pipeline_length_encoding : pipeline_length Data_encoding.encoding
-
-  type view = {
-    pipeline_length : pipeline_length;
-    mutable last_validated_head : Block_hash.t;
-    mutable last_advertised_head : Block_hash.t;
-  }
-
-  val encoding : view Data_encoding.encoding
-
-  val pp : Format.formatter -> view -> unit
-end
+val pipeline_length_encoding : pipeline_length Data_encoding.encoding

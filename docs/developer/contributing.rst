@@ -16,7 +16,7 @@ Reporting issues
 The simplest way to contribute to Tezos is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
-consult the :ref:`technical support sources <support>`
+consult the :doc:`technical support sources <../introduction/support>`
 first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
@@ -30,6 +30,7 @@ Going further
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
 This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
@@ -38,6 +39,8 @@ First, make sure that you are proficient enough in OCaml. The community
 website https://ocaml.org gives a few useful pointers for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
+For a more specific explanation of GADT usage in Tezos you can check out
+:doc:`gadt`.
 
 Then, if you don’t know much about the Lwt library, that’s what you want
 to learn next. This library is used extensively throughout the code base:
@@ -47,15 +50,17 @@ chapter on concurrency of the `Real World OCaml <https://dev.realworldocaml.org/
 has also been `ported to Lwt <https://github.com/dkim/rwo-lwt>`__.
 
 After that, it is a good idea to read the tutorials for
-:ref:`error_monad<error_monad>` and
-:ref:`data_encoding <data_encoding>`, two homegrown
+:doc:`error_monad <error_monad>` and
+:doc:`data_encoding <data_encoding>`, two homegrown
 libraries that we use pervasively.
 
 While you familiarize yourself with the basics as suggested above, you
-can have a look at the :ref:`software architecture
-<software_architecture>` of Tezos. It will
+can have a look at the :doc:`software architecture
+<../shell/the_big_picture>` of Tezos. It will
 give you the main components and their interactions, and links to the
 documentation for the various parts.
+
+You may also want to take a look to some :ref:`developer tools <dev_tools>` that can make protocol development more convenient.
 
 Now, that you're ready to delve into the code, it is time to know how
 contributions to the code are submitted, reviewed, and finally accepted into the master branch.
@@ -72,7 +77,7 @@ We mostly use merge requests (aka MRs) for contributing to the master branch,
 meaning that nobody should be pushing into the master branch directly. Once a
 merge request is ready, it is reviewed and approved, then merged with a merge commit.
 
-We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviewing_and_managing_merge_requests.html#semi-linear-history-merge-requests>`_,
+We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviews/index.html#semi-linear-history-merge-requests>`_,
 which means that merge requests are only
 merged if they are direct suffixes of the master branch.
 This means that merge requests are rebased on top of ``master`` before they are merged.
@@ -160,7 +165,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
    Use multilines commit messages for important commits.
--  Adhere to the :ref:`coding guidelines <coding_guidelines>`.
+-  Adhere to the :doc:`coding guidelines <guidelines>`.
 -  Document your changes, in the MR description and commit messages.
    Imagine if somebody asked what your change was about in front of the
    coffee machine, write down your answer and put it in the MR.
@@ -172,6 +177,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  If you add new functions to an interface, don’t forget to
    document the function in the interface (in the corresponding .mli file; or,
    if there is no .mli file, directly in the .ml file)
+-  If you add a new RPC endpoint or modify an existing one, be sure to take
+   into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
    a command-line option), update the corresponding documentation. In
    particular, for configuration parameters of the Tezos node, update the node
@@ -219,7 +226,7 @@ Therefore, when creating your MR, observe the following rules:
   - Merge requests should include automated tests for new
     functionality and bug fixes.
 
-    - Refer to the :ref:`testing guide <testing>` for more information.
+    - Refer to the :doc:`testing guide <testing>` for more information.
 
     - Bug fixes should include a test that demonstrates that the bug has been fixed
       (i.e. that fails before the supplied fix).
@@ -332,7 +339,12 @@ Special case: MRs that introduce a new dependency
 
 In the special case where your MR adds a new opam dependency or updates an
 existing opam dependency, you will need to follow
-:ref:`this additional dedicated guide <adding_new_opam_dependency>`.
+this additional dedicated guide:
+
+.. toctree::
+   :maxdepth: 2
+
+   contributing-adding-a-new-opam-dependency
 
 In the special case where your MR adds a new Python, Rust, Javascript, or other
 dependency, additional steps must also be followed.
@@ -371,7 +383,7 @@ useless otherwise.
 For this reason after the activation of a protocol the first step to
 start a new development cycle is to remove the migration code.
 In order to facilitate this, *migration code is always in a different commit* with respect to the protocol features it migrates.
-When submitting an MR which contains migration code, **the author must also have tested the migration** (see :ref:`proposal_testing`) and write in the
+When submitting an MR which contains migration code, **the author must also have tested the migration** (see :doc:`proposal_testing`) and write in the
 description what was tested and how so that **reviewers can reproduce it**.
 
 
@@ -381,7 +393,7 @@ Code Review
 -----------
 
 At Tezos all the code is peer reviewed before getting committed in the
-master branch by the :ref:`merge team <merge_team>`.
+master branch by the :doc:`merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
 
@@ -526,3 +538,11 @@ The code for the bot is at
 `smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course
 work-in-progress and new warnings and comments will appear little by little.
 We welcome specific issues or contributions there too.
+
+.. _dev_tools:
+
+Developer Tools
+~~~~~~~~~~~~~~~
+
+Somme tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
+In particular, it contains ``tztop``, a REPL (interactive read-eval-print loop) based on ``utop``.

@@ -42,8 +42,8 @@ module Mnemonic = struct
           seed_32
           i
           (Char.chr
-             ( Char.code (Bytes.get first_32 i)
-             lxor Char.code (Bytes.get second_32 i) ))
+             (Char.code (Bytes.get first_32 i)
+             lxor Char.code (Bytes.get second_32 i)))
       done ;
       seed_32
     in
@@ -66,8 +66,7 @@ let from_uri (cctxt : #Client_context.full) uri =
 let register (cctxt : #Client_context.full) ?(force = false)
     ?(unencrypted = false) mnemonic name =
   let sk = Mnemonic.to_sapling_key mnemonic in
-  to_uri unencrypted cctxt sk
-  >>=? fun sk_uri ->
+  to_uri unencrypted cctxt sk >>=? fun sk_uri ->
   let key =
     {
       sk = sk_uri;
@@ -75,19 +74,16 @@ let register (cctxt : #Client_context.full) ?(force = false)
       address_index = Viewing_key.default_index;
     }
   in
-  Sapling_key.add ~force cctxt name key
-  >>=? fun () -> return @@ Viewing_key.of_sk sk
+  Sapling_key.add ~force cctxt name key >>=? fun () ->
+  return @@ Viewing_key.of_sk sk
 
 let derive (cctxt : #Client_context.full) ?(force = false)
     ?(unencrypted = false) src_name dst_name child_index =
-  Sapling_key.find cctxt src_name
-  >>=? fun k ->
-  from_uri cctxt k.sk
-  >>=? fun src_sk ->
+  Sapling_key.find cctxt src_name >>=? fun k ->
+  from_uri cctxt k.sk >>=? fun src_sk ->
   let child_index = Int32.of_int child_index in
   let dst_sk = Spending_key.derive_key src_sk child_index in
-  to_uri unencrypted cctxt dst_sk
-  >>=? fun dst_sk_uri ->
+  to_uri unencrypted cctxt dst_sk >>=? fun dst_sk_uri ->
   let dst_key =
     {
       sk = dst_sk_uri;
@@ -97,32 +93,25 @@ let derive (cctxt : #Client_context.full) ?(force = false)
   in
   (* TODO check this force *)
   let _ = force in
-  Sapling_key.add ~force:true cctxt dst_name dst_key
-  >>=? fun () ->
+  Sapling_key.add ~force:true cctxt dst_name dst_key >>=? fun () ->
   let path =
     String.concat "/" (List.map Int32.to_string (List.rev dst_key.path))
   in
   return (path, Viewing_key.of_sk dst_sk)
 
 let find_vk cctxt name =
-  Sapling_key.find cctxt name
-  >>=? fun k ->
+  Sapling_key.find cctxt name >>=? fun k ->
   from_uri cctxt k.sk >>=? fun sk -> return (Viewing_key.of_sk sk)
 
 let new_address (cctxt : #Client_context.full) name index_opt =
-  Sapling_key.find cctxt name
-  >>=? fun k ->
+  Sapling_key.find cctxt name >>=? fun k ->
   let index =
     match index_opt with
-    | None ->
-        k.address_index
-    | Some i ->
-        Viewing_key.index_of_int64 (Int64.of_int i)
+    | None -> k.address_index
+    | Some i -> Viewing_key.index_of_int64 (Int64.of_int i)
   in
-  from_uri cctxt k.sk
-  >>=? fun sk ->
-  return (Viewing_key.of_sk sk)
-  >>=? fun vk ->
+  from_uri cctxt k.sk >>=? fun sk ->
+  return (Viewing_key.of_sk sk) >>=? fun vk ->
   (* Viewing_key.new_address finds the smallest index greater or equal to
      [index] that generates a correct address. *)
   let (corrected_index, address) = Viewing_key.new_address vk index in
@@ -133,5 +122,5 @@ let new_address (cctxt : #Client_context.full) name index_opt =
   >>=? fun () -> return (sk, corrected_index, address)
 
 let export_vk cctxt name =
-  find_vk cctxt name
-  >>=? fun vk -> return (Data_encoding.Json.construct Viewing_key.encoding vk)
+  find_vk cctxt name >>=? fun vk ->
+  return (Data_encoding.Json.construct Viewing_key.encoding vk)

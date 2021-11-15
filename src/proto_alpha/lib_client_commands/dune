@@ -1,5 +1,6 @@
 (library
  (name tezos_client_alpha_commands)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-alpha-commands)
  (libraries tezos-base
             tezos-stdlib-unix
@@ -29,6 +30,7 @@
 
 (library
  (name tezos_client_alpha_commands_registration)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-alpha-commands-registration)
  (libraries tezos-base
             tezos-protocol-alpha

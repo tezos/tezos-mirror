@@ -1,5 +1,6 @@
 (library
  (name tezos_client_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-alpha)
  (libraries tezos-base
             tezos-protocol-alpha

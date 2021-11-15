@@ -146,7 +146,7 @@ module type SCHEDULER = sig
   val shutdown : t -> unit Lwt.t
 end
 
-module type PRECHECK = sig
+module type PROBE = sig
   type key
 
   type param
@@ -155,7 +155,7 @@ module type PRECHECK = sig
 
   type value
 
-  val precheck : key -> param -> notified_value -> value option
+  val probe : key -> param -> notified_value -> value option
 end
 
 module type REQUEST = sig
@@ -170,19 +170,24 @@ module type REQUEST = sig
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
-(** The requester uses a generic scheduler to schedule its requests.
-    The [Memory_table] must be shared between the scheduler and the requester
-    as it used to store both pending requests and found values. *)
-
-module Make_request_scheduler (Hash : sig
+module type HASH = sig
   type t
 
   val name : string
 
   val encoding : t Data_encoding.t
-end)
-(Table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t) : sig
+
+  val pp : Format.formatter -> t -> unit
+end
+
+(** The requester uses a generic scheduler to schedule its requests.
+    The [Memory_table] must be shared between the scheduler and the requester
+    as it is used to store both pending requests and found values. *)
+
+module Make_request_scheduler
+    (Hash : HASH)
+    (Table : MEMORY_TABLE with type key := Hash.t)
+    (Request : REQUEST with type key := Hash.t) : sig
   include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
   module Events = Requester_event.Make (Hash)
@@ -394,37 +399,28 @@ end = struct
   let pending_requests s = Table.length s.pending
 end
 
-module Make (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : DISK_TABLE with type key := Hash.t)
-(Memory_table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t)
-(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
-  include
-    FULL_REQUESTER
-      with type key = Hash.t
-       and type value = Disk_table.value
-       and type param = Precheck.param
-       and type request_param = Request.param
-       and type notified_value = Precheck.notified_value
-       and type store = Disk_table.store
-end = struct
+module Make
+    (Hash : HASH)
+    (Disk_table : DISK_TABLE with type key := Hash.t)
+    (Memory_table : MEMORY_TABLE with type key := Hash.t)
+    (Request : REQUEST with type key := Hash.t)
+    (Probe : PROBE with type key := Hash.t and type value := Disk_table.value) :
+  FULL_REQUESTER
+    with type key = Hash.t
+     and type value = Disk_table.value
+     and type param = Probe.param
+     and type request_param = Request.param
+     and type notified_value = Probe.notified_value
+     and type store = Disk_table.store = struct
   type key = Hash.t
 
   type value = Disk_table.value
 
-  type param = Precheck.param
+  type param = Probe.param
 
   type request_param = Request.param
 
-  type notified_value = Precheck.notified_value
+  type notified_value = Probe.notified_value
 
   type store = Disk_table.store
 
@@ -554,7 +550,7 @@ end = struct
     | Some (Found v) -> return v
 
   let notify_when_pending s p k w param v =
-    match Precheck.precheck k param v with
+    match Probe.probe k param v with
     | None -> Scheduler.notify_invalid s.scheduler p k
     | Some v ->
         Scheduler.notify s.scheduler p k >>= fun () ->

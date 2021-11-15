@@ -1,26 +1,15 @@
-(executables
- (names test_requester)
+(tests
+ (names test_requester test_fuzzing_requester)
+ (package tezos-requester)
  (libraries tezos-base
             tezos-base.unix
+            tezos-test-helpers
+            tezos-base-test-helpers
             tezos-stdlib-unix
             tezos-requester
-            tezos-test-services
+            qcheck-alcotest
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base_test_helpers
                    -open Tezos_stdlib
-                   -open Tezos_requester
-                   -open Tezos_test_services)))
-
-(alias
-  (name buildtest)
-  (deps test_requester.exe))
-
-(rule
- (alias runtest_requester)
- (action (run %{exe:test_requester.exe})))
-
-(rule
- (alias runtest)
- (package tezos-requester)
- (deps (alias runtest_requester))
- (action (progn)))
+                   -open Tezos_requester)))

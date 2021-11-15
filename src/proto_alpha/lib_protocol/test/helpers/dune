@@ -1,8 +1,12 @@
 (library
  (name tezos_alpha_test_helpers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-alpha-test-helpers)
  (libraries alcotest-lwt
+            qcheck-alcotest
+            tezos-test-helpers
             tezos-base
+            tezos-micheline
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment

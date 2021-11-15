@@ -45,16 +45,15 @@ let of_string_opt str =
   | Ok (V6 addr) -> Some addr
   | Error (`Msg _) -> None
 
+let of_string_error_message = "P2p_addr.of_string"
+
+let of_string_exc = Failure of_string_error_message
+
 let of_string_exn str =
-  match of_string_opt str with
-  | None -> Stdlib.failwith "P2p_addr.of_string"
-  | Some t -> t
+  of_string_opt str |> WithExceptions.Option.to_exn ~none:of_string_exc
 
 let of_string str =
-  try Ok (of_string_exn str) with
-  | Invalid_argument s -> Error s
-  | Failure s -> Error s
-  | _ -> Error "P2p_point.of_string"
+  of_string_opt str |> Result.of_option ~error:of_string_error_message
 
 let to_string saddr = Format.asprintf "%a" pp saddr
 

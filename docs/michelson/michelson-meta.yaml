@@ -1,0 +1,2403 @@
+protocols:
+  ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK: Alpha
+  PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq: Edo
+  PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo: Delphi
+  PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb: Carthage
+  PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS: Babylon
+  Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd: Athens
+  PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP: Alpha III
+  PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt: Alpha II
+  PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY: Alpha I
+  Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P: Bootstrap
+  PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i: Genesis
+
+categories:
+ # IF, EXEC, NOOP, FAILWITH, ...
+ control_structure: Control structures
+ # DUP, PUSH, (LAMBDA, UNIT?), ...
+ stack: Stack manipulation
+ # ADD, COMPARE, SHIFT, ...
+ arithmetic: Arithmetic operations
+ # AND, OR, ...
+ logic: Boolean operations
+ # HASH, CHECK_SIGNATURE, HASH_KEY
+ crypto: Cryptographic operations
+ # SELF, CONTRACT, AMOUNT, BALANCE, ADDRESS,
+ blockchain: Blockchain operations
+ # (list, set, map, string, bytes)
+ # CAR, CDR, CONCAT, (UN)PACK, ...
+ data_structure: Operations on data structures
+ # STEPS_TO_QUOTA, etc
+ deprecated: Deprecated instructions
+ # TICKET, READ_TICKET, SPLIT_TICKET, JOIN_TICKETS
+ tickets: Operations on tickets
+
+instructions:
+  ADD:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Add two numerical values
+    documentation: |
+        Adds numerical values.
+        This instruction is polymorphic and accepts any combination of natural numbers and integers as operands.
+        The return value is a natural number if both operands are natural. Otherwise, it is an integer.
+
+        Furthermore, integers can be added to timestamps in which case
+        the return value is a timestamp offset with the integer number
+        of seconds.
+
+        A ``mutez`` can also be added to a ``mutez``, in which
+        case the return value is a ``mutez``. In this case, the
+        operation triggers a run-time error if the sum of the ``mutez``
+        values overflows.
+
+        Finally, ``ADD`` can be used to add two BLS12-381 curve points (values of type ``bls12_381_g1`` and ``bls12_381_g2`` or two BLS-381 field elements (values of type ``bls12_381_fr``).
+
+    examples:
+      - name: Various additions
+        description: This example demonstrates the addition of different types of numbers and domain specific types.
+        path: opcodes/add.tz
+        input: 'Unit'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+        hide_final_storage: True
+  ADDRESS:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the address of a contract
+    documentation: |
+      This instruction consumes a contract value and produces the address of that contract.
+
+    examples:
+      - name: Address
+        description: This example takes a contract by parameter, and then stores its address.
+        path: opcodes/address.tz
+        input: '"tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"'
+        initial_storage: 'None'
+        final_storage: '(Some "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")'
+
+  LOOP_LEFT:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Loop with accumulator
+    documentation: |
+        The ``LOOP_LEFT body`` instruction executes ``body`` as long
+        as the top element of the stack is ``(Left a)``. The ``body``
+        of the loop must consume a value of type ``a`` and produce a
+        value of type ``(or a b)``.
+
+        If the top element is ``(Right b)``, at the beginning of the loop or at
+        the end of an iteration, then the loop is terminated and this value is
+        left on the top of the stack.
+
+    examples:
+      - name: Sum list
+        description: This contract reverses the list of strings passed by parameter and stores it.
+        path: opcodes/loop_left.tz
+        input: '{ "a" ; "b" ; "c" }'
+        initial_storage: '{}'
+        final_storage: '{ "c" ; "b" ; "a" }'
+  CDR:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Access the right part of a pair
+    documentation: |
+      ``CDR`` destructs the pair on top of the stack and leaves only
+      the right part of it.
+    examples:
+      - name: Store right part of the parameter
+        description: |
+          This contract takes a pair as parameter. It selects the right
+          part of the parameter and stores it.
+
+        path: opcodes/cdr.tz
+        input: '(Pair 15 9)'
+        initial_storage: '0'
+        final_storage: '9'
+  CAR:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Access the left part of a pair
+    documentation: |
+      ``CAR`` destructs the pair on top of the stack and leaves only
+      the left part of it.
+    examples:
+      - name: Store left parameter
+        description: |
+          This contract takes a pair as parameter. It selects the left
+          part of the parameter and stores it.
+
+        path: opcodes/car.tz
+        input: '(Pair 15 9)'
+        initial_storage: '0'
+        final_storage: '15'
+  CHAIN_ID:
+    category: blockchain
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Push the chain identifier
+    documentation: |
+      This instruction pushes on the stack the identifier of the chain
+      on which the smart contract is executed.
+
+      The chain identifier is designed to prevent replay attacks
+      between the main chain and the test chain forked during an amendment
+      exploration, where contract addresses and storages are identical.
+
+      The value is derived from the genesis block hash and will thus
+      be different on the main chains of different networks and on the
+      test chains on which the value depends on the first block of the
+      testchain.
+
+
+    examples:
+      - name: Push the chain identifier
+        description: |
+          This contract pushes and then stores the chain identifier.
+
+        path: opcodes/chain_id_store.tz
+        input: 'Unit'
+        initial_storage: 'None'
+        final_storage: '(Some "NetXynUjJNZm7wi")'
+        hide_final_storage: True
+        final_storage_pre: |
+          In case this example is executed using mockup mode,
+          with the initial storage ``None`` and the parameter ``Unit``
+          then the final storage will be ``(Some "NetXynUjJNZm7wi")``.
+
+  PAIR:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: "Build a pair from the stack's top two elements"
+  PAIRN:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: "Fold ``n`` values on the top of the stack into a right comb"
+    documentation: |
+      Fold ``n`` values on the top of the stack into a right comb. ``PAIR 0`` and ``PAIR 1`` are rejected. ``PAIR 2`` is equivalent to ``PAIR``.
+  UNPAIR:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: "Split a pair into its components"
+  UNPAIRN:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: "Unfold ``n`` values from a right comb on the top of the stack"
+    documentation: |
+      Unfold ``n`` values from a right comb on the top of the stack. ``UNPAIR 0`` and ``UNPAIR 1`` are rejected. ``UNPAIR 2`` is equivalent to ``UNPAIR``.
+  GETN:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Access an element or a sub comb in a right comb
+    documentation: |
+      The nodes of a right comb of size ``n`` are canonically numbered as follows:
+
+      ::
+
+             0
+           /   \
+         1       2
+               /   \
+             3       4
+                   /   \
+                 5       ...
+                              2n-4
+                            /      \
+                       2n-3          2n-2
+
+
+      Or in plain English:
+
+        - The root is numbered with 0,
+        - The left child of the node numbered by ``k`` is numbered by ``k+1``, and
+        - The right child of the node numbered by ``k`` is numbered by ``k+2``.
+
+      The ``GET k`` instruction accesses the node numbered by ``k``. In
+      particular, for a comb of size ``n``, the ``n-1`` first elements are
+      accessed by ``GET 1``, ``GET 3``, ..., and ``GET (2n-1)`` and the last
+      element is accessed by ``GET (2n)``.
+  UPDATEN:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Update an element or a sub comb in a right comb
+    documentation: |
+      Update an element or a sub comb in a right comb. The topmost stack element is
+      the new value to insert in the comb, the second stack element is the right
+      comb to update. The meaning of ``n`` is the same as for the ``GET n``
+      instruction.
+  DIP:
+    category: stack
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Run code protecting the top of the stack
+    documentation: |
+      ``DIP instr`` runs ``instr`` protecting the top
+      element of the stack.
+
+    examples:
+      - description: |
+          This examples takes a pair of integers ``(a, b)`` as parameter,
+          and stores ``(a, a + b)``
+
+        path: opcodes/dip.tz
+        input: '(Pair 15 9)'
+        initial_storage: '(Pair 0 0)'
+        final_storage: '(Pair 15 24)'
+  DIPN:
+    category: stack
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Run code protecting the ``n`` topmost elements of the stack
+    documentation: |
+      ``DIP n instr`` runs ``instr`` protecting the ``n`` topmost
+      elements of the stack. In particular, ``DIP 0 instr`` is
+      equivalent to ``instr`` and ``DIP 1 instr`` is equivalent to ``DIP
+      instr``.
+
+    examples:
+      - description: |
+          This example builds a stack of size 5 by calling ``UNPAIR`` 4 times, then inserts the value ``6`` at the bottom of the stack using ``DIP 5``, discards all the stack elements but the last one using several ``DROP`` and finally stores the bottom element.
+
+        path: opcodes/dipn.tz
+        input: '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)'
+        initial_storage: '0'
+        final_storage: '6'
+  DUP:
+    category: stack
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Duplicate the top of the stack
+  DUPN:
+    category: stack
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Duplicate the ``n``\ th element of the stack
+    documentation: |
+      ``DUP n`` consumes a stack that contains at least ``n``
+      elements.  It duplicates the ``n``\ th element of the stack and pushes
+      the duplicate at the top of the stack leaving a copy at its original
+      position. The element on top of the initial stack
+      is the first element, so that ``DUP 1`` is equivalent to ``DUP``.
+      ``DUP 0`` is forbidden.
+      In other words, ``DUP n`` transforms a stack on the form
+      ``x1 : ... : xn : ...`` into the stack
+      ``xn : x1 : ... : xn : ...``.
+
+      See also ``DIG``.
+
+  DROP:
+    category: stack
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Drop the top ``n`` elements of the stack
+    documentation: |
+      ``DROP n`` drops the `n` topmost elements of the stack. In
+      particular, ``DROP 0`` is a noop and ``DROP 1`` is equivalent to
+      ``DROP``.
+
+  FAILWITH:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Explicitly abort the current program
+    documentation: |
+      This instruction aborts the current program exposing the top element of the stack, which must be of a packable type, in its error message. It makes the output useless since all subsequent instructions will simply ignore their usual semantics to propagate the failure up to the main result. Its type is thus completely generic.
+
+  IF:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Conditional branching
+    documentation: |
+      The ``IF bt bf`` instruction consumes a stack whose top element
+      ``b`` is of type ``bool`` and an arbitrary remaining stack
+      ``S``.
+
+      This instruction executes the ``bt`` branch if ``b`` is
+      ``True``, and the ``bf`` branch otherwise.
+
+      Note that both branches must return a stack of the same type.
+
+  IF_CONS:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Inspect a list
+    documentation: |
+      The ``IF_CONS instr1 instr2`` instruction consumes a stack whose top
+      element ``l`` has a list type ``list ty1`` and an arbitrary
+      remaining stack ``S``.
+
+      If the list ``l`` has at least one element ``d`` followed by (a
+      possibly empty) list ``tl``, then the ``instr1`` branch is executed
+      on the stack ``d : tl : S``.  Otherwise, the ``instr2`` branch is
+      executed on the stack ``S``.
+
+      Note that both branches must return a stack of the same type.
+
+  IF_NONE:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Inspect an optional value
+    documentation: |
+      The ``IF_NONE instr1 instr2`` instruction consumes a stack whose top
+      element ``v`` has an option type ``option ty1`` and an arbitrary
+      remaining stack ``S``.
+
+      If the optional value ``v`` is ``None``, then the ``instr1``
+      branch is executed on the stack ``S``.  If ``v`` is
+      ``Some d``, then the ``instr2`` branch is executed on the stack
+      ``d : S``.
+
+      Note that both branches must return a stack of the same type.
+
+  IF_LEFT:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Inspect a value of a union
+    documentation: |
+      The ``IF_LEFT instr1 instr2`` instruction consumes a stack whose top
+      element ``v`` has a union type ``or ty1 ty2`` and an arbitrary
+      remaining stack ``S``.
+
+      If the union ``v`` stack is ``Left d1``, then the ``instr1`` branch
+      is executed on the stack ``d1 : S``.  If it is ``Right d2``,
+      then the ``instr2`` branch is executed on the stack ``d2 : S``.
+
+      Note that both branches must return a stack of the same type.
+
+  LEFT:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Wrap a value in a union (left case)
+  NOOP:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Empty instruction sequence
+  PUSH:
+    category: stack
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push a constant value of a given type onto the stack
+  RIGHT:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Wrap a value in a union (right case)
+  SEQ:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Instruction sequence
+  SWAP:
+    category: stack
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Swap the top two elements of the stack
+    documentation: "The ``SWAP`` instruction swaps  the top two elements of the stack."
+  PACK:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Serialize data
+    documentation: |
+      Serializes any value of packable type to its optimized binary representation, of type ``bytes``.
+
+    examples:
+      - name: "``PACK`` -- ``UNPACK``"
+        description: |
+          This example packs the left part of the parameter, and
+          asserts that it is equal to the right part of the parameter.
+          It then verifies that the right part unpacks to a valid
+          Michelson value.
+
+        path: opcodes/packunpack.tz
+        input: '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+  UNPACK:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Deserialize data, if valid
+    documentation: |
+      Deserialize a value of type ``bytes`` into the corresponding
+      Michelson value of type ``option ty``.
+      If the top of the stack is not the serialization of a Michelson
+      value of type ``ty``, then ``None`` is pushed.
+      Otherwise, ``Some v`` is pushed, where ``v`` is the deserialized value.
+
+    examples: []
+    examples:
+      - name: "``UNPACK`` reverses ``PACK``"
+        description: |
+          This example takes a tuple with a member of each comparable
+          type, packs and unpacks each member and asserts that the
+          resulting value is unchanged.
+
+        path: opcodes/packunpack_rev.tz
+        input: '(Pair -1  (Pair 1 (Pair "foobar" (Pair 0x00AABBCC (Pair 1000 (Pair False (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"))))))))'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+  BLAKE2B:
+    category: crypto
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Compute a Blake2B cryptographic hash
+    documentation: |
+      Compute the cryptographic hash of the top of the stack using
+      the `BLAKE2B <https://en.wikipedia.org/wiki/BLAKE_(hash_function)>`_
+      cryptographic hash function.
+
+    examples:
+    - name: Hash and store
+      description: This example computes the BLAKE2B hash of the string passed as parameter and puts it in storage.
+      path: opcodes/hash_string.tz
+      input: '"foobar"'
+      initial_storage: 0x
+      final_storage: '0xc5b7e76c15ce98128a840b54c38f462125766d2ed3a6bff0e76f7f3eb415df04'
+  SHA256:
+    category: crypto
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Compute a SHA-256 cryptographic hash
+    documentation: |
+      Compute the cryptographic hash of the top of the stack using the SHA-256 cryptographic hash function.
+  SHA512:
+    category: crypto
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Compute a SHA-512 cryptographic hash
+    documentation: |
+      Compute the cryptographic hash of the top of the stack using the SHA-512 cryptographic hash function.
+  KECCAK:
+    category: crypto
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Compute a Keccak-256 cryptographic hash
+    documentation: |
+      Compute the cryptographic hash of the top of the stack using the Keccak-256 cryptographic hash function.
+  SHA3:
+    category: crypto
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Compute a SHA3-256 cryptographic hash
+    documentation: |
+      Compute the cryptographic hash of the top of the stack using the SHA3-256 cryptographic hash function.
+  ABS:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Obtain the absolute value of an integer
+    documentation: |
+      ``ABS`` consumes an integer and pushes its absolute value, with type ``nat``, on the stack.
+
+    examples:
+      - name: '``ABS`` is the reverse of ``NEG`` on natural numbers'
+        description: |
+          This examples negates a natural number, takes the absolute
+          value and asserts that the final value equals the initial
+          parameter.
+
+          Note that this is true for any natural number, since
+          Michelson numbers are arbitrary-precision.
+
+        path: opcodes/abs.tz
+        input: '12039123919239192312931'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+        hide_final_storage: True
+  AMOUNT:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the amount of the current transaction
+    documentation: |
+      Push the amount of the current transaction, in ``mutez``.
+
+    examples:
+      - name: Store ``AMOUNT``
+        description: This contract stores the amount of its last received transaction.
+        path: opcodes/transfer_amount.tz
+        input: 'Unit'
+        initial_storage: '0'
+        final_storage: '50000'
+        hide_final_storage: True
+  AND:
+    category: logic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Boolean and bitwise AND
+    documentation: |
+      The instruction ``AND`` is defined on boolean and natural number operands.
+      In the former case, the result is the logical AND of the operands.
+      In the latter case, the result is the bitwise AND of the operands.
+
+      ``AND`` is also defined when the top operand is an ``int``. Negative
+      numbers are considered in `two's complement representation <https://en.wikipedia.org/wiki/Two's_complement>`_,
+      starting with a virtual infinite number of 1s.
+
+    examples:
+    - name: Boolean AND
+      description: This contracts takes a pair of booleans, and computes and stores their conjunction.
+      path: opcodes/and_logical_1.tz
+      initial_storage: 'False'
+      input: '(Pair True False)'
+      final_storage: 'False'
+
+    - name: Bitwise AND
+      description: This contract demonstrates bitwise AND on numerical values.
+      path: opcodes/and_binary.tz
+      initial_storage: 'Unit'
+      input: 'Unit'
+      final_storage: 'Unit'
+      hide_final_storage: True
+  BALANCE:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the current amount of mutez of the executing contract
+    documentation: |
+      Push the current amount of mutez held by the executing contract,
+      including any mutez added by the calling transaction.
+
+    examples:
+      - name: Store ``BALANCE``
+        description: This contract stores its balance after its latest received transaction.
+        path: opcodes/balance.tz
+        input: 'Unit'
+        initial_storage: '0'
+        final_storage: '4000000000000'
+        hide_final_storage: True
+  CHECK_SIGNATURE:
+    category: crypto
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: 'Verify ``signature`` of ``bytes`` by ``key``'
+    documentation: |
+      Verifies that a byte sequence has been signed with a given key.
+      This instruction consumes three operands: a ``key``, a ``signature`` and a
+      byte sequence ``bytes``. It pushes ``True`` if and only if the signature is a
+      valid signature of the byte sequence created with the given key.
+
+    examples:
+    - name: Check signature
+      description: |
+          This contract stores a ``signature`` and a ``string``.  It
+          takes a ``key`` as parameter and runs successfully if the
+          stored ``signature`` is a valid signature of the BLAKE2B
+          hash of the stored string by that ``key``.
+
+      path: opcodes/check_signature.tz
+      input: '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
+      initial_storage: '(Pair "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF" "hello")'
+      final_storage: "(Pair \"edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF\"\n        \"hello\")"
+  COMPARE:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: 'Compare two values'
+    documentation: |
+      Comparison only works on a class of types that we call
+      comparable. The ``COMPARE`` instruction is defined in an ad hoc way
+      for each comparable type, but the result of ``COMPARE`` is
+      always an ``int``, which can in turn be checked in a generic
+      manner using the ``EQ``, ``NEQ``, ``LT``, ``GT``, ``LE`` and
+      ``GE`` combinators.
+
+      The result of ``COMPARE`` is ``0`` if the top two elements of
+      the stack are equal, negative if the first element in the stack
+      is less than the second, and positive otherwise.
+
+      - ``string``, ``bytes``, ``key_hash``, ``key``, ``signature``, ``chain_id`` values are compared lexicographically.
+      - ``address`` values are compared as follows:
+
+        - addresses of implicit accounts are strictly less than addresses of originated accounts
+        - addresses of the same type are compared lexicographically
+
+      - pair values ``(Pair d1 d2)`` are compared component-wise,
+        starting with the left component.
+      - ``nat``, ``int``, ``mutez`` and ``timestamp`` values are compared numerically
+      - comparison for types ``unit`` and ``never`` is trivial
+      - ``bool`` values are compared so that ``False`` is strictly less than ``True``
+      - ``option``-al values are compared as follows:
+        - ``None`` is strictly less than any ``Some x``,
+        - ``Some x`` and ``Some y`` are compared as ``x`` and ``y``.
+      - values of union types built with ``or`` are compared as follows:
+        - any ``Left x`` is smaller than any ``Right y``,
+        - ``Left x`` and ``Left y`` are compared as ``x`` and ``y``,
+        - ``Right x`` and ``Right y`` are compared as ``x`` and ``y``.
+
+    examples:
+    - name: A variety of comparisons
+      description: |
+          This contract demonstrate several types of comparisons over different values.
+
+      path: opcodes/compare.tz
+      input: 'Unit'
+      initial_storage: 'Unit'
+      final_storage: 'Unit'
+  CONCAT:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Concatenate a string, byte sequence, string list or byte sequence list
+    documentation: |
+      The ``CONCAT`` operator exists in four variants:
+
+       - The first version takes two string operands and pushes their concatenation, as a string.
+       - The second takes a list of strings and pushes the concatenation of all strings in the list, as a string.
+       - The third version takes two byte sequences and pushes their concatenation, as a byte sequence.
+       - The fourth version takes a list of byte sequences and pushes the concatenation of all byte sequences in the list, as a byte sequence.
+
+    examples:
+      - name: Concatenation of two strings
+        description: This example takes a list of strings as parameter. It prepends ``"Hello "`` to each of them and stores the result.
+        path: opcodes/concat_hello.tz
+        input: '{ "John" ; "Jane" }'
+        initial_storage: "{}"
+        final_storage: '{ "Hello John" ; "Hello Jane" }'
+      - name: Concatenation of list of strings
+        description: This example takes a list of strings as parameter and concatenates them, and prepends value in storage and stores the resulting string.
+        path: opcodes/list_concat.tz
+        input: '{ " " ; "World" ; "!" }'
+        initial_storage: '"Hello"'
+        final_storage: '"Hello World!"'
+      - name: Concatenation of two byte sequences
+        description: This example takes a list of byte sequences as parameter. It prepends ``0xff`` to each of them and stores the result.
+        path: opcodes/concat_hello_bytes.tz
+        input: '{ 0xab ; 0xcd }'
+        initial_storage: "{}"
+        final_storage: '{ 0xffab ; 0xffcd }'
+      - name: Concatenation of list of byte sequences
+        description: This example takes a list of byte sequences as parameter and concatenates them, and prepends the value in storage and stores the resulting byte sequence.
+        path: opcodes/list_concat_bytes.tz
+        input: '{ 0xbe ; 0xef }'
+        initial_storage: '0xdead'
+        final_storage: '0xdeadbeef'
+
+  CONTRACT:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: 'Cast an address to a typed contract'
+    documentation: |
+      Casts from an ``address`` to a typed ``contract ty``.  If and
+      only if the address is a valid Tezos contract address with the
+      type ``ty``, then the result ``Some contract`` is pushed.  If
+      the address belongs to an implicit contract, then the type
+      parameter ``ty`` must be ``unit``.If any of these conditions are
+      not fulfilled, ``None`` is pushed.
+
+      The ``CONTRACT ty`` instruction has a variant ``CONTRACT %entrypoint ty``.
+      It allows the specification of a specific
+      `entrypoint <http://tezos.gitlab.io/whitedoc/michelson.html#entrypoints>`_.
+      In addition to the requirements above, this variant is only
+      well-typed if the address is a contract with an entrypoint named
+      ``%entrypoint``. This works as follows:
+
+      ::
+
+        +---------------+---------------------+------------------------------------------+
+        | input address | instruction         | output contract                          |
+        +---------------+---------------------+------------------------------------------+
+        | "addr"        | CONTRACT t          | (Some "addr") if contract exists, has a  |
+        |               |                     | default entrypoint of type t, or has no  |
+        |               |                     | default entrypoint and parameter type t  |
+        +---------------+---------------------+------------------------------------------+
+        | "addr%name"   | CONTRACT t          | (Some "addr%name") if addr exists and    |
+        +---------------+---------------------+ has an entrypoint %name of type t        |
+        | "addr"        | CONTRACT %name t    |                                          |
+        +---------------+---------------------+------------------------------------------+
+        | "addr%_"      | CONTRACT %_ t       | None                                     |
+        +---------------+---------------------+------------------------------------------+
+
+      Note that ``CONTRACT ty`` is strictly equivalent to ``CONTRACT
+      %default ty``, and for clarity, the second variant is forbidden
+      in the concrete syntax.
+
+    examples:
+    - name: From ``address`` to ``contract``
+      description: |
+          This contract receives an ``address`` by parameter, and converts it to a ``contract unit``.
+
+      path: opcodes/contract.tz
+      input: '"tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"'
+      initial_storage: 'Unit'
+      final_storage: 'Unit'
+
+    - name: Using ``contract`` with entrypoint annotations
+      description: |
+
+        When this contract is called by anyone except itself, it
+        originates a new contract with three entrypoints: ``add``,
+        ``sub`` and ``default`` and saves its address in its
+        storage. It then emits a transaction to itself.
+
+        When the contract receives a transaction from itself, it
+        verifies that the stored ``address`` can be converted to a
+        ``contract`` for each of the entrypoints ``add``, ``sub`` and
+        ``default`` with the respective types ``nat``, ``nat`` and
+        ``unit`` using the ``CONTRACT`` instruction annotated with the
+        respective entrypoint. It verifies that the entrypoint
+        ``default`` has the type ``unit``, and that this is equivalent
+        to using ``CONTRACT`` with no entrypoint annotation. It
+        also emits transactions to these entrypoints.
+
+      path: mini_scenarios/multiple_entrypoints_counter.tz
+      hide_final_storage: True
+      input: 'Unit'
+      initial_storage: 'None'
+      final_storage: '(Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")'
+      client_run_script_params: [ "--payer", "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv" ]
+
+
+  CONS:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Prepend an element to a list
+    documentation: |
+      Prepends the element at the top of the stack to the list that is
+      the second element of the stack.
+
+    examples:
+    - name: Prepend to storage
+      description: This contracts keeps a list of integers in storage and takes an integer as parameter. It prepends the parameter to the stored list.
+      path: opcodes/cons.tz
+      input: '5'
+      initial_storage: "{ 99 }"
+      final_storage: "{ 5 ; 99 }"
+
+  CREATE_CONTRACT:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push a contract creation operation
+    documentation: |
+      Push a contract creation operation (an origination) based on a
+      script literal . The operands are the optional delegate, the initial
+      amount taken from the currently executed contract, and the
+      initial storage of the originated contract.
+      Along with the origination ``operation``, the contract's
+      ``address`` is also returned as a first-class value (to be
+      dropped, passed as parameter or stored).
+
+      The ``CONTRACT 'p`` instruction applied to this resulting
+      address will fail until the contract is actually originated,
+      that is, after the generated operation is applied.
+      It follows that a contract cannot directly return a list of
+      operations that creates a contract, and call it immediately
+      after.
+      However, a contract A creating a contract B will get its
+      address, so it can return a list of operations that first originates the
+      contract B, and then calls a contract which in turns calls B: B's address
+      being either stored in A's storage or passed as parameter, the
+      executions following B's origination can use ``CONTRACT 'p`` on
+      B's address in order to call it.
+
+    examples:
+    - name: Originate a dummy contract
+      description: This contract originates a dummy contract.
+      path: opcodes/create_contract.tz
+      input: 'Unit'
+      initial_storage: 'None'
+      final_storage:  '(Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")'
+      hide_final_storage: True
+      final_storage_pre: |
+          The final storage will be ``(Some addr)`` where ``addr`` is
+          the fresh address of the originated contract.
+    - name: Originate and call
+      description: |
+        This contract originates a contract and then call
+        itself after the application of the origination operation,
+        with the address of the contract, to call it.
+
+        The execution order is thus
+
+        - call A with ``None``
+        - originate B
+        - call A with ``(Some B)``
+        - call B with ``"abcdefg"``
+      path: mini_scenarios/create_contract.tz
+      ranges: "16-"
+      input: 'None'
+      initial_storage: 'Unit'
+      final_storage:  'Unit'
+      hide_final_storage: True
+        
+  CREATE_ACCOUNT:
+    category: deprecated
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push an account creation operation
+    documentation: |
+      Takes as operands the manager, optional delegate, the delegatable flag
+      and finally the initial amount taken from the currently executed
+      contract. This instruction originates a contract with two entrypoints;
+      ``%default`` of type ``unit`` that does nothing and ``%do`` of type
+      ``lambda unit (list operation)`` that executes and returns the
+      parameter if the sender is the contract's manager.
+
+
+  EDIV:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Euclidean division
+    documentation: |
+      Consumes two numbers ``z1`` and ``z2`` (of either ``int`` or
+      ``nat``). It returns ``None`` if ``z2`` is zero, otherwise, it returns ``Some (Pair
+      q r)``, where
+      ``q = z1 / z2`` and ``r = z1 mod z2``, such that ``q * z2 + r = z1``, and ``0 ≤ r < |z2|``.
+      That is, the quotient ``q`` is rounded down to the nearest integer and not rounded towards 0.
+
+      ========    =========  ======================
+       ``z1``       ``z2``    Results
+      ========    =========  ======================
+       ``13``     ``3``       ``Some (Pair 4 1)``
+       ``-13``    ``3``       ``Some (Pair -5 2)``
+       ``13``     ``-3``      ``Some (Pair -4 1)``
+       ``-13``    ``-3``      ``Some (Pair 5 2)``
+       ``13``     ``0``       ``None``
+      ========    =========  ======================
+
+      Furthermore, values of type ``mutez``  can be divided by values
+      of types ``nat`` or ``mutez``.
+
+  EMPTY_MAP:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Build a new, empty ``map`` from ``kty`` to ``vty``
+    documentation: |
+      Build a new, empty map from keys of a given type ``kty`` to values of
+      the other given type ``vty``.
+
+      The ``kty`` type must be comparable.
+
+  EMPTY_BIG_MAP:
+    category: data_structure
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Build a new, empty ``big_map`` from ``kty`` to ``vty``
+    documentation: |
+      Build a new, empty map from keys of a given type ``kty`` to values of
+      the other given type ``vty``.
+
+      The ``cty`` type must be comparable. The ``vty`` type cannot be
+      a ``operation`` or ``big_map``.
+
+  EMPTY_SET:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Build a new, empty set for elements of type ``cty``
+    documentation: |
+      Build a new, empty set for elements of a given
+      type ``cty``.
+
+      The ``cty`` type must be comparable.
+
+  EQ:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack equals zero
+    documentation: |
+      The ``EQ`` instruction consumes an integer and leaves ``True``
+      on the stack if it is ``0`` and ``False`` otherwise.
+
+      It is typically composed with ``COMPARE``: the instruction sequence
+      ``COMPARE; EQ`` leaves ``True`` on the stack if the two top
+      stack elements are equal, and ``False`` otherwise.
+
+  NEQ:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack is not equal to zero
+    documentation: |
+      The ``NEQ`` instruction consumes an integer and leaves ``True``
+      on the stack if it is not ``0`` and ``False`` otherwise.
+
+      It is typically composed with ``COMPARE``: the instruction sequence
+      ``COMPARE; NEQ`` leaves ``True`` on the stack if the two top
+      stack elements are not equal, and ``False`` otherwise.
+
+  LT:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack is less than zero
+    documentation: |
+      The ``LT`` instruction consumes an integer and leaves ``True``
+      on the stack if it is less than ``0`` and ``False`` otherwise.
+
+      It is typically composed with ``COMPARE``: the instruction sequence
+      ``COMPARE; LT`` leaves ``True`` on the stack if the first stack
+      element is less than the second, and ``False`` otherwise.
+
+  GT:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack is greater than zero
+    documentation: |
+      The ``GT`` instruction consumes an integer and leaves ``True``
+      on the stack if it is greater than ``0`` and ``False`` otherwise.
+
+      It is typically composed with ``COMPARE``: the instruction sequence
+      ``COMPARE; GT`` leaves ``True`` on the stack if the first stack
+      element is greater than the second, and ``False`` otherwise.
+
+  LE:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack is less than or equal to zero
+    documentation: |
+      The ``LE`` instruction consumes an integer and leaves ``True``
+      on the stack if it is less than or equal to ``0`` or ``False`` otherwise.
+
+      It typically follows a ``COMPARE`` instruction. The sequence of instructions
+      ``COMPARE; LE`` leaves ``True`` on the stack if the first stack
+      element is less than or equal to the second, and ``False`` otherwise.
+
+  GE:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check that the top of the stack is greater than or equal to zero
+    documentation: |
+      The ``GE`` instruction consumes an integer and leaves ``True``
+      on the stack if it is greater than or equal to ``0`` and ``False`` otherwise.
+
+      It is typically composed with ``COMPARE``: the instruction sequence
+      ``COMPARE; GE`` leaves ``True`` on the stack if the first stack
+      element is greater than or equal to the second, and ``False``
+      otherwise.
+
+  EXEC:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Execute a function from the stack
+    documentation: |
+      The ``EXEC`` instruction consumes a value ``x`` of type ``a``
+      and a value ``f`` of type ``lambda a b``, applies the lambda to
+      ``x`` and leaves the results, of type ``b``,  on the stack.
+
+
+  APPLY:
+    category: control_structure
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Partially apply a tuplified function from the stack
+    documentation: |
+      Partially apply a tuplified function from the stack. That is,
+      the ``APPLY`` instruction consumes a value ``d`` of type ``ty1``
+      and a value ``i`` of type ``lambda (Pair ty1 ty2) ty3``.
+      It `partially <https://en.wikipedia.org/wiki/Partial_application>`_ applies the lambda to ``d``, hence producing a
+      new lambda of type ``lambda ty2 ty3`` on the stack.
+      Intuitively, this amounts to creating a new function that acts
+      like ``i`` but with the first parameter fixed to ``d``.
+
+      Values that are not both pushable and storable
+      (values of type ``operation``, ``contract _`` and
+      ``big_map _ _``) cannot be captured by ``APPLY`` (cannot appear in
+      ``ty1``).
+
+  GET:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Access an element in a ``map`` or ``big_map``
+    documentation: |
+      The instruction ``GET`` consumes a key and a ``map`` or ``big_map`` and returns an
+      optional value: ``None`` if the key is not present in the data structure,
+      and ``Some v`` if it is present and mapped to ``v``.
+
+  MEM:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Check for the presence of a binding for a key in a ``map``, ``set`` or ``big_map``
+    documentation: |
+      The instruction ``MEM`` consumes a value and a data structure of
+      type ``map``, ``set`` or ``big_map``.
+
+      For ``map`` and ``big_map``, ``MEM`` returns ``True`` if the
+      value is a bound key in the data structure, and ``False``
+      otherwise.
+
+      For ``set``, ``True`` is returned if the value is a member of
+      the ``set``, and ``False`` otherwise.
+
+
+  UPDATE:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Add or remove an element in a ``map``, ``big_map`` or ``set``
+    documentation: |
+      For values of type ``map`` and ``big_map``, the instruction ``UPDATE`` consumes
+      a key, an optional value and a value of type ``map`` or ``big_map``.
+      It returns the same map, but updated in the following way:
+
+        - If the value is ``Some y`` then key is assigned to ``y`` in
+          the resulting map.
+        - If the value is ``None`` and the key is present in the map,
+          then it is removed in the resulting map. If the key is not
+          present, an unmodified map is returned.
+
+      For values of type ``set``, the instruction ``UPDATE`` consumes
+      a value ``x``, a boolean flag ``b`` and a set ``s``.  It returns the same set,
+      but updated in the following way:
+
+        - If ``b`` is ``True`` then the value ``x`` is added to the set ``s``.
+          If ``x`` was already present in ``s``, then the original set is returned.
+        - If ``b`` is ``False`` then the value ``x`` is removed from ``s``.
+          If ``x`` is not present in ``s``, then the original set is returned.
+
+  GET_AND_UPDATE:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: A combination of the ``GET`` and ``UPDATE`` instructions
+    documentation: |
+      This instruction is similar to ``UPDATE`` but it also returns the
+      value that was previously stored in the ``map`` or ``big_map`` at
+      that key, as ``GET`` would have done.
+
+  MAP:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Apply ``instr`` to each element of a ``list`` or ``map``.
+    documentation: |
+
+      Map over a ``list`` or ``map``.
+
+      Update a structure by applying the ``instr`` expression to each
+      of its elements:
+
+        - In the case of a ``list`` of elements of type ``ty1``, ``instr`` is applied to each
+          element, and must thus have the type ``ty1 : A => ty2 : A``.
+        - In the case of a ``map`` of keys of type ``kty`` and values of type ``ty1``, ``instr`` is
+          applied to each binding ``k`` to value ``v`` in the form of a pair ``Pair k
+          v``. Thus, ``instr`` must have the type ``pair kty ty1 : A => ty2 : A``.
+
+      In each case, ``instr`` has access to and can modify the
+      underlying stack.
+
+  TRANSFER_TOKENS:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push a transaction operation
+    documentation: |
+      The ``TRANSFER_TOKENS`` instruction consumes a value ``d`` of type ``ty``,
+      an amount ``z`` in ``mutez`` and a contract ``c`` of type ``contract ty``. It returns
+      a transfer ``operation`` that will send ``z`` mutez to the
+      specified contract ``c`` with the parameter ``d``.
+
+      Consequently, the parameter value must be consistent with the
+      parameter type of the contract. In the case the contract is an
+      implicit account, then the parameter must be ``Unit``.
+
+  HASH_KEY:
+    category: crypto
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Compute the Base58Check of a public key
+    documentation: |
+      The ``HASH_KEY`` instruction computes the
+      `Base58Check <https://en.bitcoin.it/wiki/Base58Check>`_ of a public
+      key.
+
+
+  IMPLICIT_ACCOUNT:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Create an implicit account
+    documentation: |
+      Push on the stack the contract value corresponding to the
+      `implicit account <http://tezos.gitlab.io/user/glossary.html#implicit-account>`_
+      of a public key hash. These contracts always have type ``unit``.
+
+  ITER:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Iterate over a ``set``, ``list`` or ``map``
+    documentation: |
+
+      Iterate on a ``set``, ``list`` or ``map``.
+
+      Consume a structure by applying the ``instr`` expression to each of its
+      elements:
+
+        - In the case of a ``list`` or ``set`` of elements of type ``ty1``, ``instr`` is applied to each
+          element, and must thus have the type ``ty1 : A => A``.
+        - In the case of a ``map`` of keys of type ``kty`` and values of type ``vty``, ``instr`` is
+          applied to each binding ``k`` to value ``v`` in the form of a pair ``Pair k
+          v``. Thus, ``instr`` must have the type ``pair kty vty : A => A``.
+
+      In each case, ``instr`` has access to and can modify the underlying stack.
+
+  LAMBDA:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push a lambda onto the stack
+    documentation: |
+      Push a lambda with parameter type ``ty1``, return type ``ty2`` and body ``instr``
+      onto the stack.
+
+  LOOP:
+    category: control_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: A generic loop
+    documentation: |
+
+      The instruction ``LOOP`` consumes a stack ``b : S`` of type
+      ``bool : A``, i.e. where ``b`` is boolean and the rest of the
+      stack is of any type ``A``. The body of the loop, ``instr``, is
+      executed as long as ``b`` is ``True``. The body has access to the stack ``S``
+      but must produce a stack of type ``bool : A``. If ``b`` is
+      ``False``, then the loop is terminated with the resulting stack ``S``.
+
+  LSL:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Logically left shift a natural number
+    documentation: |
+
+      The ``LSL`` instruction consumes two natural numbers and produces
+      the first number logically left-shifted by second number.
+
+      This instruction is only defined if the second number is less
+      than or equal to 256.
+
+  LSR:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Logically right shift a natural number
+    documentation: |
+      The ``LSR`` instruction consumes two natural numbers and produces
+      the first number logically right-shifted by second number.
+
+      This instruction is only defined if the second number is less than or equal to 256.
+
+  MUL:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Multiply two numerical values
+    documentation: |
+      The ``MUL`` instruction consumes two numbers (``int`` or
+      ``nat``) and produces their product.
+
+      ``MUL`` can also be used to multiply a ``mutez`` with a natural
+      number. In this case, the operation triggers a run-time error if
+      the product overflows.
+
+      ``MUL`` can also be used to multiply a BLS12-381 curve point or
+      field element by a scalar field element.
+
+      Finally, ``MUL`` can multiply together a BLS12-381 field element
+      and a natural or integer. In particular, field elements can be built from
+      naturals by multiplying by the unit of ``bls12_381_fr`` using
+      ``PUSH bls12_381_fr 1; MUL``. Note that the product will be computed
+      using the natural modulo the order of the field.
+
+  NOT:
+    category: logic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Boolean negation and bitwise complement
+    documentation: |
+      The ``NOT`` instruction is defined for ``bool``,
+      ``nat`` and ``int``.
+
+      For ``bool``, it returns the logical negation of its operand.
+
+      For numerical values, it returns the `two's
+      complement <https://en.wikipedia.org/wiki/Two%27s_complement>`_ as
+      an ``int``. The return type is ``int`` and not ``nat`` because the sign is
+      also negated. For instance, the boolean negation of 0 is -1. To
+      get a natural back, a possibility is to use ``AND`` with an unsigned
+      mask afterwards.
+
+  NEG:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Negate a numerical value
+    documentation: |
+
+      The ``NEG`` instruction consumes a number and returns its negation.
+      The input can be any numerical type except ``timestamp`` and ``mutez``.
+      In particular, ``NEG`` can be used on the BLS12-381 curves and field.
+      The output has the same type as the input except in the case of ``nat`` where
+      the output has type ``int``.
+
+  NIL:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push an empty list
+    documentation: |
+
+      The ``NIL ty1`` instruction produces the empty list of type ``list ty1``.
+      It is functionally equivalent to ``PUSH (list ty1) {}``.
+
+  NONE:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the absent optional value
+    documentation: |
+
+      The ``NONE ty1`` instruction produces the
+      absent optional value ``None`` of type ``option ty1``.
+
+      It is functionally equivalent to ``PUSH (option ty1) None``.
+
+  SOME:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Wrap an existing optional value
+    documentation: |
+
+      The ``SOME`` instruction wraps the top element ``v`` of the
+      stack, of type ``ty1`` into the existing optional value ``Some
+      v`` of type ``option ty1``.
+
+  SENDER:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the contract that initiated the current internal transaction
+    documentation: |
+
+      Push the contract that initiated the current
+      internal transaction. It may be the ``SOURCE``, but may
+      also not if the source sent an order to an intermediate
+      smart contract, which then called the current contract.
+
+      Consider a scenario involving two contracts, ``receiver`` and
+      ``proxy``.  The contract ``proxy``, transfers any amount
+      received in a call to ``receiver``.  Assume a third
+      contract ``bootstrap2`` creates a transaction to the ``proxy``
+      contract sending 99 ꜩ . Then ``proxy`` creates an internal
+      transaction that calls ``receiver``:
+
+      .. image:: static/proxy-receiver.svg
+        :alt: Distinction between ``SOURCE`` and ``SENDER``.
+
+      In this scenario, the source of the internal transaction (from
+      ``proxy`` to ``receiver``) is ``bootstrap2``, whereas the sender
+      of that transaction is the ``proxy``. That is, if ``SOURCE`` is
+      called in ``receiver``, then the address of ``bootstrap2`` is
+      returned. If ``SENDER`` is called in ``receiver``, then the address
+      of ``proxy`` is returned.
+
+      If instead, ``bootstrap2`` calls ``receiver`` directly, then
+      ``bootstrap2`` would be both source and sender.
+
+  SOURCE:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the contract that initiated the current transaction
+    documentation: |
+      Push the contract who signed the transaction initiating this
+      execution. Note that this contract is necessarily an implicit
+      account since smart contracts can't sign transactions. They can
+      however emit internal, unsigned, transactions.
+
+      Since ``TRANSFER_TOKENS`` instructions can be chained,
+      ``SOURCE`` and ``SENDER`` are not necessarily the same.  See
+      ``SENDER`` for a more detailed discussion of this distinction.
+
+  SELF:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the current contract
+    documentation: |
+      The ``SELF`` contract pushes the current contract, of type
+      ``contract ty1`` where ``ty1`` is the type of the current
+      contract.
+
+      Note that ``SELF`` is forbidden in lambdas because it cannot be
+      type-checked; the type of the contract executing the lambda cannot be
+      known at the point of type-checking the lambda's body. To access the
+      address of the contract executing a lambda, see ``SELF_ADDRESS``.
+
+      Like ``CONTRACT``,
+      the ``SELF`` instruction has a variant ``SELF %entrypoint``,
+      that is only well-typed if the current contract has an entrypoint named ``%entrypoint``.
+      It returns the ``contract ty1`` corresponding to a specific
+      `entrypoint <http://tezos.gitlab.io/whitedoc/michelson.html#entrypoints>`_
+      of the current contract, where ``ty1`` is the type of the ``%entrypoint``.
+      Unlike for ``CONTRACT``, ``SELF %default`` is allowed and is
+      strictly equal to ``SELF``.
+
+      This works as follows:
+
+      ::
+
+        +----------------------+------------------------------------------+
+        |  instruction         | output contract                          |
+        +----------------------+------------------------------------------+
+        |  SELF                | "addr_of_current_contract"               |
+        +----------------------+                                          |
+        |  SELF %default       |                                          |
+        +----------------------+------------------------------------------+
+        |  SELF %A             | "addr_of_current_contract%A" if current  |
+        |                      | contract has an entrypoint %A            |
+        |                      | (and A <> default)                       |
+        +----------------------+------------------------------------------+
+
+    examples:
+      - name: Callback self at entrypoint
+        description: |
+          This contract has two entrypoints: ``have_fun`` and
+          ``default``. The ``default`` entrypoint emits a transfer
+          token operation that calls back the contract itself, at the
+          ``have_fun`` entrypoint, passing a ``big_map`` as
+          parameter. The ``have_fun`` entrypoint unthankfully drops
+          the received big_map.
+        path: opcodes/big_map_to_self.tz
+        input: 'Unit'
+        initial_storage: '{}'
+        final_storage: '0'
+        hide_final_storage: True
+
+      - name: Self with default entrypoint
+        description: This example demonstrates using ``SELF`` with and without entrypoint annotations, as well as the ``default`` entrypoint.
+        path: opcodes/self_with_default_entrypoint.tz
+        input: '0'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+        hide_final_storage: True
+        client_run_script_params: [ "--entrypoint", "A" ]
+
+      - name: Self with entrypoint
+        description: This example demonstrates using ``SELF`` with and without entrypoint annotations. In this example, the ``CAST`` noop is used to assert the type of the contract pushed by ``SELF``.
+        path: opcodes/self_with_entrypoint.tz
+        input: 'Left (Left 0)'
+        initial_storage: 'Unit'
+        final_storage: 'Unit'
+        hide_final_storage: True
+
+  SELF_ADDRESS:
+    category: blockchain
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Push the address of the current contract
+    documentation: |
+        Push the address of the current contract. This is
+        equivalent to ``SELF; ADDRESS`` except that it is allowed in
+        lambdas.
+
+        Note that ``SELF_ADDRESS`` inside a lambda returns the address of the
+        contract executing the lambda, which can be different from the address
+        of the contract in which the ``SELF_ADDRESS`` instruction is written.
+
+  NOW:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push block timestamp
+    documentation: |
+      Push the ``timestamp`` of the block whose validation triggered this
+      execution. This timestamp does not change during the execution of
+      the contract.
+
+  LEVEL:
+    category: blockchain
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Push the current block level
+
+  VOTING_POWER:
+    category: blockchain
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Return the voting power of a given contract
+    documentation: |
+      Return the voting power of a given contract. This voting power
+      coincides with the weight of the contract in the voting listings (i.e., the
+      rolls count) which is calculated at the beginning of every voting period.
+
+  TOTAL_VOTING_POWER:
+    category: blockchain
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Return the total voting power of all contracts
+    documentation: |
+      Return the total voting power of all contracts. The total
+      voting power coincides with the sum of the rolls count of every contract in
+      the voting listings. The voting listings is calculated at the beginning of
+      every voting period.
+
+  OR:
+    category: logic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Boolean and bitwise OR
+    documentation: |
+      The instruction ``OR`` is defined on boolean and natural number operands.
+      In the former case, the result is the logical OR of the operands.
+      In the latter case, the result is the bitwise OR of the operands.
+
+  SET_DELEGATE:
+    category: blockchain
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push a delegation operation
+    documentation: |
+      The ``SET_DELEGATE`` is used to add, update or remove a
+      delegation.  It consumes an operand of type ``option
+      key_hash``.
+
+      Using this instruction is the only way to modify the delegation of a
+      smart contract. If the parameter is `None` then the delegation of the
+      current contract is withdrawn. If the contract
+      has no delegation, then no change occurs.
+
+      If the parameter is `Some kh` where `kh` is the
+      key hash of a registered delegate that is not the current delegate of
+      the contract, then this operation sets the delegate of the contract to
+      this registered delegate. The operation fails if `kh` is the current
+      delegate of the contract or if `kh` is not a registered delegate.
+
+  SIZE:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Obtain size of a ``string``, ``list``, ``set``, ``map`` or byte sequence ``bytes``
+
+    documentation: |
+      The ``SIZE`` instruction consumes the
+      top element of the stack and returns its "size" (see below) as a ``nat``. It is defined for values of type  ``string``, ``list``, ``set``, ``map`` and byte sequences ``bytes``.
+
+      - For a ``string`` value, it returns the number of characters.
+      - For a ``list``, it returns the number of elements.
+      - For a ``set``, it returns the number of elements.
+      - For a ``map``, it returns the number of key-value pairs.
+      - For a byte sequence ``bytes``, it returns the number of bytes in the sequence.
+
+
+  SLICE:
+    category: data_structure
+    proposed-in: ['PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt']
+    since: PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt
+    documentation_short: Obtain a substring or subsequence of a ``string`` respectively byte sequence ``bytes``
+
+    documentation: |
+      The ``SLICE`` instruction consumes two natural numbers ``offset`` and ``len``
+      and a character sequence (``string``) or bytes sequence (``bytes``).
+
+      If ``offset`` and ``len`` are in bounds, i.e.
+      ``offset < length`` and
+      ``offset + len  <= length`` (where ``length`` is the length
+      of the sequence), then it returns a substring, respectively
+      subsequence, ``Some v`` of
+      length ``len`` starting at ``offset`` (where offset 0 denotes
+      the first element) of the sequence.
+
+      If ``offset`` or ``len`` is out of bounds, i.e.
+      ``offset >= length`` or
+      ``offset + len > length`` (where ``length`` is the length
+      of the sequence), then ``None`` is returned.
+      Note that if the ``offset`` is out of bounds, ``None`` is
+      returned, even if ``len`` is 0. Consequently, ``SLICE`` on an
+      empty string always returns ``None``.
+
+      Examples:
+
+      ::
+
+        +----------+--------+-----+------------+-------------------------------+
+        | sequence | offset | len | output     | comment                       |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      0 |   0 | Some ""    |                               |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      0 |   3 | Some "foo" |                               |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      3 |   3 | Some "bar" |                               |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      3 |   4 | None       | offset + len is out of bounds |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      6 |   0 | None       | offset is out of bounds       |
+        +----------+--------+-----+------------+-------------------------------+
+        | "foobar" |      7 |   0 | None       | offset is out of bounds       |
+        +----------+--------+-----+------------+-------------------------------+
+        | ""       |      0 |   0 | None       | offset is out of bounds       |
+        +----------+--------+-----+------------+-------------------------------+
+
+
+  STEPS_TO_QUOTA:
+    category: deprecated
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the remaining steps before the contract execution must terminate
+
+    documentation: |
+      *Deprecated*. The ``STEPS_TO_QUOTA`` instruction pushes the
+      number of steps remaining before contract execution is aborted
+      due to gas exhaustion.
+
+  SUB:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Subtract two numerical values
+    documentation: |
+
+      Consumes two numerical values and returns their difference. The
+      return type depends on the operand type:
+
+        - Integers can be subtracted from natural numbers and
+          vice versa, in which case the result type is always an
+          integer.
+        - Integers can be subtracted from timestamps, in which case the
+          result is the timestamp offset by the integer.
+        - Timestamps can also be subtracted from timestamps, in which
+          case the result is a integer denoting their difference
+          in seconds.
+        - Finally, a ``mutez`` can be subtracted from a ``mutez``, in
+          which case the return value is a ``mutez``. This operation
+          triggers a run-time error if the result is negative.
+
+  UNIT:
+    category: data_structure
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Push the unit value onto the stack
+
+  NEVER:
+    category: data_structure
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Close an absurd branch
+
+  XOR:
+    category: logic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Boolean and bitwise eXclusive OR
+    documentation: |
+      The instruction ``XOR`` is defined on boolean and natural number operands.
+      In the former case, the result is the logical XOR of the operands.
+      In the latter case, the result is the bitwise XOR of the operands.
+
+  DIG:
+    category: stack
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Retrieve the ``n``\ th element of the stack
+    documentation: |
+      ``DIG n`` consumes a stack that contains at least ``n``
+      elements.  It moves the ``n``\ th element of the stack to the
+      top of the stack. The element on top of the stack
+      is the 0th element, so that ``DIG 0`` is a no-op,
+      and ``DIG 1`` is equivalent to ``SWAP``.
+      In other words, ``DIG n`` transforms a stack on the form
+      ``x1 : ... : xn : y : ...`` into the stack
+      ``y : x1 : ... : xn : ...``.
+
+      The inverse of ``DIG`` is ``DUG``.
+
+  DUG:
+    category: stack
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    documentation_short: Insert the top element at depth ``n``
+    documentation: |
+      ``DUG n`` consumes a stack that contains at least ``n``
+      elements.  It removes the top element of the stack, and inserts
+      it at the ``n``\ th level in the stack.  The element on top of
+      the stack is at depth ``0`` so that ``DUG 0`` is a no-op
+      and ``DUG 1`` is equivalent to ``SWAP``. In
+      other words, ``DUG n`` transforms a stack on the form
+      ``y : x1 : ... : xn : ...`` into the stack
+      ``x1 : ... : xn : y : ...``.
+
+      The inverse of ``DUG`` is ``DIG``.
+
+  INT:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Convert a natural number or a BLS12-381 field element to an integer
+    documentation: |
+      For natural numbers, ``INT`` is the identity cast from ``nat``
+      to ``int``.  For BLS12-381 field elements, the returned value is
+      always between ``0`` (inclusive) and the order of the BLS12-381 field
+      (exclusive).
+
+  ISNAT:
+    category: arithmetic
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation_short: Convert a non-negative integer to a natural number
+    documentation: |
+      The ``ISNAT`` instruction consumes an integer ``z`` and returns
+      a value of type ``option nat``.  If the integer is non-negative,
+      ``Some n`` is returned, where ``n`` is equal to ``z`` but
+      represented as a natural number. Otherwise, ``None`` is
+      returned.
+
+  SAPLING_VERIFY_UPDATE:
+    category: crypto
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Verify and apply a transaction on a Sapling state
+    documentation: |
+      ``SAPLING_VERIFY_UPDATE`` takes a sapling transaction and a sapling state and returns an
+      option type that is ``Some (updated
+      state and a balance)`` if the transaction is correct, ``None`` otherwise.
+      A transaction has a list of inputs, outputs, a signature, a balance,
+      and the root of the Merkle tree containing its inputs.
+      The verification part checks the zero-knowledge proofs of all inputs
+      and outputs of the transaction, which guarantees several correctness properties.
+      It also checks a (randomised) signature associated with each input
+      (which guarantees that the owner forged the transaction), and the
+      signature that binds the whole transaction together and guarantees the
+      correctness of the balance.
+      All the signatures are over the hash of the data that we wish to sign
+      and the hash function used is BLAKE2B, prefixed with the anti-replay string.
+      The anti-replay string is the concatenation of the chain identifier and
+      the smart contract address. The same string has to be used by the client for
+      signing.
+
+      ``SAPLING_VERIFY_UPDATE`` also checks that the root of the Merkle tree appears in
+      one of the past states and that the nullifiers are not already
+      present (i.e. no double spending is happening).
+      If one of the checks fails the instruction returns ``None``.
+
+      Otherwise the instruction adds the nullifiers given with each inputs to the new state
+      and adds the outputs to the Merkle tree, which will produce a new root.
+      It should be noted that it is possible to generate transactions
+      referring to an old root, as long as the inputs used were present in
+      the Merkle tree with that root and were not spent after.
+      In particular the protocol keeps 120 previous roots and guarantees
+      that roots are updated at most once per block.
+      Considering that one block is added to the chain every minute and that each block contains at least
+      one call to the same contract, a client has 2 hours to have its
+      transaction accepted before it is considered invalid.
+
+      The nullifiers are stored in a set. The ciphertexts and other relevant
+      information linked to the commitment of the Merkle tree are
+      stored in a map indexed by the position of the commitment in the
+      Merkle tree.
+
+      Lastly the instruction pushes the updated state and balance as an ``option``
+      on the stack.
+
+      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      page for a more comprehensive description of the Sapling protocol.
+
+  SAPLING_EMPTY_STATE:
+    category: crypto
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Pushes an empty Sapling state on the stack
+    documentation: |
+      ``SAPLING_EMPTY_STATE ms`` pushes the empty Sapling state (i.e. no one can spend tokens from it)
+      with memo size ``ms``.
+
+      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      page for a more comprehensive description of the Sapling protocol.
+
+  TICKET:
+    category: tickets
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Create a ticket
+    documentation: |
+      Create a ticket with the given content and amount. The ticketer is the address of ``SELF``.
+
+  READ_TICKET:
+    category: tickets
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Retrieve the information stored in a ticket. Also return the ticket.
+
+  SPLIT_TICKET:
+    category: tickets
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Split a ticket in two
+    documentation: |
+     Delete the given ticket and create two tickets with the
+     same content and ticketer as the original, but with the new provided amounts.
+     (This can be used to easily implement UTXOs.)
+     Return ``None`` iff the ticket's original amount is not equal to the sum of the
+     provided amounts.
+
+  JOIN_TICKETS:
+    category: tickets
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Join two tickets into one
+    documentation: |
+      The inverse of ``SPLIT_TICKET``. Delete the given tickets and create a ticket with an amount equal to the
+      sum of the amounts of the input tickets.
+      (This can be used to consolidate UTXOs.)
+      Return ``None`` iff the input tickets have a different ticketer or content.
+
+  PAIRING_CHECK:
+    category: crypto
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    documentation_short: Check a BLS12-381 pairing
+    documentation: |
+      Verify that the product of pairings of the given list of points is equal to 1
+      in the field Fq12. Returns ``True`` if the list is empty.
+      This instruction can be used to verify if two pairings P1 and P2 are equal by
+      verifying ``P1 * P2^(-1) = 1``.
+
+
+types:
+  string:
+    documentation_short: "A string of characters"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    documentation: |
+      The current version of Michelson restricts strings to be the printable
+      subset of 7-bit ASCII, namely characters with codes from within
+      `[32, 126]` range, plus the following escape characters ``\n``,
+      ``\\``, ``\"``. Unescaped line breaks (both ``\n`` and ``\r``)
+      cannot appear in a string.
+    examples:
+      - "\"foo\""
+      - "\"ABC\\n123\""
+  nat:
+    documentation_short: "An arbitrary-precision natural number"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation: |
+      Naturals are arbitrary-precision, meaning that the only size
+      limit is gas.
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - 0
+      - 1
+      - 99999
+  int:
+    documentation_short: "An arbitrary-precision integer"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation: |
+      Integers are arbitrary-precision, meaning that the only size
+      limit is gas.
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - -99999
+      - -1
+      - 0
+      - 1
+      - 99999
+  bytes:
+    documentation_short: "A sequence of bytes"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation: |
+      Bytes are used for serializing data, in order to check
+      signatures and compute hashes on them. They can also be used to
+      incorporate data from the wild and untyped outside world.
+
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - "0x"
+      - "0xABCDEF42"
+  bool:
+    documentation_short: "A boolean"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    documentation: |
+      The type for booleans whose values are ``True`` and ``False``.
+
+    examples:
+      - "True"
+      - "False"
+  mutez:
+    documentation_short: "A specific type for manipulating tokens"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation: |
+      Mutez (micro-Tez) are internally represented by 64-bit signed
+      integers. These are restricted to prevent creating a negative amount
+      of mutez. Instructions are limited to prevent overflow and mixing them
+      with other numerical types by mistake. They are also mandatorily checked
+      for overflows.
+
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - 0
+      - 1
+      - 99999
+  key_hash:
+    documentation_short: "A hash of a public cryptographic key"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+      - '"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"'
+
+  timestamp:
+    documentation_short: "A real-world date."
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    documentation: |
+      Timestamps can be obtained by the ``NOW`` instruction, or retrieved from
+      script parameters or globals.
+
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - '"2019-09-26T10:59:51Z"'
+      - '1571659294'
+    documentation: |
+      Literal ``timestamp``\ s are written either using ``RFC3339`` notation
+      in a string (readable), or as the number of seconds since Epoch in
+      a natural (optimized).
+
+
+  key:
+    documentation_short: "A public cryptographic key"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    examples:
+      - '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
+      - '"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"'
+
+  unit:
+    documentation_short: The type whose only value is ``Unit``
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      The type whose only value is ``Unit``, to use as a placeholder
+      when some result or parameter is non-necessary. For instance,
+      when the only goal of a contract is to update its storage.
+    examples:
+      - Unit
+
+  never:
+    documentation_short: The empty type
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    comparable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      The empty type. Since ``never`` has no inhabitant, no value of
+      this type is allowed to occur in a well-typed program.
+
+      The type ``never`` is the type of forbidden values. The most prominent
+      scenario in which ``never`` is used is when implementing a contract
+      template with no additional entrypoint. A contract template defines a set
+      of basic entrypoints, and its ``parameter`` declaration contains a type
+      variable for additional entrypoints in some branch of a union type, or
+      wrapped inside an option type. Letting this type variable be ``never`` in
+      a particular implementation indicates that the contract template has not
+      been extended, and turns the branch in the code that processes the
+      additional entrypoints into a forbidden branch.
+
+      Values of type ``never`` cannot occur in a well-typed program. However,
+      they can be abstracted in the ``parameter`` declaration of a contract—or
+      by using the ``LAMBDA`` operation—thus indicating that the corresponding
+      branches in the code are forbidden. The type ``never`` also plays a role
+      when introducing values of union or option type with ``LEFT never``,
+      ``RIGHT never``, or ``NONE never``. In such cases, the created values can
+      be inspected with the operations ``IF_LEFT``, ``IF_RIGHT``, or
+      ``IF_NONE``, and the corresponding branches in the code are forbidden
+      branches.
+
+  signature:
+    documentation_short: "A cryptographic signature"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    duplicable: true
+    examples:
+      - '"edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"'
+      - '"spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm"'
+  option:
+    documentation_short: An optional value
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      Optional value of type ``ty`` that we note ``None`` or ``(Some v)``.
+    examples:
+      - ['None', 'option unit']
+      - ['Some "foo"', 'option string']
+
+  list:
+    documentation_short: "A single, immutable, homogeneous linked list"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: false
+    pushable: true
+    packable: true
+    passable: true
+    storable: true
+    big_map_value: true
+    duplicable: true
+    documentation: |
+      A single, immutable, homogeneous linked list, whose elements are
+      of type ``type``, and that we note ``{}`` for the empty list or
+      ``{ first ; ... }``. In the semantics, we use the less-than and
+      greater-than sign (< and >) to denote a subsequence of
+      elements. For instance ``{ head ; <tail> }``.
+    examples:
+      - ["{}", 'list unit']
+      - ["{ 0 ; 10 }", 'list nat']
+      - ["{ Some 10 ; None }", 'list (option int)']
+  set:
+    documentation_short: "An immutable set of comparable values of type ``cty``"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: false
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      Immutable sets of comparable values of type ``cty`` that we note
+      as lists ``{ item ; ... }``, of course with their elements
+      unique, and sorted.
+    examples:
+      - ["{}", 'set bool']
+      - ["{ 0 ; 3 ; 4 }", 'set nat']
+
+  contract:
+    documentation_short: "Address of a contract, where `type` is the contract's parameter type"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    insertions: [ 'contract nat' ]
+    comparable: false
+    literal: false
+    passable: true
+    big_map_value: true
+    pushable: false
+    packable: true
+    storable: false
+    duplicable: true
+    documentation:
+      A value of type ``contract t`` is guaranteed to be a valid,
+      existing account whose parameter type is ``t``.  This can be
+      opposed to the ``address`` type, that merely gives the guarantee
+      that the value has the form of a Tezos address.
+
+      Values of the ``contract`` type cannot be
+      stored. There are not literal values of type contract.
+      Instead, such values are created using instructions such as
+      ``CONTRACT`` or ``IMPLICIT_ACCOUNT``.
+    insertions:
+      - 'contract nat'
+
+  address:
+    documentation_short: "Address of an untyped contract"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: true
+    storable: true
+    big_map_value: true
+    comparable: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      The ``address`` type merely gives the guarantee that the value
+      has the form of a Tezos address, as opposed to ``contract``
+      that guarantees that the value is indeed a valid, existing
+      account.
+
+      A valid Tezos address is a string prefixed by either ``tz1``,
+      ``tz2``, ``tz3`` or ``KT1`` and followed by a Base58 encoded
+      hash and terminated by a 4-byte checksum.
+
+      The prefix designates the type of address:
+
+      - ``tz1`` addresses are followed by a ed25519 public key hash
+      - ``tz2`` addresses are followed by a Secp256k1 public key hash
+      - ``tz3`` addresses are followed by a NIST p256r1 public key hash
+      - ``KT1`` addresses are followed by a contract hash
+
+      Addresses prefixed by ``tz1``, ``tz2`` and ``tz3`` designate
+      implicit accounts, whereas those prefixed ``KT1`` designate
+      originated accounts.
+
+      Finally, addresses can specify an entrypoint, with a
+      ``%entrypoint`` suffix.
+
+    examples:
+      - '"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"'
+      - '"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%entrypoint"'
+      - '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+      - '"tz2VGBaXuS6rnaa5hpC92qkgadRJKdEbeGwc"'
+      - '"tz3WEJYwJ6pPwVbSL8FrSoAXRmFHHZTuEnMA"'
+
+  operation:
+    documentation_short: "An internal operation emitted by a contract"
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: false
+    pushable: false
+    storable: false
+    big_map_value: false
+    packable: false
+    comparable: false
+    duplicable: true
+    documentation:
+      There are no literal values of type ``operation``.
+      Instead, such values are created using the instructions
+      ``TRANSFER_TOKENS``, ``SET_DELEGATE`` and ``CREATE_CONTRACT``.
+
+  pair:
+    documentation_short: A pair or tuple of values
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: true
+    storable: true
+    big_map_value: true
+    comparable: true
+    pushable: true
+    packable: true
+    duplicable: true
+    documentation: |
+      The type ``pair l r`` is the type of binary pairs composed of a left
+      element of type ``l`` and a right element of type ``r``. A value of
+      type ``pair l r`` is written ``Pair x y`` where ``x`` is a value of
+      type ``l`` and ``y`` is a value of type ``r``.
+
+      To build tuples of length greater than 2, right combs have specific
+      optimized operations. For any ``n > 2``, the compact notation ``pair
+      t{0} t{1} ... t{n-2} t{n-1}`` is provided for the type of right combs
+      ``pair t{0} (pair t{1} ... (pair t{n-2} t{n-1}) ...)``. Similarly, the
+      compact notation ``Pair x{0} x{1} ... x{n-2} x{n-1}`` is provided for
+      the right-comb value ``Pair x{0} (Pair x{1} ... (Pair x{n-2} x{n-1})...)``.
+      Right-comb values can also be written using sequences;
+      ``Pair x{0} x{1} ... x{n-2} x{n-1}`` can be written
+      ``{x{0}; x{1}; ...; x{n-2}; x{n-1}}``.
+
+    examples:
+      - ["(Pair 0 True)", 'pair int bool']
+      - ["(Pair 0 (Pair True 0x))", 'pair int bool bytes']
+      - ["(Pair 0 True 0x)", 'pair int bool bytes']
+      - ["{0; True; 0x}", 'pair int bool bytes']
+
+  or:
+    documentation_short: A union of two types
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    comparable: true
+    duplicable: true
+    documentation: |
+      A union of two types: a value holding either a value ``a`` of
+      type ``ty1`` or a value ``b`` of type ``ty2``, that we write
+      ``(Left a)`` or ``(Right b)``.
+    examples:
+      - ['(Left True)', 'or bool string']
+      - ['(Right "foo")', 'or bool string']
+
+  lambda:
+    documentation_short: A lambda with given parameter and return types
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    comparable: false
+    duplicable: true
+    examples:
+      - ['{ }', 'lambda unit unit']
+      - ['{ PUSH nat 1; ADD }', 'lambda nat nat']
+
+  map:
+    documentation_short: An immutable map from ``kty`` to ``vty``
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    comparable: false
+    duplicable: true
+    documentation: |
+      Immutable maps from keys of type ``kty`` and values of type
+      ``vty`` that we note ``{ Elt key value ; ... }``, with keys
+      sorted.
+    examples:
+      - ['{}', 'map nat unit']
+      - ['{ Elt 0 0xCB ; Elt 1 0xAB }', 'map nat bytes']
+
+  big_map:
+    documentation_short: A lazily deserialized map from ``kty`` to ``vty``
+    proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
+    since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
+    comparable: false
+    packable: false
+    passable: true
+    pushable: false
+    storable: true
+    big_map_value: false
+    duplicable: true
+    documentation: |
+      Lazily deserialized maps from keys of type ``kty`` of values of
+      type ``vty`` that we note ``{ Elt key value ; ... }``, with keys
+      sorted.  These maps should be used if you intend to store large
+      amounts of data in a map. Operations on ``big_map``\ s have
+      higher gas costs than those over standard maps, as data is
+      lazily deserialized. However, a ``big_map`` has a lower
+      storage cost than a standard map of the same size.
+
+      The behavior of ``GET``, ``UPDATE`` and ``MEM`` is the same on
+      ``big_map``\ s as on standard maps, except that under
+      the hood, elements are loaded and deserialized on demand.
+
+      Literal ``big_map``\ s cannot be pushed directly in contract
+      code. Instead, they must be created using ``EMPTY_BIG_MAP`` and
+      manipulated using ``GET``, ``UPDATE`` and ``MEM``. However,
+      literal ``big_map``\ s are used when originating and calling
+      contracts using ``tezos-client``.
+
+      Values of the ``big_map`` type cannot be serialized using ``PACK``.
+    examples:
+      - ['{}', 'big_map nat bytes']
+      - ['{ Elt 0 0xCB ; Elt 1 0xAB }', 'big_map nat bytes']
+
+  chain_id:
+    documentation_short: A chain identifier
+    proposed-in: ['PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS']
+    since: PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    comparable: true
+    duplicable: true
+    documentation: |
+      An identifier for a chain, used to distinguish the test and the
+      main chains.
+
+      The value is derived from the genesis block hash and will thus
+      be different on the main chains of different networks and on the
+      test chains for which the value depends on the first block of the
+      testchain.
+
+    examples:
+      - '0x7a06a770'
+      - '"NetXynUjJNZm7wi"'
+
+  sapling_transaction:
+    documentation_short: A Sapling transaction
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    passable: true
+    storable: true
+    big_map_value: true
+    pushable: true
+    packable: true
+    comparable: false
+    duplicable: true
+    documentation: |
+      ``sapling_transaction ms`` is the type of Sapling
+      transactions of memo-size ``ms``.
+
+      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      page for a more comprehensive description of the Sapling protocol.
+    insertions:
+      - 'sapling_transaction 8'
+
+  sapling_state:
+    documentation_short: A Sapling state
+    proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+    passable: true
+    storable: true
+    big_map_value: false
+    pushable: false
+    packable: false
+    comparable: false
+    duplicable: true
+    documentation: |
+      ``sapling_state ms`` is the type of Sapling
+      states of memo-size ``ms``.
+
+      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      page for a more comprehensive description of the Sapling protocol.
+    examples:
+      - ['{}', 'sapling_state 8']
+
+  ticket:
+     documentation_short: A ticket used to authenticate information of type ``cty``
+     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+     passable: true
+     storable: true
+     big_map_value: true
+     pushable: false
+     packable: false
+     comparable: false
+     duplicable: false
+     documentation: |
+      Tickets are a way for smart contracts to authenticate data with respect to a Tezos address. This authentication can
+      then be used to build composable permission systems.
+
+      A contract can create a ticket from a comparable value and an amount. The ticket, when
+      inspected, reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
+      impossible for a contract to “forge” a ticket that appears to have been created
+      by another ticketer.
+
+      The amount is a metadata that can be used to implement UTXOs.
+
+      Tickets cannot be duplicated using the ``DUP`` instruction.
+
+      For example, a ticket could represent a Non-Fungible Token (NFT) or an Unspent
+      Transaction Output (UTXO) which can then be passed around and behave like a value.
+      This process can happen without the need to interact with a centralized NFT contract,
+      simplifying the code.
+     examples:
+      - ['Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" 0x01 42', 'ticket bytes']
+      - ['Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" Unit 42', 'ticket unit']
+
+  bls12_381_g1:
+     documentation_short: A point on the BLS12-381 curve G\ :sub:`1`
+     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+     passable: true
+     storable: true
+     big_map_value: true
+     pushable: true
+     packable: true
+     comparable: false
+     duplicable: true
+     examples:
+     - '0x0572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e166a9d8cabc673a322fda673779d8e3822ba3ecb8670e461f73bb9021d5fd76a4c56d9d4cd16bd1bba86881979749d28'
+
+  bls12_381_g2:
+     documentation_short: A point on the BLS12-381 curve G\ :sub:`2`
+     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+     passable: true
+     storable: true
+     big_map_value: true
+     pushable: true
+     packable: true
+     comparable: false
+     duplicable: true
+     examples:
+     - '0x0a4edef9c1ed7f729f520e47730a124fd70662a904ba1074728114d1031e1572c6c886f6b57ec72a6178288c47c335771638533957d540a9d2370f17cc7ed5863bc0b995b8825e0ee1ea1e1e4d00dbae81f14b0bf3611b78c952aacab827a0530f6d4552fa65dd2638b361543f887136a43253d9c66c411697003f7a13c308f5422e1aa0a59c8967acdefd8b6e36ccf30468fb440d82b0630aeb8dca2b5256789a66da69bf91009cbfe6bd221e47aa8ae88dece9764bf3bd999d95d71e4c9899'
+
+  bls12_381_fr:
+     documentation_short: An element of the BLS12-381 scalar field F\ :sub:`r`
+     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
+     passable: true
+     storable: true
+     big_map_value: true
+     pushable: true
+     packable: true
+     comparable: false
+     duplicable: true
+     documentation: |
+       An element of the scalar field F\ :sub:`r`, used for scalar multiplication on the
+       BLS12-381 curves G\ :sub:`1` and G\ :sub:`2`.
+
+     examples:
+     - '0'
+     - '1'
+     - '0x01'
+     - '0x0001'

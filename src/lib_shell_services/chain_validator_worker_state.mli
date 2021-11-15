@@ -35,6 +35,8 @@ end
 module Event : sig
   type update = Ignored_head | Branch_switch | Head_increment
 
+  val update_encoding : update Data_encoding.t
+
   type synchronisation_status =
     | Synchronised of {is_chain_stuck : bool}
     | Not_synchronised
@@ -52,6 +54,7 @@ module Event : sig
       }
     | Notify_branch of P2p_peer.Id.t
     | Notify_head of P2p_peer.Id.t
+    | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped
@@ -73,14 +76,6 @@ module Event : sig
   val encoding : t Data_encoding.encoding
 
   val pp : Format.formatter -> t -> unit
-end
-
-module Worker_state : sig
-  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
-
-  val encoding : view Data_encoding.encoding
-
-  val pp : Format.formatter -> view -> unit
 end
 
 module Distributed_db_state : sig

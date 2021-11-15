@@ -1,5 +1,3 @@
-.. _mainnet-may-2019:
-
 Mainnet May 2019
 ================
 

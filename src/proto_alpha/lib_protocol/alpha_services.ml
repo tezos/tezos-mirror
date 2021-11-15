@@ -43,7 +43,7 @@ module Seed = struct
 
   let () =
     let open Services_registration in
-    register0 S.seed (fun ctxt () () ->
+    register0 ~chunked:false S.seed (fun ctxt () () ->
         let l = Level.current ctxt in
         Seed.for_cycle ctxt l.cycle)
 
@@ -88,7 +88,7 @@ module Nonce = struct
 
   let register () =
     let open Services_registration in
-    register1 S.get (fun ctxt raw_level () () ->
+    register1 ~chunked:false S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
         Nonce.get ctxt level >|= function
         | Ok (Revealed nonce) -> ok (Revealed nonce)
@@ -116,11 +116,71 @@ module Liquidity_baking = struct
 
   let register () =
     let open Services_registration in
-    register0 S.get_cpmm_address (fun ctxt () () ->
+    register0 ~chunked:false S.get_cpmm_address (fun ctxt () () ->
         Alpha_context.Liquidity_baking.get_cpmm_address ctxt)
 
   let get_cpmm_address ctxt block =
     RPC_context.make_call0 S.get_cpmm_address ctxt block () ()
+end
+
+module Cache = struct
+  module S = struct
+    let cached_contracts =
+      RPC_service.get_service
+        ~description:"Return the list of cached contracts"
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(list @@ tup2 Alpha_context.Contract.encoding int31)
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "all")
+
+    let contract_cache_size =
+      RPC_service.get_service
+        ~description:"Return the size of the contract cache"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int31
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "size")
+
+    let contract_cache_size_limit =
+      RPC_service.get_service
+        ~description:"Return the size limit of the contract cache"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int31
+        RPC_path.(
+          custom_root / "context" / "cache" / "contracts" / "size_limit")
+
+    let contract_rank =
+      RPC_service.post_service
+        ~description:
+          "Return the number of cached contracts older than the provided \
+           contract"
+        ~query:RPC_query.empty
+        ~input:Alpha_context.Contract.encoding
+        ~output:Data_encoding.(option int31)
+        RPC_path.(custom_root / "context" / "cache" / "contract_rank")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 ~chunked:true S.cached_contracts (fun ctxt () () ->
+        Script_cache.entries ctxt |> Lwt.return) ;
+    register0 ~chunked:false S.contract_cache_size (fun ctxt () () ->
+        Script_cache.size ctxt |> return) ;
+    register0 ~chunked:false S.contract_cache_size_limit (fun ctxt () () ->
+        Script_cache.size_limit ctxt |> return) ;
+    register0 ~chunked:false S.contract_rank (fun ctxt () contract ->
+        Script_cache.contract_rank ctxt contract |> return)
+
+  let cached_contracts ctxt block =
+    RPC_context.make_call0 S.cached_contracts ctxt block () ()
+
+  let contract_cache_size ctxt block =
+    RPC_context.make_call0 S.contract_cache_size ctxt block () ()
+
+  let contract_cache_size_limit ctxt block =
+    RPC_context.make_call0 S.contract_cache_size_limit ctxt block () ()
+
+  let contract_rank ctxt block contract =
+    RPC_context.make_call0 S.contract_rank ctxt block () contract
 end
 
 let register () =
@@ -130,4 +190,5 @@ let register () =
   Nonce.register () ;
   Voting.register () ;
   Sapling.register () ;
-  Liquidity_baking.register ()
+  Liquidity_baking.register () ;
+  Cache.register ()

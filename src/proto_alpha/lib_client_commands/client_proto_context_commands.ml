@@ -277,6 +277,55 @@ let commands network () =
         >>= fun () -> return_unit);
     command
       ~group
+      ~desc:"Lists cached contracts and their age in LRU ordering."
+      no_options
+      (prefixes ["list"; "cached"; "contracts"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        cached_contracts cctxt ~chain:cctxt#chain ~block:cctxt#block
+        >>=? fun keys ->
+        List.iter_s
+          (fun (key, size) ->
+            cctxt#message "%a %d" Alpha_context.Contract.pp key size)
+          keys
+        >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get the key rank of a cache key."
+      no_options
+      (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ stop)
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+        >>=? fun rank ->
+        match rank with
+        | None ->
+            cctxt#error
+              "Invalid contract: %a"
+              Alpha_context.Contract.pp
+              contract
+            >>= fun () -> return_unit
+        | Some rank -> cctxt#message "%d" rank >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get cache contract size."
+      no_options
+      (prefixes ["get"; "cache"; "contract"; "size"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        contract_cache_size cctxt ~chain:cctxt#chain ~block:cctxt#block
+        >>=? fun t ->
+        cctxt#message "%d" t >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get cache contract size limit."
+      no_options
+      (prefixes ["get"; "cache"; "contract"; "size"; "limit"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        contract_cache_size_limit cctxt ~chain:cctxt#chain ~block:cctxt#block
+        >>=? fun t ->
+        cctxt#message "%d" t >>= fun () -> return_unit);
+    command
+      ~group
       ~desc:"Get the balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
@@ -393,7 +442,7 @@ let commands network () =
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>= function
-        | Error errs -> cctxt#error "%a" pp_print_error errs
+        | Error errs -> cctxt#error "%a" pp_print_trace errs
         | Ok None -> cctxt#error "This is not a smart contract."
         | Ok (Some hash) -> cctxt#answer "%a" Script_expr_hash.pp hash >|= ok);
     command
@@ -970,6 +1019,87 @@ let commands network () =
             entrypoint ));
     command
       ~group
+      ~desc:"Register a global constant"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["register"; "global"; "constant"]
+      @@ global_constant_param
+           ~name:"expression"
+           ~desc:
+             "Michelson expression to register. Note the value is not \
+              typechecked before registration."
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account registering the global constant"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           global_constant_str
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith "Only implicit accounts can register global constants"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            register_global_constant
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~constant:global_constant_str
+              ()
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source:false
+              ~msg:"register global constant simulation failed"
+              cctxt
+              errors
+            >>= fun _ -> return_unit);
+    command
+      ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
       (args16
          fee_arg
@@ -1315,7 +1445,7 @@ let commands network () =
           >>= fun () -> return_unit);
       command
         ~group:binary_description
-        ~desc:"Describe unsigned block header"
+        ~desc:"Describe unsigned operation"
         no_options
         (fixed ["describe"; "unsigned"; "operation"])
         (fun () (cctxt : Protocol_client_context.full) ->
@@ -1487,7 +1617,7 @@ let commands network () =
                                | _ -> true)
                         |> String.concat " "
                         |> String.map (function '\n' | '\t' -> ' ' | c -> c))
-                  | el -> cctxt#message "Error:@ %a" pp_print_error el)
+                  | el -> cctxt#message "Error:@ %a" pp_print_trace el)
                   >>= fun () -> failwith "Failed to submit proposals"));
       command
         ~group

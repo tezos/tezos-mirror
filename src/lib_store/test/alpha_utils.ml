@@ -153,52 +153,38 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_priority ctxt priority block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     (rpc_ctxt ctxt)
     ~all:true
     ~max_priority:(priority + 1)
     block
   >>=? fun bakers ->
-  let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
     List.find
-      (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
-        p = priority)
+      (fun {Plugin.RPC.Baking_rights.priority = p; _} -> p = priority)
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_by_account ctxt pkh block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     (rpc_ctxt ctxt)
     ~delegates:[pkh]
     ~max_priority:256
     block
   >>=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_excluding ctxt excludes block =
-  Alpha_services.Delegate.Baking_rights.get
-    (rpc_ctxt ctxt)
-    ~max_priority:256
-    block
+  Plugin.RPC.Baking_rights.get (rpc_ctxt ctxt) ~max_priority:256 block
   >>=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     List.find
-      (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+      (fun {Plugin.RPC.Baking_rights.delegate; _} ->
         not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -437,10 +423,38 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   | None -> Lwt.return context
   | Some hash -> Context.add_predecessor_ops_metadata_hash context hash)
   >>= fun ctxt ->
+  let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+    Main.value_of_key
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+    >|= Environment.wrap_tzresult
+    >>=? fun f -> return (fun x -> f x >|= Environment.wrap_tzresult)
+  in
+  let predecessor_context = Shell_context.wrap_disk_context ctxt in
+  element_of_key
+    ~chain_id
+    ~predecessor_context
+    ~predecessor_timestamp:(Store.Block.timestamp pred)
+    ~predecessor_level:(Store.Block.level pred)
+    ~predecessor_fitness:(Store.Block.fitness pred)
+    ~predecessor:(Store.Block.hash pred)
+    ~timestamp:shell.timestamp
+  >>=? fun element_of_key ->
+  Environment_context.Context.load_cache
+    predecessor_context
+    `Lazy
+    element_of_key
+  >>=? fun predecessor_context ->
   (let open Environment.Error_monad in
   Main.begin_construction
     ~chain_id
-    ~predecessor_context:(Shell_context.wrap_disk_context ctxt)
+    ~predecessor_context
     ~predecessor_timestamp:(Store.Block.timestamp pred)
     ~predecessor_level:(Store.Block.level pred)
     ~predecessor_fitness:(Store.Block.fitness pred)
@@ -449,12 +463,12 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     ~protocol_data
     ()
   >>=? fun vstate ->
-  fold_left_s
+  List.fold_left_es
     (fun vstate op ->
       apply_operation vstate op >>=? fun (state, _result) -> return state)
     vstate
     (List.concat operations)
-  >>=? fun vstate -> Main.finalize_block vstate)
+  >>=? fun vstate -> Main.finalize_block vstate (Some shell))
   >|= Environment.wrap_tzresult
   >>=? fun (validation, block_header_metadata) ->
   let max_operations_ttl =
@@ -515,6 +529,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
       Tezos_validation.Block_validation.validation_store =
         {
           context_hash;
+          timestamp = block_header.shell.timestamp;
           message = validation.Environment_context.message;
           max_operations_ttl = validation.max_operations_ttl;
           last_allowed_fork_level = validation.last_allowed_fork_level;
@@ -545,7 +560,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         Store.Chain.set_head chain_store b >>=? fun _ ->
         Block_store.await_merging block_store >>= fun () ->
         (match Block_store.get_merge_status block_store with
-        | Merge_failed err -> Assert.fail_msg "%a" pp_print_error err
+        | Merge_failed err -> Assert.fail_msg "%a" pp_print_trace err
         | Running | Not_running -> ()) ;
         return b)
       else Store.Chain.set_head chain_store b >>=? fun _ -> return b

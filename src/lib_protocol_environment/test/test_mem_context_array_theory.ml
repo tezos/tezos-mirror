@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Environment
-    Invocation:   dune build @src/lib_protocol_environment/runtest_mem_context_array_theory
+    Invocation:   dune build @src/lib_protocol_environment/runtest
     Dependencies: src/lib_protocol_environment/test/test_mem_context.ml
     Subject:      get/set operations on memory contexts.
 *)

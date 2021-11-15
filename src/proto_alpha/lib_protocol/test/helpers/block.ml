@@ -63,50 +63,35 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_priority priority block =
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     rpc_ctxt
     ~all:true
     ~max_priority:(priority + 1)
     block
   >|=? fun bakers ->
-  let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
-           p = priority)
+         (fun {Plugin.RPC.Baking_rights.priority = p; _} -> p = priority)
          bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
-  Alpha_services.Delegate.Baking_rights.get
-    rpc_ctxt
-    ~delegates:[pkh]
-    ~max_priority:256
-    block
+  Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] ~max_priority:256 block
   >|=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
-  Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
+  Plugin.RPC.Baking_rights.get rpc_ctxt ~max_priority:256 block
   >|=? fun bakers ->
-  let {
-    Alpha_services.Delegate.Baking_rights.delegate = pkh;
-    timestamp;
-    priority;
-    _;
-  } =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; priority; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+         (fun {Plugin.RPC.Baking_rights.delegate; _} ->
            not
              (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
          bakers
@@ -120,21 +105,31 @@ let dispatch_policy = function
 
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
-let get_endorsing_power b =
-  List.fold_left_es
-    (fun acc (op : Operation.packed) ->
-      let (Operation_data data) = op.protocol_data in
-      match data.contents with
-      | Single (Endorsement _) ->
-          Alpha_services.Delegate.Endorsing_power.get
-            rpc_ctxt
-            b
-            op
-            Chain_id.zero
-          >|=? fun endorsement_power -> acc + endorsement_power
-      | _ -> return acc)
+let compute_endorsement_powers ~block =
+  Plugin.RPC.Endorsing_rights.get rpc_ctxt block >|=? fun endorsing_rights ->
+  List.filter_map
+    (function
+      | {Plugin.RPC.Endorsing_rights.slots = top :: _ as slots; _} ->
+          Some (top, List.length slots)
+      | {Plugin.RPC.Endorsing_rights.slots = []; _} -> None)
+    endorsing_rights
+
+let get_endorsing_power block =
+  compute_endorsement_powers ~block >|=? fun endorsement_powers ->
+  List.fold_left
+    (fun sum -> function
+      | {
+          Alpha_context.protocol_data =
+            Operation_data
+              {contents = Single (Endorsement_with_slot {slot; _}); _};
+          _;
+        } -> (
+          match List.assoc ~equal:Compare.Int.equal slot endorsement_powers with
+          | None -> sum
+          | Some pow -> sum + pow)
+      | _ -> sum)
     0
-    b.operations
+    block.operations
 
 module Forge = struct
   type header = {
@@ -408,7 +403,8 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 
 let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?min_proposal_quorum ?level initial_accounts =
+    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
@@ -431,6 +427,14 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
       ~default:constants.delay_per_missing_endorsement
       delay_per_missing_endorsement
   in
+  let cost_per_byte =
+    Option.value ~default:constants.cost_per_byte cost_per_byte
+  in
+  let liquidity_baking_subsidy =
+    Option.value
+      ~default:constants.liquidity_baking_subsidy
+      liquidity_baking_subsidy
+  in
   let constants =
     {
       constants with
@@ -440,6 +444,8 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
       time_between_blocks;
       minimal_block_delay;
       delay_per_missing_endorsement;
+      cost_per_byte;
+      liquidity_baking_subsidy;
     }
   in
   (* Check there is at least one roll *)
@@ -476,8 +482,8 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
-    ?delay_per_missing_endorsement ?bootstrap_contracts ?level
-    (initial_accounts : (Account.t * Tez.t) list) =
+    ?delay_per_missing_endorsement ?bootstrap_contracts ?level ?cost_per_byte
+    ?liquidity_baking_subsidy (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?endorsers_per_block
     ?initial_endorsers
@@ -486,6 +492,8 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?minimal_block_delay
     ?delay_per_missing_endorsement
     ?level
+    ?cost_per_byte
+    ?liquidity_baking_subsidy
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context
@@ -530,8 +538,8 @@ let apply_with_metadata header ?(operations = []) pred =
     vstate
     operations
   >>=? fun vstate ->
-  Main.finalize_block vstate >|=? fun (validation, result) ->
-  (validation.context, result))
+  Main.finalize_block vstate (Some header.shell)
+  >|=? fun (validation, result) -> (validation.context, result))
   >|= Environment.wrap_tzresult
   >|=? fun (context, result) ->
   let hash = Block_header.hash header in
@@ -601,7 +609,9 @@ let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
             | Successful_manager_result
                 (Transaction_result {balance_updates; _})
             | Successful_manager_result
-                (Origination_result {balance_updates; _}) ->
+                (Origination_result {balance_updates; _})
+            | Successful_manager_result
+                (Register_global_constant_result {balance_updates; _}) ->
                 List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
@@ -622,7 +632,8 @@ let bake_n_with_origination_results ?policy n b =
             function
             | Successful_manager_result (Reveal_result _)
             | Successful_manager_result (Delegation_result _)
-            | Successful_manager_result (Transaction_result _) ->
+            | Successful_manager_result (Transaction_result _)
+            | Successful_manager_result (Register_global_constant_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

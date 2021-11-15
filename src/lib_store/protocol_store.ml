@@ -53,15 +53,13 @@ let store store protocol_hash protocol =
   raw_store store protocol_hash (Protocol.to_bytes protocol)
 
 let read store protocol_hash =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       let protocol_file =
         Naming.protocol_file store.protocol_store_dir protocol_hash
       in
       Lwt_utils_unix.read_file (Naming.file_path protocol_file)
       >>= fun content ->
       Lwt.return (Protocol.of_bytes (Bytes.unsafe_of_string content)))
-    (fun _ -> Lwt.return_none)
 
 let init store_dir =
   let protocol_store_dir = Naming.protocol_store_dir store_dir in

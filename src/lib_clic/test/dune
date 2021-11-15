@@ -1,21 +1,7 @@
-(executables
+(tests
  (names test_clic)
  (libraries tezos-clic
             alcotest-lwt)
+ (package tezos-clic)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_clic)))
-
-(rule
- (alias buildtest)
- (deps test_clic.exe)
- (action (progn)))
-
-(rule
- (alias runtest_clic)
- (action (run %{exe:test_clic.exe})))
-
-(rule
- (alias runtest)
- (package tezos-clic)
- (deps (alias runtest_clic))
- (action (progn)))

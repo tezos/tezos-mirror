@@ -50,6 +50,10 @@ emitted by the node. This allows fine-grained tests. In particular, as
 much as possible, a test in `tezt` should avoid the use of `timeouts`
 and instead, should rely on `events` if possible.
 
+Tezt provides an experimental module to deploy tests on remote machines.
+It is important to note that it relies on the existence of an `openssh`
+configuration on the different machines.
+
 ## API Documentation
 
 The `tezt` and `tezt-tezos` APIs are documented in the

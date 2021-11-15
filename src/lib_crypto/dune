@@ -1,21 +1,24 @@
 (library
  (name tezos_crypto)
  (public_name tezos-crypto)
- (flags (:standard -open Tezos_stdlib
-                   -open Data_encoding
-                   -open Tezos_error_monad
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Tezos_rpc))
- (libraries data-encoding
-            tezos-lwt-result-stdlib
-            lwt
-            ; NOTE: tezos-*-glue are virtual packages
-            ; either the unix or js implementation must be installed
-            tezos-hacl-glue
-            bls12-381
-            secp256k1-internal
-            tezos-error-monad
-            tezos-rpc
-            tezos-stdlib
-            ringo
-            zarith))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  data-encoding
+  tezos-lwt-result-stdlib
+  lwt
+  ; NOTE: tezos_*_glue are virtual packages;
+  ; either the unix or js implementation must be installed
+  tezos-hacl-glue
+  secp256k1-internal
+  tezos-error-monad
+  tezos-rpc
+  tezos-stdlib
+  ringo
+  zarith)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Data_encoding
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib
+   -open Tezos_rpc)))

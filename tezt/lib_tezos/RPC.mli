@@ -74,6 +74,14 @@ val force_bootstrapped :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/is_bootstrapped *)
+val is_bootstrapped :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/checkpoint *)
 val get_checkpoint :
   ?endpoint:Client.endpoint ->
@@ -97,6 +105,15 @@ val inject_block :
   data:JSON.u ->
   Client.t ->
   JSON.t Lwt.t
+
+(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/protocol/raw]. *)
+val raw_protocol_data :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  string Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
 val get_protocol_data :
@@ -133,6 +150,35 @@ val get_mempool_pending_operations :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chains/[chain]/mempool/ban_operation *)
+val mempool_ban_operation :
+  ?endpoint:Client.endpoint ->
+  ?chain:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chains/[chain]/mempool/unban_operation *)
+val mempool_unban_operation :
+  ?endpoint:Client.endpoint ->
+  ?chain:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chains/[chain]/mempool/unban_all_operations *)
+val mempool_unban_all_operations :
+  ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
+
+(** Call RPC POST /chains/[chain]/mempool/filter *)
+val post_mempool_filter :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
   ?endpoint:Client.endpoint ->
@@ -164,6 +210,20 @@ val post_run_operation :
   JSON.t Lwt.t
 
 (** {2 Protocol RPCs} *)
+
+type ctxt_type = Bytes | Json
+
+(** Call RPC /chain/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+*)
+val get_context_value :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?ctxt_type:ctxt_type ->
+  value_path:string list ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
 val get_constants :
@@ -716,15 +776,6 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
   val get_ballots :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
-  val get_current_period_kind :
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->

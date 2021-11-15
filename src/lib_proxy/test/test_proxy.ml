@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest_proxy
+    Invocation:   dune build @src/lib_proxy/runtest
     Subject:      --mode proxy of the client
 *)
 
@@ -34,7 +34,7 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = TzString.Map
-module Local = Tezos_context_memory.Context
+module Local = Tezos_proxy.Local_context
 
 (** Alias to make "empty list" intention more explicit *)
 let tree_root = []
@@ -103,7 +103,8 @@ let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
     block = mock_block;
   }
 
-open Test_services_base
+open Lib_test.Assert
+open Lib_test.Lwt_assert
 
 let test_tree _ () =
   let open Tezos_proxy.Proxy_getter.RequestsTree in
@@ -220,11 +221,8 @@ let () =
       ( "all",
         [
           Alcotest_lwt.test_case "RequestsTree" `Quick test_tree;
-          Test_services.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;
-          Test_services.tztest
-            "test split key triggers"
-            `Quick
-            test_split_key_triggers;
+          Tztest.tztest "test do_rpc" `Quick test_do_rpc_no_longer_key;
+          Tztest.tztest "test split key triggers" `Quick test_split_key_triggers;
         ] );
     ]
   |> Lwt_main.run

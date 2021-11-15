@@ -30,13 +30,9 @@
     Subject:      Checking all of the HACL* primitives used in lib_crypto:
                   hashing, HMAC, NaCl, Ed25519, and P-256.
 *)
-
 open Hacl
 
 let hex s = Hex.to_bytes (`Hex s)
-
-let check_bytes =
-  Alcotest.testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal
 
 type vector = {
   data_in : Bytes.t list;
@@ -112,9 +108,9 @@ let test_sha256 () =
     let st = init () in
     update st msg ;
     let d = finish st in
-    Alcotest.(check check_bytes "sha256" value d) ;
+    Alcotest.(check bytes "sha256" value d) ;
     let d = digest msg in
-    Alcotest.(check check_bytes "sha256" value d)
+    Alcotest.(check bytes "sha256" value d)
   in
   List.iter
     init_finish_digest
@@ -134,7 +130,7 @@ let test_sha256_seq () =
   let d = finish st in
   Printf.printf "Digest size %d\n" (Bytes.length d) ;
   print_endline "Finish done." ;
-  Alcotest.(check check_bytes "sha256_seq" bothresp d)
+  Alcotest.(check bytes "sha256_seq" bothresp d)
 
 (** Checks SHA512 hash function. *)
 let test_sha512 () =
@@ -143,7 +139,7 @@ let test_sha512 () =
       "b4686c597b48c05f9d79f933611343e00985967c16f81a301269c75065ed05067dc547b1b36ec1822cc19a78df691e30fdb739ffb6b2a0ea6533ff20a2202e51"
   in
   let digest = Hash.SHA512.digest msg in
-  Alcotest.(check check_bytes "sha512" resp digest)
+  Alcotest.(check bytes "sha512" resp digest)
 
 (** Checks HMAC-SHA256 with a fixed message and key. *)
 let test_hmac_sha256 () =
@@ -155,7 +151,7 @@ let test_hmac_sha256 () =
     of_hex "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
   in
   let digest = Hash.SHA256.HMAC.digest ~key ~msg in
-  Alcotest.(check check_bytes "hmac_sha256" resp digest)
+  Alcotest.(check bytes "hmac_sha256" resp digest)
 
 (** Checks HMAC-SHA512. *)
 let test_hmac_sha512 () =
@@ -176,7 +172,7 @@ let test_hmac_sha512 () =
   List.iter
     (fun (key, msg, resp) ->
       let digest = Hash.SHA512.HMAC.digest ~key ~msg in
-      Alcotest.(check check_bytes "hmac_sha512" resp digest))
+      Alcotest.(check bytes "hmac_sha512" resp digest))
     vectors
 
 (** Checks SHA3-256 hash function. *)
@@ -185,7 +181,7 @@ let test_sha3_256 () =
     of_hex "c0bc8a6fc1d24c6d8aba95294d86159807aacb95eff450367e807c76fdf98037"
   in
   let digest = Hash.SHA3_256.digest msg in
-  Alcotest.(check check_bytes "sha3_256" resp digest)
+  Alcotest.(check bytes "sha3_256" resp digest)
 
 (** Checks SHA3-512 hash function. *)
 let test_sha3_512 () =
@@ -194,7 +190,7 @@ let test_sha3_512 () =
       "5d64d3ef8598612744af86fb24d9ad792e0064544a97c149ff8aaedf35c2717d105a2ae191aa11e08c525c28433687c044a8e81271ab9a668ba531091823dfe7"
   in
   let digest = Hash.SHA3_512.digest msg in
-  Alcotest.(check check_bytes "sha3_512" resp digest)
+  Alcotest.(check bytes "sha3_512" resp digest)
 
 (** Checks Keccak-256 hash function. *)
 let test_keccak_256 () =
@@ -202,7 +198,7 @@ let test_keccak_256 () =
     of_hex "9f3afe7d35d9bbc4efd98252357e73e85ce1234a48603a063bb7079174aafa68"
   in
   let digest = Hash.Keccak_256.digest msg in
-  Alcotest.(check check_bytes "keccak_256" resp digest)
+  Alcotest.(check bytes "keccak_256" resp digest)
 
 let hash =
   [
@@ -226,7 +222,7 @@ let test_blake2b_direct {data_in; data_key; data_out} =
       (Bytes.concat Bytes.empty data_in)
       (Bytes.length data_out)
   in
-  assert (Bytes.(equal data_out h))
+  Alcotest.(check bytes "blake2b_direct" data_out h)
 
 (** Tests Blake2b using [vectors]. *)
 let blake2b_tests =
@@ -242,8 +238,13 @@ let test_secretbox () =
   let cmsg = Bytes.create (msglen + 16) in
   secretbox ~key ~nonce ~msg ~cmsg ;
   let decrypted_msg = Bytes.create msglen in
-  assert (secretbox_open ~key ~nonce ~cmsg ~msg:decrypted_msg) ;
-  Alcotest.check check_bytes "secretbox_decrypt" msg decrypted_msg
+  Alcotest.(
+    check
+      bool
+      "secretbox_open"
+      true
+      (secretbox_open ~key ~nonce ~cmsg ~msg:decrypted_msg)) ;
+  Alcotest.(check bytes "secretbox_decrypt" msg decrypted_msg)
 
 let secretbox = [("secretbox", `Quick, test_secretbox)]
 
@@ -259,8 +260,9 @@ let test_box () =
   let cmsg = Bytes.create (msglen + tagbytes) in
   box ~k ~nonce ~msg:msg_orig ~cmsg ;
   let decrypted_msg = Bytes.create msglen in
-  assert (box_open ~k ~nonce ~cmsg ~msg:decrypted_msg) ;
-  Alcotest.check check_bytes "box" msg_orig decrypted_msg
+  Alcotest.(
+    check bool "box_open" true (box_open ~k ~nonce ~cmsg ~msg:decrypted_msg)) ;
+  Alcotest.(check bytes "box" msg_orig decrypted_msg)
 
 let box = [("box", `Quick, test_box)]
 
@@ -281,7 +283,7 @@ let test_keypair_ed25519 () =
       let pk_bytes = to_bytes pk in
       let pk_bytes_length = Bytes.length pk_bytes in
       Alcotest.(check int "to_bytes" pk_size pk_bytes_length)
-  | _ -> assert false
+  | _ -> Alcotest.fail "keypair_ed25519"
 
 (** Signs the message [msg] with [Sign.sign] and then verifies that it
     is accepted by [Sign.verify].
@@ -289,7 +291,7 @@ let test_keypair_ed25519 () =
 let test_sign_ed25519 () =
   let (pk, sk) = keypair () in
   let signature = sign ~sk ~msg in
-  assert (verify ~pk ~msg ~signature)
+  Alcotest.(check bool "verify" true (verify ~pk ~msg ~signature))
 
 (** Checks the neuterize function for public key generation. *)
 let test_public_ed25519 () =
@@ -297,8 +299,8 @@ let test_public_ed25519 () =
   let pk' = to_bytes pk in
   let ppk = to_bytes (neuterize pk) in
   let psk = to_bytes (neuterize sk) in
-  Alcotest.check check_bytes "public" pk' ppk ;
-  Alcotest.check check_bytes "public" pk' psk
+  Alcotest.(check bytes "public" pk' ppk) ;
+  Alcotest.(check bytes "public" pk' psk)
 
 let ed25519 =
   [
@@ -309,24 +311,32 @@ let ed25519 =
 
 open P256
 
-let nb_iterations = 10
+let check_p256_bytes_secret =
+  Alcotest.testable
+    (fun fmt bytes -> Fmt.fmt "%S" fmt (Bytes.to_string (P256.to_bytes bytes)))
+    P256.equal
 
-let checki = Alcotest.check Alcotest.int
+let check_p256_bytes_public =
+  Alcotest.testable
+    (fun fmt bytes -> Fmt.fmt "%S" fmt (Bytes.to_string (P256.to_bytes bytes)))
+    P256.equal
+
+let nb_iterations = 10
 
 let test_export_p256 () =
   let (pk, sk) = keypair () in
   let sk_bytes = to_bytes sk in
   let pk_bytes = to_bytes pk in
-  checki __LOC__ sk_size (Bytes.length sk_bytes) ;
-  checki __LOC__ pk_size (Bytes.length pk_bytes) ;
+  Alcotest.(check int __LOC__ sk_size (Bytes.length sk_bytes)) ;
+  Alcotest.(check int __LOC__ pk_size (Bytes.length pk_bytes)) ;
   match (sk_of_bytes sk_bytes, pk_of_bytes pk_bytes) with
   | (Some sk', Some pk') ->
       let pk'' = neuterize pk' in
-      assert (equal sk sk') ;
-      assert (equal pk pk') ;
-      assert (equal pk pk'') ;
-      assert (equal pk' pk')
-  | _ -> assert false
+      Alcotest.(check check_p256_bytes_secret "sk'" sk sk') ;
+      Alcotest.(check check_p256_bytes_public "pk'" pk pk') ;
+      Alcotest.(check check_p256_bytes_public "pk''" pk pk'') ;
+      Alcotest.(check check_p256_bytes_public "pk" pk' pk')
+  | _ -> Alcotest.fail "export_p256"
 
 let test_export_p256 () =
   for _i = 0 to nb_iterations - 1 do
@@ -341,8 +351,8 @@ let test_write_key_p256 () =
   let pk_buf = Bytes.create pk_size in
   blit_to_bytes sk sk_buf ;
   blit_to_bytes pk pk_buf ;
-  assert (Bytes.equal sk_bytes sk_buf) ;
-  assert (Bytes.equal pk_bytes pk_buf)
+  Alcotest.(check bytes "write_key_p256 sk" sk_bytes sk_buf) ;
+  Alcotest.(check bytes "write_key_p256 pk" pk_bytes pk_buf)
 
 let test_write_key_pos_p256 () =
   let pos = 42 in
@@ -353,8 +363,10 @@ let test_write_key_pos_p256 () =
   let pk_buf = Bytes.create (pk_size + pos) in
   blit_to_bytes ~pos sk sk_buf ;
   blit_to_bytes ~pos pk pk_buf ;
-  assert (Bytes.equal sk_bytes (Bytes.sub sk_buf pos sk_size)) ;
-  assert (Bytes.equal pk_bytes (Bytes.sub pk_buf pos pk_size))
+  Alcotest.(
+    check bytes "write_key_pos_p256 sk" sk_bytes (Bytes.sub sk_buf pos sk_size)) ;
+  Alcotest.(
+    check bytes "write_key_pos_p256 pk" pk_bytes (Bytes.sub pk_buf pos pk_size))
 
 let test_write_key_with_ledger () =
   (* This test simulates  the code in Ledger_commands.public_key_returning_instruction *)
@@ -366,7 +378,8 @@ let test_write_key_with_ledger () =
   | Some pk ->
       TzEndian.set_int8 buf 0 2 ;
       blit_to_bytes pk ~pos:1 buf ;
-      assert (Bytes.equal (Bytes.sub buf 1 pk_size) pk_bytes)
+      Alcotest.(
+        check bytes "write_key_with_ledger" (Bytes.sub buf 1 pk_size) pk_bytes)
 
 let test_write_key_p256 () =
   for _i = 0 to nb_iterations - 1 do
@@ -378,7 +391,7 @@ let test_write_key_p256 () =
 let test_keypair_p256 () =
   let (pk, sk) = keypair () in
   let pk' = neuterize sk in
-  assert (equal pk pk')
+  Alcotest.(check bytes "keccak_256" (P256.to_bytes pk) (P256.to_bytes pk'))
 
 let test_keypair_p256 () =
   for _i = 0 to nb_iterations - 1 do
@@ -388,7 +401,7 @@ let test_keypair_p256 () =
 let test_sign_p256 () =
   let (pk, sk) = keypair () in
   let signature = sign ~sk ~msg in
-  assert (verify ~pk ~msg ~signature)
+  Alcotest.(check bool "sign_p256" true (verify ~pk ~msg ~signature))
 
 let test_sign_p256 () =
   for _i = 0 to nb_iterations - 1 do
@@ -402,7 +415,7 @@ let test_vectors_p256 () =
       (fun (sk, pk) ->
         match (sk_of_bytes (of_hex sk), pk_of_bytes (of_hex pk)) with
         | (Some sk, Some pk) -> (sk, pk)
-        | _ -> failwith "invalid key")
+        | _ -> Alcotest.fail "invalid key")
       Vectors_p256.keys
   in
   let expected_sigs =
@@ -422,9 +435,10 @@ let test_vectors_p256 () =
       List.iter2
         ~when_different_lengths:()
         (fun msg s ->
-          assert (verify ~pk ~msg ~signature:s) ;
+          Alcotest.(
+            check bool "vectors_p256" true (verify ~pk ~msg ~signature:s)) ;
           let signature = sign ~sk ~msg in
-          assert (verify ~pk ~msg ~signature))
+          Alcotest.(check bool "vectors_p256" true (verify ~pk ~msg ~signature)))
         msgs
         sigs)
     keys
@@ -442,14 +456,14 @@ let p256 =
     ("test_vectors", `Quick, test_vectors_p256);
   ]
 
-let () =
-  Alcotest.run
-    "hacl"
-    [
-      ("hash", hash);
-      ("blake2b", blake2b_tests);
-      ("secretbox", secretbox);
-      ("box", box);
-      ("ed25519", ed25519);
-      ("p256", p256);
-    ]
+let tests =
+  [
+    ("hash", hash);
+    ("blake2b", blake2b_tests);
+    ("secretbox", secretbox);
+    ("box", box);
+    ("ed25519", ed25519);
+    ("p256", p256);
+  ]
+
+let tests_lwt = []

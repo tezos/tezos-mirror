@@ -77,12 +77,12 @@ let () =
       Format.fprintf
         ppf
         "Not a supported multisig contract %a.@\n\
-         The hash of this script is 0x%a, it was not found among in the list \
-         of known multisig script hashes."
+         The hash of this script is %a, it was not found among in the list of \
+         known multisig script hashes."
         Michelson_v1_printer.print_expr
         script
-        Hex.pp
-        (Script_expr_hash.to_bytes hash |> Hex.of_bytes))
+        Script_expr_hash.pp
+        hash)
     Data_encoding.(
       obj2
         (req "hash" Script_expr_hash.encoding)
@@ -369,9 +369,6 @@ type multisig_contract_description = {
                        (list operation)). *)
 }
 
-let script_hash_of_hex_string s =
-  Script_expr_hash.of_bytes_exn @@ Hex.to_bytes @@ `Hex s
-
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
   let hash = multisig_script_hash in
@@ -379,15 +376,15 @@ let known_multisig_contracts : multisig_contract_description list =
     {hash; requires_chain_id = true; generic = false};
     {
       hash =
-        script_hash_of_hex_string
-          "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
+        Script_expr_hash.of_b58check_exn
+          "exprtw1v4KvQN414oEXdGuA1U3eQizuCdS8cipx8QGK8TbNLRwc3qL";
       requires_chain_id = true;
       generic = false;
     };
     {
       hash =
-        script_hash_of_hex_string
-          "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
+        Script_expr_hash.of_b58check_exn
+          "expru4Ju9kf6MQ216FxUEsb9P6j8UhkPtsFcYP8r9XhQSRb47FZGfM";
       requires_chain_id = false;
       generic = false;
     };

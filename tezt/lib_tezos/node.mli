@@ -63,6 +63,7 @@ type argument =
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
+  | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
 
 (** Tezos node states. *)
 type t
@@ -125,6 +126,9 @@ val add_argument : t -> argument -> unit
     where [<PORT>] is the P2P port of [peer]. *)
 val add_peer : t -> t -> unit
 
+(** Returns the list of address of all [Peer <addr>] arguments. *)
+val get_peers : t -> string list
+
 (** Add a [--peer] argument to a node.
 
     Usage: [add_peer node peer]
@@ -172,6 +176,14 @@ val runner : t -> Runner.t option
     If [exit_code] is not specified, any non-zero code is accepted.
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
+
+(** Get a fresh, unused port.
+
+    Warning: this function does not guarantee that the given port is
+    not already in use by another process. It only guarantees that
+    it is not already in use by another node, and only if you let
+    the [Node] module choose all ports for you. *)
+val fresh_port : unit -> int
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
@@ -236,6 +248,19 @@ val run :
   argument list ->
   unit Lwt.t
 
+(** Spawn [tezos-node replay].
+
+    Same as [run] but for the [replay] command.
+    In particular it also supports events.
+    One key difference is that the node will eventually stop. *)
+val replay :
+  ?on_terminate:(Unix.process_status -> unit) ->
+  ?event_level:string ->
+  ?blocks:string list ->
+  t ->
+  argument list ->
+  unit Lwt.t
+
 (** {2 Events} *)
 
 (** Exception raised by [wait_for] functions if the node terminates before the event.
@@ -274,9 +299,18 @@ val wait_for_identity : t -> string Lwt.t
 
 (** Wait for a custom event to occur.
 
-    Usage: [wait_for node name filter]
+    Usage: [wait_for_full node name filter]
 
-    If an event named [name] occurs, apply [filter] to its value.
+    If an event named [name] occurs, apply [filter] to its
+    whole json, which is of the form:
+    {[{
+      "fd-sink-item.v0": {
+        "hostname": "...",
+        "time_stamp": ...,
+        "section": [ ... ],
+        "event": { <name>: ... }
+      }
+    }]}
     If [filter] returns [None], continue waiting.
     If [filter] returns [Some x], return [x].
 
@@ -289,6 +323,18 @@ val wait_for_identity : t -> string Lwt.t
     For instance, you can define a promise with
     [let x_event = wait_for node "x" (fun x -> Some x)]
     and bind it later with [let* x = x_event]. *)
+val wait_for_full :
+  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
+
+    More precisely, [filter] is applied to the value of field
+    ["fd-sink-item.v0"."event".<name>].
+
+    If the node receives a JSON value that does not match the right
+    JSON structure, it is not given to [filter] and the event is
+    ignored. See [wait_for_full] to know what the JSON value must
+    look like. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)

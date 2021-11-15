@@ -244,8 +244,10 @@ module S = struct
     let get_diff = make_service Sapling_services.S.Args.get_diff
 
     let register () =
-      let reg (service, f) = Services_registration.opt_register1 service f in
-      reg get_diff
+      let reg chunked (service, f) =
+        Services_registration.opt_register1 ~chunked service f
+      in
+      reg false get_diff
 
     let mk_call1 (service, _f) ctxt block id q =
       RPC_context.make_call1 service ctxt block id q ()
@@ -254,15 +256,15 @@ end
 
 let[@coq_axiom_with_reason "gadt"] register () =
   let open Services_registration in
-  register0 S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
-  let register_field s f =
-    opt_register1 s (fun ctxt contract () () ->
+  register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
+  let register_field ~chunked s f =
+    opt_register1 ~chunked s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function
         | true -> f ctxt contract >|=? Option.some
         | false -> return_none)
   in
-  let register_opt_field s f =
-    opt_register1 s (fun ctxt contract () () ->
+  let register_opt_field ~chunked s f =
+    opt_register1 ~chunked s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function
         | true -> f ctxt contract
         | false -> return_none)
@@ -300,7 +302,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
         parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
         >>?= fun (Ex_ty value_type, ctxt) ->
         Big_map.list_values ?offset ?length ctxt id >>=? fun (ctxt, values) ->
-        Lwt_list.fold_left_s
+        List.fold_left_s
           (fun acc value ->
             acc >>?= fun (ctxt, rev_values) ->
             parse_data
@@ -317,8 +319,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
           values
         >|=? fun (_ctxt, rev_values) -> List.rev rev_values
   in
-  register_field S.balance Contract.get_balance ;
-  opt_register1 S.manager_key (fun ctxt contract () () ->
+  register_field ~chunked:false S.balance Contract.get_balance ;
+  opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None -> return_none
       | Some mgr -> (
@@ -326,15 +328,15 @@ let[@coq_axiom_with_reason "gadt"] register () =
           | false -> return_some None
           | true ->
               Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key))) ;
-  register_opt_field S.delegate Delegate.get ;
-  opt_register1 S.counter (fun ctxt contract () () ->
+  register_opt_field ~chunked:false S.delegate Delegate.get ;
+  opt_register1 ~chunked:false S.counter (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None -> return_none
       | Some mgr ->
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
-  register_opt_field S.script (fun c v ->
+  register_opt_field ~chunked:true S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
-  register_opt_field S.storage (fun ctxt contract ->
+  register_opt_field ~chunked:true S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       match script with
       | None -> return_none
@@ -346,7 +348,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode_in_context ctxt script.storage
           >>?= fun (storage, _ctxt) -> return_some storage) ;
-  opt_register2 S.entrypoint_type (fun ctxt v entrypoint () () ->
+  opt_register2 ~chunked:true S.entrypoint_type (fun ctxt v entrypoint () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -356,8 +358,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let open Script_ir_translator in
           Lwt.return
             ( Script.force_decode_in_context ctxt expr >>? fun (expr, _) ->
-              ( parse_toplevel ~legacy expr
-              >>? fun (arg_type, _, _, root_name) ->
+              ( parse_toplevel ctxt ~legacy expr
+              >>? fun ({arg_type; root_name; _}, ctxt) ->
                 parse_parameter_ty ctxt ~legacy arg_type
                 >>? fun (Ex_ty arg_type, _) ->
                 Script_ir_translator.find_entrypoint
@@ -369,7 +371,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
                   unparse_ty ctxt ty >|? fun (ty_node, _) ->
                   Some (Micheline.strip_locations ty_node)
               | Error _ -> ok_none )) ;
-  opt_register1 S.list_entrypoints (fun ctxt v () () ->
+  opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -379,8 +381,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let open Script_ir_translator in
           Lwt.return
             ( Script.force_decode_in_context ctxt expr >>? fun (expr, _) ->
-              ( parse_toplevel ~legacy expr
-              >>? fun (arg_type, _, _, root_name) ->
+              ( parse_toplevel ctxt ~legacy expr
+              >>? fun ({arg_type; root_name; _}, ctxt) ->
                 parse_parameter_ty ctxt ~legacy arg_type
                 >>? fun (Ex_ty arg_type, _) ->
                 Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
@@ -394,19 +396,13 @@ let[@coq_axiom_with_reason "gadt"] register () =
                     map
                     [] ) )) ;
   opt_register1
+    ~chunked:true
     S.contract_big_map_get_opt
     (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       let key_type_node = Micheline.root key_type in
       Script_ir_translator.parse_comparable_ty ctxt key_type_node
       >>?= fun (Ex_comparable_ty key_type, ctxt) ->
-      let loc = Micheline.location key_type_node in
-      Script_ir_translator.check_comparable_type_size
-        ~legacy:false
-        ctxt
-        ~loc
-        key_type
-      >>?= fun () ->
       Script_ir_translator.parse_comparable_data
         ctxt
         key_type
@@ -429,11 +425,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
           match Script_ir_translator.list_of_big_map_ids ids with
           | [] | _ :: _ :: _ -> return_some None
           | [id] -> do_big_map_get ctxt id key >|=? Option.some)) ;
-  opt_register2 S.big_map_get (fun ctxt id key () () ->
+  opt_register2 ~chunked:true S.big_map_get (fun ctxt id key () () ->
       do_big_map_get ctxt id key) ;
-  register1 S.big_map_get_all (fun ctxt id {offset; length} () ->
+  register1 ~chunked:true S.big_map_get_all (fun ctxt id {offset; length} () ->
       do_big_map_get_all ?offset ?length ctxt id) ;
-  register_field S.info (fun ctxt contract ->
+  register_field ~chunked:false S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.get ctxt contract >>=? fun delegate ->
       (match Contract.is_implicit contract with

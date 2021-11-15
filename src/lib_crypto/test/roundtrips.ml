@@ -24,16 +24,8 @@
 (*****************************************************************************)
 
 let test_rt_opt name testable enc dec input =
-  try
-    let roundtripped = dec (enc input) in
-    Alcotest.check (Alcotest.option testable) name (Some input) roundtripped
-  with exc ->
-    Alcotest.failf
-      "%s failed for %a: exception whilst decoding: %s"
-      name
-      (Alcotest.pp testable)
-      input
-      (Printexc.to_string exc)
+  let roundtripped = dec (enc input) in
+  Alcotest.check (Alcotest.option testable) name (Some input) roundtripped
 
 let test_decode_opt_safe name testable dec encoded =
   match dec encoded with

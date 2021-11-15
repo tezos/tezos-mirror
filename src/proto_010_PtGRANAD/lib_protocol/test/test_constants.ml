@@ -84,12 +84,9 @@ let liquidity_baking_subsidy_param () =
 
 let tests =
   [
-    Test_services.tztest
-      "constants consistency"
-      `Quick
-      test_constants_consistency;
-    Test_services.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
-    Test_services.tztest
+    Tztest.tztest "constants consistency" `Quick test_constants_consistency;
+    Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
+    Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"
       `Quick

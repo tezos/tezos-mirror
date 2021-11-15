@@ -1,5 +1,3 @@
-.. _software_architecture:
-
 Tezos Software Architecture
 ===========================
 
@@ -40,7 +38,7 @@ responsibility of selecting and downloading alternative chains, feed
 them to the protocol, which in turn has the responsibility to check
 them for errors, and give them an absolute score. The shell then
 simply selects the valid head of the highest absolute score. This part
-of the shell is called :ref:`the validator<validation>`.
+of the shell is called :doc:`the validator <../shell/validation>`.
 
 The rest of the shell includes the peer-to-peer layer, the disk storage
 of blocks, the operations to allow the node to transmit the chain data
@@ -58,6 +56,11 @@ the protocol’s code so that it only calls authorized modules and
 functions. Seeing protocols as plug-ins, it means that the code only
 called primitives from the plug-in API. It is a form of statically
 enforced sandboxing.
+
+Note that the economic protocol on the chain is subject to an amendment
+procedure. On-chain operations can be used to switch from one protocol to
+another. The procedure is described in more details in :doc:`the protocol's
+voting procedure documentation<../active/voting>`.
 
 Finally, the RPC layer (in yellow on the right in the picture) is an
 important part of the node. It is how the client, third-party
@@ -105,7 +108,7 @@ that are used everywhere for basic operations.
    error trace). When extending the type, programmers must also call
    the ``register_error`` function that registers a pretty printer and
    an encoding for serialization.
-   A :ref:`tutorial<error_monad>` is available for this library.
+   A :doc:`tutorial<../developer/error_monad>` is available for this library.
  - :package:`tezos-rpc` provides the basics of Tezos' RPC service
    mechanism. It provides combinators for building service hierarchies
    à la Ocsigen/Eliom, registering, and calling services. This module
@@ -164,7 +167,7 @@ protocols.
     protocol versions, embedded or dynamically linked.
   - :package:`tezos-shell` implements the scheduling of block
     validations, the mempool management, and the distributed database.
-    A description is available in :ref:`this document<validation>`.
+    A description is available in :doc:`this document <../shell/validation>`.
 
 The Economic Protocol Environment and Compiler
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -230,7 +233,7 @@ Three kinds of economic protocols are included in the main Tezos repository.
     (:package:`tezos-embedded-protocol-alpha`) on the ``master``
     branch is the protocol currently under development
     (see :ref:`here<node-protocol>` for more details).
-    A :ref:`tutorial<entering_alpha>` is available to start reading
+    A :doc:`tutorial<../developer/entering_alpha>` is available to start reading
     the protocol's code.
   - Demo protocols. :package:`tezos-protocol-demo-noops`
     (:package:`tezos-embedded-protocol-demo-noops`) is just a demo

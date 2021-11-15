@@ -1,5 +1,3 @@
-.. _node-conf:
-
 Node Configuration
 ==================
 
@@ -91,13 +89,26 @@ configuration options/parameters.
 RPC parameters
 --------------
 
-RPC parameters allow to customize the :doc:`JSON/RPC interface <../developer/rpc>`, by defining for instance hosts to listen for RPC requests, or a certificate/key file necessary when TLS is used.
+RPC parameters allow to customize the :doc:`JSON/RPC interface
+<../developer/rpc>`, by defining for instance network addresses (corresponding
+to node's network interfaces) to listen for RPC requests on, or a
+certificate/key file necessary when TLS is used.
+
+Access Control Lists
+~~~~~~~~~~~~~~~~~~~~
 
 Access to RPC endpoints can be restricted using an Access Control List. The
-default policy for now is to allow access to all paths, but this is not very
-safe and will likely change in the future. Such a list can be put in the
-configuration file. In the ``rpc`` object a key ``acl`` can be included,
-containing a list of policies for different listening addresses:
+default policy grants full access to clients connecting from the local machine,
+but only allows *safe* endpoints if accessed remotely (see :ref:`default_acl`
+for details). One important exception to this rule is when the node listens on
+the special address ``0.0.0.0``, which means roughly "listen to requests
+addressed to any address" and hence all requests coming to such a node are
+treated as coming from a remote host. It is worth remembering that it's
+unimportant where the request actually comes from. The policy is defined for an address
+on which the node is configured to listen to incoming RPC requests. A custom
+list can be put in the configuration file. In the ``rpc`` object a key ``acl``
+can be included, containing a list of policies for different listening
+addresses:
 
 .. code-block:: json
 
@@ -117,6 +128,24 @@ in which case the rule applies to any port on that address. Note that this does 
 enable RPC on that address, to do that the address must be included in ``listen-addrs`` or passed
 by command-line argument ``--rpc-addr`` when starting the node.
 
+.. note::
+   Both listening addresses and ACL addresses are resolved at the node's startup
+   (they're not re-resolved at any point after that), before matching. This
+   means that only IP addresses are ever matched, so if e.g. "localhost" is
+   written in the policy and listening address is set "127.0.0.1", it *does* match. The converse is also true.
+
+.. warning::
+   Note that "0.0.0.0" is a specific address, distinct from any other. It is
+   usually treated specially by operating systems to mean "any address".
+   However, the ACL configuration **does not** follow this rule, because
+   matching addresses to rules would have become difficult and potentially very
+   confusing. Therefore if a node is configured to listen on address ``0.0.0.0``,
+   a policy may be defined for ``0.0.0.0`` specifically (otherwise, the default
+   policy will apply to it). If one wishes
+   to apply different policies to different addresses, multiple ``rpc-addr``
+   switches can be used to listen on those specific addresses and then separate
+   policies can be configured for them.
+
 Additionally either the ``whitelist`` **or** the ``blacklist`` field must be specified
 (but not both), containing a list of paths which should be black-listed or
 white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``tezos-client rpc``
@@ -126,12 +155,115 @@ character, which stands for any whole path segment (i.e. it's not allowed to mix
 with other characters in a path segment).
 A ``**`` stands for any possible path suffix.
 
+Additionally ``--allow-all-rpc`` CLI option to ``tezos-node`` can be used to
+simply allow all RPC endpoints on a given address. When passed to
+``tezos-node config`` command, this option modifies the ``config.json`` file,
+putting an appropriate ACL there. When passed to ``tezos-node run``, it
+overrides the settings of the ``config.json`` for this particular run, without
+modifying the file.
+
+.. danger::
+   Exposing all RPCs over the public network is extremely dangerous and
+   strongly advised against. It opens the door widely to DoS attacks
+   and allows anyone to manipulate the node's configuration, inject blocks
+   and in general harm the node's state. Even more discouraged is exposing
+   all RPCs on the special ``0.0.0.0`` address.
+
 .. warning::
-   The policy is always searched from the beginning of the list to the end and
+   Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
    rule on a specific port on a given host and another rule for all other ports
    on the same host, then more specific rules should always be written *first*
    Otherwise they'll be shadowed by the more general rule.
+
+Examples
+~~~~~~~~
+
+::
+
+  $ tezos-node run --rpc-addr localhost:8732
+
+In this case the RPC is only available for requests coming from ``localhost``
+(i.e. ``127.0.0.1``). There's no need configure the ACL, as an allow-all policy
+is applied to the local host by default.
+::
+  $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
+
+In this example the RPC is available to both ``localhost`` and to the local
+network (assuming the node does have address ``192.168.0.3`` in that network).
+However, different policies apply to each address. For ``localhost`` an allow-all
+policy will be selected as before, but requests addressed to ``192.168.0.3`` will
+be filtered by the default ACL (:ref:`see below <default_acl>`).
+
+In this last case, to listen on both ``localhost`` and local network, it might
+be tempting to listen on the special ``0.0.0.0`` address::
+
+  $ tezos-node run --rpc-addr 0.0.0.0:8732
+
+``0.0.0.0`` is a special address, not attached to any particular networking
+interface. Instead it tells the OS to route messages incoming to **all**
+interfaces to the node. However, the ACL mechanism does not attach such special
+significance to this address. It will apply to this listening address a policy
+written for it specifically and in the absence thereof – a default policy for
+**remote addresses**. Thus, even if a request is coming through a local
+interface, it does not matter, it'll still be treated as if it came from a
+remote address.
+
+A common situation is when one wants to accept only safe RPC requests coming from
+remote hosts, but enable all RPCs for localhost (which is for instance necessary
+to perform baking and endorsing). Since all RPCs are available to localhost by
+default, it is sufficient to open another listening address::
+
+  $ tezos-node run --rpc-addr localhost --rpc-addr 0.0.0.0
+
+The ``--allow-all-rpc`` switch can be used to open all RPCs on a specific address::
+
+  $ tezos-node run --rpc-addr 192.168.0.3 --allow-all-rpc 192.168.0.3
+
+Note that the addresses of both ``--rpc-addr`` and ``--allow-all-rpc`` switches
+should match. In particular remember that ``0.0.0.0`` is a specific address
+and won't match anything else except for itself, even though the underlying OS
+might treat it differently. Also be advised that using this option is discouraged
+as dangerous, especially when applied to the special ``0.0.0.0`` address.
+
+Both ``--rpc-addr`` and ``--allow-all-rpc`` switches can be used multiple times
+in order to accommodate each specific setup.
+
+
+.. _default_acl:
+
+Default ACL for RPC
+-------------------
+
+The default ACL for RPC depends on the listening address that the node is using.
+
+If the listening address resolves to the loopback network interface, then full
+access to all endpoints is granted. Note that it does not matter from which
+machine the client is really making a request, but only what the listening
+address is. This guarantees that insecure endpoints can only be accessed from
+``localhost``.
+
+If the listening address is a network address, then a more restrictive policy
+applies. Its main purpose is to protect nodes from attacks. These attacks can
+take two main forms:
+
+  - spamming the node with costly requests (denial of service attack)
+  - breaking the node by forcing it to perform a risky operation
+
+Thus all costly or risky endpoints are blocked by default. This can be
+relaxed or tightened by modifying the configuration file. It's
+worth noting that this default policy among other things disallows baking and
+endorsing by bakers and endorsers running on remote servers.
+
+The following is the default ACL policy for the node,
+hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
+``any.public.address`` with an IP address or a domain name that you'll be
+actually listening on):
+
+.. literalinclude:: default-acl.json
+
+The endpoints specifically required for baking can be found in
+:src:`vendors/flextesa-lib/tezos_node.ml`.
 
 .. _configure_p2p:
 

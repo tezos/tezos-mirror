@@ -142,11 +142,11 @@ let trim s =
 
 let print_desc ppf doc =
   let (short, long) =
-    try
-      let len = String.index doc '\n' in
-      ( String.sub doc 0 len,
-        Some (String.sub doc (len + 1) (String.length doc - len - 1)) )
-    with _ -> (doc, None)
+    match String.index_opt doc '\n' with
+    | None -> (doc, None)
+    | Some len ->
+        ( String.sub doc 0 len,
+          Some (String.sub doc (len + 1) (String.length doc - len - 1)) )
   in
   match long with
   | None -> Format.fprintf ppf "%s" short
@@ -762,21 +762,19 @@ let parse_arg :
           >|=? fun x -> Some x
       | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
-      converter ctx default >>= fun default ->
-      (match default with
-      | Ok x -> return x
+      converter ctx default >>= function
       | Error _ ->
           invalid_arg
             (Format.sprintf
                "Value provided as default for '%s' could not be parsed by \
                 converter function."
-               long))
-      >>=? fun default ->
-      match TzString.Map.find_opt long args_dict with
-      | None | Some [] -> return default
-      | Some [s] ->
-          trace (Bad_option_argument (long, command)) (converter ctx s)
-      | Some (_ :: _) -> fail (Multiple_occurrences (long, command)))
+               long)
+      | Ok default -> (
+          match TzString.Map.find_opt long args_dict with
+          | None | Some [] -> return default
+          | Some [s] ->
+              trace (Bad_option_argument (long, command)) (converter ctx s)
+          | Some (_ :: _) -> fail (Multiple_occurrences (long, command))))
   | Switch {label = {long; short = _}; _} -> (
       match TzString.Map.find_opt long args_dict with
       | None | Some [] -> return_false
@@ -869,10 +867,9 @@ let make_args_dict_consume ?command spec args =
             | (1, []) when completing -> return (acc, [])
             | (1, []) -> fail (Option_expected_argument (arg, None))
             | (_, _) ->
-                raise
-                  (Failure
-                     "cli_entries: Arguments with arity not equal to 1 or 0 \
-                      not supported")
+                Stdlib.failwith
+                  "cli_entries: Arguments with arity not equal to 1 or 0 \
+                   unsupported"
           else fail (Unknown_option (arg, None))
         else return (acc, args)
   in
@@ -904,10 +901,9 @@ let make_args_dict_filter ?command spec args =
                 tl'
           | (1, []) -> fail (Option_expected_argument (arg, command))
           | (_, _) ->
-              raise
-                (Failure
-                   "cli_entries: Arguments with arity not equal to 1 or 0 not \
-                    supported")
+              Stdlib.failwith
+                "cli_entries: Arguments with arity not equal to 1 or 0 \
+                 unsupported"
         else make_args_dict arities (dict, arg :: other_args) tl
   in
   make_args_dict
@@ -1395,8 +1391,9 @@ let string ~name ~desc next =
     next
 
 let string_contains ~needle ~haystack =
-  try Some (Re.Str.search_forward (Re.Str.regexp_string needle) haystack 0)
-  with Not_found -> None
+  Option.catch
+    ~catch_only:(function Not_found -> true | _ -> false)
+    (fun () -> Re.Str.search_forward (Re.Str.regexp_string needle) haystack 0)
 
 let rec search_params_prefix : type a arg. string -> (a, arg) params -> bool =
  fun prefix -> function
@@ -1439,11 +1436,7 @@ let exec (type ctx)
         let rec do_seq i acc = function
           | [] -> return (List.rev acc)
           | p :: rest ->
-              Lwt.catch
-                (fun () -> converter ctx p)
-                (function
-                  | Failure msg -> Error_monad.failwith "%s" msg
-                  | exn -> fail (Exn exn))
+              Error_monad.catch_es (fun () -> converter ctx p)
               |> trace (Bad_argument (i, p))
               >>=? fun v -> do_seq (succ i) (v :: acc) rest
         in
@@ -1465,28 +1458,18 @@ let exec (type ctx)
               if matched then return (List.rev acc, unmatched_rest)
               else
                 (* if suffix is not match, try to continue with the sequence *)
-                Lwt.catch
-                  (fun () ->
+                Error_monad.catch_es (fun () ->
                     converter ctx p >>=? fun v ->
                     do_seq (succ i) (v :: acc) rest)
-                  (function
-                    | err -> (
-                        match err with
-                        | Failure msg -> Error_monad.failwith "%s" msg
-                        | exn -> fail (Exn exn)))
         in
         do_seq i [] seq >>=? fun (parsed, rest) ->
         exec (succ i) ctx next (cb parsed) rest
     | (Prefix (n, next), p :: rest) when n = p -> exec (succ i) ctx next cb rest
     | (Param (_, _, {converter; _}, next), p :: rest) ->
-        Lwt.catch
-          (fun () -> converter ctx p)
-          (function
-            | Failure msg -> Error_monad.failwith "%s" msg
-            | exn -> fail (Exn exn))
+        Error_monad.catch_es (fun () -> converter ctx p)
         |> trace (Bad_argument (i, p))
         >>=? fun v -> exec (succ i) ctx next (cb v) rest
-    | _ -> raise (Failure "cli_entries internal error: exec no case matched")
+    | _ -> Stdlib.failwith "cli_entries internal error: exec no case matched"
   in
   let ctx = conv ctx in
   parse_args ~command options_spec args_dict ctx >>=? fun parsed_options ->
@@ -1565,7 +1548,7 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         let autocomplete = conv_autocomplete autocomplete in
         if not (has_options cmd) then
           TParam {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
-        else raise (Failure "Command cannot have both prefix and options")
+        else Stdlib.failwith "Command cannot have both prefix and options"
     | (TStop cmd, Prefix (n, next)) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
     | (TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next))
@@ -1594,10 +1577,9 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
           n <> t.name || desc <> t.desc || t.suffix <> suffix
           (* we should match the parameter too but this would require a bit of refactoring*)
         then
-          raise
-            (Failure
-               "Command cannot have different non_terminal_seq_level at the \
-                same position")
+          Stdlib.failwith
+            "Command cannot have different non_terminal_seq_level at the same \
+             position"
         else
           let params = suffix_to_params suffix next in
           TNonTerminalSeq {t with tree = insert_tree t.tree params}

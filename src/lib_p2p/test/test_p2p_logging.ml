@@ -1,5 +1,3 @@
-open Test_services
-
 module type TEST = sig
   val name : string
 
@@ -319,26 +317,23 @@ let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 let testcase (module T : TEST) =
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
       Internal_event_unix.init ~lwt_log_sink () >>= fun () ->
-      Test_services.with_empty_mock_sink (fun () ->
+      Tztest.with_empty_mock_sink (fun () ->
           T.run () >>= function
           | Ok () -> Lwt.return_unit
           | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
-
-let main () =
-  Alcotest_lwt.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-logging.",
-        [
-          testcase (module Authentication);
-          testcase (module Nack);
-          testcase (module Read_and_write);
-          testcase (module P2p_net);
-        ] );
-    ]
+              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
 
 let () =
-  Sys.catch_break true ;
-  Lwt_main.run @@ Lwt.catch main (fun _ -> Lwt.return_unit)
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-logging",
+           [
+             testcase (module Authentication);
+             testcase (module Nack);
+             testcase (module Read_and_write);
+             testcase (module P2p_net);
+           ] );
+       ]

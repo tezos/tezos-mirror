@@ -92,7 +92,7 @@ update_all_dot_ocamlformats () {
 
 check_scripts () {
     # Gather scripts
-    scripts=$(find "${source_directories[@]}" tests_python/ scripts/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" packaging/ tests_python/ scripts/ -name "*.sh" -type f -print)
     exit_code=0
 
     # Check scripts do not contain the tab character
@@ -119,7 +119,7 @@ check_scripts () {
           say "$script shellcheck SKIPPED ⚠️"
         else
           # script is not skipped, let's shellcheck it
-          if shellcheck "${script}"; then
+          if shellcheck --external-sources "${script}"; then
             say "$script shellcheck PASSED ✅"
           else
             say "$script shellcheck FAILED ❌"
@@ -166,7 +166,7 @@ check_redirects () {
 update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
-    repeated=$(grep '^[^ #]' .gitlab-ci.yml | sort | uniq --repeated)
+    repeated=$(grep '^[^ #]' .gitlab-ci.yml .gitlab/ci/*.yml | sort | uniq --repeated)
     if [ -n "$repeated" ]; then
         echo ".gitlab-ci.yml contains repeated rules:"
         echo "$repeated"

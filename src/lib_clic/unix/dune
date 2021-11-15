@@ -1,5 +1,6 @@
 (library
  (name tezos_clic_unix)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-clic.unix)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_clic

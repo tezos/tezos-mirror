@@ -37,12 +37,34 @@ let max_proposals_per_delegate = 20
 
 let max_operation_data_length = 32 * 1024 (* 32kB *)
 
+let max_micheline_node_count = 50_000
+
+let max_micheline_bytes_limit = 50_000
+
+let max_allowed_global_constant_depth = 10_000
+
+(* In this version of the protocol, there is a single cache for
+   contract source code and storage. Its size has been chosen
+   not too exceed 100 000 000 bytes. *)
+let cache_layout = [100_000_000]
+
+(* In previous versions of the protocol, this
+   [michelson_maximum_type_size] limit was set to 1000 but
+   the contract input types (pair <parameter_type> <storage_type>)
+   were not checked. Both components, <parameter_type> and
+   <storage_type> where however checked hence it was possible to build
+   types as big as 2001. *)
+let michelson_maximum_type_size = 2001
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
   max_anon_ops_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
+  max_micheline_node_count : int;
+  max_micheline_bytes_limit : int;
+  max_allowed_global_constant_depth : int;
 }
 
 let fixed_encoding =
@@ -53,25 +75,37 @@ let fixed_encoding =
         c.nonce_length,
         c.max_anon_ops_per_block,
         c.max_operation_data_length,
-        c.max_proposals_per_delegate ))
+        c.max_proposals_per_delegate,
+        c.max_micheline_node_count,
+        c.max_micheline_bytes_limit,
+        c.max_allowed_global_constant_depth ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
            max_anon_ops_per_block,
            max_operation_data_length,
-           max_proposals_per_delegate ) ->
+           max_proposals_per_delegate,
+           max_micheline_node_count,
+           max_micheline_bytes_limit,
+           max_allowed_global_constant_depth ) ->
       {
         proof_of_work_nonce_size;
         nonce_length;
         max_anon_ops_per_block;
         max_operation_data_length;
         max_proposals_per_delegate;
+        max_micheline_node_count;
+        max_micheline_bytes_limit;
+        max_allowed_global_constant_depth;
       })
-    (obj5
+    (obj8
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
        (req "max_anon_ops_per_block" uint8)
        (req "max_operation_data_length" int31)
-       (req "max_proposals_per_delegate" uint8))
+       (req "max_proposals_per_delegate" uint8)
+       (req "max_micheline_node_count" int31)
+       (req "max_micheline_bytes_limit" int31)
+       (req "max_allowed_global_constants_depth" int31))
 
 let fixed =
   {
@@ -80,6 +114,9 @@ let fixed =
     max_anon_ops_per_block;
     max_operation_data_length;
     max_proposals_per_delegate;
+    max_micheline_node_count;
+    max_micheline_bytes_limit;
+    max_allowed_global_constant_depth;
   }
 
 (* The encoded representation of this type is stored in the context as
@@ -102,7 +139,6 @@ type parametric = {
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
-  michelson_maximum_type_size : int;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
   block_security_deposit : Tez_repr.t;
@@ -136,7 +172,6 @@ let parametric_encoding =
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold ),
         ( ( c.tokens_per_roll,
-            c.michelson_maximum_type_size,
             c.seed_nonce_revelation_tip,
             c.origination_size,
             c.block_security_deposit,
@@ -165,7 +200,6 @@ let parametric_encoding =
              hard_gas_limit_per_block,
              proof_of_work_threshold ),
            ( ( tokens_per_roll,
-               michelson_maximum_type_size,
                seed_nonce_revelation_tip,
                origination_size,
                block_security_deposit,
@@ -195,7 +229,6 @@ let parametric_encoding =
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         tokens_per_roll;
-        michelson_maximum_type_size;
         seed_nonce_revelation_tip;
         origination_size;
         block_security_deposit;
@@ -231,9 +264,8 @@ let parametric_encoding =
              Gas_limit_repr.Arith.z_integral_encoding)
           (req "proof_of_work_threshold" int64))
        (merge_objs
-          (obj10
+          (obj9
              (req "tokens_per_roll" Tez_repr.encoding)
-             (req "michelson_maximum_type_size" uint16)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
              (req "block_security_deposit" Tez_repr.encoding)
@@ -308,6 +340,7 @@ module Proto_previous = struct
     blocks_per_roll_snapshot : int32;
     blocks_per_voting_period : int32;
     time_between_blocks : Period_repr.t list;
+    minimal_block_delay : Period_repr.t;
     endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -322,13 +355,14 @@ module Proto_previous = struct
     endorsement_reward : Tez_repr.t list;
     cost_per_byte : Tez_repr.t;
     hard_storage_limit_per_operation : Z.t;
-    test_chain_duration : int64;
-    (* in seconds *)
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period_repr.t;
+    liquidity_baking_subsidy : Tez_repr.t;
+    liquidity_baking_sunset_level : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   let parametric_encoding =
@@ -343,24 +377,27 @@ module Proto_previous = struct
             c.time_between_blocks,
             c.endorsers_per_block,
             c.hard_gas_limit_per_operation,
-            c.hard_gas_limit_per_block ),
-          ( ( c.proof_of_work_threshold,
-              c.tokens_per_roll,
+            c.hard_gas_limit_per_block,
+            c.proof_of_work_threshold ),
+          ( ( c.tokens_per_roll,
               c.michelson_maximum_type_size,
               c.seed_nonce_revelation_tip,
               c.origination_size,
               c.block_security_deposit,
               c.endorsement_security_deposit,
-              c.baking_reward_per_endorsement ),
-            ( c.endorsement_reward,
+              c.baking_reward_per_endorsement,
+              c.endorsement_reward,
               c.cost_per_byte,
-              c.hard_storage_limit_per_operation,
-              c.test_chain_duration,
-              c.quorum_min,
+              c.hard_storage_limit_per_operation ),
+            ( c.quorum_min,
               c.quorum_max,
               c.min_proposal_quorum,
               c.initial_endorsers,
-              c.delay_per_missing_endorsement ) ) ))
+              c.delay_per_missing_endorsement,
+              c.minimal_block_delay,
+              c.liquidity_baking_subsidy,
+              c.liquidity_baking_sunset_level,
+              c.liquidity_baking_escape_ema_threshold ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -369,24 +406,27 @@ module Proto_previous = struct
                time_between_blocks,
                endorsers_per_block,
                hard_gas_limit_per_operation,
-               hard_gas_limit_per_block ),
-             ( ( proof_of_work_threshold,
-                 tokens_per_roll,
+               hard_gas_limit_per_block,
+               proof_of_work_threshold ),
+             ( ( tokens_per_roll,
                  michelson_maximum_type_size,
                  seed_nonce_revelation_tip,
                  origination_size,
                  block_security_deposit,
                  endorsement_security_deposit,
-                 baking_reward_per_endorsement ),
-               ( endorsement_reward,
+                 baking_reward_per_endorsement,
+                 endorsement_reward,
                  cost_per_byte,
-                 hard_storage_limit_per_operation,
-                 test_chain_duration,
-                 quorum_min,
+                 hard_storage_limit_per_operation ),
+               ( quorum_min,
                  quorum_max,
                  min_proposal_quorum,
                  initial_endorsers,
-                 delay_per_missing_endorsement ) ) ) ->
+                 delay_per_missing_endorsement,
+                 minimal_block_delay,
+                 liquidity_baking_subsidy,
+                 liquidity_baking_sunset_level,
+                 liquidity_baking_escape_ema_threshold ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -408,15 +448,18 @@ module Proto_previous = struct
           endorsement_reward;
           cost_per_byte;
           hard_storage_limit_per_operation;
-          test_chain_duration;
           quorum_min;
           quorum_max;
           min_proposal_quorum;
           initial_endorsers;
           delay_per_missing_endorsement;
+          minimal_block_delay;
+          liquidity_baking_subsidy;
+          liquidity_baking_sunset_level;
+          liquidity_baking_escape_ema_threshold;
         })
       (merge_objs
-         (obj9
+         (obj10
             (req "preserved_cycles" uint8)
             (req "blocks_per_cycle" int32)
             (req "blocks_per_commitment" int32)
@@ -429,25 +472,28 @@ module Proto_previous = struct
                Gas_limit_repr.Arith.z_integral_encoding)
             (req
                "hard_gas_limit_per_block"
-               Gas_limit_repr.Arith.z_integral_encoding))
+               Gas_limit_repr.Arith.z_integral_encoding)
+            (req "proof_of_work_threshold" int64))
          (merge_objs
-            (obj8
-               (req "proof_of_work_threshold" int64)
+            (obj10
                (req "tokens_per_roll" Tez_repr.encoding)
                (req "michelson_maximum_type_size" uint16)
                (req "seed_nonce_revelation_tip" Tez_repr.encoding)
                (req "origination_size" int31)
                (req "block_security_deposit" Tez_repr.encoding)
                (req "endorsement_security_deposit" Tez_repr.encoding)
-               (req "baking_reward_per_endorsement" (list Tez_repr.encoding)))
-            (obj9
+               (req "baking_reward_per_endorsement" (list Tez_repr.encoding))
                (req "endorsement_reward" (list Tez_repr.encoding))
                (req "cost_per_byte" Tez_repr.encoding)
-               (req "hard_storage_limit_per_operation" z)
-               (req "test_chain_duration" int64)
+               (req "hard_storage_limit_per_operation" z))
+            (obj9
                (req "quorum_min" int32)
                (req "quorum_max" int32)
                (req "min_proposal_quorum" int32)
                (req "initial_endorsers" uint16)
-               (req "delay_per_missing_endorsement" Period_repr.encoding))))
+               (req "delay_per_missing_endorsement" Period_repr.encoding)
+               (req "minimal_block_delay" Period_repr.encoding)
+               (req "liquidity_baking_subsidy" Tez_repr.encoding)
+               (req "liquidity_baking_sunset_level" int32)
+               (req "liquidity_baking_escape_ema_threshold" int32))))
 end

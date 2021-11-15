@@ -17,9 +17,9 @@ After a successful compilation, you should have the following binaries:
 
 - ``tezos-node``: the tezos daemon itself (see `Node`_);
 - ``tezos-client``: a command-line client and basic wallet (see `Client`_);
-- ``tezos-admin-client``: administration tool for the node;
+- ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
 - ``tezos-{baker,endorser,accuser}-*``: daemons to bake, endorse and
-  accuse on the Tezos network (see :ref:`howtorun`);
+  accuse on the Tezos network (see :doc:`howtorun`);
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
@@ -28,8 +28,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
-bound to. For instance, ``tezos-baker-009-PsFLoren`` is the baker
-for the Florence protocol, and ``tezos-baker-alpha`` is the baker
+bound to. For instance, ``tezos-baker-010-PtGRANAD`` is the baker
+for the Granada protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
 
@@ -60,6 +60,8 @@ node. In the last case, the above command generates a warning::
 
     Warning:
       Failed to acquire the protocol version from the node
+
+.. _tezos_client_protocol:
 
 To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
@@ -127,7 +129,7 @@ Node Synchronization
 Whenever a node starts, it tries to retrieve the most current head of the chain
 from its peers. This can be a long process if there are many blocks to retrieve
 (e.g. when a node is launched for the first time or has been out of sync for a
-while), or on a slow network connection. The mechanism of :ref:`snapshots` can
+while), or on a slow network connection. The mechanism of :doc:`../user/snapshots` can
 help in reducing the synchronization time.
 
 Once the synchronization is complete, the node is said to be *bootstrapped*.
@@ -147,7 +149,7 @@ finally switches to the current protocol.
 Throughout the documentation, `Alpha` refers to the protocol in the
 ``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
 for the currently active protocol. The Alpha protocol is used by
-default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
+default in :doc:`sandbox mode <../user/sandbox>` and in the various test
 suites.
 
 
@@ -172,8 +174,8 @@ RPC Interface
 ~~~~~~~~~~~~~
 
 The only programming interface to the node is through JSON RPC calls and it is disabled by
-default.  More detailed documentation can be found in the :ref:`RPC index.
-<rpc>` The RPC interface must be enabled for the clients
+default.  More detailed documentation can be found in the :doc:`RPC index
+<../active/rpc>`. The RPC interface must be enabled for the clients
 to communicate with the node but it should not be publicly accessible on the
 internet. With the following command, it is available uniquely on the
 `localhost` address of your machine, on the default port ``8732``.
@@ -197,7 +199,7 @@ The list of configurable options can be obtained using the following command::
 
     tezos-node run --help
 
-You can read more about the :ref:`node configuration <node-conf>` and its :ref:`private mode <private-mode>`.
+You can read more about the :doc:`node configuration <../user/node-configuration>` and its :ref:`private mode <private-mode>`.
 
 Besides listening from requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
@@ -260,11 +262,11 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``florencenet.sh``
-to run the Florencenet test network for instance), you should prefix the file
+If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``granadanet.sh``
+to run the Granadanet test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image::
 
-    ./florencenet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
+    ./granadanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 
@@ -459,7 +461,7 @@ Let's originate our first contract and call it *id*::
 
 The initial balance is ꜩ1, generously provided by implicit account
 *alice*. The contract stores a Michelson program ``id.tz``
-(found in file :src:`./tests_python/contracts_alpha/attic/id.tz`), with
+(found in file :src:`tests_python/contracts_alpha/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
 needed to avoid shell expansion). The parameter ``--burn-cap``
 specifies the maximal fee the user is willing to pay for this
@@ -573,7 +575,7 @@ and storage based on those indicated by the node.
 This is why we were able to submit transactions without specifying
 these limits: they were computed for us.
 
-More information on validation can be found :ref:`here. <validation>`
+More information on validation can be found :doc:`here <../shell/validation>`.
 
 
 It's RPCs all the Way Down
@@ -588,8 +590,12 @@ For example the ``get timestamp`` command above is a shortcut for::
 
 The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific information you'll
-have to resort to RPCs. For example to check the value of important
-constants in Tezos, which may differ between Mainnet and other
+have to resort to RPCs.
+
+.. _get_protocol_constants:
+
+For example to check the value of important
+:ref:`constants <protocol_constants>` in Tezos, which may differ between Mainnet and other
 :ref:`test networks<test-networks>`, you can use::
 
    tezos-client rpc get /chains/main/blocks/head/context/constants | jq
@@ -636,7 +642,7 @@ An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.
 
 
-You can find more info in the :ref:`RPCs' page. <rpc>`
+You can find more info in the :doc:`RPCs' page <../active/rpc>`.
 
 Environment variables for the client
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -646,8 +652,7 @@ The behavior of the client can be configured using the following environment var
 - `TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER`: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
 - `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
   Its value is overridden by option ``-d``.
-- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>`.
-  Its value is overwritten by option ``-d``.
+- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>` (see there for details).
 - `TEZOS_CLIENT_RPC_TIMEOUT_SECONDS`: This variable controls how long (in seconds, as an integer)
   the client will wait for a response from the node, for each of the two RPC calls made during startup.
   If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.

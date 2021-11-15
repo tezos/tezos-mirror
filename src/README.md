@@ -31,6 +31,8 @@ Tezos is mainly implemented in the [OCaml language](https://ocaml.org).
 The software architecture of Tezos at a finer grain is presented as a [more detailed diagram](https://tezos.gitlab.io/shell/the_big_picture.html#packages).
 That diagram describes the sources at the level of OPAM packages ([OPAM](https://opam.ocaml.org) is the OCaml package manager).
 
+To develop protocol enhancement proposals with a REPL, see [`tztop`](./tooling/tztop/README.md).
+
 ## API Documentation
 <!--
 - Link to the external API.

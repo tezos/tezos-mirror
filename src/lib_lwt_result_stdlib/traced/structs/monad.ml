@@ -33,13 +33,25 @@ module Make (Trace : Traced_sigs.Trace.S) :
 
   let fail_trace e = fail (Trace.make e)
 
+  module TracedResult = struct
+    include Result
+
+    let fail x = error_trace x
+  end
+
+  module LwtTracedResult = struct
+    include LwtResult
+
+    let fail x = fail_trace x
+  end
+
   let rec join_e_errors trace_acc = function
     | Ok _ :: ts -> join_e_errors trace_acc ts
     | Error trace :: ts -> join_e_errors (Trace.conp trace_acc trace) ts
     | [] -> Error trace_acc
 
   let rec join_e = function
-    | [] -> unit_e
+    | [] -> Result.return_unit
     | Ok () :: ts -> join_e ts
     | Error trace :: ts -> join_e_errors trace ts
 

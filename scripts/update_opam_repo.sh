@@ -89,11 +89,11 @@ done
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,reactiveData,opam-ed
+  $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,opam-ed
 
 ## Adding useful compiler variants
-for variant in afl flambda fp fp+flambda spacetime ; do
-    git checkout packages/ocaml-variants/ocaml-variants.$ocaml_version+$variant
+for variant in afl flambda fp spacetime ; do
+    git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
 done
 
 ## Removing the various tezos packages

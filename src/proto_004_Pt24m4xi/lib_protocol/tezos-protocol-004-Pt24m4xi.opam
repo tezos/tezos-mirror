@@ -12,7 +12,7 @@ depends: [
 build: [
   [
     "%{tezos-protocol-compiler:lib}%/replace"
-    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v0"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
     "004_Pt24m4xi"

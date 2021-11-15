@@ -65,10 +65,10 @@
     [when_different_lengths] error should be composed with the other errors.)
 
     To obtain a different behaviour for sequential traversors, or to process
-    two lists in parallel, you can use {!combine} or any of the alternative that
-    handles the error differently: {!combine_drop}, {!combine_with_leftovers}.
-    Finally, the {!rev_combine} is provided to allow to avoid
-    multiple-reversing.
+    two lists in parallel, you can use {!combine} or any of the alternatives
+    that handles the error differently: {!combine_drop},
+    {!combine_with_leftovers}. Finally, the {!rev_combine} is provided to allow
+    to avoid multiple-reversing.
 
     {3 Special considerations}
 
@@ -78,7 +78,7 @@
     behaviour, it may be surprising enough that it requires mentioning here.
 
     Because they may return early, {!for_all2} and {!exists2} and all their
-    variants may return [Ok _] even tough the arguments have different lengths.
+    variants may return [Ok _] even though the arguments have different lengths.
 *)
 
 module type S = sig
@@ -91,13 +91,13 @@ module type S = sig
   (** [nil] is [[]] *)
   val nil : 'a list
 
-  (** [nil] is [Ok []] *)
+  (** [nil_e] is [Ok []] *)
   val nil_e : ('a list, 'trace) result
 
-  (** [nil] is [Lwt.return_nil] *)
+  (** [nil_s] is [Lwt.return_nil] *)
   val nil_s : 'a list Lwt.t
 
-  (** [nil] is [Lwt.return (Ok [])] *)
+  (** [nil_es] is [Lwt.return (Ok [])] *)
   val nil_es : ('a list, 'trace) result Lwt.t
 
   (** {3 Safe wrappers}
@@ -120,7 +120,7 @@ module type S = sig
   (** [nth xs n] is the [n]th element of the list or [None] if the list has
       fewer than [n] elements.
 
-      [nth xs 0 = tl xs] *)
+      [nth xs 0 = hd xs] *)
   val nth : 'a list -> int -> 'a option
 
   (** [nth_opt] is an alias for [nth] provided for backwards compatibility. *)
@@ -279,6 +279,11 @@ module type S = sig
     'b list ->
     'c ->
     ('c, 'trace) result
+
+  (** [fold_left_map f a xs] is a combination of [fold_left] and [map] that maps
+      over all elements of [xs] and threads an accumulator with initial value [a]
+      through calls to [f]. *)
+  val fold_left_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
   val for_all2 :
     when_different_lengths:'trace ->
@@ -589,6 +594,48 @@ module type S = sig
     'b list ->
     ('a, 'trace) result Lwt.t
 
+  (** [fold_left_map_e f a xs] is a combination of [fold_left_e] and [map_e] that
+      maps over all elements of [xs] and threads an accumulator with initial
+      value [a] through calls to [f]. The list is traversed from left to right
+      and the first encountered error is returned. *)
+  val fold_left_map_e :
+    ('a -> 'b -> ('a * 'c, 'trace) result) ->
+    'a ->
+    'b list ->
+    ('a * 'c list, 'trace) result
+
+  (** [fold_left_map_s f a xs] is a combination of [fold_left_s] and [map_s] that
+      maps over all elements of [xs] and threads an accumulator with initial
+      value [a] through calls to [f]. *)
+  val fold_left_map_s :
+    ('a -> 'b -> ('a * 'c) Lwt.t) -> 'a -> 'b list -> ('a * 'c list) Lwt.t
+
+  (** [fold_left_map_es f a xs] is a combination of [fold_left_es] and [map_es] that
+      maps over all elements of [xs] and threads an accumulator with initial
+      value [a] through calls to [f]. The list is traversed from left to right
+      and the first encountered error is returned. *)
+  val fold_left_map_es :
+    ('a -> 'b -> ('a * 'c, 'trace) result Lwt.t) ->
+    'a ->
+    'b list ->
+    ('a * 'c list, 'trace) result Lwt.t
+
+  val fold_left_i : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+  val fold_left_i_e :
+    (int -> 'a -> 'b -> ('a, 'trace) result) ->
+    'a ->
+    'b list ->
+    ('a, 'trace) result
+
+  val fold_left_i_s : (int -> 'a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
+
+  val fold_left_i_es :
+    (int -> 'a -> 'b -> ('a, 'trace) result Lwt.t) ->
+    'a ->
+    'b list ->
+    ('a, 'trace) result Lwt.t
+
   (** This function is not tail-recursive *)
   val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 
@@ -833,19 +880,24 @@ module type S = sig
       *)
   val combine_drop : 'a list -> 'b list -> ('a * 'b) list
 
+  (** A type like [result] but which is symmetric *)
+  type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
+
   (** [combine_with_leftovers ll lr] is a tuple [(combined, leftover)]
       where [combined] is [combine_drop ll lr]
       and [leftover] is either [`Left lsuffix] or [`Right rsuffix] depending on
       which of [ll] or [lr] is longer. [leftover] is [None] if the two lists
       have the same length. *)
   val combine_with_leftovers :
-    'a list ->
-    'b list ->
-    ('a * 'b) list * [`Left of 'a list | `Right of 'b list] option
+    'a list -> 'b list -> ('a * 'b) list * ('a, 'b) left_or_right_list option
 
   (** {3 compare / equal} *)
 
   val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
+
+  val compare_lengths : 'a list -> 'a list -> int
+
+  val compare_length_with : 'a list -> int -> int
 
   val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 

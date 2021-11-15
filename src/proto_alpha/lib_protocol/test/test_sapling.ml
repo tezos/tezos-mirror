@@ -33,6 +33,11 @@
 
 open Protocol
 
+let ( >>??= ) x y =
+  match x with
+  | Ok s -> y s
+  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+
 module Raw_context_tests = struct
   open Sapling_helpers.Common
 
@@ -598,7 +603,7 @@ module Interpreter_tests = struct
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, _ctx, _state) ->
+    >>=? fun (b, _state) ->
     (* we shield again on another block, forging with the empty state *)
     let (list_transac, total) =
       shield
@@ -612,10 +617,9 @@ module Interpreter_tests = struct
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, ctx, state) ->
+    >>=? fun (b, state) ->
     (* address that will receive an unshield *)
-    Alpha_context.Contract.get_balance ctx src1 >>= wrap
-    >>=? fun balance_before_shield ->
+    Context.Contract.balance (B b) src1 >>=? fun balance_before_shield ->
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
     let list_forge_input =
@@ -662,9 +666,8 @@ module Interpreter_tests = struct
     in
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
-    >>=? fun (b, ctx, state) ->
-    Alpha_context.Contract.get_balance ctx src1 >>= wrap
-    >>=? fun balance_after_shield ->
+    >>=? fun (b, state) ->
+    Context.Contract.balance (B b) src1 >>=? fun balance_after_shield ->
     let diff =
       Int64.sub
         (Test_tez.Tez.to_mutez balance_after_shield)
@@ -710,7 +713,7 @@ module Interpreter_tests = struct
     in
     (* b transfers to a with dummy inputs and outputs *)
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
-    >>=? fun (b, _ctx, _state) ->
+    >>=? fun (b, _state) ->
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.Tez.of_int 10 in
@@ -801,7 +804,7 @@ module Interpreter_tests = struct
                   true
               | _ -> false)
             errs) ;
-        ok_unit
+        Result.return_unit
 
   (* In this test we do two transactions in one block and same two in two block.
      We check that the sate is the same expect for roots.
@@ -818,7 +821,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string_1))
     in
     transac_and_sync ~memo_size block_start parameters_1 15 src dst baker
-    >>=? fun (block_1, _ctx, state) ->
+    >>=? fun (block_1, state) ->
     let intermediary_root = Tezos_sapling.Storage.get_root state in
     let addr =
       snd
@@ -845,7 +848,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string_2))
     in
     transac_and_sync ~memo_size block_1 parameters_2 0 src dst baker
-    >>=? fun (block_1, _ctx, state_1) ->
+    >>=? fun (block_1, state_1) ->
     let final_root = Tezos_sapling.Storage.get_root state_1 in
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
@@ -1006,12 +1009,12 @@ module Interpreter_tests = struct
     let ctx_without_gas = Alpha_context.Gas.set_unlimited ctx in
     Alpha_services.Contract.storage Block.rpc_ctxt b dst >>=? fun storage ->
     let storage_lazy_expr = Alpha_context.Script.lazy_expr storage in
-    let tytype =
-      let memo_size = memo_size_of_int memo_size in
-      let open Script_typed_ir in
-      let state_ty = Sapling_state_t (memo_size, None) in
-      Pair_t ((state_ty, None, None), (state_ty, None, None), None)
-    in
+
+    (let memo_size = memo_size_of_int memo_size in
+     let open Script_typed_ir in
+     let state_ty = sapling_state_t ~memo_size ~annot:None in
+     pair_t (-1) (state_ty, None, None) (state_ty, None, None) ~annot:None)
+    >>??= fun tytype ->
     Script_ir_translator.parse_storage
       ctx_without_gas
       ~legacy:true
@@ -1077,75 +1080,57 @@ end
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "commitments_add_uncommitted"
       `Quick
       Raw_context_tests.commitments_add_uncommitted;
-    Test_services.tztest
-      "nullifier_double"
-      `Quick
-      Raw_context_tests.nullifier_double;
-    Test_services.tztest
-      "nullifier_test"
-      `Quick
-      Raw_context_tests.nullifier_test;
-    Test_services.tztest
-      "cm_cipher_test"
-      `Quick
-      Raw_context_tests.cm_cipher_test;
-    Test_services.tztest
+    Tztest.tztest "nullifier_double" `Quick Raw_context_tests.nullifier_double;
+    Tztest.tztest "nullifier_test" `Quick Raw_context_tests.nullifier_test;
+    Tztest.tztest "cm_cipher_test" `Quick Raw_context_tests.cm_cipher_test;
+    Tztest.tztest
       "list_insertion_test"
       `Quick
       Raw_context_tests.list_insertion_test;
-    Test_services.tztest "root" `Quick Raw_context_tests.root_test;
-    Test_services.tztest
+    Tztest.tztest "root" `Quick Raw_context_tests.root_test;
+    Tztest.tztest
       "test_get_memo_size"
       `Quick
       Raw_context_tests.test_get_memo_size;
-    Test_services.tztest
-      "test_verify_memo"
-      `Quick
-      Alpha_context_tests.test_verify_memo;
-    Test_services.tztest
+    Tztest.tztest "test_verify_memo" `Quick Alpha_context_tests.test_verify_memo;
+    Tztest.tztest
       "test_bench_phases"
       `Slow
       Alpha_context_tests.test_bench_phases;
-    Test_services.tztest
+    Tztest.tztest
       "test_bench_fold_over_same_token"
       `Slow
       Alpha_context_tests.test_bench_fold_over_same_token;
-    Test_services.tztest
+    Tztest.tztest
       "test_double_spend_same_input"
       `Quick
       Alpha_context_tests.test_double_spend_same_input;
-    Test_services.tztest
+    Tztest.tztest
       "test_verifyupdate_one_transaction"
       `Quick
       Alpha_context_tests.test_verifyupdate_one_transaction;
-    Test_services.tztest
+    Tztest.tztest
       "test_verifyupdate_two_transactions"
       `Quick
       Alpha_context_tests.test_verifyupdate_two_transactions;
-    Test_services.tztest
-      "test_shielded_tez"
-      `Quick
-      Interpreter_tests.test_shielded_tez;
-    Test_services.tztest
+    Tztest.tztest "test_shielded_tez" `Quick Interpreter_tests.test_shielded_tez;
+    Tztest.tztest
       "test use state from other contract and transact"
       `Quick
       Interpreter_tests.test_use_state_from_other_contract_and_transact;
-    Test_services.tztest
+    Tztest.tztest
       "Instruction PUSH sapling_state 0 should be forbidden"
       `Quick
       Interpreter_tests.test_push_sapling_state_should_be_forbidden;
-    Test_services.tztest
+    Tztest.tztest
       "test_transac_and_block"
       `Quick
       Interpreter_tests.test_transac_and_block;
-    Test_services.tztest "test_drop" `Quick Interpreter_tests.test_drop;
-    Test_services.tztest "test_double" `Quick Interpreter_tests.test_double;
-    Test_services.tztest
-      "test_state_as_arg"
-      `Quick
-      Interpreter_tests.test_state_as_arg;
+    Tztest.tztest "test_drop" `Quick Interpreter_tests.test_drop;
+    Tztest.tztest "test_double" `Quick Interpreter_tests.test_double;
+    Tztest.tztest "test_state_as_arg" `Quick Interpreter_tests.test_state_as_arg;
   ]

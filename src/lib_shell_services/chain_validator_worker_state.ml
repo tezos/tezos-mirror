@@ -68,6 +68,7 @@ module Event = struct
       }
     | Notify_branch of P2p_peer.Id.t
     | Notify_head of P2p_peer.Id.t
+    | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped
@@ -92,7 +93,8 @@ module Event = struct
     | Could_not_switch_testchain _ -> Internal_event.Error
     | Notify_head _ -> Internal_event.Debug
     | Notify_branch _ -> Internal_event.Info
-    | Disconnection _ | Bootstrapped -> Internal_event.Notice
+    | Connection _ | Disconnection _ -> Internal_event.Info
+    | Bootstrapped -> Internal_event.Notice
     | Sync_status sync_status -> (
         match sync_status with
         | Synchronised {is_chain_stuck} ->
@@ -102,6 +104,23 @@ module Event = struct
     | Bootstrap_active_peers _ -> Internal_event.Debug
     | Bootstrap_active_peers_heads_time _ -> Internal_event.Debug
     | Request_failure _ -> Internal_event.Notice
+
+  let update_encoding =
+    let open Data_encoding in
+    def
+      "chain_update"
+      ~description:
+        "If 'ignored', the new validated block is ignored since the current \
+         head fitness is better. If 'branch', we have set our head to a new \
+         validated block which is not the direct successor of the previous \
+         head. If 'increment', the new validated head is the direct successor \
+         of the previous head."
+      (string_enum
+         [
+           ("ignored", Ignored_head);
+           ("branch", Branch_switch);
+           ("increment", Head_increment);
+         ])
 
   let sync_status_encoding =
     let open Data_encoding in
@@ -129,20 +148,16 @@ module Event = struct
         case
           (Tag 0)
           ~title:"Processed_block"
-          (obj6
-             (req "request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding)
+          (obj1
              (req
-                "outcome"
-                (string_enum
-                   [
-                     ("ignored", Ignored_head);
-                     ("branch", Branch_switch);
-                     ("increment", Head_increment);
-                   ]))
-             (req "fitness" Fitness.encoding)
-             (req "level" int32)
-             (req "timestamp" Time.Protocol.encoding))
+                "processed_block"
+                (obj6
+                   (req "request" Request.encoding)
+                   (req "status" Worker_types.request_status_encoding)
+                   (req "outcome" update_encoding)
+                   (req "fitness" Fitness.encoding)
+                   (req "level" int32)
+                   (req "timestamp" Time.Protocol.encoding))))
           (function
             | Processed_block
                 {request; request_status; update; fitness; level; timestamp} ->
@@ -154,13 +169,13 @@ module Event = struct
         case
           (Tag 1)
           ~title:"Could_not_switch_testchain"
-          RPC_error.encoding
+          (obj1 (req "could_not_switch_testchain" RPC_error.encoding))
           (function Could_not_switch_testchain err -> Some err | _ -> None)
           (fun err -> Could_not_switch_testchain err);
         case
           (Tag 2)
           ~title:"Bootstrapped"
-          unit
+          (obj1 (req "bootstrapped" unit))
           (function Bootstrapped -> Some () | _ -> None)
           (fun () -> Bootstrapped);
         case
@@ -172,7 +187,10 @@ module Event = struct
         case
           (Tag 4)
           ~title:"Bootstrap_active_peers"
-          (obj2 (req "active" int31) (req "needed" int31))
+          (obj1
+             (req
+                "bootstrap_active_peers"
+                (obj2 (req "active" int31) (req "needed" int31))))
           (function
             | Bootstrap_active_peers {active; needed} -> Some (active, needed)
             | _ -> None)
@@ -180,10 +198,13 @@ module Event = struct
         case
           (Tag 5)
           ~title:"Bootstrap_active_peers_heads_time"
-          (obj3
-             (req "min_head_time" Time.Protocol.encoding)
-             (req "max_head_time" Time.Protocol.encoding)
-             (req "most_recent_validation" Time.Protocol.encoding))
+          (obj1
+             (req
+                "bootstrap_active_peers_head_time"
+                (obj3
+                   (req "min_head_time" Time.Protocol.encoding)
+                   (req "max_head_time" Time.Protocol.encoding)
+                   (req "most_recent_validation" Time.Protocol.encoding))))
           (function
             | Bootstrap_active_peers_heads_time
                 {min_head_time; max_head_time; most_recent_validation} ->
@@ -195,31 +216,51 @@ module Event = struct
         case
           (Tag 6)
           ~title:"notify_branch"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (obj1
+             (req "notify_branch" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
           (function Notify_branch peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Notify_branch peer_id);
         case
           (Tag 7)
           ~title:"notify_head"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (obj1 (req "notify_head" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
           (function Notify_head peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Notify_head peer_id);
         case
           (Tag 8)
           ~title:"disconnection"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
-          (function Disconnection peer_id -> Some peer_id | _ -> None)
-          (fun peer_id -> Disconnection peer_id);
+          (obj1
+             (req
+                "disconnection"
+                (obj2
+                   (req "kind" Data_encoding.string)
+                   (req "peer_id" P2p_peer.Id.encoding))))
+          (function
+            | Disconnection peer_id -> Some ("disconnection", peer_id)
+            | _ -> None)
+          (fun (_, peer_id) -> Disconnection peer_id);
         case
           (Tag 9)
           ~title:"request_failure"
-          (obj3
-             (req "failed_validation" Request.encoding)
-             (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+          (obj1
+             (req
+                "request_failure"
+                (obj3
+                   (req "failed_validation" Request.encoding)
+                   (req "status" Worker_types.request_status_encoding)
+                   (dft "errors" RPC_error.encoding []))))
           (function
             | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Request_failure (r, s, err));
+        case
+          (Tag 10)
+          ~title:"connection"
+          (obj2
+             (req "kind" Data_encoding.string)
+             (req "peer_id" P2p_peer.Id.encoding))
+          (function
+            | Connection peer_id -> Some ("connection", peer_id) | _ -> None)
+          (fun (_, peer_id) -> Connection peer_id);
       ]
 
   let sync_status_to_string = function
@@ -258,6 +299,8 @@ module Event = struct
         Format.fprintf ppf "Notify branch from %a" P2p_peer.Id.pp peer_id
     | Notify_head peer_id ->
         Format.fprintf ppf "Notify head from %a" P2p_peer.Id.pp peer_id
+    | Connection peer_id ->
+        Format.fprintf ppf "Connection of %a" P2p_peer.Id.pp peer_id
     | Disconnection peer_id ->
         Format.fprintf ppf "Disconnection of %a" P2p_peer.Id.pp peer_id
     | Could_not_switch_testchain err ->
@@ -297,27 +340,6 @@ module Event = struct
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
           errs
-end
-
-module Worker_state = struct
-  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {bootstrapped; active_peers} -> (bootstrapped, active_peers))
-      (fun (bootstrapped, active_peers) -> {bootstrapped; active_peers})
-      (obj2
-         (req "bootstrapped" bool)
-         (req "active_peers" (list P2p_peer.Id.encoding)))
-
-  let pp ppf {bootstrapped; active_peers} =
-    Format.fprintf
-      ppf
-      "@[<v 0>Network is%s bootstrapped.@,@[<v 2>Active peers:%a@]@]"
-      (if bootstrapped then "" else " not yet")
-      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
-      active_peers
 end
 
 module Distributed_db_state = struct

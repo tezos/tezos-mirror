@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import itertools
 from typing import List, Union, Any
 import pytest
@@ -15,6 +14,14 @@ from .contract_paths import (
     all_contracts,
     all_legacy_contracts,
 )
+
+
+ID_SCRIPT_LITERAL = '''
+parameter unit; storage unit; code {CAR; NIL operation; PAIR}
+'''.strip()
+ID_SCRIPT_HASH = '''
+exprtpyospPfMqcARmu5FGukprC7kbbe4jb4zxFd4Gxrp2vcCPjRNa
+'''.strip()
 
 
 @pytest.mark.contract
@@ -261,56 +268,6 @@ class TestManager:
             'manager', 'rooted_target', ['--arg', arg, '--entrypoint', 'root']
         )
         utils.bake(client, 'bootstrap5')
-
-    def test_transfer_json_to_entrypoint_with_args(self, client):
-        balance = client.get_mutez_balance('manager')
-        balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.0123
-        fee_mutez = utils.mutez_of_tez(fee)
-        json_obj = [
-            {
-                "destination": "target",
-                "amount": "0",
-                "fee": str(fee),
-                "gas-limit": "65942",
-                "storage-limit": "1024",
-                "arg": 'Pair "hello" 42',
-                "entrypoint": "add_left",
-            }
-        ]
-        json_ops = json.dumps(json_obj, separators=(',', ':'))
-        client.run(client.cmd_batch('manager', json_ops))
-        utils.bake(client, 'bootstrap5')
-        new_balance = client.get_mutez_balance('manager')
-        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        assert balance == new_balance
-        assert balance_bootstrap - fee_mutez == new_balance_bootstrap
-
-    def test_multiple_transfers(self, client):
-        balance = client.get_mutez_balance('manager')
-        balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
-        balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        amount_2 = 10.1
-        amount_mutez_2 = utils.mutez_of_tez(amount_2)
-        amount_3 = 11.01
-        amount_mutez_3 = utils.mutez_of_tez(amount_3)
-        json_obj = [
-            {"destination": "bootstrap2", "amount": str(amount_2)},
-            {"destination": "bootstrap3", "amount": str(amount_3)},
-        ]
-        json_ops = json.dumps(json_obj, separators=(',', ':'))
-        client.run(client.cmd_batch('manager', json_ops))
-        utils.bake(client, 'bootstrap5')
-        new_balance = client.get_mutez_balance('manager')
-        new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
-        new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 691 + 595
-        assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
-        assert (
-            balance_bootstrap2 + amount_mutez_2 - fee_mutez
-            == new_balance_bootstrap2
-        )
-        assert balance_bootstrap3 + amount_mutez_3 == new_balance_bootstrap3
 
 
 # This test to verifies contract execution order. There are 3
@@ -699,6 +656,7 @@ SECOND_EXPLOSION = '''
 '''
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestGasBound:
     def test_write_contract(self, tmpdir, session: dict):
@@ -796,6 +754,7 @@ class TestGasBound:
             client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestChainId:
     def test_chain_id_opcode(self, client: Client, session: dict):
@@ -839,6 +798,7 @@ class TestChainId:
         utils.bake(client, 'bootstrap5')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestBigMapToSelf:
     def test_big_map_to_self_origination(self, client: Client, session: dict):
@@ -854,6 +814,7 @@ class TestBigMapToSelf:
         utils.bake(client, 'bootstrap5')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestNonRegression:
     """Test contract-related non-regressions"""
@@ -866,6 +827,7 @@ class TestNonRegression:
         assert client.get_balance('bug_262') == 1
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestMiniScenarios:
     """Test mini scenarios"""
@@ -1429,6 +1391,7 @@ code { CAR; UNPACK (lambda unit unit); NIL operation; PAIR}
 '''
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestBadAnnotation:
     def test_write_contract_bad_annot(self, tmpdir, session: dict):
@@ -1478,6 +1441,7 @@ class TestOrderInTopLevelDoesNotMatter:
             client.typecheck(contract, file=False)
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 @pytest.mark.regression
 class TestSelfAddressTransfer:
@@ -1516,13 +1480,24 @@ class TestSelfAddressTransfer:
 @pytest.mark.contract
 @pytest.mark.regression
 class TestScriptHashRegression:
-    @pytest.mark.parametrize("contract", all_contracts())
-    def test_contract_hash(self, client_regtest: Client, contract):
-        client = client_regtest
-        assert contract.endswith(
-            '.tz'
-        ), "test contract should have .tz extension"
-        client.hash_script(os.path.join(CONTRACT_PATH, contract))
+    @pytest.mark.parametrize(
+        "client_regtest_custom_scrubber",
+        [[(re.escape(CONTRACT_PATH), '[CONTRACT_PATH]')]],
+        indirect=True,
+    )
+    def test_contract_hash(self, client_regtest_custom_scrubber: Client):
+        client = client_regtest_custom_scrubber
+        contracts = all_contracts()
+        contracts.sort()
+        for contract in contracts:
+            assert contract.endswith(
+                '.tz'
+            ), "test contract should have .tz extension"
+
+        client.hash_script(
+            [os.path.join(CONTRACT_PATH, contract) for contract in contracts],
+            display_names=True,
+        )
 
 
 @pytest.mark.contract
@@ -1530,7 +1505,7 @@ class TestScriptHashOrigination:
     def test_contract_hash_with_origination(
         self, client: Client, session: dict
     ):
-        script = 'parameter unit; storage unit; code {CAR; NIL operation; PAIR}'
+        script = ID_SCRIPT_LITERAL
         originate(
             client,
             session,
@@ -1539,9 +1514,88 @@ class TestScriptHashOrigination:
             amount=1000,
             contract_name='dummy_contract',
         )
-        hash1 = client.hash_script(script)
+        [(hash1, _)] = client.hash_script([script])
         hash2 = client.get_script_hash('dummy_contract')
         assert hash1 == hash2
+
+
+@pytest.mark.contract
+class TestScriptHashMultiple:
+    """Test tezos-client hash script with diffent number and type of
+    arguments"""
+
+    def test_contract_hashes_empty(self, client: Client):
+        assert client.hash_script([]) == []
+
+    def test_contract_hashes_single(self, client: Client):
+        assert client.hash_script([ID_SCRIPT_LITERAL]) == [
+            (ID_SCRIPT_HASH, None)
+        ]
+
+    def test_contract_hashes_single_display_names(self, client: Client):
+        assert client.hash_script([ID_SCRIPT_LITERAL], display_names=True,) == [
+            (
+                ID_SCRIPT_HASH,
+                'Literal script 1',
+            )
+        ]
+
+    def test_contract_hashes_mixed(self, client: Client):
+        contract_path = os.path.join(CONTRACT_PATH, 'attic', 'empty.tz')
+        script_empty_hash = '''
+expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
+        '''.strip()
+        with open(contract_path, 'r') as contract_file:
+            script = contract_file.read()
+
+            hashes = client.hash_script([contract_path, script])
+
+            assert hashes == [
+                (
+                    script_empty_hash,
+                    None,
+                ),
+                (
+                    script_empty_hash,
+                    None,
+                ),
+            ]
+
+            hashes = client.hash_script(
+                [contract_path, script], display_names=True
+            )
+
+            assert hashes == [
+                (
+                    script_empty_hash,
+                    contract_path,
+                ),
+                (
+                    script_empty_hash,
+                    'Literal script 2',
+                ),
+            ]
+
+    @pytest.mark.parametrize(
+        "for_script, display_names, results",
+        [
+            ('csv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
+            ('csv', False, (ID_SCRIPT_HASH, None)),
+            ('tsv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
+            ('tsv', False, (ID_SCRIPT_HASH, None)),
+        ],
+    )
+    def test_contract_hashes_for_script(
+        self, client: Client, for_script, display_names, results
+    ):
+        assert (
+            client.hash_script(
+                [ID_SCRIPT_LITERAL],
+                display_names=display_names,
+                for_script=for_script,
+            )
+            == [results]
+        )
 
 
 @pytest.mark.contract
@@ -1617,3 +1671,231 @@ class TestTZIP4View:
         )
 
         assert const_view_res.result == "5\n" and add_view_res.result == "4\n"
+
+
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestBadIndentation:
+    """Tests for the "hash script" and "convert script" commands on
+    badly-indented scripts."""
+
+    BADLY_INDENTED = os.path.join(ILLTYPED_CONTRACT_PATH, 'badly_indented.tz')
+
+    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
+
+    def test_bad_indentation_ill_typed(self, client):
+        with utils.assert_run_failure('syntax error in program'):
+            client.typecheck(self.BADLY_INDENTED)
+
+    def test_bad_indentation_hash(self, client):
+        assert client.hash_script([self.BADLY_INDENTED]) == [
+            (self.SCRIPT_HASH, None)
+        ]
+
+    def test_formatting(self, client, session):
+        session['formatted_script'] = client.convert_script(
+            self.BADLY_INDENTED, 'Michelson', 'Michelson'
+        )
+
+    def test_formatted_hash(self, client, session):
+        assert client.hash_script([session['formatted_script']]) == [
+            (self.SCRIPT_HASH, None)
+        ]
+
+    def test_formatted_typechecks(self, client, session):
+        client.typecheck(session['formatted_script'], file=False)
+
+
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestContractTypeChecking:
+    """Typechecking tests for the address and (contract _) types."""
+
+    def check_address(self, client, address):
+        """An address followed by an entrypoint typechecks at type address if
+        and only if the entrypoint is not "default"."""
+
+        address_a = f'"{address}%a"'
+        address_opt = client.normalize(
+            f'"{address}"', 'address', 'Optimized'
+        ).strip()
+        address_opt_a = client.normalize(
+            address_a, 'address', 'Optimized'
+        ).strip()
+
+        client.typecheck_data(f'"{address}"', 'address')
+        client.typecheck_data(f'{address_a}', 'address')
+        client.typecheck_data(f'{address_opt}', 'address')
+        client.typecheck_data(f'{address_opt_a}', 'address')
+
+        unexpected_annotation_error = "unexpected annotation."
+
+        with utils.assert_run_failure(unexpected_annotation_error):
+            client.typecheck_data(f'"{address}%default"', 'address')
+
+        # 64656661756c74 is "default" in hexa
+        with utils.assert_run_failure(unexpected_annotation_error):
+            client.typecheck_data(address_opt + '64656661756c74', 'address')
+
+    def check_contract_ok(self, client, address, entrypoint, typ):
+        """Helper to check that an address followed by an entrypoint typechecks
+        at type (contract typ) using both readable and optimised
+        representations."""
+
+        address_readable = f'"{address}"'
+        if entrypoint is not None:
+            address_readable = f'"{address}%{entrypoint}"'
+
+        address_opt = client.normalize(
+            address_readable, 'address', 'Optimized'
+        ).strip()
+
+        client.typecheck_data(address_readable, f'contract ({typ})')
+        client.typecheck_data(address_opt, f'contract ({typ})')
+
+        client.run_script(
+            f"""
+parameter unit;
+storage address;
+code {{
+        CDR;
+        CONTRACT ({typ});
+        ASSERT_SOME;
+        ADDRESS;
+        NIL operation;
+        PAIR }}""",
+            address_readable,
+            'Unit',
+            file=False,
+        )
+
+    def check_contract_ko(
+        self, client, address, entrypoint, typ, expected_error
+    ):
+        """Helper to check that an address followed by an entrypoint does not
+        typecheck at type (contract typ) using both readable and optimised
+        representations."""
+
+        address_readable = f'"{address}"'
+        if entrypoint is not None:
+            address_readable = f'"{address}%{entrypoint}"'
+
+        address_opt = client.normalize(
+            address_readable, 'address', 'Optimized'
+        ).strip()
+
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data(address_readable, f'contract ({typ})')
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data(address_opt, f'contract ({typ})')
+
+        client.run_script(
+            f"""
+parameter unit;
+storage address;
+code {{
+        CDR;
+        DUP;
+        CONTRACT ({typ});
+        ASSERT_NONE;
+        NIL operation;
+        PAIR }}""",
+            address_readable,
+            'Unit',
+            file=False,
+        )
+
+    def test_implicit(self, client):
+        """The address of an implicit account followed by some entrypoint
+        typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if the entrypoint is empty and ty is unit."""
+
+        tz1 = 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx'
+
+        self.check_address(client, tz1)
+        self.check_contract_ok(client, tz1, None, 'unit')
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        type_mismatch_error = 'Type nat is not compatible with type unit.'
+        self.check_contract_ko(client, tz1, 'a', 'unit', no_entrypoint_error)
+        self.check_contract_ko(client, tz1, 'a', 'nat', type_mismatch_error)
+        self.check_contract_ko(client, tz1, None, 'nat', type_mismatch_error)
+
+    def test_originated_inexistent(self, client):
+        """The address of an inexistent originated account followed by some
+        entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at no (contract _) type."""
+
+        kt1 = 'KT1RvwLgpxVv9ANCKsDb5vBgTaZRG1W4bKWP'
+
+        self.check_address(client, kt1)
+
+        invalid_contract_error = 'invalid contract.'
+        self.check_contract_ko(
+            client, kt1, None, 'unit', invalid_contract_error
+        )
+        self.check_contract_ko(client, kt1, 'a', 'unit', invalid_contract_error)
+        self.check_contract_ko(client, kt1, None, 'nat', invalid_contract_error)
+        self.check_contract_ko(client, kt1, 'a', 'nat', invalid_contract_error)
+
+    def test_originated_no_default(self, client, session):
+        """The address of an existent originated account that does not specify
+        a default entrypoint followed by some entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if
+          - the entrypoint is empty and <ty> is the root type
+          - the entrypoint is non-empty, one of the declared entrypoints, and
+            <ty> is the type associated to that entrypoint."""
+
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'simple_entrypoints.tz'
+        )
+        origination = originate(client, session, path, 'Unit', 0)
+        kt1 = origination.contract
+        root_type = 'or (unit %A) (or (string %B) (nat %C))'
+        a_type = 'unit'
+        b_type = 'string'
+
+        self.check_address(client, kt1)
+        self.check_contract_ok(client, kt1, None, root_type)
+        self.check_contract_ok(client, kt1, 'A', a_type)
+        self.check_contract_ok(client, kt1, 'B', b_type)
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        self.check_contract_ko(client, kt1, 'a', a_type, no_entrypoint_error)
+
+    def test_originated_with_default(self, client, session):
+        """The address of an existent originated account that specifies
+        a default entrypoint followed by some entrypoint typechecks:
+        - at type address if the entrypoint is not "default",
+        - at type (contract <ty>) if
+          - the entrypoint is empty and <ty> is the type of the default
+            entrypoint
+          - the entrypoint is non-empty, one of the declared entrypoints, and
+            <ty> is the type associated to that entrypoint."""
+
+        path = os.path.join(
+            CONTRACT_PATH, 'entrypoints', 'delegatable_target.tz'
+        )
+        initial_storage = 'Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "" 0'
+        origination = originate(client, session, path, initial_storage, 0)
+        kt1 = origination.contract
+        root_type = (
+            'or (or (key_hash %set_delegate) (unit %remove_delegate))'
+            '(or %default string nat)'
+        )
+        default_type = 'or string nat'
+
+        self.check_address(client, kt1)
+        self.check_contract_ok(client, kt1, None, default_type)
+        self.check_contract_ok(client, kt1, 'set_delegate', 'key_hash')
+
+        no_entrypoint_error = 'Contract has no entrypoint named a'
+        self.check_contract_ko(client, kt1, 'a', root_type, no_entrypoint_error)
+
+        type_mismatch_error = 'is not compatible with type'
+        self.check_contract_ko(
+            client, kt1, None, root_type, type_mismatch_error
+        )

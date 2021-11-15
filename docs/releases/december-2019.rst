@@ -1,5 +1,3 @@
-.. _mainnet-december-2019:
-
 Mainnet December 2019
 =====================
 

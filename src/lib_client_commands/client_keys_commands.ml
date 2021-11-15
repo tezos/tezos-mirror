@@ -207,7 +207,7 @@ let fail_if_already_registered cctxt force pk_uri name =
   | Some (pk_uri_found, _) ->
       fail_unless
         (pk_uri = pk_uri_found || force)
-        (failure
+        (error_of_fmt
            "public and secret keys '%s' don't correspond, please don't use \
             --force"
            name)
@@ -461,8 +461,7 @@ let commands network : Client_context.full Clic.command list =
           alias_keys cctxt name >>=? fun key_info ->
           match key_info with
           | None ->
-              cctxt#message "No keys found for address" >>= fun () ->
-              return_unit
+              cctxt#error "No keys found for address" >>= fun () -> return_unit
           | Some (pkh, pk, skloc) -> (
               cctxt#message "Hash: %a" Signature.Public_key_hash.pp pkh
               >>= fun () ->
@@ -494,7 +493,7 @@ let commands network : Client_context.full Clic.command list =
           Public_key.mem cctxt name >>=? fun has_public_key ->
           fail_when
             ((not force) && (has_secret_key || has_public_key))
-            (failure
+            (error_of_fmt
                "secret or public key present for %s, use --force to delete"
                name)
           >>=? fun () ->
@@ -514,7 +513,7 @@ let commands network : Client_context.full Clic.command list =
         (fun force (cctxt : Client_context.full) ->
           fail_unless
             force
-            (failure "this can only be used with option --force")
+            (error_of_fmt "this can only be used with option --force")
           >>=? fun () ->
           Public_key.set cctxt [] >>=? fun () ->
           Secret_key.set cctxt [] >>=? fun () -> Public_key_hash.set cctxt []);
@@ -532,7 +531,9 @@ let commands network : Client_context.full Clic.command list =
         (fun () (name, _pkh) data (cctxt : Client_context.full) ->
           let data = Bytes.of_string data in
           Secret_key.mem cctxt name >>=? fun sk_present ->
-          fail_unless sk_present (failure "secret key not present for %s" name)
+          fail_unless
+            sk_present
+            (error_of_fmt "secret key not present for %s" name)
           >>=? fun () ->
           Secret_key.find cctxt name >>=? fun sk_uri ->
           Client_keys.deterministic_nonce sk_uri data >>=? fun nonce ->
@@ -553,7 +554,9 @@ let commands network : Client_context.full Clic.command list =
         (fun () (name, _pkh) data (cctxt : Client_context.full) ->
           let data = Bytes.of_string data in
           Secret_key.mem cctxt name >>=? fun sk_present ->
-          fail_unless sk_present (failure "secret key not present for %s" name)
+          fail_unless
+            sk_present
+            (error_of_fmt "secret key not present for %s" name)
           >>=? fun () ->
           Secret_key.find cctxt name >>=? fun sk_uri ->
           Client_keys.deterministic_nonce_hash sk_uri data
@@ -658,7 +661,7 @@ let commands network : Client_context.full Clic.command list =
         (fun force (name, _key) (cctxt : #Client_context.full) ->
           fail_unless
             force
-            (failure "this can only be used with option --force")
+            (error_of_fmt "this can only be used with option --force")
           >>=? fun () ->
           PVSS_public_key.del cctxt name >>=? fun () ->
           PVSS_secret_key.del cctxt name);
@@ -675,7 +678,7 @@ let commands network : Client_context.full Clic.command list =
         (fun force (cctxt : #Client_context.full) ->
           fail_unless
             force
-            (failure "this can only be used with option --force")
+            (error_of_fmt "this can only be used with option --force")
           >>=? fun () ->
           PVSS_public_key.set cctxt [] >>=? fun () ->
           PVSS_secret_key.set cctxt []);

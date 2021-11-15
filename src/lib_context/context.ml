@@ -5,6 +5,7 @@
 (* Copyright (c) 2018-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2018-2020 Tarides <contact@tarides.com>                     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 DaiLambda, Inc. <contact@dailambda.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -112,6 +113,13 @@ let reporter () =
 
 let index_log_size = ref None
 
+let auto_flush = ref 10_000
+(* This limit ensures that no trees with more than [auto_flush]
+   mutations can exist in memory, bounding the memory usage of a
+   single commit performed by a read-write process. As a trade-off,
+   the intermediate flushed trees to the store might be unused and
+   will have to be garbage collected later on to save space. *)
+
 let () =
   let verbose_info () =
     Logs.set_level (Some Logs.Info) ;
@@ -122,6 +130,7 @@ let () =
     Logs.set_reporter (reporter ())
   in
   let index_log_size n = index_log_size := Some (int_of_string n) in
+  let auto_flush n = auto_flush := int_of_string n in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -133,6 +142,7 @@ let () =
           | v -> (
               match String.split '=' v with
               | ["index-log-size"; n] -> index_log_size n
+              | ["auto-flush"; n] -> auto_flush n
               | _ -> ()))
         args
 
@@ -165,7 +175,13 @@ type index = {
   readonly : bool;
 }
 
-and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
+and context = {
+  index : index;
+  parents : Store.Commit.t list;
+  tree : Store.tree;
+  (* number of [remove], [add_tree] and [add] calls, not yet flushed *)
+  ops : int;
+}
 
 type t = context
 
@@ -185,17 +201,6 @@ let current_predecessor_block_metadata_hash_key =
 let current_predecessor_ops_metadata_hash_key =
   ["predecessor_ops_metadata_hash"]
 
-let restore_integrity ?ppf index =
-  match Store.integrity_check ?ppf ~auto_repair:true index.repo with
-  | Ok (`Fixed n) -> Ok (Some n)
-  | Ok `No_error -> Ok None
-  | Error (`Cannot_fix msg) -> error (failure "%s" msg)
-  | Error (`Corrupted n) ->
-      error
-        (failure
-           "unable to fix the corrupted context: %d bad entries detected"
-           n)
-
 let sync index =
   if index.readonly then Store.sync index.repo ;
   Lwt.return ()
@@ -211,7 +216,7 @@ let checkout index key =
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
   >|= Option.map (fun commit ->
           let tree = Store.Commit.tree commit in
-          {index; tree; parents = [commit]})
+          {index; tree; parents = [commit]; ops = 0})
 
 let checkout_exn index key =
   checkout index key >>= function
@@ -234,15 +239,21 @@ let unshallow context =
               >|= fun _ -> ())
         children)
 
+let get_hash_version _c = Context_hash.Version.of_int 0
+
+let set_hash_version c v =
+  if Context_hash.Version.(of_int 0 = v) then return c
+  else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
+
 let raw_commit ~time ?(message = "") context =
   let info =
     Info.v ~author:"Tezos" ~date:(Time.Protocol.to_seconds time) message
   in
   let parents = List.map Store.Commit.hash context.parents in
   unshallow context >>= fun () ->
-  Store.Commit.v context.index.repo ~info ~parents context.tree >|= fun h ->
+  Store.Commit.v context.index.repo ~info ~parents context.tree >|= fun c ->
   Store.Tree.clear context.tree ;
-  h
+  c
 
 let hash ~time ?(message = "") context =
   let info =
@@ -281,19 +292,34 @@ let list ctxt ?offset ?length key =
 
 let find ctxt key = raw_find ctxt (data_key key)
 
+let incr_ops ctxt = {ctxt with ops = ctxt.ops + 1}
+
 let raw_add ctxt key data =
-  Tree.add ctxt.tree key data >|= fun tree -> {ctxt with tree}
+  Tree.add ctxt.tree key data >|= fun tree -> incr_ops {ctxt with tree}
 
 let add ctxt key data = raw_add ctxt (data_key key) data
 
-let raw_remove ctxt k = Tree.remove ctxt.tree k >|= fun tree -> {ctxt with tree}
+let raw_remove ctxt k =
+  Tree.remove ctxt.tree k >|= fun tree -> incr_ops {ctxt with tree}
 
 let remove ctxt key = raw_remove ctxt (data_key key)
 
 let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
 
+let flush context =
+  P.Repo.batch context.index.repo (fun x y _ ->
+      Store.save_tree ~clear:true context.index.repo x y context.tree)
+  >|= fun _ -> {context with ops = 0}
+
+let may_flush context =
+  if (not context.index.readonly) && context.ops >= !auto_flush then
+    flush context
+  else Lwt.return context
+
 let add_tree ctxt key tree =
-  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
+  may_flush ctxt >>= fun ctxt ->
+  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree ->
+  incr_ops {ctxt with tree}
 
 let fold ?depth ctxt key ~init ~f =
   Tree.fold ?depth ctxt.tree (data_key key) ~init ~f
@@ -470,8 +496,8 @@ let add_predecessor_ops_metadata_hash v hash =
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ?(readonly = false) root =
-  Store.Repo.v
-    (Irmin_pack.config ~readonly ?index_log_size:!index_log_size root)
+  let index_log_size = Option.value ~default:2_500_000 !index_log_size in
+  Store.Repo.v (Irmin_pack.config ~readonly ~index_log_size root)
   >|= fun repo -> {path = root; repo; patch_context; readonly}
 
 let close index = Store.Repo.close index.repo
@@ -480,7 +506,7 @@ let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = Store.Tree.empty in
-  let ctxt = {index; tree; parents = []} in
+  let ctxt = {index; tree; parents = []; ops = 0} in
   (match index.patch_context with
   | None -> return ctxt
   | Some patch_context -> patch_context ctxt)
@@ -551,7 +577,25 @@ module Dumpable_context = struct
 
   type tree = Store.tree
 
-  type hash = [`Blob of Store.hash | `Node of Store.hash]
+  type hash = Store.hash
+
+  module Kinded_hash = struct
+    type t = [`Blob of hash | `Node of hash]
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
+      conv
+        (function
+          | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
+          | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
+        (function
+          | (`Blob, h) ->
+              `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
+          | (`Node, h) ->
+              `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
+        (obj2 (req "kind" kind_encoding) (req "value" bytes))
+  end
 
   type commit_info = Info.t
 
@@ -572,20 +616,6 @@ module Dumpable_context = struct
         (author, message, date))
       (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
-
-  let hash_encoding : hash Data_encoding.t =
-    let open Data_encoding in
-    let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
-    conv
-      (function
-        | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
-        | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
-      (function
-        | (`Blob, h) ->
-            `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
-        | (`Node, h) ->
-            `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
-      (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
   let hash_equal (h1 : hash) (h2 : hash) = h1 = h2
 
@@ -612,12 +642,6 @@ module Dumpable_context = struct
 
   let context_tree ctxt = ctxt.tree
 
-  let tree_hash tree =
-    let hash = Store.Tree.hash tree in
-    match Store.Tree.destruct tree with
-    | `Node _ -> `Node hash
-    | `Contents _ -> `Blob hash
-
   type binding = {
     key : string;
     value : tree;
@@ -638,34 +662,42 @@ module Dumpable_context = struct
                    iterating over existing keys *)
                assert false
            | Some value_kind ->
-               let value_hash = tree_hash value in
+               let value_hash = Store.Tree.hash value in
                {key; value; value_kind; value_hash})
     >|= fun bindings ->
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
       >>= List.map_s (fun {key; value; value_hash; value_kind} ->
-              let kv = (key, value_hash) in
+              let kinded_value_hash =
+                match value_kind with
+                | `Node -> `Node value_hash
+                | `Contents -> `Blob value_hash
+              in
+              let kv = (key, kinded_value_hash) in
               if visited value_hash then Lwt.return kv
               else
                 match value_kind with
@@ -684,7 +716,8 @@ module Dumpable_context = struct
     in
     aux tree Fun.id >>= fun () -> Lwt.return !total_visited
 
-  let make_context index = {index; tree = Store.Tree.empty; parents = []}
+  let make_context index =
+    {index; tree = Store.Tree.empty; parents = []; ops = 0}
 
   let update_context context tree = {context with tree}
 
@@ -895,7 +928,25 @@ module Dumpable_context_legacy = struct
 
   type tree = Store.tree
 
-  type hash = [`Blob of Store.hash | `Node of Store.hash]
+  type hash = Store.hash
+
+  module Kinded_hash = struct
+    type t = [`Blob of hash | `Node of hash]
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
+      conv
+        (function
+          | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
+          | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
+        (function
+          | (`Blob, h) ->
+              `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
+          | (`Node, h) ->
+              `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
+        (obj2 (req "kind" kind_encoding) (req "value" bytes))
+  end
 
   type commit_info = Info.t
 
@@ -916,20 +967,6 @@ module Dumpable_context_legacy = struct
         (author, message, date))
       (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
-
-  let hash_encoding : hash Data_encoding.t =
-    let open Data_encoding in
-    let kind_encoding = string_enum [("node", `Node); ("blob", `Blob)] in
-    conv
-      (function
-        | `Blob h -> (`Blob, Context_hash.to_bytes (Hash.to_context_hash h))
-        | `Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
-      (function
-        | (`Blob, h) ->
-            `Blob (Hash.of_context_hash (Context_hash.of_bytes_exn h))
-        | (`Node, h) ->
-            `Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
-      (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
   let hash_equal (h1 : hash) (h2 : hash) = h1 = h2
 
@@ -959,12 +996,6 @@ module Dumpable_context_legacy = struct
 
   let context_tree ctxt = ctxt.tree
 
-  let tree_hash tree =
-    let hash = Store.Tree.hash tree in
-    match Store.Tree.destruct tree with
-    | `Node _ -> `Node hash
-    | `Contents _ -> `Blob hash
-
   type binding = {
     key : string;
     value : tree;
@@ -985,34 +1016,42 @@ module Dumpable_context_legacy = struct
                   iterating over existing keys *)
                assert false
            | Some value_kind ->
-               let value_hash = tree_hash value in
+               let value_hash = Store.Tree.hash value in
                {key; value; value_kind; value_hash})
     >|= fun bindings ->
     Store.Tree.clear tree ;
     bindings
 
-  module Hashtbl = Hashtbl.MakeSeeded (struct
-    type t = hash
+  module Hashset = struct
+    module String_set = Utils.String_set
 
-    let hash = Hashtbl.seeded_hash
+    let create () =
+      String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
 
-    let equal = hash_equal
-  end)
+    let mem t h = String_set.mem t (Hash.to_raw_string h)
+
+    let add t h = String_set.add t (Hash.to_raw_string h)
+  end
 
   let tree_iteri_unique f tree =
     let total_visited = ref 0 in
     (* Noting the visited hashes *)
-    let visited_hash = Hashtbl.create 1000 in
-    let visited h = Hashtbl.mem visited_hash h in
+    let visited_hash = Hashset.create () in
+    let visited h = Hashset.mem visited_hash h in
     let set_visit h =
       incr total_visited ;
-      Hashtbl.add visited_hash h ()
+      Hashset.add visited_hash h
     in
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
       >>= List.map_s (fun {key; value; value_hash; value_kind} ->
-              let kv = (key, value_hash) in
+              let kinded_value_hash =
+                match value_kind with
+                | `Node -> `Node value_hash
+                | `Contents -> `Blob value_hash
+              in
+              let kv = (key, kinded_value_hash) in
               if visited value_hash then Lwt.return kv
               else
                 match value_kind with
@@ -1031,7 +1070,8 @@ module Dumpable_context_legacy = struct
     in
     aux tree Fun.id
 
-  let make_context index = {index; tree = Store.Tree.empty; parents = []}
+  let make_context index =
+    {index; tree = Store.Tree.empty; parents = []; ops = 0}
 
   let update_context context tree = {context with tree}
 
@@ -1149,7 +1189,7 @@ let check_protocol_commit_consistency index ~expected_context_hash
   if Context_hash.equal expected_context_hash computed_context_hash then
     let ctxt =
       let parent = Store.of_private_commit index.repo commit in
-      {index; tree = Store.Tree.empty; parents = [parent]}
+      {index; tree = Store.Tree.empty; parents = [parent]; ops = 0}
     in
     add_test_chain ctxt test_chain_status >>= fun ctxt ->
     add_protocol ctxt given_protocol_hash >>= fun ctxt ->
@@ -1356,7 +1396,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
   if Context_hash.equal expected_context_hash computed_context_hash then
     let ctxt =
       let parent = Store.of_private_commit index.repo commit in
-      {index; tree = Store.Tree.empty; parents = [parent]}
+      {index; tree = Store.Tree.empty; parents = [parent]; ops = 0}
     in
     add_test_chain ctxt test_chain >>= fun ctxt ->
     add_protocol ctxt protocol_hash >>= fun ctxt ->

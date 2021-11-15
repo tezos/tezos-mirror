@@ -1,11 +1,9 @@
-.. _snapshots:
-
 Snapshots
 =========
 
 As the chain invariably grows every day, retrieving a full chain from
 the peer-to-peer network can be a very long process.  Thanks to the
-implementation of :ref:`history modes<history-modes>`, it is now possible to propose an
+implementation of :doc:`history modes <history_modes>`, it is now possible to propose an
 import/export feature: snapshots.  This procedure allows to gather all
 the data necessary to bootstrap a node from a single file within few
 minutes.
@@ -89,7 +87,7 @@ The command can be used as following:
 
 As can be seen in the snapshot information, a snapshot contains
 historical data corresponding to a given history mode, which can be:
-Full, Archive, or Rolling (see :ref:`history modes<history-modes>`).
+Full, Archive, or Rolling (see :doc:`history modes <history_modes>`).
 
 Storage reconstruction from a snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -124,7 +122,7 @@ point. This kind of snapshot can only be created from a ``full`` or an
 
 The ``<BLOCK>`` hint can be given as a *block hash*, a *block level*,
 an alias (*head*, *savepoint* or *checkpoint*) and a relative block
-target using the ``~`` notation (such as ``head~42``).
+target using the ``~``, ``-`` or ``+`` notation (such as ``head~42``).
 
 If no ``--block <BLOCK>`` option is given, the checkpoint level will
 be chosen as the default block to export.
@@ -188,3 +186,15 @@ can be exported from a given history mode node.
 +---------+---------------+-----------------+
 | Rolling | No            | Yes             |
 +---------+---------------+-----------------+
+
+Snapshot providers
+~~~~~~~~~~~~~~~~~~
+
+There is a number of services that provide node snapshots. They create snapshots
+of their nodes on a regular basis (usually daily) and make them available for
+download. These include:
+
+* `Giga Node <https://snapshots-tezos.giganode.io/>`_
+* `XTZ-Shots <https://mainnet.xtz-shots.io/>`_
+* `Lambs on acid <https://lambsonacid.nl/>`_
+

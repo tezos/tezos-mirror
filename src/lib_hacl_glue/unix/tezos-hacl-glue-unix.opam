@@ -1,17 +1,21 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "1.11" }
-  "hacl-star" { < "0.4" }
+  "dune" { >= "2.0" }
   "tezos-hacl-glue"
+  "hacl-star" { >= "0.4.2" & < "0.5" }
+  "hacl-star-raw"
 ]
 conflicts: [
   "hacl_x25519"
 ]
-build: [["dune" "build" "-p" name "-j" jobs]]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
 synopsis: "Tezos: thin layer of glue around hacl-star (unix implementation)"

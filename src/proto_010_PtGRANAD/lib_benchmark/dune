@@ -1,5 +1,6 @@
 (library
  (name tezos_benchmark_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-010-PtGRANAD)
  (libraries
   tezos-base

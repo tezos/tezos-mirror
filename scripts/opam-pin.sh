@@ -12,19 +12,35 @@ echo "## Pinning tezos packages..."
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-packages=
+bin_packages=
+lib_packages=
 for opam in $opams; do
-    dir=$(dirname $opam)
-    file=$(basename $opam)
+    dir=$(dirname "$opam")
+    file=$(basename "$opam")
     package=${file%.opam}
-    packages="$packages $package"
-    opam pin add --no-action $package $dir > /dev/null 2>&1
+    if echo "$dir" | grep -q "\/bin_.*" ; then
+      bin_packages="$bin_packages $package"
+    else
+      lib_packages="$lib_packages $package"
+    fi
+    opam pin add --no-action "$package" "$dir" > /dev/null 2>&1
 done
 
-packages=$(opam list --short --sort --pinned $packages)
+
+#shellcheck disable=SC2086
+lib_packages=$(opam list --short --sort --pinned $lib_packages)
+#shellcheck disable=SC2086
+bin_packages=$(opam list --short --sort --pinned $bin_packages)
+
+export packages="$bin_packages $lib_packages"
+echo
+echo "## Pinned lib packages:"
+echo
+echo "$lib_packages" | sed 's/^/ /'
+echo
 
 echo
-echo "## Pinned packages:"
+echo "## Pinned bin packages:"
 echo
-echo "$packages" | sed 's/^/ /'
+echo "$bin_packages" | sed 's/^/ /'
 echo

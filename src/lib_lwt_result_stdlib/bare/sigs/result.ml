@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,8 +29,43 @@
 
     See {!Lwtreslib} and {!Seq} for general description of traversors and the
     meaning of [_s], [_e], and [_es] suffixes. *)
-module type S = sig
+
+module type MONAD_S = sig
   type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e (***)
+
+  val return : 'a -> ('a, 'e) result
+
+  val return_unit : (unit, 'e) result
+
+  val return_none : ('a option, 'e) result
+
+  val return_some : 'a -> ('a option, 'e) result
+
+  val return_nil : ('a list, 'e) result
+
+  val return_true : (bool, 'e) result
+
+  val return_false : (bool, 'e) result
+
+  val fail : 'e -> ('a, 'e) result
+
+  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
+
+  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
+
+  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+end
+
+module type S = sig
+  include MONAD_S
+
+  (* We do not provide all of the [_e] and [_es] functions that you might expect
+     based on other modules such as [Option]. This is because the returned
+     values are results within results ([(('a, 'e) result, 'ee) result]) which
+     are often impractical. It is possible to achieve manually in the rare
+     occasions where it might be appropriate. *)
 
   val ok : 'a -> ('a, 'e) result
 
@@ -44,19 +79,13 @@ module type S = sig
 
   val value_f : ('a, 'e) result -> default:(unit -> 'a) -> 'a
 
-  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-
   val bind_s :
     ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
-
-  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
 
   val bind_error_s :
     ('a, 'e) result -> ('e -> ('a, 'f) result Lwt.t) -> ('a, 'f) result Lwt.t
 
   val join : (('a, 'e) result, 'e) result -> ('a, 'e) result
-
-  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
 
   (* NOTE: [map_e] is [bind] *)
   val map_e : ('a -> ('b, 'e) result) -> ('a, 'e) result -> ('b, 'e) result
@@ -66,8 +95,6 @@ module type S = sig
   (* NOTE: [map_es] is [bind_s] *)
   val map_es :
     ('a -> ('b, 'e) result Lwt.t) -> ('a, 'e) result -> ('b, 'e) result Lwt.t
-
-  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
 
   (* NOTE: [map_error_e] is [bind_error] *)
   val map_error_e :
@@ -114,4 +141,62 @@ module type S = sig
   val to_list : ('a, 'e) result -> 'a list
 
   val to_seq : ('a, 'e) result -> 'a Stdlib.Seq.t
+
+  (** [catch f] is [try Ok (f ()) with e -> Error e]: it is [Ok x] if [f ()]
+      evaluates to [x], and it is [Error e] if [f ()] raises [e].
+
+      See {!WithExceptions.S.Result.to_exn} for a converse function.
+
+      If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+      is [true] are caught.
+
+      Whether [catch_only] is set or not, this function never catches
+      non-deterministic runtime exceptions of OCaml such as {!Stack_overflow}
+      and {!Out_of_memory}. *)
+  val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> ('a, exn) result
+
+  (** [catch_f f handler] is equivalent to [map_error (catch f) handler].
+      In other words, it catches exceptions in [f ()] and either returns the
+      value in an [Ok] or passes the exception to [handler] for the [Error].
+
+      No attempt is made to catch the exceptions raised by [handler].
+
+      [catch_only] has the same use as with [catch]. The same restriction on
+      catching non-deterministic runtime exceptions applies. *)
+  val catch_f :
+    ?catch_only:(exn -> bool) -> (unit -> 'a) -> (exn -> 'e) -> ('a, 'e) result
+
+  (** [catch_ef f handler] is equivalent to [join @@ map_error (catch f) handler].
+      In other words, it catches exceptions in [f ()] and either returns the
+      value as is or passes the exception to [handler] for the [Error]. The
+      handler must return an error of the same type as that carried by [f ()].
+
+      No attempt is made to catch the exceptions raised by [handler].
+
+      [catch_only] has the same use as with [catch]. The same restriction on
+      catching non-deterministic runtime exceptions applies. *)
+  val catch_ef :
+    ?catch_only:(exn -> bool) ->
+    (unit -> ('a, 'error) result) ->
+    (exn -> 'error) ->
+    ('a, 'error) result
+
+  (** [catch_s] is [catch] but for Lwt promises. Specifically, [catch_s f]
+      returns a promise that resolves to [Ok x] if and when [f ()] resolves to
+      [x], or to [Error exc] if and when [f ()] is rejected with [exc].
+
+      If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+      is [true] are caught.
+
+      Whether [catch_only] is set or not, this function never catches
+      non-deterministic runtime exceptions of OCaml such as {!Stack_overflow}
+      and {!Out_of_memory}. *)
+  val catch_s :
+    ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
+
+  (** We do not provide [catch_s_f] because (a) the suffix becomes confusing,
+      (b) it's not used, (c) it is not obvious whether we want the handler to be
+      within Lwt (gives more flexibility) or not (gives more guarantee about the
+      timeliness of learning about rejections). We will revisit this if a needs
+      for it arises. *)
 end

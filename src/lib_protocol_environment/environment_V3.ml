@@ -42,7 +42,10 @@ module type V3 = sig
        and type Operation_list_hash.t = Operation_list_hash.t
        and type Operation_list_list_hash.t = Operation_list_list_hash.t
        and type Context.t = Context.t
+       and type Context.cache_key = Environment_context.Context.cache_key
+       and type Context.cache_value = Environment_context.Context.cache_value
        and type Context_hash.t = Context_hash.t
+       and type Context_hash.Version.t = Context_hash.Version.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
@@ -134,28 +137,83 @@ struct
         Stdlib.exit 1
 
   include Stdlib
-
-  (* The modules provided in the [_struct.V3.M] pack are meant specifically to
-     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
-     versions. Thus we open the module, hiding the incompatible, newer modules.
-  *)
   open Tezos_protocol_environment_structs.V3.M
   module Pervasives = Stdlib
+
+  module Logging = struct
+    type level = Internal_event.level =
+      | Debug
+      | Info
+      | Notice
+      | Warning
+      | Error
+      | Fatal
+
+    let logging_function = ref None
+
+    let name_colon_space = Param.name ^ ": "
+
+    let null_formatter = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
+
+    let log (level : Internal_event.level) =
+      match !logging_function with
+      | None -> Format.ikfprintf ignore null_formatter
+      | Some f -> Format.kasprintf (fun s -> f level (name_colon_space ^ s))
+
+    let log_string (level : Internal_event.level) s =
+      match !logging_function with
+      | None -> ()
+      | Some f -> f level (name_colon_space ^ s)
+  end
+
   module Compare = Compare
-  module List = List
+  module Seq = Tezos_error_monad.TzLwtreslib.Seq
+  module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes
   module Hex = Hex
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian
-  module Set = Stdlib.Set
-  module Map = Stdlib.Map
+  module Set = Tezos_error_monad.TzLwtreslib.Set
+  module Map = Tezos_error_monad.TzLwtreslib.Map
   module Int32 = Int32
   module Int64 = Int64
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_error_monad.TzLwtreslib.Option
+  module FallbackArray = FallbackArray
+
+  let not_a_sys_exc next_classifier = function
+    | Unix.Unix_error _ | UnixLabels.Unix_error _ | Sys_error _ -> false
+    | e -> next_classifier e
+
+  module Option = struct
+    include Tezos_error_monad.TzLwtreslib.Option
+
+    (* This as well as the catchers in [Result] and [Error_monad] are different
+       from the ones in Lwtreslib/Error Monad in that they also hide the Unix
+       and System errors. This is because, from the point-of-view of the
+       protocol, these exceptions are too abstract and too indeterministic. *)
+    let catch ?(catch_only = fun _ -> true) f =
+      (* Note that [catch] also special-cases its own set of exceptions. *)
+      catch ~catch_only:(not_a_sys_exc catch_only) f
+
+    let catch_s ?(catch_only = fun _ -> true) f =
+      catch_s ~catch_only:(not_a_sys_exc catch_only) f
+  end
+
+  module Result = struct
+    include Tezos_error_monad.TzLwtreslib.Result
+
+    let catch ?(catch_only = fun _ -> true) f =
+      catch ~catch_only:(not_a_sys_exc catch_only) f
+
+    let catch_f ?(catch_only = fun _ -> true) f =
+      catch_f ~catch_only:(not_a_sys_exc catch_only) f
+
+    let catch_s ?(catch_only = fun _ -> true) f =
+      catch_s ~catch_only:(not_a_sys_exc catch_only) f
+  end
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -173,7 +231,6 @@ struct
 
   module Z = Z
   module Lwt = Lwt
-  module Lwt_list = Lwt_list
   module Uri = Uri
 
   module Data_encoding = struct
@@ -186,7 +243,7 @@ struct
   end
 
   module Time = Time.Protocol
-  module Bls12_381 = BLS12_381
+  module Bls12_381 = Bls12_381
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
@@ -237,34 +294,22 @@ struct
       val rpc_arg : t RPC_arg.t
     end
 
-    module type SET = S.SET
-
-    module type MAP = S.MAP
-
     module type INDEXES_SET = sig
-      include SET
+      include Set.S
+
+      val random_elt : t -> elt
 
       val encoding : t Data_encoding.t
     end
 
     module type INDEXES_MAP = sig
-      include MAP
+      include Map.S
 
       val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
     end
 
     module type INDEXES = sig
       type t
-
-      val to_path : t -> string list -> string list
-
-      val of_path : string list -> t option
-
-      val of_path_exn : string list -> t
-
-      val prefix_path : string -> string list
-
-      val path_length : int
 
       module Set : INDEXES_SET with type elt = t
 
@@ -567,8 +612,6 @@ struct
       Error_core :
         sig
           include Tezos_error_monad.Sig.CORE with type error := unwrapped
-
-          include Tezos_error_monad.Sig.EXT with type error := unwrapped
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -584,18 +627,55 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
-    include Local_monad
+    include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
-        (Local_monad)
-    include Error_monad_traversors
+      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+        (Tezos_error_monad.TzLwtreslib.Monad)
+
+    (* Backwards compatibility additions (dont_wait, trace helpers) *)
+    include
+      Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
+
+    let dont_wait ex er f = dont_wait f er ex
+
+    let trace_of_error e = TzTrace.make e
 
     let make_trace_encoding e = TzTrace.encoding e
 
-    let pp_trace = pp_print_error
+    let pp_trace = pp_print_trace
 
     type 'err trace = 'err TzTrace.trace
+
+    (* Shadowing catch to prevent catching system exceptions *)
+    type error += Exn of exn
+
+    let () =
+      register_error_kind
+        `Temporary
+        ~id:"failure"
+        ~title:"Exception"
+        ~description:"Exception safely wrapped in an error"
+        ~pp:(fun ppf s ->
+          Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
+        Data_encoding.(obj1 (req "msg" string))
+        (function
+          | Exn (Failure msg) -> Some msg
+          | Exn exn -> Some (Printexc.to_string exn)
+          | _ -> None)
+        (fun msg -> Exn (Failure msg))
+
+    let error_of_exn e = TzTrace.make @@ Exn e
+
+    let catch ?catch_only f =
+      Result.catch ?catch_only f |> Result.map_error error_of_exn
+
+    let catch_f ?catch_only f h =
+      Result.catch ?catch_only f
+      |> Result.map_error (fun e -> trace_of_error (h e))
+
+    let catch_s ?catch_only f =
+      Result.catch_s ?catch_only f
+      >|= Result.map_error (fun e -> error_of_exn e)
   end
 
   let () =
@@ -632,6 +712,7 @@ struct
   module RPC_answer = struct
     type 'o t =
       [ `Ok of 'o (* 200 *)
+      | `OkChunk of 'o (* 200 but with chunked transfer encoding *)
       | `OkStream of 'o stream (* 200 *)
       | `Created of string option (* 201 *)
       | `No_content (* 204 *)
@@ -663,7 +744,8 @@ struct
     let gen_register dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | `Ok o -> RPC_answer.return_chunked o
+          | `Ok o -> RPC_answer.return o
+          | `OkChunk o -> RPC_answer.return_chunked o
           | `OkStream s -> RPC_answer.return_stream s
           | `Created s -> Lwt.return (`Created s)
           | `No_content -> Lwt.return `No_content
@@ -683,49 +765,61 @@ struct
               let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Error e))
 
-    let register dir service handler =
+    let register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | Ok o -> RPC_answer.return o
+          | Ok o when chunked -> RPC_answer.return_chunked o
+          | Ok o (* otherwise *) -> RPC_answer.return o
           | Error e -> RPC_answer.fail e)
 
-    let opt_register dir service handler =
+    let opt_register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | Ok (Some o) -> RPC_answer.return o
+          | Ok (Some o) when chunked -> RPC_answer.return_chunked o
+          | Ok (Some o) (* otherwise *) -> RPC_answer.return o
           | Ok None -> RPC_answer.not_found
           | Error e -> RPC_answer.fail e)
 
-    let lwt_register dir service handler =
+    let lwt_register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
-          handler p q i >>= fun o -> RPC_answer.return o)
+          handler p q i >>= fun o ->
+          if chunked then RPC_answer.return_chunked o else RPC_answer.return o)
 
     open Curry
 
-    let register0 root s f = register root s (curry Z f)
+    let register0 ~chunked root s f = register ~chunked root s (curry Z f)
 
-    let register1 root s f = register root s (curry (S Z) f)
+    let register1 ~chunked root s f = register ~chunked root s (curry (S Z) f)
 
-    let register2 root s f = register root s (curry (S (S Z)) f)
+    let register2 ~chunked root s f =
+      register ~chunked root s (curry (S (S Z)) f)
 
-    let register3 root s f = register root s (curry (S (S (S Z))) f)
+    let register3 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S Z))) f)
 
-    let register4 root s f = register root s (curry (S (S (S (S Z)))) f)
+    let register4 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f)
+    let register5 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S (S (S Z))))) f)
 
-    let opt_register0 root s f = opt_register root s (curry Z f)
+    let opt_register0 ~chunked root s f =
+      opt_register ~chunked root s (curry Z f)
 
-    let opt_register1 root s f = opt_register root s (curry (S Z) f)
+    let opt_register1 ~chunked root s f =
+      opt_register ~chunked root s (curry (S Z) f)
 
-    let opt_register2 root s f = opt_register root s (curry (S (S Z)) f)
+    let opt_register2 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S Z)) f)
 
-    let opt_register3 root s f = opt_register root s (curry (S (S (S Z))) f)
+    let opt_register3 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S Z))) f)
 
-    let opt_register4 root s f = opt_register root s (curry (S (S (S (S Z)))) f)
+    let opt_register4 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let opt_register5 root s f =
-      opt_register root s (curry (S (S (S (S (S Z))))) f)
+    let opt_register5 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S (S (S Z))))) f)
 
     let gen_register0 root s f = gen_register root s (curry Z f)
 
@@ -740,18 +834,23 @@ struct
     let gen_register5 root s f =
       gen_register root s (curry (S (S (S (S (S Z))))) f)
 
-    let lwt_register0 root s f = lwt_register root s (curry Z f)
+    let lwt_register0 ~chunked root s f =
+      lwt_register ~chunked root s (curry Z f)
 
-    let lwt_register1 root s f = lwt_register root s (curry (S Z) f)
+    let lwt_register1 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S Z) f)
 
-    let lwt_register2 root s f = lwt_register root s (curry (S (S Z)) f)
+    let lwt_register2 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S Z)) f)
 
-    let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
+    let lwt_register3 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S Z))) f)
 
-    let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
+    let lwt_register4 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let lwt_register5 root s f =
-      lwt_register root s (curry (S (S (S (S (S Z))))) f)
+    let lwt_register5 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S (S (S Z))))) f)
   end
 
   module RPC_context = struct
@@ -855,10 +954,16 @@ struct
 
   module Micheline = struct
     include Micheline
+    include Micheline_encoding
 
+    (* Note: we "lie" about canonical-v1 and actually use canonical-v2 behind
+       the protocol's back. Truly, the protocol shouldn't have access to
+       versions (it should just have access to plain canonical) and the
+       environment should ensure the stability. *)
     let canonical_encoding_v1 ~variant encoding =
-      canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding
+      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
 
+    (* For backwards compatibility, the version here is wrong *)
     let canonical_encoding ~variant encoding =
       canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
@@ -882,11 +987,11 @@ struct
 
     let activate = Context.set_protocol
 
-    let fork_test_chain = Context.fork_test_chain
-
     module type PROTOCOL =
       Environment_protocol_T_V3.T
         with type context := Context.t
+         and type cache_value := Environment_context.Context.cache_value
+         and type cache_key := Environment_context.Context.cache_key
          and type quota := quota
          and type validation_result := validation_result
          and type rpc_context := rpc_context
@@ -910,9 +1015,17 @@ struct
   module Context = struct
     include Context
 
+    type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+
     module type VIEW = Environment_context.VIEW
 
+    module Kind = struct
+      type t = [`Value | `Tree]
+    end
+
     module type TREE = Environment_context.TREE
+
+    module type CACHE = Environment_context.CACHE
 
     let register_resolver = Base58.register_resolver
 
@@ -920,20 +1033,74 @@ struct
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
+    let environment_version = Protocol.V3
+
     include P
 
+    let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+        ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+      value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      >|= wrap_tzresult
+      >>=? fun f -> return (fun x -> f x >|= wrap_tzresult)
+
+    (*
+       [load_predecessor_cache] ensures that the cache is correctly
+       loaded in memory before running any operations.
+    *)
+    let load_predecessor_cache ~chain_id ~predecessor_context
+        ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
+        ~predecessor ~timestamp ~cache =
+      value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      >>=? fun value_of_key ->
+      Context.load_cache predecessor_context cache value_of_key
+
     let begin_partial_application ~chain_id ~ancestor_context
-        ~predecessor_timestamp ~predecessor_fitness raw_block =
+        ~(predecessor : Block_header.t) ~predecessor_hash ~cache
+        (raw_block : block_header) =
+      load_predecessor_cache
+        ~chain_id
+        ~predecessor_context:ancestor_context
+        ~predecessor_timestamp:predecessor.shell.timestamp
+        ~predecessor_level:predecessor.shell.level
+        ~predecessor_fitness:predecessor.shell.fitness
+        ~predecessor:predecessor_hash
+        ~timestamp:raw_block.shell.timestamp
+        ~cache
+      >>=? fun ancestor_context ->
       begin_partial_application
         ~chain_id
         ~ancestor_context
-        ~predecessor_timestamp
-        ~predecessor_fitness
+        ~predecessor_timestamp:predecessor.shell.timestamp
+        ~predecessor_fitness:predecessor.shell.fitness
         raw_block
       >|= wrap_tzresult
 
     let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
-        ~predecessor_fitness raw_block =
+        ~predecessor_fitness ~cache (raw_block : block_header) =
+      load_predecessor_cache
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level:(Int32.pred raw_block.shell.level)
+        ~predecessor_fitness
+        ~predecessor:raw_block.shell.predecessor
+        ~timestamp:raw_block.shell.timestamp
+        ~cache
+      >>=? fun predecessor_context ->
       begin_application
         ~chain_id
         ~predecessor_context
@@ -944,7 +1111,17 @@ struct
 
     let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
-        ?protocol_data () =
+        ?protocol_data ~cache () =
+      load_predecessor_cache
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+        ~cache
+      >>=? fun predecessor_context ->
       begin_construction
         ~chain_id
         ~predecessor_context
@@ -957,15 +1134,14 @@ struct
         ()
       >|= wrap_tzresult
 
-    let current_context c = current_context c >|= wrap_tzresult
-
     let apply_operation c o = apply_operation c o >|= wrap_tzresult
 
-    let finalize_block c = finalize_block c >|= wrap_tzresult
+    let finalize_block c shell_header =
+      finalize_block c shell_header >|= wrap_tzresult
 
     let init c bh = init c bh >|= wrap_tzresult
 
-    let environment_version = Protocol.V3
+    let set_log_message_consumer f = Logging.logging_function := Some f
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

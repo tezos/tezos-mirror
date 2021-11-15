@@ -12,7 +12,6 @@ depends: [
   "tezos-protocol-006-PsCARTHA"
   "tezos-shell-services"
   "tezos-signer-backends"
-  "tezos-protocol-006-PsCARTHA-parameters"
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [

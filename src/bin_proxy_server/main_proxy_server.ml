@@ -176,7 +176,7 @@ let main (config_file : string option) (log_requests : bool)
      | Ok (Ok _) -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
      | Ok (Error err) ->
          Lwt_exit.exit_and_wait 2 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_error err)
+         `Error (false, Format.asprintf "%a" pp_print_trace err)
      | Error exit_status ->
          Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
 

@@ -36,7 +36,7 @@ type input = {
   mtree : Tezos_shell_services.Block_services.merkle_tree;
       (** The tree received from the endpoint providing data.
           It is much smaller than [tree]. *)
-  tree : Tezos_context_memory.Context.tree;
+  tree : Local_context.tree;
       (** The current data tree. The call to [M.consensus]
       will check that validating endpoints send data
       which agree with this tree. *)

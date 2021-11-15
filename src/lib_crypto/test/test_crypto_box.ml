@@ -30,9 +30,6 @@
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
-let check_bytes =
-  Alcotest.testable (fun fmt x -> Hex.pp fmt (Hex.of_bytes x)) Bytes.equal
-
 let (sk, pk, pkh) = Crypto_box.random_keypair ()
 
 let zero_nonce = Crypto_box.zero_nonce
@@ -82,8 +79,13 @@ let test_fast_box_noalloc msg () =
   let tag = Bytes.make Crypto_box.tag_length '\x00' in
   (* encryption / decryption *)
   Crypto_box.fast_box_noalloc chkey zero_nonce tag buf ;
-  assert (Crypto_box.fast_box_open_noalloc chkey zero_nonce tag buf) ;
-  Alcotest.check check_bytes "test_fast_box_noalloc" buf msg
+  Alcotest.(
+    check
+      bool
+      "fast_box_open"
+      true
+      (Crypto_box.fast_box_open_noalloc chkey zero_nonce tag buf)) ;
+  Alcotest.(check bytes "test_fast_box_noalloc" buf msg)
 
 (** Encrypts then decrypts the message [msg] with authentication.
     Returns a new buffer for ciphertext.
@@ -92,22 +94,20 @@ let test_fast_box msg () =
   let cmsg = Crypto_box.fast_box chkey zero_nonce msg in
   match Crypto_box.fast_box_open chkey zero_nonce cmsg with
   | Some decrypted_msg ->
-      Alcotest.check check_bytes "test_fast_box" msg decrypted_msg
+      Alcotest.(check bytes "test_fast_box" msg decrypted_msg)
   | None -> Alcotest.fail "Box: Decryption error"
 
 let tests =
   [
-    ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
-    ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
-    ( "HACL* box (noalloc)",
-      `Quick,
-      test_fast_box_noalloc (Bytes.of_string "test") );
-    ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test"));
+    ( "crypto_box",
+      [
+        ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
+        ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
+        ( "HACL* box (noalloc)",
+          `Quick,
+          test_fast_box_noalloc (Bytes.of_string "test") );
+        ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test"));
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("crypto_box", tests)]
-
-let tests_lwt = [("Check PoW", `Slow, test_check_pow)]
-
-let () =
-  Lwt_main.run @@ Alcotest_lwt.run "tezos-crypto" [("crypto_box", tests_lwt)]
+let tests_lwt = [("crypto_box", [("Check PoW", `Slow, test_check_pow)])]

@@ -29,20 +29,32 @@
     consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
+type 'operation_data operation = private {
+  hash : Operation_hash.t;  (** Hash of an operation. *)
+  raw : Operation.t;
+      (** Raw representation of an operation (from the point view of the
+     shell). *)
+  protocol_data : 'operation_data;
+      (** Economic protocol specific data of an operation. It is the
+     unserialized representation of [raw.protocol_data]. For
+     convenience, the type associated to this type may be [unit] if we
+     do not have deserialized the operation yet. *)
+}
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
   type t
 
-  type operation = private {
-    hash : Operation_hash.t;
-    raw : Operation.t;
-    protocol_data : Proto.operation_data;
-  }
+  val parse : Operation.t -> Proto.operation_data operation tzresult
 
-  val compare : operation -> operation -> int
+  (** [parse_unsafe bytes] parses [bytes] as operation data. Any error
+     happening during parsing becomes {!Parse_error}.
 
-  val parse : Operation.t -> operation tzresult
+      [unsafe] because there are no length checks, unlike {!parse}.
+
+     @deprecated You should use [parse] instead. *)
+  val parse_unsafe : bytes -> Proto.operation_data tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
@@ -64,7 +76,7 @@ module type T = sig
     | Refused of error list
     | Outdated
 
-  val apply_operation : t -> operation -> result Lwt.t
+  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
   val validation_state : t -> Proto.validation_state
 
@@ -74,13 +86,14 @@ end
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   T with module Proto = Proto
 
-(** Pre-apply creates a new block and returns it. *)
-val preapply :
-  Store.chain_store ->
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  predecessor:Store.Block.t ->
-  timestamp:Time.Protocol.t ->
-  protocol_data:Bytes.t ->
-  Operation.t list list ->
-  (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+module Internal_for_tests : sig
+  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
+
+      If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to
+      replace [Proto.operation_data_encoding].
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/1487
+      Move this function to [data_encoding] or [tezos_base] and consider not catching some exceptions
+      *)
+  val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
+end

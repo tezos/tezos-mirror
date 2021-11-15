@@ -1,70 +1,23 @@
-(executables
- (names test_bits
-        test_tzList
-        test_bounded_heap
-        test_tzString
-        test_fallbackArray
-        test_lwt_pipe
-        test_circular_buffer
-        test_circular_buffer_fuzzy)
- (libraries tezos-stdlib
-            alcotest
-            alcotest-lwt
-            lwt_log
-            bigstring
-            lwt.unix
-            tezos-test-helpers
-            qcheck-alcotest)
- (flags (:standard -open Tezos_stdlib)))
-
-(rule
- (alias buildtest)
- (deps test_tzList.exe
-       test_bounded_heap.exe
-       test_tzString.exe
-       test_lwt_pipe.exe)
- (action (progn)))
-
-(rule
- (alias runtest_bits)
- (action (run %{exe:test_bits.exe})))
-
-(rule
- (alias runtest_tzList)
- (action (run %{exe:test_tzList.exe})))
-
-(rule
- (alias runtest_bounded_heap)
- (action (run %{exe:test_bounded_heap.exe})))
-
-(rule
- (alias runtest_tzString)
- (action (run %{exe:test_tzString.exe})))
-
-(rule
- (alias runtest_fallbackArray)
- (action (run %{exe:test_fallbackArray.exe})))
-
-(rule
- (alias runtest_lwt_pipe)
- (action (run %{exe:test_lwt_pipe.exe})))
-
-(rule
- (alias runtest_circular_buffer)
- (action (run %{exe:test_circular_buffer.exe})))
-
-(rule
- (alias runtest_circular_buffer_fuzzy)
- (action (run %{exe:test_circular_buffer_fuzzy.exe})))
-
-(rule
- (alias runtest)
+(tests
+ (names
+  test_bits
+  test_tzList
+  test_bounded_heap
+  test_tzString
+  test_arrays
+  test_fallbackArray
+  test_functionalArray
+  test_lwt_pipe
+  test_circular_buffer
+  test_circular_buffer_fuzzy)
  (package tezos-stdlib)
- (deps (alias runtest_bits)
-       (alias runtest_tzList)
-       (alias runtest_bounded_heap)
-       (alias runtest_tzString)
-       (alias runtest_lwt_pipe)
-       (alias runtest_circular_buffer)
-       (alias runtest_circular_buffer_fuzzy))
- (action (progn)))
+ (libraries
+  tezos-stdlib
+  alcotest
+  alcotest-lwt
+  lwt_log
+  bigstring
+  lwt.unix
+  tezos-test-helpers
+  qcheck-alcotest)
+ (flags (:standard -open Tezos_stdlib)))

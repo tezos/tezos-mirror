@@ -1,5 +1,3 @@
-.. _sapling_dev_010:
-
 **The features described in this page are experimental and have not  undergone any security review.**
 
 Sapling integration
@@ -51,7 +49,7 @@ transaction and produce the zero-knowledge proofs, which are
 computationally too intensive for an embedded device.
 
 More details can be found in the `specification document
-<https://github.com/zcash/zips/blob/master/protocol/sapling.pdf>`_.
+<https://github.com/zcash/zips/blob/main/protocol/sapling.pdf>`_.
 
 Shielded transactions
 ~~~~~~~~~~~~~~~~~~~~~
@@ -165,7 +163,7 @@ There are a number of more sophisticated techniques to deanonymise
 users using timing of operations, network monitoring, side-channels on
 clients and analysis of number of inputs/outputs just to mention a few
 (`A fistful of Bitcoins
-<https://dblp.org/rec/journals/cacm/MeiklejohnPJLMV16>`_ is a good
+<https://dblp.org/rec/journals/cacm/MeiklejohnPJLMV16.html>`_ is a good
 first read).
 We advice users to be familiar with the use of the TOR network and to
 use clients developed specifically to protect their privacy.
@@ -438,7 +436,7 @@ Sandbox tutorial
 ~~~~~~~~~~~~~~~~
 
 As usual it's possible to test the system end-to-end using the
-:ref:`sandboxed-mode`.
+:doc:`../user/sandbox`.
 After having set up the sandbox and originated the contract, a good
 way to get familiar with the system is to generate keys and then
 perform the full cycle of shielding, shielded transfer and

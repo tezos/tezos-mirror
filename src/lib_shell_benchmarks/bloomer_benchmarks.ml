@@ -75,7 +75,8 @@ let () =
        (fun _rng_state ->
          let bloomer = make_bloomer () in
          let string = "test" in
-         Bloomer.add bloomer string ; (bloomer, string))
+         Bloomer.add bloomer string ;
+         (bloomer, string))
        (fun generator () ->
          let (bloomer, string) = generator () in
          let closure () = ignore (Bloomer.mem bloomer string) in

@@ -54,17 +54,26 @@ val get : 'a t -> int -> 'a
     If [idx] < 0 or [idx] >= [length a], [a] is unchanged. *)
 val set : 'a t -> int -> 'a -> unit
 
-(** [iter a f] iterates [f] over the cells of [a] from the
+(** [iter f a] iterates [f] over the cells of [a] from the
    cell indexed [0] to the cell indexed [length a - 1]. *)
-val iter : 'a t -> ('a -> unit) -> unit
+val iter : ('a -> unit) -> 'a t -> unit
 
-(** [map a f] computes a new array obtained by applying [f] to each
+(** [map f a] computes a new array obtained by applying [f] to each
    cell contents of [a]. Notice that the fallback value of the new
    array is [f (fallback a)]. *)
-val map : 'a t -> ('a -> 'b) -> 'b t
+val map : ('a -> 'b) -> 'a t -> 'b t
 
-(** [fold a init f] traverses [a] from the cell indexed [0] to the
+(** [fold f a init] traverses [a] from the cell indexed [0] to the
    cell indexed [length a - 1] and transforms [accu] into [f accu x]
    where [x] is the content of the cell under focus. [accu] is
    [init] on the first iteration. *)
-val fold : 'a t -> 'b -> ('b -> 'a -> 'b) -> 'b
+val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+
+(** [fold_map f a init fallback] traverses [a] from the cell indexed
+   [0] to the cell indexed [length a - 1] and transforms [accu] into
+   [fst (f accu x)] where [x] is the content of the cell under
+   focus. [accu] is [init] on the first iteration. The function also
+   returns a fresh array containing [snd (f accu x)] for each [x].
+   [fallback] is required to initialize a fresh array before it can be
+   filled. *)
+val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t

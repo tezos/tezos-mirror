@@ -2,7 +2,7 @@ Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
 This specification gives a detailed formal semantics of the Michelson
-language, and a short explanation of how smart contracts are executed
+language and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
 The language is stack-based, with high level data types and primitives,
@@ -11,7 +11,7 @@ several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
 
 A Michelson program is a series of instructions that are run in
-sequence: each instruction receives as input the stack resulting of the
+sequence: each instruction receives as input the stack resulting from the
 previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
@@ -53,7 +53,7 @@ Intra-transaction semantics
 
 Alongside their tokens, smart contracts keep a piece of storage. Both
 are ruled by a specific logic specified by a Michelson program. A
-transaction to smart contract will provide an input value and in
+transaction to a smart contract will provide an input value and in
 option some tokens, and in return, the smart contract can modify its
 storage and transfer its tokens.
 
@@ -69,7 +69,7 @@ not be caught by the type system (e.g. gas exhaustion).
 A bit of polymorphism can be used at contract level, with a
 lightweight system of named entrypoints: instead of an input value,
 the contract can be called with an entrypoint name and an argument,
-and these two component are transformed automatically in a simple and
+and these two components are transformed automatically in a simple and
 deterministic way to an input value. This feature is available both
 for users and from Michelson code. See the dedicated section.
 
@@ -159,7 +159,8 @@ In any case, when a failure happens, either total success or total
 failure is guaranteed. If a transaction (internal or external) fails,
 then the whole sequence fails and all the effects up to the failure
 are reverted. These transactions can still be included in blocks, and
-the transaction fees given to the implicit account who baked the block.
+the transaction fees are given to the implicit account who baked the
+block.
 
 Language semantics
 ------------------
@@ -191,8 +192,8 @@ The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
 selected using the following process. First, the toplevel structure of
 the program must match the syntax pattern. This is quite simple since
-there is only a few non trivial patterns to deal with instruction
-sequences, and the rest is made of trivial pattern that match one
+there are only a few non-trivial patterns to deal with instruction
+sequences, and the rest is made of trivial patterns that match one
 specific instruction. Then, the initial stack must match the initial
 stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
@@ -219,7 +220,7 @@ form.
 
     where (intermediate program) / (intermediate stack)  =>  (partial result)
 
-This means that this rules applies in case interpreting the intermediate
+This means that this rule applies in case interpreting the intermediate
 state on the left gives the pattern on the right.
 
 The left hand sign of the ``=>`` sign is constructed from elements of
@@ -302,7 +303,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
-.. _michelson_type_system:
+.. _michelson_type_system_alpha:
 
 Introduction to the type system and notations
 ---------------------------------------------
@@ -1725,6 +1726,13 @@ Domain specific data types
 
 -  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
 
+-  ``chest``: a timelocked chest containing bytes and information to open it.
+   see :doc:`Timelock <timelock>` .
+
+-  ``chest_key``: used to open a chest, also contains a proof
+   to check the correctness of the opening. see :doc:`Timelock <timelock>` .
+
+
 Domain specific operations
 --------------------------
 
@@ -2007,7 +2015,7 @@ Special operations
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
--  ``LEVEL``: Push the current block level.
+-  ``LEVEL``: Push the level of the current transaction's block.
 
 ::
 
@@ -2290,11 +2298,23 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
    :: (pair (ticket 'a) (ticket 'a)) : 'S ->
    option (ticket 'a) : 'S
 
+Operations on timelock
+~~~~~~~~~~~~~~~~~~~~~~
+
+- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The results can be bytes
+  if the opening is correct, or a boolean indicating whether the chest was incorrect,
+  or its opening was. See :doc:`Timelock <timelock>` for more information.
+
+::
+
+   ::  chest_key : chest : nat : 'S -> or bytes bool : 'S
+
+
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
 
-:ref:`005_babylon` deprecated the following instructions. Because no smart
+:doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
@@ -2330,6 +2350,100 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
+.. _MichelsonViews_alpha:
+
+Operations on views
+~~~~~~~~~~~~~~~~~~~~
+
+Views are a mechanism for contract calls that:
+
+- are read-only: they may depend on the storage of the contract declaring the view but cannot modify it nor emit operations (but they can call other views),
+- take arguments as input in addition to the contract storage,
+- return results as output,
+- are synchronous: the result is immediately available on the stack of the caller contract.
+
+In other words, the execution of a view is included in the operation of caller's contract, but accesses the storage of the declarer's contract, in read-only mode.
+Thus, in terms of execution, views are more like lambda functions rather than contract entrypoints,
+Here is an example:
+
+::
+
+    code {
+    ...;
+    TRANSFER_TOKENS;
+    ...;
+    VIEW "view_ex" unit;
+    ...;
+    };
+
+This contract calls a contract ``TRANSFER_TOKENS``, and, later on, a view called "view_ex".
+No matter if the callee "view_ex" is defined in the same contract with this caller contract or not,
+this view will be executed immediately in the current operation,
+while the operations emitted by ``TRANSFER_TOKENS`` will be executed later on.
+As a result, although it may seem that "view_ex" receives the storage modified by ``TRANSFER_TOKENS``,
+this is not the case.
+In other words, the storage of the view is the same as when the current contract was called.
+In particular, in case of re-entrance, i.e., if a contract A calls a contract B that calls a view on A, the storage of the view will be the same as when B started, not when A started.
+
+Views are **declared** at the toplevel of the script of the contract on which they operate,
+alongside the contract parameter type, storage type, and code.
+To declare a view, the ``view`` keyword is used; its syntax is
+``view name 'arg 'return { instr; ... }`` where:
+
+- ``name`` is a string of at most 31 characters matching the regular expression ``[a-zA-Z0-9_.%@]*``; it is used to identify the view, hence it must be different from the names of the other views declared in the same script;
+- ``'arg`` is the type of the argument of the view;
+- ``'return`` is the type of the result returned by the view;
+- ``{ instr; ... }`` is a sequence of instructions of type ``lambda (pair 'arg 'storage_ty) 'return`` where ``'storage_ty`` is the type of the storage of the current contract. Certain specific instructions have different semantics in ``view``: ``BALANCE`` represents the current amount of mutez held by the contract where ``view`` is; ``SENDER`` represents the contract which is the caller of ``view``; ``SELF_ADDRESS`` represents the contract where ``view`` is; ``AMOUNT`` is always 0 mutez.
+
+Note that in both view input (type ``'arg``) and view output (type ``'return``), the following types are forbidden: ``ticket``, ``operation``, ``big_map`` and ``sapling_state``.
+
+Views are **called** using the following Michelson instruction:
+
+-  ``VIEW name 'return``: Call the view named ``name`` from the contract whose address is the second element of the stack, sending it as input the top element of the stack.
+
+::
+
+    :: 'arg : address : 'S  ->  option 'return : 'S
+
+    > VIEW name 'return / x : addr : S  =>  Some y : S
+        iff addr is the address of a smart contract c with storage s
+        where c has a toplevel declaration of the form "view name 'arg 'return { code }"
+        and code / Pair x s : []  =>  y : []
+
+    > VIEW name 'return / _ : _ : S  =>  None : S
+        otherwise
+
+
+
+If the given address is nonexistent or if the contract at that address does not have a view of the expected name and type,
+``None`` will be returned.
+Otherwise, ``Some a`` will be returned where ``a`` is the result of the view call.
+Note that if a contract address containing an entrypoint ``address%entrypoint`` is provided,
+only the ``address`` part will be taken.
+``operation``, ``big_map`` and ``sapling_state`` and ``ticket`` types are forbidden for the ``'return`` type.
+
+
+Here is an example using views, consisting of two contracts.
+The first contract defines two views at toplevel that are named ``add_v`` and ``mul_v``.
+
+::
+
+    { parameter nat;
+      storage nat;
+      code { CAR; NIL operation ; PAIR };
+      view "add_v" nat nat { UNPAIR; ADD };
+      view "mul_v" nat nat { UNPAIR; MUL };
+    }
+
+
+The second contract calls the ``add_v`` view of the above contract and obtains a result immediately.
+
+::
+
+    { parameter (pair nat address) ;
+      storage nat ;
+      code { CAR ; UNPAIR; VIEW "add_v" nat ;
+             IF_SOME { } { FAIL }; NIL operation; PAIR }; }
 
 Macros
 ------
@@ -2562,7 +2676,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called :ref:`Micheline`.
+This simple five cases notation is called :doc:`../shell/micheline`.
 
 Constants
 ~~~~~~~~~
@@ -3602,6 +3716,7 @@ Full grammar
       | READ_TICKET
       | SPLIT_TICKET
       | JOIN_TICKETS
+      | OPEN_CHEST
     <type> ::=
       | <comparable type>
       | option <type>
@@ -3620,6 +3735,8 @@ Full grammar
       | bls12_381_fr
       | sapling_transaction <natural number constant>
       | sapling_state <natural number constant>
+      | chest
+      | chest_key
     <comparable type> ::=
       | unit
       | never

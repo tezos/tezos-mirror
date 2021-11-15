@@ -48,8 +48,7 @@ module Make (P : Sampler_parameters_sig) = struct
   module MH_params : MH.MH_parameters with type t = State_space.t = struct
     let uniform (l : State_space.t list) : State_space.t Stats.fin_prb =
       match l with
-      | [] ->
-          assert false
+      | [] -> assert false
       | _ ->
           let arr = Array.of_list l in
           let emp = Stats.empirical_of_raw_data arr in
@@ -57,8 +56,7 @@ module Make (P : Sampler_parameters_sig) = struct
 
     let trace state =
       match P.verbosity with
-      | `Silent | `Progress ->
-          ()
+      | `Silent | `Progress -> ()
       | `Trace ->
           Format.eprintf "@." ;
           Format.eprintf "%a" State_space.pp state ;

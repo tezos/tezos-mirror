@@ -30,7 +30,7 @@
     it would create a cyclic dependency between proxy_proto.ml
     and proxy_getter.ml *)
 
-module Local = Tezos_context_memory.Context
+module Local = Local_context
 
 (** Whether [tezos-client] or [tezos-proxy-server] is running. *)
 type mode =
@@ -63,7 +63,7 @@ module type TREE = sig
     t ->
     key ->
     Tezos_shell_services.Block_services.raw_context ->
-    t update tzresult Lwt.t
+    t update Lwt.t
 end
 
 (** Module used by implementations of [Proxy_getter.M]. *)

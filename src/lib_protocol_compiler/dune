@@ -1,3 +1,6 @@
+; build static executable with --profile static
+(env (static (flags (:standard -ccopt -static))))
+
 (rule
  (targets embedded_cmis.ml)
  (action
@@ -7,10 +10,12 @@
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}
-       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi})))
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi})))
 
 (library
  (name tezos_protocol_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.registerer)
  (libraries tezos-base
             tezos-protocol-environment-sigs)
@@ -20,6 +25,7 @@
 
 (library
  (name tezos_protocol_compiler)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler)
  (libraries tezos-base
             tezos-base.unix
@@ -36,17 +42,8 @@
  (modules Embedded_cmis Packer Compiler))
 
 (library
- (name tezos_protocol_compiler_byte)
- (public_name tezos-protocol-compiler.byte)
- (libraries tezos-base
-            tezos-protocol-compiler
-            compiler-libs.bytecomp)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_compiler))
- (modules Byte))
-
-(library
  (name tezos_protocol_compiler_native)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.native)
  (libraries tezos-base
             tezos-protocol-compiler
@@ -56,15 +53,8 @@
  (modules Native))
 
 (executable
- (name main_byte)
- (public_name tezos-protocol-compiler-byte)
- (modes native)
- (libraries tezos_protocol_compiler_byte)
- (flags (:standard -linkall))
- (modules Main_byte))
-
-(executable
  (name main_native)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler)
  (modes native)
  (libraries tezos_protocol_compiler_native)
@@ -73,6 +63,7 @@
 
 (executable
  (name main_packer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.tezos-protocol-packer)
  (libraries tezos-base
             tezos-protocol-compiler
@@ -84,6 +75,7 @@
 
 (executable
  (name main_embedded_packer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-packer)
  (modes native)
  (libraries tezos-base
@@ -105,6 +97,8 @@
 (install
  (section libexec)
  (files (replace.exe as replace)
-        dune_protocol
-        dune_protocol.template
+        dune_protocol.v0
+        dune_protocol.v1
+        dune_protocol.template.v0
+        dune_protocol.template.v1
         final_protocol_versions))

@@ -1,7 +1,7 @@
 (library
  (name tezos_signer_backends_unix)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-signer-backends.unix)
- (modules (:standard))
  (libraries ocplib-endian.bigstring
             tezos-signer-backends
             tezos-base

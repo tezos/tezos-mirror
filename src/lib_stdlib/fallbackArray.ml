@@ -23,48 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type 'a t = 'a Array.t
-
-(**
-
-    [make length fallback] creates an array of [length] + 1
-    elements. The final cell is reserved to store the [fallback]
-    value.
-
-*)
-let make length fallback =
-  let length = 1 + max 0 length in
-  Array.make length fallback
-
-let fallback array =
-  let len = Array.length array in
-  Array.unsafe_get array (len - 1)
-
-let get array idx =
-  if idx >= 0 && idx < Array.length array then Array.unsafe_get array idx
-  else fallback array
+include ReadOnlyArray
 
 let set array idx v =
-  let len = Array.length array - 1 in
+  let len = length array in
   if idx >= 0 && idx < len then Array.unsafe_set array idx v else ()
-
-let length array = Array.length array - 1
-
-let iter array f =
-  for idx = 0 to length array - 1 do
-    f (Array.unsafe_get array idx)
-  done
-
-let map array f =
-  let out = make (length array) (f (fallback array)) in
-  for idx = 0 to length array - 1 do
-    out.(idx) <- f (Array.unsafe_get array idx)
-  done ;
-  out
-
-let fold array init f =
-  let rec aux accu idx =
-    if idx > length array - 1 then accu
-    else aux (f accu (Array.unsafe_get array idx)) (idx + 1)
-  in
-  aux init 0

@@ -208,9 +208,15 @@ val connections :
   ('msg, 'peer_meta, 'conn_meta) connection list
 
 (** Return the active peer with identity [peer_id] *)
-val find_connection :
+val find_connection_by_peer_id :
   ('msg, 'peer_meta, 'conn_meta) net ->
   P2p_peer.Id.t ->
+  ('msg, 'peer_meta, 'conn_meta) connection option
+
+(** Return the active peer corresponding to [point] *)
+val find_connection_by_point :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  P2p_point.Id.t ->
   ('msg, 'peer_meta, 'conn_meta) connection option
 
 (** Access the info of an active peer, if available *)
@@ -234,6 +240,14 @@ val connection_stat :
   ('msg, 'peer_meta, 'conn_meta) connection ->
   P2p_stat.t
 
+(** Returns the network version that will be used for this connection.
+   This network version is the best version compatible with the versions
+   supported by ours and the remote peer. *)
+val negotiated_version :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  Network_version.t
+
 (** Cleanly closes a connection. *)
 val disconnect :
   ('msg, 'peer_meta, 'conn_meta) net ->
@@ -249,6 +263,14 @@ val get_peer_metadata :
 
 val set_peer_metadata :
   ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta -> unit
+
+(** [connect net ?timeout point] attempts to establish a connection to [point]
+   within an optional duration [timeout]. *)
+val connect :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ?timeout:Ptime.span ->
+  P2p_point.Id.t ->
+  ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t
 
 (** Wait for a message from a given connection. *)
 val recv :

@@ -34,7 +34,7 @@
 module type S = sig
   type key
 
-  type +'a t
+  type +!'a t
 
   module Legacy : Stdlib.Map.S with type key = key and type 'a t = 'a t
 

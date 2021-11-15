@@ -15,18 +15,25 @@ Tezos is a distributed consensus platform with meta-consensus
 capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
+The website https://tezos.com/ contains more information about the project.
 
- - Developer documentation is available online at https://tezos.gitlab.io/
-   and is automatically generated from the master branch.
- - The website https://tezos.com/ contains more information about the project.
- - All development happens on GitLab at https://gitlab.com/tezos/tezos
+Octez
+-----
 
-The source code of Tezos is placed under the MIT Open Source License.
+Octez is an implementation of Tezos software, including a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
+This implementation is available at https://gitlab.com/tezos/tezos.
+The source code is placed under the MIT Open Source License.
 
-Latest Release
---------------
+The current release of Octez is :doc:`../releases/version-10`.
 
-The current version of Tezos is :ref:`version-9`.
+This website
+------------
+
+This website (https://tezos.gitlab.io/) provides online developer documentation.
+This documentation is about Octez, although it also documents Tezos in general.
+
+The developer documentation is automatically generated from the master branch
+of the above repository.
 
 .. _tezos_community:
 
@@ -52,7 +59,7 @@ The Community
     - https://www.tezos.help
     - https://tezos.rocks
 
-- More resources can be found in the :ref:`support` page.
+- More resources can be found in the :doc:`introduction/support` page.
 
 
 The Networks
@@ -98,6 +105,7 @@ in the :ref:`introduction <howtoget>`.
    introduction/howtouse
    introduction/howtorun
    introduction/test_networks
+   introduction/get_troubleshooting
    introduction/support
 
 .. toctree::
@@ -134,28 +142,32 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 009 Florence doc:
+   :caption: 010 Granada Protocol doc:
 
    active/michelson
    active/proof_of_stake
+   active/consensus
    active/sapling
    active/voting
    active/glossary
    active/cli-commands
    active/rpc
+   active/liquidity_baking
 
 .. toctree::
    :maxdepth: 2
-   :caption: 010 Granada Protocol doc:
+   :caption: 011 Hangzhou Protocol doc:
 
-   010/michelson
-   010/proof_of_stake
-   010/sapling
-   010/voting
-   010/glossary
-   010/cli-commands
-   010/rpc
-   010/liquidity_baking
+   011/michelson
+   011/proof_of_stake
+   011/consensus
+   011/sapling
+   011/voting
+   011/glossary
+   011/cli-commands
+   011/rpc
+   011/liquidity_baking
+   011/timelock
 
 .. toctree::
    :maxdepth: 2
@@ -163,12 +175,14 @@ in the :ref:`introduction <howtoget>`.
 
    alpha/michelson
    alpha/proof_of_stake
+   alpha/consensus
    alpha/sapling
    alpha/voting
    alpha/glossary
    alpha/cli-commands
    alpha/rpc
    alpha/liquidity_baking
+   alpha/timelock
 
 .. toctree::
    :maxdepth: 2
@@ -177,15 +191,13 @@ in the :ref:`introduction <howtoget>`.
    developer/rpc
    developer/encodings
    developer/data_encoding
+   developer/gadt
    developer/error_monad
    developer/michelson_anti_patterns
    developer/entering_alpha
    developer/protocol_environment
-   developer/testing
-   developer/flextesa
-   developer/python_testing_framework
-   developer/tezt
-   developer/proposal_testing
+   developer/protocol_environment_upgrade
+   developer/testing_index
    developer/profiling
    developer/snoop
    developer/contributing
@@ -206,6 +218,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/008_edo
    protocols/009_florence
    protocols/010_granada
+   protocols/011_hangzhou
    protocols/alpha
 
 .. toctree::
@@ -222,6 +235,8 @@ in the :ref:`introduction <howtoget>`.
    releases/version-7
    releases/version-8
    releases/version-9
+   releases/version-10
+   releases/version-11
 
 .. toctree::
    :maxdepth: 2

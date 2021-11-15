@@ -1,12 +1,7 @@
-.. _testing:
-
 Overview of Testing in Tezos
 ============================
 
-Testing is important to ensure the quality of the Tezos codebase by
-detecting bugs and avoiding regressions. Tezos and its
-components use a variety of tools and frameworks for testing. The goal
-of this document is to give an overview on how testing is done in
+The goal of this document is to give an overview on how testing is done in
 Tezos, and to help Tezos contributors use the test suite and
 write tests by pointing them towards the most
 appropriate testing framework for their use case. Finally, this guide
@@ -136,6 +131,7 @@ References:
 
 QCheck
 ~~~~~~~
+
 `QCheck <https://github.com/c-cube/qcheck>`_ is a library for
 property-based testing in OCaml.
 
@@ -150,37 +146,13 @@ References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
  - `QCheck module documentation <https://c-cube.github.io/qcheck/>`_
 
-Crowbar
-~~~~~~~
-
-`Crowbar <https://github.com/stedolan/crowbar>`_ is a library for
-property-based testing and fuzzing in OCaml. It also interfaces with `afl
-<https://lcamtuf.coredump.cx/afl/>`_ to enable fuzzing.
-
-Typical use cases:
- - Verifying input-output invariants for functions with
-   randomized inputs.
-
-Example test:
- - Crowbar is used in :opam:`data-encoding`, a Tezos component that
-   has been spun off into its own opam package. For instance, :opam:`data-encoding` uses
-   Crowbar to `verify that serializing and
-   deserializing a value
-   <https://gitlab.com/nomadic-labs/data-encoding/-/blob/master/test/test_generated.ml>`_
-   results in the initial value.  To run this test, you need to
-   checkout and build :opam:`data-encoding`. Then, run ``dune
-   @runtest_test_generated``.
-
-References:
- - `Crowbar README <https://github.com/stedolan/crowbar>`_
-
 .. _pytest_section:
 
 Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Tezos project uses `pytest <http://pytest.org/>`_, a Python testing
-framework, combined with :ref:`tezos-launchers <python_testing_framework>`, a Python wrapper
+The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
+framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
 ``tezos-node`` and ``tezos-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
@@ -216,7 +188,7 @@ Example tests:
 
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
- - :ref:`python_testing_framework`
+ - :doc:`python_testing_framework`
  - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
  - :ref:`Section in Tezos Developer Documentation on pytest-regtest <pytest_regression_testing>`
@@ -241,7 +213,7 @@ Example test:
    scenarios (in :src:`src/bin_sandbox/command_accusations.ml`)
 
 References:
- - :ref:`Section in Tezos Developer Documentation on Flextesa <flexible_network_sandboxes>`
+ - :doc:`Section in Tezos Developer Documentation on Flextesa <flextesa>`
  - `Blog post introducing Flextesa
    <https://medium.com/@obsidian.systems/introducing-flextesa-robust-testing-tools-for-tezos-and-its-applications-edc1e336a209>`_
  - `GitLab repository <https://gitlab.com/tezos/flextesa>`_
@@ -253,13 +225,13 @@ References:
 Tezt
 ~~~~
 
-:ref:`Tezt <tezt>` is a system testing framework for Tezos. It is
+:doc:`Tezt <tezt>` is a system testing framework for Tezos. It is
 intended as a replacement to Flextesa and as an OCaml-based alternative
 to :ref:`Python testing and execution framework
 <pytest_section>`. Like the latter, Tezt is also capable of regression
 testing. Tezt focuses on tests that run in the CI, although it is also
 used for some manual tests (see the :src:`tezt/manual_tests`
-folder). Its main strengths are summarized in its :ref:`section in the
+folder). Its main strengths are summarized in its :doc:`section in the
 Tezos Developer Documentation <tezt>`. Conceptually Tezt consists of a
 generic framework for writing tests interacting with external
 processes, and a set of Tezos-specific modules for interacting with
@@ -280,9 +252,17 @@ Example tests:
  - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
 
 References:
- - :ref:`Section in Tezos Developer Documentation on Tezt <tezt>`
+ - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
+
+Long Tests
+""""""""""
+
+Tezt is also used for tests that are too long to run in the CI. Those
+tests are run on dedicated machines and can send data points to an
+InfluxDB instance to produce graphs using Grafana and/or detect
+performance regressions. See :doc:`long-tezts`.
 
 ..
    .. _michelson_unit_tests:
@@ -303,7 +283,6 @@ References:
    References:
     - `Merge request defining the Michelson unit test format <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`_
     - `A conformance test suite for Michelson interpreter using the Michelson unit test format <https://github.com/runtimeverification/michelson-semantics/tree/master/tests/unit>`_
-
 
 .. _gitlab_test_ci:
 
@@ -343,35 +322,20 @@ project directory:
     make build-dev-deps
 
 The OCaml code should be instrumented in order to generate coverage data. This
-has to be specified in ``dune`` files (or ``dune.inc`` for protocols)
-on a per-package basis by adding the following line in the ``library``
-or ``executable`` stanza.
+is done by prepending
 
 ::
 
-    (preprocess (pps bisect_ppx -- --bisect-file /path/to/tezos.git/_coverage_output))))
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/
 
-At the same time, it tells ``bisect_ppx`` to generate coverage data in the
-``_coverage_output`` directory.
-The convenience script ``./scripts/instrument_dune_bisect.sh`` does
-this automatically. For instance,
+to build and test commands run from the root of the project directory. For example,
 
 ::
 
-    ./scripts/instrument_dune_bisect.sh src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make test-coverage
 
-enables code coverage analysis for ``lib_p2p`` and ``proto_alpha``.
-To instrument all the code in ``src/``, use:
-
-::
-
-    ./scripts/instrument_dune_bisect.sh src/
-
-Then, compile the code using ``make``, ignoring warnings such as
-``.merlin generated is inaccurate.`` which
-`are expected <https://discuss.ocaml.org/t/ann-dune-1-10-0/3896/3>`_.
-Finally run any number of tests, and
-generate the HTML report from the coverage files using
+Generate the HTML report from the coverage files using
 
 ::
 
@@ -388,17 +352,70 @@ Clean up coverage data (output and report) with:
     make coverage-clean
 
 
-To reset the updated ``dune`` files, you may either use ``git``:
+If calling ``dune`` directly, instrumentation is achieved by setting
+``BISECT_FILE`` environment variable to an existing directory and
+appending the flag ``--instrument-with``. Let's consider
+``lib_mockup`` as an example:
 
 ::
 
-    git checkout -- src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
+   cd src/lib_mockup
+   mkdir -p _coverage_output/
+   BISECT_FILE=$(pwd)/_coverage_output/ dune build --instrument-with bisect_ppx
 
-or use the ``--remove`` option of the instrumentation script:
+Now, still in the ``src/lib_mockup`` directory, run test commands:
 
 ::
 
-    ./scripts/instrument_dune_bisect.sh --remove src/
+   BISECT_FILE=$(pwd)/_coverage_output/ dune test -f --instrument-with bisect_ppx
+
+In this folder, we do not have the ``make coverage-report``. However,
+this target is simply a shortcut to the ``bisect-ppx-report`` binary. This
+command must be run from the root of the project:
+
+::
+
+   cd ../../
+   bisect-ppx-report html -o _coverage_report_mockup --coverage-path src/lib_mockup/_coverage_output/
+
+The report will now be found in ``_coverage_report_mockup``.
+
+
+Enabling instrumentation for new libraries and executables
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+To ensure that all libraries and executables are included in the
+coverage report, the following field should be added to all ``library``
+and ``executable(s)`` stanzas in all ``dune`` files, e.g.:
+
+::
+
+ (library
+   (name ...)
+   (instrumentation
+     (backend bisect_ppx)))
+
+This enables the conditional instrumentation of the compilation unit
+through the ``--instrument-with bisect_ppx`` flag as described above.
+
+Exempted from this rule are the ``dune`` files that belong to tests,
+developer utilities and old protocols. In particular:
+
+ - benchmarks, e.g. ``src/lib_shell/bench/dune``
+ - bindings, e.g. ``src/lib_sapling/bindings/dune``
+ - test frameworks, e.g. ``src/bin_sandbox/dune``
+ - test packages, e.g. ``src/*/test/dune``
+ - old protocols, e.g. ``src/proto_00*/*/*dune``
+ - helper utilities, e.g.:
+
+   - ``src/openapi/dune``, (executable name ``openapi``)
+   - ``src/lib_client_base/gen/dune`` (executable name ``bip39_generator``)
+   - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
+   - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
+   - ``src/proto_010_PtGRANAD/lib_parameters/dune`` (executable name ``gen``)
+   - ``src/lib_protocol_environment/s_packer/dune`` (executable name ``s_packer``)
+   - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
+
 
 
 Known issues
@@ -413,25 +430,6 @@ Known issues
        4410  *** invalid file: '_coverage_output/819770417.coverage' error: "unexpected end of file while reading magic number"
 
    In that case, either delete the problematic files or re-launch the tests and re-generate the report.
-
-2. Instrumented code doesn't compile on certain pattern-matching constructs
-   with ``bisect_ppx <= 2.5.0``
-
-   ::
-
-        File "src/proto_008_PtEdoTez/lib_protocol/script_ir_translator.ml", line 1074, characters 13-14:
-        1074 |   | Lambda_t _
-
-        Error: This pattern matches values of type $5 ty
-            but a pattern was expected which matches values of type 'a ty
-            The type constructor $5 would escape its scope
-
-    This issue is solved in the development version of ``bisect_ppx``. It can
-    be obtained with
-
-    ::
-
-        opam pin add bisect_ppx.2.5.0 --dev-repo --yes
 
 Executing tests through the GitLab CI
 -------------------------------------
@@ -464,7 +462,7 @@ Tezt integration and regression tests
    Tezt tests are grouped in 3 batch jobs. New tests increases the
    size of the last batch.
 
-The OCaml package tests (Alcotest, Crowbar & QCheck)
+The OCaml package tests (Alcotest & QCheck)
    The OCaml package tests are regrouped analogously to the ``pytest``\ s:
    one job per protocol package, in addition to one job regrouping
    tests for remaining packages.
@@ -489,9 +487,16 @@ Tezt integration and regression tests
   To rebalance the Tezt batches, run (from the root of the Tezos repository):
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
-The OCaml package tests (Alcotest, Crowbar & QCheck)
-  Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
-  include your new test in :src:`.gitlab-ci.yml`.
+The OCaml package tests (Alcotest & QCheck)
+  
+  Any non-protocol tests located in a folder named ``src/**/test/`` will be
+  picked up automatically by the CI. No intervention is necessary.
+
+  Protocol tests must be added to :src:`.gitlab/ci/unittest.yml` under the
+  protocol that they are testing. For example, to run a new protocol test for
+  ``proto_XXX_YYYYYYYY``, add the corresponding
+  ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
+  ``make`` invocation.
 
 Other (including Flextesa)
   For other types of tests, you need to manually modify the
@@ -500,32 +505,25 @@ Other (including Flextesa)
   this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
-Launching tests manually and measuring coverage in the CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Measuring test coverage in the CI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Another way to run the tests is to trigger manually the job
-``test_coverage`` in stage ``test_coverage``, from the Gitlab CI web interface.
-This job simply runs ``dune build @runtest`` in the project directory,
-followed by ``make all`` in the directory ``tests_python``. This is slower
-than the previous method, and it is not run by default.
+To measure test coverage in the CI, trigger the jobs ``test_coverage[...]`` in
+stage ``test_coverage`` These jobs can either be triggered manually
+from the Gitlab CI web interface. These jobs build Octez with coverage
+instrumentation, and then run respectively:
 
-The role of having this extra testing stage is twofold.
+ - ``make test-unit``, executing all unit, integration and property-based tests
+ - ``make test-python-alpha``, executing the Python system tests for
+   protocol Alpha. We restrict to protocol Alpha to avoid CI timeouts.
+ - ``make test-tezt-coverage``, executing the full set of Tezt tests with a
+   timeout of 30 minutes per test case.
 
-- It can be launched locally in a container environment (see next section),
-- it can be used to generate a code coverage report, from the CI.
+Finally the coverage reports are generated: one for
+unit tests, one for the Python system tests and one for the Tezt suite.
 
-The coverage report artefact can be downloaded or browsed from the CI page upon completion
-of ``test_coverage``. It can also be published on a publicly available webpage
-linked to the gitlab repository. This is done by triggering manually
-the ``pages`` job in the ``publish_coverage`` stage, from the Gitlab CI
-web interface.
-
-Up to a few minutes after the ``pages`` job is completed, the report is
-published at the URL indicated in the log of the ``pages`` job. The actual URL
-depends on the names of the GitLab account and project which triggered
-the pipeline, as well as on the pipeline number. Examples:
-``https://nomadic-labs.gitlab.io/tezos/105822404/``,
-``https://tezos.gitlab.io/tezos/1234822404/``.
+The resulting coverage reports are stored as artifacts that can be
+downloaded or browsed from the CI page upon completion of the job.
 
 .. _executing_gitlab_ci_locally:
 
@@ -605,4 +603,4 @@ follow this convention:
 3. Each file name must be prefixed by ``test_`` to preserve a uniform
    directory structure.
 
-4. OCaml comments must be valid ``ocamldoc`` `special comments <https://caml.inria.fr/pub/docs/manual-ocaml/ocamldoc.html#s:ocamldoc-comments>`_.
+4. OCaml comments must be valid ``ocamldoc`` `special comments <https://ocaml.org/manual/ocamldoc.html#s:ocamldoc-comments>`_.

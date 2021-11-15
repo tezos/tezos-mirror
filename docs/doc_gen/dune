@@ -4,11 +4,13 @@
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell
+            tezos-rpc-http-server
             tezos-protocol-updater
             ; TODO nomadic-labs/tezos#462: adapt next line(s)
-            tezos-embedded-protocol-009-PsFLoren
             tezos-embedded-protocol-010-PtGRANAD
+            tezos-embedded-protocol-011-PtHangz2
             tezos-embedded-protocol-alpha
+            data-encoding
             re)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix

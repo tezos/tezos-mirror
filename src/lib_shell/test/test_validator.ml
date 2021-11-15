@@ -26,12 +26,10 @@
 (** Testing
     -------
     Component:    Shell (Validator)
-    Invocation:   dune exec src/lib_shell/test/test.exe test "validator"
+    Invocation:   dune exec src/lib_shell/runtest
     Subject:      Unit tests for validator. Currently only tests that
                   events are emitted.
 *)
-
-module Mock_sink = Test_services.Mock_sink
 
 (** [init_validator f] setups a mock validator, a mock block validator and
     mock chain and passes it them to the test function [f]. *)
@@ -76,7 +74,7 @@ let init_validator
   | Error errors ->
       Format.printf
         "Could not initialize validator:\n   %a\n"
-        pp_print_error
+        pp_print_trace
         errors ;
       Format.print_flush () ;
       Lwt.return_unit
@@ -85,7 +83,7 @@ let init_validator
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f] *)
 let wrap f _switch () =
-  Test_services.with_empty_mock_sink (fun _ ->
+  Tztest.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_validator f test_dir _switch ()))
 
@@ -101,7 +99,7 @@ let validator_events validator block_validator chain _switch () =
     chain
   >>= function
   | Error trace ->
-      Format.printf "Error:\n   %a\n" pp_print_error trace ;
+      Format.printf "Error:\n   %a\n" pp_print_trace trace ;
       Format.print_flush () ;
       Lwt.return_unit
   | Ok _ ->

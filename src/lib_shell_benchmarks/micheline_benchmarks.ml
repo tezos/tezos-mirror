@@ -52,12 +52,9 @@ let sample_z _ = Z.zero
 let sample (w : width_function) rng_state =
   let rec sample depth rng_state k =
     match sample_kind rng_state with
-    | Int_node ->
-        k (Micheline.Int (0, sample_z rng_state))
-    | String_node ->
-        k (Micheline.String (0, sample_string rng_state))
-    | Bytes_node ->
-        k (Micheline.Bytes (0, sample_bytes rng_state))
+    | Int_node -> k (Micheline.Int (0, sample_z rng_state))
+    | String_node -> k (Micheline.String (0, sample_string rng_state))
+    | Bytes_node -> k (Micheline.Bytes (0, sample_bytes rng_state))
     | Seq_node ->
         let width = w ~depth rng_state in
         sample_list
@@ -110,12 +107,9 @@ let micheline_size (n : node) =
   let rec micheline_size n acc =
     let open Micheline in
     match n with
-    | Int (_, i) ->
-        acc @+ int i
-    | String (_, s) ->
-        acc @+ string s
-    | Bytes (_, b) ->
-        acc @+ bytes b
+    | Int (_, i) -> acc @+ int i
+    | String (_, s) -> acc @+ string s
+    | Bytes (_, b) -> acc @+ bytes b
     | Seq (_, terms) ->
         List.fold_left
           (fun acc term -> micheline_size term acc)
@@ -156,11 +150,13 @@ module Micheline_strip_locations : Benchmark.S = struct
       [("nodes", float_of_int nodes); ("bytes", float_of_int bytes)]
 
   let models =
-    [ ( "strip_locations_model",
+    [
+      ( "strip_locations_model",
         Model.(
           make
             ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "nodes"))) ) ]
+            ~model:(linear ~coeff:(Free_variable.of_string "nodes"))) );
+    ]
 
   let create_benchmark rng_state () =
     let term = sample rng_state in

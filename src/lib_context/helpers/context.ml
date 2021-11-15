@@ -67,12 +67,14 @@ module Make_tree (Store : DB) = struct
     | Some t ->
         Store.Tree.fold
           ?depth
-          ~force:`And_clear
+          ~force:`True
+          ~cache:false
           ~uniq:`False
-          ~node:(fun k v acc -> f k (Store.Tree.of_node v) acc)
-          ~contents:(fun k v acc ->
-            if k = [] then Lwt.return acc
-            else f k (Store.Tree.of_contents v) acc)
+          ~order:`Sorted
+          ~tree:(fun k t acc ->
+            match kind t with
+            | `Value -> if k = [] then Lwt.return acc else f k t acc
+            | `Tree -> f k t acc)
           t
           init
 
@@ -157,4 +159,59 @@ module Make_tree (Store : DB) = struct
       (match kinded_hash with
       | `Node hash -> `Node (Hash.of_context_hash hash)
       | `Contents hash -> `Contents (Hash.of_context_hash hash, ()))
+
+  let list tree ?offset ?length key =
+    Store.Tree.list ~cache:true tree ?offset ?length key
+
+  exception Context_dangling_hash of string
+
+  let find_tree tree key =
+    Lwt.catch
+      (fun () -> Store.Tree.find_tree tree key)
+      (function
+        | Dangling_hash {context; hash} ->
+            let str =
+              Fmt.str
+                "%s encountered dangling hash %a"
+                context
+                (Irmin.Type.pp Hash.t)
+                hash
+            in
+            raise (Context_dangling_hash str)
+        | exn -> raise exn)
+
+  let add_tree tree key value =
+    Lwt.catch
+      (fun () -> Store.Tree.add_tree tree key value)
+      (function
+        | Dangling_hash {context; hash} ->
+            let str =
+              Fmt.str
+                "%s encountered dangling hash %a"
+                context
+                (Irmin.Type.pp Hash.t)
+                hash
+            in
+            raise (Context_dangling_hash str)
+        | exn -> raise exn)
 end
+
+type error += Unsupported_context_hash_version of Context_hash.Version.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"context_hash.unsupported_version"
+    ~title:"Unsupported context hash version"
+    ~description:"Unsupported context hash version."
+    ~pp:(fun ppf version ->
+      Format.fprintf
+        ppf
+        "@[Context hash version %a is not supported.@,\
+         You might need to update the shell.@]"
+        Context_hash.Version.pp
+        version)
+    Data_encoding.(obj1 (req "version" Context_hash.Version.encoding))
+    (function
+      | Unsupported_context_hash_version version -> Some version | _ -> None)
+    (fun version -> Unsupported_context_hash_version version)

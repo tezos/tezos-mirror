@@ -74,23 +74,16 @@ val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 (** Notify the prevalidator worker of a new injected operation. *)
 val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
 
-(** Notify the prevalidator that a new head has been selected. *)
+(** Notify the prevalidator that a new head has been selected.
+    [update] is used as an optimisation to know which operations
+    previously classified require to be prevalidated again. *)
 val flush :
   t ->
+  Chain_validator_worker_state.Event.update ->
   Block_hash.t ->
   Block_hash.Set.t ->
   Operation_hash.Set.t ->
   unit tzresult Lwt.t
-
-(** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
-    reset of the prevalidation context *)
-val timestamp : t -> Time.System.t
-
-(** Returns the list of valid operations known to this prevalidation worker *)
-val operations : t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
-
-(** Returns the list of pending operations known to this prevalidation worker *)
-val pending : t -> Operation.t Operation_hash.Map.t Lwt.t
 
 (** Returns the list of prevalidation contexts running and their associated chain *)
 val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
@@ -117,6 +110,10 @@ val current_request :
   (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view)
   option
 
+(** [DEPRECATED] This function is legacy and should be removed. Currently, it
+   always answers `[]`.
+
+    See https://gitlab.com/tezos/tezos/-/issues/1714 *)
 val last_events :
   t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 

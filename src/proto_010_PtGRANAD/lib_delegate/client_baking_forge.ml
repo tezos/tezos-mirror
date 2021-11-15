@@ -151,7 +151,7 @@ let assert_valid_operations_hash shell_header operations =
     (Operation_list_list_hash.equal
        operations_hash
        shell_header.Tezos_base.Block_header.operations_hash)
-    (failure "Client_baking_forge.inject_block: inconsistent header.")
+    (error_of_fmt "Client_baking_forge.inject_block: inconsistent header.")
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     ~priority ~delegate_pkh ~delegate_sk ~level operations
@@ -208,7 +208,7 @@ let () =
         "@[Failed to preapply %a:@ @[<v 4>%a@]@]"
         Operation_hash.pp_short
         h
-        pp_print_error
+        pp_print_trace
         err)
     Data_encoding.(
       obj2
@@ -970,31 +970,36 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
       return_some
         (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
-let filter_outdated_endorsements expected_level ops =
-  List.filter
+let extract_op_and_filter_outdated_endorsements expected_level ops =
+  List.filter_map
     (function
-      | {
-          Alpha_context.protocol_data =
-            Operation_data
-              {
-                contents =
-                  Single
-                    (Endorsement_with_slot
-                      {
-                        endorsement =
-                          {
-                            protocol_data =
-                              {contents = Single (Endorsement {level; _}); _};
-                            _;
-                          };
-                        _;
-                      });
-                _;
-              };
-          _;
-        } ->
-          Raw_level.equal expected_level level
-      | _ -> true)
+      | ( ( _,
+            ({
+               Alpha_context.protocol_data =
+                 Operation_data
+                   {
+                     contents =
+                       Single
+                         (Endorsement_with_slot
+                           {
+                             endorsement =
+                               {
+                                 protocol_data =
+                                   {
+                                     contents = Single (Endorsement {level; _});
+                                     _;
+                                   };
+                                 _;
+                               };
+                             _;
+                           });
+                     _;
+                   };
+               _;
+             } as op) ),
+          _ ) ->
+          if Raw_level.equal expected_level level then Some op else None
+      | ((_, op), _) -> Some op)
     ops
 
 (** [fetch_operations] retrieve the operations present in the
@@ -1035,7 +1040,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
   | Some current_mempool ->
       let operations =
         ref
-          (filter_outdated_endorsements
+          (extract_op_and_filter_outdated_endorsements
              head.Client_baking_blocks.level
              current_mempool)
       in
@@ -1093,7 +1098,9 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
         >>= function
         | `Event (Some op_list) ->
             last_get_event := None ;
-            let op_list = filter_outdated_endorsements head.level op_list in
+            let op_list =
+              extract_op_and_filter_outdated_endorsements head.level op_list
+            in
             notify_endorsement_arrival op_list >>= fun () ->
             let added_endorsing_power =
               compute_endorsing_power endorsement_powers op_list
@@ -1106,7 +1113,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
             (* Retrieve the remaining operations present in the stream
                before block construction *)
             let remaining_operations =
-              filter_outdated_endorsements
+              extract_op_and_filter_outdated_endorsements
                 head.level
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in
@@ -1360,7 +1367,7 @@ let traced_option_to_result ~error =
   Option.fold ~some:ok ~none:(Error_monad.error error)
 
 let check_file_exists file =
-  if Sys.file_exists file then ok_unit
+  if Sys.file_exists file then Result.return_unit
   else error (Block_vote_file_not_found file)
 
 let read_liquidity_baking_escape_vote ~per_block_vote_file =
@@ -1460,7 +1467,7 @@ let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
                load cctxt state.nonces_location >>=? fun nonces ->
                let nonces = add nonces block_hash seed_nonce in
                save cctxt state.nonces_location nonces)
-           |> trace_exn (Failure "Error while recording nonce")
+           |> generic_trace "Error while recording nonce"
           else return_unit)
           >>=? fun () -> return_unit)
   | None -> return_unit

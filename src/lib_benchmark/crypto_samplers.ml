@@ -51,14 +51,23 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
 
   let key_pool = Queue.create ()
 
-  let algo = match Arg.algo with `Default -> None | `Algo a -> Some a
+  let all_algos = [|Signature.Ed25519; Signature.Secp256k1; Signature.P256|]
+
+  let uniform_algo state =
+    let i = Random.State.int state (Array.length all_algos) in
+    all_algos.(i)
 
   let get_next state =
     if Queue.length key_pool < Arg.size then (
+      let algo =
+        match Arg.algo with
+        | `Default -> uniform_algo state
+        | `Algo algo -> algo
+      in
       let seed =
         Base_samplers.uniform_bytes ~nbytes:minimal_seed_length state
       in
-      let triple = Signature.generate_key ?algo ~seed () in
+      let triple = Signature.generate_key ~algo ~seed () in
       Queue.add triple key_pool ;
       triple)
     else

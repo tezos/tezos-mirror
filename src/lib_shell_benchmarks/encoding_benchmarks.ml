@@ -33,12 +33,9 @@ end) =
 struct
   let algo_name =
     match A.algo with
-    | Signature.Ed25519 ->
-        "ed25519"
-    | Signature.Secp256k1 ->
-        "secp256k1"
-    | Signature.P256 ->
-        "p256"
+    | Signature.Ed25519 -> "ed25519"
+    | Signature.Secp256k1 -> "secp256k1"
+    | Signature.P256 -> "p256"
 
   module Sampler = Crypto_samplers.Make_finite_key_pool (struct
     let size = 256

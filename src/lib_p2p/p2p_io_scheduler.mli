@@ -70,34 +70,8 @@ val write :
     added to [conn]'s write queue, [false] if it has been dropped. *)
 val write_now : connection -> Bytes.t -> bool
 
-(** Container to write data to when reading bytes from a connection *)
-type buffer
-
-(** [mk_buffer ?pos ?len buf] creates an instance of {!buffer},
-    for copying [len] bytes starting at [pos] in [buf]. If [pos] is omitted,
-    it is defaulted to [0]. If [len] is omitted, it is defaulted to
-    [Bytes.length buf - pos]. *)
-val mk_buffer : ?pos:int -> ?len:int -> bytes -> (buffer, tztrace) result
-
-(** [mk_buffer_safe buf] creates an instance of {!buffer},
-    that uses the entirety of [buf]; i.e. it will read at most
-    [Bytes.length buf] bytes from the connection, and will write
-    starting at position [0]. *)
-val mk_buffer_safe : bytes -> buffer
-
-(** [read_now conn buffer] blits at most [buffer.len] bytes from
-    [conn]'s read queue and returns the number of bytes written in
-    [buffer.buf] starting at [buffer.pos]. *)
-val read_now : connection -> buffer -> int tzresult option
-
-(** Like [read_now], but waits till [conn] read queue has at least one
-    element instead of failing. *)
-val read :
-  ?canceler:Lwt_canceler.t -> connection -> buffer -> int tzresult Lwt.t
-
-(** Like [read], but blits exactly [len] bytes in [buf]. *)
-val read_full :
-  ?canceler:Lwt_canceler.t -> connection -> buffer -> unit tzresult Lwt.t
+(** Returns the [readable] of an abstract [connection] *)
+val to_readable : connection -> P2p_buffer_reader.readable
 
 (** [stat conn] is a snapshot of current bandwidth usage for
     [conn]. *)
@@ -130,10 +104,3 @@ val shutdown : ?timeout:float -> t -> unit Lwt.t
 (** [id connection] returns the identifier of the underlying [P2p_fd.t]
     file descriptor. This uniquely identifies a connection. *)
 val id : connection -> int
-
-(** Module for testing only, do not use in production. *)
-module Internal : sig
-  (** [destruct_buffer buf] returns the [pos], [len], and [buf] values
-        of the given {!buffer}. See {!mk_buffer}. *)
-  val destruct_buffer : buffer -> int * int * Bytes.t
-end

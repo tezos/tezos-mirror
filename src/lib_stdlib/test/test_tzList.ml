@@ -26,7 +26,7 @@
 (** Testing
     _______
 
-    Invocation: dune build @src/lib_stdlib/test/runtest_tzList
+    Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
 let rec permut = function

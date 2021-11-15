@@ -26,12 +26,18 @@
 
 module Request = struct
   type 'a t =
-    | Flush : Block_hash.t * Block_hash.Set.t * Operation_hash.Set.t -> unit t
+    | Flush :
+        Block_hash.t
+        * Chain_validator_worker_state.Event.update
+        * Block_hash.Set.t
+        * Operation_hash.Set.t
+        -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
+    | Ban : Operation_hash.t -> unit t
 
   type view = View : _ t -> view
 
@@ -44,12 +50,17 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Flush"
-          (obj2
+          (obj3
              (req "request" (constant "flush"))
-             (req "block" Block_hash.encoding))
-          (function View (Flush (hash, _, _)) -> Some ((), hash) | _ -> None)
-          (fun ((), hash) ->
-            View (Flush (hash, Block_hash.Set.empty, Operation_hash.Set.empty)));
+             (req "block" Block_hash.encoding)
+             (req "event" Chain_validator_worker_state.Event.update_encoding))
+          (function
+            | View (Flush (hash, event, _, _)) -> Some ((), hash, event)
+            | _ -> None)
+          (fun ((), hash, event) ->
+            View
+              (Flush
+                 (hash, event, Block_hash.Set.empty, Operation_hash.Set.empty)));
         case
           (Tag 1)
           ~title:"Notify"
@@ -91,11 +102,19 @@ module Request = struct
           (obj1 (req "request" (constant "leftover")))
           (function View Leftover -> Some () | _ -> None)
           (fun () -> View Leftover);
+        case
+          (Tag 6)
+          ~title:"Ban"
+          (obj2
+             (req "request" (constant "ban"))
+             (req "operation_hash" Operation_hash.encoding))
+          (function View (Ban oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> View (Ban oph));
       ]
 
   let pp ppf (View r) =
     match r with
-    | Flush (hash, _, _) ->
+    | Flush (hash, _, _, _) ->
         Format.fprintf ppf "switching to new head %a" Block_hash.pp hash
     | Notify (id, {Mempool.known_valid; pending}) ->
         Format.fprintf
@@ -120,36 +139,17 @@ module Request = struct
     | Arrived (oph, _) ->
         Format.fprintf ppf "operation %a arrived" Operation_hash.pp oph
     | Advertise -> Format.fprintf ppf "advertising pending operations"
+    | Ban oph -> Format.fprintf ppf "banning operation %a" Operation_hash.pp oph
 end
 
-module Event = struct
-  type t =
-    | Request of
-        (Request.view * Worker_types.request_status * error list option)
-    | Invalid_mempool_filter_configuration
-    | Unparsable_operation of Operation_hash.t
-    | Processing_n_operations of int
-    | Fetching_operation of Operation_hash.t
-    | Operation_included of Operation_hash.t
-    | Operations_not_flushed of int
+module Operation_encountered = struct
+  type situation =
+    | Injected
+    | Arrived
+    | Notified of P2p_peer_id.t option
+    | Other
 
-  type view = t
-
-  let view t = t
-
-  let level req =
-    let open Request in
-    match req with
-    | Request (View (Flush _), _, _) -> Internal_event.Notice
-    | Request (View (Notify _), _, _) -> Internal_event.Debug
-    | Request (View Leftover, _, _) -> Internal_event.Debug
-    | Request (View (Inject _), _, _) -> Internal_event.Notice
-    | Request (View (Arrived _), _, _) -> Internal_event.Debug
-    | Request (View Advertise, _, _) -> Internal_event.Debug
-    | Invalid_mempool_filter_configuration | Unparsable_operation _
-    | Processing_n_operations _ | Fetching_operation _ | Operation_included _
-    | Operations_not_flushed _ ->
-        Internal_event.Debug
+  type t = situation * Operation_hash.t
 
   let encoding =
     let open Data_encoding in
@@ -158,142 +158,71 @@ module Event = struct
       [
         case
           (Tag 0)
-          ~title:"Request"
+          ~title:"injected"
           (obj2
-             (req "request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding))
-          (function Request (req, t, None) -> Some (req, t) | _ -> None)
-          (fun (req, t) -> Request (req, t, None));
+             (req "situation" (constant "injected"))
+             (req "operation" Operation_hash.encoding))
+          (function (Injected, oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> (Injected, oph));
         case
           (Tag 1)
-          ~title:"Failed request"
-          (obj3
-             (req "error" RPC_error.encoding)
-             (req "failed_request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding))
-          (function
-            | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-          (fun (errs, req, t) -> Request (req, t, Some errs));
+          ~title:"arrived"
+          (obj2
+             (req "situation" (constant "arrived"))
+             (req "operation" Operation_hash.encoding))
+          (function (Arrived, oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> (Arrived, oph));
         case
           (Tag 2)
-          ~title:"invalid_mempool_configuration"
-          empty
-          (function
-            | Invalid_mempool_filter_configuration -> Some () | _ -> None)
-          (fun () -> Invalid_mempool_filter_configuration);
+          ~title:"notified"
+          (obj3
+             (req "situation" (constant "notified"))
+             (req "operation" Operation_hash.encoding)
+             (req "peer" (option P2p_peer_id.encoding)))
+          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
+          (fun ((), oph, peer) -> (Notified peer, oph));
         case
           (Tag 3)
-          ~title:"unparsable_operation"
-          Operation_hash.encoding
-          (function Unparsable_operation oph -> Some oph | _ -> None)
-          (fun oph -> Unparsable_operation oph);
-        case
-          (Tag 4)
-          ~title:"processing_n_operations"
-          int31
-          (function Processing_n_operations n -> Some n | _ -> None)
-          (fun n -> Processing_n_operations n);
-        case
-          (Tag 5)
-          ~title:"fetching_operation"
-          Operation_hash.encoding
-          (function Fetching_operation oph -> Some oph | _ -> None)
-          (fun oph -> Fetching_operation oph);
-        case
-          (Tag 6)
-          ~title:"operation_included"
-          Operation_hash.encoding
-          (function Operation_included oph -> Some oph | _ -> None)
-          (fun oph -> Operation_included oph);
-        case
-          (Tag 7)
-          ~title:"operations_not_flushed"
-          int31
-          (function Operations_not_flushed n -> Some n | _ -> None)
-          (fun n -> Operations_not_flushed n);
+          ~title:"other"
+          (obj2
+             (req "situation" (constant "other"))
+             (req "operation" Operation_hash.encoding))
+          (function (Other, hash) -> Some ((), hash) | _ -> None)
+          (fun ((), oph) -> (Other, oph));
       ]
 
-  let pp ppf = function
-    | Invalid_mempool_filter_configuration ->
-        Format.fprintf ppf "invalid mempool filter configuration"
-    | Unparsable_operation oph ->
-        Format.fprintf ppf "unparsable operation %a" Operation_hash.pp oph
-    | Processing_n_operations n ->
-        Format.fprintf ppf "processing %d operations" n
-    | Fetching_operation oph ->
-        Format.fprintf ppf "fetching operation %a" Operation_hash.pp oph
-    | Operation_included oph ->
-        Format.fprintf
-          ppf
-          "operation %a included before being prevalidated"
-          Operation_hash.pp
-          oph
-    | Operations_not_flushed n ->
-        Format.fprintf ppf "%d operations were not washed by the flush" n
-    | Request (view, {pushed; treated; completed}, None) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>%a@, %a@]"
-          Request.pp
-          view
-          Worker_types.pp_status
-          {pushed; treated; completed}
-    | Request (view, {pushed; treated; completed}, Some errors) ->
-        Format.fprintf
-          ppf
-          "@[<v 0>%a@, %a, %a@]"
-          Request.pp
-          view
-          Worker_types.pp_status
-          {pushed; treated; completed}
-          (Format.pp_print_list Error_monad.pp)
-          errors
-end
+  let situation_pp ppf = function
+    | Injected -> Format.fprintf ppf "injected"
+    | Arrived -> Format.fprintf ppf "arrived"
+    | Notified None -> Format.fprintf ppf "notified from the previous run"
+    | Notified (Some pid) ->
+        Format.fprintf ppf "notified from %a" P2p_peer_id.pp pid
+    | Other -> Format.fprintf ppf "encountered"
 
-module Worker_state = struct
-  type view = {
-    head : Block_hash.t;
-    timestamp : Time.System.t;
-    fetching : Operation_hash.Set.t;
-    pending : Operation_hash.Set.t;
-    applied : Operation_hash.t list;
-    delayed : Operation_hash.Set.t;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {head; timestamp; fetching; pending; applied; delayed} ->
-        (head, timestamp, fetching, pending, applied, delayed))
-      (fun (head, timestamp, fetching, pending, applied, delayed) ->
-        {head; timestamp; fetching; pending; applied; delayed})
-      (obj6
-         (req "head" Block_hash.encoding)
-         (req "timestamp" Time.System.encoding)
-         (req "fetching" Operation_hash.Set.encoding)
-         (req "pending" Operation_hash.Set.encoding)
-         (req "applied" (list Operation_hash.encoding))
-         (req "delayed" Operation_hash.Set.encoding))
-
-  let pp ppf view =
+  let pp ppf (situation, oph) =
     Format.fprintf
       ppf
-      "@[<v 0>Head: %a@,\
-       Timestamp: %a@,\n\
-      \       @[<v 2>Fetching: %a@]@,\n\
-      \       @[<v 2>Pending: %a@]@,\n\
-      \       @[<v 2>Applied: %a@]@,\n\
-      \       @[<v 2>Delayed: %a@]@]"
-      Block_hash.pp
-      view.head
-      Time.System.pp_hum
-      view.timestamp
-      (Format.pp_print_list Operation_hash.pp)
-      (Operation_hash.Set.elements view.fetching)
-      (Format.pp_print_list Operation_hash.pp)
-      (Operation_hash.Set.elements view.pending)
-      (Format.pp_print_list Operation_hash.pp)
-      view.applied
-      (Format.pp_print_list Operation_hash.pp)
-      (Operation_hash.Set.elements view.delayed)
+      "operation %a: %a"
+      situation_pp
+      situation
+      Operation_hash.pp
+      oph
+end
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
+
+   This module should be removed once backlogs will be removed from
+   the RPC /worker/prevalidators *)
+module Event = struct
+  type t = unit
+
+  type view = t
+
+  let view t = t
+
+  let level _req = Internal_event.Debug
+
+  let encoding = Data_encoding.unit
+
+  let pp = Format.pp_print_newline
 end

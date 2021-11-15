@@ -34,7 +34,7 @@
 module type S = sig
   type key
 
-  type 'a t
+  type !'a t
 
   module Legacy : Stdlib.Hashtbl.S with type key = key and type 'a t = 'a t
 
@@ -123,7 +123,7 @@ end
 module type SeededS = sig
   type key
 
-  type 'a t
+  type !'a t
 
   module Legacy :
     Stdlib.Hashtbl.SeededS with type key = key and type 'a t = 'a t

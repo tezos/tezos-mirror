@@ -38,12 +38,49 @@ val max_proposals_per_delegate : int
 
 val max_operation_data_length : int
 
+(** A global size limit on the size of Micheline expressions
+    after expansion.
+
+    We want to prevent constants from being
+    used to create huge values that could potentially do damage
+    if ever printed or sent over the network. We arrived at this
+    number by finding the largest possible contract in terms of
+    number of nodes. The number of nodes is constrained by the
+    current "max_operation_data_length" (32768) to be ~10,000 (
+    see "largest_flat_contract.tz" in the tezt suite for the largest
+    contract with constants that can be originated). As a first
+    approximation, we set the node size limit to 5 times this amount. *)
+val max_micheline_node_count : int
+
+(** Same as [max_micheline_node_count] but for limiting the combined
+    bytes of the strings, ints and bytes in a expanded Micheline
+    expression.  *)
+val max_micheline_bytes_limit : int
+
+(** Represents the maximum depth of an expression stored
+    in the table after all references to other constants have
+    (recursively) been expanded, where depth refers to the
+    nesting of [Prim] and/or [Seq] nodes.
+
+    The size was chosen arbitrarily to match the typechecker
+    in [Script_ir_translator]. *)
+val max_allowed_global_constant_depth : int
+
+(** Each protocol defines the number of subcaches and their respective
+    limit size using [cache_layout]. *)
+val cache_layout : int list
+
+val michelson_maximum_type_size : int
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
   max_anon_ops_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
+  max_micheline_node_count : int;
+  max_micheline_bytes_limit : int;
+  max_allowed_global_constant_depth : int;
 }
 
 val fixed_encoding : fixed Data_encoding.encoding
@@ -63,7 +100,6 @@ type parametric = {
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
-  michelson_maximum_type_size : int;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
   block_security_deposit : Tez_repr.t;
@@ -100,6 +136,7 @@ module Proto_previous : sig
     blocks_per_roll_snapshot : int32;
     blocks_per_voting_period : int32;
     time_between_blocks : Period_repr.t list;
+    minimal_block_delay : Period_repr.t;
     endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
@@ -114,13 +151,15 @@ module Proto_previous : sig
     endorsement_reward : Tez_repr.t list;
     cost_per_byte : Tez_repr.t;
     hard_storage_limit_per_operation : Z.t;
-    test_chain_duration : int64;
     (* in seconds *)
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period_repr.t;
+    liquidity_baking_subsidy : Tez_repr.t;
+    liquidity_baking_sunset_level : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.encoding

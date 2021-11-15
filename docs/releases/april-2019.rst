@@ -1,5 +1,3 @@
-.. _mainnet-april-2019:
-
 Mainnet April 2019
 ==================
 

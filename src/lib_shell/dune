@@ -1,5 +1,6 @@
 (library
  (name tezos_shell)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-shell)
  (libraries lwt-watcher
             lwt-canceler

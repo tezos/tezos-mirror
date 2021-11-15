@@ -56,6 +56,7 @@ let () =
       ("saturation arithmetic", Test_saturation.tests);
       ("gas cost functions", Test_gas_costs.tests);
       ("lazy storage diff", Test_lazy_storage_diff.tests);
+      ("global table of constants", Test_global_constants_storage.tests);
       ("sapling", Test_sapling.tests);
       ("helpers rpcs", Test_helpers_rpcs.tests);
       ("failing_noop operation", Test_failing_noop.tests);
@@ -65,5 +66,7 @@ let () =
       ("level module", Test_level_module.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
       ("temp big maps", Test_temp_big_maps.tests);
+      ("timelock", Test_timelock.tests);
+      ("script typed ir size", Test_script_typed_ir_size.tests);
     ]
   |> Lwt_main.run

@@ -10,7 +10,7 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-010-PtGRANAD-parameters
-            tezos-test-services
+            tezos-base-test-helpers
             tezos-sapling
             astring
             tezos-protocol-plugin-010-PtGRANAD)
@@ -21,7 +21,7 @@
                    -open Tezos_protocol_plugin_010_PtGRANAD
                    -open Tezos_protocol_environment_010_PtGRANAD
                    -open Tezos_010_PtGRANAD_test_helpers
-                   -open Tezos_test_services)))
+                   -open Tezos_base_test_helpers)))
 
 (rule
  (alias buildtest)
@@ -38,14 +38,14 @@
  (alias runtest_proto_010_PtGRANAD)
  (deps (glob_files contracts/*))
  (package tezos-protocol-010-PtGRANAD-tests)
- (action (run %{exe:main.exe} -v -q)))
+ (action (run %{exe:main.exe} -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
  (deps (glob_files contracts/*))
  (package tezos-protocol-010-PtGRANAD-tests)
- (action (run %{exe:main.exe} -v)))
+ (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_saturation_fuzzing)

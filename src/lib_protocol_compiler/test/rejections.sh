@@ -33,8 +33,11 @@ if ! [ -f "$base_protocol" ] ; then
     usage
     exit 2
 fi
-if ! [ -f "$(dirname $base_protocol)/main.ml" ] ; then
-    say "wrong base-protocol: it needs to have a main.ml: $(dirname $base_protocol)/main.ml"
+
+base_protocol_dirname=$(dirname "$base_protocol")
+
+if ! [ -f "${base_protocol_dirname}/main.ml" ] ; then
+    say "wrong base-protocol: it needs to have a main.ml: ${base_protocol_dirname}/main.ml"
     usage
     exit 2
 fi
@@ -50,7 +53,7 @@ should_fail () {
     exit 4
 }
 
-try_compile "$(dirname $base_protocol)/"
+try_compile "$base_protocol_dirname"
 
 ################################################################################
 #
@@ -61,10 +64,11 @@ try_compile "$(dirname $base_protocol)/"
 #
 
 with_external=$(mktemp -d /tmp/proto_007_XXXX)
-cp "$(dirname $base_protocol)/"* "$with_external/"
+cp "${base_protocol_dirname}/"* "$with_external/"
 
 try_compile "$with_external/" # We check that we didn't break it with the `cp` :)
 
+chmod u+w "$with_external/main.ml"
 cat >> "$with_external/main.ml" <<EOF
 let _f =
   let module Hello = struct
@@ -84,7 +88,7 @@ EOF
 #
 
 with_weird_ends=$(mktemp -d /tmp/proto_008_XXXX)
-cp "$(dirname $base_protocol)/"* "$with_weird_ends/"
+cp "${base_protocol_dirname}/"* "$with_weird_ends/"
 try_compile "$with_weird_ends/" # We check that we didn't break it with the `cp` :)
 
 cat > "$with_weird_ends/weird.ml" <<EOF
@@ -102,6 +106,7 @@ EOF
 cat > "$with_weird_ends/closing.ml" <<EOF
 let x = 42
 EOF
+chmod u+w "$with_weird_ends/TEZOS_PROTOCOL"
 sed 's/"Main"/"Main", "Weird", "Closing"/' "$base_protocol" > "$with_weird_ends/TEZOS_PROTOCOL"
 
 { try_compile "$with_weird_ends/" && should_fail "with-weird-ends" ; } \

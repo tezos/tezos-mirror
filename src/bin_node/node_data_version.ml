@@ -205,7 +205,7 @@ module Events = struct
       ~level:Notice
       ~name:"aborting_upgrade"
       ~msg:"failed to upgrade storage: {error}"
-      ~pp1:Error_monad.pp_print_error
+      ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let upgrade_status =
@@ -331,7 +331,8 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
       | Ok _success_message ->
           write_version_file data_dir >>=? fun () ->
           Events.(emit update_success ()) >>= fun () -> return_unit
-      | Error e -> Events.(emit aborting_upgrade e) >>= fun () -> return_unit)
+      | Error e ->
+          Events.(emit aborting_upgrade e) >>= fun () -> Lwt.return (Error e))
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir >>=? function

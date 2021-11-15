@@ -1,5 +1,3 @@
-.. _support:
-
 Technical Support
 =================
 

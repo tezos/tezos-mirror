@@ -36,6 +36,26 @@ val rpc_port : t -> int
 val runner : t -> Runner.t option
 
 (** [init ?runner ?name ?rpc_port node] creates and starts a proxy server
-    that serves the given port and delegates its queries to [node]. *)
+    that serves the given port and delegates its queries to [node].
+
+    [event_level] specifies the verbosity of the file descriptor sink.
+    Possible values are: ["debug"], ["info"], ["notice"], ["warning"], ["error"],
+    and ["fatal"]. *)
 val init :
-  ?runner:Runner.t -> ?name:string -> ?rpc_port:int -> Node.t -> t Lwt.t
+  ?runner:Runner.t ->
+  ?name:string ->
+  ?rpc_port:int ->
+  ?event_level:string ->
+  Node.t ->
+  t Lwt.t
+
+(** Raw events. *)
+type event = {name : string; value : JSON.t}
+
+(** Add a callback to be called whenever the proxy_server emits an event.
+
+    This callback is never removed.
+
+    You can have multiple [on_event] handlers, although
+    the order in which they trigger is unspecified. *)
+val on_event : t -> (event -> unit) -> unit

@@ -37,6 +37,19 @@ open Client_proto_programs
 open Client_proto_args
 open Client_proto_contracts
 
+let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
+  match Data_encoding.Json.destruct encoding json with
+  | exception Data_encoding.Json.Cannot_destruct (_, exc) ->
+      cctxt#error
+        "could not decode json (%a)"
+        (Data_encoding.Json.print_error ~print_unknown:(fun fmt exc ->
+             Format.fprintf fmt "%s" (Printexc.to_string exc)))
+        exc
+  | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
+  | exception exc ->
+      cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
+  | expr -> return expr
+
 let commands () =
   let open Clic in
   let show_types_switch =
@@ -171,8 +184,8 @@ let commands () =
       ~desc:"literal or a path to a file"
       (parameter (fun cctxt s ->
            cctxt#read_file s >>= function
-           | Ok v -> return v
-           | Error _ -> return s))
+           | Ok v -> return (Some s, v)
+           | Error _ -> return (None, s)))
   in
   [
     command
@@ -441,20 +454,57 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to hash a Michelson script with `BLAKE2B`."
-      no_options
-      (prefixes ["hash"; "script"] @@ file_or_literal_param () @@ stop)
-      (fun () expr_string (cctxt : Protocol_client_context.full) ->
-        let program = Michelson_v1_parser.parse_toplevel expr_string in
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        let code = program.expanded in
-        let bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Alpha_context.Script.expr_encoding
-            code
-        in
-        let hash = Script_expr_hash.hash_bytes [bytes] in
-        cctxt#answer "%a" Script_expr_hash.pp hash >|= ok);
+      (args3
+         enforce_indentation_flag
+         display_names_flag
+         (Tezos_clic_unix.Scriptable.clic_arg ()))
+      (prefixes ["hash"; "script"] @@ seq_of_param @@ file_or_literal_param ())
+      (fun (check, display_names, scriptable)
+           expr_strings
+           (cctxt : Protocol_client_context.full) ->
+        if List.length expr_strings == 0 then
+          cctxt#warning "No scripts were specified on the command line" >|= ok
+        else
+          List.mapi_ep
+            (fun i (src, expr_string) ->
+              let program =
+                Michelson_v1_parser.parse_toplevel ~check expr_string
+              in
+              Micheline_parser.no_parsing_error program >>?= fun program ->
+              let code = program.expanded in
+              let bytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Alpha_context.Script.expr_encoding
+                  code
+              in
+              let hash =
+                Format.asprintf
+                  "%a"
+                  Script_expr_hash.pp
+                  (Script_expr_hash.hash_bytes [bytes])
+              in
+              let name =
+                Option.value
+                  src
+                  ~default:("Literal script " ^ string_of_int (i + 1))
+              in
+              return (hash, name))
+            expr_strings
+          >>=? fun hash_name_rows ->
+          Tezos_clic_unix.Scriptable.output
+            scriptable
+            ~for_human:(fun () ->
+              List.iter_s
+                (fun (hash, name) ->
+                  if display_names then cctxt#answer "%s\t%s" hash name
+                  else cctxt#answer "%s" hash)
+                hash_name_rows
+              >|= ok)
+            ~for_script:(fun () ->
+              List.map
+                (fun (hash, name) ->
+                  if display_names then [hash; name] else [hash])
+                hash_name_rows));
     command
       ~group
       ~desc:
@@ -751,18 +801,20 @@ let commands () =
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
-      (args1 zero_loc_switch)
+      (args2 zero_loc_switch enforce_indentation_flag)
       (prefixes ["convert"; "script"]
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
-      (fun zero_loc
-           expr_string
+      (fun (zero_loc, check)
+           (_, expr_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
         (match from_format with
         | `Michelson ->
-            let program = Michelson_v1_parser.parse_toplevel expr_string in
+            let program =
+              Michelson_v1_parser.parse_toplevel ~check expr_string
+            in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
             (typecheck_program
@@ -785,10 +837,7 @@ let commands () =
             match Data_encoding.Json.from_string expr_string with
             | Error err -> cctxt#error "%s" err
             | Ok json ->
-                return
-                @@ Data_encoding.Json.destruct
-                     Alpha_context.Script.expr_encoding
-                     json)
+                safe_decode_json cctxt Alpha_context.Script.expr_encoding json)
         | `Binary -> (
             bytes_of_prefixed_string expr_string >>=? fun bytes ->
             match
@@ -831,7 +880,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, data_ty)
-           data_string
+           (_, data_string)
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
@@ -874,10 +923,7 @@ let commands () =
             match Data_encoding.Json.from_string data_string with
             | Error err -> cctxt#error "%s" err
             | Ok json -> (
-                return
-                @@ Data_encoding.Json.destruct
-                     Alpha_context.Script.expr_encoding
-                     json
+                safe_decode_json cctxt Alpha_context.Script.expr_encoding json
                 >>=? fun expr ->
                 match data_ty with
                 | None -> return expr

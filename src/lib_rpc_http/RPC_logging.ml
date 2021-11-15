@@ -54,11 +54,11 @@ module Event = Internal_event.Make (Event_def)
 let emit level message =
   Event.emit ~section (fun () -> {level; message}) >>= function
   | Ok () -> Lwt.return_unit
-  | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_error e
+  | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace e
 
 (** Wrap an lwt computation so that it can return without waiting until the promise
     is resolved. *)
-let wrap_lwt f a = Lwt_utils.dont_wait raise (fun () -> f a)
+let wrap_lwt f a = Lwt.dont_wait (fun () -> f a) raise
 
 (** Avoid calling emit, if sinks would ignore the message anyway. *)
 let if_level_appropriate_or_else ~level if_so if_not fmt =

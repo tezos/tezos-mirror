@@ -27,7 +27,7 @@ module Int_set = Set.Make (Compare.Int)
 
 (*
 
-   Gas levels maintainance
+   Gas levels maintenance
    =======================
 
    The context maintains two levels of gas, one corresponds to the gas
@@ -62,7 +62,6 @@ type back = {
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
   fitness : Int64.t;
-  deposits : Tez_repr.t Signature.Public_key_hash.Map.t;
   included_endorsements : int;
   allowed_endorsements :
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t;
@@ -120,8 +119,6 @@ let[@inline] fees ctxt = ctxt.back.fees
 
 let[@inline] origination_nonce ctxt = ctxt.back.origination_nonce
 
-let[@inline] deposits ctxt = ctxt.back.deposits
-
 let[@inline] allowed_endorsements ctxt = ctxt.back.allowed_endorsements
 
 let[@inline] included_endorsements ctxt = ctxt.back.included_endorsements
@@ -163,16 +160,13 @@ let[@inline] update_constants ctxt constants =
 let[@inline] update_fitness ctxt fitness =
   update_back ctxt {ctxt.back with fitness}
 
-let[@inline] update_deposits ctxt deposits =
-  update_back ctxt {ctxt.back with deposits}
-
 let[@inline] update_allowed_endorsements ctxt allowed_endorsements =
   update_back ctxt {ctxt.back with allowed_endorsements}
 
 let[@inline] update_rewards ctxt rewards =
   update_back ctxt {ctxt.back with rewards}
 
-let[@inline] update_storage_space_to_pay ctxt storage_space_to_pay =
+let[@inline] raw_update_storage_space_to_pay ctxt storage_space_to_pay =
   update_back ctxt {ctxt.back with storage_space_to_pay}
 
 let[@inline] update_allocated_contracts ctxt allocated_contracts =
@@ -196,9 +190,7 @@ let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids =
   update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
 let record_endorsement ctxt k =
-  match
-    Signature.Public_key_hash.Map.find_opt k (allowed_endorsements ctxt)
-  with
+  match Signature.Public_key_hash.Map.find k (allowed_endorsements ctxt) with
   | None -> assert false
   | Some (_, _, true) -> assert false (* right already used *)
   | Some (d, s, false) ->
@@ -283,19 +275,6 @@ let add_fees ctxt fees' = Tez_repr.(fees ctxt +? fees') >|? update_fees ctxt
 let add_rewards ctxt rewards' =
   Tez_repr.(rewards ctxt +? rewards') >|? update_rewards ctxt
 
-let add_deposit ctxt delegate deposit =
-  let open Signature.Public_key_hash.Map in
-  let previous =
-    match find_opt delegate (deposits ctxt) with
-    | Some tz -> tz
-    | None -> Tez_repr.zero
-  in
-  Tez_repr.(previous +? deposit) >|? fun deposit ->
-  let deposits = add delegate deposit (deposits ctxt) in
-  update_deposits ctxt deposits
-
-let get_deposits = deposits
-
 let get_rewards = rewards
 
 let get_fees = fees
@@ -330,7 +309,7 @@ let increment_origination_nonce ctxt =
       let ctxt = update_origination_nonce ctxt origination_nonce in
       ok (ctxt, cur_origination_nonce)
 
-let origination_nonce ctxt =
+let get_origination_nonce ctxt =
   match origination_nonce ctxt with
   | None -> error Undefined_operation_nonce
   | Some origination_nonce -> ok origination_nonce
@@ -366,15 +345,15 @@ let check_gas_limit_is_valid ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   else ok_unit
 
 let consume_gas_limit_in_block ctxt (limit : 'a Gas_limit_repr.Arith.t) =
+  let open Gas_limit_repr in
   check_gas_limit_is_valid ctxt limit >>? fun () ->
   let block_gas = block_gas_level ctxt in
-  let limit = Gas_limit_repr.Arith.fp limit in
-  if Gas_limit_repr.Arith.(limit > block_gas) then error Block_quota_exceeded
+  let limit = Arith.fp limit in
+  if Arith.(limit > block_gas) then error Block_quota_exceeded
   else
-    Ok
-      (update_remaining_block_gas
-         ctxt
-         (Gas_limit_repr.Arith.sub (block_gas_level ctxt) limit))
+    let level = Arith.sub (block_gas_level ctxt) limit in
+    let ctxt = update_remaining_block_gas ctxt level in
+    Ok ctxt
 
 let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   let open Gas_limit_repr in
@@ -405,14 +384,14 @@ let init_storage_space_to_pay ctxt =
   match storage_space_to_pay ctxt with
   | Some _ -> assert false
   | None ->
-      let ctxt = update_storage_space_to_pay ctxt (Some Z.zero) in
+      let ctxt = raw_update_storage_space_to_pay ctxt (Some Z.zero) in
       update_allocated_contracts ctxt (Some 0)
 
 let clear_storage_space_to_pay ctxt =
   match (storage_space_to_pay ctxt, allocated_contracts ctxt) with
   | (None, _) | (_, None) -> assert false
   | (Some storage_space_to_pay, Some allocated_contracts) ->
-      let ctxt = update_storage_space_to_pay ctxt None in
+      let ctxt = raw_update_storage_space_to_pay ctxt None in
       let ctxt = update_allocated_contracts ctxt None in
       (ctxt, storage_space_to_pay, allocated_contracts)
 
@@ -420,7 +399,7 @@ let update_storage_space_to_pay ctxt n =
   match storage_space_to_pay ctxt with
   | None -> assert false
   | Some storage_space_to_pay ->
-      update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
+      raw_update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
 
 let update_allocated_contracts_count ctxt =
   match allocated_contracts ctxt with
@@ -534,30 +513,18 @@ let version_value = "alpha_current"
 
 let version = "v1"
 
-(* DEPRECATED: remove after activation of G *)
-let first_level_key = [version; "first_level"]
-
 let cycle_eras_key = [version; "cycle_eras"]
 
 let constants_key = [version; "constants"]
 
 let protocol_param_key = ["protocol_parameters"]
 
-(* DEPRECATED: remove after activation of G *)
-let get_first_level ctxt =
-  Context.find ctxt first_level_key >|= function
-  | None -> storage_error (Missing_key (first_level_key, Get))
-  | Some bytes -> (
-      match Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes with
-      | None -> storage_error (Corrupted_data first_level_key)
-      | Some level -> ok level)
-
 let get_cycle_eras ctxt =
   Context.find ctxt cycle_eras_key >|= function
   | None -> storage_error (Missing_key (cycle_eras_key, Get))
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes Level_repr.cycle_eras_encoding bytes
+        Data_encoding.Binary.of_bytes_opt Level_repr.cycle_eras_encoding bytes
       with
       | None -> storage_error (Corrupted_data cycle_eras_key)
       | Some cycle_eras -> ok cycle_eras)
@@ -607,7 +574,7 @@ let get_proto_param ctxt =
   Context.find ctxt protocol_param_key >>= function
   | None -> failwith "Missing protocol parameters."
   | Some bytes -> (
-      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
       | None -> fail (Failed_to_parse_parameter bytes)
       | Some json -> (
           Context.remove ctxt protocol_param_key >|= fun ctxt ->
@@ -637,7 +604,9 @@ let get_constants ctxt =
   | None -> failwith "Internal error: cannot read constants in context."
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Constants_repr.parametric_encoding
+          bytes
       with
       | None -> failwith "Internal error: cannot parse constants in context."
       | Some constants -> ok constants)
@@ -688,7 +657,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         included_endorsements = 0;
         fees = Tez_repr.zero;
         rewards = Tez_repr.zero;
-        deposits = Signature.Public_key_hash.Map.empty;
         storage_space_to_pay = None;
         allocated_contracts = None;
         origination_nonce = None;
@@ -702,7 +670,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Florence_009
+type previous_protocol = Genesis of Parameters_repr.t | Granada_010
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -714,22 +682,21 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "florence_009") then
-         return (Florence_009, ctxt)
+       else if Compare.String.(s = "granada_010") then return (Granada_010, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
   ok (previous_proto, ctxt)
 
 (* only for the migration *)
-let get_previous_protocol_constants ctxt =
+let[@warning "-32"] get_previous_protocol_constants ctxt =
   Context.find ctxt constants_key >>= function
   | None ->
       failwith
         "Internal error: cannot read previous protocol constants in context."
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Constants_repr.Proto_previous.parametric_encoding
           bytes
       with
@@ -746,7 +713,7 @@ let get_previous_protocol_constants ctxt =
    onto the context via the function `add_constants` or
    `patch_constants`.
 
-   This migration can be achieved also implicitely by modifying the
+   This migration can be achieved also implicitly by modifying the
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
@@ -767,99 +734,49 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Florence_009 ->
-      get_first_level ctxt >>=? fun first_level ->
-      Context.remove ctxt first_level_key >>= fun ctxt ->
+  | Granada_010 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let time_between_blocks_at_first_priority =
-        (match c.time_between_blocks with
-        | [] -> Period_repr.one_minute
-        | first_time_between_blocks :: _ -> first_time_between_blocks)
-        |> Period_repr.to_seconds
-      in
-      let mainnet_constants = Compare.Int.(c.initial_endorsers = 24) in
       let constants =
+        (* removes michelson_maximum_type_size *)
         Constants_repr.
           {
-            minimal_block_delay =
-              Period_repr.of_seconds_exn
-                (if Compare.Int64.(time_between_blocks_at_first_priority = 1L)
-                then 1L
-                else (Int64.div time_between_blocks_at_first_priority) 2L);
+            minimal_block_delay = c.minimal_block_delay;
             preserved_cycles = c.preserved_cycles;
-            blocks_per_cycle =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_cycle
-              else c.blocks_per_cycle);
-            blocks_per_commitment =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_commitment
-              else c.blocks_per_commitment);
-            blocks_per_roll_snapshot =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_roll_snapshot
-              else c.blocks_per_roll_snapshot);
-            blocks_per_voting_period =
-              (if mainnet_constants then Int32.mul 2l c.blocks_per_voting_period
-              else c.blocks_per_voting_period);
+            blocks_per_cycle = c.blocks_per_cycle;
+            blocks_per_commitment = c.blocks_per_commitment;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
+            blocks_per_voting_period = c.blocks_per_voting_period;
             time_between_blocks = c.time_between_blocks;
-            endorsers_per_block = 256;
+            endorsers_per_block = c.endorsers_per_block;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
-            hard_gas_limit_per_block =
-              Gas_limit_repr.Arith.(integral_of_int_exn 5_200_000);
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
-            michelson_maximum_type_size = c.michelson_maximum_type_size;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
-            block_security_deposit = Tez_repr.(mul_exn one 640);
-            endorsement_security_deposit = Tez_repr.(mul_exn one_cent 250);
-            baking_reward_per_endorsement =
-              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 11_719L];
-            endorsement_reward =
-              Tez_repr.[of_mutez_exn 78_125L; of_mutez_exn 52_083L];
+            block_security_deposit = c.block_security_deposit;
+            endorsement_security_deposit = c.endorsement_security_deposit;
+            baking_reward_per_endorsement = c.baking_reward_per_endorsement;
+            endorsement_reward = c.endorsement_reward;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;
             cost_per_byte = c.cost_per_byte;
             quorum_min = c.quorum_min;
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
-            initial_endorsers =
-              (if mainnet_constants then 192 else c.initial_endorsers);
-            delay_per_missing_endorsement =
-              (if mainnet_constants then Period_repr.of_seconds_exn 4L
-              else c.delay_per_missing_endorsement);
-            liquidity_baking_subsidy = Tez_repr.of_mutez_exn 2_500_000L;
-            (* Approximately 6 month after the first activation of Liquidity Baking on mainnet *)
-            liquidity_baking_sunset_level = 2_032_928l;
-            liquidity_baking_escape_ema_threshold = 1_000_000l;
+            initial_endorsers = c.initial_endorsers;
+            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
+            liquidity_baking_subsidy = c.liquidity_baking_subsidy;
+            liquidity_baking_sunset_level =
+              (* preserve a lower level for testnets *)
+              (if Compare.Int32.(c.liquidity_baking_sunset_level = 2_032_928l)
+              then 2_244_609l
+              else c.liquidity_baking_sunset_level);
+            liquidity_baking_escape_ema_threshold =
+              c.liquidity_baking_escape_ema_threshold;
           }
       in
-      add_constants ctxt constants >>= fun ctxt ->
-      let first_cycle_era =
-        Level_repr.
-          {
-            first_level;
-            first_cycle = Cycle_repr.root;
-            blocks_per_cycle = c.blocks_per_cycle;
-            blocks_per_commitment = c.blocks_per_commitment;
-          }
-      in
-      let current_cycle =
-        let level_position =
-          Int32.sub level (Raw_level_repr.to_int32 first_level)
-        in
-        Cycle_repr.of_int32_exn (Int32.div level_position c.blocks_per_cycle)
-      in
-      let second_cycle_era =
-        Level_repr.
-          {
-            first_level =
-              Raw_level_repr.of_int32_exn (Int32.succ (Int32.succ level));
-            first_cycle = Cycle_repr.succ current_cycle;
-            blocks_per_cycle = constants.blocks_per_cycle;
-            blocks_per_commitment = constants.blocks_per_commitment;
-          }
-      in
-      Level_repr.create_cycle_eras [second_cycle_era; first_cycle_era]
-      >>?= fun cycle_eras -> set_cycle_eras ctxt cycle_eras)
+      add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)
@@ -963,7 +880,12 @@ let list ctxt ?offset ?length k = Context.list (context ctxt) ?offset ?length k
 
 let fold ?depth ctxt k ~init ~f = Context.fold ?depth (context ctxt) k ~init ~f
 
-module Tree = struct
+module Tree :
+  Raw_context_intf.TREE
+    with type t := t
+     and type key := key
+     and type value := value
+     and type tree := tree = struct
   include Context.Tree
 
   let empty ctxt = Context.Tree.empty (context ctxt)
@@ -1031,3 +953,44 @@ let map_temporary_lazy_storage_ids_s ctxt f =
   f (temporary_lazy_storage_ids ctxt)
   >|= fun (ctxt, temporary_lazy_storage_ids) ->
   update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids
+
+module Cache = struct
+  type key = Context.Cache.key
+
+  type value = Context.Cache.value = ..
+
+  let key_of_identifier = Context.Cache.key_of_identifier
+
+  let identifier_of_key = Context.Cache.identifier_of_key
+
+  let pp fmt ctxt = Context.Cache.pp fmt (context ctxt)
+
+  let find c k = Context.Cache.find (context c) k
+
+  let set_cache_layout c layout =
+    Context.Cache.set_cache_layout (context c) layout >>= fun ctxt ->
+    Lwt.return (update_context c ctxt)
+
+  let update c k v = Context.Cache.update (context c) k v |> update_context c
+
+  let sync c ~cache_nonce =
+    Context.Cache.sync (context c) ~cache_nonce >>= fun ctxt ->
+    Lwt.return (update_context c ctxt)
+
+  let clear c = Context.Cache.clear (context c) |> update_context c
+
+  let list_keys c ~cache_index =
+    Context.Cache.list_keys (context c) ~cache_index
+
+  let key_rank c key = Context.Cache.key_rank (context c) key
+
+  let cache_size_limit c ~cache_index =
+    Context.Cache.cache_size_limit (context c) ~cache_index
+
+  let cache_size c ~cache_index =
+    Context.Cache.cache_size (context c) ~cache_index
+
+  let future_cache_expectation c ~time_in_blocks =
+    Context.Cache.future_cache_expectation (context c) ~time_in_blocks
+    |> update_context c
+end

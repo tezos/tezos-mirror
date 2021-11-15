@@ -133,7 +133,7 @@ module Public_key_hash = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 pkh -> Ed25519.Public_key_hash.to_b58check pkh
@@ -303,7 +303,7 @@ module Public_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 pk -> Ed25519.Public_key.to_b58check pk
@@ -434,7 +434,7 @@ module Secret_key = struct
     match of_b58check_opt s with
     | Some x -> Ok x
     | None ->
-        generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+        error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
     | Ed25519 sk -> Ed25519.Secret_key.to_b58check sk
@@ -568,8 +568,7 @@ let of_b58check_exn s =
 let of_b58check s =
   match of_b58check_opt s with
   | Some x -> Ok x
-  | None ->
-      generic_error "Failed to read a b58check_encoding data (%s): %S" name s
+  | None -> error_with "Failed to read a b58check_encoding data (%s): %S" name s
 
 let to_b58check = function
   | Ed25519 b -> Ed25519.to_b58check b
@@ -633,7 +632,7 @@ let pp_watermark ppf =
       fprintf
         ppf
         "Custom: 0x%s"
-        (try String.sub hexed 0 10 ^ "..." with _ -> hexed)
+        (try String.sub hexed 0 10 ^ "..." with Invalid_argument _ -> hexed)
 
 let sign ?watermark secret_key message =
   let watermark = Option.map bytes_of_watermark watermark in
@@ -664,6 +663,71 @@ let check ?watermark public_key signature message =
   | (Public_key.P256 pk, P256 signature) ->
       P256.check ?watermark pk signature message
   | _ -> false
+
+(* The following cache is a hack to work around a quadratic algorithm
+   in Tezos Mainnet protocols up to Edo. *)
+
+let make_endorsement_cache =
+  match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
+  | Some _ ->
+      let module Fake_ring (H : Stdlib.Hashtbl.HashedType) = struct
+        type key = H.t
+
+        type _ t = unit
+
+        let create _ = ()
+
+        let replace () _ _ = ()
+
+        let fold _ _ acc = acc
+
+        let fold_v _ _ acc = acc
+
+        let find_opt _ _ = None
+
+        let remove _ _ = ()
+
+        let length _ = 0
+
+        let capacity _ = 0
+
+        let clear _ = ()
+
+        module H = H
+      end in
+      (module Fake_ring : Ringo.MAP_MAKER)
+  | None ->
+      Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Sloppy)
+
+module Endorsement_cache =
+  (val make_endorsement_cache)
+    (struct
+      type nonrec t = t
+
+      let equal = equal
+
+      let hash = Hashtbl.hash
+    end)
+
+let endorsement_cache = Endorsement_cache.create 300
+
+let check ?watermark public_key signature message =
+  match watermark with
+  | Some (Endorsement _) -> (
+      (* signature check cache only applies to endorsements *)
+      match Endorsement_cache.find_opt endorsement_cache signature with
+      | Some (key, msg) ->
+          (* we rely on this property : signature_1 = signature_2 => key_1 = key_2 /\ message_1 = message_2 *)
+          Public_key.equal public_key key && Bytes.equal msg message
+      | None ->
+          let res = check ?watermark public_key signature message in
+          if res then
+            Endorsement_cache.replace
+              endorsement_cache
+              signature
+              (public_key, message) ;
+          res)
+  | _ -> check ?watermark public_key signature message
 
 let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 

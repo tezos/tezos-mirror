@@ -726,11 +726,9 @@ let ensure_valid_export_path = function
 let clean_all paths =
   Lwt_list.iter_s
     (fun path ->
-      Lwt.catch
-        (fun () ->
+      Unit.catch_s (fun () ->
           if Sys.is_directory path then Lwt_utils_unix.remove_dir path
-          else Lwt_unix.unlink path)
-        (fun _ -> Lwt.return_unit))
+          else Lwt_unix.unlink path))
     paths
 
 (* This module allows to create a tar archive by adding files to it,
@@ -1014,7 +1012,8 @@ end = struct
     Lwt_unix.close fd >>= fun () -> Lwt.return_unit
 
   let rec readdir dir_handler =
-    Lwt.catch
+    Option.catch_os
+      ~catch_only:(function End_of_file -> true | _ -> false)
       (fun () ->
         Lwt_unix.readdir dir_handler >>= function
         | filename
@@ -1022,7 +1021,6 @@ end = struct
                || filename = Filename.parent_dir_name ->
             readdir dir_handler
         | any -> Lwt.return_some any)
-      (function End_of_file -> Lwt.return_none | e -> Lwt.fail e)
 
   let enumerate path =
     let rec aux prefix dir_handler acc =
@@ -1888,8 +1886,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                        >>= fun () -> notify ()
                       else Lwt.return_unit)
                       >>= fun () -> copy_protocols ()))
-            (function
-              | End_of_file -> return_unit | exn -> Lwt.return (error_exn exn))
+            (function End_of_file -> return_unit | exn -> fail_with_exn exn)
         in
         Lwt.finalize
           (fun () -> copy_protocols ())
@@ -1961,20 +1958,47 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
      the future. In this particular case, the last allowed fork level of
      the current head is chosen. *)
   let retrieve_export_block chain_store block =
+    (* Returns the [offset]th successor of the given block [hash]. The
+       given [offset] is assumed to be negative. *)
+    let get_successor hash offset =
+      Store.Block.read_block_opt chain_store hash >>= function
+      | None -> fail (Invalid_export_block {block = None; reason = `Unknown})
+      | Some b ->
+          Store.Chain.current_head chain_store >>= fun current_head ->
+          let head_level = Store.Block.level current_head in
+          let block_level = Store.Block.level b in
+          let distance =
+            Int32.(to_int (sub head_level (sub block_level (of_int offset))))
+          in
+          if distance < 0 then
+            fail (Invalid_export_block {block = None; reason = `Unknown})
+          else
+            Store.Block.read_block
+              chain_store
+              ~distance
+              (Store.Block.hash current_head)
+    in
     (match block with
     | `Hash (h, distance) -> (
-        Store.Block.read_block_opt chain_store ~distance h >>= function
-        | None ->
-            fail (Invalid_export_block {block = Some h; reason = `Unknown})
-        | Some block -> return_some block)
-    | `Head distance ->
+        if distance < 0 then get_successor h distance
+        else
+          Store.Block.read_block_opt chain_store ~distance h >>= function
+          | None ->
+              fail (Invalid_export_block {block = Some h; reason = `Unknown})
+          | Some block -> return block)
+    | `Head distance -> (
         Store.Chain.current_head chain_store >>= fun current_head ->
         Store.Block.read_block_opt
           chain_store
           ~distance
           (Store.Block.hash current_head)
-        >>= return
-    | `Level i -> Store.Block.read_block_by_level_opt chain_store i >>= return
+        >>= function
+        | Some block -> return block
+        | None -> fail (Invalid_export_block {block = None; reason = `Unknown}))
+    | `Level i -> (
+        Store.Block.read_block_by_level_opt chain_store i >>= function
+        | Some block -> return block
+        | None -> fail (Invalid_export_block {block = None; reason = `Unknown}))
     | `Genesis ->
         fail
           (Invalid_export_block
@@ -1982,39 +2006,42 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                block = Some (Store.Chain.genesis chain_store).Genesis.block;
                reason = `Genesis;
              })
-    | `Alias (`Caboose, _) ->
+    | `Alias (`Caboose, distance) ->
+        (* With the caboose, we do not allow to use the ~/- as it is a
+           non sense. Additionally, it is not allowed to export the
+           caboose block. *)
         Store.Chain.caboose chain_store >>= fun (caboose_hash, _) ->
-        fail
-          (Invalid_export_block {block = Some caboose_hash; reason = `Caboose})
+        if distance < 0 then get_successor caboose_hash distance
+        else
+          fail
+            (Invalid_export_block {block = Some caboose_hash; reason = `Caboose})
     | `Alias (`Checkpoint, distance) -> (
         Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
-        Store.Block.read_block_opt chain_store checkpoint_hash >>= function
-        | Some checkpoint_block ->
-            (* The checkpoint is known: we should have its context and caboose
-               should be low enough to retrieve enough blocks. *)
-            if distance = 0 then return_some checkpoint_block
-            else
-              Store.Block.read_block_opt
-                chain_store
-                (Store.Block.hash checkpoint_block)
-                ~distance
-              >>= return
-        | None ->
-            fail
-              (Invalid_export_block
-                 {block = Some checkpoint_hash; reason = `Unknown}))
+        if distance < 0 then get_successor checkpoint_hash distance
+        else
+          Store.Block.read_block_opt chain_store checkpoint_hash >>= function
+          | Some checkpoint_block ->
+              (* The checkpoint is known: we should have its context and
+                 caboose should be low enough to retrieve enough
+                 blocks. *)
+              if distance = 0 then return checkpoint_block
+              else Store.Block.read_block chain_store checkpoint_hash ~distance
+          | None ->
+              fail
+                (Invalid_export_block
+                   {block = Some checkpoint_hash; reason = `Unknown}))
     | `Alias (`Savepoint, distance) ->
-        Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
-        Store.Block.read_block_by_level_opt
-          chain_store
-          Int32.(sub savepoint_level (of_int distance))
-        >>= return)
-    >>=? function
-    | None -> fail (Invalid_export_block {block = None; reason = `Unknown})
-    | Some export_block ->
-        check_export_block_validity chain_store export_block
-        >>=? fun (pred_block, minimum_level_needed) ->
-        return (export_block, pred_block, minimum_level_needed)
+        Store.Chain.savepoint chain_store
+        >>= fun (savepoint_hash, savepoint_level) ->
+        if distance < 0 then get_successor savepoint_hash distance
+        else
+          Store.Block.read_block_by_level
+            chain_store
+            Int32.(sub savepoint_level (of_int distance)))
+    >>=? fun export_block ->
+    check_export_block_validity chain_store export_block
+    >>=? fun (pred_block, minimum_level_needed) ->
+    return (export_block, pred_block, minimum_level_needed)
 
   (* Returns the list of cemented files to export and an optional list
      of remaining blocks. If the export block is cemented, we need to cut
@@ -2250,8 +2277,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               should_filter_indexes ))
         (fun exn ->
           Lwt_utils_unix.safe_close ro_fd >>= fun _ ->
-          Lwt_utils_unix.safe_close rw_fd >>= fun _ ->
-          Lwt.return (error_exn exn))
+          Lwt_utils_unix.safe_close rw_fd >>= fun _ -> fail_with_exn exn)
     in
     Store.Unsafe.open_for_snapshot_export
       ~store_dir
@@ -2309,6 +2335,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     ensure_valid_export_chain_dir store_dir chain_id >>=? fun () ->
     init snapshot_path >>=? fun snapshot_exporter ->
+    (* Register a clean up callback to prevent export cancelation not
+       to be correctly cleaned. *)
+    let cleaner_id =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          Exporter.cleaner snapshot_exporter >>= fun () -> Lwt.return_unit)
+    in
     protect
       ~on_error:(fun errors ->
         Exporter.cleaner snapshot_exporter >>= fun () ->
@@ -2380,6 +2412,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     Exporter.finalize snapshot_exporter metadata
     >>=? fun exported_snapshot_filename ->
     Event.(emit export_success exported_snapshot_filename) >>= fun () ->
+    Lwt_exit.unregister_clean_up_callback cleaner_id ;
     return_unit
 end
 
@@ -2586,11 +2619,7 @@ module Raw_importer : IMPORTER = struct
   let load_block_data t =
     let file = Naming.(snapshot_block_data_file t.snapshot_dir |> file_path) in
     Lwt_utils_unix.read_file file >>= fun block_data ->
-    match
-      Data_encoding.Binary.of_bytes_opt
-        block_data_encoding
-        (Bytes.of_string block_data)
-    with
+    match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
     | None -> fail (Cannot_read {kind = `Block_data; path = file})
 
@@ -2872,7 +2901,7 @@ module Tar_importer : IMPORTER = struct
         let (_ofs, res) =
           Data_encoding.Binary.read_exn
             Protocol_levels.encoding
-            (Bytes.to_string bytes)
+            (Bytes.unsafe_to_string bytes)
             0
             (Bytes.length bytes)
         in
@@ -3234,7 +3263,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         user_activated_protocol_overrides;
       }
     in
-    (Block_validation.apply apply_environment block_header operations
+    (Block_validation.apply
+       apply_environment
+       block_header
+       operations
+       ~cache:`Lazy
      >>= function
      | Ok block_validation_result -> return block_validation_result
      | Error errs ->
@@ -3244,9 +3277,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
                (Target_block_validation_failed
                   (Block_header.hash block_header, errs)))
            "%a"
-           pp_print_error
+           pp_print_trace
            errs)
-    >>=? fun block_validation_result ->
+    >>=? fun {result = block_validation_result; _} ->
     check_context_hash_consistency
       block_validation_result.validation_store
       block_header
@@ -3767,7 +3800,11 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
           user_activated_protocol_overrides;
         }
       in
-      (Block_validation.apply apply_environment block_header operations
+      (Block_validation.apply
+         apply_environment
+         block_header
+         operations
+         ~cache:`Lazy
        >>= function
        | Ok block_validation_result -> return block_validation_result
        | Error errs ->
@@ -3777,9 +3814,9 @@ let import_legacy ?patch_context ?block:expected_block ~snapshot_file
                  (Target_block_validation_failed
                     (Block_header.hash block_header, errs)))
              "%a"
-             pp_print_error
+             pp_print_trace
              errs)
-      >>=? fun block_validation_result ->
+      >>=? fun {result = block_validation_result; _} ->
       check_context_hash_consistency_legacy
         block_validation_result.validation_store
         block_header

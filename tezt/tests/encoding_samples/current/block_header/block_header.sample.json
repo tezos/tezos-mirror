@@ -10,5 +10,6 @@
   "priority": 21021,
   "proof_of_work_nonce": "101895ca00000000",
   "seed_nonce_hash": "nceUFoeQDgkJCmzdMWh19ZjBYqQD3N9fe6bXQ1ZsUKKvMn7iun5Z3",
+  "liquidity_baking_escape_vote": false,
   "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
 }

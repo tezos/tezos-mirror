@@ -222,9 +222,8 @@ let run () =
         | External_validation.Fork_test_chain _ (* TODO *)
         | External_validation.Init | External_validation.Commit_genesis _
         (* commit_genesis is done by [Legacy_state.init] *)
-        | External_validation.Restore_context_integrity ->
-            (* noop *) ok "noop"
-        | External_validation.Terminate -> ok "exiting" >>=? fun () -> exit 0
+        | External_validation.Terminate ->
+            ok "exiting" >>=? fun () -> exit 0
         | External_validation.Validate
             {
               chain_id;
@@ -258,7 +257,11 @@ let run () =
                   user_activated_protocol_overrides;
                 }
               in
-              Block_validation.apply apply_environment block_header operations
+              Block_validation.apply
+                apply_environment
+                block_header
+                operations
+                ~cache:`Lazy
               >>= function
               | Error
                   [Block_validator_errors.Unavailable_protocol {protocol; _}] as
@@ -271,15 +274,19 @@ let run () =
                       Block_validation.apply
                         apply_environment
                         block_header
-                        operations)
+                        operations
+                        ~cache:`Lazy)
               | result -> Lwt.return result )
-            >>=? fun ({
-                        validation_store;
-                        block_metadata;
-                        ops_metadata;
-                        block_metadata_hash;
-                        ops_metadata_hashes;
-                      } as res) ->
+            >>=? fun {result; _} ->
+            let {
+              Block_validation.validation_store;
+              block_metadata;
+              ops_metadata;
+              block_metadata_hash;
+              ops_metadata_hashes;
+            } =
+              result
+            in
             (Context.checkout context_index validation_store.context_hash
              >>= function
              | Some context -> return context
@@ -316,7 +323,7 @@ let run () =
             may_update_checkpoint chain block >>=? fun () ->
             let msg =
               Data_encoding.Json.(
-                construct Block_validation.result_encoding res |> to_string)
+                construct Block_validation.result_encoding result |> to_string)
             in
             let block_hash = Block_header.hash block_header in
             Format.kasprintf
@@ -326,14 +333,15 @@ let run () =
               block_hash
               msg
             >>=? fun () -> loop ()
+        | _ -> assert false
       in
       loop ())
     ~on_error:(fun err ->
-      Format.kasprintf ok "error: %a" pp_print_error err >>=? fun () -> exit 1)
+      Format.kasprintf ok "error: %a" pp_print_trace err >>=? fun () -> exit 1)
 
 let () =
   match Lwt_main.run (run ()) with
   | Ok () -> ()
   | Error err ->
-      Format.eprintf "%a@." pp_print_error err ;
+      Format.eprintf "%a@." pp_print_trace err ;
       exit 1

@@ -65,7 +65,7 @@ val one: t
 val minus_one: t
 (** The number -1. *)
 
-external of_int: int -> t = "ml_z_of_int" [@@noalloc]
+external of_int: int -> t = "%identity"
 (** Converts from a base integer. *)
 
 external of_int32: int32 -> t = "ml_z_of_int32"
@@ -232,7 +232,7 @@ val shift_right: t -> int -> t
     The second argument must be nonnegative.
  *)
 
-external shift_right_trunc: t -> int -> t = "ml_z_shift_right_trunc"
+val shift_right_trunc: t -> int -> t
 (** Shifts to the right, rounding towards 0.
     This is equivalent to a division by a power of 2, with truncation.
     The second argument must be nonnegative.
@@ -277,7 +277,7 @@ external hamdist: t -> t -> int = "ml_z_hamdist"
     converted value, an [Overflow] exception is raised.
  *)
 
-external to_int: t -> int = "ml_z_to_int"
+val to_int: t -> int
 (** Converts to a base integer. May raise [Overflow]. *)
 
 external to_int32: t -> int32 = "ml_z_to_int32"

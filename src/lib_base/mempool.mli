@@ -39,3 +39,6 @@ val bounded_encoding : ?max_operations:int -> unit -> mempool Data_encoding.t
 
 (** Empty mempool. *)
 val empty : mempool
+
+(** Remove an operation from all the fields of a mempool. *)
+val remove : Operation_hash.t -> mempool -> mempool

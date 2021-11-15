@@ -1,8 +1,9 @@
+---
+
 .build_template:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
   stage: build
   before_script:
     - . ./scripts/version.sh
@@ -10,24 +11,14 @@
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
 
-build:
+.build:
   extends: .build_template
   needs: []
+  variables:
+    ARCH: ""
   script:
-    # The following protocols are not needed for tests.
-    # By removing them, we cause them not to be compiled and linked and the CI runs faster.
-    # At least the following other jobs still compile with all protocols:
-    # - Docker images (for master and releases)
-    # - static binaries (only for releases)
-    # Note: src/proto_000_Ps9mPmXa is needed by Flextesa
-    - rm -r src/proto_001_PtCJ7pwo
-    - rm -r src/proto_002_PsYLVpVv
-    - rm -r src/proto_003_PsddFKi3
-    - rm -r src/proto_004_Pt24m4xi
-    - rm -r src/proto_005_PsBABY5H
-    - rm -r src/proto_005_PsBabyM1
-    - rm -r src/proto_006_PsCARTHA
-    - rm -r src/proto_007_PsDELPH1
+    # We remove protocols not needed for tests in order to speed up the CI.
+    - ./scripts/remove-old-protocols.sh
     - . ./scripts/version.sh
     # 1. Some basic, fast sanity checks
     - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
@@ -35,7 +26,6 @@ build:
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
-    - scripts/check_opam_test.sh
     - diff tests_python/poetry.lock /home/tezos/poetry.lock
     - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
     - dune build @runtest_dune_template
@@ -49,7 +39,7 @@ build:
       - _build
       - tezos-*
   artifacts:
-    name: "build-$CI_COMMIT_REF_SLUG"
+    name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
       - tezos-*
       - src/proto_*/parameters/*.json
@@ -59,16 +49,16 @@ build:
 
 build_arm64:
   extends:
-    - .build_template
-    - .rules_template__extended_test_pipeline
-  needs: []
-  script:
-    - . ./scripts/version.sh
-    - dune build @all
-    - dune install --prefix install_root
-  artifacts:
-    name: "build-$CI_COMMIT_REF_SLUG"
-    paths:
-      - install_root/bin/tezos-*
+    - .build
+    - .rules_template__development_arm64
+  variables:
+    ARCH: "arm64"
   tags:
     - arm64
+
+build_x86_64:
+  extends:
+    - .build
+    - .rules_template__development
+  variables:
+    ARCH: "x86_64"

@@ -162,7 +162,7 @@ struct
   end
 
   module Time = Time.Protocol
-  module Bls12_381 = BLS12_381
+  module Bls12_381 = Bls12_381
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
@@ -540,8 +540,6 @@ struct
       Error_core :
         sig
           include Tezos_error_monad.Sig.CORE with type error := unwrapped
-
-          include Tezos_error_monad.Sig.EXT with type error := unwrapped
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -557,12 +555,16 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
-    include Local_monad
+    include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
-        (Local_monad)
+      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+        (Tezos_error_monad.TzLwtreslib.Monad)
+
+    (* Backwards compatibility additions (traversors, dont_wait, trace) *)
     include Error_monad_traversors
+    include Error_monad_preallocated_values
+
+    let dont_wait ex er f = dont_wait f er ex
 
     type 'err trace = 'err TzTrace.trace
   end
@@ -823,6 +825,7 @@ struct
 
   module Micheline = struct
     include Micheline
+    include Tezos_micheline.Micheline_encoding
 
     let canonical_encoding_v1 ~variant encoding =
       canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding
@@ -914,7 +917,7 @@ struct
     let complete ctxt s = Base58.complete ctxt s
   end
 
-  module Lift (P : Updater.PROTOCOL) = struct
+  module LiftV1 (P : Updater.PROTOCOL) = struct
     include P
 
     let begin_partial_application ~chain_id ~ancestor_context
@@ -959,8 +962,28 @@ struct
     let finalize_block c = finalize_block c >|= wrap_error
 
     let init c bh = init c bh >|= wrap_error
+  end
 
-    let environment_version = Protocol.V1
+  module Lift (P : Updater.PROTOCOL) = struct
+    include LiftV1 (P)
+
+    include IgnoreCaches (struct
+      let set_log_message_consumer _ = ()
+
+      let environment_version = Protocol.V1
+
+      include Environment_protocol_T.V0toV3 (LiftV1 (P))
+    end)
+
+    let begin_partial_application ~chain_id ~ancestor_context
+        ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
+        (raw_block : block_header) =
+      begin_partial_application
+        ~chain_id
+        ~ancestor_context
+        ~predecessor_timestamp:predecessor.shell.timestamp
+        ~predecessor_fitness:predecessor.shell.fitness
+        raw_block
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

@@ -302,6 +302,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IAddress _ -> Interp_costs.address
   | IContract _ -> Interp_costs.contract
   | ITransfer_tokens _ -> Interp_costs.transfer_tokens
+  | IView _ -> Interp_costs.view
   | IImplicit_account _ -> Interp_costs.implicit_account
   | ISet_delegate _ -> Interp_costs.set_delegate
   | IBalance _ -> Interp_costs.balance
@@ -344,8 +345,14 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IComb_set (_, n, _, _) -> Interp_costs.comb_set n
   | ITicket _ -> Interp_costs.ticket
   | IRead_ticket _ -> Interp_costs.read_ticket
+  | IOpen_chest _ ->
+      let _chest_key = accu and (chest, (time, _)) = stack in
+      Interp_costs.open_chest
+        ~chest
+        ~time:(Alpha_context.Script_int.to_zint time)
   | ILog _ -> Gas.free
  [@@ocaml.inline always]
+ [@@coq_axiom_with_reason "unreachable expression `.` not handled"]
 
 let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
@@ -636,7 +643,10 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
    [credit] (taken to contract being executed), and an initial storage
    [init] of type [storage_ty]. The type of the new contract argument
    is [param_ty]. *)
-let create_contract (ctxt, sc) gas storage_type param_type code root_name
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
+   Refactor the sharing part of unparse_script and create_contract *)
+let create_contract (ctxt, sc) gas storage_type param_type code views root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
   unparse_ty ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
@@ -644,15 +654,31 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
     Script_ir_translator.add_field_annot root_name None unparsed_param_type
   in
   unparse_ty ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
+  let open Micheline in
+  let view name {input_ty; output_ty; view_code} views =
+    Prim
+      ( 0,
+        K_view,
+        [
+          String (0, Script_string.to_string name);
+          input_ty;
+          output_ty;
+          view_code;
+        ],
+        [] )
+    :: views
+  in
+  let views = SMap.fold view views [] |> List.rev in
   let code =
-    Micheline.strip_locations
+    strip_locations
       (Seq
          ( 0,
            [
              Prim (0, K_parameter, [unparsed_param_type], []);
              Prim (0, K_storage, [unparsed_storage_type], []);
              Prim (0, K_code, [code], []);
-           ] ))
+           ]
+           @ views ))
   in
   collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
@@ -667,7 +693,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
   >>=? fun (init, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let storage = Micheline.strip_locations storage in
+  let storage = strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
   let operation =
     Origination
@@ -698,7 +724,7 @@ let unpack ctxt ~ty ~bytes =
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
   then
     let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
-    match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+    match Data_encoding.Binary.of_bytes_opt Script.expr_encoding bytes with
     | None ->
         Lwt.return
           ( Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->

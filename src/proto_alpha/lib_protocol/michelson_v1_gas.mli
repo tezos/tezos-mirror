@@ -113,9 +113,9 @@ module Cost_of : sig
 
     val diff_timestamps : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
 
-    val concat_string_pair : string -> string -> Gas.cost
+    val concat_string_pair : Script_string.t -> Script_string.t -> Gas.cost
 
-    val slice_string : string -> Gas.cost
+    val slice_string : Script_string.t -> Gas.cost
 
     val string_size : Gas.cost
 
@@ -342,6 +342,17 @@ module Cost_of : sig
 
     val contract : Gas.cost
 
+    val view : Gas.cost
+
+    val view_mem :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
+    val view_get :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
+    val view_update :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
     val transfer_tokens : Gas.cost
 
     val implicit_account : Gas.cost
@@ -390,6 +401,8 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       'a Script_typed_ir.ticket ->
       Gas.cost
+
+    val open_chest : chest:Timelock.chest -> time:Z.t -> Gas.cost
 
     module Control : sig
       val nil : Gas.cost
@@ -470,6 +483,10 @@ module Cost_of : sig
     val contract_exists : Gas.cost
 
     val proof_argument : int -> Gas.cost
+
+    val chest_key : Gas.cost
+
+    val chest : bytes:int -> Gas.cost
   end
 
   module Unparsing : sig
@@ -518,5 +535,9 @@ module Cost_of : sig
     val sapling_transaction : Sapling.transaction -> Gas.cost
 
     val sapling_diff : Sapling.diff -> Gas.cost
+
+    val chest_key : Gas.cost
+
+    val chest : plaintext_size:int -> Gas.cost
   end
 end

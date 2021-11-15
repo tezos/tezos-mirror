@@ -36,15 +36,19 @@ let create ?path ?name count arguments =
     (fun i -> Node.create ?path ~name:(name ^ "." ^ string_of_int i) arguments)
     (range 1 count)
 
-let connect a b = List.iter (fun a -> List.iter (Node.add_peer a) b) a
+let symmetric_add_peer a b =
+  Node.add_peer a b ;
+  Node.add_peer b a
 
-let rec clique_gen connect = function
+let meta_connect connect a b = List.iter (fun a -> List.iter (connect a) b) a
+
+let rec meta_clique connect = function
   | [] -> ()
   | head :: tail ->
       List.iter (connect head) tail ;
-      clique_gen connect tail
+      meta_clique connect tail
 
-let ring_gen connect nodes =
+let meta_ring connect nodes =
   match nodes with
   | [] -> ()
   | first :: _ ->
@@ -59,25 +63,45 @@ let ring_gen connect nodes =
       in
       loop nodes
 
-let star_gen connect center other_nodes = List.iter (connect center) other_nodes
+let meta_star connect center other_nodes =
+  List.iter (connect center) other_nodes
 
-let clique = clique_gen Node.add_peer
+let connect = meta_connect symmetric_add_peer
 
-let meta_clique = clique_gen connect
+let clique = meta_clique symmetric_add_peer
 
-let ring = ring_gen Node.add_peer
+let ring = meta_ring symmetric_add_peer
 
-let meta_ring = ring_gen connect
+let star = meta_star symmetric_add_peer
 
-let star = star_gen Node.add_peer
+let wait_for_connections node connections =
+  let counter = ref 0 in
+  let (waiter, resolver) = Lwt.task () in
+  Node.on_event node (fun {name; value} ->
+      if name = "node_chain_validator.v0" then
+        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
+        | None -> ()
+        | Some "connection" ->
+            incr counter ;
+            if !counter = connections then Lwt.wakeup resolver ()
+        | Some "disconnection" ->
+            Log.warn "The topology of the test has changed"
+        | Some _ -> ()) ;
+  let* () = Node.wait_for_ready node in
+  waiter
 
-let meta_star = star_gen connect
-
-let start nodes =
+let start ?(public = false) ?event_level ?(wait_connections = false) nodes =
   let start_node node =
     let* () = Node.identity_generate node in
+    let n = Node.get_peers node |> List.length in
     let* () = Node.config_init node [] in
-    let* () = Node.run node [] in
-    Node.wait_for_ready node
+    let* () =
+      Node.run ?event_level node (if public then [] else [Private_mode])
+    in
+    let waiter =
+      if wait_connections then wait_for_connections node n
+      else Node.wait_for_ready node
+    in
+    waiter
   in
   Lwt_list.iter_p start_node nodes

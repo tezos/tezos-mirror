@@ -92,7 +92,7 @@ let replace ~template ~destination vars =
 let module_name (c : Protocol.component) = String.capitalize_ascii c.name
 
 let sources_name (c : Protocol.component) =
-  let name = String.lowercase_ascii c.name in
+  let name = String.uncapitalize_ascii c.name in
   match c.interface with
   | None -> Printf.sprintf "%s.ml" name
   | Some _ -> Printf.sprintf "%s.mli %s.ml" name name
@@ -141,14 +141,16 @@ let read_proto destination final_protocol_file =
             Stdlib.failwith
             "Failed to read TEZOS_PROTOCOL in %s:@ %a"
             source_dir
-            pp_print_error
+            pp_print_trace
             err )
 
 let main () =
   let template = Sys.argv.(1) in
   let destination = Sys.argv.(2) in
   let final_protocol_file = Sys.argv.(3) in
-  let version = try Sys.argv.(4) with _ -> guess_version () in
+  let version =
+    try Sys.argv.(4) with Invalid_argument _ -> guess_version ()
+  in
   let (hash, proto, check_hash) = read_proto destination final_protocol_file in
   process ~template ~destination proto version hash check_hash
 

@@ -39,9 +39,7 @@ let get_chain_id store =
   | `Hash chain_id -> Lwt.return chain_id
 
 let get_chain_id_opt store chain =
-  Lwt.catch
-    (fun () -> get_chain_id store chain >>= Lwt.return_some)
-    (fun _exn -> Lwt.return_none)
+  Option.catch_s (fun () -> get_chain_id store chain)
 
 let get_chain_store_exn store chain =
   get_chain_id store chain >>= fun chain_id ->
@@ -113,8 +111,7 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
     requested_heads
   >>=? fun (_, blocks) -> return (List.rev blocks)
 
-let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
-    validator =
+let rpc_directory validator =
   let dir : Store.chain_store RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir :=
@@ -144,6 +141,12 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       Store.Chain.caboose chain_store >>= fun (_, caboose_level) ->
       let history_mode = Store.Chain.history_mode chain_store in
       return (checkpoint_header, savepoint_level, caboose_level, history_mode)) ;
+  register0 S.Levels.checkpoint (fun chain_store () () ->
+      Store.Chain.checkpoint chain_store >>= return) ;
+  register0 S.Levels.savepoint (fun chain_store () () ->
+      Store.Chain.savepoint chain_store >>= return) ;
+  register0 S.Levels.caboose (fun chain_store () () ->
+      Store.Chain.caboose chain_store >>= return) ;
   register0 S.is_bootstrapped (fun chain_store () () ->
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
@@ -155,15 +158,13 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
-          return (Chain_validator.force_bootstrapped chain_validator b)) ;
+          Chain_validator.force_bootstrapped chain_validator b >>= return) ;
   (* blocks *)
   register0 S.Blocks.list (fun chain q () ->
       list_blocks chain ?length:q#length ?min_date:q#min_date q#heads) ;
   register_dynamic_directory2
     Block_services.path
-    (Block_directory.build_rpc_directory
-       ~user_activated_upgrades
-       ~user_activated_protocol_overrides) ;
+    Block_directory.build_rpc_directory ;
   (* invalid_blocks *)
   register0 S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
@@ -178,17 +179,10 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       Store.Block.unmark_invalid chain_store hash) ;
   !dir
 
-let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides validator =
+let build_rpc_directory validator =
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
-  let dir =
-    ref
-      (rpc_directory
-         ~user_activated_upgrades
-         ~user_activated_protocol_overrides
-         validator)
-  in
+  let dir = ref (rpc_directory validator) in
   (* Mempool *)
   let merge d = dir := RPC_directory.merge !dir d in
   merge

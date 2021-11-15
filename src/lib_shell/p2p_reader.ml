@@ -38,6 +38,10 @@ type callback = {
   disconnection : P2p_peer.Id.t -> unit;
 }
 
+module Block_hash_cache : Ringo.CACHE_MAP with type key = Block_hash.t =
+  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+    (Block_hash)
+
 type chain_db = {
   chain_store : Store.Chain.t;
   operation_db : Distributed_db_requester.Raw_operation.t;
@@ -107,9 +111,12 @@ let read_block {disk; _} h =
   Store.all_chain_stores disk >>= fun chain_stores ->
   Lwt_utils.find_map_s
     (fun chain_store ->
-      Store.Block.read_block_opt chain_store h >>= function
-      | None -> Lwt.return_none
-      | Some b -> Lwt.return_some (Store.Chain.chain_id chain_store, b))
+      Store.Block.read_block_opt chain_store h
+      >>= (function
+            | None -> Store.Block.read_prechecked_block_opt chain_store h
+            | Some b -> Lwt.return_some b)
+      >>= Option.map_s (fun b ->
+              Lwt.return (Store.Chain.chain_id chain_store, b)))
     chain_stores
 
 let read_block_header db h =
@@ -119,8 +126,7 @@ let read_block_header db h =
       Lwt.return_some (chain_id, Store.Block.header block)
 
 let read_predecessor_header {disk; _} h offset =
-  Lwt.catch
-    (fun () ->
+  Option.catch_os (fun () ->
       let offset = Int32.to_int offset in
       Store.all_chain_stores disk >>= fun chain_stores ->
       Lwt_utils.find_map_s
@@ -129,7 +135,6 @@ let read_predecessor_header {disk; _} h offset =
           | None -> Lwt.return_none
           | Some block -> Lwt.return_some (Store.Block.header block))
         chain_stores)
-    (fun _ -> Lwt.return_none)
 
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
@@ -230,9 +235,9 @@ let handle_msg state msg =
       in
       let known_invalid =
         known_invalid || (disable_mempool && mempool <> Mempool.empty)
-        (* A non-empty mempool was received while mempool is deactivated,
-               so the message is ignored.
-               This should probably warrant a reduction of the sender's score. *)
+        (* A non-empty mempool was received while mempool is
+           deactivated, so the message is ignored. This should
+           probably warrant a reduction of the sender's score. *)
       in
       if known_invalid then (
         P2p.disconnect state.p2p state.conn >>= fun () ->
@@ -449,17 +454,17 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   Chain_id.Table.iter
     (fun chain_id _chain_db ->
       Error_monad.dont_wait
-        (fun exc ->
-          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
-        (fun trace ->
-          Format.eprintf
-            "Uncaught error: %a\n%!"
-            Error_monad.pp_print_error
-            trace)
         (fun () ->
           let meta = P2p.get_peer_metadata p2p gid in
           Peer_metadata.incr meta (Sent_request Branch) ;
-          P2p.send p2p conn (Get_current_branch chain_id)))
+          P2p.send p2p conn (Get_current_branch chain_id))
+        (fun trace ->
+          Format.eprintf
+            "Uncaught error: %a\n%!"
+            Error_monad.pp_print_trace
+            trace)
+        (fun exc ->
+          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
     active_chains ;
   state.worker <-
     Lwt_utils.worker

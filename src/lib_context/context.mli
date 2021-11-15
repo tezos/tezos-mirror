@@ -90,13 +90,6 @@ val merkle_tree :
 
 (** {2 Accessing and Updating Versions} *)
 
-(** [restore_integrity ppf index] attempts to restore the context
-    integrity of [index]. Returns [None] when nothing needs to be fixed and
-    [Some n] with [n] the number of entries fixed. If needs be, the
-    progress might be printed via [ppf]
-    If the context integrity cannot be restored, [Failure msg] is thrown. *)
-val restore_integrity : ?ppf:Format.formatter -> index -> int option tzresult
-
 val exists : index -> Context_hash.t -> bool Lwt.t
 
 val checkout : index -> Context_hash.t -> context option Lwt.t
@@ -111,6 +104,17 @@ val commit :
 val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 
 val set_master : index -> Context_hash.t -> unit Lwt.t
+
+(** {2 Hash version} *)
+
+(** Get the hash version used for the context *)
+val get_hash_version : context -> Context_hash.Version.t
+
+(** Set the hash version used for the context.  It may recalculate the hashes
+    of the whole context, which can be a long process.
+    Returns an [Error] if the hash version is unsupported. *)
+val set_hash_version :
+  context -> Context_hash.Version.t -> context tzresult Lwt.t
 
 (** {2 Predefined Fields} *)
 

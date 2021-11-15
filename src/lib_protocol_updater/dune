@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_updater)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-updater)
  (libraries tezos-base
             tezos-stdlib-unix

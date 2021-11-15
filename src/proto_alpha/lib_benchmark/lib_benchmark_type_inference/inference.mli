@@ -43,8 +43,7 @@ type transformer = {bef : Type.Stack.t; aft : Type.Stack.t}
 (** State of the type inference module *)
 
 (** Store implementation for type representatives *)
-module Repr_store :
-  Stores.S with type key = int and type value = michelson_type
+module Repr_store : Stores.S with type key = int and type value = michelson_type
 
 (** State monad built on [Repr_store] *)
 module Repr_sm :

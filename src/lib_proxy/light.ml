@@ -25,6 +25,8 @@
 
 type sources_config = {min_agreement : float; uris : Uri.t list}
 
+let sources_config_to_uris ({uris; _} : sources_config) = uris
+
 let default_agreement = 1.0
 
 let sources_encoding =
@@ -60,6 +62,9 @@ let mk_sources_config ~min_agreement ~uris =
           (pp_print_list Uri.pp_hum)
           uris)
   else Ok {min_agreement; uris}
+
+let example_sources =
+  {|{"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
 
 let destruct_sources_config json =
   let {min_agreement; uris} =

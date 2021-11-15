@@ -167,6 +167,7 @@ type instruction_name =
   | N_INow
   | N_IBalance
   | N_ILevel
+  | N_IView
   (* We specialize the check-signature instruction for each crypto scheme. *)
   | N_ICheck_signature_ed25519
   | N_ICheck_signature_secp256k1
@@ -222,6 +223,8 @@ type instruction_name =
   (* Misc *)
   | N_IHalt
   | N_ILog
+  (* Timelock*)
+  | N_IOpen_chest
 
 type continuation_name =
   | N_KNil
@@ -247,363 +250,190 @@ and instr_or_cont_name =
 let string_of_instruction_name : instruction_name -> string =
  fun ir ->
   match ir with
-  | N_IDrop ->
-      "N_IDrop"
-  | N_IDup ->
-      "N_IDup"
-  | N_ISwap ->
-      "N_ISwap"
-  | N_IConst ->
-      "N_IConst"
-  | N_ICons_pair ->
-      "N_ICons_pair"
-  | N_ICar ->
-      "N_ICar"
-  | N_ICdr ->
-      "N_ICdr"
-  | N_ICons_some ->
-      "N_ICons_some"
-  | N_ICons_none ->
-      "N_ICons_none"
-  | N_IIf_none ->
-      "N_IIf_none"
-  | N_ILeft ->
-      "N_ILeft"
-  | N_IRight ->
-      "N_IRight"
-  | N_IIf_left ->
-      "N_IIf_left"
-  | N_ICons_list ->
-      "N_ICons_list"
-  | N_INil ->
-      "N_INil"
-  | N_IIf_cons ->
-      "N_IIf_cons"
-  | N_IList_map ->
-      "N_IList_map"
-  | N_IList_iter ->
-      "N_IList_iter"
-  | N_IIter ->
-      "N_IIter"
-  | N_IList_size ->
-      "N_IList_size"
-  | N_IEmpty_set ->
-      "N_IEmpty_set"
-  | N_ISet_iter ->
-      "N_ISet_iter"
-  | N_ISet_mem ->
-      "N_ISet_mem"
-  | N_ISet_update ->
-      "N_ISet_update"
-  | N_ISet_size ->
-      "N_ISet_size"
-  | N_IEmpty_map ->
-      "N_IEmpty_map"
-  | N_IMap_map ->
-      "N_IMap_map"
-  | N_IMap_iter ->
-      "N_IMap_iter"
-  | N_IMap_mem ->
-      "N_IMap_mem"
-  | N_IMap_get ->
-      "N_IMap_get"
-  | N_IMap_update ->
-      "N_IMap_update"
-  | N_IMap_size ->
-      "N_IMap_size"
-  | N_IEmpty_big_map ->
-      "N_IEmpty_big_map"
-  | N_IBig_map_mem ->
-      "N_IBig_map_mem"
-  | N_IBig_map_get ->
-      "N_IBig_map_get"
-  | N_IBig_map_update ->
-      "N_IBig_map_update"
-  | N_IConcat_string ->
-      "N_IConcat_string"
-  | N_IConcat_string_pair ->
-      "N_IConcat_string_pair"
-  | N_ISlice_string ->
-      "N_ISlice_string"
-  | N_IString_size ->
-      "N_IString_size"
-  | N_IConcat_bytes ->
-      "N_IConcat_bytes"
-  | N_IConcat_bytes_pair ->
-      "N_IConcat_bytes_pair"
-  | N_ISlice_bytes ->
-      "N_ISlice_bytes"
-  | N_IBytes_size ->
-      "N_IBytes_size"
-  | N_IAdd_seconds_to_timestamp ->
-      "N_IAdd_seconds_to_timestamp"
-  | N_IAdd_timestamp_to_seconds ->
-      "N_IAdd_timestamp_to_seconds"
-  | N_ISub_timestamp_seconds ->
-      "N_ISub_timestamp_seconds"
-  | N_IDiff_timestamps ->
-      "N_IDiff_timestamps"
-  | N_IAdd_tez ->
-      "N_IAdd_tez"
-  | N_ISub_tez ->
-      "N_ISub_tez"
-  | N_IMul_teznat ->
-      "N_IMul_teznat"
-  | N_IMul_nattez ->
-      "N_IMul_nattez"
-  | N_IEdiv_teznat ->
-      "N_IEdiv_teznat"
-  | N_IEdiv_tez ->
-      "N_IEdiv_tez"
-  | N_IOr ->
-      "N_IOr"
-  | N_IAnd ->
-      "N_IAnd"
-  | N_IXor ->
-      "N_IXor"
-  | N_INot ->
-      "N_INot"
-  | N_IIs_nat ->
-      "N_IIs_nat"
-  | N_INeg_nat ->
-      "N_INeg_nat"
-  | N_INeg_int ->
-      "N_INeg_int"
-  | N_IAbs_int ->
-      "N_IAbs_int"
-  | N_IInt_nat ->
-      "N_IInt_nat"
-  | N_IAdd_intint ->
-      "N_IAdd_intint"
-  | N_IAdd_intnat ->
-      "N_IAdd_intnat"
-  | N_IAdd_natint ->
-      "N_IAdd_natint"
-  | N_IAdd_natnat ->
-      "N_IAdd_natnat"
-  | N_ISub_int ->
-      "N_ISub_int"
-  | N_IMul_intint ->
-      "N_IMul_intint"
-  | N_IMul_intnat ->
-      "N_IMul_intnat"
-  | N_IMul_natint ->
-      "N_IMul_natint"
-  | N_IMul_natnat ->
-      "N_IMul_natnat"
-  | N_IEdiv_intint ->
-      "N_IEdiv_intint"
-  | N_IEdiv_intnat ->
-      "N_IEdiv_intnat"
-  | N_IEdiv_natint ->
-      "N_IEdiv_natint"
-  | N_IEdiv_natnat ->
-      "N_IEdiv_natnat"
-  | N_ILsl_nat ->
-      "N_ILsl_nat"
-  | N_ILsr_nat ->
-      "N_ILsr_nat"
-  | N_IOr_nat ->
-      "N_IOr_nat"
-  | N_IAnd_nat ->
-      "N_IAnd_nat"
-  | N_IAnd_int_nat ->
-      "N_IAnd_int_nat"
-  | N_IXor_nat ->
-      "N_IXor_nat"
-  | N_INot_nat ->
-      "N_INot_nat"
-  | N_INot_int ->
-      "N_INot_int"
-  | N_IIf ->
-      "N_IIf"
-  | N_ILoop ->
-      "N_ILoop"
-  | N_ILoop_left ->
-      "N_ILoop_left"
-  | N_IDip ->
-      "N_IDip"
-  | N_IExec ->
-      "N_IExec"
-  | N_IApply ->
-      "N_IApply"
-  | N_ILambda ->
-      "N_ILambda"
-  | N_IFailwith ->
-      "N_IFailwith"
-  | N_ICompare ->
-      "N_ICompare"
-  | N_IEq ->
-      "N_IEq"
-  | N_INeq ->
-      "N_INeq"
-  | N_ILt ->
-      "N_ILt"
-  | N_IGt ->
-      "N_IGt"
-  | N_ILe ->
-      "N_ILe"
-  | N_IGe ->
-      "N_IGe"
-  | N_IAddress ->
-      "N_IAddress"
-  | N_IContract ->
-      "N_IContract"
-  | N_ITransfer_tokens ->
-      "N_ITransfer_tokens"
-  | N_IImplicit_account ->
-      "N_IImplicit_account"
-  | N_ICreate_contract ->
-      "N_ICreate_contract"
-  | N_ISet_delegate ->
-      "N_ISet_delegate"
-  | N_INow ->
-      "N_INow"
-  | N_IBalance ->
-      "N_IBalance"
-  | N_ICheck_signature_ed25519 ->
-      "N_ICheck_signature_ed25519"
-  | N_ICheck_signature_secp256k1 ->
-      "N_ICheck_signature_secp256k1"
-  | N_ICheck_signature_p256 ->
-      "N_ICheck_signature_p256"
-  | N_IHash_key ->
-      "N_IHash_key"
-  | N_IPack ->
-      "N_IPack"
-  | N_IUnpack ->
-      "N_IUnpack"
-  | N_IBlake2b ->
-      "N_IBlake2b"
-  | N_ISha256 ->
-      "N_ISha256"
-  | N_ISha512 ->
-      "N_ISha512"
-  | N_ISource ->
-      "N_ISource"
-  | N_ISender ->
-      "N_ISender"
-  | N_ISelf ->
-      "N_ISelf"
-  | N_IAmount ->
-      "N_IAmount"
-  | N_IDig ->
-      "N_IDig"
-  | N_IDug ->
-      "N_IDug"
-  | N_IDipN ->
-      "N_IDipN"
-  | N_IDropN ->
-      "N_IDropN"
-  | N_IDupN ->
-      "N_IDupN"
-  | N_IChainId ->
-      "N_IChainId"
-  | N_ILevel ->
-      "N_ILevel"
-  | N_ISelf_address ->
-      "N_ISelf_address"
-  | N_INever ->
-      "N_INever"
-  | N_IUnpair ->
-      "N_IUnpair"
-  | N_IVoting_power ->
-      "N_IVoting_power"
-  | N_ITotal_voting_power ->
-      "N_ITotal_voting_power"
-  | N_IKeccak ->
-      "N_IKeccak"
-  | N_ISha3 ->
-      "N_ISha3"
-  | N_IAdd_bls12_381_g1 ->
-      "N_IAdd_bls12_381_g1"
-  | N_IAdd_bls12_381_g2 ->
-      "N_IAdd_bls12_381_g2"
-  | N_IAdd_bls12_381_fr ->
-      "N_IAdd_bls12_381_fr"
-  | N_IMul_bls12_381_g1 ->
-      "N_IMul_bls12_381_g1"
-  | N_IMul_bls12_381_g2 ->
-      "N_IMul_bls12_381_g2"
-  | N_IMul_bls12_381_fr ->
-      "N_IMul_bls12_381_fr"
-  | N_INeg_bls12_381_g1 ->
-      "N_INeg_bls12_381_g1"
-  | N_INeg_bls12_381_g2 ->
-      "N_INeg_bls12_381_g2"
-  | N_INeg_bls12_381_fr ->
-      "N_INeg_bls12_381_fr"
-  | N_IPairing_check_bls12_381 ->
-      "N_IPairing_check_bls12_381"
-  | N_IMul_bls12_381_fr_z ->
-      "N_IMul_bls12_381_fr_z"
-  | N_IMul_bls12_381_z_fr ->
-      "N_IMul_bls12_381_z_fr"
-  | N_IInt_bls12_381_z_fr ->
-      "N_IInt_bls12_381_z_fr"
-  | N_IComb ->
-      "N_IComb"
-  | N_IUncomb ->
-      "N_IUncomb"
-  | N_IComb_get ->
-      "N_IComb_get"
-  | N_IComb_set ->
-      "N_IComb_set"
-  | N_ITicket ->
-      "N_ITicket"
-  | N_IRead_ticket ->
-      "N_IRead_ticket"
-  | N_ISplit_ticket ->
-      "N_ISplit_ticket"
-  | N_IJoin_tickets ->
-      "N_IJoin_tickets"
-  | N_ISapling_empty_state ->
-      "N_ISapling_empty_state"
-  | N_ISapling_verify_update ->
-      "N_ISapling_verify_update"
-  | N_IMap_get_and_update ->
-      "N_IMap_get_and_update"
-  | N_IBig_map_get_and_update ->
-      "N_IBig_map_get_and_update"
-  | N_IHalt ->
-      "N_IHalt"
-  | N_ILog ->
-      "N_ILog"
+  | N_IDrop -> "N_IDrop"
+  | N_IDup -> "N_IDup"
+  | N_ISwap -> "N_ISwap"
+  | N_IConst -> "N_IConst"
+  | N_ICons_pair -> "N_ICons_pair"
+  | N_ICar -> "N_ICar"
+  | N_ICdr -> "N_ICdr"
+  | N_ICons_some -> "N_ICons_some"
+  | N_ICons_none -> "N_ICons_none"
+  | N_IIf_none -> "N_IIf_none"
+  | N_ILeft -> "N_ILeft"
+  | N_IRight -> "N_IRight"
+  | N_IIf_left -> "N_IIf_left"
+  | N_ICons_list -> "N_ICons_list"
+  | N_INil -> "N_INil"
+  | N_IIf_cons -> "N_IIf_cons"
+  | N_IList_map -> "N_IList_map"
+  | N_IList_iter -> "N_IList_iter"
+  | N_IIter -> "N_IIter"
+  | N_IList_size -> "N_IList_size"
+  | N_IEmpty_set -> "N_IEmpty_set"
+  | N_ISet_iter -> "N_ISet_iter"
+  | N_ISet_mem -> "N_ISet_mem"
+  | N_ISet_update -> "N_ISet_update"
+  | N_ISet_size -> "N_ISet_size"
+  | N_IEmpty_map -> "N_IEmpty_map"
+  | N_IMap_map -> "N_IMap_map"
+  | N_IMap_iter -> "N_IMap_iter"
+  | N_IMap_mem -> "N_IMap_mem"
+  | N_IMap_get -> "N_IMap_get"
+  | N_IMap_update -> "N_IMap_update"
+  | N_IMap_size -> "N_IMap_size"
+  | N_IEmpty_big_map -> "N_IEmpty_big_map"
+  | N_IBig_map_mem -> "N_IBig_map_mem"
+  | N_IBig_map_get -> "N_IBig_map_get"
+  | N_IBig_map_update -> "N_IBig_map_update"
+  | N_IConcat_string -> "N_IConcat_string"
+  | N_IConcat_string_pair -> "N_IConcat_string_pair"
+  | N_ISlice_string -> "N_ISlice_string"
+  | N_IString_size -> "N_IString_size"
+  | N_IConcat_bytes -> "N_IConcat_bytes"
+  | N_IConcat_bytes_pair -> "N_IConcat_bytes_pair"
+  | N_ISlice_bytes -> "N_ISlice_bytes"
+  | N_IBytes_size -> "N_IBytes_size"
+  | N_IAdd_seconds_to_timestamp -> "N_IAdd_seconds_to_timestamp"
+  | N_IAdd_timestamp_to_seconds -> "N_IAdd_timestamp_to_seconds"
+  | N_ISub_timestamp_seconds -> "N_ISub_timestamp_seconds"
+  | N_IDiff_timestamps -> "N_IDiff_timestamps"
+  | N_IAdd_tez -> "N_IAdd_tez"
+  | N_ISub_tez -> "N_ISub_tez"
+  | N_IMul_teznat -> "N_IMul_teznat"
+  | N_IMul_nattez -> "N_IMul_nattez"
+  | N_IEdiv_teznat -> "N_IEdiv_teznat"
+  | N_IEdiv_tez -> "N_IEdiv_tez"
+  | N_IOr -> "N_IOr"
+  | N_IAnd -> "N_IAnd"
+  | N_IXor -> "N_IXor"
+  | N_INot -> "N_INot"
+  | N_IIs_nat -> "N_IIs_nat"
+  | N_INeg_nat -> "N_INeg_nat"
+  | N_INeg_int -> "N_INeg_int"
+  | N_IAbs_int -> "N_IAbs_int"
+  | N_IInt_nat -> "N_IInt_nat"
+  | N_IAdd_intint -> "N_IAdd_intint"
+  | N_IAdd_intnat -> "N_IAdd_intnat"
+  | N_IAdd_natint -> "N_IAdd_natint"
+  | N_IAdd_natnat -> "N_IAdd_natnat"
+  | N_ISub_int -> "N_ISub_int"
+  | N_IMul_intint -> "N_IMul_intint"
+  | N_IMul_intnat -> "N_IMul_intnat"
+  | N_IMul_natint -> "N_IMul_natint"
+  | N_IMul_natnat -> "N_IMul_natnat"
+  | N_IEdiv_intint -> "N_IEdiv_intint"
+  | N_IEdiv_intnat -> "N_IEdiv_intnat"
+  | N_IEdiv_natint -> "N_IEdiv_natint"
+  | N_IEdiv_natnat -> "N_IEdiv_natnat"
+  | N_ILsl_nat -> "N_ILsl_nat"
+  | N_ILsr_nat -> "N_ILsr_nat"
+  | N_IOr_nat -> "N_IOr_nat"
+  | N_IAnd_nat -> "N_IAnd_nat"
+  | N_IAnd_int_nat -> "N_IAnd_int_nat"
+  | N_IXor_nat -> "N_IXor_nat"
+  | N_INot_nat -> "N_INot_nat"
+  | N_INot_int -> "N_INot_int"
+  | N_IIf -> "N_IIf"
+  | N_ILoop -> "N_ILoop"
+  | N_ILoop_left -> "N_ILoop_left"
+  | N_IDip -> "N_IDip"
+  | N_IExec -> "N_IExec"
+  | N_IApply -> "N_IApply"
+  | N_ILambda -> "N_ILambda"
+  | N_IFailwith -> "N_IFailwith"
+  | N_ICompare -> "N_ICompare"
+  | N_IEq -> "N_IEq"
+  | N_INeq -> "N_INeq"
+  | N_ILt -> "N_ILt"
+  | N_IGt -> "N_IGt"
+  | N_ILe -> "N_ILe"
+  | N_IGe -> "N_IGe"
+  | N_IAddress -> "N_IAddress"
+  | N_IContract -> "N_IContract"
+  | N_ITransfer_tokens -> "N_ITransfer_tokens"
+  | N_IImplicit_account -> "N_IImplicit_account"
+  | N_ICreate_contract -> "N_ICreate_contract"
+  | N_ISet_delegate -> "N_ISet_delegate"
+  | N_INow -> "N_INow"
+  | N_IBalance -> "N_IBalance"
+  | N_ICheck_signature_ed25519 -> "N_ICheck_signature_ed25519"
+  | N_ICheck_signature_secp256k1 -> "N_ICheck_signature_secp256k1"
+  | N_ICheck_signature_p256 -> "N_ICheck_signature_p256"
+  | N_IHash_key -> "N_IHash_key"
+  | N_IPack -> "N_IPack"
+  | N_IUnpack -> "N_IUnpack"
+  | N_IBlake2b -> "N_IBlake2b"
+  | N_ISha256 -> "N_ISha256"
+  | N_ISha512 -> "N_ISha512"
+  | N_ISource -> "N_ISource"
+  | N_ISender -> "N_ISender"
+  | N_ISelf -> "N_ISelf"
+  | N_IAmount -> "N_IAmount"
+  | N_IDig -> "N_IDig"
+  | N_IDug -> "N_IDug"
+  | N_IDipN -> "N_IDipN"
+  | N_IDropN -> "N_IDropN"
+  | N_IDupN -> "N_IDupN"
+  | N_IChainId -> "N_IChainId"
+  | N_ILevel -> "N_ILevel"
+  | N_IView -> "N_IView"
+  | N_ISelf_address -> "N_ISelf_address"
+  | N_INever -> "N_INever"
+  | N_IUnpair -> "N_IUnpair"
+  | N_IVoting_power -> "N_IVoting_power"
+  | N_ITotal_voting_power -> "N_ITotal_voting_power"
+  | N_IKeccak -> "N_IKeccak"
+  | N_ISha3 -> "N_ISha3"
+  | N_IAdd_bls12_381_g1 -> "N_IAdd_bls12_381_g1"
+  | N_IAdd_bls12_381_g2 -> "N_IAdd_bls12_381_g2"
+  | N_IAdd_bls12_381_fr -> "N_IAdd_bls12_381_fr"
+  | N_IMul_bls12_381_g1 -> "N_IMul_bls12_381_g1"
+  | N_IMul_bls12_381_g2 -> "N_IMul_bls12_381_g2"
+  | N_IMul_bls12_381_fr -> "N_IMul_bls12_381_fr"
+  | N_INeg_bls12_381_g1 -> "N_INeg_bls12_381_g1"
+  | N_INeg_bls12_381_g2 -> "N_INeg_bls12_381_g2"
+  | N_INeg_bls12_381_fr -> "N_INeg_bls12_381_fr"
+  | N_IPairing_check_bls12_381 -> "N_IPairing_check_bls12_381"
+  | N_IMul_bls12_381_fr_z -> "N_IMul_bls12_381_fr_z"
+  | N_IMul_bls12_381_z_fr -> "N_IMul_bls12_381_z_fr"
+  | N_IInt_bls12_381_z_fr -> "N_IInt_bls12_381_z_fr"
+  | N_IComb -> "N_IComb"
+  | N_IUncomb -> "N_IUncomb"
+  | N_IComb_get -> "N_IComb_get"
+  | N_IComb_set -> "N_IComb_set"
+  | N_ITicket -> "N_ITicket"
+  | N_IRead_ticket -> "N_IRead_ticket"
+  | N_ISplit_ticket -> "N_ISplit_ticket"
+  | N_IJoin_tickets -> "N_IJoin_tickets"
+  | N_ISapling_empty_state -> "N_ISapling_empty_state"
+  | N_ISapling_verify_update -> "N_ISapling_verify_update"
+  | N_IMap_get_and_update -> "N_IMap_get_and_update"
+  | N_IBig_map_get_and_update -> "N_IBig_map_get_and_update"
+  | N_IHalt -> "N_IHalt"
+  | N_ILog -> "N_ILog"
+  | N_IOpen_chest -> "N_IOpen_chest"
 
 let string_of_continuation_name : continuation_name -> string =
  fun c ->
   match c with
-  | N_KNil ->
-      "N_KNil"
-  | N_KCons ->
-      "N_KCons"
-  | N_KReturn ->
-      "N_KReturn"
-  | N_KUndip ->
-      "N_KUndip"
-  | N_KLoop_in ->
-      "N_KLoop_in"
-  | N_KLoop_in_left ->
-      "N_KLoop_in_left"
-  | N_KIter ->
-      "N_KIter"
-  | N_KList_enter_body ->
-      "N_KList_enter_body"
-  | N_KList_exit_body ->
-      "N_KList_exit_body"
-  | N_KMap_enter_body ->
-      "N_KMap_enter_body"
-  | N_KMap_exit_body ->
-      "N_KMap_exit_body"
-  | N_KLog ->
-      "N_KLog"
+  | N_KNil -> "N_KNil"
+  | N_KCons -> "N_KCons"
+  | N_KReturn -> "N_KReturn"
+  | N_KUndip -> "N_KUndip"
+  | N_KLoop_in -> "N_KLoop_in"
+  | N_KLoop_in_left -> "N_KLoop_in_left"
+  | N_KIter -> "N_KIter"
+  | N_KList_enter_body -> "N_KList_enter_body"
+  | N_KList_exit_body -> "N_KList_exit_body"
+  | N_KMap_enter_body -> "N_KMap_enter_body"
+  | N_KMap_exit_body -> "N_KMap_exit_body"
+  | N_KLog -> "N_KLog"
 
 let string_of_instr_or_cont name =
   match name with
-  | Instr_name instr_name ->
-      string_of_instruction_name instr_name
-  | Cont_name cont_name ->
-      string_of_continuation_name cont_name
+  | Instr_name instr_name -> string_of_instruction_name instr_name
+  | Cont_name cont_name -> string_of_continuation_name cont_name
 
 (* ------------------------------------------------------------------------- *)
 
@@ -642,7 +472,8 @@ let cont_sized_step cont_name args = {name = Cont_name cont_name; args}
 (* ------------------------------------------------------------------------- *)
 
 let all_instructions =
-  [ N_IDrop;
+  [
+    N_IDrop;
     N_IDup;
     N_ISwap;
     N_IConst;
@@ -769,6 +600,7 @@ let all_instructions =
     N_IDupN;
     N_IChainId;
     N_ILevel;
+    N_IView;
     N_ISelf_address;
     N_INever;
     N_IUnpair;
@@ -802,10 +634,13 @@ let all_instructions =
     N_IMap_get_and_update;
     N_IBig_map_get_and_update;
     N_IHalt;
-    N_ILog ]
+    N_ILog;
+    N_IOpen_chest;
+  ]
 
 let all_continuations =
-  [ N_KNil;
+  [
+    N_KNil;
     N_KCons;
     N_KReturn;
     N_KUndip;
@@ -816,7 +651,8 @@ let all_continuations =
     N_KList_exit_body;
     N_KMap_enter_body;
     N_KMap_exit_body;
-    N_KLog ]
+    N_KLog;
+  ]
 
 let instruction_name_encoding =
   let open Data_encoding in
@@ -848,7 +684,8 @@ let instr_or_cont_name_encoding =
   let open Data_encoding in
   def "instr_or_cont_name"
   @@ union
-       [ case
+       [
+         case
            ~title:"instr_name"
            (Tag 0)
            instruction_name_encoding
@@ -859,7 +696,8 @@ let instr_or_cont_name_encoding =
            (Tag 1)
            continuation_name_encoding
            (function Cont_name name -> Some name | _ -> None)
-           (fun name -> Cont_name name) ]
+           (fun name -> Cont_name name);
+       ]
 
 let ir_sized_step_encoding =
   let open Data_encoding in
@@ -954,9 +792,7 @@ module Instructions = struct
     ir_sized_step N_IBig_map_update (binary "key" key "big_map" big_map)
 
   let big_map_get_and_update key big_map =
-    ir_sized_step
-      N_IBig_map_get_and_update
-      (binary "key" key "big_map" big_map)
+    ir_sized_step N_IBig_map_get_and_update (binary "key" key "big_map" big_map)
 
   let concat_string total_bytes list =
     ir_sized_step
@@ -972,9 +808,7 @@ module Instructions = struct
   let string_size _string = ir_sized_step N_IString_size nullary
 
   let concat_bytes total_bytes list =
-    ir_sized_step
-      N_IConcat_bytes
-      (binary "total_bytes" total_bytes "list" list)
+    ir_sized_step N_IConcat_bytes (binary "total_bytes" total_bytes "list" list)
 
   let concat_bytes_pair str1 str2 =
     ir_sized_step N_IConcat_bytes_pair (binary "str1" str1 "str2" str2)
@@ -1192,6 +1026,8 @@ module Instructions = struct
 
   let level = ir_sized_step N_ILevel nullary
 
+  let view = ir_sized_step N_IView nullary
+
   let self_address = ir_sized_step N_ISelf_address nullary
 
   let never = ir_sized_step N_INever nullary
@@ -1278,6 +1114,9 @@ module Instructions = struct
   let halt = ir_sized_step N_IHalt nullary
 
   let log = ir_sized_step N_ILog nullary
+
+  let open_chest log_time size =
+    ir_sized_step N_IOpen_chest (binary "log_time" log_time "size" size)
 end
 
 module Control = struct
@@ -1318,28 +1157,17 @@ open Script_typed_ir
 let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
   fun (type a) (wit : a comparable_ty) (v : a) ->
    match wit with
-   | Never_key _ ->
-       Size.zero
-   | Unit_key _ ->
-       Size.unit
-   | Int_key _ ->
-       Size.integer v
-   | Nat_key _ ->
-       Size.integer v
-   | String_key _ ->
-       Size.string v
-   | Bytes_key _ ->
-       Size.bytes v
-   | Mutez_key _ ->
-       Size.mutez v
-   | Bool_key _ ->
-       Size.bool v
-   | Key_hash_key _ ->
-       Size.key_hash v
-   | Timestamp_key _ ->
-       Size.timestamp v
-   | Address_key _ ->
-       Size.address v
+   | Never_key _ -> Size.zero
+   | Unit_key _ -> Size.unit
+   | Int_key _ -> Size.integer v
+   | Nat_key _ -> Size.integer v
+   | String_key _ -> Size.string v
+   | Bytes_key _ -> Size.bytes v
+   | Mutez_key _ -> Size.mutez v
+   | Bool_key _ -> Size.bool v
+   | Key_hash_key _ -> Size.key_hash v
+   | Timestamp_key _ -> Size.timestamp v
+   | Address_key _ -> Size.address v
    | Pair_key ((leaf, _), (node, _), _) ->
        let (lv, rv) = v in
        let size =
@@ -1351,24 +1179,17 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
    | Union_key ((left, _), (right, _), _) ->
        let size =
          match v with
-         | L v ->
-             size_of_comparable_value left v
-         | R v ->
-             size_of_comparable_value right v
+         | L v -> size_of_comparable_value left v
+         | R v -> size_of_comparable_value right v
        in
        Size.add size Size.one
    | Option_key (ty, _) -> (
-     match v with
-     | None ->
-         Size.one
-     | Some x ->
-         Size.add (size_of_comparable_value ty x) Size.one )
-   | Signature_key _ ->
-       Size.signature v
-   | Key_key _ ->
-       Size.public_key v
-   | Chain_id_key _ ->
-       Size.chain_id v
+       match v with
+       | None -> Size.one
+       | Some x -> Size.add (size_of_comparable_value ty x) Size.one)
+   | Signature_key _ -> Size.signature v
+   | Key_key _ -> Size.public_key v
+   | Chain_id_key _ -> Size.chain_id v
 
 let extract_compare_sized_step :
     type a. a comparable_ty -> a -> a -> ir_sized_step =
@@ -1386,50 +1207,28 @@ let extract_ir_sized_step :
  fun ctxt instr stack ->
   let open Script_typed_ir in
   match (instr, stack) with
-  | (IDrop (_, _), _) ->
-      Instructions.drop
-  | (IDup (_, _), _) ->
-      Instructions.dup
-  | (ISwap (_, _), _) ->
-      Instructions.swap
-  | (IConst (_, _, _), _) ->
-      Instructions.const
-  | (ICons_pair (_, _), _) ->
-      Instructions.cons_pair
-  | (ICar (_, _), _) ->
-      Instructions.car
-  | (ICdr (_, _), _) ->
-      Instructions.cdr
-  | (IUnpair (_, _), _) ->
-      Instructions.unpair
-  | (ICons_some (_, _), _) ->
-      Instructions.cons_some
-  | (ICons_none (_, _, _), _) ->
-      Instructions.cons_none
-  | (IIf_none _, _) ->
-      Instructions.if_none
-  | (ICons_left (_, _), _) ->
-      Instructions.left
-  | (ICons_right (_, _), _) ->
-      Instructions.right
-  | (IIf_left _, _) ->
-      Instructions.if_left
-  | (ICons_list (_, _), _) ->
-      Instructions.cons_list
-  | (INil (_, _), _) ->
-      Instructions.nil
-  | (IIf_cons _, _) ->
-      Instructions.if_cons
-  | (IList_iter (_, _, _), _) ->
-      Instructions.list_iter
-  | (IList_map (_, _, _), _) ->
-      Instructions.list_map
-  | (IList_size (_, _), (list, _)) ->
-      Instructions.list_size (Size.list list)
-  | (IEmpty_set (_, _, _), _) ->
-      Instructions.empty_set
-  | (ISet_iter _, (set, _)) ->
-      Instructions.set_iter (Size.set set)
+  | (IDrop (_, _), _) -> Instructions.drop
+  | (IDup (_, _), _) -> Instructions.dup
+  | (ISwap (_, _), _) -> Instructions.swap
+  | (IConst (_, _, _), _) -> Instructions.const
+  | (ICons_pair (_, _), _) -> Instructions.cons_pair
+  | (ICar (_, _), _) -> Instructions.car
+  | (ICdr (_, _), _) -> Instructions.cdr
+  | (IUnpair (_, _), _) -> Instructions.unpair
+  | (ICons_some (_, _), _) -> Instructions.cons_some
+  | (ICons_none (_, _), _) -> Instructions.cons_none
+  | (IIf_none _, _) -> Instructions.if_none
+  | (ICons_left (_, _), _) -> Instructions.left
+  | (ICons_right (_, _), _) -> Instructions.right
+  | (IIf_left _, _) -> Instructions.if_left
+  | (ICons_list (_, _), _) -> Instructions.cons_list
+  | (INil (_, _), _) -> Instructions.nil
+  | (IIf_cons _, _) -> Instructions.if_cons
+  | (IList_iter (_, _, _), _) -> Instructions.list_iter
+  | (IList_map (_, _, _), _) -> Instructions.list_map
+  | (IList_size (_, _), (list, _)) -> Instructions.list_size (Size.list list)
+  | (IEmpty_set (_, _, _), _) -> Instructions.empty_set
+  | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
   | (ISet_mem (_, _), (v, (set, _))) ->
       let (module S) = set in
       let sz = size_of_comparable_value S.elt_ty v in
@@ -1438,14 +1237,10 @@ let extract_ir_sized_step :
       let (module S) = set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
-  | (ISet_size (_, _), (set, _)) ->
-      Instructions.set_size (Size.set set)
-  | (IEmpty_map (_, _, _, _), _) ->
-      Instructions.empty_map
-  | (IMap_map _, (map, _)) ->
-      Instructions.map_map (Size.map map)
-  | (IMap_iter _, (map, _)) ->
-      Instructions.map_iter (Size.map map)
+  | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
+  | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
+  | (IMap_map _, (map, _)) -> Instructions.map_map (Size.map map)
+  | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
   | (IMap_mem (_, _), (v, (((module Map) as map), _))) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_mem key_size (Size.map map)
@@ -1455,14 +1250,11 @@ let extract_ir_sized_step :
   | (IMap_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_update key_size (Size.map map)
-  | (IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _))))
-    ->
+  | (IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get_and_update key_size (Size.map map)
-  | (IMap_size (_, _), (map, _)) ->
-      Instructions.map_size (Size.map map)
-  | (IEmpty_big_map (_, _, _, _), _) ->
-      Instructions.empty_big_map
+  | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
+  | (IEmpty_big_map (_, _, _, _), _) -> Instructions.empty_big_map
   | (IBig_map_mem (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
       let key_size = size_of_comparable_value key_type v in
       Instructions.big_map_mem key_size size
@@ -1489,23 +1281,18 @@ let extract_ir_sized_step :
       Instructions.concat_string_pair (Size.string s1) (Size.string s2)
   | (ISlice_string (_, _), (_off, (_len, (s, _)))) ->
       Instructions.slice_string (Size.string s)
-  | (IString_size (_, _), (s, _)) ->
-      Instructions.string_size (Size.string s)
+  | (IString_size (_, _), (s, _)) -> Instructions.string_size (Size.string s)
   | (IConcat_bytes (_, _), (ss, _)) ->
       let list_size = Size.list ss in
       let total_bytes =
-        List.fold_left
-          (fun x s -> Size.(add x (bytes s)))
-          Size.zero
-          ss.elements
+        List.fold_left (fun x s -> Size.(add x (bytes s))) Size.zero ss.elements
       in
       Instructions.concat_bytes list_size total_bytes
   | (IConcat_bytes_pair (_, _), (s1, (s2, _))) ->
       Instructions.concat_bytes_pair (Size.bytes s1) (Size.bytes s2)
   | (ISlice_bytes (_, _), (_off, (_len, (s, _)))) ->
       Instructions.slice_bytes (Size.bytes s)
-  | (IBytes_size (_, _), _) ->
-      Instructions.bytes_size
+  | (IBytes_size (_, _), _) -> Instructions.bytes_size
   | (IAdd_seconds_to_timestamp (_, _), (s, (t, _))) ->
       Instructions.add_seconds_to_timestamp (Size.timestamp t) (Size.integer s)
   | (IAdd_timestamp_to_seconds (_, _), (t, (s, _))) ->
@@ -1526,24 +1313,15 @@ let extract_ir_sized_step :
       Instructions.ediv_teznat (Size.mutez x) (Size.integer y)
   | (IEdiv_tez (_, _), (x, (y, _))) ->
       Instructions.ediv_tez (Size.mutez x) (Size.mutez y)
-  | (IOr (_, _), _) ->
-      Instructions.or_
-  | (IAnd (_, _), _) ->
-      Instructions.and_
-  | (IXor (_, _), _) ->
-      Instructions.xor_
-  | (INot (_, _), _) ->
-      Instructions.not_
-  | (IIs_nat (_, _), (x, _)) ->
-      Instructions.is_nat (Size.integer x)
-  | (INeg_nat (_, _), (x, _)) ->
-      Instructions.neg_nat (Size.integer x)
-  | (INeg_int (_, _), (x, _)) ->
-      Instructions.neg_int (Size.integer x)
-  | (IAbs_int (_, _), (x, _)) ->
-      Instructions.abs_int (Size.integer x)
-  | (IInt_nat (_, _), (x, _)) ->
-      Instructions.int_nat (Size.integer x)
+  | (IOr (_, _), _) -> Instructions.or_
+  | (IAnd (_, _), _) -> Instructions.and_
+  | (IXor (_, _), _) -> Instructions.xor_
+  | (INot (_, _), _) -> Instructions.not_
+  | (IIs_nat (_, _), (x, _)) -> Instructions.is_nat (Size.integer x)
+  | (INeg_nat (_, _), (x, _)) -> Instructions.neg_nat (Size.integer x)
+  | (INeg_int (_, _), (x, _)) -> Instructions.neg_int (Size.integer x)
+  | (IAbs_int (_, _), (x, _)) -> Instructions.abs_int (Size.integer x)
+  | (IInt_nat (_, _), (x, _)) -> Instructions.int_nat (Size.integer x)
   | (IAdd_intint (_, _), (x, (y, _))) ->
       Instructions.add_intint (Size.integer x) (Size.integer y)
   | (IAdd_intnat (_, _), (x, (y, _))) ->
@@ -1582,165 +1360,103 @@ let extract_ir_sized_step :
       Instructions.and_int_nat (Size.integer x) (Size.integer y)
   | (IXor_nat (_, _), (x, (y, _))) ->
       Instructions.xor_nat (Size.integer x) (Size.integer y)
-  | (INot_nat (_, _), (x, _)) ->
-      Instructions.not_nat (Size.integer x)
-  | (INot_int (_, _), (x, _)) ->
-      Instructions.not_int (Size.integer x)
-  | (IIf _, _) ->
-      Instructions.if_
-  | (ILoop (_, _, _), _) ->
-      Instructions.loop
-  | (ILoop_left (_, _, _), _) ->
-      Instructions.loop_left
-  | (IDip (_, _, _), _) ->
-      Instructions.dip
-  | (IExec (_, _), _) ->
-      Instructions.exec
-  | (IApply (_, _, _), _) ->
-      Instructions.apply
-  | (ILambda (_, _, _), _) ->
-      Instructions.lambda
-  | (IFailwith (_, _, _, _), _) ->
-      Instructions.failwith_
+  | (INot_nat (_, _), (x, _)) -> Instructions.not_nat (Size.integer x)
+  | (INot_int (_, _), (x, _)) -> Instructions.not_int (Size.integer x)
+  | (IIf _, _) -> Instructions.if_
+  | (ILoop (_, _, _), _) -> Instructions.loop
+  | (ILoop_left (_, _, _), _) -> Instructions.loop_left
+  | (IDip (_, _, _), _) -> Instructions.dip
+  | (IExec (_, _), _) -> Instructions.exec
+  | (IApply (_, _, _), _) -> Instructions.apply
+  | (ILambda (_, _, _), _) -> Instructions.lambda
+  | (IFailwith (_, _, _), _) -> Instructions.failwith_
   | (ICompare (_, cmp_ty, _), (a, (b, _))) ->
       extract_compare_sized_step cmp_ty a b
-  | (IEq (_, _), _) ->
-      Instructions.eq
-  | (INeq (_, _), _) ->
-      Instructions.neq
-  | (ILt (_, _), _) ->
-      Instructions.lt
-  | (IGt (_, _), _) ->
-      Instructions.gt
-  | (ILe (_, _), _) ->
-      Instructions.le
-  | (IGe (_, _), _) ->
-      Instructions.ge
-  | (IAddress (_, _), _) ->
-      Instructions.address
-  | (IContract (_, _, _, _), _) ->
-      Instructions.contract
-  | (ITransfer_tokens (_, _), _) ->
-      Instructions.transfer_tokens
-  | (IImplicit_account (_, _), _) ->
-      Instructions.implicit_account
-  | (ICreate_contract _, _) ->
-      Instructions.create_contract
-  | (ISet_delegate (_, _), _) ->
-      Instructions.set_delegate
-  | (INow (_, _), _) ->
-      Instructions.now
-  | (IBalance (_, _), _) ->
-      Instructions.balance
-  | (ILevel (_, _), _) ->
-      Instructions.level
+  | (IEq (_, _), _) -> Instructions.eq
+  | (INeq (_, _), _) -> Instructions.neq
+  | (ILt (_, _), _) -> Instructions.lt
+  | (IGt (_, _), _) -> Instructions.gt
+  | (ILe (_, _), _) -> Instructions.le
+  | (IGe (_, _), _) -> Instructions.ge
+  | (IAddress (_, _), _) -> Instructions.address
+  | (IContract (_, _, _, _), _) -> Instructions.contract
+  | (ITransfer_tokens (_, _), _) -> Instructions.transfer_tokens
+  | (IView (_, _, _), _) -> Instructions.view
+  | (IImplicit_account (_, _), _) -> Instructions.implicit_account
+  | (ICreate_contract _, _) -> Instructions.create_contract
+  | (ISet_delegate (_, _), _) -> Instructions.set_delegate
+  | (INow (_, _), _) -> Instructions.now
+  | (IBalance (_, _), _) -> Instructions.balance
+  | (ILevel (_, _), _) -> Instructions.level
   | (ICheck_signature (_, _), (public_key, (_signature, (message, _)))) -> (
-    match public_key with
-    | Signature.Ed25519 _pk ->
-        let pk = Size.of_int Ed25519.size in
-        let signature = Size.of_int Signature.size in
-        let message = Size.bytes message in
-        Instructions.check_signature_ed25519 pk signature message
-    | Signature.Secp256k1 _pk ->
-        let pk = Size.of_int Secp256k1.size in
-        let signature = Size.of_int Signature.size in
-        let message = Size.bytes message in
-        Instructions.check_signature_secp256k1 pk signature message
-    | Signature.P256 _pk ->
-        let pk = Size.of_int P256.size in
-        let signature = Size.of_int Signature.size in
-        let message = Size.bytes message in
-        Instructions.check_signature_p256 pk signature message )
-  | (IHash_key (_, _), _) ->
-      Instructions.hash_key
+      match public_key with
+      | Signature.Ed25519 _pk ->
+          let pk = Size.of_int Ed25519.size in
+          let signature = Size.of_int Signature.size in
+          let message = Size.bytes message in
+          Instructions.check_signature_ed25519 pk signature message
+      | Signature.Secp256k1 _pk ->
+          let pk = Size.of_int Secp256k1.size in
+          let signature = Size.of_int Signature.size in
+          let message = Size.bytes message in
+          Instructions.check_signature_secp256k1 pk signature message
+      | Signature.P256 _pk ->
+          let pk = Size.of_int P256.size in
+          let signature = Size.of_int Signature.size in
+          let message = Size.bytes message in
+          Instructions.check_signature_p256 pk signature message)
+  | (IHash_key (_, _), _) -> Instructions.hash_key
   | (IPack (_, ty, _), (v, _)) ->
       let encoding_size = Size.of_encoded_value ctxt ty v in
       Instructions.pack encoding_size
-  | (IUnpack (_, _, _), _) ->
-      Instructions.unpack
-  | (IBlake2b (_, _), (bytes, _)) ->
-      Instructions.blake2b (Size.bytes bytes)
-  | (ISha256 (_, _), (bytes, _)) ->
-      Instructions.sha256 (Size.bytes bytes)
-  | (ISha512 (_, _), (bytes, _)) ->
-      Instructions.sha512 (Size.bytes bytes)
-  | (ISource (_, _), _) ->
-      Instructions.source
-  | (ISender (_, _), _) ->
-      Instructions.sender
-  | (ISelf (_, _, _, _), _) ->
-      Instructions.self
-  | (ISelf_address (_, _), _) ->
-      Instructions.self_address
-  | (IAmount (_, _), _) ->
-      Instructions.amount
-  | (ISapling_empty_state (_, _, _), _) ->
-      Instructions.sapling_empty_state
+  | (IUnpack (_, _, _), _) -> Instructions.unpack
+  | (IBlake2b (_, _), (bytes, _)) -> Instructions.blake2b (Size.bytes bytes)
+  | (ISha256 (_, _), (bytes, _)) -> Instructions.sha256 (Size.bytes bytes)
+  | (ISha512 (_, _), (bytes, _)) -> Instructions.sha512 (Size.bytes bytes)
+  | (ISource (_, _), _) -> Instructions.source
+  | (ISender (_, _), _) -> Instructions.sender
+  | (ISelf (_, _, _, _), _) -> Instructions.self
+  | (ISelf_address (_, _), _) -> Instructions.self_address
+  | (IAmount (_, _), _) -> Instructions.amount
+  | (ISapling_empty_state (_, _, _), _) -> Instructions.sapling_empty_state
   | (ISapling_verify_update (_, _), (transaction, (_state, _))) ->
       let inputs = Size.sapling_transaction_inputs transaction in
       let outputs = Size.sapling_transaction_outputs transaction in
       let state = Size.zero in
       Instructions.sapling_verify_update inputs outputs state
-  | (IDig (_, n, _, _), _) ->
-      Instructions.dig n
-  | (IDug (_, n, _, _), _) ->
-      Instructions.dug n
-  | (IDipn (_, n, _, _, _), _) ->
-      Instructions.dipn n
-  | (IDropn (_, n, _, _), _) ->
-      Instructions.dropn n
-  | (IChainId (_, _), _) ->
-      Instructions.chain_id
-  | (INever _, _) ->
-      .
-  | (IVoting_power (_, _), _) ->
-      Instructions.voting_power
-  | (ITotal_voting_power (_, _), _) ->
-      Instructions.total_voting_power
-  | (IKeccak (_, _), (bytes, _)) ->
-      Instructions.keccak (Size.bytes bytes)
-  | (ISha3 (_, _), (bytes, _)) ->
-      Instructions.sha3 (Size.bytes bytes)
-  | (IAdd_bls12_381_g1 (_, _), _) ->
-      Instructions.add_bls12_381_g1
-  | (IAdd_bls12_381_g2 (_, _), _) ->
-      Instructions.add_bls12_381_g2
-  | (IAdd_bls12_381_fr (_, _), _) ->
-      Instructions.add_bls12_381_fr
-  | (IMul_bls12_381_g1 (_, _), _) ->
-      Instructions.mul_bls12_381_g1
-  | (IMul_bls12_381_g2 (_, _), _) ->
-      Instructions.mul_bls12_381_g2
-  | (IMul_bls12_381_fr (_, _), _) ->
-      Instructions.mul_bls12_381_fr
+  | (IDig (_, n, _, _), _) -> Instructions.dig n
+  | (IDug (_, n, _, _), _) -> Instructions.dug n
+  | (IDipn (_, n, _, _, _), _) -> Instructions.dipn n
+  | (IDropn (_, n, _, _), _) -> Instructions.dropn n
+  | (IChainId (_, _), _) -> Instructions.chain_id
+  | (INever _, _) -> .
+  | (IVoting_power (_, _), _) -> Instructions.voting_power
+  | (ITotal_voting_power (_, _), _) -> Instructions.total_voting_power
+  | (IKeccak (_, _), (bytes, _)) -> Instructions.keccak (Size.bytes bytes)
+  | (ISha3 (_, _), (bytes, _)) -> Instructions.sha3 (Size.bytes bytes)
+  | (IAdd_bls12_381_g1 (_, _), _) -> Instructions.add_bls12_381_g1
+  | (IAdd_bls12_381_g2 (_, _), _) -> Instructions.add_bls12_381_g2
+  | (IAdd_bls12_381_fr (_, _), _) -> Instructions.add_bls12_381_fr
+  | (IMul_bls12_381_g1 (_, _), _) -> Instructions.mul_bls12_381_g1
+  | (IMul_bls12_381_g2 (_, _), _) -> Instructions.mul_bls12_381_g2
+  | (IMul_bls12_381_fr (_, _), _) -> Instructions.mul_bls12_381_fr
   | (IMul_bls12_381_z_fr (_, _), (_fr, (z, _))) ->
       Instructions.mul_bls12_381_z_fr (Size.integer z)
   | (IMul_bls12_381_fr_z (_, _), (z, _)) ->
       Instructions.mul_bls12_381_fr_z (Size.integer z)
-  | (IInt_bls12_381_fr (_, _), _) ->
-      Instructions.int_bls12_381_z_fr
-  | (INeg_bls12_381_g1 (_, _), _) ->
-      Instructions.neg_bls12_381_g1
-  | (INeg_bls12_381_g2 (_, _), _) ->
-      Instructions.neg_bls12_381_g2
-  | (INeg_bls12_381_fr (_, _), _) ->
-      Instructions.neg_bls12_381_fr
+  | (IInt_bls12_381_fr (_, _), _) -> Instructions.int_bls12_381_z_fr
+  | (INeg_bls12_381_g1 (_, _), _) -> Instructions.neg_bls12_381_g1
+  | (INeg_bls12_381_g2 (_, _), _) -> Instructions.neg_bls12_381_g2
+  | (INeg_bls12_381_fr (_, _), _) -> Instructions.neg_bls12_381_fr
   | (IPairing_check_bls12_381 (_, _), (list, _)) ->
       Instructions.pairing_check_bls12_381 (Size.list list)
-  | (IComb (_, n, _, _), _) ->
-      Instructions.comb (Size.of_int n)
-  | (IUncomb (_, n, _, _), _) ->
-      Instructions.uncomb (Size.of_int n)
-  | (IComb_get (_, n, _, _), _) ->
-      Instructions.comb_get (Size.of_int n)
-  | (IComb_set (_, n, _, _), _) ->
-      Instructions.comb_set (Size.of_int n)
-  | (IDup_n (_, n, _, _), _) ->
-      Instructions.dupn (Size.of_int n)
-  | (ITicket (_, _), _) ->
-      Instructions.ticket
-  | (IRead_ticket (_, _), _) ->
-      Instructions.read_ticket
+  | (IComb (_, n, _, _), _) -> Instructions.comb (Size.of_int n)
+  | (IUncomb (_, n, _, _), _) -> Instructions.uncomb (Size.of_int n)
+  | (IComb_get (_, n, _, _), _) -> Instructions.comb_get (Size.of_int n)
+  | (IComb_set (_, n, _, _), _) -> Instructions.comb_set (Size.of_int n)
+  | (IDup_n (_, n, _, _), _) -> Instructions.dupn (Size.of_int n)
+  | (ITicket (_, _), _) -> Instructions.ticket
+  | (IRead_ticket (_, _), _) -> Instructions.read_ticket
   | (ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _))) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
   | (IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _)) ->
@@ -1749,41 +1465,34 @@ let extract_ir_sized_step :
       let tez1 = Size.integer ticket1.amount in
       let tez2 = Size.integer ticket2.amount in
       Instructions.join_tickets size1 size2 tez1 tez2
-  | (IHalt _, _) ->
-      Instructions.halt
-  | (ILog _, _) ->
-      Instructions.log
+  | (IHalt _, _) -> Instructions.halt
+  | (ILog _, _) -> Instructions.log
+  | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
+      let plaintext_size = Timelock.get_plaintext_size chest - 1 in
+      let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
+      Instructions.open_chest log_time plaintext_size
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =
   match cont with
-  | KNil ->
-      Control.nil
-  | KCons _ ->
-      Control.cons
-  | KReturn _ ->
-      Control.return
-  | KUndip _ ->
-      Control.undip
-  | KLoop_in _ ->
-      Control.loop_in
-  | KLoop_in_left _ ->
-      Control.loop_in_left
-  | KIter (_, xs, _) ->
-      Control.iter (Size.of_int (List.length xs))
+  | KNil -> Control.nil
+  | KCons _ -> Control.cons
+  | KReturn _ -> Control.return
+  | KUndip _ -> Control.undip
+  | KLoop_in _ -> Control.loop_in
+  | KLoop_in_left _ -> Control.loop_in_left
+  | KIter (_, xs, _) -> Control.iter (Size.of_int (List.length xs))
   | KList_enter_body (_, xs, ys, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))
         (Size.of_int (List.length ys))
-  | KList_exit_body (_, _, _, _, _) ->
-      Control.list_exit_body
+  | KList_exit_body (_, _, _, _, _) -> Control.list_exit_body
   | KMap_enter_body (_, xs, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
   | KMap_exit_body (_, _, ((module Map) as map), k, _) ->
       let key_size = size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
-  | KLog _ ->
-      Control.log
+  | KLog _ -> Control.log
 
 (** [Stop_bench] gets raised when a [IFailwith] would be the next instruction.
     This allows us to recover the full execution trace, including the trace of
@@ -1825,15 +1534,14 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
     in
     match Environment.wrap_tzresult res with
     | Error errs ->
-        Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+        Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
     | Ok (_aft_top, _aft, _ctxt) ->
         (* ((aft_top, aft), List.rev !trace, ctxt) *)
         List.rev !trace
   with Stop_bench -> List.rev !trace
 
-let extract_deps_continuation (type bef_top bef aft_top aft) ctxt
-    step_constants
+let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation)
     (stack : bef_top * bef) =
   let trace = ref [] in
@@ -1862,7 +1570,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt
     in
     match Environment.wrap_tzresult res with
     | Error errs ->
-        Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+        Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
     | Ok (_aft_top, _aft, _outdated_ctxt, _gas) ->
         (* ((aft_top, aft), List.rev !trace, outdated_ctxt, gas) *)
@@ -1872,8 +1580,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt
 let sized_step_to_sparse_vec {name; args} =
   let s = string_of_instr_or_cont name in
   match args with
-  | [] ->
-      Sparse_vec.String.of_list [(s, float_of_int 1)]
+  | [] -> Sparse_vec.String.of_list [(s, float_of_int 1)]
   | _ ->
       List.fold_left
         (fun acc {name; arg} ->

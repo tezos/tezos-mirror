@@ -27,7 +27,7 @@
 
 let key_to_string = String.concat ";"
 
-module Store = Tezos_context_memory.Context
+module Store = Local_context
 module StringMap = TzString.Map
 
 let rec raw_context_to_irmin_tree
@@ -54,7 +54,7 @@ module Merkle = struct
          (Format.asprintf
             "Failed to convert %s to a Context hash. Error is: %a"
             s
-            pp_print_error)
+            pp_print_trace)
 
   let rec merkle_node_to_irmin_tree repo mnode :
       (Store.tree, string) result Lwt.t =
@@ -135,6 +135,7 @@ module Merkle = struct
       Returns [None] if no change was necessary, [Some result_tree] where
       [result_tree] is the union of [tree] and [mtree]. *)
   and union_irmin_tree_merkle_tree repo reversed_key tree mtree =
+    let hash_start_tree = Store.Tree.hash tree in
     let change = ref false in
     List.fold_left_es
       (fun built_tree (subkey, mnode) ->
@@ -165,7 +166,18 @@ module Merkle = struct
       tree
       (StringMap.bindings mtree)
     >>=? fun res ->
-    if !change then lwt_return_ok_some res else lwt_return_ok_none
+    let hash_end_tree = Store.Tree.hash res in
+    if not (Context_hash.equal hash_start_tree hash_end_tree) then
+      Lwt.return_error
+      @@ Format.asprintf
+           "The hash of the shallow tree %a does not correspond to the \
+            unshallowed one %a"
+           Context_hash.pp
+           hash_start_tree
+           Context_hash.pp
+           hash_end_tree
+    else if !change then lwt_return_ok_some res
+    else lwt_return_ok_none
 
   let union_irmin_tree_merkle_tree repo tree mtree =
     union_irmin_tree_merkle_tree repo [] tree mtree >>=? fun tree_opt ->

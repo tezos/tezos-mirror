@@ -35,6 +35,7 @@ type argument =
   | Connections of int
   | Private_mode
   | Peer of string
+  | No_bootstrap_peers
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -49,6 +50,7 @@ let make_argument = function
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]
+  | No_bootstrap_peers -> ["--no-bootstrap-peers"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -158,31 +160,13 @@ let spawn_config_init node arguments =
       arguments
     else Network "sandbox" :: arguments
   in
-  let (net_addr, rpc_addr) =
-    match node.persistent_state.runner with
-    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
-    | Some _ ->
-        (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:")
-  in
   spawn_command
     node
     ("config"
      ::
      "init"
      ::
-     "--data-dir"
-     ::
-     node.persistent_state.data_dir
-     ::
-     "--net-addr"
-     ::
-     (net_addr ^ string_of_int node.persistent_state.net_port)
-     ::
-     "--rpc-addr"
-     ::
-     (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
-     :: make_arguments arguments)
+     "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments)
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
@@ -299,7 +283,11 @@ let handle_event node {name; value} =
   | "node_chain_validator.v0" -> (
       match JSON.as_list_opt value with
       | Some [_timestamp; details] -> (
-          match JSON.(details |-> "event" |-> "level" |> as_int_opt) with
+          match
+            JSON.(
+              details |-> "event" |-> "processed_block" |-> "level"
+              |> as_int_opt)
+          with
           | None ->
               (* There are several kinds of [node_chain_validator.v0] events
                  and maybe this one is not the one with the level: ignore it. *)
@@ -422,7 +410,41 @@ let add_peer_with_id node peer =
   add_argument node (Peer peer) ;
   Lwt.return_unit
 
-let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
+let get_peers node =
+  List.filter_map
+    (fun arg -> match arg with Peer s -> Some s | _ -> None)
+    node.persistent_state.arguments
+
+(** [runlike_command_arguments node command arguments]
+    evaluates in a list of strings containing all command
+    line arguments needed to spawn a [command] like [run]
+    or [replay] for the given [node] and extra [arguments]. *)
+let runlike_command_arguments node command arguments =
+  let (net_addr, rpc_addr) =
+    match node.persistent_state.runner with
+    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
+    | Some _ ->
+        (* FIXME spawn an ssh tunnel in case of remote host *)
+        ("0.0.0.0:", "0.0.0.0:")
+  in
+  let arguments = node.persistent_state.arguments @ arguments in
+  command
+  ::
+  "--data-dir"
+  ::
+  node.persistent_state.data_dir
+  ::
+  "--net-addr"
+  ::
+  (net_addr ^ string_of_int node.persistent_state.net_port)
+  ::
+  "--rpc-addr"
+  ::
+  (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+  :: make_arguments arguments
+
+let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
+    =
   (match node.status with
   | Not_running -> ()
   | Running _ -> Test.fail "node %s is already running" node.name) ;
@@ -438,12 +460,6 @@ let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
               level ;
             None)
     | None -> None
-  in
-  let arguments = node.persistent_state.arguments @ arguments in
-  let arguments =
-    "run"
-    ::
-    "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments
   in
   let on_terminate status =
     on_terminate status ;
@@ -466,6 +482,14 @@ let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
+
+let run ?on_terminate ?event_level node arguments =
+  let arguments = runlike_command_arguments node "run" arguments in
+  do_runlike_command ?on_terminate ?event_level node arguments
+
+let replay ?on_terminate ?event_level ?(blocks = ["head"]) node arguments =
+  let arguments = runlike_command_arguments node "replay" arguments @ blocks in
+  do_runlike_command ?on_terminate ?event_level node arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
     ?rpc_port ?event_level arguments =

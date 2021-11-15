@@ -15,15 +15,17 @@ depends: [
   "tezos-alpha-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }
-  "tezos-test-services" { with-test }
   "tezos-client-base" { with-test }
   "tezos-protocol-alpha-parameters" { with-test }
   "tezos-shell-services" { with-test }
+  "tezos-base-test-helpers" { with-test }
+  "tezos-benchmark" { with-test }
+  "tezos-benchmark-alpha" { with-test }
 ]
 build: [
   [
     "%{tezos-protocol-compiler:lib}%/replace"
-    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v1"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
     "alpha"

@@ -332,8 +332,9 @@ let bake_with_mempool state mempool =
   let mempool_json = Data_encoding.Json.construct mempool_encoding mempool in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
-  let* _ret =
-    Tezos_stdlib_unix.Lwt_utils_unix.create_file mempool mempool_str
+  let* _ =
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
+        Lwt_io.write oc mempool_str)
   in
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)

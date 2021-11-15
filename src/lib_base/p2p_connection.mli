@@ -25,6 +25,9 @@
 (*****************************************************************************)
 
 module Id : sig
+  (** The host address and its optional listening port.
+      The port is set to None in case the node doesn't have a welcome worker
+      to accept incoming connections. *)
   type t = P2p_addr.t * P2p_addr.port option
 
   val compare : t -> t -> int
@@ -62,7 +65,12 @@ module Info : sig
     incoming : bool;
     peer_id : P2p_peer_id.t;
     id_point : Id.t;
+        (** Contact point: host address along with the TCP port on which
+            the peer can be reached (listening port). *)
     remote_socket_port : P2p_addr.port;
+        (** Port we're actually connected to. This port is equal to the
+            contact (listening) port in case of an outgoing connection,
+            and may be different in case of an incoming connection. *)
     announced_version : Network_version.t;
     private_node : bool;
     local_metadata : 'meta;
@@ -128,4 +136,12 @@ module P2p_event : sig
   val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
+end
+
+(**/**)
+
+module Internal_for_tests : sig
+  module Info : sig
+    val mock : 'meta -> 'meta Info.t
+  end
 end

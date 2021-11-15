@@ -1,22 +1,32 @@
 #! /bin/sh
 
+## This script is not meant to be executed interactively. Instead it is meant to
+## be used in other scripts to provide common variables for version numbers and
+## hashes.
+##
+## Typical use:
+## . "$script_dir"/version.sh
+
 ## `ocaml-version` should be in sync with `README.rst` and
 ## `lib.protocol-compiler/tezos-protocol-compiler.opam`
+##
+## This script is also sourced in the Makefile, as such it should be compatible
+## with both the make and sh syntax
 
-ocaml_version=4.10.2
-opam_version=2.0
-recommended_rust_version=1.44.0
+export ocaml_version=4.12.1
+export opam_version=2.0
+export recommended_rust_version=1.52.1
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-full_opam_repository_tag=aad0f94dee43a430df1f6844690ab429ab089a3c
+export full_opam_repository_tag=de2a372fc4d915bae85b7d2cc532a094941a9c0e
 
 ## opam_repository is an additional, tezos-specific opam repository.
-## This value MUST be the same as `build_deps_image_version` in `.gitlab-ci.yml
-opam_repository_tag=28c81453b41d5414a0d32af8fe10c5197f43d360
-opam_repository_url=https://gitlab.com/tezos/opam-repository
-opam_repository_git=$opam_repository_url.git
-opam_repository=$opam_repository_git\#$opam_repository_tag
+## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
+export opam_repository_url=https://gitlab.com/tezos/opam-repository
+export opam_repository_tag=e47d923d556a41fa3dd02128658a7cd899f80ab0
+export opam_repository_git=$opam_repository_url.git
+export opam_repository=$opam_repository_git\#$opam_repository_tag
 
 ## Other variables, used both in Makefile and scripts
-COVERAGE_OUTPUT=_coverage_output
+export COVERAGE_OUTPUT=_coverage_output

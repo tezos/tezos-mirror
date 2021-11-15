@@ -2,9 +2,5 @@
  (name tezos_hacl_glue_unix)
  (public_name tezos-hacl-glue-unix)
  (implements tezos-hacl-glue)
- (libraries
-   hacl-star
-   hacl-star-raw
- )
- (modules hacl)
-)
+ (instrumentation (backend bisect_ppx))
+ (libraries hacl-star hacl-star-raw))

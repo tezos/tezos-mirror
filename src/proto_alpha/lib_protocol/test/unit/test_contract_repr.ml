@@ -34,6 +34,8 @@
 *)
 open Protocol
 
+open Tztest
+
 (*
 
   TODO: Remove dependence on contract_hash.ml and mock it

@@ -2,12 +2,13 @@
 
 .. _test-networks:
 
+=============
 Test Networks
 =============
 
 Mainnet is the main Tezos network, but is not appropriate for testing.
 Other networks are available to this end. Test networks usually run
-with different constants to speed up the chain.
+with different :ref:`constants <protocol_constants>` to speed up the chain.
 
 There is one test network for the current protocol, and one test
 network for the protocol which is being proposed for voting. The
@@ -15,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Florence for FLorencenet), the protocol
+network is activated (such as Granada for granadanet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -23,7 +24,7 @@ a new test network is spawned. This also makes synchronization much
 faster than with a long-lived network.
 
 Get Free Funds
---------------
+==============
 
 Test networks have a list of built-in accounts with some funds.
 You can obtain the key to these accounts from a faucet to claim the funds.
@@ -31,7 +32,7 @@ All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
 Granadanet
-----------
+==========
 
 - Built-in network alias: ``granadanet`` (see :ref:`builtin_networks`)
 
@@ -42,49 +43,12 @@ Granadanet
 Granadanet is a test network running the ``PtGRANAD`` protocol.
 Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
 
-On Granadanet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 1024 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts half a cycle and should thus last about 8 hours.
-
-Florencenet
------------
-
-- Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
-
-  * Available in version 9.0
-
-- Run Docker image: ``wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Florencenet is a test network running the ``PsFLoren`` protocol.
-Florencenet will run until Florence is replaced by another protocol on Mainnet.
-
-On Florencenet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 1024 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 0 instead of 1966080;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts half a cycle and should thus last about 8 hours.
+On Granadanet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Future Networks
----------------
+===============
 
 At some point, there will be a proposal for a successor to the current
 protocol (let's call this new protocol P). After P is injected, a new test network
@@ -96,19 +60,28 @@ P is activated, the previous test network will end and P-net will continue on it
 Old Networks
 ============
 
+Florencenet
+-----------
+
+Florencenet was a test network running the Florence protocol.
+Following the activation of the Granada protocol replacing Florence on Mainnet,
+Florencenet stopped being maintained on August 6, 2021.
+
 Edo2net
 -------
 
 Edo2net was a test network running the Edo protocol.
 Following the activation of the Florence protocol replacing Edo on Mainnet,
-Edo2net stopped being maintained on May 11th, 2021.
+Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker will
+no longer be producing blocks).
 
 Delphinet
 ---------
 
 Delphinet was a test network running the Delphi protocol.
 Following the activation of the Edo protocol replacing Delphi on Mainnet,
-Delphinet stopped being maintained on Febuary 28th, 2021.
+Delphinet stopped being maintained on Febuary 28th, 2021 (the bootstrap baker
+will no longer be producing blocks).
 
 Dalphanet
 ---------
@@ -123,7 +96,8 @@ Carthagenet
 
 Carthagenet was a test network running the Carthage protocol.
 Following the activation of the Delphi protocol replacing Carthage on Mainnet,
-Carthagenet stopped being maintained on December 12th, 2020.
+Carthagenet stopped being maintained on December 12th, 2020 (the bootstrap
+baker will no longer be producing blocks).
 
 Babylonnet
 ----------

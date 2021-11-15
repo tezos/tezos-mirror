@@ -28,7 +28,5 @@ module Make (Prefix : Sig.PREFIX) : sig
 
   include Sig.CORE with type error := error
 
-  include Sig.EXT with type error := error
-
   include Sig.WITH_WRAPPED with type error := error
 end

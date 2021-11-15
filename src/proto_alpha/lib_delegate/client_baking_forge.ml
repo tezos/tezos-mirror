@@ -151,7 +151,7 @@ let assert_valid_operations_hash shell_header operations =
     (Operation_list_list_hash.equal
        operations_hash
        shell_header.Tezos_base.Block_header.operations_hash)
-    (failure "Client_baking_forge.inject_block: inconsistent header.")
+    (error_of_fmt "Client_baking_forge.inject_block: inconsistent header.")
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     ~priority ~delegate_pkh ~delegate_sk ~level operations
@@ -208,7 +208,7 @@ let () =
         "@[Failed to preapply %a:@ @[<v 4>%a@]@]"
         Operation_hash.pp_short
         h
-        pp_print_error
+        pp_print_trace
         err)
     Data_encoding.(
       obj2
@@ -482,7 +482,7 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
   | `Auto (src_pkh, max_priority) -> (
       Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
-      Alpha_services.Delegate.Baking_rights.get
+      Plugin.RPC.Baking_rights.get
         cctxt
         ?max_priority
         ~levels:[level]
@@ -491,10 +491,10 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
       >>=? fun possibilities ->
       match
         List.find
-          (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
+          (fun p -> p.Plugin.RPC.Baking_rights.level = level)
           possibilities
       with
-      | Some {Alpha_services.Delegate.Baking_rights.priority = prio; _} ->
+      | Some {Plugin.RPC.Baking_rights.priority = prio; _} ->
           Alpha_services.Delegate.Minimal_valid_time.get
             cctxt
             (chain, block)
@@ -544,7 +544,7 @@ let error_of_op (result : error Preapply_result.t) op =
           | None -> None))
 
 let compute_endorsement_powers cctxt constants ~chain ~block =
-  Delegate_services.Endorsing_rights.get
+  Plugin.RPC.Endorsing_rights.get
     cctxt
     ~levels:[block.Client_baking_blocks.level]
     (chain, `Hash (block.hash, 0))
@@ -552,7 +552,7 @@ let compute_endorsement_powers cctxt constants ~chain ~block =
   let slots_arr = Array.make constants.Constants.endorsers_per_block 0 in
   (* Populate the array *)
   List.iter
-    (fun {Delegate_services.Endorsing_rights.slots; _} ->
+    (fun {Plugin.RPC.Endorsing_rights.slots; _} ->
       let endorsing_power = List.length slots in
       List.iter (fun slot -> slots_arr.(slot) <- endorsing_power) slots)
     endorsing_rights ;
@@ -704,23 +704,39 @@ let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
     inc
     (List.flatten operations)
   >>=? fun final_inc ->
-  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
-  return
-    (final_inc, (validation_result, metadata), operations, expected_validity)
-
-(* Build the block header : mimics node prevalidation *)
-let finalize_block_header shell_header ~timestamp validation_result operations
-    predecessor_block_metadata_hash predecessor_ops_metadata_hash =
-  let {Tezos_protocol_environment.context; fitness; message; _} =
-    validation_result
-  in
-  let validation_passes = List.length Main.validation_passes in
   let operations_hash : Operation_list_list_hash.t =
     Operation_list_list_hash.compute
       (List.map
          (fun sl ->
            Operation_list_hash.compute (List.map Operation.hash_packed sl))
          operations)
+  in
+  let validation_passes = List.length Main.validation_passes in
+  let final_inc =
+    {
+      final_inc with
+      header =
+        {
+          final_inc.header with
+          operations_hash;
+          validation_passes;
+          level = Int32.succ final_inc.header.level;
+        };
+    }
+  in
+  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
+  return
+    (final_inc, (validation_result, metadata), operations, expected_validity)
+
+(* Build the block header : mimics node prevalidation *)
+let finalize_block_header shell_header ~timestamp validation_result
+    predecessor_block_metadata_hash predecessor_ops_metadata_hash =
+  let {Tezos_protocol_environment.context; fitness; message; _} =
+    validation_result
+  in
+  let header =
+    Tezos_base.Block_header.
+      {shell_header with fitness; context = Context_hash.zero}
   in
   let context = Shell_context.unwrap_disk_context context in
   (match predecessor_block_metadata_hash with
@@ -738,18 +754,7 @@ let finalize_block_header shell_header ~timestamp validation_result operations
   | None -> Lwt.return context)
   >>= fun context ->
   let context = Context.hash ~time:timestamp ?message context in
-  let header =
-    Tezos_base.Block_header.
-      {
-        shell_header with
-        level = Int32.succ shell_header.level;
-        validation_passes;
-        operations_hash;
-        fitness;
-        context;
-      }
-  in
-  return header
+  return {header with context}
 
 let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
@@ -883,7 +888,6 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           final_context.header
           ~timestamp:min_valid_timestamp
           validation_result
-          operations
           block_info.predecessor_block_metadata_hash
           block_info.predecessor_operations_metadata_hash
         >>= function
@@ -963,31 +967,36 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
       return_some
         (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
-let filter_outdated_endorsements expected_level ops =
-  List.filter
+let extract_op_and_filter_outdated_endorsements expected_level ops =
+  List.filter_map
     (function
-      | {
-          Alpha_context.protocol_data =
-            Operation_data
-              {
-                contents =
-                  Single
-                    (Endorsement_with_slot
-                      {
-                        endorsement =
-                          {
-                            protocol_data =
-                              {contents = Single (Endorsement {level; _}); _};
-                            _;
-                          };
-                        _;
-                      });
-                _;
-              };
-          _;
-        } ->
-          Raw_level.equal expected_level level
-      | _ -> true)
+      | ( ( _,
+            ({
+               Alpha_context.protocol_data =
+                 Operation_data
+                   {
+                     contents =
+                       Single
+                         (Endorsement_with_slot
+                           {
+                             endorsement =
+                               {
+                                 protocol_data =
+                                   {
+                                     contents = Single (Endorsement {level; _});
+                                     _;
+                                   };
+                                 _;
+                               };
+                             _;
+                           });
+                     _;
+                   };
+               _;
+             } as op) ),
+          _ ) ->
+          if Raw_level.equal expected_level level then Some op else None
+      | ((_, op), _) -> Some op)
     ops
 
 (** [fetch_operations] retrieve the operations present in the
@@ -1028,7 +1037,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
   | Some current_mempool ->
       let operations =
         ref
-          (filter_outdated_endorsements
+          (extract_op_and_filter_outdated_endorsements
              head.Client_baking_blocks.level
              current_mempool)
       in
@@ -1086,7 +1095,9 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
         >>= function
         | `Event (Some op_list) ->
             last_get_event := None ;
-            let op_list = filter_outdated_endorsements head.level op_list in
+            let op_list =
+              extract_op_and_filter_outdated_endorsements head.level op_list
+            in
             notify_endorsement_arrival op_list >>= fun () ->
             let added_endorsing_power =
               compute_endorsing_power endorsement_powers op_list
@@ -1099,7 +1110,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
             (* Retrieve the remaining operations present in the stream
                before block construction *)
             let remaining_operations =
-              filter_outdated_endorsements
+              extract_op_and_filter_outdated_endorsements
                 head.level
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in
@@ -1225,7 +1236,6 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 final_context.header
                 ~timestamp:valid_timestamp
                 validation_result
-                operations
                 bi.predecessor_block_metadata_hash
                 bi.predecessor_operations_metadata_hash
               >>= function
@@ -1353,7 +1363,7 @@ let traced_option_to_result ~error =
   Option.fold ~some:ok ~none:(Error_monad.error error)
 
 let check_file_exists file =
-  if Sys.file_exists file then ok_unit
+  if Sys.file_exists file then Result.return_unit
   else error (Block_vote_file_not_found file)
 
 let read_liquidity_baking_escape_vote ~per_block_vote_file =
@@ -1453,7 +1463,7 @@ let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
                load cctxt state.nonces_location >>=? fun nonces ->
                let nonces = add nonces block_hash seed_nonce in
                save cctxt state.nonces_location nonces)
-           |> trace_exn (Failure "Error while recording nonce")
+           |> generic_trace "Error while recording nonce"
           else return_unit)
           >>=? fun () -> return_unit)
   | None -> return_unit
@@ -1465,7 +1475,7 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
   let chain = `Hash new_head.Client_baking_blocks.chain_id in
   let block = `Hash (new_head.hash, 0) in
   let level = Raw_level.succ new_head.level in
-  Alpha_services.Delegate.Baking_rights.get
+  Plugin.RPC.Baking_rights.get
     cctxt
     ~max_priority
     ~levels:[level]
@@ -1479,8 +1489,7 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
       let slots =
         List.filter_map
           (function
-            | {Alpha_services.Delegate.Baking_rights.timestamp = None; _} ->
-                None
+            | {Plugin.RPC.Baking_rights.timestamp = None; _} -> None
             | {timestamp = Some timestamp; priority; delegate; _} ->
                 Some (timestamp, (new_head, priority, delegate)))
           slots

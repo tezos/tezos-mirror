@@ -223,9 +223,6 @@ module type T = sig
 
   val information : _ t -> Worker_types.worker_information
 
-  (** Introspect the state of a worker. *)
-  val view : _ t -> Types.view
-
   (** Lists the running workers in this group. *)
   val list : 'a table -> (Name.t * 'a t) list
 
@@ -487,7 +484,7 @@ struct
     >>= function
     | Ok () -> Lwt.return_unit
     | Error el ->
-        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_error el
+        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_trace el
 
   let log_event w evt =
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt)) >>= fun () ->
@@ -736,8 +733,6 @@ struct
         | Bounded_buffer pipe -> Lwt_pipe.length pipe
         | Dropbox_buffer _ -> 1);
     }
-
-  let view w = Types.view (state w) w.parameters
 
   let list {instances; _} =
     Nametbl.fold (fun n w acc -> (n, w) :: acc) instances []

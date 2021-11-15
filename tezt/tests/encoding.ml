@@ -135,7 +135,6 @@ let register () =
         "operation.unsigned";
         "period";
         "raw_level";
-        "receipt.balance_updates";
         "roll";
         "seed";
         "tez";
@@ -157,7 +156,6 @@ let register () =
         "contract";
         "contract.big_map_diff";
         "cycle";
-        "delegate.balance_updates";
         "delegate.frozen_balance";
         "delegate.frozen_balance_by_cycles";
         "fitness";

@@ -353,8 +353,6 @@ struct
       Error_core :
         sig
           include Tezos_error_monad.Sig.CORE with type error := unwrapped
-
-          include Tezos_error_monad.Sig.EXT with type error := unwrapped
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -370,14 +368,17 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
-    include Local_monad
+    include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
-        (Local_monad)
+      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+        (Tezos_error_monad.TzLwtreslib.Monad)
+
+    (* below is for backward compatibility *)
     include Error_monad_traversors
 
-    let ( >>|? ) = ( >|=? ) (* for backward compatibility *)
+    let classify_errors = classify_trace
+
+    let ( >>|? ) = ( >|=? )
   end
 
   let () =
@@ -634,6 +635,7 @@ struct
 
   module Micheline = struct
     include Micheline
+    include Tezos_micheline.Micheline_encoding
 
     let canonical_encoding_v1 ~variant encoding =
       canonical_encoding_v1 ~variant:(Param.name ^ "." ^ variant) encoding
@@ -725,7 +727,7 @@ struct
     let del = remove
   end
 
-  module Lift (P : Updater.PROTOCOL) = struct
+  module LiftV0 (P : Updater.PROTOCOL) = struct
     include P
 
     let begin_partial_application ~chain_id ~ancestor_context
@@ -770,8 +772,28 @@ struct
     let finalize_block c = finalize_block c >|= wrap_error
 
     let init c bh = init c bh >|= wrap_error
+  end
 
-    let environment_version = Protocol.V0
+  module Lift (P : Updater.PROTOCOL) = struct
+    include LiftV0 (P)
+
+    include Environment_protocol_T.IgnoreCaches (struct
+      let environment_version = Protocol.V0
+
+      let set_log_message_consumer _ = ()
+
+      include Environment_protocol_T.V0toV3 (LiftV0 (P))
+    end)
+
+    let begin_partial_application ~chain_id ~ancestor_context
+        ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
+        (raw_block : block_header) =
+      begin_partial_application
+        ~chain_id
+        ~ancestor_context
+        ~predecessor_timestamp:predecessor.shell.timestamp
+        ~predecessor_fitness:predecessor.shell.fitness
+        raw_block
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

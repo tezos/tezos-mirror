@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -206,4 +206,52 @@ module type S = sig
   val to_list : 'a option -> 'a list
 
   val to_seq : 'a option -> 'a Stdlib.Seq.t
+
+  (** [catch f] is [Some (f ())] if [f] does not raise an exception, it is
+      [None] otherwise.
+
+      You should only use [catch] when you truly do not care about
+      what exception may be raised during the evaluation of [f ()]. If you need
+      to inspect the raised exception, or if you need to pass it along, consider
+      {!Result.catch} instead.
+
+      If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+      is [true] are caught.
+
+      Whether [catch_only] is set or not, this function never catches
+      non-deterministic runtime exceptions of OCaml such as {!Stack_overflow}
+      and {!Out_of_memory}. *)
+  val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
+
+  (** [catch_o f] is equivalent to [join @@ catch f]. In other words, it is
+      [f ()] if [f] doesn't raise any exception, and it is [None] otherwise.
+
+      [catch_only] has the same behaviour and limitations as with [catch]. *)
+  val catch_o : ?catch_only:(exn -> bool) -> (unit -> 'a option) -> 'a option
+
+  (** [catch_s f] is a promise that resolves to [Some x] if and when [f ()]
+      resolves to [x]. Alternatively, it resolves to [None] if and when [f ()]
+      is rejected.
+
+      You should only use [catch_s] when you truly do not care about
+      what exception may be raised during the evaluation of [f ()]. If you need
+      to inspect the raised exception, or if you need to pass it along, consider
+      {!Result.catch_s} instead.
+
+      If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+      is [true] are caught.
+
+      Whether [catch_only] is set or not, this function never catches
+      non-deterministic runtime exceptions of OCaml such as {!Stack_overflow}
+      and {!Out_of_memory}. *)
+  val catch_s :
+    ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
+
+  (** [catch_os f] is like [catch_s f] where [f] returns a promise that resolves
+      to an option. [catch_os f] resolves to [None] if [f ()] resolves to
+      [None] or is rejected. It resolves to [Some _] if [f ()] does.
+
+      [catch_only] has the same behaviour and limitations as with [catch]. *)
+  val catch_os :
+    ?catch_only:(exn -> bool) -> (unit -> 'a option Lwt.t) -> 'a option Lwt.t
 end

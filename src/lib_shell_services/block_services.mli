@@ -69,7 +69,18 @@ type raw_context =
           depth requested in the
           /chains/<chain_id>/blocks/<block_id/context/raw/bytes RPC *)
 
+(** [raw_context_eq rc1 rc2] tests whether [rc1] and [rc2] are equal,
+ *  that is, have the same constructors; and the constructor's content
+ *  are recursively equal *)
+val raw_context_eq : raw_context -> raw_context -> bool
+
+val raw_context_encoding : raw_context Data_encoding.t
+
 val pp_raw_context : Format.formatter -> raw_context -> unit
+
+(** [raw_context_insert (k,v) c] inserts a key-value pair [(k,v)] in a raw_context [c].
+    If [k] collides to a existing sub-tree in [c], the sub-tree is replaced by a new key-value pair. *)
+val raw_context_insert : string list * raw_context -> raw_context -> raw_context
 
 type error += Invalid_depth_arg of int
 
@@ -86,6 +97,11 @@ type merkle_node =
 
 (** The type of Merkle tree used by the light mode *)
 and merkle_tree = merkle_node TzString.Map.t
+
+(** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
+ *  that is, have the same constructors; and the constructor's content
+ *  are recursively equal *)
+val merkle_tree_eq : merkle_tree -> merkle_tree -> bool
 
 (** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
     or whether the returned tree should contain data at the given key
@@ -378,8 +394,31 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
+    (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
     val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
 
+    (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
+    val ban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_operation *)
+    val unban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_all_operations *)
+    val unban_all_operations :
+      #simple ->
+      ?chain:chain ->
+      unit ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC GET /chains/[chain]/mempool/monitor_operations *)
     val monitor_operations :
       #streamed ->
       ?chain:chain ->
@@ -388,8 +427,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_refused:bool ->
       ?refused:bool ->
       unit ->
-      (Next_proto.operation list Lwt_stream.t * stopper) tzresult Lwt.t
+      (((Operation_hash.t * Next_proto.operation) * error list) list
+       Lwt_stream.t
+      * stopper)
+      tzresult
+      Lwt.t
 
+    (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
       #simple -> ?chain:chain -> unit -> unit tzresult Lwt.t
   end
@@ -591,10 +635,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     module Mempool : sig
       val encoding : Mempool.t Data_encoding.t
 
+      (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) RPC_path.t ->
         ([`GET], 'a, 'b, unit, unit, Mempool.t) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
+      val ban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_operation *)
+      val unban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_all_operations *)
+      val unban_all_operations :
+        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+
+      (** Define RPC GET /chains/[chain]/mempool/monitor_operations *)
       val monitor_operations :
         ('a, 'b) RPC_path.t ->
         ( [`GET],
@@ -605,17 +665,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_refused : bool
           ; refused : bool >,
           unit,
-          Next_proto.operation list )
+          ((Operation_hash.t * Next_proto.operation) * error list) list )
         RPC_service.t
 
+      (** Define RPC GET /chains/[chain]/mempool/filter *)
       val get_filter :
         ('a, 'b) RPC_path.t ->
         ([`GET], 'a, 'b, unit, unit, Data_encoding.json) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/filter *)
       val set_filter :
         ('a, 'b) RPC_path.t ->
         ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :
         ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
     end

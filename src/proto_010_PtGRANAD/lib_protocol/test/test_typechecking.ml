@@ -18,7 +18,7 @@ let expression_from_string str : Script.expr tzresult Lwt.t =
   (match errs with
   | [] -> ()
   | lst ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
+      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace lst ;
       raise Expression_from_string) ;
   return ast.expanded
 
@@ -116,7 +116,7 @@ let test_typecheck_stack_overflow () =
            lst ->
       return ()
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 (* NOTE: this test fails with an out-of-memory exception. *)
 let _test_unparse_stack_overflow () =
@@ -474,7 +474,7 @@ let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   wrap_error_lwt
     ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
-      if equal actual expected then return ctxt
+      if equal actual expected then Environment.Error_monad.return ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
@@ -495,7 +495,7 @@ let test_parse_data_fails loc ctxt ty node =
          if
            Astring.String.is_infix ~affix:expect_id trace_string
            && Astring.String.is_infix ~affix:expect_descrfiption trace_string
-         then return_unit
+         then Environment.Error_monad.return_unit
          else
            Alcotest.failf
              "Unexpected error (%s) at %s"
@@ -775,27 +775,18 @@ let test_optimal_comb () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test_services.tztest "test comb type parsing" `Quick test_parse_comb_type;
-    Test_services.tztest
-      "test comb type unparsing"
-      `Quick
-      test_unparse_comb_type;
-    Test_services.tztest
+    Tztest.tztest "test comb type parsing" `Quick test_parse_comb_type;
+    Tztest.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
+    Tztest.tztest
       "test comb comparable type unparsing"
       `Quick
       test_unparse_comb_comparable_type;
-    Test_services.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Test_services.tztest
-      "test comb data unparsing"
-      `Quick
-      test_unparse_comb_data;
-    Test_services.tztest
-      "test optimal comb data unparsing"
-      `Quick
-      test_optimal_comb;
-    Test_services.tztest "test parse address" `Quick test_parse_address;
+    Tztest.tztest "test comb data parsing" `Quick test_parse_comb_data;
+    Tztest.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
+    Tztest.tztest "test optimal comb data unparsing" `Quick test_optimal_comb;
+    Tztest.tztest "test parse address" `Quick test_parse_address;
   ]

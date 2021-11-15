@@ -11,7 +11,9 @@ depends: [
   "tezos-stdlib-unix"
   "lwt-watcher"
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "tezos-test-services" { with-test }
+  "tezos-test-helpers" { with-test }
+  "tezos-base-test-helpers" { with-test }
+  "qcheck-alcotest" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,44 +24,21 @@
 (*****************************************************************************)
 
 let () =
-  let socket_dir = ref None in
-  let args =
-    Arg.
-      [
-        ( "--socket-dir",
-          String
-            (fun s ->
-              if not (Sys.file_exists s && Sys.is_directory s) then
-                raise
-                  (Arg.Bad
-                     (Format.sprintf "File '%s' is not a valid directory" s))
-              else socket_dir := Some s),
-          {|<dir>
-      When provided, the validator will communicate through a socket located
-      at '<dir>/tezos-validation-socket-<pid>' where <pid> is the
-      tezos-validator's process identifier. By default, the validator will
-      communicate through its standard input and output.|}
-        );
-        ( "--version",
-          Unit
-            (fun () ->
-              Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
-              Stdlib.exit 0),
-          " Display version information" );
-      ]
-  in
-  let usage_msg =
-    Format.sprintf "tezos-validator [--version] [--socket-dir <dir>]"
-  in
-  Arg.parse
-    args
-    (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
-    usage_msg ;
-  let main_promise = Validator.main ?socket_dir:!socket_dir () in
-  Stdlib.exit
-    (Lwt_main.run
-       (Lwt_exit.wrap_and_exit main_promise >>= function
-        | Ok () -> Lwt_exit.exit_and_wait 0
-        | Error err ->
-            Format.eprintf "%a\n%!" pp_print_error err ;
-            Lwt_exit.exit_and_wait 1))
+  (* The default allocation policy of Octez is "best-fit" which gives
+     the best compromise in terms of performances and memory
+     consumption. This default policy can be changed if the user set
+     an environment variable. *)
+  (* Any change to this constant should be replicated into the
+     external validator in [src/bin_node/main.ml]. *)
+  let default_allocation_policy = 2 in
+  let current = Gc.get () in
+  (match Sys.getenv_opt "OCAMLRUNPARAM" with
+  | None -> Gc.set {current with allocation_policy = default_allocation_policy}
+  | Some _ -> ()) ;
+  if (Gc.get ()).allocation_policy <> default_allocation_policy then
+    Format.eprintf
+      "WARNING: Default allocation policy changed: %d (default %d)@."
+      current.allocation_policy
+      default_allocation_policy
+
+let () = Command_line.run ()

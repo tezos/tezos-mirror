@@ -1,4 +1,5 @@
 (library
  (name bare_structs)
  (public_name tezos-lwt-result-stdlib.bare.structs)
+ (instrumentation (backend bisect_ppx))
  (libraries lwt tezos-lwt-result-stdlib.bare.sigs))

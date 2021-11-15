@@ -6,6 +6,18 @@
 ; but the original template in `tezos-protocol-compiler`
 ;
 
+; generated from src/lib_protocol_compiler/dune_protocol.template.v0
+;
+; This template is intended for protocols written when the Tezos
+; project was using OCaml 4.10 or earlier.
+;
+; Protocols that have already been activated on-chain cannot be
+; changed. Additionally, protocols written when the tezos project was
+; using OCaml 4.10 or earlier may trigger warnings when compiled with a more
+; recent version of the OCaml compiler. Consequently, this template
+; sets some specific warning-related options so that protocols written
+; on OCaml 4.10 or earlier can be compiled with the more recent compiler version
+; currently used in the tezos project.
 
 (rule
  (targets environment.ml)
@@ -253,6 +265,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_environment_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -260,11 +273,12 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_raw_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H.raw)
  (libraries tezos_protocol_environment_005_PsBABY5H)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
                    -warn-error +a
                    -open Tezos_protocol_environment_005_PsBABY5H__Environment
                    -open Pervasives
@@ -347,36 +361,39 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_005_PsBABY5H)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
-        -warn-error "+a"
+ (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+        -warn-error "-A"
         -nopervasives)
  (modules Protocol))
 
 (library
  (name tezos_protocol_005_PsBABY5H_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-005-PsBABY5H)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos-protocol-005-PsBABY5H.raw)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
-        -warn-error "+a"
+ (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+        -warn-error "-A"
         -nopervasives)
  (modules Functor))
 
 (library
  (name tezos_embedded_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-005-PsBABY5H)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-005-PsBABY5H
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+ (flags (:standard -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67
                    -warn-error +a))
  (modules Registerer))
 

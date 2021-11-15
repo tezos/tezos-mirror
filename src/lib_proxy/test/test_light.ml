@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune build @src/lib_proxy/runtest_light
+    Invocation:   dune build @src/lib_proxy/runtest
     Dependencies: src/lib_proxy/test/light_lib.ml
 *)
 
@@ -100,6 +100,20 @@ let test_wrong_uris_parsing _ =
     List.(repeat (length uris_lists) false)
     results
 
+(** Test that the example content of [--sources] is valid *)
+let test_parse_example_sources _ =
+  let check_parsed = function
+    | Error errmsg ->
+        Alcotest.failf "Parsing should have succeeded, but obtained: %s" errmsg
+    | Ok x -> x
+  in
+  let json =
+    Data_encoding.Json.from_string Tezos_proxy.Light.example_sources
+    |> check_parsed
+  in
+  Tezos_proxy.Light.destruct_sources_config json |> check_parsed |> ignore ;
+  ()
+
 let () =
   Alcotest.run
     "tezos-light"
@@ -122,5 +136,9 @@ let () =
             "test default min agreement"
             `Quick
             test_good_min_agreement_parsing_default_agreement;
+          Alcotest.test_case
+            "test parsing sources example"
+            `Quick
+            test_parse_example_sources;
         ] );
     ]

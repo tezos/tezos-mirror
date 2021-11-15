@@ -116,7 +116,7 @@ module Term = struct
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () -> `Ok ()
-    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 
   let subcommand_arg =
     let parser = function

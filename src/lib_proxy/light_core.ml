@@ -28,7 +28,7 @@
 module Internal = Light_internal
 module Logger = Light_logger.Logger
 module Merkle = Internal.Merkle
-module Store = Tezos_context_memory.Context
+module Store = Local_context
 module Consensus = Light_consensus
 module Block_services = Tezos_shell_services.Block_services
 
@@ -40,6 +40,25 @@ let chain_n_block_to_string chain block =
     (Block_services.chain_to_string chain)
     (Block_services.to_string block)
 
+let light_failwith (pgi : Proxy.proxy_getter_input) ?(warn_symbolic = false) msg
+    =
+  let symbolic_block = Light.hash_of_block pgi.block |> Option.is_none in
+  let full_msg =
+    Format.sprintf
+      "Light mode (%s): %s%s"
+      (chain_n_block_to_string pgi.chain pgi.block)
+      msg
+      (if warn_symbolic && symbolic_block then
+       Format.sprintf
+         ". Because requested block is symbolic: %s (it has no hash), it could \
+          be that the different endpoints are mapping this symbolic identifier \
+          to different concrete blocks. If you are using the 'head' identifier \
+          (or 'head~1', etc.) in a RPC path, replace it with a concrete hash."
+       @@ Block_services.to_string pgi.block
+      else "")
+  in
+  Logger.(emit failing full_msg) >>= fun () -> failwith "%s" full_msg
+
 let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     (printer : Tezos_client_base.Client_context.printer)
     ({endpoints; min_agreement} : Light.sources) =
@@ -49,13 +68,48 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     (** Do not access directly, use [get_irmin] instead *)
     let irmin_ref : irmin option ref = ref None
 
-    let get_irmin () : irmin Lwt.t =
+    let shallow_tree_of_merkle_tree repo mtree =
+      Merkle.merkle_tree_to_irmin_tree repo mtree >>=? fun tree ->
+      Lwt.return_ok (Store.shallow_of_tree repo tree)
+
+    let hash_of_merkle_tree repo mtree =
+      Merkle.merkle_tree_to_irmin_tree repo mtree >>=? fun tree ->
+      Lwt.return_ok (Store.Tree.hash tree)
+
+    let get_irmin_and_update_root pgi mtree =
+      match !irmin_ref with
+      | None -> (
+          Store.Tree.make_repo () >>= fun repo ->
+          shallow_tree_of_merkle_tree repo mtree >>= function
+          | Ok root ->
+              let irmin = {repo; root} in
+              irmin_ref := Some irmin ;
+              Lwt.return_ok irmin
+          | Error msg -> light_failwith pgi msg)
+      | Some res -> (
+          hash_of_merkle_tree res.repo mtree >>= function
+          | Ok merkle_hash ->
+              let tree_hash = Store.Tree.hash res.root in
+              if not (Context_hash.equal tree_hash merkle_hash) then
+                light_failwith pgi
+                @@ Format.asprintf
+                     "Hash of the irmin tree %a does not correspond to hash of \
+                      the merkle tree %a"
+                     Context_hash.pp
+                     tree_hash
+                     Context_hash.pp
+                     merkle_hash
+              else Lwt.return_ok res
+          | Error msg -> light_failwith pgi msg)
+
+    (* Don't update the irmin ref when looking for key, so as not to add the
+       empty tree. *)
+    let get_irmin_key () : irmin Lwt.t =
       match !irmin_ref with
       | None ->
           Store.Tree.make_repo () >>= fun repo ->
           let root = Store.Tree.empty Store.empty in
           let irmin = {repo; root} in
-          irmin_ref := Some irmin ;
           Lwt.return irmin
       | Some res -> Lwt.return res
 
@@ -99,7 +153,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                 (Uri.to_string uri)
                 (key_to_string key)
                 (chain_n_block_to_string chain block)
-                pp_print_error
+                pp_print_trace
                 trace
               >>= fun () ->
               get_first_merkle_tree
@@ -123,27 +177,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
 
     let get key =
       Logger.(emit api_get @@ key_to_string key) >>= fun () ->
-      get_irmin () >>= fun {root; _} -> Store.Tree.find_tree root key
-
-    let light_failwith (pgi : Proxy.proxy_getter_input) ?(warn_symbolic = false)
-        msg =
-      let symbolic_block = Light.hash_of_block pgi.block |> Option.is_none in
-      let full_msg =
-        Format.sprintf
-          "Light mode (%s): %s%s"
-          (chain_n_block_to_string pgi.chain pgi.block)
-          msg
-          (if warn_symbolic && symbolic_block then
-           Format.sprintf
-             ". Because requested block is symbolic: %s (it has no hash), it \
-              could be that the different endpoints are mapping this symbolic \
-              identifier to different concrete blocks. If you are using the \
-              'head' identifier (or 'head~1', etc.) in a RPC path, replace it \
-              with a concrete hash."
-           @@ Block_services.to_string pgi.block
-          else "")
-      in
-      Logger.(emit failing full_msg) >>= fun () -> failwith "%s" full_msg
+      get_irmin_key () >>= fun {root; _} -> Store.Tree.find_tree root key
 
     module Consensus = Light_consensus.Make (Light_proto)
 
@@ -163,7 +197,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                nb_endpoints
                (key_to_string key)
       | Some (mtree, validating_endpoints) -> (
-          get_irmin () >>= fun {root; repo} ->
+          get_irmin_and_update_root pgi mtree >>=? fun {root; repo} ->
           Merkle.union_irmin_tree_merkle_tree repo root mtree >>>=? fun root' ->
           Logger.(
             emit

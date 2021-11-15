@@ -1,3 +1,27 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
 module type B58CHECK = sig
   type t
 
@@ -7,12 +31,14 @@ module type B58CHECK = sig
 end
 
 let test_b58check_roundtrip :
-    type t. (module B58CHECK with type t = t) -> t -> unit =
- fun m input ->
+    type t. (module B58CHECK with type t = t) -> string -> t -> unit =
+ fun m msg input ->
   let module M = (val m) in
-  let testable = Alcotest.testable M.pp ( = ) in
+  let testable =
+    Alcotest.testable M.pp (fun a b -> M.to_b58check a = M.to_b58check b)
+  in
   Roundtrips.test_rt_opt
-    "b58check"
+    ("b58check." ^ msg)
     testable
     M.to_b58check
     M.of_b58check_opt
@@ -20,9 +46,12 @@ let test_b58check_roundtrip :
 
 let test_b58check_roundtrips () =
   let (pubkey_hash, pubkey, seckey) = P256.generate_key () in
-  test_b58check_roundtrip (module P256.Public_key_hash) pubkey_hash ;
-  test_b58check_roundtrip (module P256.Public_key) pubkey ;
-  test_b58check_roundtrip (module P256.Secret_key) seckey
+  test_b58check_roundtrip
+    (module P256.Public_key_hash)
+    "pubkey_hash"
+    pubkey_hash ;
+  test_b58check_roundtrip (module P256.Public_key) "pubkey" pubkey ;
+  test_b58check_roundtrip (module P256.Secret_key) "seckey" seckey
 
 let test_b58check_invalid input =
   Roundtrips.test_decode_opt_fail
@@ -76,10 +105,13 @@ let test_key_encodings () =
 
 let tests =
   [
-    ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
-    ("b58check.invalid", `Slow, test_b58check_invalids);
-    ("b58 pkh encodings", `Slow, test_pkh_encodings);
-    ("b58 key encodings", `Slow, test_key_encodings);
+    ( "p256-encodings",
+      [
+        ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
+        ("b58check.invalid", `Slow, test_b58check_invalids);
+        ("b58 pkh encodings", `Slow, test_pkh_encodings);
+        ("b58 key encodings", `Slow, test_key_encodings);
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("p256", tests)]
+let tests_lwt = []

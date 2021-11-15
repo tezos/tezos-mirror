@@ -1,5 +1,6 @@
 (library
  (name tezos_validator)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-validator)
  (libraries tezos-base
             tezos-base.unix
@@ -18,10 +19,12 @@
                    -open Tezos_validation
                    -open Tezos_protocol_updater
                    -open Tezos_shell_context))
- (modules Validator))
+ (modules Validator
+          Command_line))
 
 (executable
  (name main_validator)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-validator)
  (package tezos-validator)
  (libraries tezos_validator)

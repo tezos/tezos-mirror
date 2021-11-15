@@ -180,7 +180,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
           >>=? fun () -> return_unit))
   >>= function
   | Error err ->
-      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
   | Ok r -> Lwt.return r
 
@@ -222,7 +222,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             (fun () -> Store.close_store store >>= fun _ -> Lwt.return_unit)))
   >>= function
   | Error err ->
-      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
+      Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
       Lwt.fail Alcotest.Test_error
   | Ok () -> Lwt.return_unit
 
@@ -320,6 +320,7 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
       Tezos_validation.Block_validation.validation_store =
         {
           context_hash = Block_repr.context raw_block;
+          timestamp = Block_repr.timestamp raw_block;
           message = Block_repr.message metadata;
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
           last_allowed_fork_level = Block_repr.last_allowed_fork_level metadata;

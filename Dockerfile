@@ -25,7 +25,7 @@ COPY --chown=tezos:nogroup scripts/alphanet_version scripts/tezos-docker-manager
 # Although alphanet.sh has been replaced by tezos-docker-manager.sh,
 # the built-in auto-update mechanism expects an alphanet.sh script to exist.
 # So we keep it for a while as a symbolic link.
-CMD ln -s tezos-docker-manager.sh /home/tezos/scripts/alphanet.sh
+CMD ["ln", "-s", "tezos-docker-manager.sh", "/home/tezos/scripts/alphanet.sh"]
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug
 ARG BUILD_IMAGE
@@ -40,7 +40,11 @@ LABEL maintainer="contact@nomadic-labs.com" \
       org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
       org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
 
-RUN sudo apk --no-cache add vim
+USER root
+# hadolint ignore=DL3018
+RUN apk --no-cache add vim
+USER tezos
+
 ENV EDITOR=/usr/bin/vi
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos/
@@ -49,7 +53,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION_NON_MIN} as stripper
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/tezos-* /home/tezos/bin/
-RUN strip /home/tezos/bin/tezos*
+RUN chmod +rw /home/tezos/bin/tezos* && strip /home/tezos/bin/tezos*
 
 
 FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare

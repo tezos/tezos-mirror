@@ -290,6 +290,67 @@ module Partition = struct
     [Alcotest_lwt.test_case_sync "partition-result" `Quick partition_result]
 end
 
+module Fold = struct
+  let list = [1; 2; 3; 4]
+
+  let list_sum = 10
+
+  let test_fold_left_map () =
+    assert (List.fold_left_map (fun _ _ -> assert false) 0 [] = (0, [])) ;
+    assert (List.fold_left_map (fun a b -> (a + b, b)) 0 list = (list_sum, list))
+
+  let test_fold_left_map_e () =
+    assert (
+      fold_left_map_e (fun a b -> Ok (a + b, b)) 0 list = Ok (list_sum, list)) ;
+    assert (fold_left_map_e (fun _ _ -> assert false) 0 [] = Ok (0, [])) ;
+    let x =
+      fold_left_map_e (fun s x -> if x < 3 then Ok (s, x) else Error x) 0 list
+    in
+    assert (x = Error 3)
+
+  let test_fold_left_map_s _ () =
+    assert_eq_s
+      (fold_left_map_s (fun _ _ -> assert false) 0 [])
+      (Lwt.return (0, []))
+    >>= fun () ->
+    assert_eq_s
+      (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
+      (Lwt.return (list_sum, list))
+    >>= fun () ->
+    let p =
+      fold_left_map_s
+        (fun a b -> if a < 3 then Lwt.return (a + 1, b) else Lwt.fail Exit)
+        0
+        list
+    in
+    assert (Lwt.state p = Lwt.Fail Exit) ;
+    Lwt.return ()
+
+  let test_fold_left_map_es _ () =
+    assert_eq_s
+      (fold_left_map_es (fun _ _ -> assert false) 0 [])
+      (return (0, []))
+    >>= fun () ->
+    assert_eq_s
+      (fold_left_map_es (fun a b -> return (a + b, b)) 0 list)
+      (return (list_sum, list))
+    >>= fun () ->
+    assert_eq_s
+      (fold_left_map_es
+         (fun s x -> if x < 3 then return (s, x) else fail x)
+         0
+         list)
+      (fail 3)
+
+  let tests =
+    [
+      Alcotest_lwt.test_case_sync "fold_left-map" `Quick test_fold_left_map;
+      Alcotest_lwt.test_case_sync "fold_left_map_e" `Quick test_fold_left_map_e;
+      Alcotest_lwt.test_case "fold_left_map_s" `Quick test_fold_left_map_s;
+      Alcotest_lwt.test_case "fold_left_map_es" `Quick test_fold_left_map_es;
+    ]
+end
+
 let () =
   Alcotest_lwt.run
     "list-basic"
@@ -300,5 +361,6 @@ let () =
       ("filter_*", FilterSmthg.tests);
       ("combine_*", Combine.tests);
       ("partition_*", Partition.tests);
+      ("fold", Fold.tests);
     ]
   |> Lwt_main.run

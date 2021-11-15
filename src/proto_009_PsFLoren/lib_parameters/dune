@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_009_PsFLoren_parameters)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-009-PsFLoren-parameters)
  (modules :standard \ gen)
  (libraries tezos-base

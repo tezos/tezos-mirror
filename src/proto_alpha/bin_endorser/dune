@@ -1,5 +1,12 @@
+; build static executable with --profile static
+(env
+ (static (flags (:standard
+                  -ccopt -static
+                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+
 (executable
  (name main_endorser_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-endorser-alpha)
  (libraries tezos-client-base-unix
             tezos-client-commands

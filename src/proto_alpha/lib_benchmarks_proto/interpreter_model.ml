@@ -56,10 +56,8 @@ let model_0 instr model =
   let open Interpreter_workload in
   Model.make
     ~conv:(function
-      | {name; args = []} ->
-          if name = instr then () else trace_error instr name
-      | {args; _} ->
-          arity_error instr 0 args)
+      | {name; args = []} -> if name = instr then () else trace_error instr name
+      | {args; _} -> arity_error instr 0 args)
     ~model
 
 let model_1 instr model =
@@ -68,8 +66,7 @@ let model_1 instr model =
     ~conv:(function
       | {name; args = [{name = _; arg}]} ->
           if name = instr then (arg, ()) else trace_error instr name
-      | {args; _} ->
-          arity_error instr 1 args)
+      | {args; _} -> arity_error instr 1 args)
     ~model
 
 let model_2 instr model =
@@ -78,36 +75,38 @@ let model_2 instr model =
     ~conv:(function
       | {name; args = [{name = _; arg = x}; {name = _; arg = y}]} ->
           if name = instr then (x, (y, ())) else trace_error instr name
-      | {args; _} ->
-          arity_error instr 2 args)
+      | {args; _} -> arity_error instr 2 args)
     ~model
 
 let model_3 instr model =
   let open Interpreter_workload in
   Model.make
     ~conv:(function
-      | { name;
-          args = [{name = _; arg = x}; {name = _; arg = y}; {name = _; arg = z}]
+      | {
+          name;
+          args = [{name = _; arg = x}; {name = _; arg = y}; {name = _; arg = z}];
         } ->
           if name = instr then (x, (y, (z, ()))) else trace_error instr name
-      | {args; _} ->
-          arity_error instr 3 args)
+      | {args; _} -> arity_error instr 3 args)
     ~model
 
 let model_4 instr model =
   let open Interpreter_workload in
   Model.make
     ~conv:(function
-      | { name;
+      | {
+          name;
           args =
-            [ {name = _; arg = w};
+            [
+              {name = _; arg = w};
               {name = _; arg = x};
               {name = _; arg = y};
-              {name = _; arg = z} ] } ->
+              {name = _; arg = z};
+            ];
+        } ->
           if name = instr then (w, (x, (y, (z, ()))))
           else trace_error instr name
-      | {args; _} ->
-          arity_error instr 4 args)
+      | {args; _} -> arity_error instr 4 args)
     ~model
 
 let fv = Free_variable.of_string
@@ -128,12 +127,9 @@ let division_cost name =
       let arity = Model.arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
-        let_ ~name:"q" (size1 - size2)
-        @@ fun q ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        let_ ~name:"q" (size1 - size2) @@ fun q ->
         (free ~name:coeff * if_ (lt size2 size1) (q * size2) (int 0))
         + free ~name:const
     end
@@ -154,12 +150,9 @@ let addlogadd name =
       let arity = Model.arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
-        let_ ~name:"a" (size1 + size2)
-        @@ fun a ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        let_ ~name:"a" (size1 + size2) @@ fun a ->
         (free ~name:coeff * (a * log2 (int 1 + a))) + free ~name:const
     end
   end in
@@ -257,13 +250,32 @@ module Models = struct
         let arity = Model.arity_2
 
         let model =
-          lam ~name:"size1"
-          @@ fun size1 ->
-          lam ~name:"size2"
-          @@ fun size2 ->
+          lam ~name:"size1" @@ fun size1 ->
+          lam ~name:"size2" @@ fun size2 ->
           free ~name:(fv (sf "%s_const" name))
           + (free ~name:(fv (sf "%s_add_coeff" name)) * max size1 size2)
           + (free ~name:(fv (sf "%s_cmp_coeff" name)) * min size1 size2)
+      end
+    end in
+    (module M : Model.Model_impl with type arg_type = int * (int * unit))
+
+  let open_chest_model name =
+    let module M = struct
+      type arg_type = int * (int * unit)
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size -> size -> size
+
+        let arity = Model.arity_2
+
+        let model =
+          lam ~name:"size1" @@ fun size1 ->
+          lam ~name:"size2" @@ fun size2 ->
+          free ~name:(fv (sf "%s_const" name))
+          + (free ~name:(fv (sf "%s_log_time_coeff" name)) * size1)
+          + (free ~name:(fv (sf "%s_plaintext_coeff" name)) * size2)
       end
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
@@ -286,14 +298,12 @@ module Models = struct
         let arity = Model.arity_2
 
         let model =
-          lam ~name:"size_xs"
-          @@ fun size_xs ->
-          lam ~name:"size_ys"
-          @@ fun size_ys ->
+          lam ~name:"size_xs" @@ fun size_xs ->
+          lam ~name:"size_ys" @@ fun size_ys ->
           if_
             (eq size_xs (int 0))
-            ( free ~name:(fv (sf "%s_const" name))
-            + (free ~name:(fv (sf "%s_coeff" name)) * size_ys) )
+            (free ~name:(fv (sf "%s_const" name))
+            + (free ~name:(fv (sf "%s_coeff" name)) * size_ys))
             (free ~name:(fv (sf "%s_iter" name)))
       end
     end in
@@ -311,8 +321,7 @@ module Models = struct
         let arity = Model.arity_1
 
         let model =
-          lam ~name:"size"
-          @@ fun size ->
+          lam ~name:"size" @@ fun size ->
           if_
             (eq size (int 0))
             (free ~name:(fv (sf "%s_empty" name)))
@@ -333,14 +342,10 @@ module Models = struct
         let arity = Model.Succ_arity Model.arity_3
 
         let model =
-          lam ~name:"content_size_x"
-          @@ fun content_size_x ->
-          lam ~name:"content_size_y"
-          @@ fun content_size_y ->
-          lam ~name:"amount_size_x"
-          @@ fun amount_size_x ->
-          lam ~name:"amount_size_y"
-          @@ fun amount_size_y ->
+          lam ~name:"content_size_x" @@ fun content_size_x ->
+          lam ~name:"content_size_y" @@ fun content_size_y ->
+          lam ~name:"amount_size_x" @@ fun amount_size_x ->
+          lam ~name:"amount_size_y" @@ fun amount_size_y ->
           free ~name:(fv (sf "%s_const" name))
           + free ~name:(fv (sf "%s_compare_coeff" name))
             * min content_size_x content_size_y
@@ -349,7 +354,7 @@ module Models = struct
       end
     end in
     (module M : Model.Model_impl
-      with type arg_type = int * (int * (int * (int * unit))) )
+      with type arg_type = int * (int * (int * (int * unit))))
 end
 
 let ir_model ?specialization instr_or_cont =
@@ -358,244 +363,119 @@ let ir_model ?specialization instr_or_cont =
   let name = name_of_instr_or_cont ?specialization instr_or_cont in
   match instr_or_cont with
   | Instr_name instr -> (
-    match instr with
-    | N_IDrop
-    | N_IDup
-    | N_ISwap
-    | N_IConst
-    | N_ICons_pair
-    | N_ICar
-    | N_ICdr
-    | N_ICons_some
-    | N_ICons_none
-    | N_IIf_none
-    | N_ILeft
-    | N_IRight
-    | N_IIf_left
-    | N_ICons_list
-    | N_INil
-    | N_IIf_cons
-    | N_IEmpty_set
-    | N_IEmpty_map
-    | N_IEmpty_big_map
-    | N_IOr
-    | N_IAnd
-    | N_IXor
-    | N_INot
-    | N_IIf
-    | N_ILoop
-    | N_ILoop_left
-    | N_IDip
-    | N_IExec
-    | N_ILambda
-    | N_IFailwith
-    | N_IAddress
-    | N_ICreate_contract
-    | N_ISet_delegate
-    | N_INow
-    | N_IBalance
-    | N_IHash_key
-    | N_IUnpack
-    | N_ISource
-    | N_ISender
-    | N_ISelf
-    | N_IAmount
-    | N_IChainId
-    | N_ILevel
-    | N_ISelf_address
-    | N_INever
-    | N_IUnpair
-    | N_IVoting_power
-    | N_ITotal_voting_power
-    | N_IList_size
-    | N_ISet_size
-    | N_IMap_size
-    | N_ISapling_empty_state ->
-        model_0 instr_or_cont (const1_model name)
-    | N_ISet_mem
-    | N_ISet_update
-    | N_IMap_mem
-    | N_IMap_get
-    | N_IMap_update
-    | N_IBig_map_mem
-    | N_IBig_map_get
-    | N_IBig_map_update
-    | N_IMap_get_and_update
-    | N_IBig_map_get_and_update ->
-        model_2 instr_or_cont (nlogm_model name)
-    | N_IConcat_string ->
-        model_2 instr_or_cont (concat_model name)
-    | N_IConcat_string_pair ->
-        model_2 instr_or_cont (concat_pair_model name)
-    | N_ISlice_string ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IString_size ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IConcat_bytes ->
-        model_2 instr_or_cont (concat_model name)
-    | N_IConcat_bytes_pair ->
-        model_2 instr_or_cont (concat_pair_model name)
-    | N_ISlice_bytes ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IBytes_size ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IAdd_seconds_to_timestamp
-    | N_IAdd_timestamp_to_seconds
-    | N_ISub_timestamp_seconds
-    | N_IDiff_timestamps ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IAdd_tez | N_ISub_tez | N_IEdiv_tez ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IMul_teznat | N_IMul_nattez ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IEdiv_teznat ->
-        model_2 instr_or_cont (division_cost name)
-    | N_IIs_nat ->
-        model_0 instr_or_cont (const1_model name)
-    | N_INeg_nat ->
-        model_1 instr_or_cont (affine_model name)
-    | N_INeg_int ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IAbs_int ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IInt_nat ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IAdd_intint ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IAdd_intnat ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IAdd_natint ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IAdd_natnat ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_ISub_int ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IMul_intint ->
-        model_2 instr_or_cont (addlogadd name)
-    | N_IMul_intnat ->
-        model_2 instr_or_cont (addlogadd name)
-    | N_IMul_natint ->
-        model_2 instr_or_cont (addlogadd name)
-    | N_IMul_natnat ->
-        model_2 instr_or_cont (addlogadd name)
-    | N_IEdiv_intint ->
-        model_2 instr_or_cont (division_cost name)
-    | N_IEdiv_intnat ->
-        model_2 instr_or_cont (division_cost name)
-    | N_IEdiv_natint ->
-        model_2 instr_or_cont (division_cost name)
-    | N_IEdiv_natnat ->
-        model_2 instr_or_cont (division_cost name)
-    | N_ILsl_nat ->
-        model_1 instr_or_cont (affine_model name)
-    | N_ILsr_nat ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IOr_nat ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_IAnd_nat ->
-        model_2 instr_or_cont (linear_min_model name)
-    | N_IAnd_int_nat ->
-        model_2 instr_or_cont (linear_min_model name)
-    | N_IXor_nat ->
-        model_2 instr_or_cont (linear_max_model name)
-    | N_INot_nat ->
-        model_1 instr_or_cont (affine_model name)
-    | N_INot_int ->
-        model_1 instr_or_cont (affine_model name)
-    | N_ICompare ->
-        model_2 instr_or_cont (linear_min_model name)
-    | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IPack ->
-        model_3 instr_or_cont (pack_model name)
-    | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
-        model_1 instr_or_cont (affine_model name)
-    | N_ICheck_signature_ed25519
-    | N_ICheck_signature_secp256k1
-    | N_ICheck_signature_p256 ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
-        model_0 instr_or_cont (const1_model name)
-    (* The following two instructions are expected to have an affine model. However,
-       we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
-    | N_IDupN ->
-        model_1 instr_or_cont (break_model_2 name 300 400)
-    | N_IDropN ->
-        model_1 instr_or_cont (break_model_2_const name 300 400)
-    | N_IDig | N_IDug | N_IDipN ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IAdd_bls12_381_g1
-    | N_IAdd_bls12_381_g2
-    | N_IAdd_bls12_381_fr
-    | N_IMul_bls12_381_g1
-    | N_IMul_bls12_381_g2
-    | N_IMul_bls12_381_fr
-    | N_INeg_bls12_381_g1
-    | N_INeg_bls12_381_g2
-    | N_INeg_bls12_381_fr
-    | N_IInt_bls12_381_z_fr ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IMul_bls12_381_fr_z
-    | N_IMul_bls12_381_z_fr
-    | N_IPairing_check_bls12_381 ->
-        model_1 instr_or_cont (affine_model name)
-    (* Like DupN and DropN, this instruction's model is in two affine parts. *)
-    | N_IComb_get ->
-        model_1 instr_or_cont (break_model name 512)
-    | N_IComb | N_IComb_set | N_IUncomb ->
-        model_1 instr_or_cont (affine_model name)
-    | N_ITicket | N_IRead_ticket ->
-        model_0 instr_or_cont (const1_model name)
-    | N_ISplit_ticket ->
-        model_2 instr_or_cont (split_ticket_model name)
-    | N_IJoin_tickets ->
-        model_4 instr_or_cont (join_tickets_model name)
-    | N_ISapling_verify_update ->
-        model_2 instr_or_cont (verify_update_model name)
-    | N_IList_map ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IList_iter ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IIter ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IMap_map ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IMap_iter ->
-        model_1 instr_or_cont (affine_model name)
-    | N_ISet_iter ->
-        model_1 instr_or_cont (affine_model name)
-    | N_IHalt ->
-        model_0 instr_or_cont (const1_model name)
-    | N_IApply ->
-        model_0 instr_or_cont (const1_model name)
-    | N_ILog ->
-        model_0 instr_or_cont (const1_model name) )
+      match instr with
+      | N_IDrop | N_IDup | N_ISwap | N_IConst | N_ICons_pair | N_ICar | N_ICdr
+      | N_ICons_some | N_ICons_none | N_IIf_none | N_ILeft | N_IRight
+      | N_IIf_left | N_ICons_list | N_INil | N_IIf_cons | N_IEmpty_set
+      | N_IEmpty_map | N_IEmpty_big_map | N_IOr | N_IAnd | N_IXor | N_INot
+      | N_IIf | N_ILoop | N_ILoop_left | N_IDip | N_IExec | N_IView | N_ILambda
+      | N_IFailwith | N_IAddress | N_ICreate_contract | N_ISet_delegate | N_INow
+      | N_IBalance | N_IHash_key | N_IUnpack | N_ISource | N_ISender | N_ISelf
+      | N_IAmount | N_IChainId | N_ILevel | N_ISelf_address | N_INever
+      | N_IUnpair | N_IVoting_power | N_ITotal_voting_power | N_IList_size
+      | N_ISet_size | N_IMap_size | N_ISapling_empty_state ->
+          model_0 instr_or_cont (const1_model name)
+      | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
+      | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update
+      | N_IMap_get_and_update | N_IBig_map_get_and_update ->
+          model_2 instr_or_cont (nlogm_model name)
+      | N_IConcat_string -> model_2 instr_or_cont (concat_model name)
+      | N_IConcat_string_pair -> model_2 instr_or_cont (concat_pair_model name)
+      | N_ISlice_string -> model_1 instr_or_cont (affine_model name)
+      | N_IString_size -> model_0 instr_or_cont (const1_model name)
+      | N_IConcat_bytes -> model_2 instr_or_cont (concat_model name)
+      | N_IConcat_bytes_pair -> model_2 instr_or_cont (concat_pair_model name)
+      | N_ISlice_bytes -> model_1 instr_or_cont (affine_model name)
+      | N_IBytes_size -> model_0 instr_or_cont (const1_model name)
+      | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
+      | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
+          model_2 instr_or_cont (linear_max_model name)
+      | N_IAdd_tez | N_ISub_tez | N_IEdiv_tez ->
+          model_0 instr_or_cont (const1_model name)
+      | N_IMul_teznat | N_IMul_nattez ->
+          model_1 instr_or_cont (affine_model name)
+      | N_IEdiv_teznat -> model_2 instr_or_cont (division_cost name)
+      | N_IIs_nat -> model_0 instr_or_cont (const1_model name)
+      | N_INeg_nat -> model_1 instr_or_cont (affine_model name)
+      | N_INeg_int -> model_1 instr_or_cont (affine_model name)
+      | N_IAbs_int -> model_1 instr_or_cont (affine_model name)
+      | N_IInt_nat -> model_0 instr_or_cont (const1_model name)
+      | N_IAdd_intint -> model_2 instr_or_cont (linear_max_model name)
+      | N_IAdd_intnat -> model_2 instr_or_cont (linear_max_model name)
+      | N_IAdd_natint -> model_2 instr_or_cont (linear_max_model name)
+      | N_IAdd_natnat -> model_2 instr_or_cont (linear_max_model name)
+      | N_ISub_int -> model_2 instr_or_cont (linear_max_model name)
+      | N_IMul_intint -> model_2 instr_or_cont (addlogadd name)
+      | N_IMul_intnat -> model_2 instr_or_cont (addlogadd name)
+      | N_IMul_natint -> model_2 instr_or_cont (addlogadd name)
+      | N_IMul_natnat -> model_2 instr_or_cont (addlogadd name)
+      | N_IEdiv_intint -> model_2 instr_or_cont (division_cost name)
+      | N_IEdiv_intnat -> model_2 instr_or_cont (division_cost name)
+      | N_IEdiv_natint -> model_2 instr_or_cont (division_cost name)
+      | N_IEdiv_natnat -> model_2 instr_or_cont (division_cost name)
+      | N_ILsl_nat -> model_1 instr_or_cont (affine_model name)
+      | N_ILsr_nat -> model_1 instr_or_cont (affine_model name)
+      | N_IOr_nat -> model_2 instr_or_cont (linear_max_model name)
+      | N_IAnd_nat -> model_2 instr_or_cont (linear_min_model name)
+      | N_IAnd_int_nat -> model_2 instr_or_cont (linear_min_model name)
+      | N_IXor_nat -> model_2 instr_or_cont (linear_max_model name)
+      | N_INot_nat -> model_1 instr_or_cont (affine_model name)
+      | N_INot_int -> model_1 instr_or_cont (affine_model name)
+      | N_ICompare -> model_2 instr_or_cont (linear_min_model name)
+      | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe ->
+          model_0 instr_or_cont (const1_model name)
+      | N_IPack -> model_3 instr_or_cont (pack_model name)
+      | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
+          model_1 instr_or_cont (affine_model name)
+      | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
+      | N_ICheck_signature_p256 ->
+          model_1 instr_or_cont (affine_model name)
+      | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
+          model_0 instr_or_cont (const1_model name)
+      (* The following two instructions are expected to have an affine model. However,
+         we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
+      | N_IDupN -> model_1 instr_or_cont (break_model_2 name 300 400)
+      | N_IDropN -> model_1 instr_or_cont (break_model_2_const name 300 400)
+      | N_IDig | N_IDug | N_IDipN -> model_1 instr_or_cont (affine_model name)
+      | N_IAdd_bls12_381_g1 | N_IAdd_bls12_381_g2 | N_IAdd_bls12_381_fr
+      | N_IMul_bls12_381_g1 | N_IMul_bls12_381_g2 | N_IMul_bls12_381_fr
+      | N_INeg_bls12_381_g1 | N_INeg_bls12_381_g2 | N_INeg_bls12_381_fr
+      | N_IInt_bls12_381_z_fr ->
+          model_0 instr_or_cont (const1_model name)
+      | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
+      | N_IPairing_check_bls12_381 ->
+          model_1 instr_or_cont (affine_model name)
+      | N_IComb_get | N_IComb | N_IComb_set | N_IUncomb ->
+          model_1 instr_or_cont (affine_model name)
+      | N_ITicket | N_IRead_ticket -> model_0 instr_or_cont (const1_model name)
+      | N_ISplit_ticket -> model_2 instr_or_cont (split_ticket_model name)
+      | N_IJoin_tickets -> model_4 instr_or_cont (join_tickets_model name)
+      | N_ISapling_verify_update ->
+          model_2 instr_or_cont (verify_update_model name)
+      | N_IList_map -> model_0 instr_or_cont (const1_model name)
+      | N_IList_iter -> model_0 instr_or_cont (const1_model name)
+      | N_IIter -> model_0 instr_or_cont (const1_model name)
+      | N_IMap_map -> model_1 instr_or_cont (affine_model name)
+      | N_IMap_iter -> model_1 instr_or_cont (affine_model name)
+      | N_ISet_iter -> model_1 instr_or_cont (affine_model name)
+      | N_IHalt -> model_0 instr_or_cont (const1_model name)
+      | N_IApply -> model_0 instr_or_cont (const1_model name)
+      | N_ILog -> model_0 instr_or_cont (const1_model name)
+      | N_IOpen_chest -> model_2 instr_or_cont (open_chest_model name))
   | Cont_name cont -> (
-    match cont with
-    | N_KNil ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KCons ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KReturn ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KUndip ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KLoop_in ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KLoop_in_left ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KIter ->
-        model_1 instr_or_cont (branching_model name)
-    | N_KList_enter_body ->
-        model_2 instr_or_cont (list_enter_body_model name)
-    | N_KList_exit_body ->
-        model_0 instr_or_cont (const1_model name)
-    | N_KMap_enter_body ->
-        model_1 instr_or_cont (branching_model name)
-    | N_KMap_exit_body ->
-        model_2 instr_or_cont (nlogm_model name)
-    | N_KLog ->
-        model_0 instr_or_cont (const1_model name) )
+      match cont with
+      | N_KNil -> model_0 instr_or_cont (const1_model name)
+      | N_KCons -> model_0 instr_or_cont (const1_model name)
+      | N_KReturn -> model_0 instr_or_cont (const1_model name)
+      | N_KUndip -> model_0 instr_or_cont (const1_model name)
+      | N_KLoop_in -> model_0 instr_or_cont (const1_model name)
+      | N_KLoop_in_left -> model_0 instr_or_cont (const1_model name)
+      | N_KIter -> model_1 instr_or_cont (branching_model name)
+      | N_KList_enter_body -> model_2 instr_or_cont (list_enter_body_model name)
+      | N_KList_exit_body -> model_0 instr_or_cont (const1_model name)
+      | N_KMap_enter_body -> model_1 instr_or_cont (branching_model name)
+      | N_KMap_exit_body -> model_2 instr_or_cont (nlogm_model name)
+      | N_KLog -> model_0 instr_or_cont (const1_model name))
 
 let amplification_loop_iteration = fv "amplification_loop_iteration"
 
@@ -616,8 +496,7 @@ let interpreter_model ?amplification ?specialization () =
           let module Timer_result = Timer_applied (X) in
           let initial =
             match amplification with
-            | None ->
-                Timer_result.applied
+            | None -> Timer_result.applied
             | Some amplification_factor ->
                 let (module Amplification_applied) =
                   Model.apply amplification_loop_model amplification_factor
@@ -658,5 +537,7 @@ let make_model ?amplification ?specialization instr_name_opt =
           (function [sized_step] -> sized_step | _ -> assert false)
           ir_model
       in
-      [ ("interpreter", interpreter_model ?amplification ?specialization ());
-        ("codegen", ir_model) ]
+      [
+        ("interpreter", interpreter_model ?amplification ?specialization ());
+        ("codegen", ir_model);
+      ]

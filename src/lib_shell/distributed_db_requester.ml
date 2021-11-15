@@ -46,36 +46,33 @@ module type EXTENDED_REQUESTER_2 = sig
   val clear_all : t -> Block_hash.t -> int -> unit
 end
 
-module Make_raw (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-(Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
-(Request_message : sig
+module type REQUEST_MESSAGE = sig
   type param
+
+  type hash
 
   val max_length : int
 
   val initial_delay : Time.System.Span.t
 
-  val forge : param -> Hash.t list -> Message.t
-end)
-(Precheck : Requester.PRECHECK
-              with type key := Hash.t
-               and type value := Disk_table.value) :
+  val forge : param -> hash list -> Message.t
+end
+
+module Make_raw
+    (Hash : Requester.HASH)
+    (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
+    (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
+    (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
+    (Probe : Requester.PROBE
+               with type key := Hash.t
+                and type value := Disk_table.value) :
   EXTENDED_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value
      and type request_param = Request_message.param request_param
      and type store = Disk_table.store
-     and type param = Precheck.param
-     and type notified_value = Precheck.notified_value = struct
+     and type param = Probe.param
+     and type notified_value = Probe.notified_value = struct
   module Request = struct
     type param = Request_message.param request_param
 
@@ -104,7 +101,7 @@ end)
   end
 
   module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Precheck)
+    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Probe)
   include Table
 
   let state_of_t t =
@@ -130,7 +127,7 @@ module Fake_operation_storage = struct
 
   let known _ _ = Lwt.return_false
 
-  let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
+  let read _ _ = fail_with_exn Not_found
 
   let read_opt _ _ = Lwt.return_none
 end
@@ -151,7 +148,7 @@ module Raw_operation =
 
       type notified_value = Operation.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)
 
 module Block_header_storage = struct
@@ -159,15 +156,22 @@ module Block_header_storage = struct
 
   type value = Block_header.t
 
-  let known = Store.Block.is_known_valid
+  let known chain_store hash =
+    Store.Block.is_known_valid chain_store hash >>= function
+    | true -> Lwt.return_true
+    | false -> Store.Block.is_known_prechecked chain_store hash
 
   let read chain_store h =
-    Store.Block.read_block chain_store h >>=? fun b ->
-    return (Store.Block.header b)
+    (Store.Block.read_block chain_store h >>= function
+     | Ok b -> return b
+     | Error _ -> Store.Block.read_prechecked_block chain_store h)
+    >>=? fun b -> return (Store.Block.header b)
 
   let read_opt chain_store h =
-    Store.Block.read_block_opt chain_store h >>= fun b ->
-    Lwt.return (Option.map Store.Block.header b)
+    (Store.Block.read_block_opt chain_store h >>= function
+     | Some b -> Lwt.return_some b
+     | None -> Store.Block.read_prechecked_block_opt chain_store h)
+    >>= fun b -> Lwt.return (Option.map Store.Block.header b)
 end
 
 module Raw_block_header =
@@ -186,7 +190,7 @@ module Raw_block_header =
 
       type notified_value = Block_header.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)
 
 module Operations_table = Hashtbl.MakeSeeded (struct
@@ -248,7 +252,7 @@ module Raw_operations = struct
 
         type notified_value = Operation.t list * Operation_list_list_hash.path
 
-        let precheck (_block, expected_ofs) expected_hash (ops, path) =
+        let probe (_block, expected_ofs) expected_hash (ops, path) =
           let (received_hash, received_ofs) =
             Operation_list_list_hash.check_path
               path
@@ -276,7 +280,7 @@ module Protocol_storage = struct
 
   let read store ph =
     read_opt store ph >>= function
-    | None -> Lwt.return (Error_monad.error_exn Not_found)
+    | None -> fail_with_exn Not_found
     | Some p -> return p
 end
 
@@ -296,5 +300,5 @@ module Raw_protocol =
 
       type notified_value = Protocol.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)

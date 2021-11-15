@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [is_empty l] returns [true] iff [l = []]. *)
+val is_empty : 'a list -> bool
+
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove : int -> 'a list -> 'a list
 
@@ -54,30 +57,9 @@ val rev_sub : 'a list -> int -> 'a list
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
 
-(** [merge_filter2 ~compare ~f l1 l2] merges two lists ordered by [compare]
-    and whose items can be merged with [f]. Item is discarded or kept whether
-    [f] returns [Some] or [None] *)
-val merge_filter2 :
-  ?finalize:('a list -> 'a list) ->
-  ?compare:('a -> 'a -> int) ->
-  ?f:('a option -> 'a option -> 'a option) ->
-  'a list ->
-  'a list ->
-  'a list
-
-(** [merge2 ~compare ~f l1 l2] merges two lists ordered by [compare] and
-    whose items can be merged with [f] *)
-val merge2 :
-  ?finalize:('a list -> 'a list) ->
-  ?compare:('a -> 'a -> int) ->
-  ?f:('a -> 'a -> 'a) ->
-  'a list ->
-  'a list ->
-  'a list
-
 (** [shuffle l] is a list that contains the same elements as [l] but in a random
     order. *)
-val shuffle : 'a list -> 'a list
+val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
 
 (** Get the index of an element in a list. *)
 val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
@@ -89,3 +71,7 @@ val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
     Present in OCaml 4.10: this function can be removed once we catch
     up. *)
 val find_map : ('a -> 'b option) -> 'a list -> 'b option
+
+(** [fold_left_i f init l] is equivalent to [fold_left] except that
+    the index of the element is passed as a first argument to [f]. *)
+val fold_left_i : (int -> 'b -> 'a -> 'b) -> 'b -> 'a list -> 'b

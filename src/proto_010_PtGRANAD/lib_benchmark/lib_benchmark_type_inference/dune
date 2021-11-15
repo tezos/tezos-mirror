@@ -1,5 +1,6 @@
 (library
  (name tezos_benchmark_type_inference_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-type-inference-010-PtGRANAD)
  (libraries
   tezos-stdlib

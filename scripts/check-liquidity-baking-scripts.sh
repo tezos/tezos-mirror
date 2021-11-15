@@ -2,18 +2,30 @@
 
 set -e
 
-#
+usage () {
+  echo "usage:"
+  echo "  ./scripts/check-liquidity-baking-scripts.sh COMMIT_HASH PROTOCOL_DIR"
+}
+
 # This script checks that the serialized versions of the Liquidity Baking
 # LIGO scripts
 #
-#   https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/dexter.liquidity_baking.mligo
-#   https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/lqt_fa12.mligo
+#   https://gitlab.com/dexter2tz/dexter2tz/-/blob/"$COMMIT_HASH"/dexter.liquidity_baking.mligo
+#   https://gitlab.com/dexter2tz/dexter2tz/-/blob/"$COMMIT_HASH"/lqt_fa12.mligo
 #
 #   are correctly embedded in the source tree in
 #
-#   src/proto_alpha/lib_protocol/liquidity_baking_cpmm.ml
-#   src/proto_alpha/lib_protocol/liquidity_baking_lqt.ml
+#   "$PROTOCOL_DIR"/lib_protocol/liquidity_baking_cpmm.ml
+#   "$PROTOCOL_DIR"/lib_protocol/liquidity_baking_lqt.ml
 #
+
+if [ "$#" -ne 2 ]; then
+    usage
+    exit 1
+fi
+
+COMMIT_HASH="${1}"
+PROTOCOL_DIR="${2}"
 
 # --------------------
 echo "* Configuration"
@@ -50,10 +62,8 @@ LIGO=$(pwd)/ligo
 echo "* Step 2: Retrieve and compile the LIGO scripts"
 # ----------------------------------------------------
 
-COMMIT_HASH="d98643881fe14996803997f1283e84ebd2067e35"
-
 retrieve () {
-  wget --quiet https://gitlab.com/dexter2tz/dexter2tz/-/raw/$COMMIT_HASH/"$1" -O "$2"
+  wget --quiet https://gitlab.com/dexter2tz/dexter2tz/-/raw/"$COMMIT_HASH"/"$1" -O "$2"
 }
 
 retrieve dexter.liquidity_baking.mligo cpmm.mligo
@@ -68,7 +78,7 @@ echo "* Step 3: Compute the binary representations of the two Michelson scripts"
 
 serialize () {
   CONTRACT="$1"
-  $TEZOS_CLIENT convert script "$CONTRACT.tz" from michelson to binary > "$CONTRACT.bin"
+  $TEZOS_CLIENT convert script "$CONTRACT.tz" from michelson to binary --legacy > "$CONTRACT.bin"
 }
 
 serialize cpmm
@@ -98,8 +108,8 @@ compare () {
   fi
 }
 
-source_hex "$TOP_DIR"/src/proto_alpha/lib_protocol/liquidity_baking_lqt.ml 3 source.lqt.bin
+source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_lqt.ml 3 source.lqt.bin
 compare lqt source.lqt.bin lqt.bin
 
-source_hex "$TOP_DIR"/src/proto_alpha/lib_protocol/liquidity_baking_cpmm.ml 3 source.cpmm.bin
+source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_cpmm.ml 3 source.cpmm.bin
 compare cpmm source.cpmm.bin cpmm.bin

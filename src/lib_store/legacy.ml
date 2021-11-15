@@ -797,7 +797,7 @@ let upgrade_0_0_4 ~data_dir ?patch_context
           Lwt.return (Error errors))
     (fun exn ->
       upgrade_cleaner data_dir ~upgraded_store:new_store_tmp >>= fun () ->
-      Lwt.return (error_exn exn))
+      fail_with_exn exn)
 
 let upgrade_0_0_5 ~data_dir genesis =
   let floating_stores_to_upgrade = Floating_block_store.[RO; RW; RW_TMP] in

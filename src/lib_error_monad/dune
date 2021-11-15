@@ -1,12 +1,11 @@
 (library
  (name tezos_error_monad)
  (public_name tezos-error-monad)
- (flags (:standard -open Tezos_stdlib
-                   -open Data_encoding
-                   ))
- (libraries tezos-stdlib
-            data-encoding
-            lwt-canceler
-            lwt
-            tezos-lwt-result-stdlib
-            ))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-stdlib
+  data-encoding
+  lwt-canceler
+  lwt
+  tezos-lwt-result-stdlib)
+ (flags (:standard -open Tezos_stdlib -open Data_encoding)))

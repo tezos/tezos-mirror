@@ -1,0 +1,5 @@
+parameter unit ;
+storage int ;
+code { DROP;
+       PUSH int (constant "expruQN5r2umbZVHy6WynYM8f71F8zS4AERz9bugF8UkPBEqrHLuU8");
+       NIL operation ; PAIR }

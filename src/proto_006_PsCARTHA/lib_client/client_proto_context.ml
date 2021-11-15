@@ -370,7 +370,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
     (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
-    (failure
+    (error_of_fmt
        "@[<v 2>Inconsistent activation key:@ Computed pkh: %a@ Embedded pkh: \
         %a @]"
        Signature.Public_key_hash.pp

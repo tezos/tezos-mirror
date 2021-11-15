@@ -73,7 +73,7 @@ module Crypto = struct
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create header_length in
     read_full ?canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
@@ -165,7 +165,7 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create Crypto.header_length in
     read_full ~canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let len = TzEndian.get_uint16 header_buf 0 in
@@ -175,7 +175,8 @@ module Connection_message = struct
     (* This call to [mk_buffer] is safe (it can't [Error] out)
        but we cannot use [mk_buffer_safe], because we need to specify
        ~len and ~pos. *)
-    mk_buffer ~len ~pos buf >>?= read_full ~canceler fd >>=? fun () ->
+    mk_buffer ~length_to_copy:len ~pos buf >>?= read_full ~canceler fd
+    >>=? fun () ->
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
     | Error re -> fail (P2p_errors.Decoding_error re)
@@ -346,7 +347,10 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       version = announced_version;
     }
   >>=? fun sent_msg ->
-  Connection_message.read ~canceler scheduled_conn >>=? fun (msg, recv_msg) ->
+  Connection_message.read
+    ~canceler
+    (P2p_io_scheduler.to_readable scheduled_conn)
+  >>=? fun (msg, recv_msg) ->
   (* TODO: make the below bytes-to-string copy-conversion unnecessary.
      This requires making the consumer of the [recv_msg] value
      ([Crypto_box.generate_nonces]) able to work with strings directly. *)
@@ -382,7 +386,11 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     cryptobox_data
     local_metadata
   >>=? fun () ->
-  Metadata.read ~canceler metadata_config scheduled_conn cryptobox_data
+  Metadata.read
+    ~canceler
+    metadata_config
+    (P2p_io_scheduler.to_readable scheduled_conn)
+    cryptobox_data
   >>=? fun remote_metadata ->
   let info =
     {
@@ -419,7 +427,7 @@ module Reader = struct
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
-            st.conn.scheduled_conn
+            (P2p_io_scheduler.to_readable st.conn.scheduled_conn)
             st.conn.cryptobox_data
           >>=? fun buf ->
           Events.(emit read_event) (Bytes.length buf, st.conn.info.peer_id)
@@ -618,7 +626,11 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
   protect
     (fun () ->
       Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack
-      >>=? fun () -> Ack.read ~canceler conn.scheduled_conn conn.cryptobox_data)
+      >>=? fun () ->
+      Ack.read
+        ~canceler
+        (P2p_io_scheduler.to_readable conn.scheduled_conn)
+        conn.cryptobox_data)
     ~on_error:(fun err ->
       P2p_io_scheduler.close conn.scheduled_conn >>= fun _ ->
       match err with
@@ -717,3 +729,54 @@ let close ?(wait = false) st =
   Reader.shutdown st.reader >>= fun () ->
   Writer.shutdown st.writer >>= fun () ->
   P2p_io_scheduler.close st.conn.scheduled_conn >>= fun _ -> Lwt.return_unit
+
+module Internal_for_tests = struct
+  let mock_authenticated_connection default_metadata =
+    let (secret_key, public_key, _pkh) = Crypto_box.random_keypair () in
+    let cryptobox_data =
+      Crypto.
+        {
+          channel_key = Crypto_box.precompute secret_key public_key;
+          local_nonce = Crypto_box.zero_nonce;
+          remote_nonce = Crypto_box.zero_nonce;
+        }
+    in
+    let scheduled_conn =
+      let f2d_t = Lwt_main.run (P2p_fd.socket PF_INET6 SOCK_STREAM 0) in
+      P2p_io_scheduler.register
+        (P2p_io_scheduler.create ~read_buffer_size:0 ())
+        f2d_t
+    in
+    let info = P2p_connection.Internal_for_tests.Info.mock default_metadata in
+    {scheduled_conn; info; cryptobox_data}
+
+  let make_crashing_encoding () : 'a Data_encoding.t =
+    Data_encoding.conv
+      (fun _ -> assert false)
+      (fun _ -> assert false)
+      Data_encoding.unit
+
+  let mock conn =
+    let reader =
+      Reader.
+        {
+          canceler = Lwt_canceler.create ();
+          conn;
+          encoding = make_crashing_encoding ();
+          messages = Lwt_pipe.create ();
+          worker = Lwt.return_unit;
+        }
+    in
+    let writer =
+      Writer.
+        {
+          canceler = Lwt_canceler.create ();
+          conn;
+          encoding = make_crashing_encoding ();
+          messages = Lwt_pipe.create ();
+          worker = Lwt.return_unit;
+          binary_chunks_size = 0;
+        }
+    in
+    {conn; reader; writer}
+end

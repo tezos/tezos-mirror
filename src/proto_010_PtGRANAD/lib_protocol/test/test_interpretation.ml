@@ -86,13 +86,13 @@ let test_bad_contract_parameter () =
   >>= function
   | Ok _ -> Alcotest.fail "expected an error"
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
-      Test_services.(check Testable.contract)
+      Alcotest.(check Testable.contract)
         "incorrect field in Bad_contract_parameter"
         default_source
         source' ;
       return_unit
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let test_multiplication_close_to_overflow_passes () =
   test_context () >>=? fun ctx ->
@@ -108,7 +108,7 @@ let test_multiplication_close_to_overflow_passes () =
   >>= function
   | Ok _ -> return_unit
   | Error errs ->
-      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let read_file filename =
   let ch = open_in filename in
@@ -209,7 +209,7 @@ let error_encoding_tests =
   let script_expr_int = Micheline.strip_locations (Micheline.Int (0, Z.zero)) in
   List.map
     (fun (name, e) ->
-      Test_services.tztest
+      Tztest.tztest
         (Format.asprintf "test error encoding: %s" name)
         `Quick
         (test_json_roundtrip_err name e))
@@ -225,22 +225,16 @@ let error_encoding_tests =
 
 let tests =
   [
-    Test_services.tztest
-      "test bad contract error"
-      `Quick
-      test_bad_contract_parameter;
-    Test_services.tztest
-      "check robustness overflow error"
-      `Slow
-      test_stack_overflow;
-    Test_services.tztest
+    Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
+    Tztest.tztest "check robustness overflow error" `Slow test_stack_overflow;
+    Tztest.tztest
       "check robustness overflow error in lwt"
       `Slow
       test_stack_overflow_in_lwt;
-    Test_services.tztest
+    Tztest.tztest
       "test multiplication no illegitimate overflow"
       `Quick
       test_multiplication_close_to_overflow_passes;
-    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow;
+    Tztest.tztest "test stack overflow error" `Slow test_stack_overflow;
   ]
   @ error_encoding_tests

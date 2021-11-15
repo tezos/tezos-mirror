@@ -371,13 +371,16 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.block
          (fun (((), chain), _block) o {operations; protocol_data = _} ->
            with_chain chain (fun () ->
-               ( begin_construction () >>=? fun validation_state ->
+               ( begin_construction ~cache:`Lazy () >>=? fun validation_state ->
                  List.fold_left_es
                    (List.fold_left_es simulate_operation)
                    (validation_state, [])
                    operations
                  >>=? fun (validation_state, preapply_results) ->
-                 E.Protocol.finalize_block validation_state
+                 (* The following is a "fake finalization" that must not
+                    commit into the protocol caches. Hence, [cache_nonce]
+                    is set to [None]. *)
+                 E.Protocol.finalize_block validation_state None
                  >>=? fun (validation_result, _metadata) ->
                  (* Similar to lib_shell.Prevalidation.preapply *)
                  let operations_hash =
@@ -427,7 +430,7 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.operations
          (fun ((_, chain), _block) () op_list ->
            with_chain chain (fun () ->
-               ( begin_construction () >>=? fun state ->
+               ( begin_construction ~cache:`Lazy () >>=? fun state ->
                  List.fold_left_es
                    (fun (state, acc) op ->
                      E.Protocol.apply_operation state op
@@ -436,42 +439,43 @@ module Make (E : MENV) = struct
                    (state, [])
                    op_list
                  >>=? fun (state, acc) ->
-                 E.Protocol.finalize_block state >>=? fun _ ->
+                 (* A pre-application should not commit into the
+                    protocol caches. For this reason, [cache_nonce]
+                    is [None]. *)
+                 E.Protocol.finalize_block state None >>=? fun _ ->
                  return (List.rev acc) )
                >>= fun outcome ->
                match outcome with
                | Ok result -> RPC_answer.return result
                | Error errs -> RPC_answer.fail errs)))
 
-  let equal_op (a_shell_header, a_operation_data)
-      (b_shell_header, b_operation_data) =
-    Block_hash.equal
-      a_shell_header.Operation.branch
-      b_shell_header.Operation.branch
-    && (* FIXME: the protocol should export equality/comparison functions for its
-          abstract types such as operation_data.
-
-
-          WARNING: the following expression causes an exception to be raised,
-          complaining about functional values
-          Stdlib.( = ) a_operation_data b_operation_data
-       *)
-    Stdlib.compare a_operation_data b_operation_data = 0
+  let hash_op (shell, proto) =
+    let proto =
+      Data_encoding.Binary.to_bytes_exn E.Protocol.operation_data_encoding proto
+    in
+    Operation.hash {shell; proto}
 
   let need_operation shell_header operation_data =
     Mempool.read () >>=? fun mempool_operations ->
     let op = (shell_header, operation_data) in
-    if List.mem ~equal:equal_op op mempool_operations then return_false
+    let op_hash = hash_op op in
+    if
+      List.exists
+        (fun op -> Operation_hash.equal op_hash (hash_op op))
+        mempool_operations
+    then return_false
     else
       let operations = op :: mempool_operations in
-      begin_construction () >>=? fun validation_state ->
+      begin_construction ~cache:`Lazy () >>=? fun validation_state ->
       List.fold_left_es
         (fun rstate (shell, protocol_data) ->
           simulate_operation rstate E.Protocol.{shell; protocol_data})
         (validation_state, [])
         operations
       >>=? fun (validation_state, _) ->
-      E.Protocol.finalize_block validation_state >>=? fun _ -> return_true
+      (* A pre-application should not commit into the protocol
+         caches. For this reason, [cache_nonce] is [None]. *)
+      E.Protocol.finalize_block validation_state None >>=? fun _ -> return_true
 
   let inject_operation_with_mempool operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
@@ -513,9 +517,12 @@ module Make (E : MENV) = struct
             let op =
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
             in
-            ( begin_construction () >>=? fun state ->
+            ( begin_construction ~cache:`Lazy () >>=? fun state ->
               E.Protocol.apply_operation state op >>=? fun (state, receipt) ->
-              E.Protocol.finalize_block state
+              (* The following finalization does not have to update protocol
+                 caches because we are not interested in block creation here.
+                 Hence, [cache_nonce] is set to [None]. *)
+              E.Protocol.finalize_block state None
               >>=? fun (validation_result, _block_header_metadata) ->
               return (validation_result, receipt) )
             >>= fun result ->
@@ -549,6 +556,7 @@ module Make (E : MENV) = struct
               E.Protocol.block_header_data_encoding
               block_header.protocol_data;
         }
+        ~cache:`Lazy
       >>=? fun validation_state ->
       let i = ref 0 in
       List.fold_left_es
@@ -568,7 +576,7 @@ module Make (E : MENV) = struct
         (validation_state, [])
         operations
       >>=? fun (validation_state, _) ->
-      E.Protocol.finalize_block validation_state
+      E.Protocol.finalize_block validation_state (Some block_header.shell)
     in
     Directory.register
       Directory.empty

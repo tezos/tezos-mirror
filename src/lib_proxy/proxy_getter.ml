@@ -23,28 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local = Tezos_context_memory.Context
+module Local = Local_context
+
+(** The kind of RPC request: is it a GET (i.e. is it loading data?) or
+    is it only a MEMbership request (i.e. is the key associated to data?). *)
+type kind = Get | Mem
+
+let kind_encoding : kind Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (function Get -> true | Mem -> false)
+    (function true -> Get | false -> Mem)
+    bool
+
+let pp_kind fmt kind =
+  Format.fprintf fmt "%s" (match kind with Get -> "get" | Mem -> "mem")
 
 module Events = struct
   include Internal_event.Simple
 
   let section = ["proxy_getter"]
 
+  let pp_key =
+    let pp_sep fmt () = Format.fprintf fmt "/" in
+    Format.pp_print_list ~pp_sep Format.pp_print_string
+
   let cache_hit =
-    declare_1
+    declare_2
       ~section
       ~name:"cache_hit"
-      ~msg:"Cache hit: ({key})"
+      ~msg:"Cache hit ({kind}): ({key})"
       ~level:Debug
-      ("key", Data_encoding.string)
+      ~pp1:pp_kind
+      ~pp2:pp_key
+      ("kind", kind_encoding)
+      ("key", Data_encoding.(list string))
 
   let cache_miss =
-    declare_1
+    declare_2
       ~section
       ~name:"cache_miss"
-      ~msg:"Cache miss: ({key})"
+      ~msg:"Cache miss ({kind}): ({key})"
       ~level:Debug
-      ("key", Data_encoding.string)
+      ~pp1:pp_kind
+      ~pp2:pp_key
+      ("kind", kind_encoding)
+      ("key", Data_encoding.(list string))
 
   let split_key_triggers =
     declare_2
@@ -52,8 +76,10 @@ module Events = struct
       ~level:Debug
       ~name:"split_key_triggers"
       ~msg:"split_key heuristic triggers, getting {parent} instead of {leaf}"
-      ("parent", Data_encoding.string)
-      ("leaf", Data_encoding.string)
+      ~pp1:pp_key
+      ~pp2:pp_key
+      ("parent", Data_encoding.(list string))
+      ("leaf", Data_encoding.(list string))
 end
 
 let rec raw_context_size = function
@@ -102,11 +128,11 @@ struct
 
   let get = Local.Tree.find_tree
 
-  let set_leaf tree key raw_context : t Proxy.update tzresult Lwt.t =
+  let set_leaf tree key raw_context : t Proxy.update Lwt.t =
     (raw_context_to_tree raw_context >>= function
      | None -> Lwt.return tree
      | Some sub_tree -> Local.Tree.add_tree tree key sub_tree)
-    >|= fun updated_tree -> ok (Proxy.Value updated_tree)
+    >|= fun updated_tree -> Proxy.Value updated_tree
 end
 
 module type REQUESTS_TREE = sig
@@ -169,7 +195,7 @@ module Core
     X.do_rpc pgi key >>=? fun tree ->
     lazy_load_store () >>= fun current_store ->
     (* Update cache with data obtained *)
-    T.set_leaf current_store key tree >>=? fun updated ->
+    T.set_leaf current_store key tree >>= fun updated ->
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end
@@ -177,13 +203,8 @@ end
 module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let requests = ref RequestsTree.empty
 
-  let pp_key k = String.concat ";" k
-
   let is_all k =
     match RequestsTree.find_opt !requests k with Some All -> true | _ -> false
-
-  (** The kind of RPC request: is it a GET (i.e. is it loading data?) or is it only a MEMbership request (i.e. is the key associated to data?). *)
-  type kind = Get | Mem
 
   (** Handles the application of [X.split_key] to optimize queries. *)
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
@@ -215,8 +236,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
     if split && is_all key_to_get then return_unit
     else
       (if split then
-       Events.(
-         emit split_key_triggers (pp_key key_to_get, pp_key requested_key))
+       Events.(emit split_key_triggers (key_to_get, requested_key))
       else Lwt.return_unit)
       >>= fun () ->
       C.do_rpc pgi key_to_get >>= function
@@ -239,18 +259,17 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.key ->
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
-    let pped_key = pp_key key in
     (if is_all key then
      (* This exact request was done already.
         So data was obtained already. Note that this does not imply
         that this function will return [Some] (maybe the node doesn't
         map this key). *)
-     Events.(emit cache_hit pped_key) >>= fun () -> return_unit
+     Events.(emit cache_hit (kind, key)) >>= fun () -> return_unit
     else
       (* This exact request was NOT done already (either a longer request
          was done or no related request was done at all).
          An RPC MUST be done. *)
-      Events.(emit cache_miss pped_key) >>= fun () -> do_rpc pgi kind key)
+      Events.(emit cache_miss (kind, key)) >>= fun () -> do_rpc pgi kind key)
     >>=? fun () -> C.get key >>= return
 
   let proxy_get pgi key = generic_call Get pgi key
@@ -274,4 +293,6 @@ module MakeProxy (X : Proxy_proto.PROTO_RPC) : M = Make (Core (Tree) (X)) (X)
 
 module Internal = struct
   module Tree = Tree
+
+  let raw_context_to_tree = raw_context_to_tree
 end

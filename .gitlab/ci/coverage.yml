@@ -7,28 +7,30 @@ test_coverage:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development_coverage
   stage: test_coverage
+  needs: []
+  parallel:
+    matrix:
+      # Set up tests suites to run. Note that each of these make will
+      # create a separate report.
+      - TEST_TARGET:
+        - test-unit
+        # Running the full set of python tests take more than 4 hours
+        # triggering a timeout. We only run the tests for tests_alpha
+        # in the mean time
+        - test-python-alpha
+        # Tezt tests are run with an individual timeout, to work around
+        # https://gitlab.com/tezos/tezos/-/issues/1652
+        - test-tezt-coverage
   variables:
-    # We exclude from coverage old protocols and code that can't be
-    # instrumented because of current limitations of bisect_ppx.
-    OLD_PROTOCOLS: "src/proto_000_Ps9mPmXa src/proto_001_PtCJ7pwo src/proto_002_PsYLVpVv src/proto_003_PsddFKi3 src/proto_004_Pt24m4xi src/proto_005_PsBABY5H src/proto_005_PsBabyM1 src/proto_006_PsCARTHA  src/proto_007_PsDELPH1"
-    NOT_INSTRUMENTABLE: ""
-    COVERAGE_EXCLUDE: "$OLD_PROTOCOLS $NOT_INSTRUMENTABLE"
+    COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   script:
-    # The next three lines are temporary. They replace bisect_ppx.2.5.0 with
-    # its development version (and hopefully could be removed when
-    # bisect_ppx is upgraded to a version > 2.5.0)
-    # See commit "CI: pin bisect_ppx to dev version to fix coverage"
-    # and `docs/developer/testing.rst`
-    - test $(opam show -f version bisect_ppx) = "2.5.0"
-    - opam repository add default https://opam.ocaml.org --rank=-1
-    - opam pin add bisect_ppx git+https://github.com/aantron/bisect_ppx.git#2fc5b795e603cde966a45343ef1b523234ce93d4 --yes
-    - scripts/instrument_dune_bisect.sh src/ --except $COVERAGE_EXCLUDE
     - make
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
     # A failing test shouldn't prevent the generation of the report (|| true)
-    - make test-coverage || true
+    - make $TEST_TARGET || true
     - make coverage-report
     - make coverage-report-summary
     # hack to capture script success in after_script script

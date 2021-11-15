@@ -51,4 +51,11 @@ let bounded_encoding ?max_operations () =
 
 let empty = {known_valid = []; pending = Operation_hash.Set.empty}
 
+let remove oph {known_valid; pending} =
+  {
+    known_valid =
+      List.filter (fun x -> not (Operation_hash.equal x oph)) known_valid;
+    pending = Operation_hash.Set.remove oph pending;
+  }
+
 let () = Data_encoding.Registration.register encoding

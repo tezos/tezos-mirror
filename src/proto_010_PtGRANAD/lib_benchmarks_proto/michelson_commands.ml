@@ -112,7 +112,7 @@ module Michelson_gen_cmd = struct
       | terms_count ->
           if terms_count <= 0 then (
             Format.eprintf "TERMS-COUNT must be strictly positive, exiting@." ;
-            exit 1 )
+            exit 1)
           else terms_count
     in
     let progress =

@@ -65,4 +65,10 @@ module Make_tree (DB : DB) : sig
   val make_repo : unit -> DB.repo Lwt.t
 
   val shallow : DB.repo -> kinded_hash -> DB.tree
+
+  (** Exception raised by [find_tree] and [add_tree] when applied to shallow
+    trees. It is exposed for so that the memory context can in turn raise it. *)
+  exception Context_dangling_hash of string
 end
+
+type error += Unsupported_context_hash_version of Context_hash.Version.t

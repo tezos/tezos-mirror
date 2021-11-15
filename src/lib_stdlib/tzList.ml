@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let may_cons xs x = match x with None -> xs | Some x -> x :: xs
+let is_empty = function [] -> true | _ -> false
 
 let rev_sub l n =
   if n < 0 then invalid_arg "Utils.rev_sub: `n` must be non-negative." ;
@@ -38,40 +38,6 @@ let rev_sub l n =
   append_rev_sub [] l n
 
 let sub l n = rev_sub l n |> List.rev
-
-let first_some o1 o2 =
-  match (o1, o2) with (Some _, _) -> o1 | (None, o2) -> o2
-
-let merge_filter2 ?(finalize = List.rev) ?(compare = compare) ?(f = first_some)
-    l1 l2 =
-  let sort = List.sort compare in
-  let rec merge_aux acc = function
-    | ([], []) -> finalize acc
-    | (r1, []) -> finalize acc @ List.filter_map (fun x1 -> f (Some x1) None) r1
-    | ([], r2) -> finalize acc @ List.filter_map (fun x2 -> f None (Some x2)) r2
-    | ((h1 :: t1 as r1), (h2 :: t2 as r2)) ->
-        if compare h1 h2 > 0 then
-          merge_aux (may_cons acc (f None (Some h2))) (r1, t2)
-        else if compare h1 h2 < 0 then
-          merge_aux (may_cons acc (f (Some h1) None)) (t1, r2)
-        else
-          (* m1 = m2 *)
-          merge_aux (may_cons acc (f (Some h1) (Some h2))) (t1, t2)
-  in
-  merge_aux [] (sort l1, sort l2)
-
-let merge2 ?finalize ?compare ?(f = fun x1 _x1 -> x1) l1 l2 =
-  merge_filter2
-    ?finalize
-    ?compare
-    ~f:(fun x1 x2 ->
-      match (x1, x2) with
-      | (None, None) -> assert false
-      | (Some x1, None) -> Some x1
-      | (None, Some x2) -> Some x2
-      | (Some x1, Some x2) -> Some (f x1 x2))
-    l1
-    l2
 
 let rec remove nb = function
   | [] -> []
@@ -122,11 +88,16 @@ let rec product a b =
 
 (* Use Fisher-Yates shuffle as described by Knuth
    https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle *)
-let shuffle l =
+let shuffle ?rng_state l =
+  let randint =
+    match rng_state with
+    | None -> Random.int
+    | Some rng_state -> Random.State.int rng_state
+  in
   let a = Array.of_list l in
   let len = Array.length a in
   for i = len downto 2 do
-    let m = Random.int i in
+    let m = randint i in
     let n' = i - 1 in
     if m <> n' then (
       let tmp = a.(m) in
@@ -146,3 +117,12 @@ let index_of ?(compare = Stdlib.compare) item list =
 let rec find_map f = function
   | [] -> None
   | x :: l -> ( match f x with None -> find_map f l | r -> r)
+
+let fold_left_i f init l =
+  List.fold_left
+    (fun (i, accu) x ->
+      let accu = f i accu x in
+      (i + 1, accu))
+    (0, init)
+    l
+  |> snd

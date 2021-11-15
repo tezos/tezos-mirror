@@ -84,12 +84,12 @@ let set_storage_limit storage_limit (Manager_info c) =
 
 let set_counter counter (Manager_info c) =
   match c.counter with
-  | Some _ -> generic_error "set_counter_annot: already set"
+  | Some _ -> error_with "set_counter_annot: already set"
   | None -> ok (Manager_info {c with counter = Some counter})
 
 let set_source source (Manager_info c) =
   match c.source with
-  | Some _ -> generic_error "set_source_annot: already set"
+  | Some _ -> error_with "set_source_annot: already set"
   | None -> ok (Manager_info {c with source = Some source})
 
 let manager_from_annotated operation =
@@ -103,12 +103,12 @@ let manager_from_annotated operation =
   >>? fun storage_limit ->
   Option.fold
     ~some:ok
-    ~none:(generic_error "manager_from_annotated: source not set")
+    ~none:(error_with "manager_from_annotated: source not set")
     source
   >>? fun source ->
   Option.fold
     ~some:ok
-    ~none:(generic_error "manager_from_annotated: counter not set")
+    ~none:(error_with "manager_from_annotated: counter not set")
     counter
   >|? fun counter ->
   Manager_operation {source; fee; counter; gas_limit; storage_limit; operation}

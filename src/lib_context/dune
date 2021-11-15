@@ -1,7 +1,9 @@
 (library
  (name tezos_context)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-context)
  (libraries tezos-base
+            bigstringaf
             tezos-shell-services
             logs.fmt
             digestif.c

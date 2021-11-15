@@ -1,5 +1,3 @@
-.. _coding_guidelines:
-
 Coding guidelines
 =================
 
@@ -157,7 +155,10 @@ the template, and address any gap if needed.
 Logging Levels
 --------------
 
-The Tezos libraries use an internal logging library with 5 different verbosity `levels`.
+The Tezos libraries use an logging library with 5 different verbosity `levels`
+defined in ``src/lib_event_logging/internal_event.mli`` for shell and
+``src/lib_protocol_environment/sigs/v3/logging.mli`` for protocol code.
+
 It is important to choose the appropriate level for each event in the code to
 avoid flooding the node administrator with too much information.
 
@@ -180,6 +181,17 @@ administrator of possible problems and errors:
   the node.
 - ``Error`` level are all those events that require an intervention of the node
   administrator or that signal some exceptional circumstance.
+
+There is another level ``Fatal`` with the highest priority but it is rarely
+relevant. Specifically, ``Fatal`` should be reserved for errors that can
+absolutely not be recovered. All logging at the ``Fatal`` level should be
+immediately followed by a call to ``Lwt_exit.exit_and_raise``.
+
+Note that a library is never able to decide whether a certain condition is fatal
+or not. Indeed, the application that calls into the library may not consider the
+function call as essential to the continuation of the application's main
+purpose. Consequently, ``Fatal`` should never be used within libraries.
+
 
 Code formatting
 ---------------
@@ -256,7 +268,7 @@ Example:
    let f t =
      let w = g t in
      ...
-   
+
    module Internal_for_tests = struct
      type t_raw = t = {bar : string; baz : int}
 
@@ -267,11 +279,92 @@ Example:
      module Mycache = Mycache
    end
 
+Exceptions and errors
+---------------------
+
+The following pieces of advice should be applied in general, although exceptions apply (pun intended).
+
+- Only use exceptions locally and don't let them escape: raise them and catch them within the same function or the same module.
+
+  - If a function that is exported can fail, return a ``result`` or a ``tzresult``.
+
+  - If you cannot (or for another reason do not) handle an exception and it may escape you **must** document it.
+
+- Never catch ``Stack_overflow`` nor ``Out_of_memory`` which are exceptions from
+  the OCaml runtime rather than the code itself. In other words, when one of
+  these exception is raised in one process, the same exception may or may not be
+  raised in another process executing the same code on other machines. When you
+  catch this exception, you make a branching in the code that is decided not
+  based on properties of the code, but properties of the process executing the
+  code. Consequently, the same branching may differ on two distinct runs of the
+  same code. This is, in essence, non-determinism.
+
+  - If you are in one of the small cases where non-determinism is ok and you
+    have a compelling reason to catch either ``Stack_overflow`` or
+    ``Out_of_memory``, you **must** include a comment explaining why.
+
+  - Note that catch-all patterns (such as wildcard (`| _ ->`) and variable
+    (`| exn ->`) include ``Stack_overflow`` and ``Out_of_memory``.
+
+- Do not let low-level, implementation-dependent exceptions and errors bubble up
+  to high-level code. For example, you should catch ``Unix_error`` near the
+  syscall sites (ideally, within the same module) and handle it there. If you
+  cannot handle it (e.g., if the error is non-recoverable) you should translate
+  it into an error that is more relevant to the high-level code.
+
+  - E.g., If a file-writing call to a library function raises
+    ``Unix_error(ENOSPC, _, _)``, the caller of that library function should
+
+    - catch the exception,
+
+    - attempt to recover (if possible; e.g., by removing other old files before attempting it again),
+
+    - and if the recovery does not work (e.g., does not release sufficient
+      space) or is impossible (e.g., there are no references to old files in
+      scope) then it should fail in a more meaningful way than by forwarding the
+      exception (e.g., indicating what operation it was trying to carry).
+
+  - In the rare case that the underlying exception/error is satisfactory to the
+    higher level code, then you may propagate it as is.
+
+The ``Lwtreslib`` and the ``Error_monad`` libraries provide functions that can
+help you follow these guidelines. Notably, ``traces`` allow callers to
+contextualise the errors produced by its callees.
+
+.. _rpc_security:
+
+RPC security
+------------
+
+During the development of the codebase a lot of RPC endpoints were created, some
+of which are responsible for delicate or computationally intense tasks like
+validating blocks or executing Michelson scripts. While some of them are
+necessary for the node's users to interact with the blockchain, others are there
+to expose API to processes responsible for baking and endorsing, for
+configuration or debugging purposes or to facilitate development of smart
+contracts.
+
+In order to mitigate risks related to exposing these endpoints, Access Control
+Lists (ACL for short) were introduced to limit the scope of the API exposed to
+public networks (see also :ref:`configure_rpc`). While node administrators are
+free to configure these ACLs however they like, there is :ref:`the default ACL
+<default_acl>`, which lists all the endpoints that are **exposed by default**.
+
+When adding a new RPC endpoint, please consider whether or not there is a reason
+to call it over a public network. If the answer is yes, you should probably
+consider adding the new endpoint to the ACL. If there are also risks related to
+calling the endpoint by a potentially malicious user, they should be weighed
+when making the decision too. There are no simple answers here. Remember that
+all new endpoints are **blocked be default** unless explicitly added to the ACL.
+
+When changing an existing public RPC endpoint it is also important to consider,
+how does the change impact possible risks related to calling the endpoint.
+Should it be removed from the ACL?
+
 Coding conventions
 ------------------
 
-Other than the formatting rules above, there are currently no coding
+Other than the guidelines above, there are currently no coding
 conventions enforced in the codebase. However, Tezos developers should be aware
-of general `OCaml programming guidelines <http://caml.inria.fr/resources/doc/
-guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
+of general `OCaml programming guidelines <https://caml.inria.fr/resources/doc/guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
 and more.

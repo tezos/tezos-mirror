@@ -63,7 +63,7 @@ module Public_key = struct
   let to_bytes pk = Bigstring.to_bytes (Key.to_bytes context pk)
 
   let of_bytes_opt s =
-    try Some (Key.read_pk_exn context (Bigstring.of_bytes s)) with _ -> None
+    Option.catch (fun () -> Key.read_pk_exn context (Bigstring.of_bytes s))
 
   let to_string s = Bytes.to_string (to_bytes s)
 

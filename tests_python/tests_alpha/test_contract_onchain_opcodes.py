@@ -448,6 +448,7 @@ class TestContractOnchainOpcodes:
         bake(client)
 
 
+@pytest.mark.incremental
 class TestTickets:
     """Tests for tickets."""
 

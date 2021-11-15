@@ -1,5 +1,10 @@
 (executables
- (names main saturation_fuzzing test_gas_properties test_tez_repr)
+ (names main
+        saturation_fuzzing
+        test_gas_properties
+        test_tez_repr
+        liquidity_baking_pbt
+        test_script_comparison)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -10,24 +15,22 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-alpha-parameters
-            tezos-test-services
+            tezos-base-test-helpers
             tezos-sapling
             astring
-            tezos-protocol-plugin-alpha)
+            tezos-protocol-plugin-alpha
+            tezos-benchmark
+            tezos-benchmark-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_alpha
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_environment_alpha
+                   -open Tezos_benchmark_alpha
+                   -open Tezos_benchmark_type_inference_alpha
                    -open Tezos_alpha_test_helpers
-                   -open Tezos_test_services)))
-
-(rule
- (alias buildtest)
- (package tezos-protocol-alpha-tests)
- (deps main.exe)
- (action (progn)))
+                   -open Tezos_base_test_helpers)))
 
 (rule
  (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
@@ -38,14 +41,14 @@
  (alias runtest_proto_alpha)
  (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
- (action (run %{exe:main.exe} -v -q)))
+ (action (run %{exe:main.exe} -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
  (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
- (action (run %{exe:main.exe} -v)))
+ (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_saturation_fuzzing)
@@ -53,12 +56,27 @@
  (action (run %{exe:saturation_fuzzing.exe})))
 
 (rule
+ (alias runtest_test_script_comparison)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:test_script_comparison.exe})))
+
+(rule
  (alias runtest_test_tez_repr)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:test_tez_repr.exe})))
 
 (rule
+ (alias runtest_liquidity_baking_pbt)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:liquidity_baking_pbt.exe})))
+
+(rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing) (alias runtest_test_tez_repr))
+ (deps
+  (alias runtest_proto_alpha)
+  (alias runtest_saturation_fuzzing)
+  (alias runtest_test_tez_repr)
+  (alias runtest_liquidity_baking_pbt)
+  (alias runtest_test_script_comparison))
  (action (progn)))

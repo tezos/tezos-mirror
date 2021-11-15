@@ -1,0 +1,185 @@
+variables:
+  ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
+  build_deps_image_version: e47d923d556a41fa3dd02128658a7cd899f80ab0
+  build_deps_image_name: registry.gitlab.com/tezos/opam-repository
+  public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: "1"
+  GET_SOURCES_ATTEMPTS: "2"
+  ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
+  # Sets the number of tries before failing opam downloads.
+  OPAMRETRIES: "5"
+
+  TEZOS_DEFAULT_BRANCH: "master"
+  TEZOS_DEFAULT_NAMESPACE: "tezos"
+
+# Basic, specialised, minimal, orthogonal templates
+
+# Some settings we want by default on all jobs
+.default_settings_template:
+  interruptible: true
+
+# Image templates
+.image_template__runtime_build_test_dependencies_template:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+
+.image_template__runtime_build_dependencies_template:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+
+.image_template__latest:
+  image: docker:latest
+
+# Rules template
+
+# Rules for all the jobs that need to be run on development branches (typically
+# those that have an MR, but also some experiments, etc.)
+.rules_template__development:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - when: on_success
+
+# Same as .rules_template__development, but for manual jobs.
+.rules_template__development_manual:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - when: manual
+
+# Rules for all the jobs that are run only for the master branch and the like
+# (tags, releases, etc.)
+.rules_template__master_and_releases:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - when: never
+
+# Rules for all the jobs that are run only for the master branch
+.rules_template__master:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - when: never
+
+# Rules for all the jobs that are run only on release tags
+.rules_template__release_tag:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - when: never
+
+# Rules for specific topics: doc, opam, etc.
+.rules_template__development_documentation:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /doc/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /doc/'
+      when: always
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
+      when: always
+    - changes:
+        - /docs
+      when: always
+    - when: never
+
+.rules_template__opam_child_pipeline_tests:
+  rules:
+    # Run on push to the default branch (i.e master).
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: always
+    # Run on scheduled builds.
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when the branch name contains the `opam` keyword.
+    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
+      when: always
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+      when: always
+    # Run when opam changes are detected.
+    - if: '$TZ_OPAM_FILES_MODIFIED == "true"'
+      when: always
+    - when: never
+
+.rules_template__development_coverage:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - when: manual
+      allow_failure: true
+
+.rules_template__development_arm64:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH =~ /arm64/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /arm64/'
+      when: always
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
+      when: always
+    - when: manual
+      allow_failure: true
+
+.rules_template__development_docker:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
+      when: on_success
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docker(?:$|[,])/'
+      when: on_success
+    - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_template__extended_test_pipeline:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    - when: never
+
+.rules_template__trigger_opam_child_pipeline:
+  rules:
+    # Run on push to the default branch (i.e master).
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: always
+    # Run on scheduled builds.
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when the branch name contains the `opam` keyword.
+    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
+      when: always
+    # Run when there is label on the merge request.
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
+      when: always
+    # Run on merge requests.
+    - if: '$CI_MERGE_REQUEST_PROJECT_ID'
+      when: always
+    - when: never # default

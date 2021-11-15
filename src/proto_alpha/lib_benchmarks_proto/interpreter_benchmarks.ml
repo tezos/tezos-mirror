@@ -88,13 +88,13 @@ module Default_config = struct
           string_size = {min = 1 lsl 10; max = 1 lsl 17};
           bytes_size = {min = 1 lsl 10; max = 1 lsl 17};
           stack_size = {min = 3; max = 3};
-          type_depth = {min = 3; max = 3};
+          type_size = {min = 1; max = 15};
           list_size = {min = 10; max = 1000};
           set_size = {min = 10; max = 1000};
           map_size = {min = 10; max = 1000};
         };
       sapling = {sapling_txs_file = {|/no/such/file|}; seed = None};
-      comb = {max_depth = 500};
+      comb = {max_depth = 1000};
     }
 
   let sapling_config_encoding =
@@ -122,8 +122,8 @@ module Default_config = struct
          (req "comb" comb_config_encoding))
 end
 
-let make_default_samplers ?(algo = `Default) cfg :
-    (module Michelson_samplers.S) =
+let make_default_samplers ?(algo = `Default) cfg : (module Michelson_samplers.S)
+    =
   let module Samplers = Michelson_samplers.Make (struct
     let size = 16
 
@@ -205,22 +205,24 @@ let make_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
     ?salt:string ->
+    ?more_tags:string list ->
     name:Interpreter_workload.instruction_name ->
-    kinstr_and_stack_sampler:(Default_config.config ->
-                             Random.State.t ->
-                             unit ->
-                             ex_stack_and_kinstr) ->
+    kinstr_and_stack_sampler:
+      (Default_config.config -> Random.State.t -> unit -> ex_stack_and_kinstr) ->
     unit ->
     Benchmark.t =
  fun ?amplification
      ?(intercept = false)
      ?salt
+     ?(more_tags = [])
      ~name
      ~kinstr_and_stack_sampler
      () ->
   let module B : Benchmark.S = struct
     include Default_config
     include Default_boilerplate
+
+    let tags = tags @ more_tags
 
     let models =
       (* [intercept = true] implies there's a benchmark with [intercept = false].
@@ -245,8 +247,7 @@ let make_benchmark :
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
       match Lwt_main.run (Execution_context.make ~rng_state) with
-      | Error _errs ->
-          assert false
+      | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
           let kinstr_and_stack_sampler =
             kinstr_and_stack_sampler config rng_state
@@ -261,11 +262,12 @@ let make_simple_benchmark :
     type bef_top bef res_top res.
     ?amplification:int ->
     ?intercept:bool ->
+    ?more_tags:string list ->
     name:Interpreter_workload.instruction_name ->
     kinstr:(bef_top, bef, res_top, res) Script_typed_ir.kinstr ->
     unit ->
     Benchmark.t =
- fun ?amplification ?intercept ~name ~kinstr () ->
+ fun ?amplification ?intercept ?more_tags ~name ~kinstr () ->
   let kinfo = Script_typed_ir.kinfo_of_kinstr kinstr in
   let stack_ty = kinfo.kstack_ty in
   let kinstr_and_stack_sampler config rng_state =
@@ -276,40 +278,61 @@ let make_simple_benchmark :
       Ex_stack_and_kinstr
         {stack = Samplers.Random_value.stack stack_ty rng_state; kinstr}
   in
-  make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+  make_benchmark
+    ?amplification
+    ?intercept
+    ?more_tags
+    ~name
+    ~kinstr_and_stack_sampler
+    ()
 
-let benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler () =
+let benchmark ?amplification ?intercept ?more_tags ~name
+    ~kinstr_and_stack_sampler () =
   let bench =
-    make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+    make_benchmark
+      ?amplification
+      ?intercept
+      ?more_tags
+      ~name
+      ~kinstr_and_stack_sampler
+      ()
   in
   Registration_helpers.register bench
 
-let benchmark_with_stack_sampler ?amplification ?intercept ~name ~kinstr
-    ~stack_sampler () =
+let benchmark_with_stack_sampler ?amplification ?intercept ?more_tags ~name
+    ~kinstr ~stack_sampler () =
   let kinstr_and_stack_sampler config rng_state =
     let stack_sampler = stack_sampler config rng_state in
     fun () -> Ex_stack_and_kinstr {stack = stack_sampler (); kinstr}
   in
   let bench =
-    make_benchmark ?amplification ?intercept ~name ~kinstr_and_stack_sampler ()
+    make_benchmark
+      ?amplification
+      ?intercept
+      ?more_tags
+      ~name
+      ~kinstr_and_stack_sampler
+      ()
   in
   Registration_helpers.register bench
 
-let benchmark_with_fixed_stack ?amplification ?intercept ~name ~stack ~kinstr
-    () =
+let benchmark_with_fixed_stack ?amplification ?intercept ?more_tags ~name ~stack
+    ~kinstr () =
   benchmark_with_stack_sampler
     ?amplification
     ?intercept
+    ?more_tags
     ~name
     ~kinstr
     ~stack_sampler:(fun _cfg _rng_state () -> stack)
     ()
 
-let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ~name
-    ~kinstr ~stack_sampler () =
+let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack
+    ?more_tags ~name ~kinstr ~stack_sampler () =
   benchmark_with_stack_sampler
     ?amplification
     ~intercept:false
+    ?more_tags
     ~name
     ~kinstr
     ~stack_sampler
@@ -319,15 +342,23 @@ let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ~name
       benchmark_with_fixed_stack
         ?amplification
         ~intercept:true
+        ?more_tags
         ~name
         ~stack
         ~kinstr
         ())
     intercept_stack
 
-let simple_benchmark ?amplification ?intercept_stack ~name ~kinstr () =
+let simple_benchmark ?amplification ?intercept_stack ?more_tags ~name ~kinstr ()
+    =
   let bench =
-    make_simple_benchmark ?amplification ~intercept:false ~name ~kinstr ()
+    make_simple_benchmark
+      ?amplification
+      ~intercept:false
+      ?more_tags
+      ~name
+      ~kinstr
+      ()
   in
   Registration_helpers.register bench ;
   Option.iter
@@ -335,6 +366,7 @@ let simple_benchmark ?amplification ?intercept_stack ~name ~kinstr () =
       benchmark_with_fixed_stack
         ?amplification
         ~intercept:true
+        ?more_tags
         ~name
         ~stack
         ~kinstr
@@ -415,17 +447,27 @@ let make_continuation_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
     ?salt:string ->
+    ?more_tags:string list ->
     name:Interpreter_workload.continuation_name ->
-    cont_and_stack_sampler:(Default_config.config ->
-                           Random.State.t ->
-                           unit ->
-                           ex_stack_and_continuation) ->
+    cont_and_stack_sampler:
+      (Default_config.config ->
+      Random.State.t ->
+      unit ->
+      ex_stack_and_continuation) ->
     unit ->
     Benchmark.t =
- fun ?amplification ?(intercept = false) ?salt ~name ~cont_and_stack_sampler () ->
+ fun ?amplification
+     ?(intercept = false)
+     ?salt
+     ?(more_tags = [])
+     ~name
+     ~cont_and_stack_sampler
+     () ->
   let module B : Benchmark.S = struct
     include Default_config
     include Default_boilerplate
+
+    let tags = tags @ more_tags
 
     let models =
       Interpreter_model.make_model
@@ -440,16 +482,11 @@ let make_continuation_benchmark :
 
     let benchmark cont_and_stack_sampler ctxt step_constants () =
       let stack_instr = cont_and_stack_sampler () in
-      benchmark_from_continuation
-        ?amplification
-        ctxt
-        step_constants
-        stack_instr
+      benchmark_from_continuation ?amplification ctxt step_constants stack_instr
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
       match Lwt_main.run (Execution_context.make ~rng_state) with
-      | Error _errs ->
-          assert false
+      | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
           let cont_and_stack_sampler =
             cont_and_stack_sampler config rng_state
@@ -460,13 +497,14 @@ let make_continuation_benchmark :
   end in
   (module B : Benchmark.S)
 
-let continuation_benchmark ?amplification ?intercept ?salt ~name
+let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ~name
     ~cont_and_stack_sampler () =
   let bench =
     make_continuation_benchmark
       ?amplification
       ?intercept
       ?salt
+      ?more_tags
       ~name
       ~cont_and_stack_sampler
       ()
@@ -493,8 +531,7 @@ let adversarial_ints rng_state (cfg : Default_config.config) n =
 (* Error helpers *)
 
 let raise_if_error = function
-  | Ok x ->
-      x
+  | Ok x -> x
   | Error e ->
       Format.eprintf "%a@." (Error_monad.TzTrace.pp_print Error_monad.pp) e ;
       Stdlib.failwith "raise_if_error"
@@ -628,8 +665,7 @@ module Registration_section = struct
       else
         let stack = make_stack (depth - 1) in
         match stack with
-        | Ex_stack (stack_ty, stack) ->
-            Ex_stack (unit @$ stack_ty, ((), stack))
+        | Ex_stack (stack_ty, stack) -> Ex_stack (unit @$ stack_ty, ((), stack))
 
     let parse_instr rng_state node stack =
       match stack with
@@ -638,22 +674,21 @@ module Registration_section = struct
             (Lwt_main.run
                ( Execution_context.make ~rng_state
                >>=? fun (ctxt, _step_constants) ->
-               Script_ir_translator.parse_instr
-                 Script_ir_translator.Lambda
-                 ctxt
-                 ~legacy:false
-                 node
-                 stack_ty
-               >|= Environment.wrap_tzresult
-               >>=? fun (judgement, _) ->
-               match judgement with
-               | Script_ir_translator.Typed descr ->
-                   let kinfo = {iloc = 0; kstack_ty = descr.bef} in
-                   let kinfo' = {iloc = 0; kstack_ty = descr.aft} in
-                   let kinstr = descr.instr.apply kinfo (IHalt kinfo') in
-                   return (Ex_stack_and_kinstr {stack; kinstr})
-               | Script_ir_translator.Failed _ ->
-                   assert false ))
+                 Script_ir_translator.parse_instr
+                   Script_ir_translator.Lambda
+                   ctxt
+                   ~legacy:false
+                   node
+                   stack_ty
+                 >|= Environment.wrap_tzresult
+                 >>=? fun (judgement, _) ->
+                 match judgement with
+                 | Script_ir_translator.Typed descr ->
+                     let kinfo = {iloc = 0; kstack_ty = descr.bef} in
+                     let kinfo' = {iloc = 0; kstack_ty = descr.aft} in
+                     let kinstr = descr.instr.apply kinfo (IHalt kinfo') in
+                     return (Ex_stack_and_kinstr {stack; kinstr})
+                 | Script_ir_translator.Failed _ -> assert false ))
 
     open Protocol.Michelson_v1_primitives
 
@@ -719,9 +754,7 @@ module Registration_section = struct
 
     let () =
       let nop = Micheline.Seq (0, []) in
-      let dip n =
-        Micheline.(Prim (0, I_DIP, [Int (0, Z.of_int n); nop], []))
-      in
+      let dip n = Micheline.(Prim (0, I_DIP, [Int (0, Z.of_int n); nop], [])) in
       benchmark
         ~name:Interpreter_workload.N_IDipN
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
@@ -767,9 +800,8 @@ module Registration_section = struct
       if depth = 0 then
         match acc with
         | Ex_stack (stack_ty, stack) -> (
-          match make_comb comb_width (Ex_value {value = (); ty = unit}) with
-          | Ex_value {value; ty} ->
-              Ex_stack (ty @$ stack_ty, (value, stack)) )
+            match make_comb comb_width (Ex_value {value = (); ty = unit}) with
+            | Ex_value {value; ty} -> Ex_stack (ty @$ stack_ty, (value, stack)))
       else
         match acc with
         | Ex_stack (stack_ty, stack) ->
@@ -809,9 +841,7 @@ module Registration_section = struct
         ()
 
     let () =
-      let comb_get n =
-        Micheline.(Prim (0, I_GET, [Int (0, Z.of_int n)], []))
-      in
+      let comb_get n = Micheline.(Prim (0, I_GET, [Int (0, Z.of_int n)], [])) in
       benchmark
         ~name:Interpreter_workload.N_IComb_get
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
@@ -905,8 +935,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICons_none
-        ~kinstr:
-          (ICons_none (kinfo_unit, unit, halt (option unit @$ unit @$ bot)))
+        ~kinstr:(ICons_none (kinfo_unit, halt (option unit @$ unit @$ bot)))
         ()
 
     let () =
@@ -918,6 +947,7 @@ module Registration_section = struct
                kinfo = kinfo (option unit @$ unit @$ bot);
                branch_if_none = halt_unit;
                branch_if_some = IDrop (kinfo_unitunit, halt_unit);
+               k = halt_unit;
              })
         ()
   end
@@ -944,6 +974,7 @@ module Registration_section = struct
                kinfo = kinfo (union unit unit @$ bot);
                branch_if_left = halt_unit;
                branch_if_right = halt_unit;
+               k = halt_unit;
              })
         ()
   end
@@ -953,8 +984,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_ICons_list
         ~kinstr:
-          (ICons_list
-             (kinfo (unit @$ list unit @$ bot), halt (list unit @$ bot)))
+          (ICons_list (kinfo (unit @$ list unit @$ bot), halt (list unit @$ bot)))
         ()
 
     let () =
@@ -975,6 +1005,7 @@ module Registration_section = struct
                    ( kinfo (unit @$ list unit @$ unit @$ bot),
                      IDrop (kinfo (list unit @$ unit @$ bot), halt_unit) );
                branch_if_nil = halt_unit;
+               k = halt_unit;
              })
         ()
 
@@ -991,7 +1022,7 @@ module Registration_section = struct
          *)
         benchmark_with_fixed_stack
           ~name:Interpreter_workload.N_IList_map
-          ~stack:(Script_ir_translator.list_empty, ((), eos))
+          ~stack:(Script_list.empty, ((), eos))
           ~kinstr:
             (IList_map
                ( kinfo (list unit @$ unit @$ bot),
@@ -1016,7 +1047,7 @@ module Registration_section = struct
       let kinfo1 = kinfo (list unit @$ unit @$ bot) in
       benchmark_with_fixed_stack
         ~name:Interpreter_workload.N_IList_iter
-        ~stack:(Script_ir_translator.list_empty, ((), eos))
+        ~stack:(Script_list.empty, ((), eos))
         ~kinstr:
           (IList_iter (kinfo1, IDrop (kinfo_unitunit, halt_unit), halt_unit))
         ()
@@ -1049,7 +1080,7 @@ module Registration_section = struct
        *)
       simple_benchmark
         ~name:Interpreter_workload.N_ISet_iter
-        ~intercept_stack:(Script_ir_translator.empty_set int_cmp, ((), eos))
+        ~intercept_stack:(Script_set.empty int_cmp, ((), eos))
         ~kinstr:set_iter_code
         ()
 
@@ -1061,8 +1092,7 @@ module Registration_section = struct
              ( kinfo (int @$ set int_cmp @$ unit @$ bot),
                halt (bool @$ unit @$ bot) ))
         ~intercept_stack:
-          ( Alpha_context.Script_int.zero,
-            (Script_ir_translator.empty_set int_cmp, ((), eos)) )
+          (Alpha_context.Script_int.zero, (Script_set.empty int_cmp, ((), eos)))
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 1) ;
           let n =
@@ -1073,8 +1103,8 @@ module Registration_section = struct
           let elts = adversarial_ints rng_state cfg n in
           let set =
             List.fold_left
-              (fun set elt -> Script_ir_translator.set_update elt true set)
-              (Script_ir_translator.empty_set int_cmp)
+              (fun set elt -> Script_set.update elt true set)
+              (Script_set.empty int_cmp)
               elts
           in
           let elt =
@@ -1093,7 +1123,7 @@ module Registration_section = struct
                halt (set int_cmp @$ bot) ))
         ~intercept_stack:
           ( Alpha_context.Script_int.zero,
-            (false, (Script_ir_translator.empty_set int_cmp, eos)) )
+            (false, (Script_set.empty int_cmp, eos)) )
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 2) ;
           let n =
@@ -1107,8 +1137,8 @@ module Registration_section = struct
           in
           let set =
             List.fold_left
-              (fun set elt -> Script_ir_translator.set_update elt true set)
-              (Script_ir_translator.empty_set int_cmp)
+              (fun set elt -> Script_set.update elt true set)
+              (Script_set.empty int_cmp)
               in_set
           in
           let stack =
@@ -1119,7 +1149,7 @@ module Registration_section = struct
             else
               (* remove an element in the set *)
               let elt = out_of_set in
-              let set = Script_ir_translator.set_update elt true set in
+              let set = Script_set.update elt true set in
               (elt, (flip, (set, eos)))
           in
           stack)
@@ -1140,13 +1170,16 @@ module Registration_section = struct
       let keys = adversarial_ints rng_state cfg n in
       let map =
         List.fold_left
-          (fun map i -> Script_ir_translator.map_update i (Some ()) map)
-          (Script_ir_translator.empty_map int_cmp)
+          (fun map i -> Script_map.update i (Some ()) map)
+          (Script_map.empty int_cmp)
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose_opt (fst M.boxed)
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       (key, map)
@@ -1156,10 +1189,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IEmpty_map
         ~kinstr:
           (IEmpty_map
-             ( kinfo_unit,
-               unit_cmp,
-               unit,
-               halt (map unit_cmp unit @$ unit @$ bot) ))
+             (kinfo_unit, unit_cmp, halt (map unit_cmp unit @$ unit @$ bot)))
         ()
 
     (*
@@ -1173,11 +1203,7 @@ module Registration_section = struct
     let map_map_code =
       IMap_map
         ( kinfo (map int_cmp unit @$ unit @$ bot),
-          IFailwith
-            ( kinfo (pair int unit @$ unit @$ bot),
-              0,
-              pair int unit,
-              halt_unitunit ),
+          IFailwith (kinfo (pair int unit @$ unit @$ bot), 0, pair int unit),
           halt (map int_cmp unit @$ unit @$ bot) )
 
     let () =
@@ -1190,7 +1216,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IMap_map
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (map, ((), eos)))
         ~kinstr:map_map_code
         ()
@@ -1211,7 +1237,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IMap_iter
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (map, ((), eos)))
         ~kinstr:kmap_iter_code
         ()
@@ -1229,7 +1255,7 @@ module Registration_section = struct
              ( kinfo (int @$ map int_cmp unit @$ unit @$ bot),
                halt (bool @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (Alpha_context.Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1249,7 +1275,7 @@ module Registration_section = struct
              ( kinfo (int @$ map int_cmp unit @$ unit @$ bot),
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (Alpha_context.Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1269,7 +1295,7 @@ module Registration_section = struct
              ( kinfo (int @$ option unit @$ map int_cmp unit @$ bot),
                halt (map int_cmp unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (Alpha_context.Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1290,7 +1316,7 @@ module Registration_section = struct
              ( kinfo (int @$ option unit @$ map int_cmp unit @$ bot),
                halt (option unit @$ map int_cmp unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_map int_cmp in
+          (let map = Script_map.empty int_cmp in
            (Alpha_context.Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1306,10 +1332,9 @@ module Registration_section = struct
        *)
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_size
-        ~kinstr:
-          (IMap_size (kinfo (map int_cmp unit @$ bot), halt (nat @$ bot)))
+        ~kinstr:(IMap_size (kinfo (map int_cmp unit @$ bot), halt (nat @$ bot)))
         ~stack_sampler:(fun _cfg _rng_state ->
-          let map = Script_ir_translator.empty_map int_cmp in
+          let map = Script_map.empty int_cmp in
           fun () -> (map, eos))
         ()
   end
@@ -1323,32 +1348,33 @@ module Registration_section = struct
       let keys = adversarial_ints rng_state cfg n in
       let map =
         List.fold_left
-          (fun map i -> Script_ir_translator.map_update i (Some (Some ())) map)
-          (Script_ir_translator.empty_map int_cmp)
+          (fun map i -> Script_map.update i (Some (Some ())) map)
+          (Script_map.empty int_cmp)
           keys
       in
       let (module M) = map in
-      let (key, _) =
-        M.OPS.choose_opt (fst M.boxed)
+      let key =
+        M.OPS.fold
+          (fun k _ -> function None -> Some k | x -> x)
+          (fst M.boxed)
+          None
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let big_map =
         raise_if_error
           (Lwt_main.run
-             ( Execution_context.make ~rng_state
-             >>=? fun (ctxt, _) ->
-             let big_map =
-               Script_ir_translator.empty_big_map int_cmp (Unit_t None)
-             in
-             Script_ir_translator.map_fold
-               (fun k v acc ->
-                 acc
-                 >>=? fun (bm, ctxt_acc) ->
-                 Script_ir_translator.big_map_update ctxt_acc k v bm)
-               map
-               (return (big_map, ctxt))
-             >|= Environment.wrap_tzresult
-             >>=? fun (big_map, _) -> return big_map ))
+             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+               let big_map =
+                 Script_ir_translator.empty_big_map int_cmp (unit_t ~annot:None)
+               in
+               Script_map.fold
+                 (fun k v acc ->
+                   acc >>=? fun (bm, ctxt_acc) ->
+                   Script_ir_translator.big_map_update ctxt_acc k v bm)
+                 map
+                 (return (big_map, ctxt))
+               >|= Environment.wrap_tzresult
+               >>=? fun (big_map, _) -> return big_map ))
       in
       (key, big_map)
 
@@ -1444,10 +1470,12 @@ module Registration_section = struct
   end
 
   module Strings = struct
+    open Alpha_context.Script_string
+
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IConcat_string
-        ~intercept_stack:(Script_ir_translator.list_empty, eos)
+        ~intercept_stack:(Script_list.empty, eos)
         ~kinstr:
           (IConcat_string (kinfo (list string @$ bot), halt (string @$ bot)))
         ()
@@ -1455,7 +1483,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IConcat_string_pair
-        ~intercept_stack:("", ("", eos))
+        ~intercept_stack:(empty, (empty, eos))
         ~kinstr:
           (IConcat_string_pair
              (kinfo (string @$ string @$ bot), halt (string @$ bot)))
@@ -1469,16 +1497,16 @@ module Registration_section = struct
              (kinfo (nat @$ nat @$ string @$ bot), halt (option string @$ bot)))
         ~intercept_stack:
           (let z = Alpha_context.Script_int.zero_n in
-           (z, (z, ("", eos))))
+           (z, (z, (empty, eos))))
         ~stack_sampler:(fun cfg rng_state ->
           let (module Samplers) = make_default_samplers cfg.sampler in
           fun () ->
             let string =
               Samplers.Random_value.value
-                Script_typed_ir.(String_t None)
+                Script_typed_ir.(string_t ~annot:None)
                 rng_state
             in
-            let len = nat_of_positive_int (String.length string) in
+            let len = nat_of_positive_int (length string) in
             (* worst case: offset = 0 *)
             (nat_of_positive_int 0, (len, (string, eos))))
         ()
@@ -1496,9 +1524,8 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IConcat_bytes
-        ~intercept_stack:(Script_ir_translator.list_empty, eos)
-        ~kinstr:
-          (IConcat_bytes (kinfo (list bytes @$ bot), halt (bytes @$ bot)))
+        ~intercept_stack:(Script_list.empty, eos)
+        ~kinstr:(IConcat_bytes (kinfo (list bytes @$ bot), halt (bytes @$ bot)))
         ()
 
     let () =
@@ -1524,7 +1551,7 @@ module Registration_section = struct
           fun () ->
             let bytes =
               Samplers.Random_value.value
-                Script_typed_ir.(Bytes_t None)
+                Script_typed_ir.(bytes_t ~annot:None)
                 rng_state
             in
             let len = nat_of_positive_int (Bytes.length bytes) in
@@ -1600,10 +1627,8 @@ module Registration_section = struct
             let a = Samplers.Random_value.value mutez rng_state in
             let b =
               match Alpha_context.Tez.(a /? 2L) with
-              | Error _ ->
-                  assert false
-              | Ok x ->
-                  x
+              | Error _ -> assert false
+              | Ok x -> x
             in
             (a, (b, eos)))
         ()
@@ -1614,18 +1639,15 @@ module Registration_section = struct
       let int64 = Int64.(div max_int (mul mutez_int64 2L)) in
       let nat =
         match Alpha_context.Script_int.(is_nat (of_int64 int64)) with
-        | None ->
-            assert false
-        | Some nat ->
-            nat
+        | None -> assert false
+        | Some nat -> nat
       in
       (mutez, nat)
 
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMul_teznat
-        ~kinstr:
-          (IMul_teznat (kinfo (mutez @$ nat @$ bot), halt (mutez @$ bot)))
+        ~kinstr:(IMul_teznat (kinfo (mutez @$ nat @$ bot), halt (mutez @$ bot)))
         ~stack_sampler:(fun cfg rng_state ->
           let samplers = make_default_samplers cfg.sampler in
           fun () ->
@@ -1636,8 +1658,7 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMul_nattez
-        ~kinstr:
-          (IMul_nattez (kinfo (nat @$ mutez @$ bot), halt (mutez @$ bot)))
+        ~kinstr:(IMul_nattez (kinfo (nat @$ mutez @$ bot), halt (mutez @$ bot)))
         ~stack_sampler:(fun cfg rng_state ->
           let samplers = make_default_samplers cfg.sampler in
           fun () ->
@@ -1925,6 +1946,7 @@ module Registration_section = struct
                kinfo = kinfo (bool @$ unit @$ bot);
                branch_if_true = halt_unit;
                branch_if_false = halt_unit;
+               k = halt_unit;
              })
         ()
 
@@ -1935,9 +1957,7 @@ module Registration_section = struct
         - IHalt (false on top of stack)
         - IConst false ; IHalt (true on top of stack)
        *)
-      let push_false =
-        IConst (kinfo_unit, false, halt (bool @$ unit @$ bot))
-      in
+      let push_false = IConst (kinfo_unit, false, halt (bool @$ unit @$ bot)) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop
         ~kinstr:(ILoop (kinfo (bool @$ unit @$ bot), push_false, halt_unit))
@@ -1952,8 +1972,7 @@ module Registration_section = struct
       let cons_r = ICons_right (kinfo_unit, halt (union unit unit @$ bot)) in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop_left
-        ~kinstr:
-          (ILoop_left (kinfo (union unit unit @$ bot), cons_r, halt_unit))
+        ~kinstr:(ILoop_left (kinfo (union unit unit @$ bot), cons_r, halt_unit))
         ()
 
     let () =
@@ -2040,7 +2059,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IFailwith
         ~amplification:100
-        ~kinstr:(IFailwith (kinfo_unit, 0, unit, halt_unit))
+        ~kinstr:(IFailwith (kinfo_unit, 0, unit))
         ()
   end
 
@@ -2051,13 +2070,13 @@ module Registration_section = struct
         ~kinstr_and_stack_sampler:(fun cfg rng_state ->
           let (module Samplers) = make_default_samplers cfg.sampler in
           fun () ->
-            let max_depth =
+            let size =
               Base_samplers.sample_in_interval
                 rng_state
-                ~range:cfg.sampler.type_depth
+                ~range:cfg.sampler.type_size
             in
             let (Script_ir_translator.Ex_comparable_ty cmp_ty) =
-              Samplers.Random_type.m_comparable_type ~max_depth rng_state
+              Samplers.Random_type.m_comparable_type ~size rng_state
             in
             let ty = Michelson_samplers.comparable_downcast cmp_ty in
             let value = Samplers.Random_value.comparable cmp_ty rng_state in
@@ -2110,8 +2129,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IAddress
-        ~kinstr:
-          (IAddress (kinfo (contract unit @$ bot), halt (address @$ bot)))
+        ~kinstr:(IAddress (kinfo (contract unit @$ bot), halt (address @$ bot)))
         ()
 
     let () =
@@ -2157,8 +2175,8 @@ module Registration_section = struct
                     ( kinfo (unit @$ bot),
                       ICons_pair
                         ( kinfo (list operation @$ unit @$ bot),
-                          IHalt (kinfo (pair (list operation) unit @$ bot)) )
-                    ) );
+                          IHalt (kinfo (pair (list operation) unit @$ bot)) ) )
+                );
           }
         in
         Lam (descr, Micheline.Int (0, Z.zero))
@@ -2172,9 +2190,25 @@ module Registration_section = struct
                storage_type = unit;
                arg_type = unit;
                lambda;
+               views = SMap.empty;
                root_name = None;
                k = halt (operation @$ address @$ bot);
              })
+        ()
+
+    let () =
+      let name =
+        match Protocol.Alpha_context.Script_string.of_string "view" with
+        | Ok s -> s
+        | Error _ -> assert false
+      in
+      simple_benchmark
+        ~name:Interpreter_workload.N_IView
+        ~kinstr:
+          (IView
+             ( kinfo (unit @$ address @$ bot),
+               View_signature {name; input_ty = unit; output_ty = unit},
+               halt (option unit @$ bot) ))
         ()
 
     let () =
@@ -2206,12 +2240,10 @@ module Registration_section = struct
     let check_signature (algo : Signature.algo) ~for_intercept =
       let name =
         match algo with
-        | Signature.Ed25519 ->
-            Interpreter_workload.N_ICheck_signature_ed25519
+        | Signature.Ed25519 -> Interpreter_workload.N_ICheck_signature_ed25519
         | Signature.Secp256k1 ->
             Interpreter_workload.N_ICheck_signature_secp256k1
-        | Signature.P256 ->
-            Interpreter_workload.N_ICheck_signature_p256
+        | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
       in
       benchmark_with_stack_sampler
         ~intercept:for_intercept
@@ -2230,7 +2262,7 @@ module Registration_section = struct
               if for_intercept then Environment.Bytes.empty
               else
                 Samplers.Random_value.value
-                  Script_typed_ir.(Bytes_t None)
+                  Script_typed_ir.(bytes_t ~annot:None)
                   rng_state
             in
             let signed_message = Signature.sign sk unsigned_message in
@@ -2257,9 +2289,7 @@ module Registration_section = struct
       benchmark
         ~name:Interpreter_workload.N_IPack
         ~kinstr_and_stack_sampler:(fun _cfg _rng_state ->
-          let kinstr =
-            IPack (kinfo (unit @$ bot), unit, halt (bytes @$ bot))
-          in
+          let kinstr = IPack (kinfo (unit @$ bot), unit, halt (bytes @$ bot)) in
           fun () -> Ex_stack_and_kinstr {stack = ((), eos); kinstr})
         ()
 
@@ -2270,11 +2300,10 @@ module Registration_section = struct
           let b =
             raise_if_error
               (Lwt_main.run
-                 ( Execution_context.make ~rng_state
-                 >>=? fun (ctxt, _) ->
-                 Script_ir_translator.pack_data ctxt unit ()
-                 >|= Environment.wrap_tzresult
-                 >>=? fun (bytes, _) -> return bytes ))
+                 ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+                   Script_ir_translator.pack_data ctxt unit ()
+                   >|= Environment.wrap_tzresult
+                   >>=? fun (bytes, _) -> return bytes ))
           in
           let kinstr =
             IUnpack (kinfo (bytes @$ bot), unit, halt (option unit @$ bot))
@@ -2356,8 +2385,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IChainId
-        ~kinstr:
-          (IChainId (kinfo (unit @$ bot), halt (chain_id @$ unit @$ bot)))
+        ~kinstr:(IChainId (kinfo (unit @$ bot), halt (chain_id @$ unit @$ bot)))
         ()
 
     let () =
@@ -2378,10 +2406,8 @@ module Registration_section = struct
     let () =
       let memo_size =
         match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
-        | Error _ ->
-            assert false
-        | Ok sz ->
-            sz
+        | Error _ -> assert false
+        | Ok sz -> sz
       in
       simple_benchmark
         ~name:Interpreter_workload.N_ISapling_empty_state
@@ -2396,10 +2422,8 @@ module Registration_section = struct
       (* Note that memo_size is hardcoded to 0 in module [Sapling_generation]. *)
       let memo_size =
         match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
-        | Error _ ->
-            assert false
-        | Ok sz ->
-            sz
+        | Error _ -> assert false
+        | Ok sz -> sz
       in
       let (info, name) =
         info_and_name ~intercept:false "ISapling_verify_update"
@@ -2434,21 +2458,21 @@ module Registration_section = struct
           in
           (* Prepare context. We _must_ reuse the same seed as the one used for
                the context when generating the transactions. This ensures that the
-               bootstrap account match and that the transactions can be replayed.  *)
+               bootstrap account match and that the transactions can be replayed. *)
           let result =
             Lwt_main.run
               ( Execution_context.make ~rng_state:sapling_forge_rng_state
               >>=? fun (ctxt, step_constants) ->
-              (* Prepare a sapling state able to replay the transition. *)
-              Sapling_generation.prepare_seeded_state sapling_transition ctxt
-              >>=? fun (_, _, _, _, ctxt, state_id) ->
-              Alpha_context.Sapling.(state_from_id ctxt (Id.parse_z state_id))
-              >|= Environment.wrap_tzresult
-              >>=? fun (state, ctxt) -> return (ctxt, state, step_constants) )
+                (* Prepare a sapling state able to replay the transition. *)
+                Sapling_generation.prepare_seeded_state sapling_transition ctxt
+                >>=? fun (_, _, _, _, ctxt, state_id) ->
+                Alpha_context.Sapling.(state_from_id ctxt (Id.parse_z state_id))
+                >|= Environment.wrap_tzresult
+                >>=? fun (state, ctxt) -> return (ctxt, state, step_constants)
+              )
           in
           match result with
-          | Ok r ->
-              r
+          | Ok r -> r
           | Error _ ->
               Format.eprintf
                 "Error in prepare_sapling_execution_environment, aborting@." ;
@@ -2712,7 +2736,11 @@ module Registration_section = struct
               Samplers.Random_value.value (ticket string_cmp) rng_state
             in
             let ticket =
-              {ticket with contents = ""; amount = Script_int_repr.zero_n}
+              {
+                ticket with
+                contents = Alpha_context.Script_string.empty;
+                amount = Script_int_repr.zero_n;
+              }
             in
             Ex_stack_and_kinstr
               {stack = ((ticket, ticket), eos); kinstr = join_tickets_instr})
@@ -2733,6 +2761,58 @@ module Registration_section = struct
             let ticket' = {ticket with amount = alt_amount} in
             Ex_stack_and_kinstr
               {stack = ((ticket, ticket'), eos); kinstr = join_tickets_instr})
+        ()
+  end
+
+  module Timelock = struct
+    let name = Interpreter_workload.N_IOpen_chest
+
+    let kinstr =
+      IOpen_chest
+        ( kinfo
+            (Michelson_types.chest_key @$ Michelson_types.chest @$ nat @$ bot),
+          halt (union bytes bool @$ bot) )
+
+    let resulting_stack chest chest_key time =
+      ( chest_key,
+        ( chest,
+          ( Script_int_repr.is_nat (Script_int_repr.of_int time)
+            |> WithExceptions.Option.get ~loc:"Timelock:gas benchmarks",
+            eos ) ) )
+
+    let () =
+      benchmark_with_stack_sampler
+        ~intercept:true
+        ~name
+        ~kinstr
+        ~stack_sampler:(fun _ rng_state () ->
+          let (chest, chest_key) =
+            Timelock.chest_sampler ~plaintext_size:1 ~time:0 ~rng_state
+          in
+          resulting_stack chest chest_key 0)
+        ()
+
+    let () =
+      benchmark_with_stack_sampler
+        ~name
+        ~kinstr
+        ~stack_sampler:(fun _ rng_state () ->
+          let log_time =
+            Base_samplers.sample_in_interval
+              ~range:{min = 0; max = 29}
+              rng_state
+          in
+          let time = Random.State.int rng_state (Int.shift_left 1 log_time) in
+          let plaintext_size =
+            Base_samplers.sample_in_interval
+              ~range:{min = 1; max = 10000}
+              rng_state
+          in
+
+          let (chest, chest_key) =
+            Timelock.chest_sampler ~plaintext_size ~time ~rng_state
+          in
+          resulting_stack chest chest_key time)
         ()
   end
 
@@ -2939,9 +3019,7 @@ module Registration_section = struct
 
     let map_enter_body_code =
       let kbody = ICdr (kinfo (pair int unit @$ unit @$ bot), halt_unitunit) in
-      fun accu ->
-        KMap_enter_body
-          (kbody, accu, Script_ir_translator.empty_map int_cmp, KNil)
+      fun accu -> KMap_enter_body (kbody, accu, Script_map.empty int_cmp, KNil)
 
     let () =
       (*

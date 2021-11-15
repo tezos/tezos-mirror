@@ -1,5 +1,11 @@
+
+; build static executable with --profile static
+(env
+ (static (flags (:standard -ccopt -static ))))
+
 (executables
  (names main_snoop)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-snoop)
  (package tezos-snoop)
  (libraries tezos-base
@@ -13,8 +19,7 @@
             str
             ocamlgraph
             pyml
-            pyml-plot
-            latex)
+            pyml-plot)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_benchmark

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Micheline
-    Invocation:   dune build @src/lib_benchmark/lib_micheline_rewriting/runtest_test_rewriting
+    Invocation:   dune build @src/lib_benchmark/lib_micheline_rewriting/runtest
     Subject:      Rewriting
 *)
 

@@ -64,11 +64,9 @@ type operation = {
   protocol_data : operation_data;
 }
 
-let compare_operations _ _ = 0
+let relative_position_within_block _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Fitness.t}
-
-let current_context {context; _} = return context
 
 let begin_application ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header) =
@@ -118,7 +116,7 @@ let () =
 
 let apply_operation _state _op = fail No_error
 
-let finalize_block state =
+let finalize_block state _ =
   let fitness = state.fitness in
   return
     ( {
@@ -133,6 +131,7 @@ let finalize_block state =
 let init context block_header =
   let open Block_header in
   let fitness = block_header.fitness in
+  Context.Cache.set_cache_layout context [] >>= fun context ->
   return
     {
       Updater.message = None;
@@ -141,5 +140,9 @@ let init context block_header =
       max_operations_ttl = 0;
       last_allowed_fork_level = 0l;
     }
+
+let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+    ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+  return (fun _ -> fail No_error)
 
 let rpc_services = RPC_directory.empty

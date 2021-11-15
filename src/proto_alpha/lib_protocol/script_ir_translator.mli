@@ -38,6 +38,14 @@ type ex_stack_ty =
 
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
+type toplevel = {
+  code_field : Script.node;
+  arg_type : Script.node;
+  storage_type : Script.node;
+  views : Script_typed_ir.view Script_typed_ir.SMap.t;
+  root_name : Script_typed_ir.field_annot option;
+}
+
 type ('arg, 'storage) code = {
   code :
     ( ('arg, 'storage) Script_typed_ir.pair,
@@ -47,10 +55,22 @@ type ('arg, 'storage) code = {
     Script_typed_ir.lambda;
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
+  views : Script_typed_ir.view Script_typed_ir.SMap.t;
   root_name : Script_typed_ir.field_annot option;
+  code_size : Cache_memory_helpers.sint;
+      (** This is an over-approximation of the value size in memory, in
+         bytes, of the contract's static part, that is its source
+         code. This includes the code of the contract as well as the code
+         of the views. The storage size is not taken into account by this
+         field as it has a dynamic size. *)
 }
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
+
+type 'storage ex_view =
+  | Ex_view :
+      ('input * 'storage, 'output) Script_typed_ir.lambda
+      -> 'storage ex_view
 
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
@@ -85,7 +105,62 @@ type ('a, 's) judgement =
     }
       -> ('a, 's) judgement
 
+val close_descr :
+  ('a, 'b, 'c, 'd) descr -> ('a, 'b, 'c, 'd) Script_typed_ir.kdescr
+
 type unparsing_mode = Optimized | Readable | Optimized_legacy
+
+type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
+
+module Gas_monad : sig
+  (** This monad combines:
+     - a state monad where the state is the context
+     - two levels of error monad to distinguish gas exhaustion from other errors
+
+     It is useful for backtracking on type checking errors without backtracking
+     the consumed gas.
+  *)
+  type 'a t
+
+  (** Alias of ['a t] to avoid confusion when the module is open *)
+  type 'a gas_monad = 'a t
+
+  (** monadic return operator of the gas monad *)
+  val return : 'a -> 'a t
+
+  (** Binding operator for the gas monad *)
+  val ( >>$ ) : 'a t -> ('a -> 'b t) -> 'b t
+
+  (** Mapping operator for the gas monad, [m >|$ f] is equivalent to
+     [m >>$ fun x -> return (f x)] *)
+  val ( >|$ ) : 'a t -> ('a -> 'b) -> 'b t
+
+  (** Variant of [( >>$ )] to bind uncarbonated functions *)
+  val ( >?$ ) : 'a t -> ('a -> 'b tzresult) -> 'b t
+
+  (** Another variant of [( >>$ )] that lets recover from inner errors *)
+  val ( >??$ ) : 'a t -> ('a tzresult -> 'b t) -> 'b t
+
+  (** gas-free embedding of tzresult values. [from_tzresult x] is equivalent to [return () >?$ fun () -> x] *)
+  val from_tzresult : 'a tzresult -> 'a t
+
+  (** Open the abstraction barrier to construct an 'a t from a function.
+     This must only be used on functions that can only fail because of gas
+     such as unparse_ty *)
+  val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
+
+  (** Gas consumption *)
+  val gas_consume : Gas.cost -> unit t
+
+  (** Escaping the gas monad *)
+  val run : context -> 'a t -> ('a tzresult * context) tzresult
+
+  (** re-export of [Error_monad.record_trace_eval] *)
+  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+
+  (** read the state of the state monad *)
+  val get_context : context t
+end
 
 type type_logger =
   int ->
@@ -93,47 +168,7 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
-(* ---- Lists, Sets and Maps ----------------------------------------------- *)
-
-val list_empty : 'a Script_typed_ir.boxed_list
-
-val list_cons :
-  'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
-
-val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
-
-val set_fold :
-  ('elt -> 'acc -> 'acc) -> 'elt Script_typed_ir.set -> 'acc -> 'acc
-
-val set_update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
-
-val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool
-
-val set_size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
-
-val empty_map : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
-
-val map_fold :
-  ('key -> 'value -> 'acc -> 'acc) ->
-  ('key, 'value) Script_typed_ir.map ->
-  'acc ->
-  'acc
-
-val map_update :
-  'a ->
-  'b option ->
-  ('a, 'b) Script_typed_ir.map ->
-  ('a, 'b) Script_typed_ir.map
-
-val map_mem : 'key -> ('key, 'value) Script_typed_ir.map -> bool
-
-val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
-
-val map_key_ty :
-  ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
-
-val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
-
+(** Create an empty big_map *)
 val empty_big_map :
   'a Script_typed_ir.comparable_ty ->
   'b Script_typed_ir.ty ->
@@ -151,6 +186,7 @@ val big_map_get :
   ('key, 'value) Script_typed_ir.big_map ->
   ('value option * context) tzresult Lwt.t
 
+(** Update a big map. See {!big_map_get_and_update} for details. *)
 val big_map_update :
   context ->
   'key ->
@@ -158,6 +194,10 @@ val big_map_update :
   ('key, 'value) Script_typed_ir.big_map ->
   (('key, 'value) Script_typed_ir.big_map * context) tzresult Lwt.t
 
+(** Update a big map, returning the old value of the given key and the new map.
+
+    This does {i not} modify the underlying storage, only the diff table.
+ *)
 val big_map_get_and_update :
   context ->
   'key ->
@@ -173,9 +213,14 @@ val ty_eq :
   'tb Script_typed_ir.ty ->
   (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
 
-val compare_address : Script_typed_ir.address -> Script_typed_ir.address -> int
-
-val compare_comparable : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> int
+val merge_types :
+  legacy:bool ->
+  merge_type_error_flag:merge_type_error_flag ->
+  Script.location ->
+  'a Script_typed_ir.ty ->
+  'b Script_typed_ir.ty ->
+  (('a Script_typed_ir.ty, 'b Script_typed_ir.ty) eq * 'a Script_typed_ir.ty)
+  Gas_monad.t
 
 val parse_comparable_data :
   ?type_logger:type_logger ->
@@ -231,6 +276,36 @@ val parse_parameter_ty :
 val parse_comparable_ty :
   context -> Script.node -> (ex_comparable_ty * context) tzresult
 
+val parse_view_input_ty :
+  context ->
+  stack_depth:int ->
+  legacy:bool ->
+  Script.node ->
+  (ex_ty * context) tzresult
+
+val parse_view_output_ty :
+  context ->
+  stack_depth:int ->
+  legacy:bool ->
+  Script.node ->
+  (ex_ty * context) tzresult
+
+val parse_view_returning :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  'storage Script_typed_ir.ty ->
+  Script_typed_ir.view ->
+  ('storage ex_view * context) tzresult Lwt.t
+
+val typecheck_views :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  'storage Script_typed_ir.ty ->
+  Script_typed_ir.view Script_typed_ir.SMap.t ->
+  context tzresult Lwt.t
+
 (**
   [parse_ty] allowing big_map values, operations, contract and tickets.
 *)
@@ -256,33 +331,8 @@ val unparse_ty :
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
 
-(**
-  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty]
-  or any negative value if that result would be negative.
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-val deduce_type_size : remaining:int -> 't Script_typed_ir.ty -> int
-
-(**
-  [check_comparable_type_size ~legacy ctxt ~loc ty] checks that the size of type [ty]
-  is not larger than the constant [maximum_type_size] from the context [ctxt].
-  If the check fails, an error [Type_too_large] is returned.
-  If [legacy] is [true], there is no check at all and [ok_unit] is returned directly.
-
-  It is guaranteed to not grow the stack by more than [maximum_type_size] non-tail calls.
-*)
-val check_comparable_type_size :
-  legacy:bool ->
-  context ->
-  loc:Script.location ->
-  't Script_typed_ir.comparable_ty ->
-  unit tzresult
-
 val parse_toplevel :
-  legacy:bool ->
-  Script.expr ->
-  (Script.node * Script.node * Script.node * Script_typed_ir.field_annot option)
-  tzresult
+  context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult
 
 val add_field_annot :
   Script_typed_ir.field_annot option ->
@@ -351,7 +401,7 @@ val find_entrypoint :
   string ->
   ((Script.node -> Script.node) * ex_ty) tzresult
 
-module Entrypoints_map : S.MAP with type key = string
+module Entrypoints_map : Map.S with type key = string
 
 val list_entrypoints :
   't Script_typed_ir.ty ->
@@ -380,6 +430,9 @@ type lazy_storage_ids
 
 val no_lazy_storage_id : lazy_storage_ids
 
+(** Traverse the given type, producing a {!lazy_storage_ids} for
+    use with {!extract_lazy_storage_diff}.
+ *)
 val collect_lazy_storage :
   context ->
   'a Script_typed_ir.ty ->
@@ -388,6 +441,21 @@ val collect_lazy_storage :
 
 val list_of_big_map_ids : lazy_storage_ids -> Big_map.Id.t list
 
+(** Produce a lazy storage diff, containing in-memory writes to
+    lazy data structures such as big_maps yet to be committed.
+
+    The resulting diff can be committed to the underlying storage
+    (context) using [Lazy_storage_diff.apply].
+
+ @param to_duplicate
+    Lazy data structure reference produced via {!collect_lazy_storage}
+    that can not be reused. Typically collected via traversing
+    the parameters to a smart contract.
+ @param to_update
+    Lazy data structure reference produced via {!collect_lazy_storage}
+    that can be reused. Typically collected via traversing the previous
+    storage of a smart contract.
+ *)
 val extract_lazy_storage_diff :
   context ->
   unparsing_mode ->
@@ -404,3 +472,8 @@ val get_single_sapling_state :
   'a Script_typed_ir.ty ->
   'a ->
   (Sapling.Id.t option * context) tzresult
+
+(** [script_size script] returns an overapproximation of the size of
+    the in-memory representation of [script] as well as the cost
+    associated to computing that overapproximation. *)
+val script_size : ex_script -> int * Gas_limit_repr.cost

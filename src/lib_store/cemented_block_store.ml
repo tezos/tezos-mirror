@@ -563,9 +563,7 @@ let trigger_full_gc cemented_store cemented_blocks_files offset =
               file
             |> file_path)
         in
-        Lwt.catch
-          (fun () -> Lwt_unix.unlink metadata_file_path)
-          (fun _exn -> Lwt.return_unit))
+        Unit.catch_s (fun () -> Lwt_unix.unlink metadata_file_path))
       files_to_remove
 
 let trigger_rolling_gc cemented_store cemented_blocks_files offset =
@@ -597,13 +595,9 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
               file
             |> file_path)
         in
-        Lwt.catch
-          (fun () -> Lwt_unix.unlink metadata_file_path)
-          (fun _exn -> Lwt.return_unit)
+        Unit.catch_s (fun () -> Lwt_unix.unlink metadata_file_path)
         >>= fun () ->
-        Lwt.catch
-          (fun () -> Lwt_unix.unlink (Naming.file_path file))
-          (fun _exn -> Lwt.return_unit))
+        Unit.catch_s (fun () -> Lwt_unix.unlink (Naming.file_path file)))
       files_to_remove
 
 let trigger_gc cemented_store =

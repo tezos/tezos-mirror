@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,6 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () =
+  (* The default allocation policy of Octez is "best-fit" which gives
+     the best compromise in terms of performances and memory
+     consumption. This default policy can be changed if the user set
+     an environment variable. *)
+  (* Any change to this constant should be replicated into the
+     external validator in [src/bin_validation/main_validator.ml]. *)
+  let default_allocation_policy = 2 in
+  let current = Gc.get () in
+  (match Sys.getenv_opt "OCAMLRUNPARAM" with
+  | None -> Gc.set {current with allocation_policy = default_allocation_policy}
+  | Some _ -> ()) ;
+  if (Gc.get ()).allocation_policy <> default_allocation_policy then
+    Format.eprintf
+      "WARNING: Default allocation policy changed: %d (default %d)@."
+      current.allocation_policy
+      default_allocation_policy
+
 (* This can be removed once the protocol is fixed
    (currently there is [to_int Int32.max_int] which is obviously invalid). *)
 let () =
@@ -42,27 +60,8 @@ let () =
       Stdlib.exit 1)
 
 let () =
-  if Filename.basename Sys.argv.(0) = "tezos-validator" then (
-    try
-      let is_valid_directory =
-        Array.length Sys.argv = 3
-        && Sys.argv.(1) = "--socket-dir"
-        && Sys.file_exists Sys.argv.(2)
-        && Sys.is_directory Sys.argv.(2)
-      in
-      if not is_valid_directory then
-        invalid_arg
-          "Invalid arguments provided for the validator: expected \
-           'tezos-validator --socket-dir <dir>'." ;
-      Stdlib.exit
-        (Lwt_main.run
-           (Lwt_exit.wrap_and_exit @@ Validator.main ~socket_dir:Sys.argv.(2) ()
-            >>= function
-            | Ok () -> Lwt_exit.exit_and_wait 0
-            | Error _ -> Lwt.return 1))
-    with exn ->
-      Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Stdlib.exit 1)
+  if Filename.basename Sys.argv.(0) = "tezos-validator" then
+    Tezos_validator.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in

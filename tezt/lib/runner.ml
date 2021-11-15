@@ -133,7 +133,7 @@ let wrap_with_ssh runner shell =
     @ (match runner.ssh_port with
       | None -> []
       | Some port -> ["-p"; string_of_int port])
-    @ match runner.ssh_id with None -> [] | Some id -> ["-h"; id]
+    @ match runner.ssh_id with None -> [] | Some id -> ["-i"; id]
   in
   ("ssh", ssh_args @ [cmd])
 

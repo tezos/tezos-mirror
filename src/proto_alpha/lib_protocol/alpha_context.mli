@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2019-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,25 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** An [Alpha_context.t] is an immutable snapshot of the ledger state at some block
+    height, preserving
+    {{:https://tezos.gitlab.io/developer/entering_alpha.html#the-big-abstraction-barrier-alpha-context}
+    type-safety and invariants} of the ledger state.
+
+    {2 Implementation}
+
+    [Alpha_context.t] is a wrapper over [Raw_context.t], which in turn is a
+    wrapper around [Context.t] from the Protocol Environment.
+
+    {2 Lifetime of an Alpha_context}
+
+    - Creation, using [prepare] or [prepare_first_block]
+
+    - Modification, using the operations defined in this signature
+
+    - Finalization, using [finalize]
+ *)
 
 module type BASIC_DATA = sig
   type t
@@ -169,93 +188,150 @@ module Cycle : sig
 
   val to_int32 : cycle -> int32
 
-  module Map : S.MAP with type key = cycle
+  module Map : Map.S with type key = cycle
 end
 
 module Gas : sig
+  (** This module implements the gas subsystem of the context.
+
+     Gas reflects the computational cost of each operation to limit
+     the cost of operations and, by extension, the cost of blocks.
+
+     There are two gas quotas: one for operation and one for
+     block. For this reason, we maintain two gas levels -- one for
+     operations and another one for blocks -- that correspond to the
+     remaining amounts of gas, initialized with the quota
+     limits and decreased each time gas is consumed.
+
+  *)
+
   module Arith :
     Fixed_point_repr.Safe
       with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
+  [@@coq_plain_module]
 
+  (** For maintenance operations or for testing, gas can be
+     [Unaccounted]. Otherwise, the computation is [Limited] by the
+     [remaining] gas in the context. *)
   type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
   val encoding : t Data_encoding.encoding
 
   val pp : Format.formatter -> t -> unit
 
+  (** [check_limit_is_valid ctxt limit] checks that the given gas
+     [limit] is well-formed, i.e., it does not exceed the hard gas
+     limit per operation as defined in [ctxt] and it is positive. *)
+  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
+
+  (** [set_limit ctxt limit] returns a context with a given
+     [limit] level of gas allocated for an operation. *)
+  val set_limit : context -> 'a Arith.t -> context
+
+  (** [set_unlimited] allows unlimited gas consumption. *)
+  val set_unlimited : context -> context
+
+  (** [remaining_operation_gas ctxt] returns the current gas level in
+     the context [ctxt] for the current operation. If gas is
+     [Unaccounted], an arbitrary value will be returned. *)
+  val remaining_operation_gas : context -> Arith.fp
+
+  (** [level ctxt] is the current gas level in [ctxt] for the current
+     operation. *)
+  val level : context -> t
+
+  (** [update_remaining_operation_gas ctxt remaining] sets the current
+     gas level for operations to [remaining]. *)
+  val update_remaining_operation_gas : context -> Arith.fp -> context
+
+  (** [gas_exhausted_error ctxt] raises an error indicating the gas
+      has been exhausted. *)
+  val gas_exhausted_error : context -> 'a tzresult
+
+  (** [consumed since until] is the operation gas level difference
+     between context [since] and context [until]. This function
+     returns [Arith.zero] if any of the two contexts allows for an
+     unlimited gas consumption. This function also returns
+     [Arith.zero] if [since] has less gas than [until]. *)
+  val consumed : since:context -> until:context -> Arith.fp
+
+  (** [block_level ctxt] returns the block gas level in context [ctxt]. *)
+  val block_level : context -> Arith.fp
+
+  (** Costs are computed using a saturating arithmetic. See
+     {!Saturation_repr}. *)
   type cost = Saturation_repr.may_saturate Saturation_repr.t
 
   val cost_encoding : cost Data_encoding.encoding
 
   val pp_cost : Format.formatter -> cost -> unit
 
-  type error += Block_quota_exceeded (* `Temporary *)
+  (** [consume ctxt cost] subtracts [cost] to the current operation
+     gas level in [ctxt]. This operation may fail with
+     [Operation_quota_exceeded] if the operation gas level would
+     go below zero. *)
+  val consume : context -> cost -> context tzresult
 
   type error += Operation_quota_exceeded (* `Temporary *)
 
-  type error += Gas_limit_too_high (* `Permanent *)
-
-  val free : cost
-
-  val atomic_step_cost : 'a Saturation_repr.t -> cost
-
-  val step_cost : 'a Saturation_repr.t -> cost
-
-  val alloc_cost : 'a Saturation_repr.t -> cost
-
-  val alloc_bytes_cost : int -> cost
-
-  val alloc_mbytes_cost : int -> cost
-
-  val read_bytes_cost : int -> cost
-
-  val write_bytes_cost : int -> cost
-
-  val ( *@ ) : 'a Saturation_repr.t -> cost -> cost
-
-  val ( +@ ) : cost -> cost -> cost
-
-  (** Checks that the given gas limit does not exceed the hard gas limit
-      per operation *)
-  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
-
-  (** Consumes gas equal to the given operation gas limit in the current
-      block gas level of the context. May fail if not enough gas remains
-      in the block *)
+  (** [consume_limit_in_block ctxt limit] consumes [limit] in
+     the current block gas level of the context. This operation may
+     fail with error [Block_quota_exceeded] if not enough gas remains
+     in the block. This operation may also fail with
+     [Gas_limit_too_high] if [limit] is greater than the allowed
+     limit for operation gas level. *)
   val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
 
-  (** Sets a limit to the consumable operation gas *)
-  val set_limit : context -> 'a Arith.t -> context
+  type error += Block_quota_exceeded (* `Temporary *)
 
-  (** Allows unlimited gas consumption *)
-  val set_unlimited : context -> context
+  type error += Gas_limit_too_high (* `Permanent *)
 
-  (** Consumes operation gas. May fail if not enough gas remains for the
-      operation *)
-  val consume : context -> cost -> context tzresult
+  (** The cost of free operation is [0]. *)
+  val free : cost
 
-  (** Returns the current gas counter. *)
-  val remaining_operation_gas : context -> Arith.fp
+  (** [atomic_step_cost x] corresponds to [x] milliunit of gas. *)
+  val atomic_step_cost : _ Saturation_repr.t -> cost
 
-  (** Update gas counter in the context. *)
-  val update_remaining_operation_gas : context -> Arith.fp -> context
+  (** [step_cost x] corresponds to [x] units of gas. *)
+  val step_cost : _ Saturation_repr.t -> cost
 
-  (** Triggers an error in case of gas exhaustion. *)
-  val gas_exhausted_error : context -> 'a tzresult
+  (** Cost of allocating qwords of storage.
+    [alloc_cost n] estimates the cost of allocating [n] qwords of storage. *)
+  val alloc_cost : _ Saturation_repr.t -> cost
 
-  (** Returns operation gas level *)
-  val level : context -> t
+  (** Cost of allocating bytes in the storage.
+    [alloc_bytes_cost b] estimates the cost of allocating [b] bytes of
+    storage. *)
+  val alloc_bytes_cost : int -> cost
 
-  (** Returns the operation gas level difference between two contexts.
-      Returns [Arith.zero] if any of the contexts are set to unlimited
-      gas *)
-  val consumed : since:context -> until:context -> Arith.fp
+  (** Cost of allocating bytes in the storage.
 
-  (** Returns block gas level *)
-  val block_level : context -> Arith.fp
+      [alloc_mbytes_cost b] estimates the cost of allocating [b] bytes of
+      storage and the cost of an header to describe these bytes. *)
+  val alloc_mbytes_cost : int -> cost
 
+  (** Cost of reading the storage.
+    [read_bytes_cost n] estimates the cost of reading [n] bytes of storage. *)
+  val read_bytes_cost : int -> cost
+
+  (** Cost of writing to storage.
+    [write_bytes_const n] estimates the cost of writing [n] bytes to the
+    storage. *)
+  val write_bytes_cost : int -> cost
+
+  (** Multiply a cost by a factor. Both arguments are saturated arithmetic values,
+    so no negative numbers are involved. *)
+  val ( *@ ) : _ Saturation_repr.t -> cost -> cost
+
+  (** Add two costs together. *)
+  val ( +@ ) : cost -> cost -> cost
+
+  (** [cost_of_repr] is an internal operation needed to inject costs
+     for Storage_costs into Gas.cost. *)
   val cost_of_repr : Gas_limit_repr.cost -> cost
 end
+
+module Script_string : module type of Script_string_repr
 
 module Script_int : module type of Script_int_repr
 
@@ -292,6 +368,7 @@ module Script : sig
     | K_parameter
     | K_storage
     | K_code
+    | K_view
     | D_False
     | D_Elt
     | D_Left
@@ -324,6 +401,7 @@ module Script : sig
     | I_DIP
     | I_DROP
     | I_DUP
+    | I_VIEW
     | I_EDIV
     | I_EMPTY_BIG_MAP
     | I_EMPTY_MAP
@@ -400,6 +478,7 @@ module Script : sig
     | I_READ_TICKET
     | I_SPLIT_TICKET
     | I_JOIN_TICKETS
+    | I_OPEN_CHEST
     | T_bool
     | T_contract
     | T_int
@@ -430,6 +509,9 @@ module Script : sig
     | T_bls12_381_g2
     | T_bls12_381_fr
     | T_ticket
+    | T_chest_key
+    | T_chest
+    | H_constant
 
   type location = Micheline.canonical_location
 
@@ -482,6 +564,9 @@ module Constants : sig
     max_anon_ops_per_block : int;
     max_operation_data_length : int;
     max_proposals_per_delegate : int;
+    max_micheline_node_count : int;
+    max_micheline_bytes_limit : int;
+    max_allowed_global_constant_depth : int;
   }
 
   val fixed_encoding : fixed Data_encoding.t
@@ -498,6 +583,8 @@ module Constants : sig
 
   val max_proposals_per_delegate : int
 
+  val michelson_maximum_type_size : int
+
   (** Constants parameterized by context *)
   type parametric = {
     preserved_cycles : int;
@@ -512,7 +599,6 @@ module Constants : sig
     hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez.t;
-    michelson_maximum_type_size : int;
     seed_nonce_revelation_tip : Tez.t;
     origination_size : int;
     block_security_deposit : Tez.t;
@@ -559,8 +645,6 @@ module Constants : sig
 
   val tokens_per_roll : context -> Tez.t
 
-  val michelson_maximum_type_size : context -> int
-
   val baking_reward_per_endorsement : context -> Tez.t list
 
   val endorsement_reward : context -> Tez.t list
@@ -591,6 +675,305 @@ module Constants : sig
   val encoding : t Data_encoding.t
 end
 
+module Global_constants_storage : sig
+  type error += Expression_too_deep
+
+  type error += Expression_already_registered
+
+  (** A constant is the prim of the literal characters "constant".
+    A constant must have a single argument, being a string with a
+    well formed hash of a Micheline expression (i.e generated by
+    [Script_expr_hash.to_b58check]). *)
+  type error += Badly_formed_constant_expression
+
+  type error += Nonexistent_global
+
+  (** [get context hash] retrieves the Micheline value with the given hash.
+
+    Fails with [Nonexistent_global] if no value is found at the given hash.
+
+    Fails with [Storage_error Corrupted_data] if the deserialisation fails.
+
+    Consumes [Gas_repr.read_bytes_cost <size of the value>]. *)
+  val get : t -> Script_expr_hash.t -> (t * Script.expr) tzresult Lwt.t
+
+  (** [register context value] Register a constant in the global table of constants,
+    returning the hash and storage bytes consumed.
+
+    Does not type-check the Micheline code being registered, allow potentially
+    ill-typed Michelson values (see note at top of module in global_constants_storage.mli).
+
+    The constant is stored unexpanded, but it is temporarily expanded at registration
+    time only to check the expanded version respects the following limits.
+
+    Fails with [Expression_too_deep] if, after fully, expanding all constants,
+    the expression would contain too many nested levels, that is more than
+    [Constants_repr.max_allowed_global_constant_depth].
+
+    Fails with [Badly_formed_constant_expression] if constants are not
+    well-formed (see declaration of [Badly_formed_constant_expression]) or with
+    [Nonexistent_global] if a referenced constant does not exist in the table.
+
+    Consumes serialization cost.
+    Consumes [Gas_repr.write_bytes_cost <size>] where size is the number
+    of bytes in the binary serialization provided by [Script.expr_encoding].*)
+  val register :
+    t -> Script.expr -> (t * Script_expr_hash.t * Z.t) tzresult Lwt.t
+
+  (** [expand context expr] Replaces every constant in the
+    given Michelson expression with its value stored in the global table.
+
+    The expansion is applied recursively so that the returned expression
+    contains no constant.
+
+    Fails with [Badly_formed_constant_expression] if constants are not
+    well-formed (see declaration of [Badly_formed_constant_expression]) or
+    with [Nonexistent_global] if a referenced constant does not exist in
+    the table. *)
+  val expand : t -> Script.expr -> (t * Script.expr) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    (** [node_too_large node] returns true if:
+      - The number of sub-nodes in the [node]
+        exceeds [Global_constants_storage.node_size_limit].
+      - The sum of the bytes in String, Int,
+        and Bytes sub-nodes of [node] exceeds
+        [Global_constants_storage.bytes_size_limit].
+
+      Otherwise returns false.  *)
+    val node_too_large : Script.node -> bool
+
+    (** [bottom_up_fold_cps initial_accumulator node initial_k f]
+        folds [node] and all its sub-nodes if any, starting from
+        [initial_accumulator], using an initial continuation [initial_k].
+        At each node, [f] is called to transform the continuation [k] into
+        the next one. This explicit manipulation of the continuation
+        is typically useful to short-circuit.
+
+        Notice that a common source of bug is to forget to properly call the
+        continuation in `f`. *)
+    val bottom_up_fold_cps :
+      'accumulator ->
+      Script.node ->
+      ('accumulator -> Script.node -> 'return) ->
+      ('accumulator ->
+      Script_repr.node ->
+      ('accumulator -> Script.node -> 'return) ->
+      'return) ->
+      'return
+
+    (** [expr_to_address_in_context context expr] converts [expr]
+       into a unique hash represented by a [Script_expr_hash.t].
+
+       Consumes gas corresponding to the cost of converting [expr]
+       to bytes and hashing the bytes. *)
+    val expr_to_address_in_context :
+      t -> Script.expr -> (t * Script_expr_hash.t) tzresult
+  end
+end
+
+module Cache : sig
+  (**
+
+     Frequently used data should be kept in memory and persist along a
+     chain of blocks. The caching mechanism allows the economic protocol
+     to declare such data and to rely on a Least Recently Used strategy
+     to keep the cache size under a fixed limit.
+
+     Take a look at {!Environment_cache} and {!Environment_context}
+     for additional implementation details about the protocol cache.
+
+     The protocol has two main kinds of interaction with the cache:
+
+     1. It is responsible for setting up the cache with appropriate
+        parameter values and callbacks. It must also compute cache nonces
+        to give the shell enough information to properly synchronize the
+        in-memory cache with the block contexts and protocol upgrades.
+        A typical place where this happens is {!Apply}.
+        This aspect must be implemented using {!Cache.Admin}.
+
+     2. It can exploit the cache to retrieve, to insert, and to update
+        cached values from the in-memory cache. The basic idea is to
+        avoid recomputing values from scratch at each block when they are
+        frequently used. {!Script_cache} is an example of such usage.
+        This aspect must be implemented using {!Cache.Interface}.
+
+  *)
+
+  (** Size for subcaches and values of the cache. *)
+  type size = int
+
+  (** Index type to index caches. *)
+  type index = int
+
+  (**
+
+     The following module acts on the whole cache, not on a specific
+     sub-cache, unlike {!Interface}. It is used to administrate the
+     protocol cache, e.g., to maintain the cache in a consistent state
+     with respect to the chain. This module is typically used by
+     low-level layers of the protocol and by the shell.
+
+  *)
+  module Admin : sig
+    (** A key uniquely identifies a cached [value] in some subcache. *)
+    type key
+
+    (** Cached values. *)
+    type value
+
+    (** [pp fmt ctxt] is a pretty printter for the [cache] of [ctxt]. *)
+    val pp : Format.formatter -> context -> unit
+
+    (** [set_cache_layout ctxt layout] sets the caches of [ctxt] to
+     comply with given [layout]. If there was already a cache in
+     [ctxt], it is erased by the new layout.
+
+     In that case, a fresh collection of empty caches is reconstructed
+     from the new [layout]. Notice that cache [key]s are invalidated
+     in that case, i.e., [find t k] will return [None]. *)
+    val set_cache_layout : context -> size list -> context Lwt.t
+
+    (** [sync ctxt ~cache_nonce] updates the context with the domain of
+     the cache computed so far. Such function is expected to be called
+     at the end of the validation of a block, when there is no more
+     accesses to the cache.
+
+     [cache_nonce] identifies the block that introduced new cache
+     entries. The nonce should identify uniquely the block which
+     modifies this value. It cannot be the block hash for circularity
+     reasons: The value of the nonce is stored onto the context and
+     consequently influences the context hash of the very same
+     block. Such nonce cannot be determined by the shell and its
+     computation is delegated to the economic protocol. *)
+    val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
+
+    (** [clear ctxt] removes all cache entries. *)
+    val clear : context -> context
+
+    (** {3 Cache helpers for RPCs} *)
+
+    (** [future_cache_expectation ctxt ~time_in_blocks] returns [ctxt] except
+      that the entries of the caches that are presumably too old to
+      still be in the caches in [n_blocks] are removed.
+
+      This function is based on a heuristic. The context maintains
+      the median of the number of removed entries: this number is
+      multipled by `n_blocks` to determine the entries that are
+      likely to be removed in `n_blocks`. *)
+    val future_cache_expectation : context -> time_in_blocks:int -> context
+
+    (** [cache_size ctxt ~cache_index] returns an overapproximation of
+       the size of the cache. Returns [None] if [cache_index] is
+       greater than the number of subcaches declared by the cache
+       layout. *)
+    val cache_size : context -> cache_index:int -> size option
+
+    (** [cache_size_limit ctxt ~cache_index] returns the maximal size of
+       the cache indexed by [cache_index]. Returns [None] if
+       [cache_index] is greater than the number of subcaches declared
+       by the cache layout. *)
+    val cache_size_limit : context -> cache_index:int -> size option
+
+    (** [value_of_key ctxt k] interprets the functions introduced by
+     [register] to construct a cacheable value for a key [k]. *)
+    val value_of_key :
+      context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+  end
+
+  (** A client uses a unique namespace (represented as a string
+     without '@') to avoid collision with the keys of other
+     clients. *)
+  type namespace = string
+
+  (** A key is fully determined by a namespace and an identifier. *)
+  type identifier = string
+
+  (**
+
+     To use the cache, a client must implement the [CLIENT]
+     interface.
+
+  *)
+  module type CLIENT = sig
+    (** The type of value to be stored in the cache. *)
+    type cached_value
+
+    (** The client must declare the index of the subcache where its
+       values shall live. [cache_index] must be between [0] and
+       [List.length Constants_repr.cache_layout - 1]. *)
+    val cache_index : index
+
+    (** The client must declare a namespace. This namespace must
+        be unique. Otherwise, the program stops.
+        A namespace cannot contain '@'. *)
+    val namespace : namespace
+
+    (** [value_of_identifier id] builds the cached value identified by
+       [id]. This function is called when the subcache is loaded into
+       memory from the on-disk representation of its domain.
+
+       An error during the execution of this function is fatal as
+       witnessed by its type: an error embedded in a [tzresult] is not
+       supposed to be catched by the protocol. *)
+    val value_of_identifier :
+      context -> identifier -> cached_value tzresult Lwt.t
+  end
+
+  (**
+
+     An [INTERFACE] to the subcache where keys live in a given [namespace].
+
+  *)
+  module type INTERFACE = sig
+    (** The type of value to be stored in the cache. *)
+    type cached_value
+
+    (** [update ctxt i (Some (e, size))] returns a context where the
+       value [e] of given [size] is associated to identifier [i] in
+       the subcache. If [i] is already in the subcache, the cache
+       entry is updated.
+
+        [update ctxt i None] removes [i] from the subcache. *)
+    val update :
+      context -> identifier -> (cached_value * size) option -> context tzresult
+
+    (** [find ctxt i = Some v] if [v] is the value associated to [i]
+       in the subcache. Returns [None] if there is no such value in
+       the subcache. This function is in the Lwt monad because if the
+       value may have not been constructed (see the lazy loading
+       mode in {!Environment_context}), it is constructed on the fly. *)
+    val find : context -> identifier -> cached_value option tzresult Lwt.t
+
+    (** [list_identifiers ctxt] returns the list of the
+       identifiers of the cached values along with their respective
+       size. The returned list is sorted in terms of their age in the
+       cache, the oldest coming first. *)
+    val list_identifiers : context -> (string * int) list
+
+    (** [identifier_rank ctxt identifier] returns the number of cached value
+       older than the one of [identifier]; or, [None] if the [identifier] has
+       no associated value in the subcache. *)
+    val identifier_rank : context -> string -> int option
+
+    (** [size ctxt] returns an overapproximation of the subcache size
+        (in bytes). *)
+    val size : context -> int
+
+    (** [size_limit ctxt] returns the maximal size of the subcache
+        (in bytes). *)
+    val size_limit : context -> int
+  end
+
+  (** [register_exn client] produces an [Interface] specific to a
+     given [client]. This function can fail if [client] does not
+     respect the invariant declared in the documentation of
+     {!CLIENT}. *)
+  val register_exn :
+    (module CLIENT with type cached_value = 'a) ->
+    (module INTERFACE with type cached_value = 'a)
+end
+
 module Level : sig
   type t = private {
     level : Raw_level.t;
@@ -612,7 +995,11 @@ module Level : sig
 
   val pred : context -> level -> level option
 
-  val from_raw : context -> ?offset:int32 -> Raw_level.t -> level
+  val from_raw : context -> Raw_level.t -> level
+
+  (** Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative. *)
+  val from_raw_with_offset :
+    context -> offset:int32 -> Raw_level.t -> level tzresult
 
   val diff : level -> level -> int32
 
@@ -825,6 +1212,10 @@ module Sapling : sig
   type alloc = {memo_size : Memo_size.t}
 
   type updates = diff
+
+  val transaction_in_memory_size : transaction -> Cache_memory_helpers.sint
+
+  val diff_in_memory_size : diff -> Cache_memory_helpers.sint
 end
 
 module Lazy_storage : sig
@@ -866,6 +1257,8 @@ module Lazy_storage : sig
 
   val encoding : diffs Data_encoding.t
 
+  val diffs_in_memory_size : diffs -> Cache_memory_helpers.nodes_and_size
+
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
 
   val cleanup_temporaries : context -> context Lwt.t
@@ -877,6 +1270,8 @@ module Contract : sig
   include BASIC_DATA
 
   type contract = t
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
 
   val rpc_arg : contract RPC_arg.arg
 
@@ -1018,6 +1413,8 @@ module Delegate : sig
     context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val list : context -> public_key_hash list Lwt.t
+
+  val check_delegate : context -> public_key_hash -> unit tzresult Lwt.t
 
   val freeze_deposit :
     context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
@@ -1254,11 +1651,14 @@ module Kind : sig
 
   type failing_noop = Failing_noop_kind
 
+  type register_global_constant = Register_global_constant_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Register_global_constant_manager_kind : register_global_constant manager
 end
 
 type 'kind operation = {
@@ -1348,6 +1748,10 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  | Register_global_constant : {
+      value : Script.lazy_expr;
+    }
+      -> Kind.register_global_constant manager_operation
 
 and counter = Z.t
 
@@ -1381,11 +1785,15 @@ val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 module Fees : sig
   val origination_burn : context -> (context * Tez.t) tzresult
 
+  val cost_of_bytes : context -> Z.t -> Tez.t tzresult
+
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
   val record_paid_storage_space_subsidy :
     context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
+  val record_global_constant_storage_space : context -> Z.t -> context * Z.t
 
   val start_counting_storage_fees : context -> context
 
@@ -1450,6 +1858,9 @@ module Operation : sig
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
+  val packed_internal_operation_in_memory_size :
+    packed_internal_operation -> Cache_memory_helpers.nodes_and_size
+
   val pack : 'kind operation -> packed_operation
 
   type ('a, 'b) eq = Eq : ('a, 'a) eq
@@ -1494,6 +1905,9 @@ module Operation : sig
 
     val delegation_case : Kind.delegation Kind.manager case
 
+    val register_global_constant_case :
+      Kind.register_global_constant Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -1513,10 +1927,12 @@ module Operation : sig
       val origination_case : Kind.origination case
 
       val delegation_case : Kind.delegation case
+
+      val register_global_constant_case : Kind.register_global_constant case
     end
   end
 
-  val of_list : packed_contents list -> packed_contents_list
+  val of_list : packed_contents list -> packed_contents_list tzresult
 
   val to_list : packed_contents_list -> packed_contents list
 end
@@ -1581,6 +1997,7 @@ module Migration : sig
   }
 end
 
+(** Create an [Alpha_context.t] from an untyped context (first block in the chain only). *)
 val prepare_first_block :
   Context.t ->
   typecheck:
@@ -1592,6 +2009,7 @@ val prepare_first_block :
   fitness:Fitness.t ->
   context tzresult Lwt.t
 
+(** Create an [Alpha_context.t] from an untyped context. *)
 val prepare :
   Context.t ->
   level:Int32.t ->
@@ -1602,6 +2020,8 @@ val prepare :
   tzresult
   Lwt.t
 
+(** Finalize an {{!t} [Alpha_context.t]}, producing a [validation_result].
+ *)
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
 val activate : context -> Protocol_hash.t -> context Lwt.t
@@ -1631,14 +2051,9 @@ val add_fees : context -> Tez.t -> context tzresult
 
 val add_rewards : context -> Tez.t -> context tzresult
 
-val add_deposit :
-  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult
-
 val get_fees : context -> Tez.t
 
 val get_rewards : context -> Tez.t
-
-val get_deposits : context -> Tez.t Signature.Public_key_hash.Map.t
 
 val description : context Storage_description.t
 

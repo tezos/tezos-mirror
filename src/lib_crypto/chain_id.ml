@@ -44,7 +44,7 @@ let of_string_opt s = if String.length s <> size then None else Some s
 let of_string s =
   match of_string_opt s with
   | None ->
-      generic_error
+      error_with
         "%s.of_string: wrong string size (%d instead of %d)"
         name
         (String.length s)
@@ -91,7 +91,7 @@ let of_bytes_exn b =
 let of_bytes s =
   match of_bytes_opt s with
   | Some x -> Ok x
-  | None -> generic_error "Failed to deserialize a hash (%s)" name
+  | None -> error_with "Failed to deserialize a hash (%s)" name
 
 let to_bytes = Bytes.of_string
 

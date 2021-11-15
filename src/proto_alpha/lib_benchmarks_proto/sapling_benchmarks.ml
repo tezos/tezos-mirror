@@ -59,8 +59,10 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let workload_to_vector {nb_input; nb_output; nb_cm = _; nb_nf = _} =
     let l =
-      [ ("nb_input", float_of_int nb_input);
-        ("nb_output", float_of_int nb_output) ]
+      [
+        ("nb_input", float_of_int nb_input);
+        ("nb_output", float_of_int nb_output);
+      ]
     in
     Sparse_vec.String.of_list l
 
@@ -86,43 +88,42 @@ module Apply_diff_bench : Benchmark.S = struct
     Lwt_main.run
       ( Execution_context.make ~rng_state:sapling_forge_rng_state
       >>=? fun (ctxt, step_constants) ->
-      Sapling_generation.prepare_seeded_state sapling_transition ctxt
-      >>=? fun (_, _, _, _, ctxt, state_id) ->
-      let external_state_id = Alpha_context.Sapling.Id.parse_z state_id in
-      let internal_state_id =
-        Lazy_storage_kind.Sapling_state.Id.parse_z state_id
-      in
-      Alpha_context.Sapling.(state_from_id ctxt external_state_id)
-      >|= Protocol.Environment.wrap_tzresult
-      >>=? fun (state, ctxt) ->
-      Format.eprintf "state hash: %d@." (Hashtbl.hash state.diff) ;
-      Format.eprintf
-        "tx hash: %d@."
-        (Hashtbl.hash sapling_transition.sapling_tx) ;
-      let address = Alpha_context.Contract.to_b58check step_constants.self in
-      let chain_id =
-        Environment.Chain_id.to_b58check step_constants.chain_id
-      in
-      let anti_replay = address ^ chain_id in
-      Format.eprintf "anti-replay: %s@." anti_replay ;
-      let diff = diff_from_tx sapling_transition.sapling_tx in
-      let closure () =
-        ignore
-          (Lwt_main.run
-             (Sapling_generation.apply_diff ctxt internal_state_id diff))
-      in
-      let workload =
-        {
-          nb_input = List.length sapling_transition.sapling_tx.inputs;
-          nb_output = List.length sapling_transition.sapling_tx.outputs;
-          nb_cm = Int64.to_int sapling_transition.commitment_count;
-          nb_nf = Int64.to_int sapling_transition.nullifier_count;
-        }
-      in
-      return (Generator.Plain {workload; closure}) )
+        Sapling_generation.prepare_seeded_state sapling_transition ctxt
+        >>=? fun (_, _, _, _, ctxt, state_id) ->
+        let external_state_id = Alpha_context.Sapling.Id.parse_z state_id in
+        let internal_state_id =
+          Lazy_storage_kind.Sapling_state.Id.parse_z state_id
+        in
+        Alpha_context.Sapling.(state_from_id ctxt external_state_id)
+        >|= Protocol.Environment.wrap_tzresult
+        >>=? fun (state, ctxt) ->
+        Format.eprintf "state hash: %d@." (Hashtbl.hash state.diff) ;
+        Format.eprintf
+          "tx hash: %d@."
+          (Hashtbl.hash sapling_transition.sapling_tx) ;
+        let address = Alpha_context.Contract.to_b58check step_constants.self in
+        let chain_id =
+          Environment.Chain_id.to_b58check step_constants.chain_id
+        in
+        let anti_replay = address ^ chain_id in
+        Format.eprintf "anti-replay: %s@." anti_replay ;
+        let diff = diff_from_tx sapling_transition.sapling_tx in
+        let closure () =
+          ignore
+            (Lwt_main.run
+               (Sapling_generation.apply_diff ctxt internal_state_id diff))
+        in
+        let workload =
+          {
+            nb_input = List.length sapling_transition.sapling_tx.inputs;
+            nb_output = List.length sapling_transition.sapling_tx.outputs;
+            nb_cm = Int64.to_int sapling_transition.commitment_count;
+            nb_nf = Int64.to_int sapling_transition.nullifier_count;
+          }
+        in
+        return (Generator.Plain {workload; closure}) )
     |> function
-    | Ok closure ->
-        closure
+    | Ok closure -> closure
     | Error errs ->
         Format.eprintf
           "Runner.benchmarkable_from_instr_str:\n%a@."

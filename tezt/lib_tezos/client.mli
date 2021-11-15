@@ -30,12 +30,20 @@ type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Proxy_server of Proxy_server.t  (** A proxy server *)
 
+(** [rpc_port endpoint] returns the port on which to reach [endpoint]
+    when doing RPC calls. *)
+val rpc_port : endpoint -> int
+
 (** Mode of the client *)
 type mode =
   | Client of endpoint option
   | Mockup
   | Light of float * endpoint list
   | Proxy of endpoint
+
+(** [mode_to_endpoint mode] returns the {!endpoint} within a {!mode}
+    (if any) *)
+val mode_to_endpoint : mode -> endpoint option
 
 (** The synchronization mode of the client.
 
@@ -48,6 +56,9 @@ type normalize_mode = Readable | Optimized | Optimized_legacy
 
 (** Tezos client states. *)
 type t
+
+(** Get the name of a client (e.g. ["client1"]). *)
+val name : t -> string
 
 (** Get the base directory of a client.
 
@@ -96,6 +107,10 @@ val get_mode : t -> mode
     a new client from scratch. *)
 val set_mode : mode -> t -> unit
 
+(** Write the [--sources] file used by the light mode. *)
+val write_sources_file :
+  min_agreement:float -> uris:string list -> t -> unit Lwt.t
+
 (** {2 RPC calls} *)
 
 (** Paths for RPCs.
@@ -104,6 +119,9 @@ val set_mode : mode -> t -> unit
     denotes [/chains/main/blocks/head]. *)
 type path = string list
 
+(** [string_of_path ["seg1"; "seg2"]] is ["/seg1/seg2"] *)
+val string_of_path : path -> string
+
 (** Query strings for RPCs.
 
     For instance, [["key1", "value1"; "key2", "value2"]]
@@ -111,7 +129,10 @@ type path = string list
 type query_string = (string * string) list
 
 (** HTTP methods for RPCs. *)
-type meth = GET | PUT | POST | PATCH
+type meth = GET | PUT | POST | PATCH | DELETE
+
+(** A lowercase string of the method. *)
+val string_of_meth : meth -> string
 
 (** [rpc_path_query_to_string ["key1", "value1"; "key2", "value2")] ["seg1"; "seg2"]]
     returns [/seg1/seg2?key1=value1&key2=value2] where seg1, seg2, key1, key2,
@@ -163,6 +184,10 @@ val shell_header :
 val spawn_shell_header :
   ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> Process.t
 
+(** Run [shell_header] and retrieves the level. *)
+val level :
+  ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> int Lwt.t
+
 (** {2 Admin Client Commands} *)
 
 module Admin : sig
@@ -192,6 +217,12 @@ module Admin : sig
 end
 
 (** {2 Regular Client Commands} *)
+
+(** Run [tezos-client --version]. *)
+val version : t -> unit Lwt.t
+
+(** Same as [version], but do not wait for the process to exit. *)
+val spawn_version : t -> Process.t
 
 (** Run [tezos-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Constant.key -> unit Lwt.t
@@ -281,6 +312,7 @@ val transfer :
   ?fee:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
+  ?counter:int ->
   ?arg:string ->
   amount:Tez.t ->
   giver:string ->
@@ -296,6 +328,7 @@ val spawn_transfer :
   ?fee:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
+  ?counter:int ->
   ?arg:string ->
   amount:Tez.t ->
   giver:string ->
@@ -401,6 +434,56 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** [stresstest ?endpoint ?tps souces transfers], calls
+ *  [tezos-client stresstest transfer using <sources> --transfers <transfers> --tps <tps>]. *)
+val stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  unit Lwt.t
+
+(** Same as [stresstest], but do not wait for the process to exit. *)
+val spawn_stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  Process.t
+
+(** Run [tezos-client run script .. on storage .. and input ..].
+
+    Returns the new storage as a string.
+
+    Fails if the new storage cannot be extracted from the output. *)
+val run_script :
+  src:string -> storage:string -> input:string -> t -> string Lwt.t
+
+(** Same as [run_script] but do not wait for the process to exit. *)
+val spawn_run_script :
+  src:string -> storage:string -> input:string -> t -> Process.t
+
+(** Run [tezos-client register global constant value from src].
+    Returns the address hash of the new constant. *)
+val register_global_constant :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  value:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [register_global_constant] but do not wait for the process to exit. *)
+val spawn_register_global_constant :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  value:string ->
+  src:string ->
+  t ->
+  Process.t
+
 (** Run [tezos-client hash data .. of type ...]
 
     Given that the output of [tezos-client] is:
@@ -455,18 +538,54 @@ val spawn_normalize_data :
   t ->
   Process.t
 
-(** Run [tezos-client list mockup protocols]. *)
-val list_mockup_protocols : t -> string list Lwt.t
+(** Run [tezos-client normalize script ..]*)
+val normalize_script :
+  ?mode:normalize_mode -> script:string -> t -> string Lwt.t
 
-(** Same as [list_mockup_protocols], but do not wait for the process to exit
+(** Same as [normalize_script], but do not wait for the process to exit. *)
+val spawn_normalize_script :
+  ?mode:normalize_mode -> script:string -> t -> Process.t
+
+(** Run [tezos-client typecheck script ..]*)
+val typecheck_script :
+  script:string ->
+  ?details:bool ->
+  ?emacs:bool ->
+  ?no_print_source:bool ->
+  ?gas:int ->
+  ?legacy:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as [typecheck_script], but do not wait for the process to exit. *)
+val spawn_typecheck_script :
+  script:string ->
+  ?details:bool ->
+  ?emacs:bool ->
+  ?no_print_source:bool ->
+  ?gas:int ->
+  ?legacy:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client list mode protocols]. *)
+val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
+
+(** Same as [list_protocols], but do not wait for the process to exit
     and do not process stdout. *)
-val spawn_list_mockup_protocols : t -> Process.t
+val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
 (** Run [tezos-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [migrate_mockup], but do not wait for the process to exit. *)
 val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
+
+(** Run [tezos-client sign block <hexdata> for <delegate>]. *)
+val sign_block : t -> string -> delegate:string -> string Lwt.t
+
+(** Same as [sign_block], but do not wait for the process to exit. *)
+val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
 (** {2 High-Level Functions} *)
 
@@ -482,12 +601,17 @@ val init :
   unit ->
   t Lwt.t
 
-(** Set up a client and a node and activate a protocol.
+(** Set up a client and node(s) and activate a protocol.
 
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
     - Activate the given protocol
-    - Bake (unless [~bake:false] is passed) *)
+    - Wait for the protocol to be activated (i.e. chain level 1)
+    - Bake (unless [~bake:false] is passed)
+
+    In addition to the client, returns the first created node
+    (if [`Light] is passed, a second node has been created, but it is
+    not exposed). *)
 val init_activate_bake :
   ?path:string ->
   ?admin_path:string ->
@@ -500,7 +624,7 @@ val init_activate_bake :
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
-  t Lwt.t
+  (Node.t * t) Lwt.t
 
 (** Create a client with mode [Mockup] and run [create mockup].
 
@@ -520,8 +644,8 @@ val init_mockup :
   unit ->
   t Lwt.t
 
-(** Create a client with mode [Light]. In addition to the client, the list
-    of nodes is returned, as it is created by this call; and
+(** Create a client with mode [Light]. In addition to the client, created
+    nodes are returned, as they are created by this call; and
     the light mode needs tight interaction with the nodes. The [nodes_args]
     argument allows to configure the created nodes, but note
     that arguments [Node.Connections] and [Node.Synchronisation_threshold]
@@ -535,4 +659,4 @@ val init_light :
   ?min_agreement:float ->
   ?nodes_args:Node.argument list ->
   unit ->
-  (t * Node.t list) Lwt.t
+  (t * Node.t * Node.t) Lwt.t

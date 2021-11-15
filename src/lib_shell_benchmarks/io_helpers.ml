@@ -28,15 +28,13 @@
     and computing statistics. *)
 
 let assert_ok ~msg = function
-  | Ok x ->
-      x
+  | Ok x -> x
   | Error errs ->
-      Format.eprintf "%s:@.%a@." msg pp_print_error errs ;
+      Format.eprintf "%s:@.%a@." msg pp_print_trace errs ;
       exit 1
 
 let prepare_genesis base_dir =
-  Tezos_context.Context.init ~readonly:false base_dir
-  >>= fun index ->
+  Tezos_context.Context.init ~readonly:false base_dir >>= fun index ->
   let genesis_block =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
@@ -47,10 +45,8 @@ let prepare_genesis base_dir =
     ~time:(Time.Protocol.of_seconds 0L)
     ~protocol:(Obj.magic ())
   >>=? fun context_hash ->
-  Tezos_context.Context.checkout index context_hash
-  >>= function
-  | None ->
-      assert false
+  Tezos_context.Context.checkout index context_hash >>= function
+  | None -> assert false
   | Some context ->
       let context =
         Tezos_shell_context.Shell_context.wrap_disk_context context
@@ -58,9 +54,7 @@ let prepare_genesis base_dir =
       return (index, context, context_hash)
 
 let commit context =
-  let context =
-    Tezos_shell_context.Shell_context.unwrap_disk_context context
-  in
+  let context = Tezos_shell_context.Shell_context.unwrap_disk_context context in
   Tezos_context.Context.commit
     ~time:
       (Time.Protocol.of_seconds
@@ -68,19 +62,14 @@ let commit context =
     context
 
 let prepare_empty_context base_dir =
-  prepare_genesis base_dir
-  >>=? fun (index, context, _context_hash) ->
-  commit context
-  >>= fun context_hash ->
+  prepare_genesis base_dir >>=? fun (index, context, _context_hash) ->
+  commit context >>= fun context_hash ->
   Tezos_context.Context.close index >>= fun () -> return context_hash
 
 let load_context_from_disk_lwt base_dir context_hash =
-  Tezos_context.Context.init ~readonly:false base_dir
-  >>= fun index ->
-  Tezos_context.Context.checkout index context_hash
-  >>= function
-  | None ->
-      assert false
+  Tezos_context.Context.init ~readonly:false base_dir >>= fun index ->
+  Tezos_context.Context.checkout index context_hash >>= function
+  | None -> assert false
   | Some context ->
       Lwt.return
         (Tezos_shell_context.Shell_context.wrap_disk_context context, index)
@@ -91,12 +80,12 @@ let load_context_from_disk base_dir context_hash =
 let with_context ~base_dir ~context_hash f =
   let (context, index) = load_context_from_disk base_dir context_hash in
   Lwt_main.run
-    ( f context
-    >>= fun res ->
-    Tezos_context.Context.close index >>= fun () -> Lwt.return res )
+    ( f context >>= fun res ->
+      Tezos_context.Context.close index >>= fun () -> Lwt.return res )
 
 let prepare_base_dir base_dir =
-  Unix.unlink base_dir ; Unix.mkdir base_dir 0o700
+  Unix.unlink base_dir ;
+  Unix.mkdir base_dir 0o700
 
 (* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
@@ -104,10 +93,9 @@ let initialize_key rng_state context path storage_size =
   Tezos_protocol_environment.Context.add context path bytes
 
 let commit_and_reload base_dir index context =
-  commit context
-  >>= fun context_hash ->
-  Tezos_context.Context.close index
-  >>= fun () -> load_context_from_disk_lwt base_dir context_hash
+  commit context >>= fun context_hash ->
+  Tezos_context.Context.close index >>= fun () ->
+  load_context_from_disk_lwt base_dir context_hash
 
 (** Maps from string lists to bytes. No balancing. A key cannot be a prefix
     or a suffix to another key. *)
@@ -123,90 +111,67 @@ module Key_map = struct
   let empty = Node String_map.empty
 
   let is_empty = function
-    | Leaf _ ->
-        false
-    | Node map ->
-        String_map.is_empty map
+    | Leaf _ -> false
+    | Node map -> String_map.is_empty map
 
   let rec insert (key : string list) data (tree : 'a t) =
     if is_empty tree then
       match key with
-      | [] ->
-          Leaf data
+      | [] -> Leaf data
       | seg :: tl ->
           let subtree = insert tl data empty in
           let singleton = String_map.singleton seg subtree in
           Node singleton
     else
       match key with
-      | [] ->
-          raise Collision_with_prefix
+      | [] -> raise Collision_with_prefix
       | seg :: tl -> (
-        match tree with
-        | Leaf _ ->
-            raise Collision_with_suffix
-        | Node map ->
-            let subtree =
-              match String_map.find_opt seg map with
-              | None ->
-                  insert tl data empty
-              | Some subtree ->
-                  insert tl data subtree
-            in
-            let map = String_map.add seg subtree map in
-            Node map )
+          match tree with
+          | Leaf _ -> raise Collision_with_suffix
+          | Node map ->
+              let subtree =
+                match String_map.find_opt seg map with
+                | None -> insert tl data empty
+                | Some subtree -> insert tl data subtree
+              in
+              let map = String_map.add seg subtree map in
+              Node map)
 
   let rec does_not_collide key tree =
     if is_empty tree then `Key_does_not_collide
     else
       match (key, tree) with
-      | ([], Leaf _) ->
-          `Key_exists
-      | (_, Leaf _) ->
-          `Key_has_prefix
-      | ([], Node _) ->
-          `Key_has_suffix
+      | ([], Leaf _) -> `Key_exists
+      | (_, Leaf _) -> `Key_has_prefix
+      | ([], Node _) -> `Key_has_suffix
       | (seg :: tl, Node map) -> (
-        match String_map.find_opt seg map with
-        | None ->
-            `Key_does_not_collide
-        | Some subtree ->
-            does_not_collide tl subtree )
+          match String_map.find_opt seg map with
+          | None -> `Key_does_not_collide
+          | Some subtree -> does_not_collide tl subtree)
 
   let rec mem key tree =
     match (key, tree) with
-    | ([], Leaf _) ->
-        true
-    | (_, Leaf _) ->
-        false
-    | ([], Node _) ->
-        false
+    | ([], Leaf _) -> true
+    | (_, Leaf _) -> false
+    | ([], Node _) -> false
     | (seg :: tl, Node map) -> (
-      match String_map.find_opt seg map with
-      | None ->
-          false
-      | Some subtree ->
-          mem tl subtree )
+        match String_map.find_opt seg map with
+        | None -> false
+        | Some subtree -> mem tl subtree)
 
   let rec find_opt key tree =
     match (key, tree) with
-    | ([], Leaf v) ->
-        Some v
-    | (_ :: _, Leaf _) ->
-        None
-    | ([], Node _) ->
-        None
+    | ([], Leaf v) -> Some v
+    | (_ :: _, Leaf _) -> None
+    | ([], Node _) -> None
     | (seg :: tl, Node map) -> (
-      match String_map.find_opt seg map with
-      | None ->
-          None
-      | Some subtree ->
-          find_opt tl subtree )
+        match String_map.find_opt seg map with
+        | None -> None
+        | Some subtree -> find_opt tl subtree)
 
   let rec to_seq path acc tree =
     match tree with
-    | Leaf v ->
-        fun () -> Seq.Cons ((List.rev path, v), acc)
+    | Leaf v -> fun () -> Seq.Cons ((List.rev path, v), acc)
     | Node map ->
         String_map.fold
           (fun seg subtree acc -> to_seq (seg :: path) acc subtree)
@@ -244,10 +209,8 @@ let rec take_n n list acc =
   if n = 0 then (List.rev acc, list)
   else
     match list with
-    | [] ->
-        Stdlib.invalid_arg "take_n"
-    | x :: tl ->
-        take_n (n - 1) tl (x :: acc)
+    | [] -> Stdlib.invalid_arg "take_n"
+    | x :: tl -> take_n (n - 1) tl (x :: acc)
 
 let sample_without_replacement n list =
   let (first_n, rest) = take_n n list [] in
@@ -259,7 +222,7 @@ let sample_without_replacement n list =
       let j = Random.int (i + 1) in
       if j < n then (
         reject := reservoir.(j) :: !reject ;
-        reservoir.(j) <- elt )
+        reservoir.(j) <- elt)
       else reject := elt :: !reject)
     rest ;
   (Array.to_list reservoir, !reject)
@@ -281,13 +244,14 @@ let file_copy input_name output_name =
   let fd_out = openfile output_name [O_WRONLY; O_CREAT; O_TRUNC] 0o660 in
   let rec copy_loop () =
     match read fd_in buffer 0 buffer_size with
-    | 0 ->
-        ()
+    | 0 -> ()
     | r ->
         ignore (write fd_out buffer 0 r) ;
         copy_loop ()
   in
-  copy_loop () ; close fd_in ; close fd_out
+  copy_loop () ;
+  close fd_in ;
+  close fd_out
 
 let set_infos filename infos =
   let open Unix in
@@ -310,7 +274,8 @@ let rec copy_rec source dest =
   let infos = lstat source in
   match infos.st_kind with
   | S_REG ->
-      file_copy source dest ; set_infos dest infos
+      file_copy source dest ;
+      set_infos dest infos
   | S_LNK ->
       let link = readlink source in
       symlink link dest
@@ -325,5 +290,4 @@ let rec copy_rec source dest =
             copy_rec (Filename.concat source file) (Filename.concat dest file))
         source ;
       set_infos dest infos
-  | _ ->
-      prerr_endline ("Can't cope with special file " ^ source)
+  | _ -> prerr_endline ("Can't cope with special file " ^ source)

@@ -3,6 +3,7 @@
 /api/tezos-snoop.html
 /api/tezos-codec.html
 /api/tezos-node-run.txt
+/user/default-acl.json
 tezos-baker.html
 tezos-accuser.html
 tezos-endorser.html

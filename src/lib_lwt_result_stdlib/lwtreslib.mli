@@ -288,7 +288,7 @@ module Bare : sig
   module WithExceptions : Bare_sigs.WithExceptions.S
 end
 
-(** [Traced] is a functor to generate an advanced combined-monad replacements
+(** [Traced] is a functor to generate advanced combined-monad replacements
     for parts of the Stdlib. The generated module is similar to [Bare] with the
     addition of traces: structured collections of errors.
 
@@ -316,8 +316,13 @@ let load_config file =
 
     Example implementations of traces are provided in the [traces/] directory.
 *)
-module Traced (Trace : Traced_sigs.Trace.S) : sig
-  module Monad : Traced_sigs.Monad.S with type 'error trace = 'error Trace.trace
+module type TRACE = Traced_sigs.Trace.S
+(* exporting for availablility *)
+
+module type TRACED_MONAD = Traced_sigs.Monad.S (* exporting for availablility *)
+
+module Traced (Trace : TRACE) : sig
+  module Monad : TRACED_MONAD with type 'error trace = 'error Trace.trace
 
   module Hashtbl :
     Traced_sigs.Hashtbl.S with type 'error trace := 'error Trace.trace
@@ -343,6 +348,8 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
        and type 'a seq_s_t := 'a Seq_s.t
 
   module Set : Traced_sigs.Set.S with type 'error trace := 'error Trace.trace
+
+  module Unit : Traced_sigs.Unit.S
 
   module WithExceptions : Traced_sigs.WithExceptions.S
 end

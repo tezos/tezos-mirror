@@ -32,26 +32,26 @@ let context_init_memory ~rng_state =
   Context.init
     ~rng_state
     ~initial_balances:
-      [ 4_000_000_000_000L;
+      [
         4_000_000_000_000L;
         4_000_000_000_000L;
         4_000_000_000_000L;
-        4_000_000_000_000L ]
+        4_000_000_000_000L;
+        4_000_000_000_000L;
+      ]
     5
   >>=? fun (block, accounts) ->
   match accounts with
   | [bs1; bs2; bs3; bs4; bs5] ->
       return (`Mem_block (block, (bs1, bs2, bs3, bs4, bs5)))
-  | _ ->
-      assert false
+  | _ -> assert false
 
 let context_init ~rng_state = context_init_memory ~rng_state
 
 let make ~rng_state =
-  context_init_memory ~rng_state
-  >>=? fun context ->
+  context_init_memory ~rng_state >>=? fun context ->
   let open Script_interpreter in
-  ( match context with
+  (match context with
   | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
       let source = bs1 in
       let payer = bs2 in
@@ -76,7 +76,7 @@ let make ~rng_state =
           chain_id = Chain_id.zero;
         }
       in
-      return (block, step_constants) )
+      return (block, step_constants))
   >>=? fun (block, step_constants) ->
   Incremental.begin_construction
     ~priority:0

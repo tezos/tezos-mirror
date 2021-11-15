@@ -40,10 +40,8 @@ type michelson_data =
 let generator_config_encoding =
   let open Data_encoding in
   conv
-    (fun {target_size; burn_in_multiplier} ->
-      (target_size, burn_in_multiplier))
-    (fun (target_size, burn_in_multiplier) ->
-      {target_size; burn_in_multiplier})
+    (fun {target_size; burn_in_multiplier} -> (target_size, burn_in_multiplier))
+    (fun (target_size, burn_in_multiplier) -> {target_size; burn_in_multiplier})
     (obj2
        (req "target_size" Base_samplers.range_encoding)
        (req "burn_in_multiplier" int31))
@@ -55,7 +53,8 @@ let michelson_data_encoding =
   let e = Script_repr.expr_encoding in
   list
   @@ union
-       [ case
+       [
+         case
            ~title:"Code"
            (Tag 0)
            (tup2 e (list e))
@@ -66,7 +65,8 @@ let michelson_data_encoding =
            (Tag 1)
            (tup2 e e)
            (function Data {term; typ} -> Some (term, typ) | _ -> None)
-           (fun (term, typ) -> Data {term; typ}) ]
+           (fun (term, typ) -> Data {term; typ});
+       ]
 
 let save ~filename ~terms =
   let bytes =
@@ -77,30 +77,27 @@ let save ~filename ~terms =
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
-    | Ok res ->
-        res
+    | Ok res -> res
   in
   ignore (* TODO handle error *)
-    ( Lwt_main.run
+    (Lwt_main.run
     @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file
          filename
-         (Bytes.unsafe_to_string bytes) )
+         (Bytes.unsafe_to_string bytes))
 
 let load_file filename =
   Lwt_main.run
-  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
-     >>= fun str ->
-     Format.eprintf "Michelson_generation.load: loaded %s@." filename ;
-     let bytes = Bytes.unsafe_of_string str in
-     match Data_encoding.Binary.of_bytes michelson_data_encoding bytes with
-     | Ok result ->
-         Lwt.return result
-     | Error err ->
-         Format.eprintf
-           "Michelson_generation.load: can't load file (%a); exiting"
-           Data_encoding.Binary.pp_read_error
-           err ;
-         exit 1 )
+  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
+       Format.eprintf "Michelson_generation.load: loaded %s@." filename ;
+       let bytes = Bytes.unsafe_of_string str in
+       match Data_encoding.Binary.of_bytes michelson_data_encoding bytes with
+       | Ok result -> Lwt.return result
+       | Error err ->
+           Format.eprintf
+             "Michelson_generation.load: can't load file (%a); exiting"
+             Data_encoding.Binary.pp_read_error
+             err ;
+           exit 1 )
 
 (* ----------------------------------------------------------------------- *)
 
@@ -148,10 +145,9 @@ let michelson_type_to_ex_ty (typ : Alpha_context.Script.expr)
     (Micheline.root typ)
   |> Environment.wrap_tzresult
   |> function
-  | Ok t ->
-      t
+  | Ok t -> t
   | Error errs ->
-      Format.eprintf "%a@." Error_monad.pp_print_error errs ;
+      Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
       raise (Failure "Michelson_generation.michelson_type_to_ex_ty: error")
 
 let base_type_to_ex_ty ty =
@@ -163,8 +159,7 @@ let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
   match node with
   | Type.Stack.Stack_var_t _ ->
       Stdlib.failwith "stack_type_to_michelson_type_list: bug found"
-  | Type.Stack.Empty_t ->
-      []
+  | Type.Stack.Empty_t -> []
   | Type.Stack.Item_t (ty, tl) ->
       base_type_to_michelson_type ty :: stack_type_to_michelson_type_list tl
 
@@ -174,8 +169,7 @@ let rec michelson_type_list_to_ex_stack_ty
     (stack_ty : Alpha_context.Script.expr list) ctxt =
   let open Script_ir_translator in
   match stack_ty with
-  | [] ->
-      (Ex_stack_ty Script_typed_ir.Bot_t, ctxt)
+  | [] -> (Ex_stack_ty Script_typed_ir.Bot_t, ctxt)
   | hd :: tl -> (
       let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with
@@ -184,8 +178,7 @@ let rec michelson_type_list_to_ex_stack_ty
             michelson_type_list_to_ex_stack_ty tl ctxt
           in
           match ex_stack_ty with
-          | Ex_stack_ty tl ->
-              (Ex_stack_ty (Item_t (ty, tl, None)), ctxt) ) )
+          | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
 
 let stack_type_to_ex_stack_ty ty =
   michelson_type_list_to_ex_stack_ty (stack_type_to_michelson_type_list ty)

@@ -322,7 +322,8 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
+let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port)
+    =
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
@@ -340,8 +341,7 @@ let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
   in
   let acl =
     let open RPC_server.Acl in
-    Option.either_f acl (fun () ->
-        find_policy config.rpc.acl (Ipaddr.V6.to_string addr, Some port))
+    find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
     |> Option.value ~default:(default addr)
   in
   Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)
@@ -364,9 +364,12 @@ let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
           }
       >>= return)
     (function
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
+         This exception seems to be unreachable.
+      *)
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (RPC_Port_already_in_use [(addr, port)])
-      | exn -> Lwt.return (error_exn exn))
+      | exn -> fail_with_exn exn)
 
 let init_rpc (config : Node_config_file.t) node =
   List.fold_right_es
@@ -374,12 +377,12 @@ let init_rpc (config : Node_config_file.t) node =
       Node_config_file.resolve_rpc_listening_addrs addr >>=? function
       | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
-          let acl =
-            RPC_server.Acl.find_policy_by_domain_name config.rpc.acl addr
-          in
+          RPC_server.Acl.resolve_domain_names config.rpc.acl
+          >>= fun acl_policy ->
           List.fold_right_es
             (fun x a ->
-              launch_rpc_server ?acl config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server ~acl_policy config node x >>=? fun o ->
+              return (o :: a))
             addrs
             acc)
     config.rpc.listen_addrs
@@ -494,23 +497,14 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ~singleprocess
           ~force_history_mode_switch
           config)
-      (function
-        | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-            List.fold_right_es
-              (fun addr acc ->
-                Node_config_file.resolve_rpc_listening_addrs addr >>=? fun x ->
-                return (x @ acc))
-              config.rpc.listen_addrs
-              []
-            >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
-        | exn -> Lwt.return (error_exn exn))
+      (function exn -> fail_with_exn exn)
   in
   Lwt_main.run
     (Lwt_exit.wrap_and_exit main_promise >>= function
      | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
      | Error err ->
          Lwt_exit.exit_and_wait 1 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_error err))
+         `Error (false, Format.asprintf "%a" pp_print_trace err))
 
 module Term = struct
   let verbosity =

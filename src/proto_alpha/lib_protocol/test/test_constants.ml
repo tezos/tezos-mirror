@@ -40,7 +40,7 @@ let test_constants_consistency () =
 
 let test_max_operations_ttl () =
   let open Protocol in
-  (* max_operatios_ttl is hard-coded for mainnet to avoid any
+  (* max_operations_ttl is hard-coded for mainnet to avoid any
      recomputation and is not reconfigured for other networks. *)
   let minimal_block_delay =
     Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
@@ -84,12 +84,9 @@ let liquidity_baking_subsidy_param () =
 
 let tests =
   [
-    Test_services.tztest
-      "constants consistency"
-      `Quick
-      test_constants_consistency;
-    Test_services.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
-    Test_services.tztest
+    Tztest.tztest "constants consistency" `Quick test_constants_consistency;
+    Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
+    Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"
       `Quick

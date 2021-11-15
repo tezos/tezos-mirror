@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_alpha_parameters)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-alpha-parameters)
  (modules :standard \ gen)
  (libraries tezos-base

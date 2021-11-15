@@ -139,15 +139,17 @@ let pp ppf op =
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 
+let to_string v = Data_encoding.Binary.to_string_exn encoding v
+
 let of_bytes b = Data_encoding.Binary.of_bytes_opt encoding b
 
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
-let to_b58check v = Base58.safe_encode (Bytes.to_string (to_bytes v))
+let to_b58check v = Base58.safe_encode (to_string v)
 
 let of_b58check b =
   Option.bind (Base58.safe_decode b) (fun s ->
-      Data_encoding.Binary.of_bytes_opt encoding (Bytes.of_string s))
+      Data_encoding.Binary.of_string_opt encoding s)
 
 let hash block = Block_hash.hash_bytes [to_bytes block]
 

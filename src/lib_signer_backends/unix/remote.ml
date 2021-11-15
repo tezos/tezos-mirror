@@ -197,16 +197,16 @@ let parse_base_uri s =
   match Uri.of_string s with
   (* We keep [Invalid_argument] but this needs investigation because of the
       above comment *)
-  | exception Invalid_argument msg -> generic_error "Malformed URI: %s" msg
-  | exception Not_found -> generic_error "Malformed URI"
+  | exception Invalid_argument msg -> error_with "Malformed URI: %s" msg
+  | exception Not_found -> error_with "Malformed URI"
   | uri -> (
       match Uri.scheme uri with
       | Some "http" -> Ok uri
       | Some "https" -> Ok uri
       | Some "tcp" -> Ok uri
       | Some "unix" -> Ok uri
-      | Some scheme -> generic_error "Unknown scheme: %s" scheme
-      | None -> generic_error "Unknown scheme: <empty>")
+      | Some scheme -> error_with "Unknown scheme: %s" scheme
+      | None -> error_with "Unknown scheme: <empty>")
 
 let parse_base_uri s =
   parse_base_uri s |> record_trace (Invalid_remote_signer s) |> Lwt.return

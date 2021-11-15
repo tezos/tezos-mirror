@@ -242,7 +242,7 @@ module Maintenance = struct
       Cluster.create max_connections [Connections (max_connections - 1)]
     in
     Cluster.clique nodes ;
-    let* () = Cluster.start nodes in
+    let* () = Cluster.start ~public:true nodes in
     Log.info "Complete network of nodes created." ;
     let maintenance_ended_promise =
       Node.wait_for target_node "maintenance_ended.v0" (fun _ -> Some ())

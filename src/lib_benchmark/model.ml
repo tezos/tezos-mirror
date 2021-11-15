@@ -306,6 +306,23 @@ let nlogn ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
+let logn ~coeff =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size -> free ~name:coeff * log2 (int 1 + size)
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
 let linear_sum ~intercept ~coeff =
   let module M = struct
     type arg_type = int * (int * unit)

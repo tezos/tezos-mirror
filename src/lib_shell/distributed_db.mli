@@ -139,6 +139,17 @@ module Advertise : sig
       the identifier for this [chain_db]. *)
   val current_head : chain_db -> ?mempool:Mempool.t -> Store.Block.t -> unit
 
+  (** [prechecked_head chain_db ?mempool head] sends a [Current_head
+     (chain_id, head_header, mempool)] message to all known active
+     peers for this chain. If [mempool] isn't specified, or if remote
+     peer has disabled its mempool, [mempool] is empty. [chain_id] is
+     the identifier for this [chain_db].
+
+      The message is only sent when the peer's network version is at
+     least 2. For former protocol versions, we could get kicked kicked
+     for having send an invalid block that passes the precheck. *)
+  val prechecked_head : chain_db -> ?mempool:Mempool.t -> Block_header.t -> unit
+
   (** [current_branch chain_db] sends a
       [Current_branch (chain_id, locator)] message to all known active peers
       for this chain. [locator] is constructed based on the seed
@@ -193,20 +204,29 @@ val commit_invalid_block :
 
 (** {2 Operations index} *)
 
-(** Index of operations (for the mempool). *)
-module Operation : sig
-  type t = Operation.t (* avoid shadowing. *)
-
-  include
-    Requester.REQUESTER
-      with type t := chain_db
-       and type key := Operation_hash.t
-       and type value := Operation.t
-       and type param := unit
-end
-
 (** Inject a new operation in the local index (memory only). *)
 val inject_operation : chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
+
+(** Inject a prechecked block in the [precheck_blocks] memory table.
+   This is to ensure the data availability of the operations once the
+   block has been prechecked and advertised to our peers.
+
+   No need to remove the data explicitely of the [precheck_blocks]
+   memory table. The table is handled as an LRU cache. *)
+val inject_prechecked_block :
+  chain_db ->
+  Block_hash.t ->
+  Block_header.t ->
+  Operation.t trace trace ->
+  unit tzresult Lwt.t
+
+(** Index of operations (for the mempool). *)
+module Operation :
+  Requester.REQUESTER
+    with type t := chain_db
+     and type key := Operation_hash.t
+     and type value := Operation.t
+     and type param := unit
 
 (** {2 Protocol index} *)
 

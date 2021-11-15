@@ -7,30 +7,32 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039992.660 units remaining)
+  - location: 7 (remaining gas: 1039988.633 units remaining)
     [ (Pair 257 0x0000000000000000000000000000000000000000000000000000000000000000)  	 ]
-  - location: 7 (remaining gas: 1039992.650 units remaining)
+  - location: 7 (remaining gas: 1039988.623 units remaining)
     [ 257  	@parameter ]
-  - location: 8 (remaining gas: 1039992.640 units remaining)
+  - location: 8 (remaining gas: 1039988.613 units remaining)
     [ 1  	
       257  	@parameter ]
-  - location: 11 (remaining gas: 1039992.630 units remaining)
+  - location: 11 (remaining gas: 1039988.603 units remaining)
     [ 257  	@parameter
       1  	 ]
-  - location: 12 (remaining gas: 1039992.565 units remaining)
+  - location: 12 (remaining gas: 1039988.538 units remaining)
     [ (Some (Pair 257 0))  	 ]
-  - location: 14 (remaining gas: 1039992.555 units remaining)
+  - location: 14 (remaining gas: 1039988.528 units remaining)
     [ (Pair 257 0)  	@some ]
-  - location: 20 (remaining gas: 1039992.545 units remaining)
+  - location: 14 (remaining gas: 1039988.513 units remaining)
+    [ (Pair 257 0)  	@some ]
+  - location: 20 (remaining gas: 1039988.503 units remaining)
     [ 257  	 ]
-  - location: 21 (remaining gas: 1039992.535 units remaining)
+  - location: 21 (remaining gas: 1039988.493 units remaining)
     [ 0x0100000000000000000000000000000000000000000000000000000000000000  	
       257  	 ]
-  - location: 24 (remaining gas: 1039992.263 units remaining)
+  - location: 24 (remaining gas: 1039988.221 units remaining)
     [ 0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 25 (remaining gas: 1039992.248 units remaining)
+  - location: 25 (remaining gas: 1039988.206 units remaining)
     [ {}  	
       0x0101000000000000000000000000000000000000000000000000000000000000  	 ]
-  - location: 27 (remaining gas: 1039992.233 units remaining)
+  - location: 27 (remaining gas: 1039988.191 units remaining)
     [ (Pair {} 0x0101000000000000000000000000000000000000000000000000000000000000)  	 ]
 

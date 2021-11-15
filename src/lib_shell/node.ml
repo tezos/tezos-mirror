@@ -357,18 +357,15 @@ let build_rpc_directory node =
        node.validator
        node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
-  merge
-    (Chain_directory.build_rpc_directory
-       ~user_activated_upgrades:node.user_activated_upgrades
-       ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
-       node.validator) ;
+  merge (Chain_directory.build_rpc_directory node.validator) ;
   merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.store) ;
   merge (Stat_directory.rpc_directory ()) ;
   merge
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
-       ~user_activated_protocol_overrides:node.user_activated_protocol_overrides) ;
+       ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
+       node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;

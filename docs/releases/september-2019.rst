@@ -1,5 +1,3 @@
-.. _mainnet-september-2019:
-
 Mainnet September 2019
 ======================
 
@@ -24,7 +22,7 @@ Changelog
 ---------
 
 Changes introduced by Babylon (including RPC calls) can be found in
-:ref:`the protocol documentation <005_babylon>`.
+:doc:`the protocol documentation <../protocols/005_babylon>`.
 
 Shell
 ~~~~~

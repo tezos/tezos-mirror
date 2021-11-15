@@ -83,6 +83,15 @@ let store_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
+let store_prechecked_block =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"store_prechecked_block"
+    ~msg:"prechecked block {block} was stored"
+    ~pp1:pp_block_descriptor
+    ("block", block_descriptor_encoding)
+
 (* Notice *)
 let fork_testchain =
   declare_4
@@ -155,7 +164,7 @@ let inconsistent_store =
     ~level:Internal_event.Notice
     ~name:"inconsistent_store"
     ~msg:"the store is in an inconsistent state: {errs}"
-    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)
 
 let fix_store =
@@ -251,6 +260,23 @@ let restore_protocol_activation =
     ~pp2:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+let update_protocol_table =
+  declare_4
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"update_protocol_table"
+    ~msg:
+      "the protocol table was updated: protocol {proto_hash} (level \
+       {proto_level}) was activated on block {block_hash} (level \
+       {block_level})"
+    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Protocol_hash.pp_short
+    ("proto_level", Data_encoding.int31)
+    ("block_hash", Block_hash.encoding)
+    ~pp3:Block_hash.pp
+    ("block_level", Data_encoding.int32)
+    ~pp4:pp_int32
+
 let restore_history_mode =
   declare_1
     ~section
@@ -274,23 +300,6 @@ let restore_infered_history_mode =
        mode switch"
     ("history_mode", History_mode.encoding)
     ~pp1:History_mode.pp
-
-let update_protocol_table =
-  declare_4
-    ~section
-    ~level:Internal_event.Notice
-    ~name:"update_protocol_table"
-    ~msg:
-      "the protocol table was updated: protocol {proto_hash} (level \
-       {proto_level}) was activated on block {block_hash} (level \
-       {block_level})"
-    ("proto_hash", Protocol_hash.encoding)
-    ~pp1:Protocol_hash.pp_short
-    ("proto_level", Data_encoding.int31)
-    ("block_hash", Block_hash.encoding)
-    ~pp3:Block_hash.pp
-    ("block_level", Data_encoding.int32)
-    ~pp4:pp_int32
 
 (* Warning *)
 let warning_incomplete_storage =
@@ -326,5 +335,5 @@ let notify_merge_error =
     ~msg:
       "store merge has failed, restart the node to restore the consistency: \
        {errs}"
-    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)

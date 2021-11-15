@@ -1,15 +1,22 @@
 TMP=/tmp
 
-CURRENT_PROTO=009-PsFLoren
-CURRENT_PROTO_NAME=Florence
-CURRENT_PROTO_HASH=PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-NEXT_PROTO=010-PtGRANAD
-NEXT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-NEXT_PROTO_NAME=Granada
+CURRENT_PROTO=010-PtGRANAD
+CURRENT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
+CURRENT_PROTO_NAME=Granada
+## To be recommented when protocol G is over
+NEXT_PROTO=011-PtHangz2
+NEXT_PROTO_HASH=PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
+NEXT_PROTO_NAME=Hangzhou
 ALPHA_PROTO=alpha
 ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 .PHONY: all
+all: accusations_simple_double_baking \
+	accusations_simple_double_endorsing \
+	voting_demo_noops \
+	user_activated_upgrade_alpha \
+	daemons_upgrade_alpha \
+	node_synchronization
 all: accusations_simple_double_baking \
 	accusations_simple_double_endorsing \
 	voting_demo_noops \

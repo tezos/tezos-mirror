@@ -1,5 +1,3 @@
-.. _snoop_interpreter.rst:
-
 Snoop and the Michelson Interpreter
 ===================================
 
@@ -43,7 +41,7 @@ The only step left here is to update the ``extract_ir_sized_step`` function: upd
 
 Here are three examples: the first one is ``Nil``, its execution time is constant, so its function is called as is, and its workload will be empty. For ``Dig``, the depth needs to be passed to the ``Instructions.dig`` function, and it will simply be saved in its workload, to be used later for the model. The last example requires some computation: the execution time of ``Concat_bytes`` depends on the size of the list on top of the stack, as well as the total number of bytes to concatenate. We calculate these values here, so we can retrieve the appropriate workload.
 
-In that last example, we use the module ``Size`` to convert the bytes into their size as an integer. It is oftentimes more appropriate to consider the size of the arguments, instead of their values, as the actual workload on the instructions. 
+In that last example, we use the module ``Size`` to convert the bytes into their size as an integer. It is oftentimes more appropriate to consider the size of the arguments, instead of their values, as the actual workload on the instructions.
 
 .. code-block:: ocaml
 
@@ -73,7 +71,7 @@ We now need to specify a cost model for the instruction in ``interpreter_model.m
 
      (...)
 
-They directly derive from generic models available in ``model.ml``. ``const1_model`` is used for constant-time instructions, ``affine_model`` is for instructions with cost function :math:`\lambda size. const + coeff * size`, where ``size`` is a value that appears in the workload, while ``const`` and ``coeff`` are free variables, etc... Note that the arity of the model must match the number of elements in the workload. Some instructions may require a specific model that does not yet exist. In this case, we can add it to the ``Models`` module, like ``join_tickets_model``, which has arity 4, and is exclusively used for the instruction ``IJoin_tickets``. 
+They directly derive from generic models available in ``model.ml``. ``const1_model`` is used for constant-time instructions, ``affine_model`` is for instructions with cost function :math:`\lambda size. const + coeff * size`, where ``size`` is a value that appears in the workload, while ``const`` and ``coeff`` are free variables, etc... Note that the arity of the model must match the number of elements in the workload. Some instructions may require a specific model that does not yet exist. In this case, we can add it to the ``Models`` module, like ``join_tickets_model``, which has arity 4, and is exclusively used for the instruction ``IJoin_tickets``.
 
 The affine model expects an argument for the constant value, called ``intercept``. It is the execution time of the instruction when the workload is 0. Some models assume that the intercept is 0, like the linear models. Otherwise, we may want to make two benchmarks for the instruction, one of which made exclusively for the computation of that ``intercept``.
 
@@ -113,10 +111,10 @@ The interpreter benchmarks are located in ``interpreter_benchmarks.ml``, in the 
        unit
 
 
-This function builds the ``Benchmark.S`` module and registers it, doing most of the work defined in Step 1 of the :ref:`usage example <snoop_example.rst>`. Its arguments are as follows:
+This function builds the ``Benchmark.S`` module and registers it, doing most of the work defined in Step 1 of the :doc:`usage example <snoop_example>`. Its arguments are as follows:
 
 * ``amplification``, if provided, is the number of times an operation must be run in a single execution of the benchmark. If not specified, the instruction will be run only once. It is useful for instance when the operation itself takes very little time, and the calls to the timer take the most of the benchmark runtime.
-* ``intercept`` (default ``false``) is ``true`` if and only if the benchmark is covering the intercept case. It can be used when the expected intercept for the chosen model is not 0. The user should then make sure that the provided sampler generates zero workload for the instruction. 
+* ``intercept`` (default ``false``) is ``true`` if and only if the benchmark is covering the intercept case. It can be used when the expected intercept for the chosen model is not 0. The user should then make sure that the provided sampler generates zero workload for the instruction.
 * ``name`` is simply the name of the benchmarked instruction. It will also appear in the name of the registered benchmark. When searching for a benchmark in snoop, the names are structured as follows: ``<name>{_intercept}_<protocol_version>``, where ``<protocol_version>`` is either the version number of the protocol, or ``alpha``. ``_intercept`` only appears if the previous argument was set to ``true``. The function cannot register two benchmarks with the same ``name``, unless they have different ``intercept`` values.
 * ``kinstr_and_stack_sampler`` is a function that, given a configuration and a random state, returns a stack and a ``kinstr`` on which the benchmark will be performed. If ``intercept`` is ``ŧrue``, this sampler should be so that zero workload is generated for the instruction.
 
@@ -199,4 +197,4 @@ Here we define two benchmarks, the first being the interception case, which is w
 Testing
 -------
 
-Assuming the workload is correctly defined for our benchmarking and modeling needs, we just need to check if the chosen model fits the data. For that, we can refer to the :ref:`usage example <snoop_example.rst>`, and follow the given steps. If the resulting plot shows that the predicted execution time fits the empirical data, then it should be good. Otherwise, it should provide some insight to choose a more fitting model for the instruction.
+Assuming the workload is correctly defined for our benchmarking and modeling needs, we just need to check if the chosen model fits the data. For that, we can refer to the :doc:`usage example <snoop_example>`, and follow the given steps. If the resulting plot shows that the predicted execution time fits the empirical data, then it should be good. Otherwise, it should provide some insight to choose a more fitting model for the instruction.

@@ -491,6 +491,20 @@ let unparsing_mode_arg ~default =
     ~default
     unparsing_mode_parameter
 
+let enforce_indentation_flag =
+  switch
+    ~long:"enforce-indentation"
+    ~doc:
+      "Check that the Micheline expression passed to this command is \
+       well-indented."
+    ()
+
+let display_names_flag =
+  switch
+    ~long:"display-names"
+    ~doc:"Print names of scripts passed to this command"
+    ()
+
 module Daemon = struct
   let baking_switch =
     switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()

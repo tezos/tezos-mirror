@@ -86,7 +86,7 @@ module C = struct
         ~name:"delegation_error"
         ~msg:
           "{function} returned an error, ignoring it but this is bad: {trace}"
-        ~pp2:pp_print_error
+        ~pp2:pp_print_trace
         ("function", Data_encoding.string)
         ("trace", Error_monad.trace_encoding)
   end
@@ -197,6 +197,11 @@ module C = struct
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 
+  let set_hash_version (t : t) v =
+    Local.set_hash_version t.local v >|=? fun local -> {t with local}
+
+  let get_hash_version (t : t) = Local.get_hash_version t.local
+
   module Tree = struct
     let pp ppf t = Local.Tree.pp ppf t.tree
 
@@ -258,19 +263,13 @@ end
 open Tezos_protocol_environment
 include Environment_context.Register (C)
 
-let impl_name = "proxy"
+let proxy_impl_name = "proxy"
 
 let empty proxy =
   let ctxt = M.{proxy; local = Local.empty} in
-  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
-
-let set_delegate : M.proxy_delegate -> Context.t -> Context.t =
- fun proxy (Context.Context t) ->
-  match t.kind with
-  | Context ->
-      let ctxt = {t.ctxt with proxy = Some proxy} in
-      Context.Context {t with ctxt}
-  | _ ->
-      Environment_context.err_implementation_mismatch
-        ~expected:impl_name
-        ~got:t.impl_name
+  Context.make
+    ~ops
+    ~ctxt
+    ~kind:Context
+    ~equality_witness
+    ~impl_name:proxy_impl_name

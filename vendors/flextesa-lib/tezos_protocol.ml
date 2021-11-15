@@ -173,6 +173,12 @@ let protocol_parameters_json t : Ezjsonm.t =
          [ ("test_chain_duration", string (Int.to_string 1_966_080)) ]
       | `Florence | `Granada | `Alpha -> []
     in
+    let michelson_max_type_size =
+      match subkind with
+      | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada ->
+         [ ("michelson_maximum_type_size", int 1_000) ]
+      | `Alpha -> []
+    in
     let op_gas_limit, block_gas_limit =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
@@ -182,12 +188,12 @@ let protocol_parameters_json t : Ezjsonm.t =
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     alpha_specific_parameters
     @ legacy_parameters
+    @ michelson_max_type_size
     @ [ ("blocks_per_commitment", int 4)
       ; ("endorsers_per_block", int 256)
       ; ("hard_gas_limit_per_operation", string (Int.to_string op_gas_limit))
       ; ("hard_gas_limit_per_block", string (Int.to_string block_gas_limit))
       ; ("tokens_per_roll", string (Int.to_string 8_000_000_000))
-      ; ("michelson_maximum_type_size", int 1_000)
       ; ("seed_nonce_revelation_tip", string (Int.to_string 125_000))
       ; ("origination_size", int 257)
       ; ("block_security_deposit", string (Int.to_string 640_000_000))
@@ -504,10 +510,14 @@ module Pretty_print = struct
     let header = field ~k:"header" block_json in
     let level = field ~k:"level" header |> get_int in
     let timestamp = field ~k:"timestamp" header |> get_string in
-    let voting_kind = metadata |> field ~k:"voting_period_kind" |> get_string in
+    let voting_kind =
+      metadata |> field ~k:"voting_period_info"
+      |> field ~k:"voting_period"
+      |> field ~k:"kind"
+      |> get_string in
     let voting_pos =
-      metadata |> field ~k:"level"
-      |> field ~k:"voting_period_position"
+      metadata |> field ~k:"voting_period_info"
+      |> field ~k:"position"
       |> get_int in
     let voting_nth =
       metadata |> field ~k:"level" |> field ~k:"voting_period" |> get_int in

@@ -50,7 +50,7 @@ let prevalidator_reinstantiation_failure =
     ~name:"prevalidator_reinstantiation_failure"
     ~msg:"failed to reinstantiate prevalidator error {trace}"
     ~level:Error
-    ~pp1:pp_print_error_first
+    ~pp1:pp_print_top_error_of_trace
     ("trace", trace_encoding)
 
 let prevalidator_instantiation_failure =
@@ -59,7 +59,7 @@ let prevalidator_instantiation_failure =
     ~name:"prevalidator_instantiation_failure"
     ~msg:"failed to instantiate the prevalidator: {trace}"
     ~level:Error
-    ~pp1:pp_print_error_first
+    ~pp1:pp_print_top_error_of_trace
     ("trace", trace_encoding)
 
 let loading_protocol =

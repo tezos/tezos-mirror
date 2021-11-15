@@ -1,7 +1,7 @@
-Release system
+Release System
 ==============
 
-Tezos releases include all the software needed to run the distributed
+Octez releases include all the software needed to run the distributed
 consensus platform with its meta-consensus capability. This
 meta-consensus capability is supported by a protocol that is used to
 achieve consensus not only about the state of its ledger, but also about
@@ -9,20 +9,42 @@ upgrading the protocol itself, subject to an on-chain voting procedure.
 This evolving nature of the protocol implies that at each point there
 are several important protocols, including a currently active protocol
 (on the main Tezos network) and other protocols under test, development,
-or being voted on-chain. Thus, protocols are versioned independently
-from releases (see :doc:`../protocols/naming`). For more details on
+or being voted on-chain. Thus, **protocols are versioned independently
+from releases** (see :doc:`../protocols/naming`). For more details on
 the distinction between the protocol and the rest of the Tezos node
 software, see :doc:`../shell/the_big_picture`.
 
-Although a Tezos node is able to compile and upgrade to a new protocol
+Although a node is able to compile and upgrade to a new protocol
 on the fly, each release contains several embedded protocol versions.
-Consequently, Tezos releases are created not only when new features are
+Consequently, Octez releases are created not only when new features are
 added or bugs are fixed, but also when new protocols are proposed or
 adopted.
 
 Starting with version 7.0, releases are named using a
 ``<major>.<minor>`` numbering scheme. There are also release candidates
 suffixed by ``~rc<N>``.
+
+- **The major version number is incremented when a new release branch is
+  created from master.** Such branches thus include many new
+  features and possibly significant breaking changes, such as
+  improvements to the storage layer requiring a manual
+  upgrade that can take significant time.
+
+- **The minor version number is incremented when changes are backported
+  to an existing release branch.** Such versions usually include mostly
+  bug fixes and minor improvements. But they can also include new
+  economic protocols and/or new versions of the economic protocol
+  environment, so that users who do not want to migrate to newer major
+  versions yet (because of the possible breaking changes) can still
+  run a node and a baker for these new protocols.
+
+- Release candidates are not releases per se. They are published
+  versions of release branches that are believed to be ready but that
+  require further testing by the community at large. After a few days
+  or weeks, release candidates are either considered to be stable, in
+  which case they are actually released (losing their ``~rc<N>``
+  suffix), or a new release candidate is published with an increment
+  of ``N``. Usually, only major releases have release candidates.
 
 Releases are available in several forms:
 
@@ -53,14 +75,13 @@ The packaged forms are updated from the source form as follows:
 
    -  at each stable release
    -  This is currently a manual process performed by
-      `Nomadic Labs <https://nomadic-labs.com>`_.
+      `Nomadic Labs <https://www.nomadic-labs.com/>`_.
 
 -  APT and DNF binary packages:
 
    -  at each stable release
    -  The process is currently performed manually by
-      `Serokell <https://serokell.io>`_ when the OPAM packages
-      above are generated.
+      `Serokell <https://serokell.io>`_.
 
 For installing Tezos from these different forms of releases, see
 :doc:`../introduction/howtoget`.
