@@ -378,8 +378,6 @@ let round_and_offset round_durations ~level_offset =
   let rec bin_search min_r max_r =
     if Compare.Int32.(min_r >= right_bound) then
       error (Level_offset_too_high level_offset)
-    else if Compare.Int32.(min_r = Int32.pred max_r) then
-      bin_search min_r (Int32.succ max_r)
     else
       let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
       level_offset_of_round round_durations ~round:(Int32.succ round)
@@ -393,7 +391,7 @@ let round_and_offset round_durations ~level_offset =
         if
           Compare.Int64.(
             Period_repr.to_seconds level_offset < current_level_offset)
-        then bin_search min_r (Int32.pred round)
+        then bin_search min_r round
         else
           ok
             {
