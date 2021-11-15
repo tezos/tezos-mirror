@@ -753,7 +753,8 @@ type ``_ Lwt.t``) or a simple result (an immediate value of a
 enough that the module ``Lwt_result_syntax`` provides helpers dedicated
 to this.
 
-**From Lwt-only into Lwt-``result``**
+From Lwt-only into Lwt-``result``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``lwt_ok: 'a Lwt.t -> ('a, 'e) result Lwt.t``: the expression
 ``lwt_ok p`` is a promise which waits for the promise ``p`` to resolve
@@ -771,7 +772,8 @@ function is generally used as follows:
    let* x = lwt_ok @@ plain_lwt_function foo bar in
    ..
 
-**From ``result``-only into Lwt-``result``**
+From ``result``-only into Lwt-``result``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``bind_from_result : ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t``:
 the expression ``bind_from_result r (fun x -> e)`` is either ``e`` with
@@ -1501,72 +1503,6 @@ Exercises
           the calls to [f] have resolved before the whole promise resolves. *)
       val map : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult
 
-.. _lifting-1:
-
-Lifting
-~~~~~~~
-
-When you are working with promises of ``tzresult`` (i.e., within
-Lwt-``tzresult``), you may occasionally need to call functions that
-return a simple promise (i.e., within Lwt-only) or a simple ``tzresult``
-(i.e., within ``tzresult``-only).
-
-This situation is similar to that of ``Lwt_result_syntax`` and the
-solutions are the same. Specifically, the functions provided by
-``Lwt_tzresult_syntax`` are identical to those provided by
-``Lwt_result_syntax``.
-
-**From Lwt-only into Lwt-``result``**
-
-``lwt_ok: 'a Lwt.t -> ('a, 'e) result Lwt.t``: the expression
-``lwt_ok p`` is a promise which waits for the promise ``p`` to resolve
-to a value, after which it resolves successfully with the same value.
-
-Note that within the scope of ``Lwt_tzresult_syntax`` (i.e., within a
-function that handles Lwt-``tzresult`` values), the resulting type is
-generally specialised to ``'a tzresult Lwt.t``. However, this is
-transparent: you do not need to do anything. You simply use it within
-the expression you are binding to:
-
-::
-
-   let* x = lwt_ok @@ plain_lwt_function foo bar in
-   ..
-
-**From ``result``-only into Lwt-``result``**
-
-``bind_from_result : ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t``:
-``bind_from_result r (fun x -> e)`` either continues with ``e`` or
-interrupts immediately without evaluating ``e`` if ``r`` is an
-``Error``.
-
-Note that within the scope of ``Lwt_tzresult_syntax`` (i.e., within a
-function that handles Lwt-``tzresult`` values), the ``result`` type is
-generally specialised to ``'a tzresult``. However, this is transparent:
-you do not need to do anything. You can use it with as pseudo-infix
-binding:
-
-::
-
-   bind_from_result (..) @@ fun .. -> ..
-
-Or, if performance do not matter, you can replace it by lifting with
-``Lwt.return``:
-
-::
-
-   let* .. = Lwt.return @@ .. in
-   ..
-
-Or, if you use it repeatedly within a small enough scope, you can define
-a dedicated binding operator:
-
-::
-
-   let ( let*? ) = bind_from_result in
-   ..
-   let*? .. = .. in
-   ..
 
 Are you kidding me?! there is even more! what module am I supposed to open locally and what operators should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1751,13 +1687,13 @@ for ``List.map``
      (* vanilla map *)
      val map : ('a -> 'b) -> 'a list -> 'b list
 
-     (* `result`-aware map: stops at the first error *)
+     (* [result]-aware map: stops at the first error *)
      val map_e : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
      (* sequential Lwt map: treats each element after the previous one *)
      val map_s : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
-     (* sequential Lwt-`result` map:
+     (* sequential Lwt-[result] map:
         - treats each element after the previous one
         - stops at the first error *)
      val map_es :
@@ -1768,7 +1704,7 @@ for ``List.map``
      (* concurrent Lwt map: treats all the elements concurrently *)
      val map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
-     (* concurrent Lwt-`result` map:
+     (* concurrent Lwt-[result] map:
         - treats all the elements concurrently
         - treats the whole list no matter the success/errors *)
      val map_ep :
@@ -1791,7 +1727,7 @@ new modules:
 Whenever you need to traverse a standard data structure with some
 ``result`` or Lwt or Lwt-``result`` function, ``Lwtreslib`` should have
 that function ready for you. **You should never fold over a data
-structure with a promise or ``result`` accumulator.** E.g., you should
+structure with a promise or result accumulator.** E.g., you should
 do
 
 ::
@@ -2310,7 +2246,7 @@ This compilation unit gathers multiple low-level modules together. Of
 interest to us is ``include Tezos_error_monad.Error_monad`` (left
 untouched in the ``mli``) and ``include Tezos_error_monad.TzLwtreslib``
 (not present in the ``mli``, used to shadow the Stdlib modules ``List``,
-``Option``, Result`, etc.).
+``Option``, ``Result``, etc.).
 
 The ``Error_monad`` module exports:
 
@@ -2406,7 +2342,7 @@ Within your code, you can go from one use to the other. E.g.,
    let xs =
      List.rev_map
        (fun x ->
-         (* `result` as control-flow *)
+         (* [result] as control-flow *)
          let open Result_syntax in
          let* .. = .. in
          let* .. = .. in
@@ -2414,7 +2350,7 @@ Within your code, you can go from one use to the other. E.g.,
        ys
    in
    let successes xs =
-     (* `result` as data *)
+     (* [result] as data *)
      List.length (List.rev_filter_ok xs)
    in
    ..
