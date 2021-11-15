@@ -1,7 +1,10 @@
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
-active_protocol_directories := $(shell tr -- - _ < active_protocol_versions)
+
+define directory_of_version
+src/proto_$(shell echo $1 | tr -- - _)
+endef
 
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
@@ -21,6 +24,13 @@ COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
+TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
+    $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
+    $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
+    $(foreach p, $(active_protocol_versions), \
+		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
+		             echo tezos-endorser-$(p); fi))
+
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
@@ -33,53 +43,16 @@ all:
 
 .PHONY: build-parameters
 build-parameters:
-	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
-	@for p in $(active_protocol_directories) ; do \
-	   mkdir -p src/proto_$$p/parameters ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
-	   cp -f _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
-	 done
+	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) @copy-parameters
 
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
-		src/bin_node/main.exe \
-		src/bin_validation/main_validator.exe \
-		src/bin_client/main_client.exe \
-		src/bin_client/main_admin.exe \
-		src/bin_signer/main_signer.exe \
-		src/bin_codec/codec.exe \
-		src/lib_protocol_compiler/main_native.exe \
-		src/bin_snoop/main_snoop.exe \
-		src/bin_proxy_server/main_proxy_server.exe \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
-		$(foreach p, $(active_protocol_directories), \
-		  $(shell if [ ! -z $(wildcard src/proto_$(p)/bin_endorser/*.ml) ]; then \
-		             echo src/proto_$(p)/bin_endorser/main_endorser_$(p).exe; fi)) \
-		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe)
-	@cp -f _build/default/src/bin_node/main.exe tezos-node
-	@cp -f _build/default/src/bin_validation/main_validator.exe tezos-validator
-	@cp -f _build/default/src/bin_client/main_client.exe tezos-client
-	@cp -f _build/default/src/bin_client/main_admin.exe tezos-admin-client
-	@cp -f _build/default/src/bin_signer/main_signer.exe tezos-signer
-	@cp -f _build/default/src/bin_codec/codec.exe tezos-codec
-	@cp -f _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
-	@cp -f _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
-	@cp -f _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
-	@for p in $(active_protocol_directories) ; do \
-	   cp -f _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
-	   if [ -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe ]; then \
-	      cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
-	   fi ; \
-	   cp -f _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
-	 done
-	@$(MAKE) build-parameters
+	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
+		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
+		@copy-parameters
+	cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
 endif
@@ -344,19 +317,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f \
-		tezos-node \
-		tezos-validator \
-		tezos-client \
-		tezos-signer \
-		tezos-admin-client \
-		tezos-codec \
-		tezos-protocol-compiler \
-		tezos-snoop \
-		tezos-proxy-server \
-		tezos-sandbox \
-	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p)) \
-	  $(foreach p, $(active_protocol_directories), src/proto_$(p)/parameters/sandbox-parameters.json src/proto_$(p)/parameters/test-parameters.json)
+	@-rm -f ${TEZOS_BIN} tezos-sandbox
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
