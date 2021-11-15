@@ -87,12 +87,23 @@ Node
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
 
+- Added two optional fields, ``now`` and ``level`` as input to the
+  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
+  fields can be used to override the values normally returned by the
+  ``NOW`` and ``LEVEL`` instructions.
+
 Client
 ------
 
 - Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be  ``json``, ``binary`` or ``any``.
+
+- Added two options, ``--now`` and ``--level`` to the ``run script``
+  and ``run view`` commands simulating exectution of Michelson
+  code. These options can be used to override the values normally
+  returned by the ``NOW`` and ``LEVEL`` instructions.
 
 
 Baker / Endorser / Accuser
@@ -125,6 +136,11 @@ Miscellaneous
 
 -  Added specific documentation pages about logging for users and
    developers.
+
+Version 11.0
+============
+
+No changes compared to 11.0~rc2.
 
 Version 11.0~rc2
 ================
@@ -362,7 +378,7 @@ Docker Images
    If you use ``tezos-docker-manager.sh``, it will expose this port only to
    other Octez containers.
    In summary, you can now call all RPCs if you use Docker images, without
-   compromising security as long as you do not explicitely expose the RPC port.
+   compromising security as long as you do not explicitly expose the RPC port.
 
 Version 10.3
 ============
@@ -442,7 +458,7 @@ Node
    optional flag ``--auto-repair`` to fix those specific corruptions
    by adding back missing entries.
 
--  Fixed an RPC inconsistency where, after a migration occured, the
+-  Fixed an RPC inconsistency where, after a migration occurred, the
    metadata from blocks returned by RPCs would return inconsistent
    data (blocks prior to a migration from a protocol A to B would
    return that their current protocol is A and next protocol is B
