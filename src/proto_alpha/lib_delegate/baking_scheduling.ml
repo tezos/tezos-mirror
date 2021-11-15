@@ -428,19 +428,24 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     =
   (* FIXME: this function (may) try to instantly repropose a block *)
   let open Baking_state in
-  let wait_end_of_round (next_round_time, next_round) =
+  let wait_end_of_round ?(delta = 0L) (next_round_time, next_round) =
+    let next_time = Time.Protocol.add next_round_time delta in
     let now = Systime_os.now () in
-    let delay = Ptime.diff (Time.System.of_protocol_exn next_round_time) now in
-    Events.(
-      emit
-        waiting_end_of_round
-        (delay, Int32.pred @@ Round.to_int32 next_round, next_round_time))
+    let delay = Ptime.diff (Time.System.of_protocol_exn next_time) now in
+    let current_round = Int32.pred @@ Round.to_int32 next_round in
+    (if delta = 0L then
+     Events.(emit waiting_end_of_round (delay, current_round, next_time))
+    else
+      Events.(
+        emit
+          waiting_delayed_end_of_round
+          (delay, current_round, next_time, delta)))
     >>= fun () ->
     let end_of_round =
       Lwt.return
       @@ End_of_round {ending_round = state.round_state.current_round}
     in
-    match sleep_until next_round_time with
+    match sleep_until next_time with
     | None -> return end_of_round
     | Some t -> return (t >>= fun () -> end_of_round)
   in
@@ -459,6 +464,26 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
             Lwt.return (Time_to_bake_next_level {at_round = next_baking_round})
           )
   in
+  let delay_next_round_timeout next_round =
+    (* we only delay if it's our turn to bake *)
+    match
+      State_transitions.round_proposer
+        state
+        state.level_state.delegate_slots.own_delegate_slots
+        (snd next_round)
+    with
+    | Some _ ->
+        let delta =
+          Round.Durations.first
+            state.global_state.constants.parametric.round_durations
+          |> Period.to_seconds
+          |> fun d -> Int64.div d 5L
+        in
+        (* NB: this means 6 seconds delay, if the first round duration is
+           30. *)
+        wait_end_of_round ~delta next_round
+    | None -> wait_end_of_round next_round
+  in
   (* TODO: re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
@@ -469,7 +494,15 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
       return (Lwt_utils.never_ending () >>= fun () -> assert false)
   (* We have no slot at the next level in the near future, we will
      patiently wait for the next round. *)
-  | (Some next_round, None) -> wait_end_of_round next_round
+  | (Some next_round, None) -> (
+      (* If there is an elected block, then we make the assumption
+         that the bakers at the next level have also received an
+         endorsement quorum, and we delay a bit injecting at the next
+         round, so that there are not two blocks injected at the same
+         time. *)
+      match state.level_state.elected_block with
+      | None -> wait_end_of_round next_round
+      | Some _elected_block -> delay_next_round_timeout next_round)
   (* There is no timestamp for a successor round but there is for a
      future baking slot, we will wait to bake. *)
   | (None, Some next_baking) -> wait_baking_time_next_level next_baking
@@ -483,7 +516,9 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
          round. *)
       if Time.Protocol.(next_baking_time <= add next_round_time 2L) then
         wait_baking_time_next_level next_baking
-      else wait_end_of_round next_round
+      else
+        (* same observation is in the [(Some next_round, None)] case *)
+        delay_next_round_timeout next_round
 
 (* initialises endorsable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk

@@ -30,6 +30,8 @@ let section = [Protocol.name; "baker"]
 
 let pp_int32 fmt n = Format.fprintf fmt "%ld" n
 
+let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
+
 module State_transitions = struct
   include Internal_event.Simple
 
@@ -372,6 +374,23 @@ module Scheduling = struct
       ("round", Data_encoding.int32)
       ~pp3:Timestamp.pp
       ("timestamp", Timestamp.encoding)
+
+  let waiting_delayed_end_of_round =
+    declare_4
+      ~section
+      ~name:"waiting_delayed_end_of_round"
+      ~level:Info
+      ~msg:
+        "waiting {timespan} until {timestamp} (end of round {round} plus \
+         {delay}s delay)"
+      ~pp1:Ptime.Span.pp
+      ("timespan", Time.System.Span.encoding)
+      ~pp2:pp_int32
+      ("round", Data_encoding.int32)
+      ~pp3:Timestamp.pp
+      ("timestamp", Timestamp.encoding)
+      ~pp4:pp_int64
+      ("delay", Data_encoding.int64)
 
   let waiting_time_to_bake =
     declare_2
