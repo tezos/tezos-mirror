@@ -130,15 +130,11 @@ module Internal_for_tests : sig
    *)
   val bottom_up_fold_cps :
     'accumulator ->
-    ('loc, Michelson_v1_primitives.prim) Micheline.node ->
+    'loc Script_repr.michelson_node ->
+    ('accumulator -> 'loc Script_repr.michelson_node -> 'return) ->
     ('accumulator ->
-    ('loc, Michelson_v1_primitives.prim) Micheline.node ->
-    'return) ->
-    ('accumulator ->
-    ('loc, Michelson_v1_primitives.prim) Micheline.node ->
-    ('accumulator ->
-    ('loc, Michelson_v1_primitives.prim) Micheline.node ->
-    'return) ->
+    'loc Script_repr.michelson_node ->
+    ('accumulator -> 'loc Script_repr.michelson_node -> 'return) ->
     'return) ->
     'return
 

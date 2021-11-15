@@ -203,8 +203,7 @@ let add_field_annot a var = function
   | expr -> expr
 
 let rec unparse_comparable_ty_uncarbonated :
-    type a loc. loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node
-    =
+    type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc -> function
   | Unit_key meta -> Prim (loc, T_unit, [], unparse_type_annot meta.annot)
   | Never_key meta -> Prim (loc, T_never, [], unparse_type_annot meta.annot)
@@ -258,7 +257,7 @@ let unparse_memo_size ~loc memo_size =
   Int (loc, z)
 
 let rec unparse_ty_uncarbonated :
-    type a loc. loc:loc -> a ty -> (loc, Script.prim) Micheline.node =
+    type a loc. loc:loc -> a ty -> loc Script.michelson_node =
  fun ~loc ty ->
   let prim (name, args, annot) = Prim (loc, name, args, annot) in
   match ty with
@@ -654,7 +653,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
     unparsing_mode ->
     a comparable_ty ->
     a ->
-    ((loc, Script.prim) Micheline.node * context) tzresult Lwt.t =
+    (loc Script.michelson_node * context) tzresult Lwt.t =
  fun ~loc ctxt mode ty a ->
   (* No need for stack_depth here. Unlike [unparse_data],
      [unparse_comparable_data] doesn't call [unparse_code].
@@ -5895,9 +5894,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       prim list ->
       bool ->
       prim list list
-      * (prim list * (unit, Script.prim) Micheline.node) Entrypoints_map.t ->
+      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t ->
       (prim list list
-      * (prim list * (unit, Script.prim) Micheline.node) Entrypoints_map.t)
+      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t)
       tzresult =
    fun t path reachable acc ->
     match t with

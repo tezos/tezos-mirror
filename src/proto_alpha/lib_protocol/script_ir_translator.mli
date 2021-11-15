@@ -294,7 +294,7 @@ val unparse_comparable_data :
   unparsing_mode ->
   'a Script_typed_ir.comparable_ty ->
   'a ->
-  (('loc, Script.prim) Micheline.node * context) tzresult Lwt.t
+  ('loc Script.michelson_node * context) tzresult Lwt.t
 
 val unparse_code :
   context ->
@@ -380,13 +380,13 @@ val unparse_ty :
   loc:'loc ->
   context ->
   'a Script_typed_ir.ty ->
-  (('loc, Script.prim) Micheline.node * context) tzresult
+  ('loc Script.michelson_node * context) tzresult
 
 val unparse_comparable_ty :
   loc:'loc ->
   context ->
   'a Script_typed_ir.comparable_ty ->
-  (('loc, Script.prim) Micheline.node * context) tzresult
+  ('loc Script.michelson_node * context) tzresult
 
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
@@ -467,7 +467,7 @@ val list_entrypoints :
   context ->
   root_name:Script_typed_ir.field_annot option ->
   (Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * (unit, Script.prim) Micheline.node)
+  * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
     Entrypoints_map.t)
   tzresult
 
