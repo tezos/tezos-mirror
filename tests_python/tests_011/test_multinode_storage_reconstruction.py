@@ -15,9 +15,6 @@ BATCH_2 = 144
 SNAPSHOT_1 = f'snapshot_block_{BATCH_1}.full'
 SNAPSHOT_2 = f'snapshot_block_{BATCH_2}.full'
 
-EXPECTED_BLOCK_ERROR = 'Unable to find block'
-EXPECTED_COMMAND_ERROR = 'Command failed: Unable to find block'
-
 
 def clear_cache(sandbox, node_id):
     # Restart node to clear the store's cache
@@ -101,8 +98,9 @@ class TestMultiNodeStorageReconstruction:
     def test_unavailable_blocks_node2(self, sandbox: Sandbox, session: dict):
         # We must fail while requesting those pruned blocks
         for i in range(1, session['snapshot_1_head_level'] - 1):
-            with utils.assert_run_failure(EXPECTED_COMMAND_ERROR):
-                utils.get_block_metadata_at_level(sandbox.client(2), i)
+            utils.get_block_metadata_at_level(
+                sandbox.client(2), i, expect_failure=True
+            )
 
     # Call the reconstruct command on Node 2
     def test_reconstruct_after_snapshot_import(self, sandbox: Sandbox):
@@ -158,8 +156,9 @@ class TestMultiNodeStorageReconstruction:
         assert utils.get_block_at_level(sandbox.client(3), savepoint)
         # We must fail while requesting blocks before savepoint
         for i in range(1, savepoint):
-            with utils.assert_run_failure(EXPECTED_COMMAND_ERROR):
-                utils.get_block_metadata_at_level(sandbox.client(3), i)
+            utils.get_block_metadata_at_level(
+                sandbox.client(3), i, expect_failure=True
+            )
 
     def test_reconstruct_command_after_bootstrap(self, sandbox: Sandbox):
         # Stop, reconstruct the storage and restart the node

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from typing import Any, List, Optional, Tuple
 
 from process.process_utils import format_command
@@ -112,6 +113,14 @@ class Client:
         self._admin_client = admin_client
         self.rpc_port = rpc_port
 
+        if endpoint is not None:
+            self.endpoint = endpoint
+        else:
+            protocol = 'https' if use_tls else 'http'
+            host = host if host else '127.0.0.1'
+            rpc_port = rpc_port if rpc_port else 8732
+            self.endpoint = f'{protocol}://{host}:{rpc_port}'
+
     def run_generic(
         self,
         params: List[str],
@@ -207,6 +216,26 @@ class Client:
             params = params + ['with', json.dumps(data)]
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
+
+    def rpc_raw(self, verb: str, path: str, data: Any = None):
+        """Run an arbitrary RPC request directly to the client's endpoint
+        without going through the client.
+
+        Args:
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
+            path (str): rpc path
+            data (dict): json data for post
+        Returns:
+            dict representing the json output, raise exception
+            if output isn't json.
+        """
+        url = self.endpoint + path
+        print(format_command(['raw rpc', verb, url]))
+        request = urllib.request.Request(url, method=verb.upper(), data=data)
+        with urllib.request.urlopen(request) as results:
+            body = results.read()
+            print(body)
+            return json.loads(body.decode())
 
     def remember_contract(
         self, alias: str, contract_address: str, force: bool = False

@@ -19,9 +19,6 @@ EXPECTED_CABOOSE = 0
 # savepoint - max_op_ttl(cp)
 EXPECTED_ROLLING_CABOOSE = EXPECTED_SAVEPOINT - MAX_OP_TTL
 
-EXPECTED_SERVICE_ERROR = 'Did not find service'
-EXPECTED_COMMAND_ERROR = 'Command failed: Unable to find block'
-
 
 def check_expected_values(head):
     assert head['header']['level'] == EXPECTED_LEVEL
@@ -103,8 +100,9 @@ class TestLegacy:
     def test_full_consistency_2(self, sandbox, nodes_legacy_store):
         # pylint: disable=unused-argument
         for i in range(1, EXPECTED_CHECKPOINT):
-            with utils.assert_run_failure(EXPECTED_COMMAND_ERROR):
-                utils.get_block_metadata_at_level(sandbox.client(2), i)
+            utils.get_block_metadata_at_level(
+                sandbox.client(2), i, expect_failure=True
+            )
 
     # All block headers in [1; CHECKPOINT] must be available
     def test_full_consistency_3(self, sandbox, nodes_legacy_store):
@@ -146,16 +144,16 @@ class TestLegacy:
     def test_rolling_consistency_2(self, sandbox, nodes_legacy_store):
         # pylint: disable=unused-argument
         for i in range(1, EXPECTED_ROLLING_CABOOSE):
-            with utils.assert_run_failure(EXPECTED_SERVICE_ERROR):
-                utils.get_block_at_level(sandbox.client(3), i)
+            utils.get_block_at_level(sandbox.client(3), i, expect_failure=True)
 
     # All blocks in [ROLLING_CABOOSE ; CHECKPOINT] must not be available
     # (only headers are)
     def test_rolling_consistency_3(self, sandbox, nodes_legacy_store):
         # pylint: disable=unused-argument
         for i in range(EXPECTED_ROLLING_CABOOSE, EXPECTED_CHECKPOINT):
-            with utils.assert_run_failure(EXPECTED_COMMAND_ERROR):
-                utils.get_block_metadata_at_level(sandbox.client(3), i)
+            utils.get_block_metadata_at_level(
+                sandbox.client(3), i, expect_failure=True
+            )
 
     # All block headers in [SAVEPOINT ; CHECKPOINT] must be available
     def test_rolling_consistency_4(self, sandbox, nodes_legacy_store):
