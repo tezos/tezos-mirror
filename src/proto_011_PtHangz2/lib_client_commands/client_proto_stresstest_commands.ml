@@ -750,7 +750,15 @@ let fresh_probability_arg =
   arg
     ~long:"fresh-probability"
     ~placeholder:"float in [0;1]"
-    ~doc:"probability for a destination to be a fresh account"
+    ~doc:
+      (Format.sprintf
+         "Probability for each transaction's destination to be a fresh \
+          account. The default value is %g. This new account may then be used \
+          as source or destination of subsequent transactions, just like the \
+          accounts that were initially provided to the command. Note that when \
+          [--single-op-per-pkh-per-block] is set, the new account will not be \
+          used as source until the head changes."
+         default_parameters.fresh_probability)
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
          match float_of_string s with
          | exception _ ->
