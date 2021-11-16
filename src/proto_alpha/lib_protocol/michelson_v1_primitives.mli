@@ -37,7 +37,16 @@ type error +=
     - types (prefixed with [T_]);
     - constants (prefixed with [D_]);
     - instructions (prefixed with [I_]);
-    - keywords (prefixed with [K_]). *)
+    - keywords (prefixed with [K_]).
+
+    Recall that Micheline is essentially just S-expressions with
+    a few extra atom types for strings and numbers. This variant
+    represents the values the [Prim] atoms in the Michelson subset
+    of Micheline. Other types (such as ['a Micheline.canonical]) are
+    frequently parameterized by this type. This gives us a strongly-typed 
+    subset of Micheline while keeping the set of primitives independent
+    from the definition of Micheline for easier changes.
+*)
 type prim =
   | K_parameter
   | K_storage
