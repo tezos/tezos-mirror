@@ -25,6 +25,8 @@
 
 (rule
  (targets generated_git_info.ml)
+ ; Ensures the hash update whenever a source file is modified ;
+ (deps (universe))
  (action (run ./get_git_info.exe))
 )
 
