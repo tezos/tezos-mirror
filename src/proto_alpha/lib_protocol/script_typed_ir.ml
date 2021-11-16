@@ -26,6 +26,7 @@
 
 open Alpha_context
 open Script_int
+open Script_ir_annot
 
 (*
 
@@ -57,12 +58,6 @@ type step_constants = {
 }
 
 (* Preliminary definitions. *)
-
-type var_annot = Var_annot of string [@@ocaml.unboxed]
-
-type type_annot = Type_annot of string [@@ocaml.unboxed]
-
-type field_annot = Field_annot of string [@@ocaml.unboxed]
 
 type never = |
 

@@ -2724,7 +2724,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
            ~stack_depth:(stack_depth + 1)
            ctxt
            ~legacy
-           (ta, Some (Var_annot "@arg"))
+           (ta, lambda_arg_annot)
            tr
            script_instr
   | (Lambda_t _, expr) ->

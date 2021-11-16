@@ -33,11 +33,11 @@ let script_string_size s = Script_string.to_string s |> string_size
    Micheline representation and that the strings are always
    shared. (One can check that they are never copied.) Besides, the
    following types are unboxed so that they have no tags. *)
-let type_annot_size (Type_annot _) = !!0
+let type_annot_size (Script_ir_annot.Type_annot _) = !!0
 
-let field_annot_size (Field_annot _) = !!0
+let field_annot_size (Script_ir_annot.Field_annot _) = !!0
 
-let var_annot_size (Var_annot _) = !!0
+let var_annot_size (Script_ir_annot.Var_annot _) = !!0
 
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0

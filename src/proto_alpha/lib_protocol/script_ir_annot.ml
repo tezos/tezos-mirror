@@ -26,7 +26,20 @@
 open Alpha_context
 open Micheline
 open Script_tc_errors
-open Script_typed_ir
+
+type var_annot = Var_annot of string [@@ocaml.unboxed]
+
+type type_annot = Type_annot of string [@@ocaml.unboxed]
+
+type field_annot = Field_annot of string [@@ocaml.unboxed]
+
+module FOR_TESTS = struct
+  let unsafe_var_annot_of_string s = Var_annot s
+
+  let unsafe_type_annot_of_string s = Type_annot s
+
+  let unsafe_field_annot_of_string s = Field_annot s
+end
 
 let default_now_annot = Some (Var_annot "now")
 
@@ -43,6 +56,8 @@ let default_sender_annot = Some (Var_annot "sender")
 let default_self_annot = Some (Var_annot "self")
 
 let default_arg_annot = Some (Var_annot "arg")
+
+let lambda_arg_annot = Some (Var_annot "@arg")
 
 let default_param_annot = Some (Var_annot "parameter")
 
