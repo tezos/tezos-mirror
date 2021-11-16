@@ -30,28 +30,6 @@
    Subject:      Test the [stresstest] client command
 *)
 
-(** Tests the [stresstest] client command with explicit values for
-    optional arguments [transfers] and [tps]. *)
-let test_stresstest_explicit =
-  Protocol.register_test ~__FILE__ ~title:"stresstest explicit" ~tags:["client"]
-  @@ fun protocol ->
-  let* node =
-    Node.init
-      [Synchronisation_threshold 0; Connections 0; Disable_operations_precheck]
-  in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-     Stresstest command uses counters to inject a lot of operations with limited
-     number of bootstrap accounts. With precheck these operations are mostly
-     rejected because we don't apply the effect of operations in the
-     prevalidation context in mempool mode anymore. So, only the operation with
-     the correct counter is considered as Applied (without incrementing the
-     counter in the context). Once the issue is fixed, the
-     [Disable_operations_precheck] flag above can be removed. *)
-  let* client = Client.init ~endpoint:Client.(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = Node.wait_for_level node 1 in
-  Client.stresstest ~transfers:30 ~tps:25 client
-
 (** Waits for [n] injection request events. *)
 let wait_for_n_injections ?(log = false) n node =
   if log then Log.info "Waiting for %d injections." n ;
@@ -65,33 +43,6 @@ let wait_for_n_injections ?(log = false) n node =
     | Some _ | None -> None
   in
   Node.wait_for node "request_completed_notice.v0" filter
-
-(** Tests the [stresstest] client command without providing optional
-    arguments [transfers] and [tps]. This means the command won't
-    stop (it only stops after [transfers] operations when the argument
-    is given), so instead we use {!wait_for_n_injections} to finish
-    the test. *)
-let test_stresstest_implicit =
-  Protocol.register_test ~__FILE__ ~title:"stresstest implicit" ~tags:["client"]
-  @@ fun protocol ->
-  let* node =
-    Node.init
-      [Synchronisation_threshold 0; Connections 0; Disable_operations_precheck]
-  in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-     Stresstest command uses counters to inject a lot of operations with limited
-     number of bootstrap accounts. With precheck these operations are mostly
-     rejected because we don't apply the effect of operations in the
-     prevalidation context in mempool mode anymore. So, only the operation with
-     the correct counter is considered as Applied (without incrementing the
-     counter in the context). Once the issue is fixed, the
-     [Disable_operations_precheck] flag above can be removed. *)
-  let* client = Client.init ~endpoint:Client.(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = Node.wait_for_level node 1 in
-  let waiter = wait_for_n_injections 50 node in
-  let _ = Client.stresstest client in
-  waiter
 
 (** Tests the various possible formats to provide sources to the
     [stresstest] command: alias, public key hash, or explicit key. *)
@@ -478,8 +429,6 @@ let test_stresstest_applied_multiple_nodes_1op =
     first_client
 
 let register ~protocols =
-  test_stresstest_explicit ~protocols ;
-  test_stresstest_implicit ~protocols ;
   test_stresstest_sources_format ~protocols ;
   test_stresstest_applied ~protocols ;
   test_stresstest_applied_new_bootstraps ~protocols ;
