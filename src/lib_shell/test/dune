@@ -5,7 +5,7 @@
   test_synchronisation_heuristic_fuzzy
   test_prevalidation
   test_prevalidator_classification
-  test_prevalidator_classification_handle_operations)
+  test_prevalidator_classification_operations)
  (libraries
   tezos-base
   tezos-base-test-helpers
@@ -53,7 +53,7 @@
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{exe:test_prevalidator_classification_handle_operations.exe})))
+ (action (run %{exe:test_prevalidator_classification_operations.exe})))
 
 (rule
  (alias runtest)

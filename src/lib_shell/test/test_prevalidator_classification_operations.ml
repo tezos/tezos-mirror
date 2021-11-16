@@ -26,8 +26,9 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe
+    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe
     Subject:      Unit tests [Prevalidator_classification.Internal_for_tests.handle_live_operations]
+                  and [Prevalidator_classification.recyle_operations]
 *)
 
 open Lib_test.Qcheck_helpers
@@ -247,11 +248,13 @@ module Block = struct
         assert false
     | Ok hash -> hash
 
+  (** Returns the [hash] field of a {!t} *)
+  let to_hash (blk : t) = blk.hash
+
   let tools : t Classification.block_tools =
-    let hash block = block.hash in
     let operations block = List.map (List.map snd) block.operations in
     let all_operation_hashes block = List.map (List.map fst) block.operations in
-    {hash; operations; all_operation_hashes}
+    {hash = to_hash; operations; all_operation_hashes}
 
   let to_string t =
     let ops_list_to_string ops =
@@ -557,29 +560,72 @@ let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
     Operation_hash.Set.t =
   List.concat blocks |> List.concat |> Operation_hash.Set.of_list
 
+(** [is_subset m1 m2] returns whether all bindings of [m1] are in [m2].
+    In other words, it returns whether [m2] is a superset of [m1]. *)
+let is_subset (m1 : Operation.t Op_map.t) (m2 : Operation.t Op_map.t) =
+  let rec go (m1_seq : (Operation_hash.t * Operation.t) Seq.t) =
+    match m1_seq () with
+    | Seq.Nil -> true
+    | Seq.Cons ((m1_key, m1_value), m1_rest) -> (
+        match Op_map.find m1_key m2 with
+        | None -> (* A key in [m1] that is not in [m2] *) false
+        | Some m2_value -> Operation.equal m1_value m2_value && go m1_rest)
+  in
+  go (Op_map.to_seq m1)
+
 module Handle_operations = struct
-  (** Test that [handle_live_operations] returns an empty map
-      of operations when [is_branch_alive] rules
-      out all operations *)
-  let test_handle_live_operations_live_blocks_all_outdated =
+  (** Test that operations returned by [handle_live_operations]
+      are all in the alive branch. *)
+  let test_handle_live_operations_is_branch_alive =
+    (* Like [Generators.chain_tools_gen], but also picks a random subset of
+       blocks from the tree to pass an interesting value to [is_branch_alive].
+       Could be in [chain_tools_gen] itself, but only used in this test. So
+       it would be overkill. *)
+    let gen =
+      let open QCheck.Gen in
+      let* (chain, tree, pair_blocks_opt, old_mempool) =
+        Generators.chain_tools_gen ?blocks:None
+      in
+      let* live_blocks =
+        sublist (Tree.values tree)
+        >|= List.map (fun (blk : Block.t) -> blk.hash)
+      in
+      return
+        ( chain,
+          tree,
+          pair_blocks_opt,
+          old_mempool,
+          Block_hash.Set.of_list live_blocks )
+    in
+    let arb = QCheck.make gen in
     QCheck.Test.make
-      ~name:
-        "[handle_live_operations ~is_branch_alive:(Fun.const false)] is empty"
-      Arbitraries.chain_tools_arb
-    @@ fun (chain, _tree, pair_blocks_opt, old_mempool) ->
+      ~name:"[handle_live_operations] is a subset of alive blocks"
+      arb
+    @@ fun (chain, tree, pair_blocks_opt, old_mempool, live_blocks) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let expected_superset : Operation.t Op_map.t =
+      (* Take all blocks *)
+      Tree.values tree
+      (* Keep only the ones in live_blocks *)
+      |> List.filter (fun (blk : Block.t) ->
+             Block_hash.Set.mem blk.hash live_blocks)
+      (* Then extract (oph, op) pairs from them *)
+      |> List.map (fun (blk : Block.t) -> blk.operations)
+      |> List.concat |> List.concat |> List.to_seq |> Op_map.of_seq
+    in
     let actual : Operation.t Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
         ~block_store:Block.tools
         ~chain
         ~from_branch
         ~to_branch
-        ~is_branch_alive:(Fun.const false)
+        ~is_branch_alive:(fun blk_hash ->
+          Block_hash.Set.mem blk_hash live_blocks)
         old_mempool
       |> Lwt_main.run
     in
-    qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
+    qcheck_cond ~pp:op_map_pp ~cond:is_subset actual expected_superset ()
 
   (** Test that operations returned by [handle_live_operations] is
       the union of 1/ operations from its last argument (a map) and 2/
@@ -755,7 +801,7 @@ module Recyle_operations = struct
       List.map to_ops blocks |> List.concat |> oph_op_list_to_map
     in
     let both f (a, b) = (f a, f b) in
-    let blocks_hashes = List.map (fun (blk : Block.t) -> blk.hash) blocks in
+    let blocks_hashes = List.map Block.to_hash blocks in
     let block_hash_t =
       (* For classification and pending, put 50% of them in live_blocks.
          For the remaining 50%, generate branch randomly, so likely outside
@@ -780,9 +826,17 @@ module Recyle_operations = struct
   let arb = QCheck.make gen
 
   (** Test that {!Classification.recycle_operations} returns an empty map when
-      live blocks are empty. This test lifts
-      {!Handle_operations.test_handle_live_operations_live_blocks_all_outdated}
-      to [recycle_operations]. *)
+      live blocks are empty.
+
+      We do not lift the test
+      {!Handle_operations.test_handle_live_operations_is_branch_alive}
+      to [recycle_operations] (checking that operations returned by
+      [recycle_operations] are all in [live_blocks]), because we have
+      to account for operations in [classification] and [pending], and
+      we don't have the assumption that their branch are disjoint from
+      each other and from branches in [tree] (because generation
+      is partly random for them). This makes lifting
+      the [handle_operations] test quite heavy. We don't do that. *)
   let test_recycle_operations_empty_live_blocks =
     QCheck.Test.make
       ~name:"[recycle_operations ~live_blocks:empty] is empty"
@@ -824,9 +878,7 @@ module Recyle_operations = struct
       |> force_opt ~loc:__LOC__
     in
     let live_blocks : Block_hash.Set.t =
-      Tree.values tree
-      |> List.map (fun (blk : Block.t) -> blk.hash)
-      |> Block_hash.Set.of_list
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     (* This is inherited from the behavior of [handle_live_operations] *)
     let expected_from_tree : Operation_hash.Set.t =
@@ -887,9 +939,7 @@ module Recyle_operations = struct
              handle_branch_refused ) ->
     QCheck.assume @@ Option.is_some pair_blocks_opt ;
     let live_blocks : Block_hash.Set.t =
-      Tree.values tree
-      |> List.map (fun (blk : Block.t) -> blk.hash)
-      |> Block_hash.Set.of_list
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     let expected : Operation.t Op_map.t =
       Classification.Internal_for_tests.to_map
@@ -930,18 +980,18 @@ let () =
     "Prevalidator"
     [
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'handle_operations' *)
+         dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe -- test 'handle_operations' *)
       ( "handle_operations",
         qcheck_wrap
           Handle_operations.
             [
-              test_handle_live_operations_live_blocks_all_outdated;
+              test_handle_live_operations_is_branch_alive;
               test_handle_live_operations_path_spec;
               test_handle_live_operations_clear;
               test_handle_live_operations_inject;
             ] );
       (* Run only first two tests (for example) with:
-         dune exec src/lib_shell/test/test_prevalidator_classification_handle_operations.exe -- test 'recycle_operations' '0..2'*)
+         dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe -- test 'recycle_operations' '0..2'*)
       ( "recycle_operations",
         qcheck_wrap
           Recyle_operations.
