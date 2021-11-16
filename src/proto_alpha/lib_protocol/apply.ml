@@ -1118,8 +1118,17 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
     parsed_script.storage_type
     storage
   >>=? fun (storage, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Script.lazy_expr (Micheline.strip_locations storage) in
-  let script = {script with storage} in
+  (* Normalize code to avoid #843 *)
+  Script_ir_translator.unparse_code
+    ctxt
+    Optimized
+    (Micheline.root unparsed_code)
+  >>=? fun (code, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
+  let code = Script.lazy_expr (Micheline.strip_locations code) in
+  let script = {Script.code; storage} in
   (match preorigination with
   | Some contract ->
       assert internal ;
