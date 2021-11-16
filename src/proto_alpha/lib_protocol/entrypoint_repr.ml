@@ -23,12 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Invariants on the string: 1 <= length <= 31 *)
-type t = Non_empty_string.t
+module Pre_entrypoint : sig
+  (** Invariants on the string: 1 <= length <= 31 *)
+  type t = private Non_empty_string.t
 
-let compare = Non_empty_string.compare
+  val of_non_empty_string : Non_empty_string.t -> t option
+end = struct
+  type t = Non_empty_string.t
 
-let ( = ) = Non_empty_string.( = )
+  let of_non_empty_string (str : Non_empty_string.t) =
+    if Compare.Int.(String.length (str :> string) > 31) then None else Some str
+end
+
+type t = Pre_entrypoint.t
+
+let compare (x : t) (y : t) =
+  Non_empty_string.compare (x :> Non_empty_string.t) (y :> Non_empty_string.t)
+
+let ( = ) (x : t) (y : t) =
+  Non_empty_string.( = ) (x :> Non_empty_string.t) (y :> Non_empty_string.t)
 
 type error += Name_too_long of string
 
@@ -59,7 +72,13 @@ let () =
     (function Unexpected_default loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_default loc)
 
-let default = Non_empty_string.of_string_exn "default"
+let default =
+  match
+    Pre_entrypoint.of_non_empty_string
+    @@ Non_empty_string.of_string_exn "default"
+  with
+  | None -> assert false
+  | Some res -> res
 
 let is_default name = name = default
 
@@ -70,9 +89,9 @@ type of_string_result =
       (** Got exactly "default", which can be an error in some cases or OK in others *)
 
 let of_non_empty_string (str : Non_empty_string.t) =
-  if Compare.Int.(String.length (str :> string) > 31) then Too_long
-  else if is_default str then Got_default
-  else Ok str
+  match Pre_entrypoint.of_non_empty_string str with
+  | None -> Too_long
+  | Some str -> if is_default str then Got_default else Ok str
 
 let of_string str =
   match Non_empty_string.of_string str with
@@ -130,13 +149,13 @@ let of_string_lax' str =
   | None -> Error ("Entrypoint name too long \"" ^ str ^ "\"")
   | Some name -> Ok name
 
-let root = Non_empty_string.of_string_exn "root"
+let root = of_string_strict_exn "root"
 
-let do_ = Non_empty_string.of_string_exn "do"
+let do_ = of_string_strict_exn "do"
 
-let set_delegate = Non_empty_string.of_string_exn "set_delegate"
+let set_delegate = of_string_strict_exn "set_delegate"
 
-let remove_delegate = Non_empty_string.of_string_exn "remove_delegate"
+let remove_delegate = of_string_strict_exn "remove_delegate"
 
 let to_address_suffix (name : t) =
   if is_default name then "" else "%" ^ (name :> string)
@@ -165,7 +184,7 @@ let smart_encoding =
     ~description:"Named entrypoint to a Michelson smart contract"
     "entrypoint"
   @@
-  let builtin_case tag (name : Non_empty_string.t) =
+  let builtin_case tag (name : Pre_entrypoint.t) =
     case
       (Tag tag)
       ~title:(name :> string)
@@ -184,7 +203,7 @@ let smart_encoding =
         (Tag 255)
         ~title:"named"
         (Bounded.string 31)
-        (fun (name : Non_empty_string.t) -> Some (name :> string))
+        (fun (name : Pre_entrypoint.t) -> Some (name :> string))
         of_string_lax_exn;
     ]
 
@@ -199,5 +218,11 @@ let rpc_arg =
 let in_memory_size (name : t) =
   Cache_memory_helpers.string_size_gen (String.length (name :> string))
 
-module Set = Set.Make (Non_empty_string)
-module Map = Map.Make (Non_empty_string)
+module T = struct
+  type nonrec t = t
+
+  let compare = compare
+end
+
+module Set = Set.Make (T)
+module Map = Map.Make (T)
