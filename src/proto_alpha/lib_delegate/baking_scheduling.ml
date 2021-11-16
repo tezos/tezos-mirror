@@ -508,17 +508,26 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   | (None, Some next_baking) -> wait_baking_time_next_level next_baking
   (* We choose the earliest timestamp between waiting to bake and
      waiting for the next round. *)
-  | ( Some ((next_round_time, _) as next_round),
+  | ( Some ((next_round_time, next_round) as next_round_info),
       Some ((next_baking_time, _) as next_baking) ) ->
-      (* If we can bake before (or at most 2s after) the next round
-         starts then bake. In other words if both timestamps are close
-         enough, waiting to bake supersedes waiting for the next
-         round. *)
-      if Time.Protocol.(next_baking_time <= add next_round_time 2L) then
-        wait_baking_time_next_level next_baking
+      (* If we can bake at the next level before the end of the next
+         round, then do so. This is because the proposed block will have
+         a smaller timestamp than the earliest block at next level built
+         on top of the proposal made at the next round (at the current
+         level). *)
+      let next_round_duration =
+        Round.round_duration
+          state.global_state.constants.parametric.round_durations
+          next_round
+        |> Period.to_seconds
+      in
+      if
+        Time.Protocol.(
+          next_baking_time < add next_round_time next_round_duration)
+      then wait_baking_time_next_level next_baking
       else
         (* same observation is in the [(Some next_round, None)] case *)
-        delay_next_round_timeout next_round
+        delay_next_round_timeout next_round_info
 
 (* initialises endorsable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk
