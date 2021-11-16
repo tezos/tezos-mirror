@@ -27,38 +27,6 @@
 open Test_utils
 open Legacy_utils
 
-(* From "legacy chain_validator"*)
-let may_update_checkpoint chain_state new_head =
-  Legacy_state.Chain.checkpoint chain_state >>= fun checkpoint ->
-  Legacy_state.Block.last_allowed_fork_level new_head >>=? fun new_level ->
-  if new_level <= checkpoint.shell.level then return_unit
-  else
-    let state = Legacy_state.Chain.global_state chain_state in
-    Legacy_state.history_mode state >>= fun history_mode ->
-    let head_level = Legacy_state.Block.level new_head in
-    Legacy_state.Block.predecessor_n
-      new_head
-      (Int32.to_int (Int32.sub head_level new_level))
-    >>= function
-    | None -> assert false (* should not happen *)
-    | Some new_checkpoint -> (
-        Legacy_state.Block.read_opt chain_state new_checkpoint >>= function
-        | None -> assert false (* should not happen *)
-        | Some new_checkpoint -> (
-            let new_checkpoint = Legacy_state.Block.header new_checkpoint in
-            match history_mode with
-            | History_mode.Legacy.Archive ->
-                Legacy_state.Chain.set_checkpoint chain_state new_checkpoint
-                >>= fun () -> return_unit
-            | Full ->
-                Legacy_state.Chain.set_checkpoint_then_purge_full
-                  chain_state
-                  new_checkpoint
-            | Rolling ->
-                Legacy_state.Chain.set_checkpoint_then_purge_rolling
-                  chain_state
-                  new_checkpoint))
-
 let assert_presence new_chain_store previously_baked_blocks ?savepoint ?caboose
     = function
   | History_mode.Archive ->

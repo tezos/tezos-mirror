@@ -120,8 +120,6 @@ let choose_exp_nat n =
   let u = Random.float 1. in
   -.log u /. lambda |> int_of_float
 
-let pi = 3.1415926502
-
 let two_pi = 2. *. 3.1415926502
 
 let round x = x +. 0.5 |> int_of_float

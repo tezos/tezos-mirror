@@ -509,7 +509,8 @@ module Consensus = struct
       method get_logs = List.rev !rev_logs
     end
 
-  let print_keys l =
+  (* used for debugging *)
+  let _print_keys l =
     let l = List.map (fun s -> "\"" ^ s ^ "\"") l in
     "[" ^ String.concat "; " l ^ "]"
 

@@ -705,20 +705,6 @@ let assert_unexpansion original ex =
       ok ()
   | _ :: _ -> Error errors
 
-let assert_unexpansion_consistent original =
-  let ({Michelson_v1_parser.expanded; _}, errors) =
-    let source = print (Micheline.strip_locations original) in
-    Michelson_v1_parser.expand_all ~source ~original
-  in
-  match errors with
-  | _ :: _ -> Error errors
-  | [] ->
-      let {Michelson_v1_parser.unexpanded; _} =
-        Michelson_v1_printer.unparse_expression expanded
-      in
-      Assert.equal ~print unexpanded (Micheline.strip_locations original) ;
-      ok ()
-
 (** Unexpanding "UNIT; FAILWITH"
     yields      "FAIL"
 *)

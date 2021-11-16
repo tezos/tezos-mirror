@@ -33,31 +33,6 @@
 open Tezos_micheline_rewriting
 open Tezos_protocol_alpha.Protocol
 
-let rec update_contract_script :
-    ('l, 'p) Micheline.node -> ('l, 'p) Micheline.node = function
-  | Micheline.Seq
-      (_, Micheline.Prim (_, Michelson_v1_primitives.I_ADDRESS, [], []) :: l) ->
-      Micheline.Seq
-        ( 0,
-          Micheline.Prim (0, Michelson_v1_primitives.I_ADDRESS, [], [])
-          ::
-          Micheline.Prim (0, Michelson_v1_primitives.I_CHAIN_ID, [], [])
-          :: Micheline.Prim (0, Michelson_v1_primitives.I_PAIR, [], []) :: l )
-  | Micheline.Seq (_, a :: l) -> (
-      let a' = update_contract_script a in
-      let b = Micheline.Seq (0, l) in
-      let b' = update_contract_script b in
-      match b' with
-      | Micheline.Seq (_, l') -> Micheline.Seq (0, a' :: l')
-      | _ -> assert false)
-  | Micheline.Prim (_, p, l, annot) ->
-      Micheline.Prim (0, p, List.map update_contract_script l, annot)
-  | script -> script
-
-let update_contract_script : Script_repr.expr -> Script_repr.expr =
- fun script ->
-  Micheline.strip_locations (update_contract_script (Micheline.root script))
-
 module Michelson_signature :
   Signature.S with type t = Michelson_v1_primitives.prim = struct
   type t = Michelson_v1_primitives.prim

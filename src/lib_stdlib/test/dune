@@ -4,7 +4,6 @@
   test_tzList
   test_bounded_heap
   test_tzString
-  test_arrays
   test_fallbackArray
   test_functionalArray
   test_lwt_pipe

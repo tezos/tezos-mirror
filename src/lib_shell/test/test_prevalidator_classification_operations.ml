@@ -88,7 +88,7 @@ module Tree = struct
 
   (* Note that I intentionally do not use {!Format} as automatic
      line cutting makes reading the output (when debugging) harder. *)
-  let rec to_string elem_to_string t indent =
+  let rec to_string_aux elem_to_string t indent =
     match t with
     | Leaf e -> indent ^ elem_to_string e
     | Node1 (e, subt) ->
@@ -97,17 +97,18 @@ module Tree = struct
           "%s%s\n%s"
           indent
           (elem_to_string e)
-          (to_string elem_to_string subt indentpp)
+          (to_string_aux elem_to_string subt indentpp)
     | Node2 (e, t1, t2) ->
         let indentpp = indent ^ "  " in
         Printf.sprintf
           "%s%s\n%s\n%s"
           indent
           (elem_to_string e)
-          (to_string elem_to_string t1 indentpp)
-          (to_string elem_to_string t2 indentpp)
+          (to_string_aux elem_to_string t1 indentpp)
+          (to_string_aux elem_to_string t2 indentpp)
 
-  let to_string elem_to_string t = to_string elem_to_string t ""
+  (* [to_string] is unused but useful when debugging, renaming it to [_to_string] to keep it around  *)
+  let _to_string elem_to_string t = to_string_aux elem_to_string t ""
 
   let rec depth = function
     | Leaf _ -> 1
@@ -270,8 +271,10 @@ module Block = struct
     in
     Format.asprintf "%a:[%s]" Block_hash.pp t.hash ops_string
 
+  (* [pp_list] is unused but useful when debugging, renaming it to [_pp_list] to keep it around  *)
+
   (** Pretty prints a list of {!t}, using [sep] as the separator *)
-  let pp_list ~(sep : string) (ts : t list) =
+  let _pp_list ~(sep : string) (ts : t list) =
     String.concat sep @@ List.map to_string ts
 
   module Ord = struct

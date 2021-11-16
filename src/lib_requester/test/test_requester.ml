@@ -64,8 +64,6 @@ let is_resolved p = match Lwt.state p with Return _ -> true | _ -> false
 
 let is_pending p = match Lwt.state p with Sleep -> true | _ -> false
 
-let is_failed p = match Lwt.state p with Fail _ -> true | _ -> false
-
 (** Start tests *)
 
 (** Creates a requester with [Disk_table] (of size 16) as the store. *)

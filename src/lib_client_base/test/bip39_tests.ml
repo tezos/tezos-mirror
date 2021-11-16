@@ -268,7 +268,9 @@ let vectors () =
       let words = String.split_on_char ' ' words in
       let mnemonic = Bip39.of_entropy (Hex.to_bytes entropy) in
       let words_computed = Bip39.to_words mnemonic in
-      assert (words = words_computed) ;
+      if words <> words_computed then (
+        Format.printf "%a\n" pp_diff (words, words_computed) ;
+        failwith "unexpected difference") ;
       let seed_computed =
         Bip39.to_seed ~passphrase:(Bytes.of_string "TREZOR") mnemonic
       in
