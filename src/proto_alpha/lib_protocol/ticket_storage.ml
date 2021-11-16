@@ -49,7 +49,8 @@ let hash_of_node ctxt node =
   | None -> error Failed_to_hash_node
 
 let make_key_hash ctxt ~ticketer ~typ ~contents ~owner =
-  hash_of_node ctxt @@ Micheline.Seq (0, [ticketer; typ; contents; owner])
+  hash_of_node ctxt
+  @@ Micheline.Seq (Micheline.dummy_location, [ticketer; typ; contents; owner])
 
 let () =
   let open Data_encoding in

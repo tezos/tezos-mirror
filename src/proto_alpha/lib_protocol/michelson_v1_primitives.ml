@@ -549,8 +549,8 @@ let prims_of_strings expr =
           (Invalid_primitive_name (expr, loc))
           (prim_of_string prim)
         >>? fun prim ->
-        List.map_e convert args >|? fun args -> Prim (0, prim, args, annot)
-    | Seq (_, args) -> List.map_e convert args >|? fun args -> Seq (0, args)
+        List.map_e convert args >|? fun args -> Prim (loc, prim, args, annot)
+    | Seq (loc, args) -> List.map_e convert args >|? fun args -> Seq (loc, args)
   in
   convert (root expr) >|? fun expr -> strip_locations expr
   [@@coq_axiom_with_reason
@@ -559,13 +559,13 @@ let prims_of_strings expr =
 let strings_of_prims expr =
   let rec convert = function
     | (Int _ | String _ | Bytes _) as expr -> expr
-    | Prim (_, prim, args, annot) ->
+    | Prim (loc, prim, args, annot) ->
         let prim = string_of_prim prim in
         let args = List.map convert args in
-        Prim (0, prim, args, annot)
-    | Seq (_, args) ->
+        Prim (loc, prim, args, annot)
+    | Seq (loc, args) ->
         let args = List.map convert args in
-        Seq (0, args)
+        Seq (loc, args)
   in
   strip_locations (convert (root expr))
   [@@coq_axiom_with_reason

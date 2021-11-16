@@ -640,11 +640,11 @@ let action_to_expr_generic ~loc = function
 
 let action_to_expr_legacy ~loc = function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} ->
-      if parameter <> Tezos_micheline.Micheline.strip_locations (unit ~loc:0)
+      if parameter <> Tezos_micheline.Micheline.strip_locations (unit ~loc:())
       then Error_monad.error @@ Unsupported_feature_generic_call parameter
       else if
         parameter_type
-        <> Tezos_micheline.Micheline.strip_locations (unit_t ~loc:0)
+        <> Tezos_micheline.Micheline.strip_locations (unit_t ~loc:())
       then
         Error_monad.error @@ Unsupported_feature_generic_call_ty parameter_type
       else
@@ -739,9 +739,9 @@ let action_of_expr_not_generic e =
                    Data_encoding.Binary.of_bytes_exn Contract.encoding s;
                  entrypoint = "default";
                  parameter_type =
-                   Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:0;
+                   Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:();
                  parameter =
-                   Tezos_micheline.Micheline.strip_locations @@ unit ~loc:0;
+                   Tezos_micheline.Micheline.strip_locations @@ unit ~loc:();
                })
   | Tezos_micheline.Micheline.Prim
       ( _,
@@ -876,7 +876,7 @@ let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
           return @@ some ~loc (String (loc, Signature.to_b58check signature)))
     optional_signatures
   >>=? fun l ->
-  Lwt.return @@ action_to_expr ~loc:0 ~generic action >>=? fun expr ->
+  Lwt.return @@ action_to_expr ~loc ~generic action >>=? fun expr ->
   return @@ strip_locations
   @@ pair ~loc (pair ~loc (int ~loc counter) expr) (Seq (loc, l))
 
@@ -994,7 +994,7 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
       return_unit
   | Lambda code ->
       let action_t =
-        Tezos_micheline.Micheline.strip_locations (lambda_action_t ~loc:0)
+        Tezos_micheline.Micheline.strip_locations (lambda_action_t ~loc:())
       in
       trace (Ill_typed_lambda (code, action_t))
       @@ Plugin.RPC.Scripts.typecheck_data

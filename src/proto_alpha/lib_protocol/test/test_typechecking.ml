@@ -73,7 +73,8 @@ let test_context_with_nat_nat_big_map () =
   let ctxt = Incremental.alpha_ctxt v in
   wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt >>=? fun (ctxt, id) ->
   let nat_ty = Script_typed_ir.nat_t ~annot:None in
-  wrap_error_lwt @@ Lwt.return @@ Script_ir_translator.unparse_ty ctxt nat_ty
+  wrap_error_lwt @@ Lwt.return
+  @@ Script_ir_translator.unparse_ty ~loc:() ctxt nat_ty
   >>=? fun (nat_ty_node, ctxt) ->
   let nat_ty_expr = Micheline.strip_locations nat_ty_node in
   let alloc = Big_map.{key_type = nat_ty_expr; value_type = nat_ty_expr} in
@@ -308,19 +309,19 @@ let test_parse_comb_type () =
 
 let test_unparse_ty loc ctxt expected ty =
   Environment.wrap_tzresult
-    ( Script_ir_translator.unparse_ty ctxt ty >>? fun (actual, ctxt) ->
+    ( Script_ir_translator.unparse_ty ~loc:() ctxt ty >>? fun (actual, ctxt) ->
       if actual = expected then ok ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_unparse_comb_type () =
   let open Script in
   let open Script_typed_ir in
-  let nat_prim = Prim (-1, T_nat, [], []) in
-  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
-  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
-  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
+  let nat_prim = Prim ((), T_nat, [], []) in
+  let nat_prim_a = Prim ((), T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim ((), T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim ((), T_nat, [], ["%c"]) in
   let nat_ty = nat_t ~annot:None in
-  let pair_prim l = Prim (-1, T_pair, l, []) in
+  let pair_prim l = Prim ((), T_pair, l, []) in
   let pair_ty ty1 ty2 =
     pair_t (-1) (ty1, None, None) (ty2, None, None) ~annot:None
   in
@@ -417,7 +418,7 @@ let test_unparse_comb_type () =
   test_unparse_ty
     __LOC__
     ctxt
-    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    (pair_prim2 nat_prim_a (Prim ((), T_pair, [nat_prim; nat_prim], ["%b"])))
     pair_nat_a_pair_b_nat_nat_ty
   >>?= fun ctxt ->
   (* pair nat (pair @b nat nat) *)
@@ -430,7 +431,7 @@ let test_unparse_comb_type () =
   test_unparse_ty
     __LOC__
     ctxt
-    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], ["@b"])))
+    (pair_prim2 nat_prim (Prim ((), T_pair, [nat_prim; nat_prim], ["@b"])))
     pair_nat_pair_b_nat_nat_ty
   >>?= fun ctxt ->
   (* pair nat (pair :b nat nat) *)
@@ -445,7 +446,7 @@ let test_unparse_comb_type () =
   test_unparse_ty
     __LOC__
     ctxt
-    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], [":b"])))
+    (pair_prim2 nat_prim (Prim ((), T_pair, [nat_prim; nat_prim], [":b"])))
     pair_nat_pair_b_nat_nat_ty
   >>?= fun _ -> return_unit
 
@@ -455,19 +456,20 @@ let test_unparse_comparable_ty loc ctxt expected ty =
   let open Script_typed_ir in
   Environment.wrap_tzresult
     ( set_t (-1) ty ~annot:None >>? fun set_ty_ty ->
-      Script_ir_translator.unparse_ty ctxt set_ty_ty >>? fun (actual, ctxt) ->
-      if actual = Prim (-1, T_set, [expected], []) then ok ctxt
+      Script_ir_translator.unparse_ty ~loc:() ctxt set_ty_ty
+      >>? fun (actual, ctxt) ->
+      if actual = Prim ((), T_set, [expected], []) then ok ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_unparse_comb_comparable_type () =
   let open Script in
   let open Script_typed_ir in
-  let nat_prim = Prim (-1, T_nat, [], []) in
-  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
-  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
-  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
+  let nat_prim = Prim ((), T_nat, [], []) in
+  let nat_prim_a = Prim ((), T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim ((), T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim ((), T_nat, [], ["%c"]) in
   let nat_ty = nat_key ~annot:None in
-  let pair_prim l = Prim (-1, T_pair, l, []) in
+  let pair_prim l = Prim ((), T_pair, l, []) in
   let pair_ty ty1 ty2 = pair_key (-1) (ty1, None) (ty2, None) ~annot:None in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
@@ -552,7 +554,7 @@ let test_unparse_comb_comparable_type () =
   test_unparse_comparable_ty
     __LOC__
     ctxt
-    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    (pair_prim2 nat_prim_a (Prim ((), T_pair, [nat_prim; nat_prim], ["%b"])))
     pair_nat_a_pair_b_nat_nat_ty
   >>?= fun ctxt ->
   (* pair nat (pair :b nat nat) *)
@@ -563,7 +565,7 @@ let test_unparse_comb_comparable_type () =
   test_unparse_comparable_ty
     __LOC__
     ctxt
-    (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], [":b"])))
+    (pair_prim2 nat_prim (Prim ((), T_pair, [nat_prim; nat_prim], [":b"])))
     pair_nat_pair_b_nat_nat_ty
   >>?= fun _ -> return_unit
 
@@ -811,7 +813,7 @@ let test_unparse_comb_data () =
 
 (* Generate all the possible syntaxes for pairs *)
 let gen_pairs left right =
-  [Prim (-1, Script.D_Pair, [left; right], []); Seq (-1, [left; right])]
+  [Prim ((), Script.D_Pair, [left; right], []); Seq ((), [left; right])]
 
 (* Generate all the possible syntaxes for combs *)
 let rec gen_combs leaf arity =
@@ -832,7 +834,7 @@ let rec gen_combs leaf arity =
 let test_optimal_comb () =
   let open Script_typed_ir in
   let leaf_ty = nat_t ~annot:None in
-  let leaf_mich = Int (-1, Z.zero) in
+  let leaf_mich = Int ((), Z.zero) in
   let leaf_v = Script_int.zero_n in
   let size_of_micheline mich =
     let canonical = Micheline.strip_locations mich in

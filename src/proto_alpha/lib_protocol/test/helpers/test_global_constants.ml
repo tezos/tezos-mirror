@@ -252,7 +252,7 @@ module Generators = struct
       ()
 
   let rec replace_with_constant :
-      Script.node -> int -> Script.node * Script.node option =
+      Script.node -> Script.location -> Script.node * Script.node option =
    fun node loc ->
     let open Michelson_v1_primitives in
     let open Micheline in

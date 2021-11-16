@@ -76,6 +76,7 @@ module type V4 = sig
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
+       and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node

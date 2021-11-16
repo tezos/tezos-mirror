@@ -36,6 +36,8 @@ type ('l, 'p) node =
 
 type canonical_location = int
 
+let dummy_location = -1
+
 type 'p canonical = Canonical of (canonical_location, 'p) node
 
 let location = function

@@ -368,7 +368,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
                  entrypoint )
              |> function
              | Ok (_f, Ex_ty ty) ->
-                 unparse_ty ctxt ty >|? fun (ty_node, _) ->
+                 unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
                  Some (Micheline.strip_locations ty_node)
              | Error _ -> Result.return_none)) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->

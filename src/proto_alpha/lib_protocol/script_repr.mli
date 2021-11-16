@@ -47,9 +47,14 @@ type error += Lazy_script_decode (* `Permanent *)
     computed on-demand. *)
 type lazy_expr = expr Data_encoding.lazy_t
 
+type 'location michelson_node =
+  ('location, Michelson_v1_primitives.prim) Micheline.node
+
+type unlocated_michelson_node = unit michelson_node
+
 (** Same as [expr], but used in different contexts, as required by Micheline's
     abstract interface. *)
-type node = (location, Michelson_v1_primitives.prim) Micheline.node
+type node = location michelson_node
 
 val location_encoding : location Data_encoding.t
 
@@ -88,7 +93,7 @@ val is_unit_parameter : lazy_expr -> bool
 
 val strip_annotations : node -> node
 
-val strip_locations_cost : node -> Gas_limit_repr.cost
+val strip_locations_cost : _ michelson_node -> Gas_limit_repr.cost
 
 val strip_annotations_cost : node -> Gas_limit_repr.cost
 

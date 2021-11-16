@@ -647,7 +647,11 @@ module Script : sig
 
   val lazy_expr : expr -> lazy_expr
 
-  type node = (location, prim) Micheline.node
+  type 'location michelson_node = ('location, prim) Micheline.node
+
+  type unlocated_michelson_node = unit michelson_node
+
+  type node = location michelson_node
 
   type t = {code : lazy_expr; storage : lazy_expr}
 
@@ -677,7 +681,7 @@ module Script : sig
 
   val unit_parameter : lazy_expr
 
-  val strip_locations_cost : node -> Gas.cost
+  val strip_locations_cost : _ michelson_node -> Gas.cost
 
   val strip_annotations_cost : node -> Gas.cost
 
@@ -912,11 +916,11 @@ module Global_constants_storage : sig
         continuation in `f`. *)
     val bottom_up_fold_cps :
       'accumulator ->
-      Script.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      'loc Script.michelson_node ->
+      ('accumulator -> 'loc Script.michelson_node -> 'return) ->
       ('accumulator ->
-      Script_repr.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      'loc Script.michelson_node ->
+      ('accumulator -> 'loc Script.michelson_node -> 'return) ->
       'return) ->
       'return
 

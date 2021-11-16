@@ -204,7 +204,7 @@ end
 
 (** {2 High-level Michelson Data Types} *)
 type type_logger =
-  int ->
+  Script.location ->
   (Script.expr * Script.annot) list ->
   (Script.expr * Script.annot) list ->
   unit
@@ -289,11 +289,12 @@ val unparse_data :
   (Script.node * context) tzresult Lwt.t
 
 val unparse_comparable_data :
+  loc:'loc ->
   context ->
   unparsing_mode ->
   'a Script_typed_ir.comparable_ty ->
   'a ->
-  (Script.node * context) tzresult Lwt.t
+  ('loc Script.michelson_node * context) tzresult Lwt.t
 
 val unparse_code :
   context ->
@@ -376,12 +377,16 @@ val parse_ty :
   (ex_ty * context) tzresult
 
 val unparse_ty :
-  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
+  loc:'loc ->
+  context ->
+  'a Script_typed_ir.ty ->
+  ('loc Script.michelson_node * context) tzresult
 
 val unparse_comparable_ty :
+  loc:'loc ->
   context ->
   'a Script_typed_ir.comparable_ty ->
-  (Script.node * context) tzresult
+  ('loc Script.michelson_node * context) tzresult
 
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
@@ -392,8 +397,8 @@ val parse_toplevel :
 val add_field_annot :
   Script_typed_ir.field_annot option ->
   Script_typed_ir.var_annot option ->
-  Script.node ->
-  Script.node
+  ('loc, 'prim) Micheline.node ->
+  ('loc, 'prim) Micheline.node
 
 val typecheck_code :
   legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
@@ -462,7 +467,8 @@ val list_entrypoints :
   context ->
   root_name:Script_typed_ir.field_annot option ->
   (Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t)
+  * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
+    Entrypoints_map.t)
   tzresult
 
 val pack_data :

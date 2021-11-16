@@ -34,7 +34,9 @@ type ('l, 'p) node =
 
 type 'p canonical
 
-type canonical_location = int
+type canonical_location
+
+val dummy_location : canonical_location
 
 val root : 'p canonical -> (canonical_location, 'p) node
 

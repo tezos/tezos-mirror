@@ -232,13 +232,13 @@ let check_depth node =
       match node with
       | Int _ | String _ | Bytes _ | Prim (_, _, [], _) | Seq (_, []) ->
           (k [@tailcall]) (depth + 1)
-      | Prim (_, _, hd :: tl, _) | Seq (_, hd :: tl) ->
+      | Prim (loc, _, hd :: tl, _) | Seq (loc, hd :: tl) ->
           (advance [@tailcall]) hd (depth + 1) (fun dhd ->
               (advance [@tailcall])
                 (* Because [depth] doesn't care about the content
                    of the expression, we can safely throw away information
                    about primitives and replace them with the [Seq] constructor.*)
-                (Seq (-1, tl))
+                (Seq (loc, tl))
                 depth
                 (fun dtl -> (k [@tailcall]) (Compare.Int.max dhd dtl)))
   in

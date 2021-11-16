@@ -670,7 +670,7 @@ let parse_ty ctxt node =
     ~allow_ticket:true
     node
 
-let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ctxt ty
+let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ~loc:(-1) ctxt ty
 
 module Parse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
@@ -782,7 +782,7 @@ module Unparse_comparable_type_benchmark : Benchmark.S = struct
       match ty with
       | Ex_comparable_ty comp_ty ->
           Environment.wrap_tzresult
-          @@ Script_ir_translator.unparse_comparable_ty ctxt comp_ty
+          @@ Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty
           >>? fun (_, ctxt') ->
           let consumed =
             Z.to_int
@@ -791,7 +791,8 @@ module Unparse_comparable_type_benchmark : Benchmark.S = struct
           in
           let workload = Type_workload {nodes = size; consumed} in
           let closure () =
-            ignore (Script_ir_translator.unparse_comparable_ty ctxt comp_ty)
+            ignore
+              (Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty)
           in
           ok (Generator.Plain {workload; closure})
     in

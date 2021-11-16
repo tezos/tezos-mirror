@@ -35,7 +35,8 @@ open Alpha_context
 let ticket_balance_key_and_amount ctxt ~owner
     (Ticket_scanner.Ex_ticket
       (comp_ty, Script_typed_ir.{ticketer; contents; amount})) =
-  Script_ir_translator.unparse_comparable_ty ctxt comp_ty
+  let loc = Micheline.dummy_location in
+  Script_ir_translator.unparse_comparable_ty ~loc ctxt comp_ty
   >>?= fun (cont_ty_unstripped, ctxt) ->
   (* We strip the annotations from the content type in order to map
      tickets with the same content type, but with different annotations, to the
@@ -53,6 +54,7 @@ let ticket_balance_key_and_amount ctxt ~owner
     ticketer_address
   >>=? fun (ticketer, ctxt) ->
   Script_ir_translator.unparse_comparable_data
+    ~loc
     ctxt
     Script_ir_translator.Optimized_legacy
     comp_ty

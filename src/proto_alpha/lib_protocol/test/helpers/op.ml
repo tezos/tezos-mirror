@@ -448,26 +448,29 @@ let dummy_script =
         lazy_expr
           (strip_locations
              (Seq
-                ( 0,
+                ( (),
                   [
-                    Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []);
-                    Prim (0, K_storage, [Prim (0, T_unit, [], [])], []);
+                    Prim ((), K_parameter, [Prim ((), T_unit, [], [])], []);
+                    Prim ((), K_storage, [Prim ((), T_unit, [], [])], []);
                     Prim
-                      ( 0,
+                      ( (),
                         K_code,
                         [
                           Seq
-                            ( 0,
+                            ( (),
                               [
-                                Prim (0, I_CDR, [], []);
+                                Prim ((), I_CDR, [], []);
                                 Prim
-                                  (0, I_NIL, [Prim (0, T_operation, [], [])], []);
-                                Prim (0, I_PAIR, [], []);
+                                  ( (),
+                                    I_NIL,
+                                    [Prim ((), T_operation, [], [])],
+                                    [] );
+                                Prim ((), I_PAIR, [], []);
                               ] );
                         ],
                         [] );
                   ] )));
-      storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], [])));
+      storage = lazy_expr (strip_locations (Prim ((), D_Unit, [], [])));
     }
 
 let dummy_script_cost = Test_tez.of_mutez_exn 9_500L

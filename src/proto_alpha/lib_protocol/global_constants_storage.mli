@@ -130,11 +130,11 @@ module Internal_for_tests : sig
    *)
   val bottom_up_fold_cps :
     'accumulator ->
-    Script_repr.node ->
-    ('accumulator -> Script_repr.node -> 'return) ->
+    'loc Script_repr.michelson_node ->
+    ('accumulator -> 'loc Script_repr.michelson_node -> 'return) ->
     ('accumulator ->
-    Script_repr.node ->
-    ('accumulator -> Script_repr.node -> 'return) ->
+    'loc Script_repr.michelson_node ->
+    ('accumulator -> 'loc Script_repr.michelson_node -> 'return) ->
     'return) ->
     'return
 
