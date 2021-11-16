@@ -1,0 +1,22 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/and.tz]
+
+Well typed
+Gas remaining: 1039994.393 units remaining
+{ parameter (pair :param (bool %first) (bool %second)) ;
+  storage (option bool) ;
+  code { CAR
+         /* [ @param pair :param (bool %first) (bool %second) ] */ ;
+         UNPAIR
+         /* [ bool : bool ] */ ;
+         AND @and
+         /* [ @and bool ] */ ;
+         SOME @res
+         /* [ @res option bool ] */ ;
+         NIL @noop operation
+         /* [ @noop list operation : @res option bool ] */ ;
+         PAIR
+         /* [ pair (list @noop operation) (option @res bool) ] */ ;
+         UNPAIR @x @y
+         /* [ @x list operation : @y option bool ] */ ;
+         PAIR %a %b
+         /* [ pair (list %a @x operation) (option %b @y bool) ] */ } }

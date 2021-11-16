@@ -1,0 +1,33 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_rec.tz]
+
+Well typed
+Gas remaining: 1039987.709 units remaining
+{ parameter unit ;
+  storage unit ;
+  view "loop"
+       address
+       never
+       { CAR
+         /* [ address ] */ ;
+         DUP
+         /* [ address : address ] */ ;
+         VIEW "loop" never
+         /* [ @contract option never ] */ ;
+         ASSERT_SOME } ;
+  code { CDR
+         /* [ @storage unit ] */ ;
+         SELF
+         /* [ @self contract unit : @storage unit ] */ ;
+         ADDRESS
+         /* [ @self.address address : @storage unit ] */ ;
+         DUP
+         /* [ @self.address address : @self.address address : @storage unit ] */ ;
+         VIEW "loop" never
+         /* [ @self.address.contract option never : @storage unit ] */ ;
+         ASSERT_SOME ;
+         DROP
+         /* [ @storage unit ] */ ;
+         NIL operation
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

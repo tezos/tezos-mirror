@@ -1,0 +1,19 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_test_step_contants.tz]
+
+Well typed
+Gas remaining: 1039992.390 units remaining
+{ parameter address ;
+  storage (option (pair (pair mutez mutez) (pair (pair address address) address))) ;
+  code { CAR
+         /* [ @parameter address ] */ ;
+         UNIT
+         /* [ unit : @parameter address ] */ ;
+         VIEW "step_constants"
+              (pair (pair mutez mutez) (pair (pair address address) address))
+         /* [ @parameter.contract option (pair (pair mutez mutez) (pair address address) address) ] */ ;
+         NIL operation
+         /* [ list operation
+            : @parameter.contract option (pair (pair mutez mutez) (pair address address) address) ] */ ;
+         PAIR
+         /* [ pair (list operation)
+                 (option @parameter.contract (pair (pair mutez mutez) (pair address address) address)) ] */ } }

@@ -1,0 +1,19 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_cdr.tz]
+
+Well typed
+Gas remaining: 1039991.782 units remaining
+{ parameter nat ;
+  storage (pair (string %s) (nat %n)) ;
+  code { DUP
+         /* [ pair (nat @parameter) (pair @storage (string %s) (nat %n))
+            : pair (nat @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
+         CDR
+         /* [ @storage pair (string %s) (nat %n)
+            : pair (nat @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
+         DIP { CAR /* [ @parameter nat ] */ }
+         /* [ @storage pair (string %s) (nat %n) : @parameter nat ] */ ;
+         SET_CDR %n ;
+         NIL operation
+         /* [ list operation : @storage pair (string %s @storage.s) (nat %n @parameter) ] */ ;
+         PAIR
+         /* [ pair (list operation) (pair @storage (string %s @storage.s) (nat %n @parameter)) ] */ } }

@@ -1,0 +1,106 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/big_map_magic.tz]
+
+Well typed
+Gas remaining: 1039941.750 units remaining
+{ storage (or (pair (big_map string string) (big_map string string)) unit) ;
+  parameter
+    (or (unit %swap)
+        (or (or %reset (pair (big_map string string) (big_map string string)) unit)
+            (or (pair %import (list (pair string string)) (list (pair string string)))
+                (or (list %add (pair string string)) (list %rem string))))) ;
+  code { UNPAIR
+         /* [ @parameter or (unit %swap)
+               (or (or %reset (pair (big_map string string) (big_map string string)) unit)
+                   (or (pair %import (list (pair string string)) (list (pair string string)))
+                       (or (list %add (pair string string)) (list %rem string))))
+            : @storage or (pair (big_map string string) (big_map string string)) unit ] */ ;
+         IF_LEFT
+           { DROP
+             /* [ @storage or (pair (big_map string string) (big_map string string)) unit ] */ ;
+             ASSERT_LEFT ;
+             UNPAIR
+             /* [ big_map string string : big_map string string ] */ ;
+             SWAP
+             /* [ big_map string string : big_map string string ] */ ;
+             PAIR
+             /* [ pair (big_map string string) (big_map string string) ] */ ;
+             LEFT unit
+             /* [ or (pair (big_map string string) (big_map string string)) unit ] */ }
+           { IF_LEFT
+               { SWAP
+                 /* [ @storage or (pair (big_map string string) (big_map string string)) unit
+                    : @parameter.right.reset or (pair (big_map string string) (big_map string string)) unit ] */ ;
+                 DROP
+                 /* [ @parameter.right.reset or (pair (big_map string string) (big_map string string)) unit ] */ }
+               { IF_LEFT
+                   { DIP { ASSERT_RIGHT ; DROP /* [] */ }
+                     /* [ @parameter.right.right.import pair (list (pair string string)) (list (pair string string)) ] */ ;
+                     UNPAIR
+                     /* [ list (pair string string) : list (pair string string) ] */ ;
+                     DIP { EMPTY_BIG_MAP
+                             string
+                             string
+                           /* [ big_map string string : list (pair string string) ] */ }
+                     /* [ list (pair string string) : big_map string string
+                        : list (pair string string) ] */ ;
+                     ITER { UNPAIR
+                            /* [ string : string : big_map string string : list (pair string string) ] */ ;
+                            DIP { SOME
+                                  /* [ option string : big_map string string : list (pair string string) ] */ }
+                            /* [ string : option string : big_map string string
+                               : list (pair string string) ] */ ;
+                            UPDATE
+                            /* [ big_map string string : list (pair string string) ] */ }
+                     /* [ big_map string string : list (pair string string) ] */ ;
+                     SWAP
+                     /* [ list (pair string string) : big_map string string ] */ ;
+                     DIP { EMPTY_BIG_MAP string string
+                           /* [ big_map string string : big_map string string ] */ }
+                     /* [ list (pair string string) : big_map string string : big_map string string ] */ ;
+                     ITER { UNPAIR
+                            /* [ string : string : big_map string string : big_map string string ] */ ;
+                            DIP { SOME /* [ option string : big_map string string : big_map string string ] */ }
+                            /* [ string : option string : big_map string string : big_map string string ] */ ;
+                            UPDATE
+                            /* [ big_map string string : big_map string string ] */ }
+                     /* [ big_map string string : big_map string string ] */ ;
+                     SWAP
+                     /* [ big_map string string : big_map string string ] */ ;
+                     PAIR
+                     /* [ pair (big_map string string) (big_map string string) ] */ ;
+                     LEFT unit
+                     /* [ or (pair (big_map string string) (big_map string string)) unit ] */ }
+                   { IF_LEFT
+                       { DIP { ASSERT_LEFT ; UNPAIR /* [ big_map string string : big_map string string ] */ }
+                         /* [ @parameter.right.right.right.add list (pair string string)
+                            : big_map string string : big_map string string ] */ ;
+                         ITER { UNPAIR
+                                /* [ string : string : big_map string string : big_map string string ] */ ;
+                                DIP { SOME /* [ option string : big_map string string : big_map string string ] */ }
+                                /* [ string : option string : big_map string string : big_map string string ] */ ;
+                                UPDATE
+                                /* [ big_map string string : big_map string string ] */ }
+                         /* [ big_map string string : big_map string string ] */ ;
+                         PAIR
+                         /* [ pair (big_map string string) (big_map string string) ] */ ;
+                         LEFT unit
+                         /* [ or (pair (big_map string string) (big_map string string)) unit ] */ }
+                       { DIP { ASSERT_LEFT ; UNPAIR /* [ big_map string string : big_map string string ] */ }
+                         /* [ @parameter.right.right.right.rem list string : big_map string string
+                            : big_map string string ] */ ;
+                         ITER { DIP { NONE string
+                                      /* [ option string : big_map string string : big_map string string ] */ }
+                                /* [ @parameter.right.right.right.rem.elt string : option string
+                                   : big_map string string : big_map string string ] */ ;
+                                UPDATE
+                                /* [ big_map string string : big_map string string ] */ }
+                         /* [ big_map string string : big_map string string ] */ ;
+                         PAIR
+                         /* [ pair (big_map string string) (big_map string string) ] */ ;
+                         LEFT unit
+                         /* [ or (pair (big_map string string) (big_map string string)) unit ] */ } } } } ;
+         NIL operation
+         /* [ list operation
+            : or (pair (big_map string string) (big_map string string)) unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (or (pair (big_map string string) (big_map string string)) unit) ] */ } }

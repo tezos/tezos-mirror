@@ -1,0 +1,12 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/bytes.tz]
+
+Well typed
+Gas remaining: 1039997.267 units remaining
+{ parameter bytes ;
+  storage unit ;
+  code { CDR
+         /* [ @storage unit ] */ ;
+         NIL operation
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

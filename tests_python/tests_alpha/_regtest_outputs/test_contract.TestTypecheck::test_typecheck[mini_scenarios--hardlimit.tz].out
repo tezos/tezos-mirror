@@ -1,0 +1,18 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/hardlimit.tz]
+
+Well typed
+Gas remaining: 1039991.583 units remaining
+{ parameter unit ;
+  storage int ;
+  code { CDR
+         /* [ @storage int ] */ ;
+         DUP
+         /* [ @storage int : @storage int ] */ ;
+         PUSH int 0
+         /* [ int : @storage int : @storage int ] */ ;
+         CMPLT ;
+         IF { PUSH int -1 /* [ int : @storage int ] */ ; ADD /* [ int ] */ } { FAIL } ;
+         NIL operation
+         /* [ list operation : int ] */ ;
+         PAIR
+         /* [ pair (list operation) int ] */ } }

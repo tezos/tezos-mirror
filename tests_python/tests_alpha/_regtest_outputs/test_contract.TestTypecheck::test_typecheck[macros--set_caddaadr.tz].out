@@ -1,0 +1,52 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/set_caddaadr.tz]
+
+Well typed
+Gas remaining: 1039968.110 units remaining
+{ parameter mutez ;
+  storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
+  code { DUP
+         /* [ pair (mutez @parameter)
+                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat)
+            : pair (mutez @parameter)
+                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
+         CAR
+         /* [ @parameter mutez
+            : pair (mutez @parameter)
+                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
+         SWAP
+         /* [ pair (mutez @parameter)
+                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat)
+            : @parameter mutez ] */ ;
+         CDR
+         /* [ @storage pair (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
+            : @parameter mutez ] */ ;
+         SET_CADDAADR @toplevel_pair_name %value ;
+         NIL operation
+         /* [ list operation
+            : @toplevel_pair_name pair (pair @storage.car
+                    (nat @storage.car.car)
+                    (pair @storage.car.cdr
+                       (nat @storage.car.cdr.car)
+                       (pair @storage.car.cdr.cdr
+                          (pair @storage.car.cdr.cdr.car
+                             (pair @storage.car.cdr.cdr.car.car
+                                (nat %p @storage.car.cdr.cdr.car.car.p)
+                                (mutez %value @parameter))
+                             (nat @storage.car.cdr.cdr.car.cdr))
+                          (nat @storage.car.cdr.cdr.cdr))))
+                 (nat @storage.cdr) ] */ ;
+         PAIR
+         /* [ pair (list operation)
+                 (pair @toplevel_pair_name
+                    (pair @storage.car
+                       (nat @storage.car.car)
+                       (pair @storage.car.cdr
+                          (nat @storage.car.cdr.car)
+                          (pair @storage.car.cdr.cdr
+                             (pair @storage.car.cdr.cdr.car
+                                (pair @storage.car.cdr.cdr.car.car
+                                   (nat %p @storage.car.cdr.cdr.car.car.p)
+                                   (mutez %value @parameter))
+                                (nat @storage.car.cdr.cdr.car.cdr))
+                             (nat @storage.car.cdr.cdr.cdr))))
+                    (nat @storage.cdr)) ] */ } }

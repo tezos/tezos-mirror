@@ -1,0 +1,14 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/balance.tz]
+
+Well typed
+Gas remaining: 1039996.803 units remaining
+{ parameter unit ;
+  storage mutez ;
+  code { DROP
+         /* [] */ ;
+         BALANCE
+         /* [ @balance mutez ] */ ;
+         NIL operation
+         /* [ list operation : @balance mutez ] */ ;
+         PAIR
+         /* [ pair (list operation) (mutez @balance) ] */ } }

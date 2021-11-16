@@ -1,0 +1,31 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_with_default_entrypoint.tz]
+
+Well typed
+Gas remaining: 1039988.615 units remaining
+{ parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %default) (string %C))) ;
+  storage unit ;
+  code { DROP
+         /* [] */ ;
+         SELF
+         /* [ @self contract unit ] */ ;
+         DROP
+         /* [] */ ;
+         SELF %A
+         /* [ @self contract nat ] */ ;
+         DROP
+         /* [] */ ;
+         SELF %default
+         /* [ @self contract unit ] */ ;
+         PACK
+         /* [ @self.packed bytes ] */ ;
+         SELF
+         /* [ @self contract unit : @self.packed bytes ] */ ;
+         PACK
+         /* [ @self.packed bytes : @self.packed bytes ] */ ;
+         ASSERT_CMPEQ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }
