@@ -84,6 +84,10 @@ Minor Changes
   step constants instead of being read from the context each time
   these instructions are executed. (MR :gl:`!3524`)
 
+- The RPC ``../helpers/current_level`` does not support anymore a
+  negative ``offset`` argument. The level which used to be returned by 
+  ``../<block>/helpers/current_level?offset=-<n>`` can still be obtained by
+  ``../<block~n>/helpers/current_level``. (MR :gl:`!3808`)
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
