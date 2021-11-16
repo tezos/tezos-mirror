@@ -292,15 +292,6 @@ module External_generators = Generators
 
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  (** A generator of maps of operations and their hashes. [?block_hash_t]
-      is an optional generator for the branch of operations. *)
-  let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let* ops = small_list (External_generators.operation_gen ?block_hash_t) in
-    (* Op_map.of_seq eliminates duplicate keys (if any) *)
-    List.map (fun op -> (Operation.hash op, op)) ops
-    |> List.to_seq |> Op_map.of_seq |> return
-
   let block_gen : Block.t QCheck.Gen.t =
     let open QCheck.Gen in
     let* ops =
@@ -815,7 +806,7 @@ module Recyle_operations = struct
     let* classification_pendings_ops =
       (* For classification and pending, we want operations that are NOT in
          the blocks already. Hence: *)
-      Generators.op_map_gen ~block_hash_t
+      External_generators.op_map_gen ~block_hash_t
       >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
     in
     let* (classification_ops, pending_ops) =

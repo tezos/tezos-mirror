@@ -54,6 +54,17 @@ let operation_gen ?block_hash_t : Operation.t QCheck.Gen.t =
   and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
 
+(** A generator of maps of operations and their hashes. [?block_hash_t]
+    is an optional generator for the branch of operations. Because it returns
+    a map, this generator guarantees that all returned operations are distinct
+    (because their hashes differ). *)
+let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  let open QCheck.Gen in
+  let+ ops = small_list (operation_gen ?block_hash_t) in
+  (* Op_map.of_seq eliminates duplicate keys (if any) *)
+  List.map (fun op -> (Operation.hash op, op)) ops
+  |> List.to_seq |> Operation_hash.Map.of_seq
+
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck.Gen.t =
   QCheck.Gen.oneofa
