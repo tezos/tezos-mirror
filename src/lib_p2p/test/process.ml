@@ -163,8 +163,8 @@ module Channel = struct
 end
 
 let terminate pid =
-  (try Unix.kill pid Sys.sigkill with _ -> ()) ;
-  ignore (Lwt_unix.waitpid [] pid)
+  (try Unix.kill pid Sys.sigterm with _ -> ()) ;
+  Lwt_unix.waitpid [] pid >>= fun (_pid, _status) -> Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
   Lwt.catch
@@ -176,9 +176,7 @@ let wait ~value_encoding ~flags pid result_ch =
       | (_, Lwt_unix.WSIGNALED n) -> Lwt.return (error (Exn (Signaled n)))
       | (_, Lwt_unix.WSTOPPED n) -> Lwt.return (error (Exn (Stopped n))))
     (function
-      | Lwt.Canceled ->
-          terminate pid ;
-          Error_monad.fail Canceled
+      | Lwt.Canceled -> terminate pid >>= fun () -> Error_monad.fail Canceled
       | exn -> Error_monad.fail (Exn exn))
 
 type ('a, 'b, 'c) t = {
@@ -241,9 +239,7 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
              child_exit)
           >>= exit
       | pid ->
-          Lwt_canceler.on_cancel canceler (fun () ->
-              terminate pid ;
-              Lwt.return_unit) ;
+          Lwt_canceler.on_cancel canceler (fun () -> terminate pid) ;
           let termination = wait ~value_encoding ~flags pid main_result in
           Lwt_io.close child_in >>= fun () ->
           Lwt_io.close child_out >>= fun () ->
