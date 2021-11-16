@@ -100,6 +100,14 @@ module type S = sig
     (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
     Lwt.t
 
+  val generic_media_type_call :
+    ?headers:(string * string) list ->
+    accept:Media_type.t list ->
+    ?body:Data_encoding.json ->
+    [< Resto.meth] ->
+    Uri.t ->
+    RPC_context.generic_call_result tzresult Lwt.t
+
   type content_type = string * string
 
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
