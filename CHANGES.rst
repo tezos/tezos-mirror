@@ -95,6 +95,11 @@ Node
 
 - Add a new CLI & config option ``advertised-net-port``.
 
+- Added an optional ``show_types`` field in the input of the
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/typecheck_code``
+  RPC. When this field is set to ``false``, type checking details are
+  omitted. This can be used to improve the performances of this RPC.
+
 Client
 ------
 

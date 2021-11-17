@@ -234,13 +234,14 @@ let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~ty:ty.expanded
 
 let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
-    (program : Michelson_v1_parser.parsed) =
+    ~show_types (program : Michelson_v1_parser.parsed) =
   Plugin.RPC.Scripts.typecheck_code
     cctxt
     (chain, block)
     ?gas
     ?legacy
     ~script:program.expanded
+    ~show_types
 
 let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(program : Michelson_v1_parser.parsed)

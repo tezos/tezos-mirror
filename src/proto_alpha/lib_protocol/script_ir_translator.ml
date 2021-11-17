@@ -5795,9 +5795,12 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     ctxt )
 
 let typecheck_code :
-    legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
-    =
- fun ~legacy ctxt code ->
+    legacy:bool ->
+    show_types:bool ->
+    context ->
+    Script.expr ->
+    (type_map * context) tzresult Lwt.t =
+ fun ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
@@ -5838,14 +5841,15 @@ let typecheck_code :
     (storage_type, None, None)
     ~annot:None
   >>?= fun ret_type_full ->
+  let type_logger loc bef aft = type_map := (loc, (bef, aft)) :: !type_map in
+  let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
       (Toplevel {storage_type; param_type = arg_type; root_name})
       ctxt
       ~legacy
       ~stack_depth:0
-      ~type_logger:(fun loc bef aft ->
-        type_map := (loc, (bef, aft)) :: !type_map)
+      ?type_logger
       (arg_type_full, None)
       ret_type_full
       code_field

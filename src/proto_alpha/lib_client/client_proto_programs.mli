@@ -129,6 +129,7 @@ val typecheck_program :
   block:Shell_services.block ->
   ?gas:Gas.Arith.integral ->
   ?legacy:bool ->
+  show_types:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
 
