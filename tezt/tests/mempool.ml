@@ -392,8 +392,18 @@ let ban_operation_branch_refused_reevaluated =
     ~title:"ban_operation_branch_refused_reevaluated"
     ~tags:["flush"; "mempool"; "ban"]
   @@ fun protocol ->
-  let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* node_2 = Node.init [Synchronisation_threshold 0] in
+  let* node_1 =
+    Node.init [Synchronisation_threshold 0; Disable_operations_precheck]
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+     We use the disable-precheck option to force application of operation in
+     the prevalidator and to force classification in branch_refused. *)
+  let* node_2 =
+    Node.init [Synchronisation_threshold 0; Disable_operations_precheck]
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+     We use the disable-precheck option to force application of operation in
+     the prevalidator and to force classification in branch_refused. *)
   let endpoint_1 = Client.(Node node_1) in
   let endpoint_2 = Client.(Node node_2) in
   let* client_1 = Client.init ~endpoint:endpoint_1 () in
