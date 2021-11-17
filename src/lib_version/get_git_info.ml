@@ -30,9 +30,10 @@ module Configurator = Configurator.V1
 let query ?env ~default cmd =
   let run_git () =
     try
-      let chan = Unix.open_process_in cmd in
-      let out = input_line chan in
-      if Unix.close_process_in chan = Unix.WEXITED 0 then out else default
+      let (ic, oc, ec) = Unix.open_process_full cmd [||] in
+      let out = input_line ic in
+      if Unix.close_process_full (ic, oc, ec) = Unix.WEXITED 0 then out
+      else default
     with
     | End_of_file -> default
     | _ ->
@@ -59,11 +60,11 @@ let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 let git_describe =
   let s = query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags" in
   match parse_version s with
+  | Some v -> v
   | None -> (
       match parse_version (Sys.getenv "OPAM_PACKAGE_VERSION") with
-      | None | (exception Not_found) -> Tezos_version_parser.default
-      | Some v -> v)
-  | Some v -> v
+      | Some v -> v
+      | None | (exception Not_found) -> Tezos_version_parser.default)
 
 let lines =
   [

@@ -18,6 +18,7 @@
 (*****************************************************************************)
 
 {
+  (* for the doc of this structure refer to the file version.mli *)
   type additional_info =
     | Dev
     | RC of int
