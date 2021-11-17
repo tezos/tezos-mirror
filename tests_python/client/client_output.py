@@ -146,6 +146,11 @@ class OriginationResult:
         if match is None:
             raise InvalidClientOutput
         self.operation_hash = match.groups()[0]
+        pattern = r"Storage size: (.*) bytes"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput
+        self.storage_size = match.groups()[0]
 
 
 class SubmitProposalsResult:
