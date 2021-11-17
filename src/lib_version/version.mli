@@ -35,6 +35,10 @@
     [RC] means "Release Candidate".
     For each release, the first release candidate has number 1.
 
+    [RC_dev] means "Release Candidate in development".
+    This is a release branch where the release candidate tag is
+    not associated to the HEAD of the branch.
+
     [Release] means "no additional information".
     This is an actual released version.
     No additional info is printed. *)
