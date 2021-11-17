@@ -1219,9 +1219,6 @@ class TestNonRegression:
     def test_issue_242_assert_balance(self, client: Client):
         assert client.get_balance('bug_262') == 1
 
-    @pytest.mark.xfail(
-        reason="See issue https://gitlab.com/tezos/tezos/-/issues/843"
-    )
     def test_issue_843(self, client: Client, session: dict):
         """Regression test for the following bug:
         https://gitlab.com/tezos/tezos/-/issues/843
