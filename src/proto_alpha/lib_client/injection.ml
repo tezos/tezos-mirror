@@ -31,16 +31,19 @@ open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
-  (* The default value is set to 2, because with Tenderbake the same
-     transaction may be included again in another block candidate at
-     the same level, so 'branch' cannot point to the head. It's not a good
-     idea if it points to the head's predecessor as well, as the predecessor
-     hash may still change because of potential reorgs (only the predecessor
-     payload is finalized, not the whole block). So 'branch' should point to
-     HEAD~2 or to an older ancestor. *)
-  let branch = Option.value ~default:2 branch in
+  (* The default branch is set to HEAD~2, because with Tenderbake the
+     same transaction may be included again in another block candidate
+     at the same level, so the operation branch should not point to
+     the current head. It's not a good idea if it points to the head's
+     predecessor as well, as the predecessor hash may still change
+     because of potential reorgs (only the predecessor payload is
+     finalized, not the whole block). *)
+  let branch = Option.value ~default:0 branch in
   (* TODO export parameter *)
   (match block with
+  | `Head 0 ->
+      (* Default client's block value: we branch to head's grandfather *)
+      return (`Head (2 + branch))
   | `Head n -> return (`Head (n + branch))
   | `Hash (h, n) -> return (`Hash (h, n + branch))
   | `Alias (a, n) -> return (`Alias (a, n))
