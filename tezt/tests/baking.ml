@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Baking
+   Invocation:   dune exec tezt/tests/main.exe -- --file baking.ml
+   Subject:      Test the baker
+*)
+
 (* ------------------------------------------------------------------------- *)
 (* Typedefs *)
 
@@ -34,7 +41,7 @@ and branch = {branch : Block_hash.t}
 
 and protocol_data = {
   contents : operation_content list;
-  signature : signature option;
+  signature : string option;
 }
 
 and operation_content = {
@@ -47,8 +54,6 @@ and operation_content = {
   amount : string;
   destination : string;
 }
-
-and signature = string
 
 type mempool_operation =
   | Mempool_operation of {
@@ -69,7 +74,7 @@ let branch_encoding : branch Data_encoding.t =
     (fun branch -> {branch})
     (obj1 (req "branch" Block_hash.encoding))
 
-let signature_encoding : signature Data_encoding.t = Data_encoding.string
+let signature_encoding : string Data_encoding.t = Data_encoding.string
 
 let operation_content_encoding : operation_content Data_encoding.t =
   let open Data_encoding in
@@ -488,4 +493,74 @@ let test_ordering =
   let* mempool = distinct_bakers_increasing_fees state in
   bake_and_check state ~mempool
 
-let register ~protocols = test_ordering ~protocols
+let check_op_not_in_baked_block client op =
+  let* ops = RPC.get_operations client in
+  let open JSON in
+  let ops_list = ops |=> 3 |> as_list in
+  let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
+  if res then Test.fail "%s found in Baked block" op ;
+  unit
+
+let wrong_branch_operation_dismissal =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"wrong branch operation dismissal"
+    ~tags:["baking"; "branch"]
+  @@ fun protocol ->
+  let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let first_round_duration = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right protocol)
+      [
+        (["consensus_threshold"], Some "1");
+        ( ["round_durations"],
+          Some (Format.sprintf "[\"%d\", \"2\"]" first_round_duration) );
+      ]
+  in
+  let* () =
+    Client.activate_protocol
+      ~timestamp_delay:0.
+      ~protocol
+      ~parameter_file
+      client
+  in
+  Log.info "Activated protocol." ;
+  Log.info "Baking a first proposal." ;
+  let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
+  (* Retrieve head's hash *)
+  let* head_hash =
+    let* json = RPC.get_block_hash client in
+    return (JSON.as_string json)
+  in
+  Log.info "Injecting a transfer branched on the current head." ;
+  let* oph =
+    Operation.inject_transfer
+      ~branch:head_hash
+      ~amount:1
+      ~source:Constant.bootstrap1
+      ~destination:Constant.bootstrap2
+      client
+  in
+  let* current_mempool = RPC.get_mempool client in
+  Check.(
+    (current_mempool <> Tezt_tezos.Mempool.empty)
+      Tezt_tezos.Mempool.typ
+      ~error_msg:"unexpected empty mempool") ;
+  Log.info "Wait a bit in order to propose on a different round." ;
+  let* () = Lwt_unix.sleep (float first_round_duration) in
+  Log.info "Bake a second proposal at a different round." ;
+  let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
+  Log.info "Checking that the transfer is dismissed from the current mempool." ;
+  let* current_mempool = RPC.get_mempool client in
+  Check.(
+    (current_mempool = Tezt_tezos.Mempool.empty)
+      Tezt_tezos.Mempool.typ
+      ~error_msg:"unexpected non-empty mempool") ;
+  Log.info "Checking that the transfer is not included in the current head." ;
+  check_op_not_in_baked_block client oph
+
+let register ~protocols =
+  test_ordering ~protocols ;
+  wrong_branch_operation_dismissal ~protocols
