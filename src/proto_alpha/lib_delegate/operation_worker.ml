@@ -291,9 +291,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
       (fun ops -> List.map (fun ((_, op), _) -> op) ops)
       operation_stream
   in
-  Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:(`Head 0) ()
-  >>=? fun current_head ->
-  return (current_head, operation_stream, stream_stopper)
+  return (operation_stream, stream_stopper)
 
 let make_initial_state ?initial_mempool ?(monitor_node_operations = true) () =
   let qc_event_stream =
@@ -460,7 +458,7 @@ let create ?initial_mempool ?(monitor_node_operations = true)
   let rec worker_loop () =
     monitor_operations cctxt >>= function
     | Error err -> Events.(emit loop_failed err)
-    | Ok (current_head_hash, operation_stream, op_stream_stopper) ->
+    | Ok (operation_stream, op_stream_stopper) ->
         Events.(emit starting_new_monitoring ()) >>= fun () ->
         Lwt_canceler.on_cancel state.canceler (fun () ->
             op_stream_stopper () ;
@@ -478,17 +476,8 @@ let create ?initial_mempool ?(monitor_node_operations = true)
               worker_loop ()
           | Some ops ->
               Events.(emit received_new_operations ()) >>= fun () ->
-              (* Filter operations that are branched to the
-                 current head, otherwise blocks baked with such
-                 operations will get rejected by the node. *)
-              let filtered_ops =
-                List.filter
-                  (fun {shell; _} ->
-                    Block_hash.(shell.branch <> current_head_hash))
-                  ops
-              in
               state.operation_pool <-
-                Operation_pool.add_operations state.operation_pool filtered_ops ;
+                Operation_pool.add_operations state.operation_pool ops ;
               update_monitoring state ops >>= fun () -> loop ()
         in
         loop ()

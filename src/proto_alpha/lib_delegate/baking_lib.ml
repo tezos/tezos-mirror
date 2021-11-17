@@ -461,7 +461,6 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?mempool ?monitor_node_mempool ?context_path
     delegates =
-  (* Operation_worker.Mempool.retrieve cctxt mempool >>= fun initial_mempool -> *)
   let config =
     let initial_mempool = mempool in
     Baking_configuration.make
