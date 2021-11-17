@@ -1219,6 +1219,40 @@ class TestNonRegression:
     def test_issue_242_assert_balance(self, client: Client):
         assert client.get_balance('bug_262') == 1
 
+    @pytest.mark.xfail(
+        reason="See issue https://gitlab.com/tezos/tezos/-/issues/843"
+    )
+    def test_issue_843(self, client: Client, session: dict):
+        """Regression test for the following bug:
+        https://gitlab.com/tezos/tezos/-/issues/843
+
+        This test checks that before origination the script, storage,
+        and the lambdas inside the storage are all normalized. To test
+        this we define them in readable mode and compare the storage
+        size of the origination operations when the readable script
+        and storage are used directly and when they are first
+        normalized to optimized format before origination.
+        """
+        path = os.path.join(CONTRACT_PATH, 'non_regression', 'bug_843.tz')
+        addr1 = '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+        op1 = originate(
+            client,
+            session,
+            path,
+            f'Pair {addr1} {{PUSH address {addr1}; DROP}}',
+            0,
+        )
+        normalized_script = client.normalize_script(path, mode='Optimized')
+        addr2 = client.normalize(addr1, 'address', mode='Optimized').strip()
+        op2 = originate(
+            client,
+            session,
+            normalized_script,
+            f'Pair {addr2} {{PUSH address {addr2}; DROP}}',
+            0,
+        )
+        assert op1.storage_size == op2.storage_size
+
 
 @pytest.mark.incremental
 @pytest.mark.contract
