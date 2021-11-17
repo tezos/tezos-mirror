@@ -36,6 +36,7 @@ type argument =
   | Private_mode
   | Peer of string
   | No_bootstrap_peers
+  | Disable_operations_precheck
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -55,6 +56,7 @@ let make_argument = function
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
+  | Disable_operations_precheck -> ["--disable-mempool-precheck"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -192,8 +194,8 @@ module Config_file = struct
   let update node update = read node |> update |> write node
 
   let set_prevalidator ?(operations_request_timeout = 10.)
-      ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
-      =
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50)
+      ?(disable_operations_precheck = false) old_config =
     let prevalidator =
       `O
         [
@@ -201,6 +203,7 @@ module Config_file = struct
           ( "max_refused_operations",
             `Float (float_of_int max_refused_operations) );
           ("operations_batch_size", `Float (float_of_int operations_batch_size));
+          ("disable_precheck", `Bool disable_operations_precheck);
         ]
       |> JSON.annotate ~origin:"set_prevalidator"
     in
