@@ -24,6 +24,7 @@ COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 PROFILE?=dev
+VALID_PROFILES=dev release static
 
 TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
     $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
@@ -34,6 +35,10 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+endif
+
+ifeq ($(filter ${VALID_PROFILES},${PROFILE}),)
+$(error Unexpected dune profile (got: ${PROFILE}, expecting one of: ${VALID_PROFILES}))
 endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
