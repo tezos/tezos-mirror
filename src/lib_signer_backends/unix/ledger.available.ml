@@ -496,14 +496,18 @@ end
    rules they provide): *)
 let vendor_id = 0x2c97
 
-let product_id_nano_s = 0x0001
+(* These come from the ledger's udev rules *)
+let nano_s_product_ids = [0x0001] @ (0x1000 -- 0x101f)
 
-let product_id_nano_x = 0x0004
+let nano_x_product_ids = [0x0004] @ (0x4000 -- 0x401f)
 
 let use_ledger ?(filter : Filter.t = `None) f =
   let ledgers =
-    Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_s ()
-    @ Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_x ()
+    let all_product_ids = nano_s_product_ids @ nano_x_product_ids in
+    let open Hidapi in
+    List.filter
+      (fun hid -> List.mem ~equal:Int.equal hid.product_id all_product_ids)
+      (enumerate ~vendor_id ())
   in
   Events.(emit ledger_found)
     ( List.length ledgers,
