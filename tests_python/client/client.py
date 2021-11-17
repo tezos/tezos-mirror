@@ -805,12 +805,13 @@ class Client:
         metadata = self.get_metadata(params=params)
         return metadata['next_protocol']
 
-    def get_current_level(self, offset=0) -> dict:
+    def get_current_level(self, block='head', offset=0) -> dict:
         return self.rpc(
             'get',
-            '/chains/main/blocks/head/helpers/current_level'
-            + '?offset='
-            + str(offset),
+            (
+                f'/chains/main/blocks/{block}/helpers/'
+                f'current_level?offset={str(offset)}'
+            ),
         )
 
     def get_period_position(self) -> str:

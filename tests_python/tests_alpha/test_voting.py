@@ -205,11 +205,11 @@ class TestManualBaking:
         client.submit_ballot(f'bootstrap{4}', proto, 'nay')
 
     def test_level_info_offset2(self, client: Client):
-        level = client.get_current_level(offset=-1)
+        level = client.get_current_level(block='head~1')
         assert level["level_position"] == 9
-        level = client.get_current_level(offset=-4)
+        level = client.get_current_level(block='head~4')
         assert level["level_position"] == 6
-        level = client.get_current_level(offset=-10)
+        level = client.get_current_level(block='head~10')
         assert level["level_position"] == 0
 
     def test_bake_first_block_of_new_proposal_period(self, client: Client):

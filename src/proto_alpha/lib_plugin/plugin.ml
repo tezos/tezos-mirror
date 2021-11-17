@@ -2962,8 +2962,8 @@ module RPC = struct
       RPC_service.get_service
         ~description:
           "Returns the level of the interrogated block, or the one of a block \
-           located `offset` blocks after in the chain (or before when \
-           negative). For instance, the next block if `offset` is 1."
+           located `offset` blocks after it in the chain. For instance, the \
+           next block if `offset` is 1. The offset cannot be negative."
         ~query:level_query
         ~output:Level.encoding
         RPC_path.(path / "current_level")
@@ -2989,6 +2989,20 @@ module RPC = struct
         RPC_path.(path / "round")
   end
 
+  type Environment.Error_monad.error += Negative_level_offset
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"negative_level_offset"
+      ~title:"The specified level offset is negative"
+      ~description:"The specified level offset is negative"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The specified level offset should be positive.")
+      Data_encoding.unit
+      (function Negative_level_offset -> Some () | _ -> None)
+      (fun () -> Negative_level_offset)
+
   let register () =
     Scripts.register () ;
     Forge.register () ;
@@ -2999,11 +3013,13 @@ module RPC = struct
     Endorsing_rights.register () ;
     Validators.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
-        Lwt.return
-          (Level.from_raw_with_offset
-             ctxt
-             ~offset:q.offset
-             (Level.current ctxt).level)) ;
+        if q.offset < 0l then fail Negative_level_offset
+        else
+          Lwt.return
+            (Level.from_raw_with_offset
+               ctxt
+               ~offset:q.offset
+               (Level.current ctxt).level)) ;
     Registration.opt_register0
       ~chunked:true
       S.levels_in_current_cycle
