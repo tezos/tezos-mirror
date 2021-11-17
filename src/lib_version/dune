@@ -2,12 +2,7 @@
  (name tezos_version)
  (instrumentation (backend bisect_ppx))
  (public_name tezos-version)
- (modules
-   bin_version
-   node_version
-   version
-   generated_git_info
-   current_git_info)
+ (modules (:standard \ get_git_info tezos_version_parser tezos_print_version))
  (libraries tezos-base tezos-version-parser)
  (flags (:standard -open Tezos_base__TzPervasives)))
 
