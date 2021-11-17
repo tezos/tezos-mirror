@@ -106,18 +106,17 @@ let reveal_manager_key c manager public_key =
         Storage.Contract.Manager.update c contract v
       else fail (Inconsistent_hash (public_key, v, actual_hash))
 
-let get_manager_key c manager =
-  let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Manager.find c contract >>=? function
-  | None -> failwith "get_manager_key"
-  | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
-  | Some (Manager_repr.Public_key v) -> return v
-
-let revealed_key ctxt delegate error =
-  Storage.Contract.Manager.find ctxt (Contract_repr.implicit_contract delegate)
-  >>=? function
-  | None | Some (Manager_repr.Hash _) -> fail error
-  (* (Unregistered_delegate delegate) *)
+let get_manager_key ?error ctxt pkh =
+  let contract = Contract_repr.implicit_contract pkh in
+  Storage.Contract.Manager.find ctxt contract >>=? function
+  | None -> (
+      match error with
+      | None -> failwith "get_manager_key"
+      | Some error -> fail error)
+  | Some (Manager_repr.Hash _) -> (
+      match error with
+      | None -> fail (Unrevealed_manager_key contract)
+      | Some error -> fail error)
   | Some (Manager_repr.Public_key pk) -> return pk
 
 let remove_existing = Storage.Contract.Manager.remove_existing

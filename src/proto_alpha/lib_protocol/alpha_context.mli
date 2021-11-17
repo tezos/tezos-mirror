@@ -1343,7 +1343,8 @@ module Contract : sig
 
   val list : context -> contract list Lwt.t
 
-  val get_manager_key : context -> public_key_hash -> public_key tzresult Lwt.t
+  val get_manager_key :
+    ?error:error -> context -> public_key_hash -> public_key tzresult Lwt.t
 
   val is_manager_key_revealed :
     context -> public_key_hash -> bool tzresult Lwt.t
