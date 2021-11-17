@@ -55,16 +55,34 @@ let date =
 
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 
-(* find the most recent tag. If one commit is associated with two or more tags,
-   output always the most recently added tag *)
+let raw_current_version = "$Format:%(describe)$"
+
+(* Deduce the version either from the a git tag ( in a specific format )
+   or from two env variables set by opam, OPAM_PACKAGE_VERSION or in the
+   docker file, GIT_VERSION.
+
+   If the code is distributed as a tarball, then we consider the string
+   `raw_current_version`, that in tarball form will be mangled by
+   git export-subst.
+
+   If one commit is associated with two or more tags,
+   output always the most recently added tag that match the regexp `v*`
+   *)
 let git_describe =
-  let s = query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags" in
-  match parse_version s with
-  | None -> (
-      match parse_version (Sys.getenv "OPAM_PACKAGE_VERSION") with
-      | None | (exception Not_found) -> Tezos_version_parser.default
-      | Some v -> v)
-  | Some v -> v
+  let parse s =
+    match parse_version s with
+    | Some v -> v
+    | None -> (
+        match parse_version (Sys.getenv "OPAM_PACKAGE_VERSION") with
+        | Some v -> v
+        | None | (exception Not_found) -> Tezos_version_parser.default)
+  in
+  let s =
+    if String.equal raw_current_version ("$Format" ^ ":%d$") then
+      query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags"
+    else raw_current_version
+  in
+  parse s
 
 let lines =
   [
