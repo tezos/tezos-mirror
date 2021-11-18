@@ -65,6 +65,30 @@ let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
   List.map (fun op -> (Operation.hash op, op)) ops
   |> List.to_seq |> Operation_hash.Map.of_seq
 
+(** A generator like {!op_map_gen} but which guarantees the size
+    of the returned maps: they are exactly of size [n]. We need
+    a custom function (as opposed to using a QCheck function for lists
+    of fixed lengths) because we *need* to return maps, because we need
+    the properties that all operations hashes are different. *)
+let op_map_gen_n ?block_hash_t ~(n : int) :
+    Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  let open QCheck.Gen in
+  let map_take_n n m =
+    Operation_hash.Map.bindings m
+    |> List.take_n n |> List.to_seq |> Operation_hash.Map.of_seq
+  in
+  let merge _oph old _new = Some old in
+  let rec go (ops : Operation.t Operation_hash.Map.t) =
+    if Operation_hash.Map.cardinal ops >= n then
+      (* Done *)
+      return (map_take_n n ops)
+    else
+      (* Not enough operations yet, generate more *)
+      let* new_ops = op_map_gen ?block_hash_t in
+      go (Operation_hash.Map.union merge ops new_ops)
+  in
+  go Operation_hash.Map.empty
+
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck.Gen.t =
   QCheck.Gen.oneofa
