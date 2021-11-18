@@ -5,7 +5,10 @@
 #   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
 
 .tezt_template:
-  extends: .integration_template
+  extends:
+    - .integration_template
+    - .template__coverage
+    - .template__cobertura
   artifacts:
     reports:
       junit: tezt-junit.xml

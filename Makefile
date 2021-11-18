@@ -18,6 +18,7 @@ DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
 DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
+COBERTURA_REPORT := _coverage_report/cobertura.xml
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -112,8 +113,9 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 .PHONY: coverage-report
 coverage-report:
-	# remove spurious empty output files which prevent bisect from generating
-	# the report
+# /!\ FIXME: https://gitlab.com/tezos/tezos/-/issues/1945
+# corrupted files will be better handled in the next bisect_ppx version
+# and this check will be removed.
 	@find ${COVERAGE_OUTPUT} -size 0 -type f -delete
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
@@ -121,6 +123,20 @@ coverage-report:
 .PHONY: coverage-report-summary
 coverage-report-summary:
 	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
+
+CORRUPTED_FILES_FOUND := $(shell find ${COVERAGE_OUTPUT} -size 0 -type f | wc -l)
+
+.PHONY: coverage-report-cobertura
+coverage-report-cobertura:
+# /!\ FIXME: https://gitlab.com/tezos/tezos/-/issues/1945
+# corrupted files will be better handled in the next bisect_ppx version
+# and this check will be removed.
+ifneq ($(CORRUPTED_FILES_FOUND), 0)
+	@echo "Corrupted .coverage files found, removing them:"
+	@find ${COVERAGE_OUTPUT} -size 0 -type f -print -delete
+endif
+	@bisect-ppx-report cobertura --ignore-missing-file --coverage-path ${COVERAGE_OUTPUT} ${COBERTURA_REPORT}
+	@echo "Cobertura report should be available in ${COBERTURA_REPORT}"
 
 .PHONY: enable-time-measurement
 enable-time-measurement:

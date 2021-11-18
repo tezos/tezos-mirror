@@ -62,3 +62,4 @@ build_x86_64:
     - .rules_template__development
   variables:
     ARCH: "x86_64"
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
