@@ -57,6 +57,7 @@ endif
 		src/lib_protocol_compiler/main_native.exe \
 		src/bin_snoop/main_snoop.exe \
 		src/bin_proxy_server/main_proxy_server.exe \
+		src/bin_tps_evaluation/main_tps_evaluation.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), \
 		  $(shell if [ ! -z $(wildcard src/proto_$(p)/bin_endorser/*.ml) ]; then \
@@ -71,6 +72,7 @@ endif
 	@cp -f _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@cp -f _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
 	@cp -f _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
+	@cp -f _build/default/src/bin_tps_evaluation/main_tps_evaluation.exe tezos-tps-evaluation
 	@for p in $(active_protocol_directories) ; do \
 	   cp -f _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
 	   if [ -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe ]; then \
