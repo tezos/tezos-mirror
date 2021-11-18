@@ -146,24 +146,24 @@ Contract memorized as check_caller.
 
 ./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1EYwqeAzgkynYXJnHJ7ZxuXk5bNBBy6R6L --burn-cap 1 --arg '"KT19P9vLfrXCEwUMpiURQ5vY8Ncp5idkyKTD"'
 Node is bootstrapped.
-Estimated gas: 4448.948 units (will add 100 for safety)
+Estimated gas: 4888.980 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'ooeWJ1x8vuNSdxzJnQPjw3Jz9XMJFqJe1Cga8quXXbWcucEujBy'
+Operation hash is 'op4wu7aQT9ofgup46yvygx2td15DfJ2o8CLgamEkaZkRnqyPMvL'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooeWJ1x8vuNSdxzJnQPjw3Jz9XMJFqJe1Cga8quXXbWcucEujBy to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for op4wu7aQT9ofgup46yvygx2td15DfJ2o8CLgamEkaZkRnqyPMvL to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000751
+    Fee to the baker: ꜩ0.000795
     Expected counter: 3
-    Gas limit: 4549
+    Gas limit: 4989
     Storage limit: 0 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000751
-      payload fees(the block proposer) ....... +ꜩ0.000751
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000795
+      payload fees(the block proposer) ....... +ꜩ0.000795
     Transaction:
       Amount: ꜩ1
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -172,7 +172,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 4449.746
+      Consumed gas: 4889.778
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
         KT1EYwqeAzgkynYXJnHJ7ZxuXk5bNBBy6R6L ... +ꜩ1
@@ -216,24 +216,24 @@ This sequence of operations was run:
 
 ./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1EYwqeAzgkynYXJnHJ7ZxuXk5bNBBy6R6L --burn-cap 1 --arg '"KT19P9vLfrXCEwUMpiURQ5vY8Ncp5idkyKTD"'
 Node is bootstrapped.
-Estimated gas: 5761.955 units (will add 100 for safety)
+Estimated gas: 6201.987 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'oohh2J6m4DnZ9e4d57NeUfNjK3eWQh5xcTxoCLGwCyktxswEYUp'
+Operation hash is 'oo6wNGAK8aSyy6XkpBd1Eij4DvdV6te4V91uYzSdtZCPcRNPnAG'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for oohh2J6m4DnZ9e4d57NeUfNjK3eWQh5xcTxoCLGwCyktxswEYUp to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for oo6wNGAK8aSyy6XkpBd1Eij4DvdV6te4V91uYzSdtZCPcRNPnAG to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000883
+    Fee to the baker: ꜩ0.000927
     Expected counter: 5
-    Gas limit: 5862
+    Gas limit: 6302
     Storage limit: 47 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000883
-      payload fees(the block proposer) ....... +ꜩ0.000883
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000927
+      payload fees(the block proposer) ....... +ꜩ0.000927
     Transaction:
       Amount: ꜩ1
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
@@ -243,7 +243,7 @@ This sequence of operations was run:
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 5762.753
+      Consumed gas: 6202.785
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
