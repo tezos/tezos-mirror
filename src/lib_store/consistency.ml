@@ -326,80 +326,52 @@ let fix_savepoint_and_caboose chain_dir block_store head =
     | Some {Cemented_block_store.start_level; _} -> Some start_level
   in
   (* Returns the lowest block level of a cemented metadata file. *)
-  let lowest_entry
-      (metadata_file : [`Cemented_blocks_metadata] Naming.file option) =
+  let lowest_metadata_entry metadata_file =
     try
-      match metadata_file with
-      | None -> return_none
-      | Some metadata_file -> (
-          let metadata_file_path = Naming.file_path metadata_file in
-          let in_file = Zip.open_in metadata_file_path in
-          let entries = Zip.entries in_file in
-          let asc_entries =
-            List.sort
-              (fun {Zip.filename = a; _} {filename = b; _} ->
-                Int.compare (int_of_string a) (int_of_string b))
-              entries
-          in
-          match List.hd asc_entries with
-          | None ->
-              (* A metadata file is never empty *)
-              assert false
-          | Some {Zip.filename; _} -> return_some (Int32.of_string filename))
-    with _exn ->
-      (* FIXME Is it ok? Or should we take the successor of the
-         end_level of the cycle as a savepoint as it is a complete
-         metadata file. However, the current metadata file is
-         invalid/broken and it should be reported. *)
-      trace (Exn _exn)
+      let metadata_file_path = Naming.file_path metadata_file in
+      let in_file = Zip.open_in metadata_file_path in
+      let entries = Zip.entries in_file in
+      let asc_entries =
+        List.sort
+          (fun {Zip.filename = a; _} {filename = b; _} ->
+            Int.compare (int_of_string a) (int_of_string b))
+          entries
+      in
+      match List.hd asc_entries with
+      | None ->
+          (* A metadata file is never empty *)
+          assert false
+      | Some {Zip.filename; _} -> return_some (Int32.of_string filename)
+    with exn ->
+      trace (Exn exn)
       @@ fail
            (Corrupted_store
-              (Cannot_find_cemented_savepoint
-                 (Option.value
-                    (Option.map Naming.file_path metadata_file)
-                    ~default:"unknown metadata file")))
+              (Cannot_find_cemented_savepoint (Naming.file_path metadata_file)))
   in
-  (* Returns the lowest cemented metadata stored. *)
   let cemented_dir = Naming.cemented_blocks_dir chain_dir in
-  let cemented_metadata_dir =
-    Naming.cemented_blocks_metadata_dir cemented_dir
-  in
-  let lowest_cemented_metadata last_cycle =
-    let rec aux last_cycle = function
-      | [] ->
-          let metadata_file =
-            Option.map
-              (Naming.cemented_blocks_metadata_file cemented_metadata_dir)
-              last_cycle
-          in
-          lowest_entry metadata_file
-      | ({file; start_level; _} : Cemented_block_store.cemented_blocks_file)
-        :: tl ->
-          let metadata_file =
-            Naming.cemented_blocks_metadata_file cemented_metadata_dir file
-          in
-          if Sys.file_exists (Naming.file_path metadata_file) then
-            (* If we reach the cycle starting at level 0 and the
-               metadata exists, then the savepoint is the genesis. It
-               is the case in archive mode and when the offset window
-               includes the genesis. *)
-            if Compare.Int32.(start_level = 0l) then return_some 0l
-            else aux (Some file) tl
-          else
-            (* As metadata files are ordered and contiguous, we can
-               stop and search for the lowest entry in that metadata
-               file. Indeed, from an imported snapshot, the metadata
-               file could be partially filled. We must seek for the
-               first entry which stand for the first block of that
-               cycle which contains metadata.*)
-            let metadata_file =
-              Option.map
-                (Naming.cemented_blocks_metadata_file cemented_metadata_dir)
-                last_cycle
-            in
-            lowest_entry metadata_file
-    in
-    aux last_cycle
+  let lowest_cemented_metadata cemented_dir =
+    Cemented_block_store.load_metadata_table cemented_dir >>=? function
+    | Some metadata_files ->
+        let rec aux = function
+          | [] -> return_none
+          | {Cemented_block_store.metadata_file; start_level; end_level} :: tl
+            -> (
+              Lwt.catch
+                (fun () -> lowest_metadata_entry metadata_file >>=? return_some)
+                (function
+                  | _ ->
+                      (* Can be the case if the metadata file is
+                         corrupted. Raise a warning and continue the
+                         search in the next metadata file. *)
+                      Store_events.(
+                        emit warning_missing_metadata (start_level, end_level))
+                      >>= fun () -> return_none)
+              >>=? function
+              | Some v -> return v
+              | None -> aux tl)
+        in
+        aux (Array.to_list metadata_files)
+    | None -> return_none
   in
   (* Returns both the lowest block and the lowest block with metadata
      from the floating block store.*)
@@ -441,8 +413,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
     | None -> []
     | Some arr -> Array.to_list arr
   in
-  lowest_cemented_metadata None (List.rev cemented_block_files)
-  >>=? fun cemented_savepoint_candidate ->
+  lowest_cemented_metadata cemented_dir >>=? fun cemented_savepoint_candidate ->
   let cemented_caboose_candidate = lowest_cemented_block cemented_block_files in
   let floating_stores = Block_store.floating_block_stores block_store in
   (match (cemented_savepoint_candidate, cemented_caboose_candidate) with
