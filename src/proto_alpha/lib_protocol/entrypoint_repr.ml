@@ -157,6 +157,8 @@ let set_delegate = of_string_strict_exn "set_delegate"
 
 let remove_delegate = of_string_strict_exn "remove_delegate"
 
+let to_string (name : t) = (name :> string)
+
 let to_address_suffix (name : t) =
   if is_default name then "" else "%" ^ (name :> string)
 

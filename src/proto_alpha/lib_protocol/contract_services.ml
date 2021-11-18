@@ -404,7 +404,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
                 ( unreachable_entrypoint,
                   Entrypoint.Map.fold
                     (fun entry (_, ty) acc ->
-                      ((entry :> string), Micheline.strip_locations ty) :: acc)
+                      (Entrypoint.to_string entry, Micheline.strip_locations ty)
+                      :: acc)
                     map
                     [] ) )) ;
   opt_register1

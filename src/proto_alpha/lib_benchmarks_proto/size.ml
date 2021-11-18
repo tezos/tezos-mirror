@@ -140,7 +140,8 @@ let chain_id (_chain_id : Chain_id.t) : t = Chain_id.size
 
 let address (addr : Script_typed_ir.address) : t =
   let (_contract, entrypoint) = addr in
-  Signature.Public_key_hash.size + String.length (entrypoint :> string)
+  Signature.Public_key_hash.size
+  + String.length (Alpha_context.Entrypoint.to_string entrypoint)
 
 let list (list : 'a Script_typed_ir.boxed_list) : t =
   list.Script_typed_ir.length
