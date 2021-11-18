@@ -291,33 +291,19 @@ module Test_map_instr_on_options = struct
     let open Michelson_v1_primitives in
     function
     | Prim (_, D_Pair, [Prim (_, D_None, [], _); Int (_, total)], _) ->
-        (None, Z.to_int total)
+        {prev = None; total = Z.to_int total}
     | Prim (_, D_Pair, [Prim (_, D_Some, [Int (_, prev)], _); Int (_, total)], _)
       ->
-        (Some (Z.to_int prev), Z.to_int total)
+        {prev = Some (Z.to_int prev); total = Z.to_int total}
     | _ -> QCheck.assume_fail ()
-
-  let assert_some ~loc = function
-    | None ->
-        failwith
-          "%s: Assertion failed: None observed where some value was expected."
-          loc
-    | Some x -> return x
-
-  let assert_none ~loc = function
-    | None -> return ()
-    | Some actual ->
-        failwith
-          "%s: Assertion failed: Some %d observed where None was expected."
-          loc
-          actual
 
   let assertions storage_before storage_after = function
     | None ->
-        assert_none ~loc:__LOC__ storage_after.prev >>=? fun () ->
+        Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int storage_after.prev
+        >>=? fun () ->
         Assert.equal_int ~loc:__LOC__ storage_before.total storage_after.total
     | Some input ->
-        assert_some ~loc:__LOC__ storage_after.prev >>=? fun prev_aft ->
+        Assert.get_some ~loc:__LOC__ storage_after.prev >>=? fun prev_aft ->
         Assert.equal_int ~loc:__LOC__ input prev_aft >>=? fun () ->
         Assert.equal_int
           ~loc:__LOC__
@@ -327,8 +313,8 @@ module Test_map_instr_on_options = struct
   let test_mapping (input, prev, total) =
     let storage_before = {prev; total} in
     run_test_map_opt_script input storage_before >>=? fun ({storage; _}, _) ->
-    let (new_prev, new_total) = assume_storage_shape (Micheline.root storage) in
-    assertions storage_before {prev = new_prev; total = new_total} input
+    let new_storage = assume_storage_shape (Micheline.root storage) in
+    assertions storage_before new_storage input
 end
 
 let tests =

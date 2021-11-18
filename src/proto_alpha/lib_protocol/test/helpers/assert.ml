@@ -140,6 +140,14 @@ let not_equal_pkh ~loc (a : Signature.Public_key_hash.t)
   let module PKH = Signature.Public_key_hash in
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
+let get_some ~loc = function
+  | Some x -> return x
+  | None -> failwith "Unexpected None (%s)" loc
+
+let is_none ~loc ~pp = function
+  | Some x -> failwith "Unexpected (Some %a) (%s)" pp x loc
+  | None -> return_unit
+
 open Context
 
 (* Some asserts for account operations *)
