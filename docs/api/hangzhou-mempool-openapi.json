@@ -153,7 +153,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                          "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                         ]
                       },
                       "branch": {
@@ -162,7 +162,7 @@
                       "contents": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+                          "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
                         }
                       },
                       "signature": {
@@ -223,7 +223,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+                              "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -254,7 +254,7 @@
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -263,7 +263,7 @@
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -301,7 +301,7 @@
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -310,7 +310,7 @@
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -348,7 +348,7 @@
                                 "protocol": {
                                   "type": "string",
                                   "enum": [
-                                    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
                                   ]
                                 },
                                 "branch": {
@@ -357,7 +357,7 @@
                                 "contents": {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
                                   }
                                 },
                                 "signature": {
@@ -530,7 +530,7 @@
   },
   "components": {
     "schemas": {
-      "010-PtGRANAD.block_header.alpha.full_header": {
+      "011-PtHangz2.block_header.alpha.full_header": {
         "title": "Shell header",
         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
         "type": "object",
@@ -599,7 +599,7 @@
           "signature"
         ]
       },
-      "010-PtGRANAD.contract_id": {
+      "011-PtHangz2.contract_id": {
         "title": "A contract handle",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
         "oneOf": [
@@ -608,7 +608,7 @@
           }
         ]
       },
-      "010-PtGRANAD.entrypoint": {
+      "011-PtHangz2.entrypoint": {
         "title": "entrypoint",
         "description": "Named entrypoint to a Michelson smart contract",
         "oneOf": [
@@ -653,7 +653,7 @@
           }
         ]
       },
-      "010-PtGRANAD.inlined.endorsement": {
+      "011-PtHangz2.inlined.endorsement": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -661,7 +661,7 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/010-PtGRANAD.inlined.endorsement.contents"
+            "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement.contents"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature"
@@ -672,7 +672,7 @@
           "operations"
         ]
       },
-      "010-PtGRANAD.inlined.endorsement.contents": {
+      "011-PtHangz2.inlined.endorsement.contents": {
         "type": "object",
         "properties": {
           "kind": {
@@ -692,156 +692,162 @@
           "level"
         ]
       },
-      "010-PtGRANAD.michelson.v1.primitives": {
+      "011-PtHangz2.michelson.v1.primitives": {
         "type": "string",
         "enum": [
-          "ADD",
-          "IF_LEFT",
-          "SELF_ADDRESS",
-          "KECCAK",
-          "Elt",
-          "TOTAL_VOTING_POWER",
-          "VOTING_POWER",
-          "SHA256",
-          "option",
-          "Right",
-          "LE",
-          "set",
-          "ticket",
-          "storage",
-          "SOURCE",
-          "False",
-          "SHA512",
-          "BALANCE",
-          "EMPTY_BIG_MAP",
-          "operation",
-          "NOT",
-          "or",
-          "TRANSFER_TOKENS",
-          "DUG",
-          "COMPARE",
-          "SHA3",
-          "chain_id",
-          "MUL",
-          "signature",
-          "AMOUNT",
-          "DIP",
           "ABS",
-          "list",
-          "LT",
-          "bls12_381_g1",
-          "CONCAT",
-          "UNIT",
-          "SWAP",
-          "DUP",
-          "bytes",
-          "CAR",
-          "CONS",
-          "NEQ",
-          "GET",
-          "Left",
-          "nat",
-          "UNPAIR",
-          "DROP",
-          "NEG",
-          "CONTRACT",
-          "big_map",
-          "ADDRESS",
-          "True",
-          "parameter",
-          "never",
-          "EQ",
+          "IF",
+          "SENDER",
+          "VOTING_POWER",
+          "False",
+          "NEVER",
+          "DUG",
+          "chest",
+          "BLAKE2B",
+          "map",
+          "bls12_381_g2",
           "Pair",
-          "UPDATE",
-          "string",
+          "INT",
+          "option",
+          "bls12_381_g1",
+          "storage",
+          "SIZE",
+          "view",
+          "SHA256",
           "AND",
+          "VIEW",
+          "mutez",
+          "NIL",
+          "big_map",
+          "SUB",
+          "SAPLING_VERIFY_UPDATE",
+          "CHECK_SIGNATURE",
+          "TOTAL_VOTING_POWER",
+          "address",
+          "MAP",
+          "or",
+          "ticket",
+          "ADD",
+          "IMPLICIT_ACCOUNT",
+          "SHA512",
+          "key",
+          "LSL",
+          "bls12_381_fr",
+          "chest_key",
+          "sapling_state",
+          "COMPARE",
+          "TRANSFER_TOKENS",
+          "STEPS_TO_QUOTA",
+          "DROP",
+          "set",
+          "BALANCE",
+          "CONCAT",
+          "MUL",
+          "FAILWITH",
+          "Elt",
+          "list",
+          "OR",
+          "DIP",
+          "MEM",
+          "LOOP_LEFT",
+          "lambda",
+          "ITER",
+          "Some",
+          "parameter",
+          "sapling_transaction",
+          "EMPTY_MAP",
+          "None",
+          "SET_DELEGATE",
+          "pair",
+          "AMOUNT",
+          "string",
+          "PAIRING_CHECK",
+          "bytes",
+          "CHAIN_ID",
+          "HASH_KEY",
+          "IF_LEFT",
+          "CREATE_ACCOUNT",
+          "LT",
+          "KECCAK",
+          "UNPACK",
+          "SPLIT_TICKET",
+          "SELF_ADDRESS",
+          "unit",
+          "UNIT",
+          "LE",
+          "SOURCE",
+          "CREATE_CONTRACT",
+          "Unit",
+          "DIG",
+          "NONE",
+          "ISNAT",
+          "GE",
+          "SOME",
+          "key_hash",
+          "SELF",
+          "signature",
+          "CAR",
+          "NOT",
+          "operation",
+          "CDR",
+          "ADDRESS",
+          "TICKET",
+          "RIGHT",
+          "LEFT",
+          "RENAME",
+          "True",
+          "Right",
+          "PACK",
+          "IF_CONS",
+          "SHA3",
+          "constant",
+          "UPDATE",
+          "EMPTY_SET",
+          "NEQ",
+          "LAMBDA",
           "timestamp",
           "READ_TICKET",
-          "unit",
-          "CHECK_SIGNATURE",
-          "IF_CONS",
-          "INT",
-          "CREATE_CONTRACT",
-          "MEM",
-          "PAIRING_CHECK",
-          "BLAKE2B",
-          "bool",
-          "STEPS_TO_QUOTA",
-          "sapling_transaction",
-          "XOR",
-          "SELF",
-          "LEVEL",
-          "IMPLICIT_ACCOUNT",
-          "PACK",
-          "NEVER",
-          "NOW",
-          "RENAME",
-          "GET_AND_UPDATE",
-          "SENDER",
-          "map",
-          "mutez",
-          "SLICE",
-          "CDR",
-          "OR",
-          "sapling_state",
-          "CHAIN_ID",
-          "ISNAT",
-          "SPLIT_TICKET",
-          "SOME",
           "LOOP",
-          "SAPLING_VERIFY_UPDATE",
-          "Unit",
-          "Some",
-          "UNPACK",
-          "IF_NONE",
-          "TICKET",
-          "ITER",
-          "EXEC",
-          "NONE",
-          "LEFT",
-          "address",
-          "JOIN_TICKETS",
-          "LSR",
-          "None",
-          "lambda",
-          "EMPTY_SET",
-          "MAP",
+          "Left",
           "int",
-          "bls12_381_g2",
-          "LSL",
-          "RIGHT",
-          "contract",
-          "SIZE",
-          "pair",
-          "IF",
-          "bls12_381_fr",
-          "PAIR",
-          "LAMBDA",
-          "HASH_KEY",
+          "LSR",
+          "EMPTY_BIG_MAP",
+          "chain_id",
+          "OPEN_CHEST",
+          "LEVEL",
+          "UNPAIR",
+          "JOIN_TICKETS",
           "PUSH",
-          "LOOP_LEFT",
-          "SAPLING_EMPTY_STATE",
-          "key",
-          "DIG",
-          "EMPTY_MAP",
-          "APPLY",
-          "CAST",
-          "key_hash",
-          "FAILWITH",
+          "nat",
           "GT",
-          "NIL",
-          "SUB",
+          "never",
+          "NOW",
+          "IF_NONE",
+          "PAIR",
+          "GET_AND_UPDATE",
+          "XOR",
+          "CAST",
+          "bool",
+          "SAPLING_EMPTY_STATE",
           "EDIV",
-          "CREATE_ACCOUNT",
-          "GE",
-          "SET_DELEGATE",
+          "EQ",
+          "CONTRACT",
+          "contract",
+          "EXEC",
+          "GET",
+          "NEG",
+          "SLICE",
+          "DUP",
+          "CONS",
+          "SWAP",
+          "APPLY",
           "code"
         ]
       },
-      "010-PtGRANAD.mutez": {
+      "011-PtHangz2.mutez": {
         "$ref": "#/components/schemas/positive_bignum"
       },
-      "010-PtGRANAD.operation.alpha.contents": {
+      "011-PtHangz2.operation.alpha.contents": {
         "oneOf": [
           {
             "title": "Endorsement",
@@ -901,7 +907,7 @@
                 ]
               },
               "endorsement": {
-                "$ref": "#/components/schemas/010-PtGRANAD.inlined.endorsement"
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
               },
               "slot": {
                 "type": "integer",
@@ -926,10 +932,10 @@
                 ]
               },
               "op1": {
-                "$ref": "#/components/schemas/010-PtGRANAD.inlined.endorsement"
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
               },
               "op2": {
-                "$ref": "#/components/schemas/010-PtGRANAD.inlined.endorsement"
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
               },
               "slot": {
                 "type": "integer",
@@ -955,10 +961,10 @@
                 ]
               },
               "bh1": {
-                "$ref": "#/components/schemas/010-PtGRANAD.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/011-PtHangz2.block_header.alpha.full_header"
               },
               "bh2": {
-                "$ref": "#/components/schemas/010-PtGRANAD.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/011-PtHangz2.block_header.alpha.full_header"
               }
             },
             "required": [
@@ -1075,7 +1081,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1114,7 +1120,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1126,16 +1132,16 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "amount": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "destination": {
-                "$ref": "#/components/schemas/010-PtGRANAD.contract_id"
+                "$ref": "#/components/schemas/011-PtHangz2.contract_id"
               },
               "parameters": {
                 "type": "object",
                 "properties": {
                   "entrypoint": {
-                    "$ref": "#/components/schemas/010-PtGRANAD.entrypoint"
+                    "$ref": "#/components/schemas/011-PtHangz2.entrypoint"
                   },
                   "value": {
                     "oneOf": [
@@ -1180,7 +1186,7 @@
                         "title": "Sequence",
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                          "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                         }
                       },
                       {
@@ -1188,12 +1194,12 @@
                         "type": "object",
                         "properties": {
                           "prim": {
-                            "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                            "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
                           },
                           "args": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                              "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                             }
                           },
                           "annots": {
@@ -1241,7 +1247,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1253,13 +1259,13 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "balance": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "delegate": {
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "script": {
-                "$ref": "#/components/schemas/010-PtGRANAD.scripted.contracts"
+                "$ref": "#/components/schemas/011-PtHangz2.scripted.contracts"
               }
             },
             "required": [
@@ -1287,7 +1293,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/010-PtGRANAD.mutez"
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1329,10 +1335,118 @@
               "kind",
               "arbitrary"
             ]
+          },
+          {
+            "title": "Register_global_constant",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "register_global_constant"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "title": "Int",
+                    "type": "object",
+                    "properties": {
+                      "int": {
+                        "$ref": "#/components/schemas/bignum"
+                      }
+                    },
+                    "required": [
+                      "int"
+                    ]
+                  },
+                  {
+                    "title": "String",
+                    "type": "object",
+                    "properties": {
+                      "string": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "title": "Bytes",
+                    "type": "object",
+                    "properties": {
+                      "bytes": {
+                        "type": "string",
+                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                      }
+                    },
+                    "required": [
+                      "bytes"
+                    ]
+                  },
+                  {
+                    "title": "Sequence",
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                    }
+                  },
+                  {
+                    "title": "Generic prim (any number of args with or without annot)",
+                    "type": "object",
+                    "properties": {
+                      "prim": {
+                        "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+                      },
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                        }
+                      },
+                      "annots": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "prim"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "value"
+            ]
           }
         ]
       },
-      "010-PtGRANAD.scripted.contracts": {
+      "011-PtHangz2.scripted.contracts": {
         "type": "object",
         "properties": {
           "code": {
@@ -1378,7 +1492,7 @@
                 "title": "Sequence",
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                 }
               },
               {
@@ -1386,12 +1500,12 @@
                 "type": "object",
                 "properties": {
                   "prim": {
-                    "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                    "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
                   },
                   "args": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                     }
                   },
                   "annots": {
@@ -1450,7 +1564,7 @@
                 "title": "Sequence",
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                 }
               },
               {
@@ -1458,12 +1572,12 @@
                 "type": "object",
                 "properties": {
                   "prim": {
-                    "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                    "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
                   },
                   "args": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                     }
                   },
                   "annots": {
@@ -1582,7 +1696,7 @@
           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
         }
       },
-      "micheline.010-PtGRANAD.michelson_v1.expression": {
+      "micheline.011-PtHangz2.michelson_v1.expression": {
         "oneOf": [
           {
             "title": "Int",
@@ -1625,7 +1739,7 @@
             "title": "Sequence",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+              "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
             }
           },
           {
@@ -1633,12 +1747,12 @@
             "type": "object",
             "properties": {
               "prim": {
-                "$ref": "#/components/schemas/010-PtGRANAD.michelson.v1.primitives"
+                "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
               },
               "args": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.010-PtGRANAD.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
                 }
               },
               "annots": {
@@ -1661,7 +1775,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+              "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
             ]
           },
           "branch": {
@@ -1670,7 +1784,7 @@
           "contents": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/010-PtGRANAD.operation.alpha.contents"
+              "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
             }
           },
           "signature": {
