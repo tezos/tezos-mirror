@@ -30,3 +30,9 @@ let default = "default"
 let is_default name = name = default
 
 let root = "root"
+
+let do_ = "do"
+
+let set_delegate = "set_delegate"
+
+let remove_delegate = "remove_delegate"

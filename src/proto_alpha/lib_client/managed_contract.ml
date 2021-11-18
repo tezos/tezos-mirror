@@ -95,10 +95,16 @@ let build_lambda_for_set_delegate ~delegate =
         delegate
   | None -> "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
 
+let entrypoint_do = Entrypoint.do_
+
+let entrypoint_set_delegate = Entrypoint.set_delegate
+
+let entrypoint_remove_delegate = Entrypoint.remove_delegate
+
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
-  let entrypoint = "do" in
+  let entrypoint = entrypoint_do in
   (Michelson_v1_entrypoints.contract_entrypoint_type
      cctxt
      ~chain
@@ -114,8 +120,8 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        (*  their is no "do" entrypoint trying "set/remove_delegate" *)
        let entrypoint =
          match delegate with
-         | Some _ -> "set_delegate"
-         | None -> "remove_delegate"
+         | Some _ -> entrypoint_set_delegate
+         | None -> entrypoint_remove_delegate
        in
        Michelson_v1_entrypoints.contract_entrypoint_type
          cctxt

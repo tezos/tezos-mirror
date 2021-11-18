@@ -34,3 +34,12 @@ val is_default : t -> bool
 
 (** Root entrypoint "root" *)
 val root : t
+
+(** Entrypoint "do" *)
+val do_ : t
+
+(** Entrypoint "set_delegate" *)
+val set_delegate : t
+
+(** Entrypoint "remove_delegate" *)
+val remove_delegate : t
