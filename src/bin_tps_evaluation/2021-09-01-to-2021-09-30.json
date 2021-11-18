@@ -1,0 +1,13 @@
+{
+  "regular": 2989498,
+  "origination": 5498,
+  "contract": {
+    "total": 5219836,
+    "most_used": {
+      "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton": 1772827,
+      "KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn": 1165878,
+      "KT1GRSvLoikDsXujKgZPsGLX8k8VvR2Tq95b": 333703
+    }
+  },
+  "total_operations": 8214832
+}

@@ -1,0 +1,17 @@
+; build static executable with --profile static
+(env
+ (static (flags (:standard -ccopt -static ))))
+
+(executables
+  (names main_tps_evaluation)
+  (public_names tezos-tps-evaluation)
+  (package tezos-tps-evaluation)
+  (libraries cmdliner
+             data-encoding
+             lwt
+             ppx_blob
+             caqti
+             caqti-lwt
+             caqti-driver-postgresql)
+  (preprocess (pps ppx_blob))
+  (preprocessor_deps (file ./sql/get_all_operations.sql)))
