@@ -4,6 +4,7 @@
   test_locator
   test_synchronisation_heuristic_fuzzy
   test_prevalidation
+  test_prevalidation_t
   test_prevalidator_classification
   test_prevalidator_classification_operations)
  (package tezos-shell)
