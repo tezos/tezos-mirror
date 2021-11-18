@@ -1074,14 +1074,14 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       let open Gas_monad in
                       let io_ty =
                         Script_ir_translator.merge_types
-                          ~error_details:Fast_merge_type_error
+                          ~error_details:Fast
                           ~legacy:true
                           kloc
                           aft_ty
                           output_ty
                         >>$ fun (out_eq, _ty) ->
                         merge_types
-                          ~error_details:Fast_merge_type_error
+                          ~error_details:Fast
                           ~legacy:true
                           kloc
                           bef_ty
@@ -1684,11 +1684,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
-    (find_entrypoint
-       ~error_details:Default_merge_type_error
-       arg_type
-       ~root_name
-       entrypoint)
+    (find_entrypoint ~error_details:Informative arg_type ~root_name entrypoint)
   >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)

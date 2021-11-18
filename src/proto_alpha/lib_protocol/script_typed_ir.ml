@@ -144,8 +144,8 @@ module Type_size : TYPE_SIZE = struct
     else
       Error
         (match error_details with
-        | Fast_merge_type_error -> Inconsistent_types_fast
-        | Default_merge_type_error ->
+        | Fast -> Inconsistent_types_fast
+        | Informative ->
             trace_of_error @@ Script_tc_errors.Inconsistent_type_sizes (x, y))
 
   let of_int loc size =

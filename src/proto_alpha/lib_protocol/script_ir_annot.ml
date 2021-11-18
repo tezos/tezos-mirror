@@ -160,8 +160,8 @@ let merge_type_annot :
       else
         Error
           (match error_details with
-          | Fast_merge_type_error -> Inconsistent_types_fast
-          | Default_merge_type_error ->
+          | Fast -> Inconsistent_types_fast
+          | Informative ->
               trace_of_error
               @@ Inconsistent_annotations
                    (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
@@ -181,8 +181,8 @@ let merge_field_annot :
       else
         Error
           (match error_details with
-          | Fast_merge_type_error -> Inconsistent_types_fast
-          | Default_merge_type_error ->
+          | Fast -> Inconsistent_types_fast
+          | Informative ->
               trace_of_error
               @@ Inconsistent_annotations
                    ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))

@@ -83,7 +83,7 @@ let record_trace_eval :
     ('a, error_trace) t =
  fun ~error_details ->
   match error_details with
-  | Fast_merge_type_error -> fun _f m -> m
-  | Default_merge_type_error ->
+  | Fast -> fun _f m -> m
+  | Informative ->
       fun f m gas ->
         m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas

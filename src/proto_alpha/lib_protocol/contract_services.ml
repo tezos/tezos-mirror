@@ -370,7 +370,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
             (( parse_parameter_ty ctxt ~legacy arg_type
              >>? fun (Ex_ty arg_type, _) ->
                Script_ir_translator.find_entrypoint
-                 ~error_details:Default_merge_type_error
+                 ~error_details:Informative
                  ~root_name
                  arg_type
                  entrypoint )
