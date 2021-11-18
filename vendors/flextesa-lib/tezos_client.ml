@@ -350,7 +350,7 @@ module Keyed = struct
 
   let endorse state baker msg =
     successful_client_cmd state ~client:baker.client
-      ["endorse"; "for"; baker.key_name; "--force"]
+      ["endorse"; "for"; baker.key_name]
     >>= fun res ->
     Log_recorder.Operations.endorse state ~client:baker.client.id
       ~output:res#out msg ;

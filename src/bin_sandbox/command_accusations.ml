@@ -331,7 +331,7 @@ let find_endorsement_in_mempool state ~client =
           Jqo.field o ~k:"contents"
           |> Jqo.list_exists ~f:(fun op ->
                  (* Dbg.e EF.(ef_json "op" op) ; *)
-                 Jqo.field op ~k:"kind" = `String "endorsement"))
+                 Jqo.field op ~k:"kind" = `String "endorsement_with_slot"))
       >>= function
       | None -> return (`Not_done (sprintf "No endorsement so far"))
       | Some e -> return (`Done e))

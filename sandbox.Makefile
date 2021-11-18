@@ -67,7 +67,9 @@ accusations_simple_double_endorsing: tezos-sandbox tezos-client tezos-node
 	  --with-timestamp \
 	  --base-port 11_000 \
 	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node
+	  --tezos-node-binary ./tezos-node \
+	  --protocol-hash ${CURRENT_PROTO_HASH} \
+	  --protocol-kind ${CURRENT_PROTO_NAME}
 
 .PHONY: voting_demo_noops
 voting_demo_noops: tezos-sandbox tezos-client tezos-admin-client tezos-node
