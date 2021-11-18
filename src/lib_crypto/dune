@@ -14,7 +14,8 @@
   tezos-rpc
   tezos-stdlib
   ringo
-  zarith)
+  zarith
+  zarith_stubs_js)
  (flags
   (:standard
    -open Tezos_stdlib

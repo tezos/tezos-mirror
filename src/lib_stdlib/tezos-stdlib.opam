@@ -10,6 +10,7 @@ depends: [
   "ppx_inline_test"
   "hex"
   "zarith" { >= "1.12" & < "1.13" }
+  "zarith_stubs_js"
   "lwt" { >= "5.4.0" }
   "alcotest" { with-test & >= "1.1.0" }
   "alcotest-lwt" { with-test & >= "1.1.0" }

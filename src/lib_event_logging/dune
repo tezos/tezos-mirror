@@ -8,6 +8,7 @@
   tezos-error-monad
   tezos-lwt-result-stdlib
   lwt_log.core)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib

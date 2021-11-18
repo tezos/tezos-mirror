@@ -9,6 +9,7 @@
   tezos-event-logging
   tezos-test-helpers
   alcotest)
+ (js_of_ocaml)
  (flags
   (:standard
    -linkall

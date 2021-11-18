@@ -658,14 +658,11 @@ let tests =
   ]
 
 let wrap (n, f) =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f () >>= function
-      | Ok () -> Lwt.return_unit
-      | Error err -> Lwt.fail_with err)
+  Alcotest.test_case n `Quick (fun () ->
+      f () >>= function Ok () -> () | Error err -> Stdlib.failwith err)
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     ~argv:[|""|]
     "tezos-lib-micheline"
     [("micheline", List.map wrap tests)]
-  |> Lwt_main.run

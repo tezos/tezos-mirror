@@ -97,8 +97,9 @@ let poke bytes ofs bits v =
 let%test_unit "random_read_writes" =
   let bytes_length = 45 in
   let bit_length = bytes_length * 8 in
-  (* max_data_bit_width = 29 to to stay within Random.int bounds. *)
-  let max_data_bit_width = 29 in
+  (* max_data_bit_width = 29 to to stay within Random.int bounds.
+     int_size - 7 to stay within [check_peek_poke_args] domain. *)
+  let max_data_bit_width = min 29 (Sys.int_size - 7) in
   let bytes = Bytes.make 45 '\000' in
   let poke_et_peek ofs len v =
     poke bytes ofs len v ;
@@ -162,11 +163,14 @@ let%test_unit "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
 let%test_unit "sequential_read_writes" =
   let bytes = Bytes.make 45 '\000' in
   let bits = Bytes.length bytes * 8 in
+  (* max_data_bit_width = 29 to stay within Random.int bounds.
+     int_size - 7 to stay within [check_peek_poke_args] domain. *)
+  let max_data_bit_width = min 29 (Sys.int_size - 7) in
   for _ = 0 to 10_000 do
     let rec init ofs acc =
       if ofs >= bits then List.rev acc
       else
-        let len = min (Random.int 29 + 1) (bits - ofs) in
+        let len = min (Random.int max_data_bit_width + 1) (bits - ofs) in
         let v = Random.int (1 lsl len) in
         poke bytes ofs len v ;
         assert (peek bytes ofs len = v) ;

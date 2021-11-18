@@ -7,6 +7,7 @@
   fmt
   qcheck-alcotest
   alcotest
-  alcotest-lwt
+  lwt
   pure-splitmix)
+ (js_of_ocaml)
  (flags (:standard -linkall)))
