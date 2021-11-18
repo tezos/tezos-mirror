@@ -78,6 +78,77 @@ module High_watermark = struct
          preendorsement (%s)"
         (Printexc.to_string exn)
 
+  let check_mark name
+      (previous_level, previous_round_opt, previous_hash, previous_signature_opt)
+      level round_opt hash =
+    let round = Option.value ~default:0l round_opt in
+    match (previous_round_opt, previous_signature_opt) with
+    | (None, None) ->
+        if previous_level >= level then
+          failwith
+            "%s level %ld not above high watermark %ld"
+            name
+            level
+            previous_level
+        else return_none
+    | (None, Some signature) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld below high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level then
+          if previous_hash <> hash then
+            failwith
+              "%s level %ld already signed with different data"
+              name
+              level
+          else return_some signature
+        else return_none
+    | (Some previous_round, None) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld not above high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level && previous_round >= round then
+          failwith
+            "%s level %ld and round %ld not above high watermark (%ld, %ld)"
+            name
+            level
+            round
+            previous_level
+            previous_round
+        else return_none
+    | (Some previous_round, Some signature) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld below high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level then
+          if previous_round > round then
+            failwith
+              "%s level %ld and round %ld not above high watermark (%ld,%ld)"
+              name
+              level
+              round
+              previous_level
+              previous_round
+          else if previous_round = round then
+            if previous_hash <> hash then
+              failwith
+                "%s level %ld and round %ld already signed with different data"
+                name
+                level
+                round
+            else return_some signature
+          else return_none
+        else return_none
+
   let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes
       sign =
     let mark art name get_level_and_round =
@@ -89,98 +160,27 @@ module High_watermark = struct
       else
         let hash = Blake2B.hash_bytes [bytes] in
         let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
-        get_level_and_round () >>=? fun (level, round) ->
-        (match (List.assoc_opt ~equal:Chain_id.equal chain_id all, round) with
-        | (None, _) -> return_none
-        | (Some marks, round_opt) -> (
-            let round = Option.value ~default:0l round_opt in
-            match
-              List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh marks
-            with
-            | None -> return_none
-            | Some (previous_level, None, _, None) ->
-                if previous_level >= level then
-                  failwith
-                    "%s level %ld not above high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else return_none
-            | Some (previous_level, None, previous_hash, Some signature) ->
-                if previous_level > level then
-                  failwith
-                    "%s level %ld below high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else if previous_level = level then
-                  if previous_hash <> hash then
-                    failwith
-                      "%s level %ld already signed with different data"
-                      name
-                      level
-                  else return_some signature
-                else return_none
-            | Some (previous_level, Some previous_round, _, None) ->
-                if previous_level > level then
-                  failwith
-                    "%s level %ld not above high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else if previous_level = level && previous_round >= round then
-                  failwith
-                    "%s level %ld and round %ld not above high watermark (%ld, \
-                     %ld)"
-                    name
-                    level
-                    round
-                    previous_level
-                    previous_round
-                else return_none
-            | Some
-                ( previous_level,
-                  Some previous_round,
-                  previous_hash,
-                  Some signature ) ->
-                if previous_level > level then
-                  failwith
-                    "%s level %ld below high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else if previous_level = level then
-                  if previous_round > round then
-                    failwith
-                      "%s level %ld and round %ld not above high watermark \
-                       (%ld,%ld)"
-                      name
-                      level
-                      round
-                      previous_level
-                      previous_round
-                  else if previous_round = round then
-                    if previous_hash <> hash then
-                      failwith
-                        "%s level %ld and round %ld already signed with \
-                         different data"
-                        name
-                        level
-                        round
-                    else return_some signature
-                  else return_none
-                else return_none))
+        get_level_and_round () >>=? fun (level, round_opt) ->
+        (match
+           Option.bind
+             (List.assoc_opt ~equal:Chain_id.equal chain_id all)
+             (List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh)
+         with
+        | None -> return_none
+        | Some mark -> check_mark name mark level round_opt hash)
         >>=? function
         | Some signature -> return signature
         | None ->
             sign bytes >>=? fun signature ->
             let rec update = function
               | [] ->
-                  [(chain_id, [(pkh, (level, round, hash, Some signature))])]
+                  [
+                    (chain_id, [(pkh, (level, round_opt, hash, Some signature))]);
+                  ]
               | (e_chain_id, marks) :: rest ->
                   if chain_id = e_chain_id then
                     let marks =
-                      (pkh, (level, round, hash, Some signature))
+                      (pkh, (level, round_opt, hash, Some signature))
                       :: List.filter (fun (pkh', _) -> pkh <> pkh') marks
                     in
                     (e_chain_id, marks) :: rest
