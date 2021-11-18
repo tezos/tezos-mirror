@@ -47,6 +47,11 @@ val set_delegate : t
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
 
+(** Converts an entrypoint to a string used as an address suffix.
+    For the default entrypoint, the result is the empty string.
+    Otherwise it is "%" followed by the entrypoint. *)
+val to_address_suffix : t -> string
+
 (** Pretty-print an entrypoint *)
 val pp : Format.formatter -> t -> unit
 

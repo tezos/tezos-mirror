@@ -485,9 +485,7 @@ let unparse_address ~loc ctxt mode (c, entrypoint) =
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       let notation =
-        match entrypoint with
-        | "default" -> Contract.to_b58check c
-        | entrypoint -> Contract.to_b58check c ^ "%" ^ entrypoint
+        Contract.to_b58check c ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
 

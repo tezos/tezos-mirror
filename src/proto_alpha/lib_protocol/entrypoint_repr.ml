@@ -37,6 +37,8 @@ let set_delegate = "set_delegate"
 
 let remove_delegate = "remove_delegate"
 
+let to_address_suffix name = if is_default name then "" else "%" ^ name
+
 let pp = Format.pp_print_string
 
 let in_memory_size name =
