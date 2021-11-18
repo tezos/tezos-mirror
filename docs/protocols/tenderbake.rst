@@ -84,16 +84,16 @@ producer. :doc:`Recall<../alpha/consensus>` that the payload producer
 may be different from the block producer, which is stored in the field
 ``baker``.
 
-The balance updates have been updated as follows:
+Previously, some internal transfers of tokens did not generate balance updates. Also, a credit balance update was not always balanced by a debit balance update. In order to make token movements easier to audit, we have remedied that by introducing new 'kinds' and 'types' of balance updates. Hence, balance updates in the metadata are now always balanced, i.e. the sum of credits is equal to the sum of debits.
 
-- There is a new type of ``origin``, called ``simulation``, used when
-  a smart contract simulation run is performed via the RPC
-  ``../helpers/scripts/run_code``.
+The balance updates have been updated as follows:
 
 - The new balance categories ``legacy_rewards``, ``legacy_deposits``, and
   ``legacy_fees`` correspond to the old ``rewards``, ``deposits``, and
   ``fees`` categories, and are only generated during migration (their
   ``origin`` field is ``migration``).
+
+- There is a new type of ``origin``, called ``simulation`` which is for internal use only (when a smart contract simulation run is performed via the RPC ``../helpers/scripts/run_code``). This ``origin`` will not appear in metadata during normal operation on mainnet.
 
 - The following new balance types have been introduced:
 
@@ -106,14 +106,24 @@ The balance updates have been updated as follows:
   - block fees, with the kind ``accumulator`` and category ``fees``;
   - storage fees, with the kind ``burned`` and category ``storage_fees``;
   - double signing punishments, with the kind ``burned`` and category ``punishments``;
-  - lost endorsing rewards, with the kind ``burned``, category ``rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean), and 5th field ``revelation`` (a boolean);
+  - lost endorsing rewards, with the kind ``burned``, category ``rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of unsufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
   - liquidity baking subsidies, with the kind ``minted`` and category ``subsidy``;
-  - "burned"??, with the kind ``burned`` and category ``burned``;
   - commitments, with the kind ``commitments`` and category ``commitment``;
-  - "bootstrap"? with the kind ``minted`` and category ``bootstrap``;
   - invoices, with the kind ``minted`` and category ``invoice``;
-  - initial commitments", with the kind ``minted`` and category ``commitment``;
-  - "minted"??, with the kind ``minted`` and category ``minted``.
+
+- The following new balance types are for internal use, they will not appear in the metadata during normal operation on mainnet :
+
+  - "bootstrap" with the kind ``minted`` and category ``bootstrap``;
+  - "initial commitments", with the kind ``minted`` and category ``commitment``;
+  - "burned", with the kind ``burned`` and category ``burned``;
+  - "minted", with the kind ``minted`` and category ``minted``
+
+- The following balance types represent external sources of tokens that can only be debited :
+  nonce revelation rewards, endorsing rewards, baking rewards, baking bonuses, liquidity baking subsidies, invoices,
+  initial commitments, bootstrap, minted
+
+- The following balance types represent destinations of tokens burned that can only be credited :
+  storage fees, double signing punishments, lost endorsing rewards, burned
 
 The receipt for (pre)endorsement operations contains three fields:
 
