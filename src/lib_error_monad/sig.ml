@@ -341,8 +341,7 @@ match res with
       the trace is wrapped in a function that is evaluated only if {e and when}
       it is needed. More formally [trace_eval mkerr p] is a promise that
       resolves to [Ok v] if [p] resolves to [Ok v], or it resolves to
-      [Error (Trace.cons err tr)] if [p] resolves to [Error tr] and then [mkerr
-      ()] resolves to [err].
+      [Error (Trace.cons (mkerr ()) tr)] if [p] resolves to [Error tr].
 
       You can achieve the same effect by hand with
 
@@ -350,8 +349,7 @@ match res with
 p >>= function
 | Ok _ -> p
 | Error tr ->
-   mkerr () >>= fun err ->
-   Lwt.return (Error (Trace.cons err tr))
+   Lwt.return (Error (Trace.cons (mkerr ()) tr))
 ]}
 
       Note that the evaluation of the error can be arbitrarily delayed. Avoid
@@ -361,7 +359,7 @@ p >>= function
       compute or heavy to allocate or when evaluating it requires the use of
       Lwt. *)
   val trace_eval :
-    (unit -> 'err Lwt.t) ->
+    (unit -> 'err) ->
     ('b, 'err trace) result Lwt.t ->
     ('b, 'err trace) result Lwt.t
 

@@ -118,7 +118,8 @@ end)
   let trace_eval mk_err f =
     f >>= function
     | Error trace ->
-        mk_err () >>= fun err -> Lwt.return_error (Trace.cons err trace)
+        let err = mk_err () in
+        Lwt.return_error (Trace.cons err trace)
     | ok -> Lwt.return ok
 
   let error_unless cond exn =
