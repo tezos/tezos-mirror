@@ -29,7 +29,7 @@ Going further
 ~~~~~~~~~~~~~
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
-This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+This kind of small contribution can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 
@@ -115,7 +115,7 @@ Dependencies on other merge requests, other relationships to MRs, to
 issues, etc, should also be mentioned.
 
 While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developers prefixes the MR with ``WIP:``. This will tell everybody
+work in progress, the developers prefix the MR with ``WIP:``. This will tell everybody
 they can look at the code, comment, but there is still work to be done and the
 branch can change and history be rewritten.
 
@@ -642,5 +642,5 @@ little. We welcome specific issues or contributions there too.
 Developer Tools
 ~~~~~~~~~~~~~~~
 
-Somme tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
+Some tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
 In particular, it contains ``tztop``, a REPL (interactive read-eval-print loop) based on ``utop``.
