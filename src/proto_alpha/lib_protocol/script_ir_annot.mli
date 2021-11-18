@@ -25,11 +25,11 @@
 
 open Alpha_context
 
-type var_annot = private Var_annot of string [@@ocaml.unboxed]
+type var_annot = private Var_annot of Non_empty_string.t [@@ocaml.unboxed]
 
-type type_annot = private Type_annot of string [@@ocaml.unboxed]
+type type_annot = private Type_annot of Non_empty_string.t [@@ocaml.unboxed]
 
-type field_annot = private Field_annot of string [@@ocaml.unboxed]
+type field_annot = private Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS : sig
   val unsafe_var_annot_of_string : string -> var_annot
