@@ -18,6 +18,8 @@ misc_checks:
     - git apply devtools/protocol-print/add-hack-module.patch
     - dune runtest -p tezos-test-helpers ||
       { echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
+    # check that yes-wallet builds correctly
+    - dune build scripts/yes-wallet/yes_wallet.exe
   artifacts:
     when: always
     paths:

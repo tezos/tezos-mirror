@@ -1,2 +1,3 @@
-*
-**/*
+declare-new-protocol-unit-test/main.ml
+gen-genesis/gen_genesis.ml
+print_version.ml
