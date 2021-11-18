@@ -967,11 +967,11 @@ let merge_types :
           @@ merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
       | Default_merge_type_error ->
           of_result
-            (merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
-            |> Error_monad.record_trace_eval (fun () ->
-                   let ty1 = serialize_ty_for_error ty1 in
-                   let ty2 = serialize_ty_for_error ty2 in
-                   Inconsistent_types (Some loc, ty1, ty2)))
+          @@ merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
+          |> Gas_monad.record_trace_eval (fun () ->
+                 let ty1 = serialize_ty_for_error ty1 in
+                 let ty2 = serialize_ty_for_error ty2 in
+                 Inconsistent_types (Some loc, ty1, ty2))
     in
     let merge_field_annot ~legacy tn1 tn2 =
       of_result (merge_field_annot ~legacy ~merge_type_error_flag tn1 tn2)
