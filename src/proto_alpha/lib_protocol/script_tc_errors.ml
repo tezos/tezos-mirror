@@ -207,6 +207,6 @@ type error += Unparsing_invariant_violated
 
 type inconsistent_types_fast_error = Inconsistent_types_fast
 
-type _ merge_type_error_flag =
-  | Default_merge_type_error : error trace merge_type_error_flag
-  | Fast_merge_type_error : inconsistent_types_fast_error merge_type_error_flag
+type _ error_details =
+  | Default_merge_type_error : error trace error_details
+  | Fast_merge_type_error : inconsistent_types_fast_error error_details

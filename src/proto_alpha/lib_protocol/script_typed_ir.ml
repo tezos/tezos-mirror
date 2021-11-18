@@ -91,7 +91,7 @@ module type TYPE_SIZE = sig
   type 'a t
 
   val merge :
-    merge_type_error_flag:'error_trace Script_tc_errors.merge_type_error_flag ->
+    error_details:'error_trace Script_tc_errors.error_details ->
     'a t ->
     'b t ->
     ('a t, 'error_trace) result
@@ -135,15 +135,15 @@ module Type_size : TYPE_SIZE = struct
 
   let merge :
       type a b error_trace.
-      merge_type_error_flag:error_trace Script_tc_errors.merge_type_error_flag ->
+      error_details:error_trace Script_tc_errors.error_details ->
       a t ->
       b t ->
       (a t, error_trace) result =
-   fun ~merge_type_error_flag x y ->
+   fun ~error_details x y ->
     if Compare.Int.(x = y) then ok x
     else
       Error
-        (match merge_type_error_flag with
+        (match error_details with
         | Fast_merge_type_error -> Inconsistent_types_fast
         | Default_merge_type_error ->
             trace_of_error @@ Script_tc_errors.Inconsistent_type_sizes (x, y))

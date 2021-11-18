@@ -148,18 +148,18 @@ let gen_access_annot :
 let merge_type_annot :
     type error_trace.
     legacy:bool ->
-    merge_type_error_flag:error_trace merge_type_error_flag ->
+    error_details:error_trace error_details ->
     type_annot option ->
     type_annot option ->
     (type_annot option, error_trace) result =
- fun ~legacy ~merge_type_error_flag annot1 annot2 ->
+ fun ~legacy ~error_details annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Type_annot a1), Some (Type_annot a2)) ->
       if legacy || Non_empty_string.(a1 = a2) then ok annot1
       else
         Error
-          (match merge_type_error_flag with
+          (match error_details with
           | Fast_merge_type_error -> Inconsistent_types_fast
           | Default_merge_type_error ->
               trace_of_error
@@ -169,18 +169,18 @@ let merge_type_annot :
 let merge_field_annot :
     type error_trace.
     legacy:bool ->
-    merge_type_error_flag:error_trace merge_type_error_flag ->
+    error_details:error_trace error_details ->
     field_annot option ->
     field_annot option ->
     (field_annot option, error_trace) result =
- fun ~legacy ~merge_type_error_flag annot1 annot2 ->
+ fun ~legacy ~error_details annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
   | (Some (Field_annot a1), Some (Field_annot a2)) ->
       if legacy || Non_empty_string.(a1 = a2) then ok annot1
       else
         Error
-          (match merge_type_error_flag with
+          (match error_details with
           | Fast_merge_type_error -> Inconsistent_types_fast
           | Default_merge_type_error ->
               trace_of_error

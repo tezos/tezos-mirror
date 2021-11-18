@@ -126,7 +126,7 @@ val gen_access_annot :
     and different, unless [legacy] *)
 val merge_type_annot :
   legacy:bool ->
-  merge_type_error_flag:'error_trace Script_tc_errors.merge_type_error_flag ->
+  error_details:'error_trace Script_tc_errors.error_details ->
   type_annot option ->
   type_annot option ->
   (type_annot option, 'error_trace) result
@@ -136,7 +136,7 @@ val merge_type_annot :
     and different, unless [legacy] *)
 val merge_field_annot :
   legacy:bool ->
-  merge_type_error_flag:'error_trace Script_tc_errors.merge_type_error_flag ->
+  error_details:'error_trace Script_tc_errors.error_details ->
   field_annot option ->
   field_annot option ->
   (field_annot option, 'error_trace) result

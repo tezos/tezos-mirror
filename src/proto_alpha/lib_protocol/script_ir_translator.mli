@@ -200,7 +200,7 @@ val ty_eq :
 
 val merge_types :
   legacy:bool ->
-  merge_type_error_flag:'error_trace merge_type_error_flag ->
+  error_details:'error_trace error_details ->
   Script.location ->
   'a Script_typed_ir.ty ->
   'b Script_typed_ir.ty ->
@@ -408,7 +408,7 @@ val parse_contract_for_script :
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 
 val find_entrypoint :
-  merge_type_error_flag:'error_trace merge_type_error_flag ->
+  error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
   root_name:Script_ir_annot.field_annot option ->
   string ->

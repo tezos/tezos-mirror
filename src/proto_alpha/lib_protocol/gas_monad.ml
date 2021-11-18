@@ -77,12 +77,12 @@ let run ctxt m =
 
 let record_trace_eval :
     type error_trace.
-    merge_type_error_flag:error_trace Script_tc_errors.merge_type_error_flag ->
+    error_details:error_trace Script_tc_errors.error_details ->
     (unit -> error) ->
     ('a, error_trace) t ->
     ('a, error_trace) t =
- fun ~merge_type_error_flag ->
-  match merge_type_error_flag with
+ fun ~error_details ->
+  match error_details with
   | Fast_merge_type_error -> fun _f m -> m
   | Default_merge_type_error ->
       fun f m gas ->
