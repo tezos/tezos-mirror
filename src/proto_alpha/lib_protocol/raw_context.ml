@@ -899,6 +899,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               {numerator = 1; denominator = 2};
             delegate_selection = Random;
+            tx_rollup_enable = false;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

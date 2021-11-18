@@ -771,6 +771,7 @@ module Constants : sig
     double_baking_punishment : Tez.t;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
     delegate_selection : delegate_selection;
+    tx_rollup_enable : bool;
   }
 
   module Generated : sig
@@ -847,6 +848,8 @@ module Constants : sig
   val double_baking_punishment : context -> Tez.t
 
   val ratio_of_frozen_deposits_slashed_per_double_endorsement : context -> ratio
+
+  val tx_rollup_enable : context -> bool
 
   val delegate_selection_encoding : delegate_selection Data_encoding.t
 

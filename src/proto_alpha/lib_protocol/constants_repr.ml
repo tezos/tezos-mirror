@@ -203,6 +203,7 @@ type parametric = {
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   delegate_selection : delegate_selection;
+  tx_rollup_enable : bool;
 }
 
 let parametric_encoding =
@@ -235,12 +236,13 @@ let parametric_encoding =
               c.round_durations,
               c.consensus_committee_size,
               c.consensus_threshold ),
-            ( c.minimal_participation_ratio,
-              c.max_slashing_period,
-              c.frozen_deposits_percentage,
-              c.double_baking_punishment,
-              c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-              c.delegate_selection ) ) ) ))
+            ( ( c.minimal_participation_ratio,
+                c.max_slashing_period,
+                c.frozen_deposits_percentage,
+                c.double_baking_punishment,
+                c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                c.delegate_selection ),
+              c.tx_rollup_enable ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -267,12 +269,13 @@ let parametric_encoding =
                  round_durations,
                  consensus_committee_size,
                  consensus_threshold ),
-               ( minimal_participation_ratio,
-                 max_slashing_period,
-                 frozen_deposits_percentage,
-                 double_baking_punishment,
-                 ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                 delegate_selection ) ) ) ) ->
+               ( ( minimal_participation_ratio,
+                   max_slashing_period,
+                   frozen_deposits_percentage,
+                   double_baking_punishment,
+                   ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                   delegate_selection ),
+                 tx_rollup_enable ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -306,6 +309,7 @@ let parametric_encoding =
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
         delegate_selection;
+        tx_rollup_enable;
       })
     (merge_objs
        (obj9
@@ -343,15 +347,17 @@ let parametric_encoding =
                 (req "round_durations" Round_repr.Durations.encoding)
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
-             (obj6
-                (req "minimal_participation_ratio" ratio_encoding)
-                (req "max_slashing_period" int31)
-                (req "frozen_deposits_percentage" int31)
-                (req "double_baking_punishment" Tez_repr.encoding)
-                (req
-                   "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                   ratio_encoding)
-                (dft "delegate_selection" delegate_selection_encoding Random)))))
+             (merge_objs
+                (obj6
+                   (req "minimal_participation_ratio" ratio_encoding)
+                   (req "max_slashing_period" int31)
+                   (req "frozen_deposits_percentage" int31)
+                   (req "double_baking_punishment" Tez_repr.encoding)
+                   (req
+                      "ratio_of_frozen_deposits_slashed_per_double_endorsement"
+                      ratio_encoding)
+                   (dft "delegate_selection" delegate_selection_encoding Random))
+                (obj1 (req "tx_rollup_enable" bool))))))
 
 type t = {fixed : fixed; parametric : parametric}
 

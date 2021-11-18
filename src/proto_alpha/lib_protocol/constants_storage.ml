@@ -141,6 +141,10 @@ let double_baking_punishment c =
   let constants = Raw_context.constants c in
   constants.double_baking_punishment
 
+let tx_rollup_enable c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_enable
+
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement

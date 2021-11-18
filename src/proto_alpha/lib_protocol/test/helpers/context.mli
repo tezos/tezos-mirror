@@ -179,6 +179,7 @@ val init :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?tx_rollup_enable:bool ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
