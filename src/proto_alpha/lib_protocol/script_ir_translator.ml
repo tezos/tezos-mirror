@@ -795,7 +795,7 @@ let record_inconsistent_types loc ta tb =
   record_trace_eval (fun () ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
-      ok @@ Inconsistent_types (Some loc, ta, tb))
+      Inconsistent_types (Some loc, ta, tb))
 
 module type GAS_MONAD = sig
   type ('a, 'trace) t
@@ -852,8 +852,7 @@ module Gas_monad : GAS_MONAD = struct
   let run ctxt x = x ctxt
 
   let record_trace_eval f m ctxt =
-    m ctxt >>? fun (x, ctxt) ->
-    of_result (x |> record_trace_eval @@ fun () -> ok @@ f ()) ctxt
+    m ctxt >>? fun (x, ctxt) -> of_result (record_trace_eval f x) ctxt
 end
 
 let merge_type_metadata :
@@ -1246,7 +1245,7 @@ let merge_branches :
       let unmatched_branches () =
         let aftbt = serialize_stack_for_error ctxt aftbt in
         let aftbf = serialize_stack_for_error ctxt aftbf in
-        ok @@ Unmatched_branches (loc, aftbt, aftbf)
+        Unmatched_branches (loc, aftbt, aftbf)
       in
       record_trace_eval
         unmatched_branches
@@ -2443,8 +2442,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
      The stack depth is bounded by the type depth, bounded by 1024. *)
   let parse_data_error () =
     let ty = serialize_ty_for_error (ty_of_comparable_ty ty) in
-    ok
-    @@ Invalid_constant (location script_data, strip_locations script_data, ty)
+    Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body =
@@ -2539,10 +2537,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   in
   let parse_data_error () =
     let ty = serialize_ty_for_error ty in
-    ok
-    @@ Invalid_constant (location script_data, strip_locations script_data, ty)
+    Invalid_constant (location script_data, strip_locations script_data, ty)
   in
-  let fail_parse_data () = parse_data_error () >>?= fail in
+  let fail_parse_data () = fail (parse_data_error ()) in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body =
     trace_eval (fun () -> Lwt.return @@ parse_data_error ()) body
@@ -2932,17 +2929,15 @@ and parse_view_returning :
   let input_ty_loc = location input_ty in
   record_trace_eval
     (fun () ->
-      ok
-      @@ Ill_formed_type
-           (Some "arg of view", strip_locations input_ty, input_ty_loc))
+      Ill_formed_type
+        (Some "arg of view", strip_locations input_ty, input_ty_loc))
     (parse_view_input_ty ctxt ~stack_depth:0 ~legacy input_ty)
   >>?= fun (Ex_ty input_ty', ctxt) ->
   let output_ty_loc = location output_ty in
   record_trace_eval
     (fun () ->
-      ok
-      @@ Ill_formed_type
-           (Some "return of view", strip_locations output_ty, output_ty_loc))
+      Ill_formed_type
+        (Some "return of view", strip_locations output_ty, output_ty_loc))
     (parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty)
   >>?= fun (Ex_ty output_ty', ctxt) ->
   pair_t
@@ -2971,20 +2966,20 @@ and parse_view_returning :
       in
       ok (cur_view', ctxt)
   | Typed ({loc; aft; _} as descr) -> (
-      let ill_type_view loc stack_ty =
+      let ill_type_view loc stack_ty () =
         let actual = serialize_stack_for_error ctxt stack_ty in
         let expected_stack = Item_t (output_ty', Bot_t, None) in
         let expected = serialize_stack_for_error ctxt expected_stack in
-        ok @@ Ill_typed_view {loc; actual; expected}
+        Ill_typed_view {loc; actual; expected}
       in
       match aft with
       | Item_t (ty, Bot_t, _) ->
           record_trace_eval
-            (fun () -> ill_type_view loc aft)
+            (ill_type_view loc aft : unit -> _)
             ( ty_eq ~legacy ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
               let view' = Ex_view (Lam (close_descr descr, view_code)) in
               (view', ctxt) )
-      | _ -> ill_type_view loc aft >>? error)
+      | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
     type storage.
@@ -3036,7 +3031,7 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
            (fun () ->
              let ret = serialize_ty_for_error ret in
              let stack_ty = serialize_stack_for_error ctxt stack_ty in
-             ok @@ Bad_return (loc, stack_ty, ret))
+             Bad_return (loc, stack_ty, ret))
            ( ty_eq ~legacy ctxt loc ty ret >|? fun (Eq, ctxt) ->
              ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt)
            )
@@ -3065,7 +3060,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       ((a, b) eq * a ty * context) tzresult =
     record_trace_eval (fun () ->
         let stack_ty = serialize_stack_for_error ctxt stack_ty in
-        ok @@ Bad_stack (loc, name, m, stack_ty))
+        Bad_stack (loc, name, m, stack_ty))
     @@ record_trace
          (Bad_stack_item n)
          ( Gas_monad.run ctxt
@@ -3149,7 +3144,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       record_trace_eval
         (fun () ->
           let t = serialize_ty_for_error v in
-          ok @@ Non_dupable_type (loc, t))
+          Non_dupable_type (loc, t))
         (check_dupable_ty ctxt loc v)
       >>?= fun ctxt ->
       let dup = {apply = (fun kinfo k -> IDup (kinfo, k))} in
@@ -3180,7 +3175,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       record_trace_eval
         (fun () ->
           let t = serialize_ty_for_error after_ty in
-          ok @@ Non_dupable_type (loc, t))
+          Non_dupable_type (loc, t))
         (check_dupable_ty ctxt loc after_ty)
       >>?= fun ctxt ->
       let dupn = {apply = (fun kinfo k -> IDup_n (kinfo, n, witness, k))} in
@@ -3643,7 +3638,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       | Typed ({aft = Item_t (ret, rest, _); _} as kibody) ->
           let invalid_map_body () =
             let aft = serialize_stack_for_error ctxt kibody.aft in
-            ok @@ Invalid_map_body (loc, aft)
+            Invalid_map_body (loc, aft)
           in
           record_trace_eval
             invalid_map_body
@@ -3694,7 +3689,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let invalid_iter_body () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
             let rest = serialize_stack_for_error ctxt rest in
-            ok @@ Invalid_iter_body (loc, rest, aft)
+            Invalid_iter_body (loc, rest, aft)
           in
           record_trace_eval
             invalid_iter_body
@@ -3742,7 +3737,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let invalid_iter_body () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
             let rest = serialize_stack_for_error ctxt rest in
-            ok @@ Invalid_iter_body (loc, rest, aft)
+            Invalid_iter_body (loc, rest, aft)
           in
           record_trace_eval
             invalid_iter_body
@@ -3807,7 +3802,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       | Typed ({aft = Item_t (ret, rest, _); _} as ibody) ->
           let invalid_map_body () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
-            ok @@ Invalid_map_body (loc, aft)
+            Invalid_map_body (loc, aft)
           in
           record_trace_eval
             invalid_map_body
@@ -3866,7 +3861,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let invalid_iter_body () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
             let rest = serialize_stack_for_error ctxt rest in
-            ok @@ Invalid_iter_body (loc, rest, aft)
+            Invalid_iter_body (loc, rest, aft)
           in
           record_trace_eval
             invalid_iter_body
@@ -4098,7 +4093,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let unmatched_branches () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
             let stack = serialize_stack_for_error ctxt stack in
-            ok @@ Unmatched_branches (loc, aft, stack)
+            Unmatched_branches (loc, aft, stack)
           in
           record_trace_eval
             unmatched_branches
@@ -4151,7 +4146,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           let unmatched_branches () =
             let aft = serialize_stack_for_error ctxt ibody.aft in
             let stack = serialize_stack_for_error ctxt stack in
-            ok @@ Unmatched_branches (loc, aft, stack)
+            Unmatched_branches (loc, aft, stack)
           in
           record_trace_eval
             unmatched_branches
@@ -5765,7 +5760,7 @@ let parse_storage :
   trace_eval
     (fun () ->
       let storage_type = serialize_ty_for_error storage_type in
-      return @@ Ill_typed_data (None, storage, storage_type))
+      Lwt.return @@ Ill_typed_data (None, storage, storage_type))
     (parse_data
        ?type_logger
        ~stack_depth:0

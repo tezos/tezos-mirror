@@ -1045,7 +1045,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                   in
                   trace_eval
                     (fun () ->
-                      return
+                      Lwt.return
                       @@ Script_tc_errors.Ill_typed_contract
                            (Micheline.strip_locations view.view_code, []))
                     view_result

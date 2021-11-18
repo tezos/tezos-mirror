@@ -1,7 +1,6 @@
 (rule
  (targets v4.ml)
  (deps
-   v0/error_monad_trace_eval.ml
    v4/hex.ml
  )
 
