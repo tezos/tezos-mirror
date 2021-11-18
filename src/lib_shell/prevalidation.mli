@@ -63,7 +63,6 @@ module type T = sig
     Store.chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
-    live_blocks:Block_hash.Set.t ->
     live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->

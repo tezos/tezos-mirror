@@ -1051,7 +1051,6 @@ module Make
       Prevalidation.create
         chain_store
         ~predecessor:new_predecessor
-        ~live_blocks:new_live_blocks
         ~live_operations:new_live_operations
         ~timestamp
         ()
@@ -1201,7 +1200,6 @@ module Make
         chain_store
         ~predecessor
         ~timestamp
-        ~live_blocks
         ~live_operations
         ()
       >>= fun validation_state ->
