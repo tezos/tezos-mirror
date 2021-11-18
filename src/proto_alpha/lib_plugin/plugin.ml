@@ -1967,7 +1967,16 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id; now; level}
+            {
+              source;
+              payer;
+              self = dummy_contract;
+              amount;
+              balance;
+              chain_id;
+              now;
+              level;
+            }
           in
           Script_interpreter.execute
             ctxt
@@ -2033,7 +2042,16 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id; now; level}
+            {
+              source;
+              payer;
+              self = dummy_contract;
+              amount;
+              balance;
+              chain_id;
+              now;
+              level;
+            }
           in
           let module Unparsing_mode = struct
             let unparsing_mode = unparsing_mode
@@ -2080,6 +2098,7 @@ module RPC = struct
           >>=? fun view_ty ->
           View_helpers.extract_view_output_type entrypoint view_ty
           >>?= fun ty ->
+          Contract.get_balance ctxt contract >>=? fun balance ->
           Error_monad.trace View_helpers.View_callback_origination_failed
           @@ originate_dummy_contract
                ctxt
@@ -2116,6 +2135,7 @@ module RPC = struct
               payer;
               self = contract;
               amount = Tez.zero;
+              balance;
               chain_id;
               now;
               level;

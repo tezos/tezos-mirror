@@ -28,16 +28,18 @@ open Error_monad
 
 type context = Alpha_context.context * Script_interpreter.step_constants
 
+let initial_balance = 4_000_000_000_000L
+
 let context_init_memory ~rng_state =
   Context.init
     ~rng_state
     ~initial_balances:
       [
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
+        initial_balance;
+        initial_balance;
+        initial_balance;
+        initial_balance;
+        initial_balance;
       ]
     5
   >>=? fun (block, accounts) ->
@@ -61,12 +63,30 @@ let make ~rng_state =
       let payer = bs2 in
       let self = bs3 in
       let step_constants =
-        {source; payer; self; amount; chain_id; now; level}
+        {
+          source;
+          payer;
+          self;
+          amount;
+          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
+          chain_id;
+          now;
+          level;
+        }
       in
       return (block, step_constants)
   | `Disk_block (block, source) ->
       let step_constants =
-        {source; payer = source; self = source; amount; chain_id; now; level}
+        {
+          source;
+          payer = source;
+          self = source;
+          amount;
+          balance = Alpha_context.Tez.of_mutez_exn initial_balance;
+          chain_id;
+          now;
+          level;
+        }
       in
       return (block, step_constants))
   >>=? fun (block, step_constants) ->
