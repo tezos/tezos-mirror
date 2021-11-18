@@ -778,12 +778,6 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent_types loc ta tb =
-  record_trace_eval (fun () ->
-      let ta = serialize_ty_for_error ta in
-      let tb = serialize_ty_for_error tb in
-      Inconsistent_types (Some loc, ta, tb))
-
 let merge_type_metadata :
     type error_trace.
     legacy:bool ->
@@ -974,7 +968,10 @@ let merge_types :
       | Default_merge_type_error ->
           of_result
             (merge_type_metadata ~legacy ~merge_type_error_flag tn1 tn2
-            |> record_inconsistent_types loc ty1 ty2)
+            |> Error_monad.record_trace_eval (fun () ->
+                   let ty1 = serialize_ty_for_error ty1 in
+                   let ty2 = serialize_ty_for_error ty2 in
+                   Inconsistent_types (Some loc, ty1, ty2)))
     in
     let merge_field_annot ~legacy tn1 tn2 =
       of_result (merge_field_annot ~legacy ~merge_type_error_flag tn1 tn2)
