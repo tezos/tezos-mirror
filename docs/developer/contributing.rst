@@ -294,9 +294,20 @@ Therefore, when creating your MR, observe the following rules:
     not developers in your project, to commit to your branch.
     It helps to rebase and propose fixes.
 
-- *Find reviewers*: it is the responsibility of the author to find a
-  suitable reviewer, ideally before opening an MR. The reviewer(s)
-  should be mentioned in the description or in the comments.
+- *Find reviewers*: it is the responsibility of the author to find
+  suitable reviewers. In this context,
+  finding a reviewer means finding someone that agreed to review in the
+  next days after the MR becomes ready.
+  Opting for a reviewer that is not in the capacity to review your MR
+  in the next days when others can is unfortunate, because
+  the merge request will become unnecessarily blocked; which is bad for:
+
+  - the author, as their work gets delayed, and
+  - the health of the repository, as it gives the impression that a new contribution
+    will land soon; while it is not the case.
+
+  To find reviewers that will review promptly, we refer to the documentation
+  of the :ref:`reviewer field <reviewers_field>` below.
 
 - *Check progress*:
   It is important to maintain to a minimum the number of your MRs that are in WIP state,
@@ -354,6 +365,8 @@ must be mitigated as follows:
   A desirable standalone improvement is for example a refactoring that
   improves the quality of the code, or adds new tests, or fixes typos.
 
+.. _assignee_field:
+
 Merge Request "Assignees" Field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -378,17 +391,31 @@ If a merge request has no assignee, it is implicitly the role of the
 Even though merge requests could require action from several people
 to be merged, we avoid assigning more than one to avoid diluting responsibility.
 
+.. _reviewers_field:
+
 Merge Request "Reviewers" Field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The reviewer field of GitLab can be used to suggest reviewers.
-Fill it when creating your merge requests so that the
-:ref:`merge dispatcher <merge_dispatcher>`
-knows who to contact if more reviews are needed.
-Anybody can suggest additional reviewers.
-In particular it is one of the role of the merge dispatcher to suggest reviewers.
-If you don't know who would be a good candidate to review your merge
-request, you can leave the field blank; but it may slow down the reviewing process.
+The reviewer field of GitLab is used to specify reviewers.
+Once the merge request is ready for review,
+:ref:`assign <assignee_field>` one of the reviewers that
+you specified in the reviewers field.
+As mentioned previously, it is the responsibility of authors to find reviewers.
+To find reviewers, either:
+
+  - Advertize your merge request on the ``#mr-advertizing`` channel of
+    the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Good advertisement
+    consists of a link to the MR and a one sentence summary.
+  - Look at authors of the code you are modifying using
+    `git blame <https://git-scm.com/docs/git-blame>`_.
+  - Ask help to the :ref:`merge dispatcher <merge_dispatcher>`, either
+    by asking him/here on Slack or mentioning them in a comment (see next paragraph).
+
+Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
+you may or may not be able to use the *Reviewers* field for specifying
+the reviewers. If you don't have the right, mention the reviewers using
+their GitLab handle (username prefixed with ``@``) in a comment.
+It causes GitLab to send a notification to them.
 
 Merge Request "Draft" Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
