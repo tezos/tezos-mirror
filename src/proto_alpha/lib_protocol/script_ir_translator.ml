@@ -2975,7 +2975,7 @@ and parse_view_returning :
       match aft with
       | Item_t (ty, Bot_t, _) ->
           record_trace_eval
-            (ill_type_view loc aft)
+            (ill_type_view loc aft : unit -> _)
             ( ty_eq ~legacy ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
               let view' = Ex_view (Lam (close_descr descr, view_code)) in
               (view', ctxt) )
