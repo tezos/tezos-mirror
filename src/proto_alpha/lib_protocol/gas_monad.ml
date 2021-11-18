@@ -75,5 +75,15 @@ let run ctxt m =
           ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
 
-let record_trace_eval f m gas =
-  m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
+let record_trace_eval :
+    type error_trace.
+    merge_type_error_flag:error_trace Script_tc_errors.merge_type_error_flag ->
+    (unit -> error) ->
+    ('a, error_trace) t ->
+    ('a, error_trace) t =
+ fun ~merge_type_error_flag ->
+  match merge_type_error_flag with
+  | Fast_merge_type_error -> fun _f m -> m
+  | Default_merge_type_error ->
+      fun f m gas ->
+        m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas

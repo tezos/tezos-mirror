@@ -67,6 +67,10 @@ val consume_gas : Gas.cost -> (unit, 'trace) t
 val run : context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
 
 (** re-export of [Error_monad.record_trace_eval]. This function has no
-    effect in the case of a gas-exhaustion error. *)
+    effect in the case of a gas-exhaustion error
+    or if [merge_type_error_flag] is [Fast_merge_type_error]. *)
 val record_trace_eval :
-  (unit -> 'err) -> ('a, 'err trace) t -> ('a, 'err trace) t
+  merge_type_error_flag:'error_trace Script_tc_errors.merge_type_error_flag ->
+  (unit -> error) ->
+  ('a, 'error_trace) t ->
+  ('a, 'error_trace) t
