@@ -28,6 +28,7 @@
 /src/lib_error_monad         @raphael-proust
 /src/lib_mockup              @smelc
 /src/lib_mockup_proxy        @smelc
+/src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment @raphael-proust
 /src/lib_proxy               @smelc
 /src/lib_proxy_server_config @smelc
