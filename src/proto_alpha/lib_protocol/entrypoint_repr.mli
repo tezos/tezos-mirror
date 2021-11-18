@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** An entrypoint is a non-empty string of at most 31 characters *)
-type t = private Non_empty_string.t
+type t
 
 (** Total ordering of entrypoints *)
 val compare : t -> t -> int
