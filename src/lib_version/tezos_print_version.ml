@@ -42,8 +42,7 @@ let () =
   | [|_; "--additional-info"|] ->
       print_endline (string_of_additional_info current_version.additional_info)
   | [|_; "--full"|] | [|_|] -> print_endline (Version.to_string current_version)
-  | [|_; "--help"|] ->
-      print_endline help_string
+  | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;
       prerr_endline
