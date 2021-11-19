@@ -20,8 +20,8 @@ depends: [
   "tezos-shell-services"
   "lwt-exit"
   "tezos-base-test-helpers" {with-test}
-  "alcotest" { with-test & >= "1.1.0" }
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest" { with-test & >= "1.5.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

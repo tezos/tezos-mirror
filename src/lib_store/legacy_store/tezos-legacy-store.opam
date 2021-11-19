@@ -15,7 +15,7 @@ depends: [
   "tezos-validation"
   "tezos-context"
   "lwt-watcher" { = "0.1" }
-  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-embedded-protocol-alpha"
   "tezos-embedded-protocol-genesis"
 ]

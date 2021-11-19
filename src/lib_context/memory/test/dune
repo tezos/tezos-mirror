@@ -1,20 +1,11 @@
-(executables
- (names test)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-context
-            tezos-context.memory
-            tezos-stdlib-unix
-            alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix)))
-
-(rule
- (alias buildtest)
- (deps test.exe)
- (action (progn)))
-
-(rule
- (alias runtest)
+(test
+ (name test)
  (package tezos-context)
- (action (chdir %{workspace_root} (run %{exe:test.exe}))))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-context
+  tezos-context.memory
+  tezos-stdlib-unix
+  alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix)))

@@ -10,8 +10,8 @@ depends: [
   "uri"
   "fmt"
   "qcheck-alcotest"
-  "alcotest" { >= "1.1.0" }
-  "alcotest-lwt" { >= "1.1.0" }
+  "alcotest" { >= "1.5.0" }
+  "alcotest-lwt" { >= "1.5.0" }
   "pure-splitmix" { = "0.2" }
 ]
 build: [
