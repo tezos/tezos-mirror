@@ -90,10 +90,6 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 .PHONY: coverage-report
 coverage-report:
-# /!\ FIXME: https://gitlab.com/tezos/tezos/-/issues/1945
-# corrupted files will be better handled in the next bisect_ppx version
-# and this check will be removed.
-	@find ${COVERAGE_OUTPUT} -size 0 -type f -delete
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
 
@@ -101,17 +97,8 @@ coverage-report:
 coverage-report-summary:
 	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
 
-CORRUPTED_FILES_FOUND := $(shell find ${COVERAGE_OUTPUT} -size 0 -type f | wc -l)
-
 .PHONY: coverage-report-cobertura
 coverage-report-cobertura:
-# /!\ FIXME: https://gitlab.com/tezos/tezos/-/issues/1945
-# corrupted files will be better handled in the next bisect_ppx version
-# and this check will be removed.
-ifneq ($(CORRUPTED_FILES_FOUND), 0)
-	@echo "Corrupted .coverage files found, removing them:"
-	@find ${COVERAGE_OUTPUT} -size 0 -type f -print -delete
-endif
 	@bisect-ppx-report cobertura --ignore-missing-file --coverage-path ${COVERAGE_OUTPUT} ${COBERTURA_REPORT}
 	@echo "Cobertura report should be available in ${COBERTURA_REPORT}"
 
