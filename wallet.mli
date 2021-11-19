@@ -25,6 +25,9 @@
 
 type t
 
+(** A wallet with no aliases *)
+val empty : t
+
 (** Load a public key hash map from the client context  *)
 val of_context : #Tezos_client_base.Client_context.wallet -> t tzresult Lwt.t
 

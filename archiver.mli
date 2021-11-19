@@ -38,5 +38,6 @@ val add_block :
   Block_hash.t ->
   Time.Protocol.t ->
   Time.System.t ->
+  Signature.Public_key_hash.t ->
   Signature.Public_key_hash.t list ->
   unit

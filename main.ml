@@ -135,53 +135,84 @@ let blocks_loop cctxt =
         (fun ((chain_id, hash), header) ->
           let reception_time = Systime_os.now () in
           let block_level = header.Block_header.shell.Block_header.level in
-          Block_services.Operations.operations_in_pass
-            cctxt
-            ~chain:(`Hash chain_id)
-            ~block:(`Hash (hash, 0))
-            0
-          >|= function
-          | Error e -> Error_monad.pp_print_trace Format.err_formatter e
-          | Ok ops ->
-              let timestamp =
-                header.Block_header.shell.Block_header.timestamp
+          match
+            Data_encoding.Binary.of_bytes
+              Protocol.block_header_data_encoding
+              header.Block_header.protocol_data
+          with
+          | Error err ->
+              let () =
+                Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
               in
-              let _seed_nonce_hash =
-                match
-                  Data_encoding.Binary.of_bytes
-                    Protocol.block_header_data_encoding
-                    header.Block_header.protocol_data
-                with
-                | Ok {contents = {seed_nonce_hash; _}; signature = _} ->
-                    seed_nonce_hash
-                | Error err ->
-                    let () =
-                      Format.eprintf
-                        "@[%a@]@."
-                        Data_encoding.Binary.pp_read_error
-                        err
-                    in
-                    None
-              in
-              let pks =
-                List.filter_map
-                  (fun Block_services.{receipt; _} ->
-                    match receipt with
-                    | Some
-                        (Protocol.Apply_results.Operation_metadata
-                          {
-                            contents =
-                              Single_result
-                                (Protocol.Apply_results
-                                 .Endorsement_with_slot_result
-                                  (Tezos_raw_protocol_010_PtGRANAD.Apply_results
-                                   .Endorsement_result {delegate; _}));
-                          }) ->
-                        Some delegate
-                    | _ -> None)
-                  ops
-              in
-              Archiver.add_block block_level hash timestamp reception_time pks)
+              Lwt.return_unit
+          | Ok {contents = {priority; seed_nonce_hash = _; _}; signature = _}
+            -> (
+              Block_services.Operations.operations_in_pass
+                cctxt
+                ~chain:(`Hash chain_id)
+                ~block:(`Hash (hash, 0))
+                0
+              >>= function
+              | Error e ->
+                  Lwt.return (Error_monad.pp_print_trace Format.err_formatter e)
+              | Ok ops -> (
+                  match
+                    Protocol.Alpha_context.Raw_level.of_int32 block_level
+                  with
+                  | Error x ->
+                      Lwt.return
+                        (Protocol.Environment.Error_monad.pp_trace
+                           Format.err_formatter
+                           x)
+                  | Ok level -> (
+                      Protocol.Delegate_services.Baking_rights.get
+                        ~levels:[level]
+                        ~max_priority:priority
+                        cctxt
+                        (cctxt#chain, `Hash (hash, 0))
+                      >|= function
+                      | Error e ->
+                          Error_monad.pp_print_trace Format.err_formatter e
+                      | Ok baking_rights -> (
+                          match List.last_opt baking_rights with
+                          | None -> ()
+                          | Some {level = l; delegate; priority = p; _} ->
+                              let () =
+                                assert (
+                                  Protocol.Alpha_context.Raw_level.equal level l
+                                  && Compare.Int.equal priority p)
+                              in
+                              let timestamp =
+                                header.Block_header.shell.Block_header.timestamp
+                              in
+                              let pks =
+                                List.filter_map
+                                  (fun Block_services.{receipt; _} ->
+                                    match receipt with
+                                    | Some
+                                        (Protocol.Apply_results
+                                         .Operation_metadata
+                                          {
+                                            contents =
+                                              Single_result
+                                                (Protocol.Apply_results
+                                                 .Endorsement_with_slot_result
+                                                  (Tezos_raw_protocol_010_PtGRANAD
+                                                   .Apply_results
+                                                   .Endorsement_result
+                                                    {delegate; _}));
+                                          }) ->
+                                        Some delegate
+                                    | _ -> None)
+                                  ops
+                              in
+                              Archiver.add_block
+                                block_level
+                                hash
+                                timestamp
+                                reception_time
+                                delegate
+                                pks)))))
         block_stream
 
 let endorsements_loop cctxt =

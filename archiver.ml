@@ -52,6 +52,8 @@ end
 module Block = struct
   type t = {
     hash : Block_hash.t;
+    delegate : Signature.public_key_hash;
+    delegate_alias : string option;
     timestamp : Time.Protocol.t;
     reception_time : Time.System.t;
     nonce : unit option;
@@ -60,12 +62,14 @@ module Block = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {hash; reception_time; timestamp; nonce} ->
-        (hash, reception_time, timestamp, nonce))
-      (fun (hash, reception_time, timestamp, nonce) ->
-        {hash; reception_time; timestamp; nonce})
-      (obj4
+      (fun {hash; delegate; delegate_alias; reception_time; timestamp; nonce} ->
+        (hash, delegate, delegate_alias, reception_time, timestamp, nonce))
+      (fun (hash, delegate, delegate_alias, reception_time, timestamp, nonce) ->
+        {hash; delegate; delegate_alias; reception_time; timestamp; nonce})
+      (obj6
          (req "hash" Block_hash.encoding)
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate_alias" string)
          (req "reception_time" Time.System.encoding)
          (req "timestamp" Time.Protocol.encoding)
          (opt "nonce" unit))
@@ -254,8 +258,16 @@ let extract_anomalies path level infos =
     | _ :: _ -> dump_anomalies path level anomalies
 
 let dump_included_in_block cctxt path block_level block_hash timestamp
-    reception_time endorsers_pkhs =
+    reception_time baker endorsers_pkhs =
   let open Lwt.Infix in
+  Wallet.of_context cctxt >>= fun aliases_opt ->
+  let aliases =
+    match aliases_opt with
+    | Ok aliases -> aliases
+    | Error err ->
+        let () = Error_monad.pp_print_trace Format.err_formatter err in
+        Wallet.empty
+  in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
    let mutex = get_file_mutex filename in
@@ -292,25 +304,24 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
            ([], endorsers_pkhs)
            infos.endorsements
        in
-       (match unknown with
-       | [] -> return updated_known
-       | _ :: _ ->
-           Wallet.of_context cctxt >>=? fun aliases ->
-           return
-             (List.fold_left
-                (fun acc delegate ->
-                  Endorsement.
-                    {
-                      delegate;
-                      delegate_alias = Wallet.alias_of_pkh aliases delegate;
-                      reception_time = None;
-                      errors = [];
-                      block_inclusion = [block_hash];
-                    }
-                  :: acc)
-                updated_known
-                unknown))
-       >>=? fun endorsements ->
+       let endorsements =
+         match unknown with
+         | [] -> updated_known
+         | _ :: _ ->
+             List.fold_left
+               (fun acc delegate ->
+                 Endorsement.
+                   {
+                     delegate;
+                     delegate_alias = Wallet.alias_of_pkh aliases delegate;
+                     reception_time = None;
+                     errors = [];
+                     block_inclusion = [block_hash];
+                   }
+                 :: acc)
+               updated_known
+               unknown
+       in
        let out_infos =
          {blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate}
        in
@@ -335,7 +346,15 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
   Lwt_mutex.with_lock mutex (fun () ->
       load filename encoding empty >>=? fun infos ->
       let blocks =
-        Block.{hash = block_hash; reception_time; timestamp; nonce = None}
+        Block.
+          {
+            hash = block_hash;
+            delegate = baker;
+            delegate_alias = Wallet.alias_of_pkh aliases baker;
+            reception_time;
+            timestamp;
+            nonce = None;
+          }
         :: infos.blocks
       in
       write
@@ -446,6 +465,7 @@ type chunk =
       * Block_hash.t
       * Time.Protocol.t
       * Time.System.t
+      * Signature.Public_key_hash.t
       * Signature.Public_key_hash.t list
   | Mempool of
       bool option
@@ -457,7 +477,7 @@ let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 let launch cctxt prefix =
   Lwt_stream.iter_p
     (function
-      | Block (block_level, block, timestamp, reception_time, pkhs) ->
+      | Block (block_level, block, timestamp, reception_time, delegate, pkhs) ->
           dump_included_in_block
             cctxt
             prefix
@@ -465,6 +485,7 @@ let launch cctxt prefix =
             block
             timestamp
             reception_time
+            delegate
             pkhs
       | Mempool (unaccurate, level, items) ->
           dump_received cctxt prefix ?unaccurate level items)
@@ -475,6 +496,8 @@ let stop () = chunk_feeder None
 let add_received ?unaccurate level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block block_level block_hash timestamp reception_time pkhs =
+let add_block block_level block_hash timestamp reception_time delegate pkhs =
   chunk_feeder
-    (Some (Block (block_level, block_hash, timestamp, reception_time, pkhs)))
+    (Some
+       (Block
+          (block_level, block_hash, timestamp, reception_time, delegate, pkhs)))

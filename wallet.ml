@@ -29,6 +29,9 @@ type t = string Map.t
 
 open Tezos_client_base
 
+(** A wallet with no aliases *)
+let empty = Map.empty
+
 (** Load a public key hash map from the client context  *)
 let of_context (wallet : #Tezos_client_base.Client_context.wallet) =
   Client_keys.Public_key_hash.load wallet >>=? fun aliases ->
