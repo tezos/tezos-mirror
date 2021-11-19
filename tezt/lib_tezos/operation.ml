@@ -166,16 +166,14 @@ let forge_operation ?protocol client ~branch ~batch =
       let name = Protocol.daemon_name p ^ ".operation.unsigned" in
       Codec.encode ~name op_json
 
-let sign_bytes ~watermark (signer : Account.key) (msg : Bytes.t) =
-  let open Tezos_crypto in
-  let (Unencrypted b58_secret_key) = signer.secret_key in
-  let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
-  Signature.(sign ~watermark sk msg)
+let sign_manager_op_bytes ~(signer : Account.key) (op_bytes : Bytes.t) =
+  Account.sign_bytes ~watermark:Generic_operation ~signer op_bytes
 
-let sign_hex ~signer ~watermark str_hex =
-  sign_bytes ~watermark signer (Hex.to_bytes (`Hex str_hex))
-  |> Tezos_crypto.Signature.to_hex
-  |> fun (`Hex signature) -> signature
+let sign_manager_op_hex ~signer op_hex_str =
+  let op_bytes = Hex.to_bytes (`Hex op_hex_str) in
+  let signature = sign_manager_op_bytes ~signer op_bytes in
+  let (`Hex sig_hex_str) = Tezos_crypto.Signature.to_hex signature in
+  sig_hex_str
 
 let inject_operation ?(async = false) ?(force = false) ~signature op_str_hex
     client =
@@ -188,7 +186,7 @@ let forge_and_inject_operation ?protocol ?branch ?async ?force ~batch ~signer
     client =
   let* branch = get_injection_branch ~branch client in
   let* op_str_hex = forge_operation ?protocol ~batch ~branch client in
-  let signature = sign_hex ~signer ~watermark:Generic_operation op_str_hex in
+  let signature = sign_manager_op_hex ~signer op_str_hex in
   inject_operation ?async ?force ~signature op_str_hex client >|= JSON.as_string
 
 (** Two high level helpers *)

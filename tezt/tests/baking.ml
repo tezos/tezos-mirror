@@ -255,13 +255,10 @@ let encode_unsigned_operation_to_binary state op =
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
 
-let sign_operation_bytes (signer : Account.key) (msg : Bytes.t) =
-  Operation.sign_bytes ~watermark:Generic_operation signer msg
-
 let mempool_operation_from_op state signer op :
     (mempool_operation * bytes) Lwt.t =
   let* bin = encode_unsigned_operation_to_binary state op in
-  let signature = sign_operation_bytes signer bin in
+  let signature = Operation.sign_manager_op_bytes ~signer bin in
   let signature = Tezos_crypto.Signature.to_b58check signature in
   return
     ( Mempool_operation
