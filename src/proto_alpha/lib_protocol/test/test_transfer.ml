@@ -246,6 +246,41 @@ let test_missing_transaction () =
   Op.transaction (I b) contract_1 contract_2 amount >>=? fun _ ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
 
+(** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
+let test_transfer_zero_implicit_with_bal_src_as_fee () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Op.transaction (I i) ~fee:bal_src src dest Tez.zero >>=? fun op ->
+  Incremental.add_operation i op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Apply.Empty_transaction _ -> true
+      | _ -> false)
+
+(** Transfer zero tez to an originated contract, with fee equals balance of src. *)
+let test_transfer_zero_to_originated_with_bal_src_as_fee () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.origination (I i) dest ~script:Op.dummy_script
+  >>=? fun (op, new_contract) ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Op.transaction (I i) ~fee:bal_src src new_contract Tez.zero >>=? fun op ->
+  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Incremental.add_operation i op >>=? fun i ->
+  Incremental.finalize_block i >>=? fun _ -> return_unit
+
 (********************)
 (* The following tests are for different kind of contracts:
    - implicit to implicit
@@ -657,11 +692,19 @@ let tests =
       "transfer zero tez from implicit contract"
       `Quick
       test_transfer_zero_implicit;
+    Tztest.tztest
+      "transfer zero tez to an implicit contract with balance of src as fee"
+      `Quick
+      test_transfer_zero_implicit_with_bal_src_as_fee;
     (* transfer to originated contract *)
     Tztest.tztest
       "transfer to originated contract paying transaction fee"
       `Quick
       test_transfer_to_originate_with_fee;
+    Tztest.tztest
+      "transfer zero tez to an originated contract with balance of src as fee"
+      `Quick
+      test_transfer_zero_to_originated_with_bal_src_as_fee;
     (* transfer by the balance of contract *)
     Tztest.tztest
       "transfer the amount from source contract balance"
