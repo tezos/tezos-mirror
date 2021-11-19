@@ -7,14 +7,14 @@
 .tezt_template:
   extends:
     - .integration_template
-    - .template__coverage
-    - .template__cobertura
+    - .template__coverage_files
   artifacts:
     reports:
       junit: tezt-junit.xml
     paths:
       - tezt.log
       - tezt-results-$TEZT_JOB.json
+      - $BISECT_FILE
     expire_in: 1 day
     when: always
   variables:

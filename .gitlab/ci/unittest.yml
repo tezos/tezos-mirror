@@ -15,6 +15,7 @@ test-script-gen-genesis:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
+    - .template__coverage
   stage: test
   before_script:
     - . ./scripts/version.sh
@@ -57,8 +58,7 @@ test-script-gen-genesis:
 unit:010_PtGRANAD:
   extends:
   - .unit_test_template_x86_64
-  - .template__coverage
-  - .template__cobertura
+  - .template__coverage_files
   variables:
     MAKE_TARGETS: >
       src/proto_010_PtGRANAD/lib_client.test_proto
@@ -67,8 +67,7 @@ unit:010_PtGRANAD:
 unit:011_PtHangz2:
   extends:
   - .unit_test_template_x86_64
-  - .template__coverage
-  - .template__cobertura
+  - .template__coverage_files
   variables:
     MAKE_TARGETS: >
       src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -79,8 +78,7 @@ unit:011_PtHangz2:
 unit:alpha:
   extends:
   - .unit_test_template_x86_64
-  - .template__coverage
-  - .template__cobertura
+  - .template__coverage_files
   variables:
     MAKE_TARGETS: >
       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -93,8 +91,7 @@ unit:alpha:
 unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64
-  - .template__coverage
-  - .template__cobertura
+  - .template__coverage_files
   variables:
     MAKE_TARGETS: test-nonproto-unit
 

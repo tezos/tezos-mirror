@@ -8,8 +8,7 @@
 .integration_template:
   extends:
     - .test_template
-    - .template__coverage
-    - .template__cobertura
+    - .template__coverage_files
   dependencies: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
@@ -64,6 +63,7 @@ integration:sandboxes:voting:
   artifacts:
     paths:
       - flextesa-voting-demo-noops
+      - $BISECT_FILE
     expire_in: 1 day
     when: on_failure
 
@@ -74,6 +74,7 @@ integration:sandboxes:acc-endorsement:
   artifacts:
     paths:
       - flextesa-acc-sde
+      - $BISECT_FILE
     expire_in: 1 day
     when: on_failure
 
@@ -86,6 +87,7 @@ integration:sandboxes:u-a-u:
     paths:
       - flextesa-hard-fork
       - flextesa-hard-fork-alpha
+      - $BISECT_FILE
     expire_in: 1 day
     when: on_failure
 
@@ -127,8 +129,7 @@ integration:sandboxes:daemons-upgrade:
 integration:pytest:
   extends:
     - .integration_python_template
-    - .template__coverage
-    - .template__cobertura
+    - .template__coverage_files
   # the number of jobs have been choosen to give jobs of maximal
   # length ~10 minutes and to accommodate the addition of new protocol
   # test suites without increasing wall time of the test stage.
@@ -139,6 +140,7 @@ integration:pytest:
     paths:
       - tests_python/tmp/
       - tests_python/reports/*.xml
+      - $BISECT_FILE
     reports:
       junit: tests_python/reports/*.xml
     expire_in: 7 day
