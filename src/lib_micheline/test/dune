@@ -9,4 +9,5 @@
 
 (rule
   (alias runtest_js)
+  (package tezos-micheline)
   (action (run node %{dep:./test_parser.bc.js})))

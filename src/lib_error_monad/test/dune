@@ -11,4 +11,5 @@
 
 (rule
   (alias runtest_js)
+  (package tezos-error-monad)
   (action (run node %{dep:./test_registration.bc.js})))
