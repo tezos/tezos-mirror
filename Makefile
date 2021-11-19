@@ -247,7 +247,7 @@ lint-opam-dune:
 # the repo if you add "internal" dependencies to tezos-test-helpers)
 .PHONY: lint-tests-pkg
 lint-tests-pkg:
-	@dune runtest -p tezos-test-helpers || \
+	@(dune build -p tezos-test-helpers @runtest @runtest_js) || \
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 
