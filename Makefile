@@ -241,6 +241,16 @@ test-coverage-tenderbake:
 lint-opam-dune:
 	@dune build @runtest_dune_template
 
+
+# Ensure that all unit tests are restricted to their opam package
+# (change 'tezos-test-helpers' to one the most elementary packages of
+# the repo if you add "internal" dependencies to tezos-test-helpers)
+.PHONY: lint-tests-pkg
+lint-tests-pkg:
+	@dune runtest -p tezos-test-helpers || \
+	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
+
+
 .PHONY: test
 test: lint-opam-dune test-code
 
