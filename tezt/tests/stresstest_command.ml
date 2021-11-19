@@ -35,7 +35,18 @@
 let test_stresstest_explicit =
   Protocol.register_test ~__FILE__ ~title:"stresstest explicit" ~tags:["client"]
   @@ fun protocol ->
-  let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
+  let* node =
+    Node.init
+      [Synchronisation_threshold 0; Connections 0; Disable_operations_precheck]
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+     Stresstest command uses counters to inject a lot of operations with limited
+     number of bootstrap accounts. With precheck these operations are mostly
+     rejected because we don't apply the effect of operations in the
+     prevalidation context in mempool mode anymore. So, only the operation with
+     the correct counter is considered as Applied (without incrementing the
+     counter in the context). Once the issue is fixed, the
+     [Disable_operations_precheck] flag above can be removed. *)
   let* client = Client.init ~endpoint:Client.(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let* _ = Node.wait_for_level node 1 in
@@ -61,7 +72,18 @@ let wait_for_n_injections n node =
 let test_stresstest_implicit =
   Protocol.register_test ~__FILE__ ~title:"stresstest implicit" ~tags:["client"]
   @@ fun protocol ->
-  let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
+  let* node =
+    Node.init
+      [Synchronisation_threshold 0; Connections 0; Disable_operations_precheck]
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+     Stresstest command uses counters to inject a lot of operations with limited
+     number of bootstrap accounts. With precheck these operations are mostly
+     rejected because we don't apply the effect of operations in the
+     prevalidation context in mempool mode anymore. So, only the operation with
+     the correct counter is considered as Applied (without incrementing the
+     counter in the context). Once the issue is fixed, the
+     [Disable_operations_precheck] flag above can be removed. *)
   let* client = Client.init ~endpoint:Client.(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let* _ = Node.wait_for_level node 1 in
