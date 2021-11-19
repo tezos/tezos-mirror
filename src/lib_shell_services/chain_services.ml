@@ -145,7 +145,7 @@ module S = struct
            ~descr:
              "The requested number of predecessors to return (per request; see \
               next argument)."
-           RPC_arg.int
+           RPC_arg.uint
            (fun x -> x#length)
       |+ multi_field
            "head"

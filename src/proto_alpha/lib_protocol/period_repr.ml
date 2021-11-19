@@ -89,9 +89,15 @@ end
 module Internal : INTERNAL = struct
   type t = Int64.t
 
-  let encoding = Data_encoding.int64
+  let encoding =
+    Data_encoding.(
+      with_decoding_guard
+        (fun t ->
+          if Compare.Int64.(t >= 0L) then Ok ()
+          else Error "Positive int64 required")
+        int64)
 
-  let rpc_arg = RPC_arg.int64
+  let rpc_arg = RPC_arg.uint63
 
   let pp ppf v = Format.fprintf ppf "%Ld" v
 

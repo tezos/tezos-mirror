@@ -27,5 +27,41 @@ type ('i, 'j) eq = ('i, 'j) Resto.eq = Eq : ('a, 'a) eq
 
 include Resto.Arg
 
+let uint =
+  make
+    ~name:"uint"
+    ~destruct:(fun s ->
+      match int_of_string_opt s with
+      | None -> Error "Cannot parse natural number (number expected)"
+      | Some n when n < 0 ->
+          Error "Cannot parse natural number (positive number expected)"
+      | Some n -> Ok n)
+    ~construct:string_of_int
+    ()
+
+let uint31 =
+  make
+    ~name:"uint31"
+    ~destruct:(fun s ->
+      match Int32.of_string_opt s with
+      | None -> Error "Cannot parse natural number (number expected)"
+      | Some n when n < 0l ->
+          Error "Cannot parse natural number (positive number expected)"
+      | Some n -> Ok n)
+    ~construct:Int32.to_string
+    ()
+
+let uint63 =
+  make
+    ~name:"uint63"
+    ~destruct:(fun s ->
+      match Int64.of_string_opt s with
+      | None -> Error "Cannot parse natural number (number expected)"
+      | Some n when n < 0L ->
+          Error "Cannot parse natural number (positive number expected)"
+      | Some n -> Ok n)
+    ~construct:Int64.to_string
+    ()
+
 let eq_descr a b =
   String.equal a.name b.name && Option.equal String.equal a.descr b.descr

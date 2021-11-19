@@ -29,4 +29,13 @@ include module type of struct
   include Resto.Arg
 end
 
+(** [uint] is the same as {!int} except that negative numbers are rejected. *)
+val uint : int arg
+
+(** [uint31] is the same as {!int32} except that negative numbers are rejected. *)
+val uint31 : int32 arg
+
+(** [uint63] is the same as {!int64} except that negative numbers are rejected. *)
+val uint63 : int64 arg
+
 val eq_descr : descr -> descr -> bool

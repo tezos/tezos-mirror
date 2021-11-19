@@ -30,17 +30,7 @@ type cycle = t
 
 let encoding = Data_encoding.int32
 
-let rpc_arg =
-  let construct = Int32.to_string in
-  let destruct str =
-    Int32.of_string_opt str |> Option.to_result ~none:"Cannot parse cycle"
-  in
-  RPC_arg.make
-    ~descr:"A cycle integer"
-    ~name:"block_cycle"
-    ~construct
-    ~destruct
-    ()
+let rpc_arg = RPC_arg.like RPC_arg.uint31 ~descr:"A cycle integer" "block_cycle"
 
 let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 

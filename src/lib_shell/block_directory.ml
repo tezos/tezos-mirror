@@ -328,10 +328,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   (* context *)
   register1 S.Context.read (fun (chain_store, block) path q () ->
       let depth = Option.value ~default:max_int q#depth in
-      fail_unless
-        (depth >= 0)
-        (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
-      >>=? fun () ->
+      (* [depth] is defined as a [uint] not an [int] *)
+      assert (depth >= 0) ;
       Store.Block.context chain_store block >>=? fun context ->
       Context.mem context path >>= fun mem ->
       Context.mem_tree context path >>= fun dir_mem ->

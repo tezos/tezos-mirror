@@ -53,14 +53,14 @@ module S = struct
              "Commitments and ciphertexts are returned from the specified \
               offset up to the most recent."
            "offset_commitment"
-           RPC_arg.int64
+           RPC_arg.uint63
            (fun {offset_commitment; _} -> offset_commitment)
       |+ opt_field
            ~descr:
              "Nullifiers are returned from the specified offset up to the most \
               recent."
            "offset_nullifier"
-           RPC_arg.int64
+           RPC_arg.uint63
            (fun {offset_nullifier; _} -> offset_nullifier)
       |> seal
 
