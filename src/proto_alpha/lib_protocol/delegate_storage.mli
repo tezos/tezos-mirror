@@ -207,11 +207,11 @@ val deactivated :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
 (** Participation slots potentially associated to accounts. The
-   accounts that didn't pay the deposits will be excluded from this
+   accounts that didn't place a deposit will be excluded from this
    list. This function should only be used to compute the deposits to
    freeze or initialize the protocol while stitching. RPCs can use this
    function to predict an approximation of long term future slot
-   allocations. It shouldn't be used in the baker *)
+   allocations. It shouldn't be used in the baker. *)
 val slot_owner :
   Raw_context.t ->
   Level_repr.t ->

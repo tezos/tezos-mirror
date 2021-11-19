@@ -377,7 +377,7 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
   | Some outdated_cycle -> Storage.Slashed_deposits.clear (ctxt, outdated_cycle)
 
 (* Return a map from delegates (with active stake at some cycle
-   between in the cycle window [from_cycle, to_cycle]) to the maximum
+   in the cycle window [from_cycle, to_cycle]) to the maximum
    of the "bondable stake" for each such cycle (which is just the
    [frozen_deposits_percentage] of the active stake at that cycle). Also
    return the delegates that have fallen out of the sliding window. *)
@@ -473,7 +473,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
            See select_distribution_for_cycle
 
            If the delegate has been slashed during the cycle, the invariant
-           above doesn't necessiraly hold. In this case, we freeze the max
+           above doesn't necessarily hold. In this case, we freeze the max
            we can for the delegate. *)
         let to_freeze = Tez_repr.(min balance desired_to_freeze) in
         Token.transfer
@@ -502,7 +502,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
           ctxt
           delegate_contract
           Tez_repr.zero
-        >>=? fun (ctxt, _) ->
+        >>=? fun (ctxt, (_current_amount : Tez_repr.t)) ->
         Token.transfer
           ~origin
           ctxt
@@ -608,8 +608,8 @@ module Random = struct
     loop state
 
   let owner c (level : Level_repr.t) offset =
-    (* TODO-TB compute sampler at stake distribution snapshot instead
-       of lazily *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2084
+       compute sampler at stake distribution snapshot instead of lazily. *)
     let cycle = level.Level_repr.cycle in
     (match Raw_context.sampler_for_cycle c cycle with
     | Error `Sampler_not_set ->
