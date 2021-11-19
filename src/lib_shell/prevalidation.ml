@@ -60,7 +60,6 @@ module type T = sig
     Store.chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
-    live_blocks:Block_hash.Set.t ->
     live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->
@@ -94,7 +93,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   type t = {
     state : Proto.validation_state;
     applied : (Proto.operation_data operation * Proto.operation_receipt) list;
-    live_blocks : Block_hash.Set.t;
     live_operations : Operation_hash.Set.t;
   }
 
@@ -116,8 +114,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     else
       parse_unsafe raw.proto >|? fun protocol_data -> {hash; raw; protocol_data}
 
-  let create chain_store ?protocol_data ~predecessor ~live_blocks
-      ~live_operations ~timestamp () =
+  let create chain_store ?protocol_data ~predecessor ~live_operations ~timestamp
+      () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
     let {
@@ -164,7 +162,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       ?protocol_data
       ~cache:`Lazy
       ()
-    >>=? fun state -> return {state; applied = []; live_blocks; live_operations}
+    >>=? fun state -> return {state; applied = []; live_operations}
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
@@ -180,7 +178,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
             {
               state;
               applied = (op, receipt) :: pv.applied;
-              live_blocks = pv.live_blocks;
               live_operations =
                 Operation_hash.Set.add op.hash pv.live_operations;
             }
