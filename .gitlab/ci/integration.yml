@@ -65,7 +65,7 @@ integration:sandboxes:voting:
       - flextesa-voting-demo-noops
       - $BISECT_FILE
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 integration:sandboxes:acc-endorsement:
   extends: .integration_template
@@ -76,7 +76,7 @@ integration:sandboxes:acc-endorsement:
       - flextesa-acc-sde
       - $BISECT_FILE
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 integration:sandboxes:u-a-u:
   extends: .integration_template
@@ -89,7 +89,7 @@ integration:sandboxes:u-a-u:
       - flextesa-hard-fork-alpha
       - $BISECT_FILE
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 integration:sandboxes:daemons-upgrade:
   extends: .integration_template
@@ -101,7 +101,7 @@ integration:sandboxes:daemons-upgrade:
       - flextesa-daemons-upgrade
       - flextesa-daemons-upgrade-alpha
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 ############################################################
 ## Stage: run python integration tests                    ##
