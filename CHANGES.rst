@@ -169,6 +169,11 @@ Miscellaneous
    RPCs where only positive integers would make sense will now error when
    provided negative values (instead of, e.g., returning empty results).
 
+-  Added diffing functionality to the Micheline library. It allows to compare
+   Micheline expressions whose primitives are ``strings``. The difference is
+   returned as another Micheline expression annotated appropriately in places
+   where compared values differ.
+
 Version 11.0
 ============
 
