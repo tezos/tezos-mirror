@@ -330,6 +330,9 @@ included during that cycle has been ``3,123,456`` slots. Given that this number 
 bigger than the minimum required (``3,276,800 * 2 / 3``), it receives an endorsing
 reward of ``3,276,800 * 0.0025 = 8192`` tez for that cycle.
 
+
+.. _slashing_alpha:
+
 Slashing
 ^^^^^^^^
 

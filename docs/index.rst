@@ -179,15 +179,7 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
-   alpha/michelson
-   alpha/proof_of_stake
-   alpha/consensus
-   alpha/sapling
-   alpha/voting
-   alpha/liquidity_baking
-   alpha/timelock
-   alpha/global_constants
-   alpha/plugins
+   alpha/protocol
    alpha/glossary
    alpha/cli-commands
    alpha/rpc

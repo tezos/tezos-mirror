@@ -85,7 +85,7 @@ The committed nonce must be revealed by the original block proposer during cycle
 ``n-1`` under penalty of forfeiting the rewards and fees of the block that
 included the commitment. The associated security deposit is not forfeited.
 
-A *nonce revelation* is an operation, and multiple nonce revelations can thus be
+A *nonce revelation* is an operation and multiple nonce revelations can thus be
 included in a block. A reward ``SEED_NONCE_REVELATION_TIP`` is given for
 including a revelation. Revelations are free operations which do not compete
 with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
