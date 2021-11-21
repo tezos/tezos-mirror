@@ -569,7 +569,7 @@ module Interpreter_tests = struct
 
   let parameters_of_list transactions =
     let string = "{ " ^ String.concat " ; " transactions ^ " }" in
-    Alpha_context.Script.(lazy_expr (expression_from_string string))
+    Alpha_context.Script.(lazy_expr (Expr.from_string string))
 
   (* In this test we use a contract which takes a list of transactions, applies
      all of them, and assert all of them are correct. It also enforces a 1-to-1
@@ -657,7 +657,7 @@ module Interpreter_tests = struct
       Format.sprintf "{Pair 0x%s (Some 0x%s) }" hex_transac hex_pkh
     in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
     transac_and_sync ~memo_size b3 parameters 0 src0 dst baker
@@ -707,7 +707,7 @@ module Interpreter_tests = struct
     in
     let string = Format.sprintf "{Pair 0x%s None }" hex_transac in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     (* b transfers to a with dummy inputs and outputs *)
     transac_and_sync ~memo_size b4 parameters 0 src0 dst baker
@@ -780,7 +780,7 @@ module Interpreter_tests = struct
       WithExceptions.Option.get ~loc:__LOC__ @@ List.hd transactions
     in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string transaction))
+      Alpha_context.Script.(lazy_expr (Expr.from_string transaction))
     in
     transac_and_sync
       ~memo_size
@@ -816,7 +816,7 @@ module Interpreter_tests = struct
     let hex_transac_1 = hex_shield ~memo_size {sk; vk} anti_replay in
     let string_1 = Format.sprintf "{Pair %s None }" hex_transac_1 in
     let parameters_1 =
-      Alpha_context.Script.(lazy_expr (expression_from_string string_1))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string_1))
     in
     transac_and_sync ~memo_size block_start parameters_1 15 src dst baker
     >>=? fun (block_1, state) ->
@@ -843,7 +843,7 @@ module Interpreter_tests = struct
     in
     let string_2 = Format.sprintf "{Pair %s None }" hex_transac_2 in
     let parameters_2 =
-      Alpha_context.Script.(lazy_expr (expression_from_string string_2))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string_2))
     in
     transac_and_sync ~memo_size block_1 parameters_2 0 src dst baker
     >>=? fun (block_1, state_1) ->
@@ -982,11 +982,11 @@ module Interpreter_tests = struct
     in
     (* transac 1 is applied to state_1*)
     let parameters_1 =
-      Alpha_context.Script.(lazy_expr (expression_from_string str_1))
+      Alpha_context.Script.(lazy_expr (Expr.from_string str_1))
     in
     (* tranasc_2 is applied to state_2*)
     let parameters_2 =
-      Alpha_context.Script.(lazy_expr (expression_from_string str_2))
+      Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
     let fee = Test_tez.of_int 10 in
     Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_1
@@ -1052,7 +1052,7 @@ module Interpreter_tests = struct
     let hex_transac_1 = hex_shield ~memo_size:8 w anti_replay in
     let string = "Left " ^ hex_transac_1 in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let fee = Test_tez.of_int 10 in
     Op.transaction ~fee (B b) src dst Tez.zero ~parameters >>=? fun operation ->
@@ -1061,7 +1061,7 @@ module Interpreter_tests = struct
     let hex_transac_2 = hex_shield ~memo_size:8 w anti_replay_2 in
     let string = "(Pair " ^ contract ^ " " ^ hex_transac_2 ^ ")" in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     Op.transaction ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
