@@ -71,6 +71,6 @@
  (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
 
 (rule
- (alias runtest)
+ (alias runtest_locator_bench)
  (package tezos-shell)
- (action (run %{exe:test_locator.exe})))
+ (action (run %{exe:test_locator.exe} --bench)))
