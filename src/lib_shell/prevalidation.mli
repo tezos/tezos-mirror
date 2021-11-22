@@ -42,16 +42,33 @@ type 'operation_data operation = private {
 }
 
 module type T = sig
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
   type operation_data
 
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
   type operation_receipt
 
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
 
+  (** The type implemented by {!Tezos_store.Store.chain_store} in
+      production, and mocked in tests *)
   type chain_store
 
+  (** The type used internally by this module. Created by {!create} and
+      then passed back and possibly updated by {!apply_operation}. *)
   type t
 
+  (** [parse op] reads a usual {!Operation.t} and lifts it to the
+      type {!operation} used by this module. This function is in the
+      {!tzresult} monad, because it can return the following errors:
+
+      - {!Validation_errors.Oversized_operation} if the size of the operation
+        data within [op] is too large (to protect against DoS attacks), and
+      - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
   val parse : Operation.t -> operation_data operation tzresult
 
   (** [parse_unsafe bytes] parses [bytes] as operation data. Any error
@@ -74,6 +91,8 @@ module type T = sig
     unit ->
     t tzresult Lwt.t
 
+  (** Values returned by {!create}. They are obtained from the result
+      of the protocol [apply_operation] function and the classification of errors. *)
   type result =
     | Applied of t * operation_receipt
     | Branch_delayed of tztrace
@@ -81,8 +100,12 @@ module type T = sig
     | Refused of tztrace
     | Outdated of tztrace
 
+  (** [apply_operation t op] calls the protocol [apply_operation] function
+      and handles possible errors, hereby yielding a classification *)
   val apply_operation : t -> operation_data operation -> result Lwt.t
 
+  (** [validation_state t] returns the subset of [t] corresponding
+      to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit

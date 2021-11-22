@@ -196,6 +196,9 @@ module MakeAbstract
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
+      (* As of November 2021, it is dubious that this case can happen.
+         If it can, it is more likely to be because of a consensus operation;
+         hence the returned error. *)
       Lwt.return (Outdated [Endorsement_branch_not_live])
     else
       protect (fun () ->
