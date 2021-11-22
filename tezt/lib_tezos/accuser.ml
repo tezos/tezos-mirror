@@ -57,10 +57,7 @@ let set_ready accuser =
   trigger_ready accuser (Some ())
 
 let handle_raw_stdout accuser line =
-  match line with
-  (* The accuser is ready when it communicates with a bootstrapped node. *)
-  | "Accuser started." -> set_ready accuser
-  | _ -> ()
+  if line =~ rex "^Accuser v.+ for .+ started.$" then set_ready accuser
 
 let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in
