@@ -76,8 +76,11 @@ let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   let query_string = [("offset", string_of_int offset)] in
   Client.rpc ?endpoint ?hooks GET path ~query_string client
 
-let get_branch ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "blocks"; "head"; "hash"] in
+let get_branch ?(offset = 2) ?endpoint ?hooks ?(chain = "main") client =
+  (* By default, we use offset = 2 for Tenderbake, to pick the latest finalized
+     branch *)
+  let block = sf "head~%d" offset in
+  let path = ["chains"; chain; "blocks"; block; "hash"] in
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
@@ -159,21 +162,26 @@ let inject_block ?endpoint ?hooks ~data client =
   let path = ["injection"; "block"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
-let inject_operation ?endpoint ?hooks ~data client =
+let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
+  let query_string = if async then [("async", "")] else [] in
+  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
-let spawn_inject_operation ?endpoint ?hooks ~data client =
+let spawn_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
-  Client.spawn_rpc ?endpoint ?hooks ~data POST path client
+  let query_string = if async then [("async", "")] else [] in
+  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
 
-let private_inject_operation ?endpoint ?hooks ~data client =
+let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["private"; "injection"; "operation"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
+  let query_string = if async then [("async", "")] else [] in
+  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
-let spawn_private_inject_operation ?endpoint ?hooks ~data client =
+let spawn_private_inject_operation ?endpoint ?hooks ?(async = false) ~data
+    client =
   let path = ["private"; "injection"; "operation"] in
-  Client.spawn_rpc ?endpoint ?hooks ~data POST path client
+  let query_string = if async then [("async", "")] else [] in
+  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in

@@ -23,114 +23,195 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_next_counter ~source client =
-  let open Lwt.Infix in
+open Lwt.Infix
+
+type manager_op_param = {entrypoint : string; value : Ezjsonm.value}
+
+type manager_op_kind =
+  | Transaction of {
+      dest : string;
+      (* public key hash *)
+      amount : int;
+      parameter : manager_op_param option;
+    }
+  | Reveal of string (* public key *)
+  | Origination of {
+      code : Ezjsonm.value;
+      storage : Ezjsonm.value;
+      balance : int;
+    }
+
+(* This is the manager operations' content type *)
+type manager_operation_content = {
+  source : string;
+  (* public key hash *)
+  op_kind : manager_op_kind;
+  counter : int;
+  fee : int;
+  gas_limit : int;
+  storage_limit : int;
+}
+
+(* Some basic auxiliary functions *)
+let get_counter ~source client =
   RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
-  >|= JSON.as_int >|= succ
+  >|= JSON.as_int
 
-let get_branch client =
-  let open Lwt.Infix in
-  RPC.get_branch client >|= JSON.as_string
+let get_next_counter ~source client = get_counter client ~source >|= succ
 
-let json_of_transfer_operation_content ~amount ~fee ~gas_limit ~counter ~source
-    ~destination =
-  `O
-    [
-      ("kind", `String "transaction");
-      ("source", `String source.Account.public_key_hash);
-      ("fee", `String (string_of_int fee));
-      ("counter", `String (string_of_int counter));
-      ("gas_limit", `String (string_of_int gas_limit));
-      ("storage_limit", `String "0");
-      ("amount", `String (string_of_int amount));
-      ("destination", `String destination.Account.public_key_hash);
-    ]
+let get_injection_branch ~branch client =
+  match branch with
+  | Some b -> Lwt.return b
+  | None -> RPC.get_branch client >|= JSON.as_string
 
-let json_of_operation ~branch operation_content_json =
-  `O [("branch", `String branch); ("contents", `A [operation_content_json])]
+(* Smart constructors *)
 
-let json_of_transfer_operation ~amount ~fee ~gas_limit ~branch ~counter ~source
-    ~destination =
-  json_of_transfer_operation_content
-    ~amount
-    ~fee
-    ~gas_limit
-    ~counter
-    ~source
-    ~destination
-  |> json_of_operation ~branch
-
-let forge_transfer ?(amount = 1) ?(fee = 1000) ?(gas_limit = 1040)
-    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?branch
-    ?counter client =
-  let open Lwt.Infix in
-  let* branch =
-    match branch with None -> get_branch client | Some b -> return b
-  in
+let mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client op_kind
+    =
   let* counter =
     match counter with
     | None -> get_next_counter ~source client
-    | Some c -> return c
+    | Some counter -> Lwt.return counter
   in
-  let op_json =
-    json_of_transfer_operation
-      ~amount
-      ~fee
-      ~gas_limit
-      ~branch
-      ~counter
-      ~source
-      ~destination
+  Lwt.return
+    {
+      op_kind;
+      source = source.Account.public_key_hash;
+      counter;
+      fee;
+      gas_limit;
+      storage_limit;
+    }
+
+let mk_call ~source ?counter ?(fee = 30_000) ?(gas_limit = 30_000)
+    ?(storage_limit = 1_500) ~dest ?(amount = 0) ~entrypoint ~arg client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Transaction {dest; amount; parameter = Some {entrypoint; value = arg}}
+
+let mk_transfer ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
+    ?(storage_limit = 257) ~dest ?(amount = 1_000_000) client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Transaction {dest = dest.Account.public_key_hash; amount; parameter = None}
+
+let mk_reveal ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
+    ?(storage_limit = 0) client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Reveal source.Account.public_key
+
+let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
+    ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Origination {code; storage = init_storage; balance = init_balance}
+
+(* encodes the given manager operation as a JSON string *)
+let manager_op_content_to_json_string
+    {op_kind; fee; gas_limit; storage_limit; source; counter} =
+  let jz_string_of_int n = Ezjsonm.string @@ string_of_int n in
+  let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
+      ?(public_key = `Null) ?(balance = `Null) ?(script = `Null) kind =
+    let filter = List.filter (fun (_k, v) -> v <> `Null) in
+    `O
+      (filter
+         [
+           (* Common parts *)
+           ("source", Ezjsonm.string source);
+           ("fee", jz_string_of_int fee);
+           ("counter", jz_string_of_int counter);
+           ("gas_limit", jz_string_of_int gas_limit);
+           ("storage_limit", jz_string_of_int storage_limit);
+           ("kind", Ezjsonm.string kind);
+           (* Simple transfer, or SC call *)
+           ("amount", amount);
+           ("destination", destination);
+           ("parameters", parameter);
+           (* Pk reveal *)
+           ("public_key", public_key);
+           (* Smart Contract origination *)
+           ("balance", balance);
+           ("script", script);
+         ])
   in
-  RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
+  match op_kind with
+  | Transaction {dest; amount; parameter = None} ->
+      mk_jsonm
+        ~amount:(jz_string_of_int amount)
+        ~destination:(Ezjsonm.string dest)
+        "transaction"
+  | Transaction {dest; amount; parameter = Some {entrypoint; value}} ->
+      let parameter =
+        `O [("entrypoint", Ezjsonm.string entrypoint); ("value", value)]
+      in
+      mk_jsonm
+        ~amount:(jz_string_of_int amount)
+        ~destination:(Ezjsonm.string dest)
+        ~parameter
+        "transaction"
+  | Reveal pk -> mk_jsonm ~public_key:(Ezjsonm.string pk) "reveal"
+  | Origination {code; storage; balance} ->
+      let script : Ezjsonm.value = `O [("code", code); ("storage", storage)] in
+      mk_jsonm ~balance:(jz_string_of_int balance) ~script "origination"
 
-let bytes_of_hex hex = Hex.to_bytes (`Hex hex)
+(* construct a JSON operations with contents and branch *)
+let manager_op_to_json_string ~branch operations_json =
+  `O [("branch", Ezjsonm.string branch); ("contents", operations_json)]
 
-let sign_operation ~watermark ~signer op_hex =
+(* Forging, signing and injection operations *)
+
+let forge_operation ?protocol client ~branch ~batch =
+  let json_batch = `A (List.map manager_op_content_to_json_string batch) in
+  let op_json = manager_op_to_json_string ~branch json_batch in
+  match protocol with
+  | None -> RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
+  | Some p ->
+      let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+      Codec.encode ~name op_json
+
+let sign_bytes ~watermark (signer : Account.key) (msg : Bytes.t) =
   let open Tezos_crypto in
-  let sk =
-    match String.split_on_char ':' signer.Account.secret_key with
-    | ["unencrypted"; b58_secret_key] ->
-        Signature.Secret_key.of_b58check_exn b58_secret_key
-    | _ ->
-        Test.fail "Could not parse secret key: '%s'" signer.Account.secret_key
-  in
-  let bytes = bytes_of_hex op_hex in
-  let signature = Signature.(sign ~watermark sk bytes) in
-  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
-  signature
+  let (Unencrypted b58_secret_key) = signer.secret_key in
+  let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
+  Signature.(sign ~watermark sk msg)
 
-let inject_operation ~signature op_str_hex client =
+let sign_hex ~signer ~watermark str_hex =
+  sign_bytes ~watermark signer (Hex.to_bytes (`Hex str_hex))
+  |> Tezos_crypto.Signature.to_hex
+  |> fun (`Hex signature) -> signature
+
+let inject_operation ?(async = false) ?(force = false) ~signature op_str_hex
+    client =
   let signed_op = op_str_hex ^ signature in
-  let* res = RPC.inject_operation ~data:(`String signed_op) client in
-  return res
+  if force then
+    RPC.private_inject_operation ~async ~data:(`String signed_op) client
+  else RPC.inject_operation ~async ~data:(`String signed_op) client
 
-let inject_transfer ?branch ?counter ?amount ?fee ?gas_limit
+let forge_and_inject_operation ?protocol ?branch ?async ?force ~batch ~signer
+    client =
+  let* branch = get_injection_branch ~branch client in
+  let* op_str_hex = forge_operation ?protocol ~batch ~branch client in
+  let signature = sign_hex ~signer ~watermark:Generic_operation op_str_hex in
+  inject_operation ?async ?force ~signature op_str_hex client >|= JSON.as_string
+
+(** Two high level helpers *)
+
+let inject_transfer ?protocol ?branch ?counter ?amount ?fee ?gas_limit
     ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) client
     =
-  let* op_str_hex =
-    forge_transfer
-      ?branch
+  let* op =
+    mk_transfer
+      ~source
       ?counter
-      ?amount
       ?fee
       ?gas_limit
-      ~source
-      ~destination
+      ~dest:destination
+      ?amount
       client
   in
-  let signature =
-    sign_operation
-      ~watermark:Tezos_crypto.Signature.Generic_operation
-      ~signer:source
-      op_str_hex
-  in
-  let* oph = inject_operation ~signature op_str_hex client in
-  return (JSON.as_string oph)
+  forge_and_inject_operation ?protocol ?branch ~batch:[op] ~signer:source client
 
-let inject_transfers ?amount ?fee ?gas_limit ?(source = Constant.bootstrap1)
-    ?(destination = Constant.bootstrap2) ~node ~number_of_operations client =
-  let* branch = get_branch client in
+let inject_transfers ?protocol ?amount ?fee ?gas_limit
+    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ~node
+    ~number_of_operations client =
+  let* branch = get_injection_branch ~branch:None client in
   (* Counter needs to be computed manually to ensure several
      operations of the same manager can be included in the same block.
   *)
@@ -142,6 +223,7 @@ let inject_transfers ?amount ?fee ?gas_limit ?(source = Constant.bootstrap1)
         let transfer_1 = Node.wait_for_request ~request:`Inject node in
         let* oph =
           inject_transfer
+            ?protocol
             ?fee
             ?gas_limit
             ?amount

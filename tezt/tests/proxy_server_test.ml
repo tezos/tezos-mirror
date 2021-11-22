@@ -121,7 +121,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         let* () = Client.bake_for client in
         (* We want Debug level events, for [heuristic_event_handler]
            to work properly *)
-        let* proxy_server = Proxy_server.init ~args ~event_level:"debug" node in
+        let* proxy_server = Proxy_server.init ~args ~event_level:`Debug node in
         Proxy_server.on_event proxy_server @@ heuristic_event_handler () ;
         return @@ Some (Client.Proxy_server proxy_server)
   in

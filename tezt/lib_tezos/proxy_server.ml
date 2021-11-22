@@ -105,13 +105,20 @@ let rpc_port ({persistent_state; _} : t) = persistent_state.rpc_port
 
 let runner node = node.persistent_state.runner
 
-let run ?(on_terminate = fun _ -> ()) ?event_level endpoint arguments =
+let run ?(on_terminate = fun _ -> ()) ?event_level ?event_sections_levels
+    endpoint arguments =
   let arguments = endpoint.persistent_state.arguments @ arguments in
   let on_terminate status =
     on_terminate status ;
     unit
   in
-  run ?event_level endpoint {ready = false} arguments ~on_terminate
+  run
+    ?event_level
+    ?event_sections_levels
+    endpoint
+    {ready = false}
+    arguments
+    ~on_terminate
 
 let check_event ?where node name promise =
   let* result = promise in
@@ -129,8 +136,9 @@ let wait_for_ready t =
         resolver :: t.persistent_state.pending_ready ;
       check_event t "starting_proxy_rpc_server.v0" promise
 
-let init ?runner ?name ?rpc_port ?event_level ?args node =
+let init ?runner ?name ?rpc_port ?event_level ?event_sections_levels ?args node
+    =
   let* endpoint = create ?runner ?name ?rpc_port ?args node in
-  let* () = run ?event_level endpoint [] in
+  let* () = run ?event_level ?event_sections_levels endpoint [] in
   let* () = wait_for_ready endpoint in
   return endpoint

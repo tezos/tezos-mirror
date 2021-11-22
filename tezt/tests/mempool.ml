@@ -286,19 +286,9 @@ let operation_json_branch ~branch operations_json =
     branch
     operations_json
 
-let sign_operation_bytes ~watermark (signer : Account.key) (msg : Bytes.t) =
-  let open Tezos_crypto in
-  let b58_secret_key =
-    match String.split_on_char ':' signer.secret_key with
-    | ["unencrypted"; rest] -> rest
-    | _ -> Test.fail "Could not parse secret key"
-  in
-  let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
-  Signature.(sign ~watermark sk msg)
-
 let sign_operation ~signer op_str_hex =
   let signature =
-    sign_operation_bytes
+    Operation.sign_bytes
       ~watermark:Generic_operation
       signer
       (Hex.to_bytes (`Hex op_str_hex))
@@ -532,7 +522,7 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let op_str_hex = JSON.as_string op_hex in
   let signature =
-    sign_operation_bytes
+    Operation.sign_bytes
       ~watermark:Generic_operation
       signer
       (Hex.to_bytes (`Hex op_str_hex))
@@ -847,9 +837,13 @@ let propagation_future_endorsement =
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
   and* node_2 =
-    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Private_mode]
+    Node.init
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      [Synchronisation_threshold 0; Private_mode]
   and* node_3 =
-    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Private_mode]
+    Node.init
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) ()
@@ -1059,7 +1053,9 @@ let refetch_failed_operation =
   set_config_operations_timeout node_2 0.00001 ;
   (* Run the node with the new config.
      event_level is set to debug to catch fetching event at this level *)
-  let* () = Node.run ~event_level:"debug" node_2 [] in
+  let* () =
+    Node.run ~event_sections_levels:[("prevalidator", `Debug)] node_2 []
+  in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
@@ -1228,7 +1224,8 @@ let ban_operation =
   let* node_1 = Node.init [Synchronisation_threshold 0; Connections 1]
   and* node_2 =
     Node.init
-      ?event_level:(Some "debug") (* to witness operation arrival event *)
+      ~event_sections_levels:
+        [("prevalidator", `Debug)] (* to witness operation arrival event *)
       [Synchronisation_threshold 0; Connections 2]
   in
   let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
@@ -1403,7 +1400,8 @@ let ban_operation_and_check_applied =
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
     Node.init
-      ?event_level:(Some "debug") (* to witness operation arrival events *)
+      ~event_sections_levels:
+        [("prevalidator", `Debug)] (* to witness operation arrival events *)
       [Synchronisation_threshold 0; Connections 1]
   and* node_2 = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
@@ -1681,7 +1679,8 @@ let unban_all_operations =
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
     Node.init
-      ?event_level:(Some "debug") (* to witness operation arrival events *)
+      ~event_sections_levels:
+        [("prevalidator", `Debug)] (* to witness operation arrival events *)
       [Synchronisation_threshold 0; Connections 2]
   and* node_2 = Node.init [Synchronisation_threshold 0; Connections 2] in
   let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
@@ -1825,7 +1824,7 @@ let recycling_branch_refused =
   (* Connect and initialise two nodes *)
   let* node_1 =
     Node.init
-      ?event_level:(Some "debug")
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
@@ -2125,7 +2124,9 @@ let test_do_not_reclassify =
     ~color:step_color
     "Step 1: Start two nodes, connect them, and activate the protocol." ;
   let* node1 =
-    Node.init ~event_level:"debug" [Synchronisation_threshold 0; Connections 1]
+    Node.init
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      [Synchronisation_threshold 0; Connections 1]
   and* node2 = Node.init [Synchronisation_threshold 0; Connections 1] in
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
   and* client2 = Client.init ~endpoint:Client.(Node node2) () in
@@ -2245,7 +2246,7 @@ let test_pending_operation_version =
   (* Initialise one node *)
   let* node_1 =
     Node.init
-      ?event_level:(Some "debug")
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) () in
@@ -2655,8 +2656,8 @@ end
 (* Probably to be replaced during upcoming mempool tests refactoring *)
 let init_single_node_and_activate_protocol
     ?(arguments = Node.[Synchronisation_threshold 0; Connections 0])
-    ?event_level protocol =
-  let* node = Node.init ?event_level arguments in
+    ?event_sections_levels protocol =
+  let* node = Node.init ?event_sections_levels arguments in
   let* client = Client.init ~endpoint:Client.(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let proto_activation_level = 1 in
@@ -2664,11 +2665,13 @@ let init_single_node_and_activate_protocol
   return (node, client)
 
 (* Probably to be replaced during upcoming mempool tests refactoring *)
-let init_two_connected_nodes_and_activate_protocol ?event_level1 ?event_level2
-    protocol =
+let init_two_connected_nodes_and_activate_protocol ?event_sections_levels1
+    ?event_sections_levels2 protocol =
   let arguments = Node.[Synchronisation_threshold 0; Connections 1] in
-  let* node1 = Node.init ?event_level:event_level1 arguments
-  and* node2 = Node.init ?event_level:event_level2 arguments in
+  let* node1 = Node.init ?event_sections_levels:event_sections_levels1 arguments
+  and* node2 =
+    Node.init ?event_sections_levels:event_sections_levels2 arguments
+  in
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
   and* client2 = Client.init ~endpoint:Client.(Node node2) () in
   let* () = Client.Admin.connect_address client1 ~peer:node2
@@ -2713,7 +2716,9 @@ let test_get_post_mempool_filter =
   let* (node1, client1) =
     (* We need event level [debug] for event
        [invalid_mempool_filter_configuration]. *)
-    init_single_node_and_activate_protocol ~event_level:"debug" protocol
+    init_single_node_and_activate_protocol
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      protocol
   in
   log_step 2 step2_msg ;
   let* () = check_RPC_GET_all_variations ~log:true default client1 in
@@ -2961,7 +2966,7 @@ let test_mempool_filter_operation_arrival =
   let* (node1, client1, node2, client2) =
     init_two_connected_nodes_and_activate_protocol
     (* Need event level [debug] to receive operation arrival events in [node1]. *)
-      ~event_level1:"debug"
+      ~event_sections_levels1:[("prevalidator", `Debug)]
       protocol
   in
   log_step 2 step2 ;
@@ -3042,7 +3047,7 @@ let test_request_operations_peer =
   Log.info "%s" step1_msg ;
   let init_node () =
     Node.init
-      ?event_level:(Some "debug")
+      ~event_sections_levels:[("prevalidator", `Debug)]
       [Synchronisation_threshold 0; Private_mode]
   in
   let* node_1 = init_node () and* node_2 = init_node () in

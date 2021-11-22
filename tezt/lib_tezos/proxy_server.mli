@@ -49,13 +49,15 @@ val runner : t -> Runner.t option
     that serves the given port and delegates its queries to [node].
 
     [event_level] specifies the verbosity of the file descriptor sink.
-    Possible values are: ["debug"], ["info"], ["notice"], ["warning"], ["error"],
-    and ["fatal"]. *)
+
+    [event_sections_levels] specifies the verbosity for events in sections whose
+    prefix is in the list. See {!Node.run} for description. *)
 val init :
   ?runner:Runner.t ->
   ?name:string ->
   ?rpc_port:int ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?args:argument list ->
   Node.t ->
   t Lwt.t

@@ -499,24 +499,11 @@ let runlike_command_arguments node command arguments =
   "--rpc-addr"
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
 
-let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
-    =
+let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
+    ?event_sections_levels node arguments =
   (match node.status with
   | Not_running -> ()
   | Running _ -> Test.fail "node %s is already running" node.name) ;
-  let event_level =
-    match event_level with
-    | Some level -> (
-        match String.lowercase_ascii level with
-        | "debug" | "info" | "notice" -> event_level
-        | _ ->
-            Log.warn
-              "Node.run: Invalid argument event_level:%s. Possible values are: \
-               debug, info, and notice. Keeping default level (notice)."
-              level ;
-            None)
-    | None -> None
-  in
   let on_terminate status =
     on_terminate status ;
     (* Cancel all [Ready] event listeners. *)
@@ -534,21 +521,34 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
   run
     ?runner:node.persistent_state.runner
     ?event_level
+    ?event_sections_levels
     node
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
 
-let run ?on_terminate ?event_level node arguments =
+let run ?on_terminate ?event_level ?event_sections_levels node arguments =
   let arguments = runlike_command_arguments node "run" arguments in
-  do_runlike_command ?on_terminate ?event_level node arguments
+  do_runlike_command
+    ?on_terminate
+    ?event_level
+    ?event_sections_levels
+    node
+    arguments
 
-let replay ?on_terminate ?event_level ?(blocks = ["head"]) node arguments =
+let replay ?on_terminate ?event_level ?event_sections_levels
+    ?(blocks = ["head"]) node arguments =
   let arguments = runlike_command_arguments node "replay" arguments @ blocks in
-  do_runlike_command ?on_terminate ?event_level node arguments
+  do_runlike_command
+    ?on_terminate
+    ?event_level
+    ?event_sections_levels
+    node
+    arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_host ?rpc_port ?event_level arguments =
+    ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
+    arguments =
   let node =
     create
       ?runner
@@ -565,7 +565,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
-  let* () = run ?event_level node [] in
+  let* () = run ?event_level ?event_sections_levels node [] in
   let* () = wait_for_ready node in
   return node
 
