@@ -23,6 +23,22 @@ misc_checks:
       - opam_repo.patch
     expire_in: 1 days
 
+semgrep:
+  extends:
+    - .rules_template__development
+  # We specify the image by hash to avoid flakiness. Indeed, if we took the
+  # latest release, then an update in the parser or analyser could result in new
+  # errors being found even if the code doesn't change. This would place the
+  # burden for fixing the code on the wrong dev (the devs who happen to open an
+  # MR coinciding with the semgrep update rather than the dev who wrote the
+  # infringing code in the first place).
+  image: returntocorp/semgrep-agent:sha-932a84b
+  stage: test
+  needs: []
+  script:
+    - echo "OCaml code linting. For information on how to reproduce locally, check out scripts/semgrep/README.md"
+    - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+
 check_precommit_hook:
   extends: .build_template
   stage: test

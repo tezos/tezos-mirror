@@ -459,6 +459,77 @@ like the two examples below.
       }
     }
 
+
+Linting
+-------
+
+The OCaml part of Octez code is analysed by a linter. You can check more details
+in :src:`scripts/semgrep/README.md`. Below are explanations for the different
+rules that may trigger linting errors.
+
+.. _linting-list-lengths-comparison:
+
+Comparing the length of two lists
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects inefficient comparisons between two list lengths and suggests
+more efficient specialised functions.
+
+When comparing the lengths of two lists it might be tempting to compute the
+lengths and compare them. This seems the most straightforward approach.
+Unfortunately, this approach is costly. Specifically,
+``List.length xs > List.length ys`` is O(``length(xs)``+``length(ys)``) because
+each list is traversed in full.
+
+The OCaml ``Stdlib.List`` module provides the function
+``compare_lengths : 'a list -> 'b list -> int`` which traverses both lists at
+once, and only as much of it as is necessary to determine which is longer.
+Consequently, the cost of
+``List.compare_lengths xs ys`` is O(min(``length(xs)``, ``length(ys)``) because
+the function stops when it reaches the end of one list.
+
+The value returned by ``compare_lengths`` is compatible with the semantic of
+other comparison functions in the Stdlib. This means that the naive comparison
+``List.length xs > List.length ys`` can be rewritten more efficiently as
+``List.compare_lengths xs ys > 0`` (note the same comparison operator is used).
+
+In Octez, there is also ``Compare.List_lengths`` which provides infix operators
+to compare the lengths of two lists directly. The same example can be rewritten
+``Compare.List_lengths.(xs > ys)``.
+
+
+.. _linting-list-length-comparison:
+
+Comparing the length of a list to a constant
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects inefficient comparisons between a list length and a constant
+and suggests more efficient specialised functions.
+
+When comparing the length of a list to a constant it might be tempting to
+compute the length and compare it to the constant. This seems the most
+straightforward approach. Unfortunately, this approach is costly. Specifically,
+``List.length xs > k`` is O(``length(xs)``) because the expression traverses the
+entirety of ``xs``.
+
+The OCaml ``Stdlib.List`` module provides the function
+``compare_length_with : 'a list -> int -> int`` which only traverses as much of
+the list as is necessary to determine if it is longer than the constant. The
+cost of ``List.compare_length_with xs k`` is O(min(``length(xs)``, ``k``)
+because it stops when it reaches the end of ``xs`` or after traversing ``k``
+elements.
+
+The value returned by ``compare_length_with`` is compatible with the semantic of
+other comparison functions in the Stdlib. This means that the expression
+``List.length xs > k`` can be rewritten more efficiently as
+``List.compare_length_with xs k > 0`` (note the same comparison operator is
+used).
+
+In Octez, there is also ``Compare.List_length_with`` which provides infix
+operators to compare the length of a list to a constant directly. The same
+example can be written ``Compare.List_length_with.(xs > k)``.
+
+
 Coding conventions
 ------------------
 

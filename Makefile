@@ -236,6 +236,9 @@ check-python-linting:
 	@$(MAKE) -C tests_python lint
 	@$(MAKE) -C docs lint
 
+check-ocaml-linting:
+	sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python
 
