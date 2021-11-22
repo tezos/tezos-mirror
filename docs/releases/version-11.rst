@@ -34,6 +34,19 @@ Octez v11.0 are not yet available. Also note that the required
 OCaml version is now 4.12.1. This means that you will need to create a
 new switch with ``opam switch create 4.12.1``.
 
+Known Issues
+------------
+
+Users with older CPUs may encounter a "core dumped: illegal instruction" error
+when using pre-built executables (Docker images or static binaries).
+Such users can fix this issue by:
+
+- using Docker images tagged ``v11.0_no_adx`` (see on `Docker Hub <https://hub.docker.com/layers/tezos/tezos/v11.0_no_adx/images/sha256-b0532eb8cc4201983e24034cf5252992db5c99bb0f7cb10afd1bf4675153ea4a>`_);
+- using the no-ADX static binaries
+  (`AMD64 <https://gitlab.com/tezos/tezos/-/jobs/1805009867/artifacts/browse/tezos-binaries/>`_ or
+  `ARM64 <https://gitlab.com/tezos/tezos/-/jobs/1805009868/artifacts/browse/tezos-binaries/>`_);
+- or compiling from source or with Opam (see :doc:`../introduction/howtoget`).
+
 Changelog
 ---------
 
