@@ -23,19 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type secret_key = Unencrypted of string
+
 (** Keys associated to an account. For example:
     {|{
       alias = "bootstrap1";
       public_key_hash = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
       public_key = Some "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
       secret_key =
-        Some "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+        Unencrypted "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
     }|} *)
 type key = {
   alias : string;
   public_key_hash : string;
   public_key : string;
-  secret_key : string;
+  secret_key : secret_key;
 }
 
 (** [write_stresstest_sources_file accounts] returns the name of a

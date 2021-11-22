@@ -31,8 +31,13 @@
     choose default process names. *)
 val declare_reset_function : (unit -> unit) -> unit
 
-(** Log an error and stop the test right here. *)
-val fail : ('a, unit, string, 'b) format4 -> 'a
+(** Log an error and stop the test right here.
+
+    If the optional location [__LOC__] is provided,
+    it is prepended to the error message.
+    You would typically use it simply as [Test.fail ~__LOC__ "..."]
+    to prepend location of the failure. *)
+val fail : ?__LOC__:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 (** Register a test.
 

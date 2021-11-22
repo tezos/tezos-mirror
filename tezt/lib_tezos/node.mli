@@ -262,25 +262,36 @@ val spawn_config_init : t -> argument list -> Process.t
     It continues running in the background.
 
     [event_level] specifies the verbosity of the file descriptor sink.
-    This must be at least ["notice"], which is the level of event
+    This must be at least [`Notice], which is the level of event
     ["node_is_ready.v0"], needed for {!wait_for_ready}.
-    Possible values are therefore: ["debug"], ["info"], and ["notice"].
-    Other values are ignored (verbosity then stays at default ["notice"]). *)
+    The default value is [`Info] which is also the default event level
+    of the node..
+
+    [event_sections_levels] specifies the verbosity for events in sections whose
+    prefix is in the list. For instance
+    [~event_sections_levels:[("prevalidator", `Debug); ("validator.block", `Debug)]]
+    will activate the logs at debug level for events whose section starts with
+    ["prevalidator"] or ["validator.block"].
+ *)
 val run :
   ?on_terminate:(Unix.process_status -> unit) ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   t ->
   argument list ->
   unit Lwt.t
 
 (** Spawn [tezos-node replay].
 
-    Same as [run] but for the [replay] command.
+    Same as {!run} but for the [replay] command.
     In particular it also supports events.
-    One key difference is that the node will eventually stop. *)
+    One key difference is that the node will eventually stop.
+
+    See {!run} for a description of the arguments. *)
 val replay :
   ?on_terminate:(Unix.process_status -> unit) ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?blocks:string list ->
   t ->
   argument list ->
@@ -406,7 +417,8 @@ val init :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   argument list ->
   t Lwt.t
 

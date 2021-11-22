@@ -554,6 +554,14 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** Convert the given smart contract from Michelson to JSON string. *)
+val convert_script_to_json :
+  ?endpoint:endpoint -> script:string -> t -> Ezjsonm.value Lwt.t
+
+(** Convert the given Michelson constant to JSON string. *)
+val convert_data_to_json :
+  ?endpoint:endpoint -> data:string -> t -> Ezjsonm.value Lwt.t
+
 (** Returns the name of a file containing the accounts corresponding
     to [bootstrap1], ..., [bootstrap5], in JSON format as expected by
     the [stresstest] command. *)
@@ -751,7 +759,8 @@ val init_with_protocol :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
@@ -793,7 +802,8 @@ val init_light :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?min_agreement:float ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   unit ->
   (t * Node.t * Node.t) Lwt.t

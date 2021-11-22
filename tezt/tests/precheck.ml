@@ -91,7 +91,12 @@ let precheck_block =
   Cluster.connect [n1] [n2] ;
   let cluster = n1 :: ring in
   Log.info "Starting up cluster" ;
-  let* () = Cluster.start ~wait_connections:true ~event_level:"debug" cluster in
+  let* () =
+    Cluster.start
+      ~wait_connections:true
+      ~event_sections_levels:[("validator.block", `Debug)]
+      cluster
+  in
   Log.info "Cluster initialized" ;
   let block_to_bake = 4 in
   let state = Hashtbl.create 11 in
@@ -183,7 +188,12 @@ let propagate_precheckable_bad_block =
   Cluster.connect [n1] [n2] ;
   let cluster = n1 :: ring in
   Log.info "Starting up cluster" ;
-  let* () = Cluster.start ~wait_connections:true ~event_level:"debug" cluster in
+  let* () =
+    Cluster.start
+      ~wait_connections:true
+      ~event_sections_levels:[("validator.block", `Debug)]
+      cluster
+  in
   Log.info "Cluster initialized" ;
   let* client = Client.(init ~endpoint:(Node n1) ()) in
   let* () = Client.activate_protocol ~protocol client in

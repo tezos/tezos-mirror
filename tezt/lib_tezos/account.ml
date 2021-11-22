@@ -24,20 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This type is used to construct values for secret keys.
+
+    Note: The tests only use unencrypted keys for the moment, please
+    add new constructors for other keys here, as needed. *)
+type secret_key =
+  | Unencrypted of string
+      (** The string does NOT contain the 'unencrypted:' prefix *)
+
 type key = {
   alias : string;
   public_key_hash : string;
   public_key : string;
-  secret_key : string;
+  secret_key : secret_key;
 }
 
 let write_stresstest_sources_file (accounts : key list) =
   let account_to_json (account : key) =
+    let (Unencrypted sk) = account.secret_key in
     `O
       [
         ("pkh", `String account.public_key_hash);
         ("pk", `String account.public_key);
-        ("sk", `String account.secret_key);
+        ("sk", `String sk);
       ]
   in
   let accounts_json_obj = `A (List.map account_to_json accounts) in

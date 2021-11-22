@@ -526,7 +526,8 @@ let test_origination_from_unrevealed_fees =
         public_key_hash = "";
         public_key = "";
         secret_key =
-          "unencrypted:edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
+          Unencrypted
+            "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
       }
   in
   let* () =

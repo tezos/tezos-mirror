@@ -168,7 +168,8 @@ val meta_star : ('a -> 'b -> unit) -> 'a -> 'b list -> unit
     neighbors. *)
 val start :
   ?public:bool ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?wait_connections:bool ->
   Node.t list ->
   unit Lwt.t

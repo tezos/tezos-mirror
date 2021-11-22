@@ -287,10 +287,11 @@ let spawn_version client = spawn_command client ["--version"]
 let version client = spawn_version client |> Process.check
 
 let spawn_import_secret_key ?endpoint client (key : Account.key) =
-  spawn_command
-    ?endpoint
-    client
-    ["import"; "secret"; "key"; key.alias; key.secret_key]
+  let sk_uri =
+    let (Unencrypted sk) = key.secret_key in
+    "unencrypted:" ^ sk
+  in
+  spawn_command ?endpoint client ["import"; "secret"; "key"; key.alias; sk_uri]
 
 let import_secret_key ?endpoint client key =
   spawn_import_secret_key ?endpoint client key |> Process.check
@@ -524,12 +525,12 @@ let show_address ~alias client =
     let public_key =
       client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
     in
-    let secret_key =
+    let sk =
       client_output
       =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
       |> mandatory "secret key"
     in
-    {alias; public_key_hash; public_key; secret_key}
+    {alias; public_key_hash; public_key; secret_key = Unencrypted sk}
   in
   let* output =
     spawn_show_address ~alias client |> Process.check_and_read_stdout
@@ -738,6 +739,22 @@ let spawn_originate_contract ?endpoint ?(wait = "none") ?init ?burn_cap ~alias
         ~none:[]
         ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
         burn_cap)
+
+let convert_michelson_to_json ~kind ?endpoint ~input client =
+  let* client_output =
+    spawn_command
+      ?endpoint
+      client
+      ["convert"; kind; input; "from"; "michelson"; "to"; "json"]
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return (Ezjsonm.from_string client_output)
+
+let convert_script_to_json ?endpoint ~script client =
+  convert_michelson_to_json ~kind:"script" ?endpoint ~input:script client
+
+let convert_data_to_json ?endpoint ~data client =
+  convert_michelson_to_json ~kind:"data" ?endpoint ~input:data client
 
 let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
     client =
@@ -996,7 +1013,7 @@ let write_sources_file ~min_agreement ~uris client =
       Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
-    ?event_level ?(nodes_args = []) () =
+    ?event_level ?event_sections_levels ?(nodes_args = []) () =
   let filter_node_arg = function
     | Node.Connections _ | Synchronisation_threshold _ -> None
     | x -> Some x
@@ -1005,8 +1022,11 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     List.filter_map filter_node_arg nodes_args
     @ Node.[Connections 1; Synchronisation_threshold 0]
   in
-  let* node1 = Node.init ?event_level ~name:"node1" nodes_args
-  and* node2 = Node.init ?event_level ~name:"node2" nodes_args in
+  let* node1 =
+    Node.init ?event_level ?event_sections_levels ~name:"node1" nodes_args
+  and* node2 =
+    Node.init ?event_level ?event_sections_levels ~name:"node2" nodes_args
+  in
   let nodes = [node1; node2] in
   let client =
     create_with_mode
@@ -1070,13 +1090,14 @@ let get_parameter_file ?additional_bootstrap_account_count
       return (Some parameter_file)
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
+    ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
     ?additional_bootstrap_account_count ?default_accounts_balance
     ?parameter_file tag ~protocol () =
   let* (node, client) =
     match tag with
     | (`Client | `Proxy) as mode ->
-        let* node = Node.init ?event_level nodes_args in
+        let* node = Node.init ?event_level ?event_sections_levels nodes_args in
         let endpoint = Node node in
         let mode =
           match mode with

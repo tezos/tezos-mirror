@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** In all RPCs, default [chain] is "main" and default [block] is "head". *)
+(** In all RPCs, default [chain] is "main" and default [block] is
+   "head~2" to pick the finalized branch for Tenderbake. *)
 
 (** {2 Shell RPCs} *)
 
@@ -94,6 +95,7 @@ val get_checkpoint :
 val inject_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
+  ?async:bool ->
   data:JSON.u ->
   Client.t ->
   JSON.t Lwt.t
@@ -102,6 +104,7 @@ val inject_operation :
 val spawn_inject_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
+  ?async:bool ->
   data:JSON.u ->
   Client.t ->
   Process.t
@@ -110,6 +113,7 @@ val spawn_inject_operation :
 val private_inject_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
+  ?async:bool ->
   data:JSON.u ->
   Client.t ->
   JSON.t Lwt.t
@@ -118,6 +122,7 @@ val private_inject_operation :
 val spawn_private_inject_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
+  ?async:bool ->
   data:JSON.u ->
   Client.t ->
   Process.t
@@ -149,8 +154,9 @@ val get_protocol_data :
   Client.t ->
   JSON.t Lwt.t
 
-(** Call RPC /chain/[chain]/blocks/head/hash *)
+(** Call RPC /chain/[chain]/blocks/head~[offset]/hash where default [offset] is [2]. *)
 val get_branch :
+  ?offset:int ->
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->

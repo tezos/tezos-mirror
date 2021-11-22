@@ -256,14 +256,7 @@ let encode_unsigned_operation_to_binary state op =
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
 
 let sign_operation_bytes (signer : Account.key) (msg : Bytes.t) =
-  let open Tezos_crypto in
-  let b58_secret_key =
-    match String.split_on_char ':' signer.secret_key with
-    | ["unencrypted"; rest] -> rest
-    | _ -> Test.fail "Could not parse secret key"
-  in
-  let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
-  Signature.(sign ~watermark:Generic_operation sk msg)
+  Operation.sign_bytes ~watermark:Generic_operation signer msg
 
 let mempool_operation_from_op state signer op :
     (mempool_operation * bytes) Lwt.t =
