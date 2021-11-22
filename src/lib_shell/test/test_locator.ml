@@ -561,9 +561,9 @@ let bench = [wrap "locator" test_locator]
 let tests =
   tests
   @
-  match Sys.argv.(1) with
-  | "--bench" -> bench
-  | _ | (exception Invalid_argument _) -> []
+  if Array.length Sys.argv > 1 then
+    match Sys.argv.(1) with "--bench" -> bench | _ -> []
+  else []
 
 let () =
   Alcotest_lwt.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
