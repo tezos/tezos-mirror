@@ -1,5 +1,6 @@
-(executables
- (names main)
+(test
+ (name main)
+ (package tezos-baking-alpha)
  (libraries
    tezos-client-alpha
    tezos_baking_alpha
@@ -15,12 +16,7 @@
                    -open Tezos_protocol_environment_alpha
                    -open Tezos_base_test_helpers
                    -open Tezos_alpha_mockup_simulator
-                   -open Tezos_baking_alpha)))
-
-(rule
- (alias runtest)
- (package tezos-baking-alpha)
- (deps main.exe)
+                   -open Tezos_baking_alpha))
  (action (run %{exe:main.exe} -q -e)))
 
 (rule
