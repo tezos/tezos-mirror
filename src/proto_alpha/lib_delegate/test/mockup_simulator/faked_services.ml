@@ -66,6 +66,11 @@ module type Mocked_services_hooks = sig
     min_date:Time.Protocol.t option ->
     Block_hash.t list list tzresult Lwt.t
 
+  (** List the ancestors of the given block which, if referred to as
+      the branch in an operation header, are recent enough for that
+      operation to be included in the current block. *)
+  val live_blocks : Block_services.block -> Block_hash.Set.t tzresult Lwt.t
+
   (** [rpc_context_callback] is used in the implementations of several
       RPCs (see local_services.ml). It should correspond to the
       rpc_context constructed from the context at the requested block. *)
@@ -244,6 +249,14 @@ module Make (Hooks : Mocked_services_hooks) = struct
              ~length:flags#length
              ~min_date:flags#min_date))
 
+  let live_blocks =
+    Directory.prefix
+      (Tezos_rpc.RPC_path.prefix Chain_services.path Block_services.path)
+    @@ Directory.register
+         Directory.empty
+         Block_services.Empty.S.live_blocks
+         (fun (_, block) _ () -> Hooks.live_blocks block)
+
   let raw_protocol_data =
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix Chain_services.path Block_services.path)
@@ -258,8 +271,9 @@ module Make (Hooks : Mocked_services_hooks) = struct
     |> merge operations |> merge hash |> merge shell_header
     |> merge (chain chain_id)
     |> merge inject_block |> merge inject_operation |> merge monitor_operations
-    |> merge list_blocks |> merge raw_protocol_data |> merge broadcast_block
-    |> merge broadcast_operation |> merge monitor_bootstrapped
+    |> merge list_blocks |> merge live_blocks |> merge raw_protocol_data
+    |> merge broadcast_block |> merge broadcast_operation
+    |> merge monitor_bootstrapped
 
   let directory chain_id =
     let proto_directory =
