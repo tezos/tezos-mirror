@@ -473,7 +473,7 @@ let load ~filename =
         filename
     in
     let files = get_all_sapling_data_files filename in
-    List.concat (List.map load_file files)
+    List.concat_map load_file files
   else load_file filename
 
 let shared_seed = [|9798798; 217861209; 876786|]

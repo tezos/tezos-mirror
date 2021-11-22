@@ -129,10 +129,9 @@ let test_max_endorsement () =
   Assert.equal_bool
     ~loc:__LOC__
     Compare.List_length_with.(
-      List.concat
-        (List.map
-           (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
-           endorsers)
+      List.concat_map
+        (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
+        endorsers
       = endorsers_per_block)
     true
   >>=? fun () ->

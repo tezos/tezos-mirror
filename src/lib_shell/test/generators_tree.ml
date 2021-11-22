@@ -399,9 +399,7 @@ let tree_gen ?blocks () =
 let old_mempool_gen (tree : Block.t Tree.tree) :
     unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let blocks = Tree.values tree in
-  let pairs =
-    List.map Block.tools.operations blocks |> List.concat |> List.concat
-  in
+  let pairs = List.concat_map Block.tools.operations blocks |> List.concat in
   let elements =
     List.map
       (fun (op : Operation.t) ->

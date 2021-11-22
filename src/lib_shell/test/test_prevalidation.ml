@@ -237,17 +237,17 @@ let () =
       nb_ops
   in
   let all_ddb_leak_tests =
-    List.map (mk_test_cases ~test:test_db_leak) applier_funs |> List.concat
+    List.concat_map (mk_test_cases ~test:test_db_leak) applier_funs
   in
   let in_mempool_leak_test =
-    List.map (mk_test_cases ~test:test_in_mempool_leak) handle_refused_pair
-    |> List.concat
+    List.concat_map
+      (mk_test_cases ~test:test_in_mempool_leak)
+      handle_refused_pair
   in
   let ddb_clearing_tests =
-    List.map
+    List.concat_map
       (mk_test_cases ~test:test_db_do_not_clear_right_away)
       handle_branch_pairs
-    |> List.concat
   in
   Alcotest.run
     "Prevalidation"

@@ -1102,7 +1102,9 @@ let forge_block cctxt ?force ?(best_effort = true) ?(sort = best_effort)
   >>=? fun (shell_header, operations) ->
   (* Now for some logging *)
   let total_op_count = List.length operations_arg in
-  let valid_op_count = List.length (List.concat operations) in
+  let valid_op_count =
+    List.fold_left (fun acc os -> acc + List.length os) 0 operations
+  in
   let time = Time.System.of_protocol_exn timestamp in
   Events.(emit found_valid_operations)
     (valid_op_count, total_op_count - valid_op_count, time, shell_header.fitness)

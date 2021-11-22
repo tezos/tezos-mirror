@@ -3147,9 +3147,9 @@ module RPC = struct
         *)
         List.sort_uniq
           Level.compare
-          (List.concat
-             (List.map (Level.from_raw ctxt) levels
-              :: List.map (Level.levels_in_cycle ctxt) cycles))
+          (List.rev_append
+             (List.rev_map (Level.from_raw ctxt) levels)
+             (List.concat_map (Level.levels_in_cycle ctxt) cycles))
 
   module Baking_rights = struct
     type t = {
@@ -3288,10 +3288,9 @@ module RPC = struct
           List.map_es (baking_rights_at_level ctxt max_round) levels
           >|=? fun rights ->
           let rights =
-            if q.all then rights
-            else List.map remove_duplicated_delegates rights
+            if q.all then List.concat rights
+            else List.concat_map remove_duplicated_delegates rights
           in
-          let rights = List.concat rights in
           match q.delegates with
           | [] -> rights
           | _ :: _ as delegates ->
@@ -3527,8 +3526,8 @@ module RPC = struct
               []
               q.levels
           in
-          List.map_es (endorsing_slots_at_level ctxt) levels >|=? fun rights ->
-          let rights = List.concat rights in
+          List.concat_map_es (endorsing_slots_at_level ctxt) levels
+          >|=? fun rights ->
           match q.delegates with
           | [] -> rights
           | _ :: _ as delegates ->
