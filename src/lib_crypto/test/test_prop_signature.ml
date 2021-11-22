@@ -30,7 +30,9 @@
     Subject:      Property-tests over the interface S.SIGNATURE and its
                   instantiations Ed25519 and Secp256k1.
 *)
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
+
+open QCheck2
 
 module Signature_Properties (Desc : sig
   val name : string
@@ -46,9 +48,10 @@ struct
     X.check pk signed data
 
   let test_prop_sign_check =
-    QCheck.Test.make
+    Test.make
       ~name:(Desc.name ^ "_sign_check")
-      QCheck.string
+      ~print:Print.string
+      Gen.string
       test_prop_sign_check
 
   let tests = [test_prop_sign_check]

@@ -33,7 +33,9 @@
                   This is currently only relevant for Hacl.P256 since it is
                   the only scheme in which these 2 functions are different.
 *)
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
+
+open QCheck2
 
 module Pk_Properties (Desc : sig
   val name : string
@@ -51,13 +53,14 @@ struct
         let pk2 = X.pk_of_bytes pk_bytes in
         pk1 = pk2 && Option.is_some pk1
     | None ->
-        QCheck.Test.fail_report
+        Test.fail_report
           "X.sk_of_bytes @@ Bytes.of_string sk_bytes can't return a None."
 
   let test_prop_sign_check =
-    QCheck.Test.make
+    Test.make
       ~name:(Desc.name ^ "_pk_of_bytes")
-      (string_fixed X.sk_size)
+      ~print:Print.string
+      Gen.(string_size @@ pure X.sk_size)
       test_prop_sign_check
 
   let tests = [test_prop_sign_check]
