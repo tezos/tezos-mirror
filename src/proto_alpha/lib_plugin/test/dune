@@ -14,4 +14,3 @@
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_environment_alpha
                    -open Tezos_protocol_alpha.Protocol)))
- (action (run %{exe:test_consensus_filter.exe} -q -e)))
