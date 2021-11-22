@@ -63,7 +63,7 @@
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{exe:test_locator.exe} --no-bench)))
+ (action (run %{exe:test_locator.exe})))
 
 (rule
  (alias runtest)

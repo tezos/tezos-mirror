@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell
-    Invocation:   dune exec src/lib_shell/test/test_locator.exe test_locator
+    Invocation:   dune exec src/lib_shell/test/test_locator.exe
     Subject:      Checks operations on locators.
 *)
 
@@ -559,8 +559,11 @@ let tests =
 let bench = [wrap "locator" test_locator]
 
 let tests =
-  try if Sys.argv.(1) = "--no-bench" then tests else tests @ bench
-  with _ -> tests @ bench
+  tests
+  @
+  match Sys.argv.(1) with
+  | "--bench" -> bench
+  | _ | (exception Invalid_argument _) -> []
 
 let () =
   Alcotest_lwt.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
