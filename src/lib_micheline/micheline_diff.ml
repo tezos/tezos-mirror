@@ -60,10 +60,8 @@ let rec replace_location :
       Prim (loc, p, List.map (replace_location no_comment) args, annots)
   | Seq (_, es) -> Seq (loc, List.map (replace_location no_comment) es)
 
-let rec diff :
-    (_, string) node -> (_, string) node -> bool * Micheline_printer.node =
- fun actual expected ->
-  match (actual, expected) with
+let rec diff_loop prev current =
+  match (prev, current) with
   | (Int (_, a), Int (_, e)) ->
       if Z.equal e a then (false, Int (no_comment, a))
       else (true, Int (mismatch ~pp:Z.pp_print e, a))
@@ -89,6 +87,9 @@ let rec diff :
 and diff_args actual expected =
   match (actual, expected) with
   | ([], []) -> []
-  | (ac :: acs, ex :: exs) -> diff ac ex :: diff_args acs exs
+  | (ac :: acs, ex :: exs) -> diff_loop ac ex :: diff_args acs exs
   | ([], exs) -> List.map (fun e -> (true, replace_location added e)) exs
   | (acs, []) -> List.map (fun e -> (true, replace_location removed e)) acs
+
+let diff ~prev ~current () =
+  match diff_loop prev current with (true, d) -> Some d | (false, _) -> None

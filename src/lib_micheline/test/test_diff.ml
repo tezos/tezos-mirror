@@ -70,160 +70,145 @@ let prim ?(args = []) ?(annots = []) p = Prim ((), p, args, annots)
 
 let seq els = Seq ((), els)
 
+let check_diff ~descr ~expected actual =
+  check' (option expr) ~msg:descr ~expected ~actual
+
 let test_identical _ =
-  let (different, d) = diff (seq []) (seq []) in
-  check bool "Empty Seqs are not identical!" different false ;
-  check expr "Diff not identical to input!" (Seq (no_comment, [])) d ;
+  let descr = "For identical expressions, the diff is None." in
+  let expected : Micheline_printer.node option = None in
+  let actual = diff ~prev:(seq []) ~current:(seq []) () in
+  check_diff ~descr actual ~expected ;
 
-  let (different, d) = diff (int 12) (int 12) in
-  check bool "Same Integers are not identical!" different false ;
-  check expr "Diff not identical to input!" (Int (no_comment, Z.of_int 12)) d ;
+  let actual = diff ~prev:(int 12) ~current:(int 12) () in
+  check_diff ~descr actual ~expected ;
 
-  let (different, d) = diff (str "xxx") (str "xxx") in
-  check bool "Same Strings are not identical!" different false ;
-  check expr "Diff not identical to input!" (String (no_comment, "xxx")) d ;
+  let actual = diff ~prev:(str "xxx") ~current:(str "xxx") () in
+  check_diff ~descr actual ~expected ;
 
-  let (different, d) = diff (prim "prim") (prim "prim") in
-  check bool "Prims are not identical!" different false ;
-  check
-    expr
-    "Diff not identical to input!"
-    (Prim (no_comment, "prim", [], []))
-    d
+  let actual = diff ~prev:(prim "prim") ~current:(prim "prim") () in
+  check_diff ~descr actual ~expected
 
 let test_different_ints _ =
-  let (different, d) = diff (int 23) (int 32) in
-  check bool "Different numbers don't differ!" different true ;
-  check expr "Unexpected diff!" (Int (comment "32", Z.of_int 23)) d
+  check_diff
+    ~descr:"For ints the comment contains changed value."
+    ~expected:(Some (Int (comment "32", Z.of_int 23)))
+    (diff ~prev:(int 23) ~current:(int 32) ())
 
 let test_different_strings _ =
-  let (different, d) = diff (str "tezos") (str "texos") in
-  check bool "Different strings don't differ!" different true ;
-  check expr "Unexpected diff!" (String (comment "texos", "tezos")) d
+  check_diff
+    ~descr:"For strings the comment contains changed value."
+    ~expected:(Some (String (comment "texos", "tezos")))
+    (diff ~prev:(str "tezos") ~current:(str "texos") ())
 
 let test_different_prims _ =
-  let (different, d) = diff (prim "ADD") (prim "SUB") in
-  check bool "Different prims don't differ!" different true ;
-  check expr "Unexpected diff!" (Prim (comment "SUB", "ADD", [], [])) d
+  check_diff
+    ~descr:"For prims the comment contains changed prim name."
+    ~expected:(Some (Prim (comment "SUB", "ADD", [], [])))
+    (diff ~prev:(prim "ADD") ~current:(prim "SUB") ())
 
 let test_different_singleton_seqs _ =
-  let (different, d) = diff (seq [str "ADD"]) (seq [int 32]) in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Seq (no_comment, [String (comment "32", "ADD")]))
-    d
+  check_diff
+    ~descr:"Changed Seq elements are put in comments."
+    ~expected:(Some (Seq (no_comment, [String (comment "32", "ADD")])))
+    (diff ~prev:(seq [str "ADD"]) ~current:(seq [int 32]) ())
 
-let test_left_seq_missing_element _ =
-  let (different, d) =
-    diff
-      (seq [str "ADD"; str "MUL"; str "SUB"])
-      (seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
-  in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Seq
-       ( no_comment,
-         [
-           String (no_comment, "ADD");
-           String (no_comment, "MUL");
-           String (no_comment, "SUB");
-           String (comment "+", "DIV");
-         ] ))
-    d
+let test_prev_seq_missing_element _ =
+  check_diff
+    ~descr:"Elements added in current are marked with '+'."
+    ~expected:
+      (Some
+         (Seq
+            ( no_comment,
+              [
+                String (no_comment, "ADD");
+                String (no_comment, "MUL");
+                String (no_comment, "SUB");
+                String (comment "+", "DIV");
+              ] )))
+    (diff
+       ()
+       ~prev:(seq [str "ADD"; str "MUL"; str "SUB"])
+       ~current:(seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"]))
 
-let test_right_seq_missing_element _ =
-  let (different, d) =
-    diff
-      (seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
-      (seq [str "ADD"; str "MUL"; str "SUB"])
-  in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Seq
-       ( no_comment,
-         [
-           String (no_comment, "ADD");
-           String (no_comment, "MUL");
-           String (no_comment, "SUB");
-           String (comment "-", "DIV");
-         ] ))
-    d
+let test_current_seq_missing_element _ =
+  check_diff
+    ~descr:"Elements removed in current are marked with '-'."
+    ~expected:
+      (Some
+         (Seq
+            ( no_comment,
+              [
+                String (no_comment, "ADD");
+                String (no_comment, "MUL");
+                String (no_comment, "SUB");
+                String (comment "-", "DIV");
+              ] )))
+    (diff
+       ()
+       ~prev:(seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
+       ~current:(seq [str "ADD"; str "MUL"; str "SUB"]))
 
 let test_seq_reordered_elements _ =
-  let (different, d) =
-    diff
-      (seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
-      (seq [str "ADD"; str "SUB"; str "DIV"; str "MUL"])
-  in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Seq
-       ( no_comment,
-         [
-           String (no_comment, "ADD");
-           String (comment "SUB", "MUL");
-           String (comment "DIV", "SUB");
-           String (comment "MUL", "DIV");
-         ] ))
-    d
+  check_diff
+    ~descr:"Reordered elements appear as just changed."
+    ~expected:
+      (Some
+         (Seq
+            ( no_comment,
+              [
+                String (no_comment, "ADD");
+                String (comment "SUB", "MUL");
+                String (comment "DIV", "SUB");
+                String (comment "MUL", "DIV");
+              ] )))
+    (diff
+       ()
+       ~prev:(seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
+       ~current:(seq [str "ADD"; str "SUB"; str "DIV"; str "MUL"]))
 
 let test_seq_replaced_elements _ =
-  let (different, d) =
-    diff
-      (seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
-      (seq [int 1; int 2; int 3; int 0])
-  in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Seq
-       ( no_comment,
-         [
-           String (comment "1", "ADD");
-           String (comment "2", "MUL");
-           String (comment "3", "SUB");
-           String (comment "0", "DIV");
-         ] ))
-    d
+  check_diff
+    ~descr:"Changed values are put in the comments."
+    ~expected:
+      (Some
+         (Seq
+            ( no_comment,
+              [
+                String (comment "1", "ADD");
+                String (comment "2", "MUL");
+                String (comment "3", "SUB");
+                String (comment "0", "DIV");
+              ] )))
+    (diff
+       ()
+       ~prev:(seq [str "ADD"; str "MUL"; str "SUB"; str "DIV"])
+       ~current:(seq [int 1; int 2; int 3; int 0]))
 
 let test_missing_prim_argument _ =
-  let (different, d) = diff (prim "TEST" ~args:[str "TRUE"]) (prim "TEST") in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Prim (no_comment, "TEST", [String (comment "-", "TRUE")], []))
-    d
+  check_diff
+    ~descr:"Prim arguments removed in current are marked with '-'."
+    ~expected:
+      (Some (Prim (no_comment, "TEST", [String (comment "-", "TRUE")], [])))
+    (diff ~prev:(prim "TEST" ~args:[str "TRUE"]) ~current:(prim "TEST") ())
 
 let test_additional_prim_argument _ =
-  let (different, d) =
-    diff
-      (prim "TEST" ~args:[int 1; int 3])
-      (prim "TEST" ~args:[int 1; int 2; int 3])
-  in
-  check bool "Different seqs don't differ!" different true ;
-  check
-    expr
-    "Unexpected diff!"
-    (Prim
-       ( no_comment,
-         "TEST",
-         [
-           Int (no_comment, Z.of_int 1);
-           Int (comment "2", Z.of_int 3);
-           Int (comment "+", Z.of_int 3);
-         ],
-         [] ))
-    d
+  check_diff
+    ~descr:"Prim arguments added in current are marked with '+'."
+    ~expected:
+      (Some
+         (Prim
+            ( no_comment,
+              "TEST",
+              [
+                Int (no_comment, Z.of_int 1);
+                Int (comment "2", Z.of_int 3);
+                Int (comment "+", Z.of_int 3);
+              ],
+              [] )))
+    (diff
+       ()
+       ~prev:(prim "TEST" ~args:[int 1; int 3])
+       ~current:(prim "TEST" ~args:[int 1; int 2; int 3]))
 
 (****************************************************************************)
 
@@ -235,9 +220,13 @@ let tests =
     test_case "test_diff_prims" `Quick test_different_prims;
     test_case "test_diff_singleton_seqs" `Quick test_different_singleton_seqs;
     test_case
-      "test_diff_left_seq_missing_element"
+      "test_diff_prev_seq_missing_element"
       `Quick
-      test_left_seq_missing_element;
+      test_prev_seq_missing_element;
+    test_case
+      "test_diff_current_seq_missing_element"
+      `Quick
+      test_current_seq_missing_element;
     test_case "test_diff_reordered_elements" `Quick test_seq_reordered_elements;
     test_case "test_diff_replaced_elements" `Quick test_seq_replaced_elements;
     test_case "test_diff_missing_prim_arg" `Quick test_missing_prim_argument;

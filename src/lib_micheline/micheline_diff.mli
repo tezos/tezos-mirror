@@ -25,15 +25,20 @@
 
 open Micheline
 
-(** [diff m1 m2] computes the difference between expressions [m1] and [m2].
-    It depends on primitives being ordinary strings so that they can be
-    displayed easily.
+(** [diff ~prev ~current ()] computes the difference between expressions [prev]
+    and [current]. It depends on primitives being ordinary strings so that they
+    can be displayed easily.
 
-    Returns [true] if expressions differ or [false] if they're identical.
-    In addition it produces a copy of [m1] with information about
-    differences with respect to [m2] put in locations.
+    Returns [None] if expressions are identical or [Some d] if they're not,
+    where [d] is a copy of [prev] with information about differences with
+    respect to [current] displayed as comments.
 
-    When a sub-expression is missing in [m1] that appears in [m2], it isn't
-    copied over; only an information about missing part appears in the
-    location. *)
-val diff : (_, string) node -> (_, string) node -> bool * Micheline_printer.node
+    Parts of the expression that are present in [prev] but missing in [current]
+    get "-" comment. Parts present in [current] but missing in [prev] get "+"
+    comment. Parts which appear in both versions are the same as in [prev] and
+    [current] version is described in the comment. *)
+val diff :
+  prev:(_, string) node ->
+  current:(_, string) node ->
+  unit ->
+  Micheline_printer.node option
