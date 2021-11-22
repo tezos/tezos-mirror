@@ -916,19 +916,30 @@ let test_blacklist address () =
   let* _success_resp = Client.rpc GET ["network"; "connections"] client in
   unit
 
-(* Test RPC with binary mode. *)
-let start_binary address =
-  let node = Node.create ~rpc_host:address [] in
+let binary_regression_test () =
+  let node = Node.create ~rpc_host:"127.0.0.1" [] in
   let endpoint = Client.(Node node) in
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
   let* () = Node.run node [] in
-  Client.init ~endpoint ~media_type:Binary ()
-
-let test_client_binary_mode address () =
-  let* client = start_binary address in
-  let* _success_resp = Client.rpc GET ["network"; "connections"] client in
-  unit
+  let* json_client = Client.init ~endpoint ~media_type:Json () in
+  let* binary_client = Client.init ~endpoint ~media_type:Binary () in
+  let call_rpc client =
+    Client.spawn_rpc
+      ~hooks
+      GET
+      ["chains"; "main"; "blocks"; "head"; "header"; "shell"]
+      client
+    |> Process.check_and_read_stdout
+  in
+  let* json_result = call_rpc json_client in
+  let* binary_result = call_rpc binary_client in
+  let* decoded_binary_result =
+    Codec.decode ~name:"block_header.shell" binary_result
+  in
+  if JSON.unannotate decoded_binary_result = Ezjsonm.from_string json_result
+  then Lwt.return_unit
+  else Test.fail "Unexpected binary answer"
 
 let test_no_service_at_valid_prefix address () =
   let node = Node.create ~rpc_host:address [] in
@@ -950,6 +961,13 @@ let test_no_service_at_valid_prefix address () =
   unit
 
 let register () =
+  Regression.register
+    ~__FILE__
+    ~title:"Binary RPC regression tests"
+    ~tags:["rpc"; "regression"; "binary"]
+    ~output_file:"binary_rpc"
+    ~regression_output_path:"tezt/_regressions/rpc/"
+    binary_regression_test ;
   let alpha_consensus_threshold = [(["consensus_threshold"], Some "0")] in
   let alpha_overrides = Some alpha_consensus_threshold in
   let register_alpha test_mode_tag =
@@ -1047,11 +1065,6 @@ let register () =
         ~title:(mk_title "blacklist" addr)
         ~tags:["rpc"; "acl"]
         (test_blacklist addr) ;
-      Test.register
-        ~__FILE__
-        ~title:(mk_title "client binary mode" addr)
-        ~tags:["rpc"; "client"; "binary"]
-        (test_client_binary_mode addr) ;
       Test.register
         ~__FILE__
         ~title:(mk_title "no_service_at_valid_prefix" addr)

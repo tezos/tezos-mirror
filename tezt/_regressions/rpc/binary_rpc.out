@@ -1,0 +1,12 @@
+tezt/_regressions/rpc/binary_rpc.out
+
+./tezos-client --media-type json rpc get /chains/main/blocks/head/header/shell
+{ "level": 0, "proto": 0,
+  "predecessor": "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2",
+  "timestamp": "[TIMESTAMP]", "validation_pass": 0,
+  "operations_hash": "LLoZS2LW3rEi7KYU4ouBQtorua37aWWCtpDmv1n2x3xoKi6sVXLWp",
+  "fitness": [],
+  "context": "CoVBYdAGWBoDTkiVXJEGX6FQvDN1oGCPJu8STMvaTYdeh7N3KGTz" }
+
+./tezos-client --media-type binary rpc get /chains/main/blocks/head/header/shell
+00000000008fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8424c7ccd00b000000005b37aac4000e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80000000046eda4bd10fa370d99881852b74be8a0e2f407afb9d4722fefffcfbe76878a66
