@@ -154,52 +154,6 @@ type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
 
-module Gas_monad : sig
-  (** This monad combines:
-     - a state monad where the state is the context
-     - two levels of error monad to distinguish gas exhaustion from other errors
-
-     It is useful for backtracking on type checking errors without backtracking
-     the consumed gas.
-  *)
-  type ('a, 'trace) t
-
-  (** Alias of [('a, 'trace) t] to avoid confusion when the module is open *)
-  type ('a, 'trace) gas_monad = ('a, 'trace) t
-
-  (** monadic return operator of the gas monad *)
-  val return : 'a -> ('a, 'trace) t
-
-  (** Binding operator for the gas monad *)
-  val ( >>$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
-
-  (** Mapping operator for the gas monad, [m >|$ f] is equivalent to
-     [m >>$ fun x -> return (f x)] *)
-  val ( >|$ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
-
-  (** Variant of [( >>$ )] to bind uncarbonated functions *)
-  val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
-
-  (** Another variant of [( >>$ )] that lets recover from inner errors *)
-  val ( >??$ ) :
-    ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace) t) -> ('b, 'trace) t
-
-  (** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
-  val of_result : ('a, 'trace) result -> ('a, 'trace) t
-
-  (** Gas consumption *)
-  val gas_consume : Gas.cost -> (unit, 'trace) t
-
-  (** Escaping the gas monad *)
-  val run :
-    context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
-
-  (** re-export of [Error_monad.record_trace_eval]. This function has no
-      effect in the case of a gas-exhaustion error. *)
-  val record_trace_eval :
-    (unit -> 'err) -> ('a, 'err trace) t -> ('a, 'err trace) t
-end
-
 (* ---- Lists, Sets and Maps ----------------------------------------------- *)
 
 (** {2 High-level Michelson Data Types} *)
