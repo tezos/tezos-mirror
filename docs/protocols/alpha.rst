@@ -17,3 +17,14 @@ Bug Fixes
 
 Minor Changes
 -------------
+
+Michelson
+---------
+
+- Some operations are now forbidden in views: ``CREATE_CONTRACT``,
+  ``SET_DELEGATE`` and ``TRANSFER_TOKENS`` cannot be used at the top-level of a
+  view because they are stateful, and ``SELF`` because the entry-point does not
+  make sense in a view.
+  However, ``CREATE_CONTRACT``, ``SET_DELEGATE`` and ``TRANSFER_TOKENS`` remain
+  available in lambdas defined inside a view.
+  (MR :gl:`!3737`)
