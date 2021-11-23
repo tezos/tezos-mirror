@@ -547,4 +547,140 @@ module Illtyped_originations = struct
     initial_storage_illtyped ~protocols
 end
 
-let register ~protocols = Illtyped_originations.register ~protocols
+module Deserialisation = struct
+  let milligas_per_byte = 20 (* As per the protocol *)
+
+  (** Returns the gas needed for the deserialization of an argument of
+      size [size_kB] in kilobytes. *)
+  let deserialization_gas ~size_kB = size_kB * milligas_per_byte
+
+  (** Returns an hexadecimal representation of a zero byte sequence of
+     size [size_kB]. *)
+  let make_zero_hex ~size_kB =
+    (* A hex representation for a byte sequence of n bytes is 2n long,
+       so for n kB it is 2000n long *)
+    String.make (size_kB * 2000) '0'
+
+  (* Originate a contract that takes a byte sequence as argument and does nothing *)
+  let originate_noop_contract nc =
+    let* contract =
+      Client.originate_contract
+        ~wait:"none"
+        ~init:"Unit"
+        ~alias:"deserialization_gas"
+        ~amount:Tez.zero
+        ~burn_cap:Tez.one
+        ~src:Constant.bootstrap1.alias
+        ~prg:"parameter bytes; storage unit; code {CDR; NIL operation; PAIR}"
+        nc.client
+    in
+    let* () = Memchecks.bake_and_wait_block nc in
+    return contract
+
+  let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
+      ~size_kB ~gas_limit client =
+    let* op =
+      Operation.mk_call
+        ~entrypoint:"default"
+        ~arg:(`O [("bytes", `String (make_zero_hex ~size_kB))])
+        ~gas_limit
+        ~dest:contract
+        ~source
+        client
+    in
+    Operation.forge_and_inject_operation
+      ?protocol
+      ~batch:[op]
+      ~signer:source
+      client
+
+  let test_deserialization_gas_canary =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Smart contract call that should succeeds with the provided gas limit"
+      ~tags:["precheck"; "gas"; "deserialization"; "canary"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let gas_for_the_rest = 2049 in
+    (* This is specific to this contract, obtained empirically *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"]
+      @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB:20
+        ~gas_limit:(min_deserialization_gas + gas_for_the_rest)
+        (* Enough gas to deserialize and do the application *)
+        nodes.main.client
+    in
+    unit
+
+  let test_not_enough_gas_deserialization =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Contract call with not enough gas to deserialize argument"
+      ~tags:["precheck"; "gas"; "deserialization"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB
+        ~gas_limit:(min_deserialization_gas - 1)
+        nodes.main.client
+    in
+    unit
+
+  let test_deserialization_gas_accounting =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Smart contract call that would succeed if we did not account \
+         deserializtion gas correctly"
+      ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract = originate_noop_contract nodes.main in
+    let size_kB = 20 in
+    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let gas_for_the_rest = 2049 in
+    (* This is specific to this contract, obtained empirically *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      @@ fun () ->
+      inject_call_with_bytes
+        ~protocol
+        ~contract
+        ~size_kB:20
+        ~gas_limit:(min_deserialization_gas + gas_for_the_rest - 1)
+        (* Enough gas to deserialize or to do the rest, but not to do both *)
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    test_deserialization_gas_canary ~protocols ;
+    test_not_enough_gas_deserialization ~protocols ;
+    test_deserialization_gas_accounting ~protocols:[Alpha]
+end
+
+let register ~protocols =
+  Illtyped_originations.register ~protocols ;
+  Deserialisation.register ~protocols
