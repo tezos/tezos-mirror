@@ -889,8 +889,7 @@ let prepare_first_block ~level ~timestamp ctxt =
               (if Compare.Int32.(c.liquidity_baking_sunset_level = 2_032_928l)
               then 2_244_609l
               else c.liquidity_baking_sunset_level);
-            liquidity_baking_escape_ema_threshold =
-              c.liquidity_baking_escape_ema_threshold;
+            liquidity_baking_escape_ema_threshold = 666_667l;
             round_durations;
             consensus_committee_size;
             consensus_threshold;
