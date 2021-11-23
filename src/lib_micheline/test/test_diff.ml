@@ -91,25 +91,25 @@ let test_identical _ =
 let test_different_ints _ =
   check_diff
     ~descr:"For ints the comment contains changed value."
-    ~expected:(Some (Int (comment "32", Z.of_int 23)))
+    ~expected:(Some (Int (comment "-> 32", Z.of_int 23)))
     (diff ~prev:(int 23) ~current:(int 32) ())
 
 let test_different_strings _ =
   check_diff
     ~descr:"For strings the comment contains changed value."
-    ~expected:(Some (String (comment "texos", "tezos")))
+    ~expected:(Some (String (comment "-> \"texos\"", "tezos")))
     (diff ~prev:(str "tezos") ~current:(str "texos") ())
 
 let test_different_prims _ =
   check_diff
     ~descr:"For prims the comment contains changed prim name."
-    ~expected:(Some (Prim (comment "SUB", "ADD", [], [])))
+    ~expected:(Some (Prim (comment "-> SUB", "ADD", [], [])))
     (diff ~prev:(prim "ADD") ~current:(prim "SUB") ())
 
 let test_different_singleton_seqs _ =
   check_diff
     ~descr:"Changed Seq elements are put in comments."
-    ~expected:(Some (Seq (no_comment, [String (comment "32", "ADD")])))
+    ~expected:(Some (Seq (no_comment, [String (comment "-> 32", "ADD")])))
     (diff ~prev:(seq [str "ADD"]) ~current:(seq [int 32]) ())
 
 let test_prev_seq_missing_element _ =
@@ -157,9 +157,9 @@ let test_seq_reordered_elements _ =
             ( no_comment,
               [
                 String (no_comment, "ADD");
-                String (comment "SUB", "MUL");
-                String (comment "DIV", "SUB");
-                String (comment "MUL", "DIV");
+                String (comment "-> \"SUB\"", "MUL");
+                String (comment "-> \"DIV\"", "SUB");
+                String (comment "-> \"MUL\"", "DIV");
               ] )))
     (diff
        ()
@@ -168,16 +168,16 @@ let test_seq_reordered_elements _ =
 
 let test_seq_replaced_elements _ =
   check_diff
-    ~descr:"Changed values are put in the comments."
+    ~descr:"Changed values are marked with '->'."
     ~expected:
       (Some
          (Seq
             ( no_comment,
               [
-                String (comment "1", "ADD");
-                String (comment "2", "MUL");
-                String (comment "3", "SUB");
-                String (comment "0", "DIV");
+                String (comment "-> 1", "ADD");
+                String (comment "-> 2", "MUL");
+                String (comment "-> 3", "SUB");
+                String (comment "-> 0", "DIV");
               ] )))
     (diff
        ()
@@ -201,7 +201,7 @@ let test_additional_prim_argument _ =
               "TEST",
               [
                 Int (no_comment, Z.of_int 1);
-                Int (comment "2", Z.of_int 3);
+                Int (comment "-> 2", Z.of_int 3);
                 Int (comment "+", Z.of_int 3);
               ],
               [] )))
@@ -209,6 +209,21 @@ let test_additional_prim_argument _ =
        ()
        ~prev:(prim "TEST" ~args:[int 1; int 3])
        ~current:(prim "TEST" ~args:[int 1; int 2; int 3]))
+
+let test_annots_are_preserved _ =
+  check_diff
+    ~descr:"Annotations should be preserved as in previous version."
+    ~expected:(Some (Prim (comment "-> SUB", "ADD", [], ["@annot"])))
+    (diff
+       ()
+       ~prev:(prim "ADD" ~annots:["@annot"])
+       ~current:(prim "SUB" ~annots:["@annot"]))
+
+let test_different_annotations_are_ignored _ =
+  check_diff
+    ~descr:"Differences in annotations are ignored."
+    ~expected:None
+    (diff () ~prev:(prim "ADD" ~annots:["@annot"]) ~current:(prim "ADD"))
 
 (****************************************************************************)
 
@@ -234,6 +249,14 @@ let tests =
       "test_diff_additional_prim_arg"
       `Quick
       test_additional_prim_argument;
+    test_case
+      "test_annots_are_preserved_as_in_prev"
+      `Quick
+      test_annots_are_preserved;
+    test_case
+      "test_different_annotations_are_ignored"
+      `Quick
+      test_different_annotations_are_ignored;
   ]
 
 let () = run ~argv:[|""|] "tezos-lib-micheline" [("micheline", tests)]
