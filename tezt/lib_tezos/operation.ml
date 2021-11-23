@@ -194,8 +194,8 @@ let forge_and_inject_operation ?protocol ?branch ?async ?force ~batch ~signer
 (** Two high level helpers *)
 
 let inject_transfer ?protocol ?branch ?counter ?amount ?fee ?gas_limit
-    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) client
-    =
+    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?force
+    client =
   let* op =
     mk_transfer
       ~source
@@ -206,11 +206,17 @@ let inject_transfer ?protocol ?branch ?counter ?amount ?fee ?gas_limit
       ?amount
       client
   in
-  forge_and_inject_operation ?protocol ?branch ~batch:[op] ~signer:source client
+  forge_and_inject_operation
+    ?force
+    ?protocol
+    ?branch
+    ~batch:[op]
+    ~signer:source
+    client
 
 let inject_transfers ?protocol ?amount ?fee ?gas_limit
-    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ~node
-    ~number_of_operations client =
+    ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?force
+    ~node ~number_of_operations client =
   let* branch = get_injection_branch ~branch:None client in
   (* Counter needs to be computed manually to ensure several
      operations of the same manager can be included in the same block.
@@ -223,6 +229,7 @@ let inject_transfers ?protocol ?amount ?fee ?gas_limit
         let transfer_1 = Node.wait_for_request ~request:`Inject node in
         let* oph =
           inject_transfer
+            ?force
             ?protocol
             ?fee
             ?gas_limit
