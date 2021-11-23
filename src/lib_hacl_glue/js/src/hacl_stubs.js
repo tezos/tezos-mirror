@@ -62,8 +62,8 @@ function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.Blake2.blake2b(digest_len, bmsg, bkey);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.Blake2.blake2b(digest_len, bmsg, bkey);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -72,8 +72,8 @@ function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) {
 function Hacl_Hash_SHA2_hash_256(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.SHA2.hash_256(bmsg);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.SHA2.hash_256(bmsg);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -82,8 +82,8 @@ function Hacl_Hash_SHA2_hash_256(msg, digest) {
 function Hacl_Hash_SHA2_hash_512(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.SHA2.hash_512(bmsg);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.SHA2.hash_512(bmsg);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -92,8 +92,8 @@ function Hacl_Hash_SHA2_hash_512(msg, digest) {
 function Hacl_SHA3_sha3_256(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.SHA3.hash_256(bmsg);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.SHA3.hash_256(bmsg);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -102,8 +102,8 @@ function Hacl_SHA3_sha3_256(msg, digest) {
 function Hacl_SHA3_sha3_512(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.SHA3.hash_512(bmsg);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.SHA3.hash_512(bmsg);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -115,8 +115,8 @@ function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) {
   // The length of the output buffer needs to be passed in explicitly because
   // since the buffer itself is not passed there is no way to retrive its
   // size in api.js
-  var bret = H.SHA3.keccak(rate, capacity, bmsg, suffix, digest.l);
-  hacl_blit_buf_to_bytes(bret[0], digest);
+  var ret = H.SHA3.keccak(rate, capacity, bmsg, suffix, digest.l);
+  hacl_blit_buf_to_bytes(ret[0], digest);
   return 0;
 }
 
@@ -126,8 +126,8 @@ function Hacl_HMAC_compute_sha2_256 (output, key, msg) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.HMAC.sha256(bkey, bmsg);
-  hacl_blit_buf_to_bytes(bret[0], output);
+  var ret = H.HMAC.sha256(bkey, bmsg);
+  hacl_blit_buf_to_bytes(ret[0], output);
   return 0;
 }
 
@@ -137,8 +137,8 @@ function Hacl_HMAC_compute_sha2_512 (output, key, msg) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.HMAC.sha512(bkey, bmsg);
-  hacl_blit_buf_to_bytes(bret[0], output);
+  var ret = H.HMAC.sha512(bkey, bmsg);
+  hacl_blit_buf_to_bytes(ret[0], output);
   return 0;
 }
 
@@ -148,8 +148,8 @@ function Hacl_Curve25519_51_scalarmult(buf, scalar, input) {
   var H = joo_global_object._HACL;
   var bscalar = hacl_create_buffer(scalar);
   var binput = hacl_create_buffer(input)
-  var bret = H.Curve25519_51.scalarmult(bscalar, binput);
-  hacl_blit_buf_to_bytes(bret[0], buf);
+  var ret = H.Curve25519_51.scalarmult(bscalar, binput);
+  hacl_blit_buf_to_bytes(ret[0], buf);
   return 0;
 }
 
@@ -160,9 +160,9 @@ function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) {
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.secretbox_easy(bm, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], c);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.secretbox_easy(bm, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], c);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_secretbox_open_easy
@@ -172,9 +172,9 @@ function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) {
   var bc = hacl_create_buffer(c);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.secretbox_open_easy(bc, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], m);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.secretbox_open_easy(bc, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], m);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_box_beforenm
@@ -183,9 +183,9 @@ function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bsk = hacl_create_buffer(sk);
-  var bret = H.NaCl.box_beforenm(bpk, bsk);
-  hacl_blit_buf_to_bytes(bret[1], k);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.box_beforenm(bpk, bsk);
+  hacl_blit_buf_to_bytes(ret[1], k);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_box_easy_afternm
@@ -195,9 +195,9 @@ function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) {
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.box_easy_afternm(bm, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], c);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.box_easy_afternm(bm, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], c);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_box_open_easy_afternm
@@ -207,9 +207,9 @@ function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) {
   var bc = hacl_create_buffer(c);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.box_open_easy_afternm(bc, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], m);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.box_open_easy_afternm(bc, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], m);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_box_detached_afternm
@@ -219,10 +219,10 @@ function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) {
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.box_detached_afternm(bm, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], c);
-  hacl_blit_buf_to_bytes(bret[2], tag);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.box_detached_afternm(bm, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], c);
+  hacl_blit_buf_to_bytes(ret[2], tag);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_NaCl_crypto_box_open_detached_afternm
@@ -233,9 +233,9 @@ function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) {
   var bc = hacl_create_buffer(c);
   var bn = hacl_create_buffer(n);
   var bk = hacl_create_buffer(k);
-  var bret = H.NaCl.box_open_detached_afternm(bc, btag, bn, bk);
-  hacl_blit_buf_to_bytes(bret[1], m);
-  return hacl_zero_is_true(bret[0]);
+  var ret = H.NaCl.box_open_detached_afternm(bc, btag, bn, bk);
+  hacl_blit_buf_to_bytes(ret[1], m);
+  return hacl_zero_is_true(ret[0]);
 }
 
 //Provides: Hacl_Ed25519_secret_to_public
@@ -243,8 +243,8 @@ function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) {
 function Hacl_Ed25519_secret_to_public(out, secret) {
   var H = joo_global_object._HACL;
   var bsecret = hacl_create_buffer(secret);
-  var bret = H.Ed25519.secret_to_public(bsecret);
-  hacl_blit_buf_to_bytes(bret[0], out);
+  var ret = H.Ed25519.secret_to_public(bsecret);
+  hacl_blit_buf_to_bytes(ret[0], out);
   return 0;
 }
 
@@ -254,8 +254,8 @@ function Hacl_Ed25519_sign(signature, sk, msg) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
   var bmsg = hacl_create_buffer(msg);
-  var bret = H.Ed25519.sign(bsk, bmsg);
-  hacl_blit_buf_to_bytes(bret[0], signature);
+  var ret = H.Ed25519.sign(bsk, bmsg);
+  hacl_blit_buf_to_bytes(ret[0], signature);
   return 0;
 }
 
@@ -266,8 +266,8 @@ function Hacl_Ed25519_verify(pk, msg, signature) {
   var bpk = hacl_create_buffer(pk);
   var bmsg = hacl_create_buffer(msg);
   var bsignature = hacl_create_buffer(signature);
-  var bret = H.Ed25519.verify(bpk, bmsg, bsignature);
-  return hacl_to_bool(bret[0]);
+  var ret = H.Ed25519.verify(bpk, bmsg, bsignature);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_ecdsa_sign_p256_without_hash
@@ -277,9 +277,9 @@ function Hacl_P256_ecdsa_sign_p256_without_hash (privkey, m, k, result) { // esl
   var bm = hacl_create_buffer(m);
   var bprivkey = hacl_create_buffer(privkey);
   var bk = hacl_create_buffer(k);
-  var bret = H.P256.ecdsa_sign_without_hash(bm, bprivkey, bk);
-  hacl_blit_buf_to_bytes(bret[1], result);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.ecdsa_sign_without_hash(bm, bprivkey, bk);
+  hacl_blit_buf_to_bytes(ret[1], result);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_ecdsa_verif_without_hash
@@ -290,8 +290,8 @@ function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) {
   var bmsg = hacl_create_buffer(msg);
   var bsig_r = hacl_create_buffer(sig_r);
   var bsig_s = hacl_create_buffer(sig_s);
-  var bret = H.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_is_more_than_zero_less_than_order
@@ -299,8 +299,8 @@ function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) {
 function Hacl_P256_is_more_than_zero_less_than_order (sk) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
-  var bret = H.P256.is_more_than_zero_less_than_order(bsk);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.is_more_than_zero_less_than_order(bsk);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_verify_q
@@ -308,8 +308,8 @@ function Hacl_P256_is_more_than_zero_less_than_order (sk) {
 function Hacl_P256_verify_q (pk) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
-  var bret = H.P256.verify_q(bpk);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.verify_q(bpk);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_ecp256dh_i
@@ -317,9 +317,9 @@ function Hacl_P256_verify_q (pk) {
 function Hacl_P256_ecp256dh_i (pk, sk) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
-  var bret = H.P256.dh_initiator(bsk);
-  hacl_blit_buf_to_bytes(bret[1], pk);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.dh_initiator(bsk);
+  hacl_blit_buf_to_bytes(ret[1], pk);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_P256_compression_compressed_form
@@ -327,8 +327,8 @@ function Hacl_P256_ecp256dh_i (pk, sk) {
 function Hacl_P256_compression_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
-  var bret = H.P256.compression_compressed_form(bpk);
-  hacl_blit_buf_to_bytes(bret[0], out);
+  var ret = H.P256.compression_compressed_form(bpk);
+  hacl_blit_buf_to_bytes(ret[0], out);
   return 0;
 }
 
@@ -337,8 +337,8 @@ function Hacl_P256_compression_compressed_form (pk, out) {
 function Hacl_P256_compression_not_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
-  var bret = H.P256.compression_not_compressed_form(bpk);
-  hacl_blit_buf_to_bytes(bret[0], out);
+  var ret = H.P256.compression_not_compressed_form(bpk);
+  hacl_blit_buf_to_bytes(ret[0], out);
   return 0;
 }
 
@@ -347,9 +347,9 @@ function Hacl_P256_compression_not_compressed_form (pk, out) {
 function Hacl_P256_decompression_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
-  var bret = H.P256.decompression_compressed_form(bpk);
-  hacl_blit_buf_to_bytes(bret[1], out);
-  return hacl_to_bool (bret[0]);
+  var ret = H.P256.decompression_compressed_form(bpk);
+  hacl_blit_buf_to_bytes(ret[1], out);
+  return hacl_to_bool (ret[0]);
 }
 
 //Provides: Hacl_P256_decompression_not_compressed_form
@@ -357,9 +357,9 @@ function Hacl_P256_decompression_compressed_form (pk, out) {
 function Hacl_P256_decompression_not_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
-  var bret = H.P256.decompression_not_compressed_form(bpk);
-  hacl_blit_buf_to_bytes(bret[1], out);
-  return hacl_to_bool(bret[0]);
+  var ret = H.P256.decompression_not_compressed_form(bpk);
+  hacl_blit_buf_to_bytes(ret[1], out);
+  return hacl_to_bool(ret[0]);
 }
 
 //Provides: Hacl_Hash_Core_SHA2_init_256
