@@ -476,6 +476,21 @@ module Helpers = struct
       ~batch:[op]
       ~signer:source
       nc.client
+
+  type hard_gas_limits = {
+    hard_gas_limit_per_operation : int;
+    hard_gas_limit_per_block : int;
+  }
+
+  let gas_limits client =
+    let* constants = RPC.get_constants client in
+    let hard_gas_limit_per_operation =
+      JSON.(constants |-> "hard_gas_limit_per_operation" |> as_int)
+    in
+    let hard_gas_limit_per_block =
+      JSON.(constants |-> "hard_gas_limit_per_block" |> as_int)
+    in
+    return {hard_gas_limit_per_operation; hard_gas_limit_per_block}
 end
 
 module Illtyped_originations = struct
@@ -681,6 +696,124 @@ module Deserialisation = struct
     test_deserialization_gas_accounting ~protocols:[Alpha]
 end
 
+module Gas_limits = struct
+  (** Build a batch of transfers with the same given gas limit for every one of
+      them.  *)
+  let mk_batch ?(source = Constant.bootstrap2) ?(dest = Constant.bootstrap3) ~nb
+      ~gas_limit client =
+    let rec loop n counter acc =
+      if n <= 0 then Lwt.return (List.rev acc)
+      else
+        let counter = counter + 1 in
+        let* op =
+          Operation.mk_transfer
+            ~source
+            ~fee:1_000_000
+            ~gas_limit
+            ~dest
+            ~counter
+            client
+        in
+        loop (n - 1) counter (op :: acc)
+    in
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    loop nb counter []
+
+  let block_below_ops_below =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch below block limit with each operation below limit"
+      ~tags:["precheck"; "batch"; "gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    (* Gas limit per op is ok *)
+    let* batch =
+      mk_batch
+        ~nb:2
+        ~gas_limit:limits.hard_gas_limit_per_operation
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"; "applied"]
+      @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let block_below_ops_over =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch below block limit with operations over limit"
+      ~tags:["precheck"; "batch"; "gas"; "op_gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    let* batch =
+      mk_batch
+        ~nb:2
+        ~gas_limit:(limits.hard_gas_limit_per_operation + 1)
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      (* Gas limit per op is too high *)
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let block_over_ops_below =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch over block limit with operations below limit"
+      ~tags:["precheck"; "batch"; "gas"; "block_gas"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* limits = Helpers.gas_limits nodes.main.client in
+    (* Gas limit per block is too high *)
+    let too_many_ops =
+      (limits.hard_gas_limit_per_block / limits.hard_gas_limit_per_operation)
+      + 1
+    in
+    let* batch =
+      mk_batch
+        ~nb:too_many_ops
+        ~gas_limit:limits.hard_gas_limit_per_operation
+        nodes.main.client
+    in
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    block_below_ops_below ~protocols ;
+    block_below_ops_over ~protocols ;
+    block_over_ops_below ~protocols:[Alpha]
+end
+
 let register ~protocols =
   Illtyped_originations.register ~protocols ;
-  Deserialisation.register ~protocols
+  Deserialisation.register ~protocols ;
+  Gas_limits.register ~protocols
