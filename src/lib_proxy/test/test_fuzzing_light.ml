@@ -57,7 +57,12 @@ let irmin_tree_arb =
   let open QCheck in
   map
     ~rev:(fun tree ->
-      Store.Tree.fold tree [] ~init:[] ~f:(fun path sub_tree acc ->
+      Store.Tree.fold
+        tree
+        []
+        ~order:`Sorted
+        ~init:[]
+        ~f:(fun path sub_tree acc ->
           Store.Tree.to_value sub_tree >|= function
           | None -> acc
           | Some bytes -> (path, bytes) :: acc)
