@@ -32,7 +32,6 @@ to get your merge request moving.
 Getting into the Octez Merge Team
 ---------------------------------
 
-Admission to the Octez merge team is done by cooptation.
 The Octez merge team is always looking for software engineers with at least the following qualities:
 
 - You are an active developer on the `tezos/tezos
@@ -52,6 +51,10 @@ The Octez merge team is always looking for software engineers with at least the 
   ask for support.
 - You are relatively skilled in one of the technologies used in the ``tezos/tezos``
   repository, i.e. ``OCaml``, ``python``, ``CI``, building, packaging, etc.
+
+To apply for being included in the Octez merge team, contact an existing member
+on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Your application
+will be discussed during the next weekly meeting of the Octez merge team.
 
 Helping the Octez Merge Team
 ----------------------------
