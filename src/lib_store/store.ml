@@ -1455,14 +1455,12 @@ module Chain = struct
       known_heads chain_store >>= fun heads ->
       genesis_block chain_store >>= fun genesis ->
       let best = genesis in
-      List.fold_left
+      List.fold_left_es
         (fun best (hash, _level) ->
-          let valid_predecessor_t = find_valid_predecessor hash in
-          best >>=? fun best ->
-          valid_predecessor_t >>=? fun pred ->
+          find_valid_predecessor hash >>=? fun pred ->
           if Fitness.(Block.fitness pred > Block.fitness best) then return pred
           else return best)
-        (return best)
+        best
         heads
 
   let set_target chain_store new_target =

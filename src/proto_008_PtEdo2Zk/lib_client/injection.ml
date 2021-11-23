@@ -349,11 +349,11 @@ let estimated_gas_single (type kind)
     | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
     | Failed (_, errs) -> Environment.wrap_error (Error errs)
   in
-  List.fold_left
+  consumed_gas operation_result >>? fun acc ->
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
-    (consumed_gas operation_result)
+    acc
     internal_operation_results
 
 let estimated_storage_single (type kind) origination_size
@@ -377,11 +377,11 @@ let estimated_storage_single (type kind) origination_size
     | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
     | Failed (_, errs) -> Environment.wrap_error (Error errs)
   in
-  List.fold_left
+  storage_size_diff operation_result >>? fun acc ->
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
-    (storage_size_diff operation_result)
+    acc
     internal_operation_results
 
 let estimated_storage origination_size res =
@@ -414,12 +414,13 @@ let originated_contracts_single (type kind)
     | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
     | Failed (_, errs) -> Environment.wrap_error (Error errs)
   in
-  List.fold_left
+  originated_contracts operation_result >>? fun acc ->
+  let acc = List.rev acc in
+  List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      acc >>? fun acc ->
       originated_contracts r >>? fun contracts ->
       Ok (List.rev_append contracts acc))
-    (originated_contracts operation_result >|? List.rev)
+    acc
     internal_operation_results
 
 let rec originated_contracts : type kind. kind contents_result_list -> _ =
@@ -455,10 +456,9 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
               (error_of_fmt "The transfer simulation failed.")
               (Environment.wrap_error (Error errs))
       in
-      List.fold_left
-        (fun acc (Internal_operation_result (_, r)) ->
-          acc >>? fun () -> detect_script_failure r)
-        (detect_script_failure operation_result)
+      detect_script_failure operation_result >>? fun () ->
+      List.iter_e
+        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
     in
     function

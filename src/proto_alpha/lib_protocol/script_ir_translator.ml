@@ -6601,15 +6601,13 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
   | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (List_f has_lazy_storage, List_t (ty, _), l) ->
-      List.fold_left
-        (fun (acc : (('acc, error) Fold_lazy_storage.result * context) tzresult)
-             x ->
-          acc >>? fun (init, ctxt) ->
+      List.fold_left_e
+        (fun ((init, ctxt) : ('acc, error) Fold_lazy_storage.result * context) x ->
           match init with
           | Fold_lazy_storage.Ok init ->
               fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
           | Fold_lazy_storage.Error -> ok (init, ctxt))
-        (ok (Fold_lazy_storage.Ok init, ctxt))
+        (Fold_lazy_storage.Ok init, ctxt)
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
       Script_map.fold
