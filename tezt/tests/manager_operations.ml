@@ -929,6 +929,123 @@ module Reveal = struct
     revealed_twice_in_batch_bad_second_key ~protocols
 end
 
+module Simple_contract_calls = struct
+  let sucessful_smart_contract_call =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Successful smart contract call"
+      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract =
+      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"]
+      @@ fun () ->
+      Operation.inject_contract_call
+        ~protocol
+        ~entrypoint:"default"
+        ~arg:(`Michelson "76")
+        ~dest:contract
+        ~source:Constant.bootstrap1
+        nodes.main.client
+    in
+    unit
+
+  let call_with_illtyped_argument =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Smart contract call with illtyped argument"
+      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract =
+      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["bad_contract_parameter"; "invalid_constant"]]
+      @@ fun () ->
+      Operation.inject_contract_call
+        ~protocol
+        ~entrypoint:"default"
+        ~arg:(`Michelson "Unit")
+        ~dest:contract
+        ~source:Constant.bootstrap1
+        nodes.main.client
+    in
+    unit
+
+  let test_contract_call_with_failwith =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Smart contract call that throws a failwith"
+      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract =
+      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["runtime_error"; "script_rejected"]]
+      @@ fun () ->
+      Operation.inject_contract_call
+        ~protocol
+        ~entrypoint:"default"
+        ~arg:(`Michelson "-33")
+        ~dest:contract
+        ~source:Constant.bootstrap1
+        nodes.main.client
+    in
+    unit
+
+  let test_contract_call_with_loop_gas_exhaution =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Smart contract call that loops/fails with 'not enough gas' at exec"
+      ~tags:["simple_contract_calls"; "smart"; "contract"; "call"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* contract =
+      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      @@ fun () ->
+      Operation.inject_contract_call
+        ~protocol
+        ~entrypoint:"default"
+        ~arg:(`Michelson "0")
+        ~dest:contract
+        ~source:Constant.bootstrap1
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    sucessful_smart_contract_call ~protocols ;
+    call_with_illtyped_argument ~protocols ;
+    test_contract_call_with_failwith ~protocols ;
+    test_contract_call_with_loop_gas_exhaution ~protocols
+end
+
 let register ~protocols =
   Illtyped_originations.register ~protocols ;
-  Reveal.register ~protocols
+  Reveal.register ~protocols ;
+  Simple_contract_calls.register ~protocols
