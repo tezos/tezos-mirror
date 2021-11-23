@@ -110,30 +110,31 @@ integration:sandboxes:daemons-upgrade:
 .integration_python_template:
   extends:
     - .test_template
-    - .template__coverage
-    - .template__cobertura
   needs:
     - build_x86_64
   dependencies:
     - build_x86_64
-  variables:
-    PYTEST_SUITE: ""
-    PYTEST_SUITE_MARKER: ""
-    PYTEST_SUITE_NAME: ""
   before_script:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
     - mkdir tests_python/tmp
-    - touch tests_python/tmp/empty__to_avoid_glob_failing
     - cd tests_python
+  # python scripts don't need the _build directory
+  # but only the binaries in the artifacts
+  cache: {}
+
+integration:pytest:
+  extends:
+    - .integration_python_template
+    - .template__coverage
+    - .template__cobertura
+  # the number of jobs have been choosen to give jobs of maximal
+  # length ~10 minutes and to accommodate the addition of new protocol
+  # test suites without increasing wall time of the test stage.
+  parallel: 25
   script:
-    - poetry run pytest "$PYTEST_SUITE" --exitfirst -m "$PYTEST_SUITE_MARKER" -s --log-dir=tmp "--junitxml=reports/$PYTEST_SUITE_NAME.xml" 2>&1 | tee "tmp/$PYTEST_SUITE_NAME.out" | tail
-  after_script:
-    - tail -n 100 tests_python/tmp/*
-    # We need the `after_script` of the cobertura template to be executed here.
-    # It is analogous (albeit not strictly equivalent) to the super() mechanism of OOP
-    - !reference [.template__cobertura, after_script]
+    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml"
   artifacts:
     paths:
       - tests_python/tmp/
@@ -142,18 +143,6 @@ integration:sandboxes:daemons-upgrade:
       junit: tests_python/reports/*.xml
     expire_in: 7 day
     when: always
-  # python scripts don't need the _build directory
-  # but only the binaries in the artifacts
-  cache: {}
-
-integration:pytest:
-  extends: .integration_python_template
-  # the number of jobs have been choosen to give jobs of maximal
-  # length ~10 minutes and to accommodate the addition of new protocol
-  # test suites without increasing wall time of the test stage.
-  parallel: 25
-  script:
-    - poetry run pytest --exitfirst -s --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" 2>&1 | tee "tmp/integration_pytest-${CI_NODE_INDEX}_${CI_NODE_TOTAL}.out" | tail
 
 integration:pytest_examples:
   extends: .integration_python_template
