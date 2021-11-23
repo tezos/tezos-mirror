@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 - 2021 Nomadic Labs, <contact@nomadic-labs.com>        *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,24 +22,5 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-let select_commands ctxt Client_config.{protocol; chain; block; _} =
-  match protocol with
-  | Some protocol ->
-      return
-        (Tezos_client_commands.Client_commands.commands_for_version
-           protocol
-           None)
-  | None -> (
-      Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
-      | Ok {next_protocol; _} ->
-          return
-            (Tezos_client_commands.Client_commands.commands_for_version
-               next_protocol
-               None)
-      | Error err ->
-          let () = Format.eprintf "%a@." Error_monad.pp_print_trace err in
-          return [])
 
-let () =
-  let () = PtGRANAD_machine.register_commands () in
-  Client_main_run.run (module Client_config) ~select_commands
+include Protocol_machinery.S
