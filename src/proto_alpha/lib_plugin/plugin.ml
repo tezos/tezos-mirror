@@ -555,7 +555,7 @@ module Mempool = struct
       validation_state ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
-      [> `Prechecked
+      [> `Prechecked_manager
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
@@ -570,7 +570,7 @@ module Mempool = struct
       in
       Main.check_manager_signature validation_state contents raw_operation )
     >|= function
-    | Ok () -> `Prechecked
+    | Ok () -> `Prechecked_manager
     | Error err -> (
         let err = Environment.wrap_tztrace err in
         match classify_trace err with
@@ -580,22 +580,40 @@ module Mempool = struct
         | Outdated -> `Outdated err)
 
   let precheck :
+      config ->
+      filter_state:state ->
       validation_state:validation_state ->
       Tezos_base.Operation.shell_header ->
+      Operation_hash.t ->
       Main.operation_data ->
-      [ `Prechecked
+      [ `Passed_precheck of state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace
       | `Undecided ]
       Lwt.t =
-   fun ~validation_state shell_header (Operation_data protocol_data) ->
+   fun _
+       ~filter_state
+       ~validation_state
+       shell_header
+       _oph
+       (Operation_data protocol_data) ->
     match protocol_data.contents with
-    | Single (Manager_operation _) ->
+    | Single (Manager_operation _) -> (
         precheck_manager validation_state shell_header protocol_data
-    | Cons (Manager_operation _, _) ->
+        >|= function
+        | `Prechecked_manager -> `Passed_precheck filter_state
+        | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+          errs ->
+            errs)
+    | Cons (Manager_operation _, _) -> (
         precheck_manager validation_state shell_header protocol_data
+        >|= function
+        | `Prechecked_manager -> `Passed_precheck filter_state
+        | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+          errs ->
+            errs)
     | Single _ -> Lwt.return `Undecided
 
   open Apply_results

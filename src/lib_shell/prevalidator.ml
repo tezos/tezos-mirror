@@ -518,16 +518,23 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let precheck pv validation_state (op : Protocol.operation_data operation) =
+  let precheck pv validation_state oph (op : Protocol.operation_data operation)
+      =
     let validation_state = Prevalidation.validation_state validation_state in
     if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
     else
-      Filter.Mempool.precheck ~validation_state op.raw.shell op.protocol_data
+      Filter.Mempool.precheck
+        pv.filter_config
+        ~filter_state:pv.filter_state
+        ~validation_state
+        op.raw.shell
+        oph
+        op.protocol_data
       >|= function
-      | `Prechecked ->
+      | `Passed_precheck filter_state ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
-          `Prechecked
+          `Passed_precheck filter_state
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -545,11 +552,11 @@ module Make
         handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
     | Ok op -> (
-        precheck pv validation_state op >>= function
+        precheck pv validation_state oph op >>= function
         | `Fail errs ->
             handle ~notifier pv.shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
-        | `Prechecked ->
+        | `Passed_precheck filter_state ->
             handle ~notifier pv.shell (`Parsed op) `Applied ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
