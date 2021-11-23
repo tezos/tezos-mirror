@@ -78,41 +78,6 @@ function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no
     })(buf)
 }
 
-//Provides: Hacl_Hash_Core_SHA2_init_256
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_init_256(state) { // eslint-disable-line no-unused-vars
-  caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_256');
-}
-
-//Provides: Hacl_Hash_Core_SHA2_update_256
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_update_256(state, bytes) { // eslint-disable-line no-unused-vars
-  caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_256');
-}
-
-//Provides: Hacl_Hash_Core_SHA2_finish_256
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_finish_256(state, hash) { // eslint-disable-line no-unused-vars
-    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_256');
-}
-
-//Provides: Hacl_Hash_Core_SHA2_init_512
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_init_512(state) { // eslint-disable-line no-unused-vars
-    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_512');
-}
-
-//Provides: Hacl_Hash_Core_SHA2_update_512
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_update_512(state, bytes) { // eslint-disable-line no-unused-vars
-    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_512');
-}
-
-//Provides: Hacl_Hash_Core_SHA2_finish_512
-//Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_finish_512(state, hash) { // eslint-disable-line no-unused-vars
-    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_512');
-}
 
 //Provides: Hacl_Blake2b_32_blake2b
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
@@ -417,4 +382,40 @@ function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disab
   var bret = _HACL.P256.decompression_not_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[1], out);
   return (bret[0] ? 1 : 0);
+}
+
+//Provides: Hacl_Hash_Core_SHA2_init_256
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_init_256(state) { // eslint-disable-line no-unused-vars
+  caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_256');
+}
+
+//Provides: Hacl_Hash_Core_SHA2_update_256
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_update_256(state, bytes) { // eslint-disable-line no-unused-vars
+  caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_256');
+}
+
+//Provides: Hacl_Hash_Core_SHA2_finish_256
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_finish_256(state, hash) { // eslint-disable-line no-unused-vars
+    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_256');
+}
+
+//Provides: Hacl_Hash_Core_SHA2_init_512
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_init_512(state) { // eslint-disable-line no-unused-vars
+    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_512');
+}
+
+//Provides: Hacl_Hash_Core_SHA2_update_512
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_update_512(state, bytes) { // eslint-disable-line no-unused-vars
+    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_512');
+}
+
+//Provides: Hacl_Hash_Core_SHA2_finish_512
+//Requires: caml_failwith
+function Hacl_Hash_Core_SHA2_finish_512(state, hash) { // eslint-disable-line no-unused-vars
+    caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_512');
 }
