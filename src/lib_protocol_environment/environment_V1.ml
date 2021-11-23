@@ -915,14 +915,14 @@ struct
       | Some sub_tree -> add_tree ctxt to_ sub_tree >>= Lwt.return_some
 
     let fold_keys s root ~init ~f =
-      Context.fold s root ~init ~f:(fun k v acc ->
+      Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with `Value -> f k acc | `Tree -> Lwt.return acc)
 
     type key_or_dir = [`Key of string list | `Dir of string list]
 
     let fold t root ~init ~f =
-      fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
+      fold ~depth:(`Eq 1) t root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with
           | `Value -> f (`Key k) acc

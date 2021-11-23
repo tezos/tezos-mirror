@@ -104,11 +104,16 @@ module type VIEW = sig
       - [Lt d] folds over nodes and contents of depth strictly less than [d].
       - [Le d] folds over nodes and contents of depth less than or equal to [d].
       - [Gt d] folds over nodes and contents of depth strictly more than [d].
-      - [Ge d] folds over nodes and contents of depth more than or equal to [d]. *)
+      - [Ge d] folds over nodes and contents of depth more than or equal to [d].
+
+      If [order] is [`Sorted] (the default), the elements are traversed in
+      lexicographic order of their keys. For large nodes, these two modes are memory-consuming,
+      use [`Undefined] for a more memory efficient [fold]. *)
   val fold :
     ?depth:depth ->
     t ->
     key ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t

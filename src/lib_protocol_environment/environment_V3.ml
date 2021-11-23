@@ -1036,13 +1036,55 @@ struct
 
     type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
-    module type VIEW = Environment_context.VIEW
+    module type VIEW = sig
+      include Environment_context.VIEW
+
+      val fold :
+        ?depth:depth ->
+        t ->
+        key ->
+        init:'a ->
+        f:(key -> tree -> 'a -> 'a Lwt.t) ->
+        'a Lwt.t
+    end
 
     module Kind = struct
       type t = [`Value | `Tree]
     end
 
-    module type TREE = Environment_context.TREE
+    module type TREE = sig
+      type t
+
+      type tree
+
+      include VIEW with type t := tree and type tree := tree
+
+      val empty : t -> tree
+
+      val is_empty : tree -> bool
+
+      val kind : tree -> Kind.t
+
+      val to_value : tree -> value option Lwt.t
+
+      val of_value : t -> value -> tree Lwt.t
+
+      val hash : tree -> Context_hash.t
+
+      val equal : tree -> tree -> bool
+
+      val clear : ?depth:int -> tree -> unit
+    end
+
+    let fold ?depth ctxt k ~init ~f =
+      Context.fold ?depth ctxt k ~order:`Sorted ~init ~f
+
+    module Tree = struct
+      include Tree
+
+      let fold ?depth ctxt k ~init ~f =
+        fold ?depth ctxt k ~order:`Sorted ~init ~f
+    end
 
     module type CACHE = Environment_context.CACHE
 
