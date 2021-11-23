@@ -223,7 +223,11 @@ let get_delegates (proto : protocol) context
       Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
       >|= Environment.wrap_tzresult
       >>=? fun (ctxt, _, _) ->
-      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+      Alpha_context.Delegate.fold
+        ctxt
+        ~order:`Sorted
+        ~init:(ok [])
+        ~f:(fun pkh acc ->
           Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
           >>=? fun pk ->
           acc >>?= fun acc ->

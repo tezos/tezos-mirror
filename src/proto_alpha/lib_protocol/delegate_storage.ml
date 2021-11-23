@@ -272,6 +272,7 @@ let update_activity ctxt last_cycle =
   | Some _unfrozen_cycle ->
       Stake_storage.fold_on_active_delegates_with_rolls
         ctxt
+        ~order:`Sorted
         ~init:(Ok (ctxt, []))
         ~f:(fun delegate () acc ->
           acc >>?= fun (ctxt, deactivated) ->

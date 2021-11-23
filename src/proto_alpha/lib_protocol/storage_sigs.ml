@@ -229,7 +229,11 @@ module type Non_iterable_indexed_carbonated_data_storage_INTERNAL = sig
   include Non_iterable_indexed_carbonated_data_storage_with_values
 
   val fold_keys_unaccounted :
-    context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(key -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 end
 
 (** The generic signature of indexed data accessors (a set of values
@@ -249,10 +253,19 @@ module type Indexed_data_storage = sig
 
   (** Iterates over all the keys and associated data. *)
   val fold :
-    context -> init:'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(key -> value -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   (** Iterate over all the keys. *)
-  val fold_keys : context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold_keys :
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(key -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 end
 
 module type Indexed_data_snapshotable_storage = sig
@@ -275,6 +288,7 @@ module type Indexed_data_snapshotable_storage = sig
   val fold_snapshot :
     context ->
     snapshot ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(key -> value -> 'a -> 'a tzresult Lwt.t) ->
     'a tzresult Lwt.t
@@ -307,7 +321,12 @@ module type Data_set_storage = sig
   val elements : context -> elt list Lwt.t
 
   (** Iterates over the elements of the set. *)
-  val fold : context -> init:'a -> f:(elt -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold :
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(elt -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   (** Removes all elements in the set *)
   val clear : context -> Raw_context.t Lwt.t
@@ -338,7 +357,11 @@ module type Carbonated_data_set_storage = sig
   val remove : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   val fold_keys_unaccounted :
-    context -> init:'acc -> f:(elt -> 'acc -> 'acc Lwt.t) -> 'acc Lwt.t
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'acc ->
+    f:(elt -> 'acc -> 'acc Lwt.t) ->
+    'acc Lwt.t
 end
 
 module type NAME = sig
@@ -366,7 +389,12 @@ module type Indexed_raw_context = sig
 
   val clear : context -> Raw_context.t Lwt.t
 
-  val fold_keys : context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold_keys :
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(key -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   val keys : context -> key list Lwt.t
 

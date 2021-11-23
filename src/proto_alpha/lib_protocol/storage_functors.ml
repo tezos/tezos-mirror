@@ -109,7 +109,8 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
 
   let list t ?offset ?length k = C.list t ?offset ?length (to_key k)
 
-  let fold ?depth t k ~init ~f = C.fold ?depth t (to_key k) ~init ~f
+  let fold ?depth t k ~order ~init ~f =
+    C.fold ?depth t (to_key k) ~order ~init ~f
 
   module Tree = C.Tree
 
@@ -233,14 +234,15 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   let clear s = C.remove s [] >|= fun t -> C.project t
 
-  let fold s ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
+  let fold s ~order ~init ~f =
+    C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
         match C.Tree.kind tree with
         | `Value -> (
             match I.of_path file with None -> assert false | Some p -> f p acc)
         | `Tree -> Lwt.return acc)
 
-  let elements s = fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+  let elements s =
+    fold s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
   let () =
     let open Storage_description in
@@ -303,8 +305,8 @@ struct
 
   let clear s = C.remove s [] >|= fun t -> C.project t
 
-  let fold s ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
+  let fold s ~order ~init ~f =
+    C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
         C.Tree.to_value tree >>= function
         | Some v -> (
             match I.of_path file with
@@ -316,12 +318,15 @@ struct
                 | Error _ -> Lwt.return acc))
         | None -> Lwt.return acc)
 
-  let fold_keys s ~init ~f = fold s ~init ~f:(fun k _ acc -> f k acc)
+  let fold_keys s ~order ~init ~f =
+    fold s ~order ~init ~f:(fun k _ acc -> f k acc)
 
   let bindings s =
-    fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p, v) :: acc))
+    fold s ~order:`Sorted ~init:[] ~f:(fun p v acc ->
+        Lwt.return ((p, v) :: acc))
 
-  let keys s = fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+  let keys s =
+    fold_keys s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
   let () =
     let open Storage_description in
@@ -470,6 +475,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
       s
       root
       ~depth
+      ~order:`Sorted
       ~init:(ok (s, [], offset, length))
       ~f:(fun file tree acc ->
         match (C.Tree.kind tree, acc) with
@@ -492,8 +498,8 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     >|=? fun (s, rev_values, _offset, _length) ->
     (C.project s, List.rev rev_values)
 
-  let fold_keys_unaccounted s ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
+  let fold_keys_unaccounted s ~order ~init ~f =
+    C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
         match C.Tree.kind tree with
         | `Value -> (
             match List.rev file with
@@ -507,7 +513,8 @@ module Make_indexed_carbonated_data_storage_INTERNAL
         | `Tree -> Lwt.return acc)
 
   let keys_unaccounted s =
-    fold_keys_unaccounted s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+    fold_keys_unaccounted s ~order:`Sorted ~init:[] ~f:(fun p acc ->
+        Lwt.return (p :: acc))
 
   let () =
     let open Storage_description in
@@ -605,7 +612,7 @@ module Make_indexed_data_snapshotable_storage
     | Some tree ->
         C.add_tree s (snapshot_path id) tree >|= (fun t -> C.project t) >|= ok
 
-  let fold_snapshot s id ~init ~f =
+  let fold_snapshot s id ~order ~init ~f =
     C.find_tree s (snapshot_path id) >>= function
     | None -> Lwt.return (err_missing_key data_name)
     | Some tree ->
@@ -613,6 +620,7 @@ module Make_indexed_data_snapshotable_storage
           tree
           ~depth:(`Eq I.path_length)
           []
+          ~order
           ~init:(Ok init)
           ~f:(fun file tree acc ->
             acc >>?= fun acc ->
@@ -646,8 +654,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let clear t = C.remove t [] >|= fun t -> C.project t
 
-  let fold_keys t ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) t [] ~init ~f:(fun path tree acc ->
+  let fold_keys t ~order ~init ~f =
+    C.fold ~depth:(`Eq I.path_length) t [] ~order ~init ~f:(fun path tree acc ->
         match C.Tree.kind tree with
         | `Tree -> (
             match I.of_path path with
@@ -655,7 +663,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
             | Some path -> f path acc)
         | `Value -> Lwt.return acc)
 
-  let keys t = fold_keys t ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
+  let keys t =
+    fold_keys t ~order:`Sorted ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
 
   let err_missing_key key = Raw_context.storage_error (Missing_key (key, Copy))
 
@@ -755,9 +764,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let (t, i) = unpack c in
       C.remove t (to_key i k) >|= fun t -> pack t i
 
-    let fold ?depth c k ~init ~f =
+    let fold ?depth c k ~order ~init ~f =
       let (t, i) = unpack c in
-      C.fold ?depth t (to_key i k) ~init ~f
+      C.fold ?depth t (to_key i k) ~order ~init ~f
 
     module Tree = struct
       include C.Tree
@@ -813,17 +822,18 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.project s
 
     let clear s =
-      fold_keys s ~init:s ~f:(fun i s ->
+      fold_keys s ~init:s ~order:`Sorted ~f:(fun i s ->
           Raw_context.remove (pack s i) N.name >|= fun c ->
           let (s, _) = unpack c in
           s)
       >|= fun t -> C.project t
 
-    let fold s ~init ~f =
-      fold_keys s ~init ~f:(fun i acc ->
+    let fold s ~order ~init ~f =
+      fold_keys s ~order ~init ~f:(fun i acc ->
           mem s i >>= function true -> f i acc | false -> Lwt.return acc)
 
-    let elements s = fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+    let elements s =
+      fold s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
     let () =
       let open Storage_description in
@@ -900,24 +910,27 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.project s
 
     let clear s =
-      fold_keys s ~init:s ~f:(fun i s ->
+      fold_keys s ~order:`Sorted ~init:s ~f:(fun i s ->
           Raw_context.remove (pack s i) N.name >|= fun c ->
           let (s, _) = unpack c in
           s)
       >|= fun t -> C.project t
 
-    let fold s ~init ~f =
-      fold_keys s ~init ~f:(fun i acc ->
+    let fold s ~order ~init ~f =
+      fold_keys s ~order ~init ~f:(fun i acc ->
           get s i >>= function Error _ -> Lwt.return acc | Ok v -> f i v acc)
 
     let bindings s =
-      fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p, v) :: acc))
+      fold s ~order:`Sorted ~init:[] ~f:(fun p v acc ->
+          Lwt.return ((p, v) :: acc))
 
-    let fold_keys s ~init ~f =
-      fold_keys s ~init ~f:(fun i acc ->
+    let fold_keys s ~order ~init ~f =
+      fold_keys s ~order ~init ~f:(fun i acc ->
           mem s i >>= function false -> Lwt.return acc | true -> f i acc)
 
-    let keys s = fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+    let keys s =
+      fold_keys s ~order:`Sorted ~init:[] ~f:(fun p acc ->
+          Lwt.return (p :: acc))
 
     let () =
       let open Storage_description in
@@ -1093,16 +1106,18 @@ module Wrap_indexed_data_storage
 
   let clear ctxt = C.clear ctxt
 
-  let fold ctxt ~init ~f =
-    C.fold ctxt ~init ~f:(fun k v acc ->
+  let fold ctxt ~order ~init ~f =
+    C.fold ctxt ~order ~init ~f:(fun k v acc ->
         match K.unwrap k with None -> Lwt.return acc | Some k -> f k v acc)
 
   let bindings s =
-    fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p, v) :: acc))
+    fold s ~order:`Sorted ~init:[] ~f:(fun p v acc ->
+        Lwt.return ((p, v) :: acc))
 
-  let fold_keys s ~init ~f =
-    C.fold_keys s ~init ~f:(fun k acc ->
+  let fold_keys s ~order ~init ~f =
+    C.fold_keys s ~order ~init ~f:(fun k acc ->
         match K.unwrap k with None -> Lwt.return acc | Some k -> f k acc)
 
-  let keys s = fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+  let keys s =
+    fold_keys s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 end

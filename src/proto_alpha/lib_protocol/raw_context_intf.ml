@@ -167,6 +167,7 @@ module type VIEW = sig
     ?depth:[`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int] ->
     t ->
     key ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t

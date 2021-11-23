@@ -42,7 +42,11 @@ let to_raw_context (b : Block.t) =
 
 let check_no_dangling_temp_big_map b =
   to_raw_context b >>=? fun ctxt ->
-  Storage.Big_map.fold ctxt ~init:() ~f:(fun id () ->
+  Storage.Big_map.fold ctxt ~init:() ~order:`Sorted ~f:(fun id () ->
+      assert (not (Lazy_storage_kind.Big_map.Id.is_temp id)) ;
+      Lwt.return_unit)
+  >>= fun () ->
+  Storage.Big_map.fold ctxt ~init:() ~order:`Undefined ~f:(fun id () ->
       assert (not (Lazy_storage_kind.Big_map.Id.is_temp id)) ;
       Lwt.return_unit)
   >>= fun () -> return_unit
