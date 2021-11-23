@@ -1,25 +1,5 @@
 /* global _HACL */
 
-//Provides: buf2hex
-function buf2hex(buffer) { // eslint-disable-line no-unused-vars
-  return Array.prototype.map.call(new joo_global_object.Uint8Array(buffer), function(x) {
-    return ('00' + x.toString(16)).slice(-2);
-  }).join('');
-}
-
-/* exported buf2hex */
-
-//Provides: hex2buf
-function hex2buf(hexString) { // eslint-disable-line no-unused-vars
-  if (hexString === "") {
-    return new joo_global_object.Uint8Array(0);
-  } else {
-    return new joo_global_object.Uint8Array(hexString.match(/.{2}/g).map(function(byte) {
-      return parseInt(byte, 16);
-    }));
-  }
-}
-
 //Provides: MlBytes2buf
 //Requires: caml_bytes_unsafe_get
 function MlBytes2buf(MlBytes) {
@@ -31,19 +11,6 @@ function MlBytes2buf(MlBytes) {
     buf[i] = uint8;
   }
   return buf;
-}
-
-//Provides: buf2MlBytes
-//Requires: caml_string_of_jsbytes
-function buf2MlBytes(buf) { // eslint-disable-line no-unused-vars
-  var s = '';
-  buf.forEach(function(uint8) {
-    var high = uint8 >> 4;
-    s += high.toString(16);
-    var low = uint8 & 15;
-    s += low.toString(16);
-  });
-  return caml_string_of_jsbytes(s);
 }
 
 //Provides: blit_buf_onto_MlBytes
