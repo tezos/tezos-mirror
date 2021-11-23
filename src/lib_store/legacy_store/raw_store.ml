@@ -174,8 +174,11 @@ let remove_dir {dir; parent} k =
   | Error err -> lwt_fail_error err
 
 let list_equal l1 l2 len =
-  if len < 0 || len > List.length l1 || len > List.length l2 then
-    invalid_arg "list_compare: invalid len" ;
+  if
+    len < 0
+    || Compare.List_length_with.(l1 < len)
+    || Compare.List_length_with.(l2 < len)
+  then invalid_arg "list_compare: invalid len" ;
   let rec inner l1 l2 len =
     match (len, l1, l2) with
     | (0, _, _) -> true
@@ -191,7 +194,8 @@ let is_child ~parent ~child =
   clen > plen && list_equal parent child plen
 
 let list_sub l pos len =
-  if len < 0 || pos < 0 || pos + len > List.length l then invalid_arg "list_sub" ;
+  if len < 0 || pos < 0 || Compare.List_length_with.(l < pos + len) then
+    invalid_arg "list_sub" ;
   let rec inner (acc, n) = function
     | [] -> List.rev acc
     | h :: t -> if n = 0 then List.rev acc else inner (h :: acc, pred n) t

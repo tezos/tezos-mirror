@@ -374,7 +374,7 @@ module Block = struct
     fail_unless
       (List.for_all2
          ~when_different_lengths:(`X "unreachable")
-         (fun l1 l2 -> List.length l1 = List.length l2)
+         (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
          operations
          ops_metadata
        |> function

@@ -1413,7 +1413,8 @@ let commands network () =
                 | dups ->
                     error
                       "There %s: %a."
-                      (if List.length dups = 1 then "is a duplicate proposal"
+                      (if Compare.List_length_with.(dups = 1) then
+                       "is a duplicate proposal"
                       else "are duplicate proposals")
                       Format.(
                         pp_print_list
@@ -1448,7 +1449,8 @@ let commands network () =
                 if !errors <> [] then
                   cctxt#message
                     "There %s with the submission:%t"
-                    (if List.length !errors = 1 then "is an issue"
+                    (if Compare.List_length_with.(!errors = 1) then
+                     "is an issue"
                     else "are issues")
                     Format.(
                       fun ppf ->

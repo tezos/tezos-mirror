@@ -373,7 +373,7 @@ let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
     nb_blocks
   >>= fun blocks ->
   let blocks = List.map fst blocks in
-  assert (List.length blocks = nb_blocks) ;
+  assert (Compare.List_length_with.(blocks = nb_blocks)) ;
   return blocks
 
 (* [expected_savepoint block_store target_offset] computes the
@@ -576,8 +576,7 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
 
 let compute_new_savepoint block_store history_mode ~new_store
     ~min_level_to_preserve ~new_head ~cycles_to_cement =
-  let nb_cycles_to_cement = List.length cycles_to_cement in
-  assert (nb_cycles_to_cement > 0) ;
+  assert (cycles_to_cement <> []) ;
   Stored_data.get block_store.savepoint >>= fun savepoint ->
   match history_mode with
   | History_mode.Archive ->
@@ -637,7 +636,7 @@ let compute_new_savepoint block_store history_mode ~new_store
             else return savepoint
           else return savepoint
         else
-          (* Else we shift the savepoint by [nb_cycles_to_cement]
+          (* Else we shift the savepoint by [List.length cycles_to_cement]
              cycles *)
           let shifted_savepoint_level =
             (* new lowest cemented block  *)
@@ -734,7 +733,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   (* [min_level_to_preserve] is the lowest block that we want to keep
      in the floating stores. *)
   let min_level_to_preserve =
-    if List.length lafl_predecessors > 0 then
+    if lafl_predecessors <> [] then
       Block_repr.level
         (fst
            (List.hd lafl_predecessors |> WithExceptions.Option.get ~loc:__LOC__))
@@ -944,7 +943,8 @@ let instanciate_temporary_floating_store block_store =
     (fun () ->
       trace
         Cannot_instanciate_temporary_floating_store
-        (assert (List.length block_store.ro_floating_block_stores = 1) ;
+        (assert (
+           Compare.List_length_with.(block_store.ro_floating_block_stores = 1)) ;
          let ro_store =
            List.hd block_store.ro_floating_block_stores
            |> WithExceptions.Option.get ~loc:__LOC__

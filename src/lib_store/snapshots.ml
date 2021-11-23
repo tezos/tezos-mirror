@@ -2915,7 +2915,7 @@ module Tar_importer : IMPORTER = struct
           |> dir_path)
     >>= fun cbh ->
     let cemented_indexes_paths = cbl @ cbh in
-    if List.length cemented_indexes_paths <> 0 then
+    if cemented_indexes_paths <> [] then
       let level_index_dir =
         Naming.(cemented_blocks_level_index_dir t.dst_cemented_dir |> dir_path)
       in

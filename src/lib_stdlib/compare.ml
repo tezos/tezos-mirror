@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -242,6 +243,42 @@ module Z = struct
   let max = Z.max
 
   let min = Z.min
+end
+
+module List_length_with = struct
+  let ( = ) l i = Stdlib.List.compare_length_with l i = 0
+
+  let ( <> ) l i = Stdlib.List.compare_length_with l i <> 0
+
+  let ( < ) l i = Stdlib.List.compare_length_with l i < 0
+
+  let ( <= ) l i = Stdlib.List.compare_length_with l i <= 0
+
+  let ( >= ) l i = Stdlib.List.compare_length_with l i >= 0
+
+  let ( > ) l i = Stdlib.List.compare_length_with l i > 0
+
+  let compare l i = Stdlib.List.compare_length_with l i
+
+  let equal = ( = )
+end
+
+module List_lengths = struct
+  let ( = ) l1 l2 = Stdlib.List.compare_lengths l1 l2 = 0
+
+  let ( <> ) l1 l2 = Stdlib.List.compare_lengths l1 l2 <> 0
+
+  let ( < ) l1 l2 = Stdlib.List.compare_lengths l1 l2 < 0
+
+  let ( <= ) l1 l2 = Stdlib.List.compare_lengths l1 l2 <= 0
+
+  let ( >= ) l1 l2 = Stdlib.List.compare_lengths l1 l2 >= 0
+
+  let ( > ) l1 l2 = Stdlib.List.compare_lengths l1 l2 > 0
+
+  let compare l1 l2 = Stdlib.List.compare_lengths l1 l2
+
+  let equal = ( = )
 end
 
 let or_else c f = if c <> 0 then c else f ()

@@ -179,7 +179,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
        delegates)
   >>=? fun () ->
   let delegates_no_duplicates = List.sort_uniq compare delegates in
-  (if List.length delegates <> List.length delegates_no_duplicates then
+  (if Compare.List_lengths.(delegates <> delegates_no_duplicates) then
    cctxt#warning
      "Warning: the list of public key hash aliases contains duplicate hashes, \
       which are ignored"

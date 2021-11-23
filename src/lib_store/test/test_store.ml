@@ -152,7 +152,7 @@ let test_locator chain_store tbl =
       seed
     >>= fun l ->
     let (_, l) = (l : Block_locator.t :> _ * _) in
-    if List.length l <> List.length expected then
+    if Compare.List_lengths.(l <> expected) then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
         h1
@@ -180,7 +180,7 @@ let test_locator chain_store tbl =
 
 let compare s name heads l =
   List.iter (fun b -> Format.printf "%s@." (rev_lookup b s)) heads ;
-  if List.length heads <> List.length l then
+  if Compare.List_lengths.(heads <> l) then
     Assert.fail_msg
       "unexpected known_heads size (%s: %d %d)"
       name
@@ -310,7 +310,7 @@ let test_new_blocks chain_store tbl =
         head
         h
         expected_ancestor ;
-    if List.length blocks <> List.length expected then
+    if Compare.List_lengths.(blocks <> expected) then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
         h

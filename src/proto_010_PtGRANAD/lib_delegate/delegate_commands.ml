@@ -332,7 +332,7 @@ let endorser_commands () =
         let delegates_no_duplicates =
           Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
         in
-        (if List.length delegates <> List.length delegates_no_duplicates then
+        (if Compare.List_lengths.(delegates <> delegates_no_duplicates) then
          cctxt#message
            "Warning: the list of public key hash aliases contains duplicate \
             hashes, which are ignored"

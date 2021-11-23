@@ -41,11 +41,11 @@ let test_baking_rights () =
   let open Plugin.RPC.Baking_rights in
   (* default max_round returns 65 results *)
   get Block.rpc_ctxt b ~all:true >>=? fun rights ->
-  assert (List.length rights = 65) ;
+  assert (Compare.List_length_with.(rights = 65)) ;
   (* arbitrary max_round *)
   let max_round = 15 in
   get Block.rpc_ctxt b ~all:true ~max_round >>=? fun rights ->
-  assert (List.length rights = max_round + 1) ;
+  assert (Compare.List_length_with.(rights = max_round + 1)) ;
   (* filtering by delegate *)
   let d =
     Option.bind (List.nth contracts 0) Contract.is_implicit

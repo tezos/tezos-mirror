@@ -395,7 +395,7 @@ module Overcrowded = struct
       (Advertisement_failure unknowns)
 
   let client legacy (node : Node.t) =
-    if List.length node.points > 50 then (
+    if Compare.List_length_with.(node.points > 50) then (
       log_error
         "This test only works for less clients than the advertisement list \
          length (50)@." ;

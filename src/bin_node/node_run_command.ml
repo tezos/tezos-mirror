@@ -474,7 +474,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
         let l = String.split_on_char ',' s in
         Lwt.catch
           (fun () ->
-            assert (List.length l = 2) ;
+            assert (Compare.List_length_with.(l = 2)) ;
             let target =
               match l with
               | [block_hash; level] ->

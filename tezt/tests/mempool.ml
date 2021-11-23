@@ -98,7 +98,10 @@ module Revamped = struct
     let error_msg =
       "some operations not classfied as 'applied: expected length %R, got %L"
     in
-    Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
+    Check.(
+      (List.compare_length_with mempool.applied number_of_operations = 0)
+        int
+        ~error_msg) ;
 
     log_step 4 "Bake a block with an empty mempool." ;
     let* () = bake_for ~empty:true ~protocol node client in
@@ -137,7 +140,8 @@ module Revamped = struct
     let error_msg =
       "endorsement is not classified as 'outdated': length expected %L, got %R"
     in
-    Check.((1 = List.length last_mempool.outdated) int ~error_msg) ;
+    Check.(
+      (List.compare_length_with last_mempool.outdated 1 = 0) int ~error_msg) ;
     unit
 end
 
@@ -557,7 +561,7 @@ let check_batch_operations_are_in_applied_mempool ops oph n =
       (fun e ->
         let contents = as_list (e |-> "contents") in
         let h = as_string (e |-> "hash") in
-        List.length contents = n && h = as_string oph)
+        List.compare_length_with contents n = 0 && h = as_string oph)
       ops_list
   in
   if not res then
@@ -1353,7 +1357,7 @@ let get_and_log_applied client =
    does not specify how operations previously applied will be applied
    again after banning one operation. *)
 let oph_list_equal l1 l2 =
-  Int.equal (List.length l1) (List.length l2)
+  Int.equal (List.compare_lengths l1 l2) 0
   && List.for_all (fun x -> List.mem x l2) l1
   && List.for_all (fun x -> List.mem x l1) l2
 
@@ -1457,7 +1461,7 @@ let ban_operation_and_check_applied =
     "Step 3: Ban one of these operations from node_1 (arbitrarily, the third \
      in the list of applied operations in the mempool of node_1)." ;
   let* applied_ophs = get_and_log_applied client_1 in
-  if not (Int.equal (List.length applied_ophs) 5) then
+  if not (Int.equal (List.compare_length_with applied_ophs 5) 0) then
     (* This could theoretically happen: we wait for each transfer to
        be present in the mempool as "pending", but not to be classified
        as "applied". In practice, this does not seem to be a problem. *)
@@ -1770,7 +1774,7 @@ let unban_all_operations =
             oph1
             oph2
             oph3 ;
-        if not (Int.equal (List.length tl) 3) then
+        if not (Int.equal (List.compare_length_with tl 3) 0) then
           Test.fail "There should only be 4 applied operations."
     | _ -> Test.fail "List of applied operations should not be empty."
   in
@@ -2028,11 +2032,11 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
   in
   (* various checks about applied and refused operations *)
   Check.(
-    (List.length applied_ophs = applied)
+    (List.compare_length_with applied_ophs applied = 0)
       int
       ~error_msg:(name ^ ": found %L applied operation(s), expected %R.")) ;
   Check.(
-    (List.length refused_ophs = refused)
+    (List.compare_length_with refused_ophs refused = 0)
       int
       ~error_msg:(name ^ ": found %L refused operation(s), expected %R.")) ;
   List.iter
@@ -2063,7 +2067,9 @@ let wait_for_notify_n_valid_ops node n_ops =
       match view |-> "request" |> as_string_opt with
       | Some "notify" ->
           let valid_ophs = view |-> "mempool" |-> "known_valid" |> as_list in
-          if Int.equal (List.length valid_ophs) n_ops then Some () else None
+          if Int.equal (List.compare_length_with valid_ophs n_ops) 0 then
+            Some ()
+          else None
       | _ -> None)
 
 (** Checks that the last block of [client] contains exactly
@@ -2073,7 +2079,7 @@ let check_n_manager_ops_in_block ?(log = false) client n_manager_ops =
   let* baked_ops = RPC.get_operations client in
   let baked_manager_ops = JSON.(baked_ops |=> 3 |> as_list) in
   Check.(
-    (List.length baked_manager_ops = n_manager_ops)
+    (List.compare_length_with baked_manager_ops n_manager_ops = 0)
       int
       ~error_msg:
         "The baked block contains %L manager operation(s), expected %R.") ;

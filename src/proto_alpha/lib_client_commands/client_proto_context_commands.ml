@@ -1649,16 +1649,18 @@ let commands_rw () =
                the user is the first proposer and just injected it with
                tezos-admin-client *)
             let check_proposals proposals : bool tzresult Lwt.t =
-              let n = List.length proposals in
               let errors = ref [] in
               let error ppf =
                 Format.kasprintf (fun s -> errors := s :: !errors) ppf
               in
-              if n = 0 then error "Empty proposal list." ;
-              if n > Constants.max_proposals_per_delegate then
+              if proposals = [] then error "Empty proposal list." ;
+              if
+                Compare.List_length_with.(
+                  proposals > Constants.max_proposals_per_delegate)
+              then
                 error
                   "Too many proposals: %d > %d."
-                  n
+                  (List.length proposals)
                   Constants.max_proposals_per_delegate ;
               (match
                  Base.List.find_all_dups
@@ -1669,7 +1671,8 @@ let commands_rw () =
               | dups ->
                   error
                     "There %s: %a."
-                    (if List.length dups = 1 then "is a duplicate proposal"
+                    (if Compare.List_length_with.(dups = 1) then
+                     "is a duplicate proposal"
                     else "are duplicate proposals")
                     Format.(
                       pp_print_list
@@ -1704,7 +1707,7 @@ let commands_rw () =
               if !errors <> [] then
                 cctxt#message
                   "There %s with the submission:%t"
-                  (if List.length !errors = 1 then "is an issue"
+                  (if Compare.List_length_with.(!errors = 1) then "is an issue"
                   else "are issues")
                   Format.(
                     fun ppf ->

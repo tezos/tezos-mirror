@@ -126,14 +126,15 @@ let test_max_endorsement () =
   let endorsers_per_block = 16 in
   Context.init ~endorsers_per_block 32 >>=? fun (b, _) ->
   Context.get_endorsers (B b) >>=? fun endorsers ->
-  Assert.equal_int
+  Assert.equal_bool
     ~loc:__LOC__
-    (List.length
-       (List.concat
-          (List.map
-             (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
-             endorsers)))
-    endorsers_per_block
+    Compare.List_length_with.(
+      List.concat
+        (List.map
+           (fun {Plugin.RPC.Endorsing_rights.slots; _} -> slots)
+           endorsers)
+      = endorsers_per_block)
+    true
   >>=? fun () ->
   List.fold_left_es
     (fun (delegates, ops, balances) (endorser : Plugin.RPC.Endorsing_rights.t) ->
@@ -454,7 +455,8 @@ let test_non_normalized_slot_wrapper () =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun endorser ->
-           List.length endorser.Plugin.RPC.Endorsing_rights.slots > 1)
+           Compare.List_length_with.(
+             endorser.Plugin.RPC.Endorsing_rights.slots > 1))
          endorsers
   in
   let (delegate, slots) = (endorser.delegate, endorser.slots) in

@@ -138,7 +138,7 @@ module Tree = struct
     let module Set = Set.Make (Ord) in
     let values_list = values t in
     let values_set = Set.of_list values_list in
-    List.length values_list = Set.cardinal values_set
+    Compare.List_length_with.(values_list = Set.cardinal values_set)
 
   (** Given a tree of values, returns an association list from a value to
       its parent (i.e. predecessor) in the tree. I.e. given :
