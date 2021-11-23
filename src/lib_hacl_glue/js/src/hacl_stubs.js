@@ -144,11 +144,12 @@ function Hacl_HMAC_compute_sha2_512 (output, key, msg) {
 
 //Provides: Hacl_Curve25519_51_scalarmult
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) {
+function Hacl_Curve25519_51_scalarmult(buf, scalar, input) {
   var H = joo_global_object._HACL;
-  var bsk = hacl_create_buffer(sk);
-  var bret = H.Curve25519_51.secret_to_public(bsk);
-  hacl_blit_buf_to_bytes(bret[0], pk);
+  var bscalar = hacl_create_buffer(scalar);
+  var binput = hacl_create_buffer(input)
+  var bret = H.Curve25519_51.scalarmult(bscalar, binput);
+  hacl_blit_buf_to_bytes(bret[0], buf);
   return 0;
 }
 
