@@ -1,26 +1,20 @@
 /* global _HACL */
 
 //Provides: hacl_create_buffer
-//Requires: caml_bytes_unsafe_get
-function hacl_create_buffer(MlBytes) {
-  var len = MlBytes.l;
-  var buf = new joo_global_object.Uint8Array(len);
-  var i=0;
-  for (i=0; i<len; i++) {
-    var uint8 = caml_bytes_unsafe_get(MlBytes, i);
-    buf[i] = uint8;
-  }
-  return buf;
+//Requires: caml_array_of_bytes
+function hacl_create_buffer(bytes) {
+  var a = caml_array_of_bytes(bytes);
+  return (new joo_global_object.Uint8Array(a));
 }
 
 //Provides: hacl_blit_buf_to_bytes
-//Requires: caml_string_unsafe_set
-function hacl_blit_buf_to_bytes(buf, MlBytes) {
-  buf.forEach(function(uint8, index) {
-    if(index < MlBytes.l)
-      caml_string_unsafe_set(MlBytes, index, uint8)
-  });
-  return 0;
+//Requires: caml_ml_bytes_length, caml_bytes_of_array, caml_blit_bytes
+function hacl_blit_buf_to_bytes(buf, bytes) {
+    var len1 = caml_ml_bytes_length(bytes);
+    var buf = caml_bytes_of_array(buf);
+    var len2 = caml_ml_bytes_length(buf);
+    caml_blit_bytes(buf,0,bytes,0,Math.min(len1,len2));
+    return 0;
 }
 
 //Provides: hacl_to_bool
