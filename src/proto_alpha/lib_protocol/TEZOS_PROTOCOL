@@ -116,7 +116,9 @@
         "Script_tc_errors_registration",
         "Ticket_costs",
         "Ticket_scanner",
+        "Ticket_token",
         "Ticket_balance_key",
+
         "Script_interpreter_defs",
         "Script_interpreter",
         "Sc_rollup_operations",

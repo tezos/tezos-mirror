@@ -45,7 +45,7 @@ let new_ctxt () =
 
 let make_contract ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer
 
-let make_ex_ticket ctxt ~ticketer ~typ ~content ~amount =
+let make_ex_token ctxt ~ticketer ~typ ~content =
   let* (Script_ir_translator.Ex_comparable_ty cty, ctxt) =
     let node = Micheline.root @@ Expr.from_string typ in
     wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
@@ -55,20 +55,15 @@ let make_ex_ticket ctxt ~ticketer ~typ ~content ~amount =
     let node = Micheline.root @@ Expr.from_string content in
     wrap @@ Script_ir_translator.parse_comparable_data ctxt cty node
   in
-  let amount = Script_int.(abs @@ of_int amount) in
-  let ticket = Script_typed_ir.{ticketer; contents; amount} in
-  return (Ticket_scanner.Ex_ticket (cty, ticket), ctxt)
+  return (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
 
-let make_key ctxt ~ticketer ~typ ~content ~amount ~owner =
-  let* (ex_ticket, ctxt) =
-    make_ex_ticket ctxt ~ticketer ~typ ~content ~amount
-  in
+let make_key ctxt ~ticketer ~typ ~content ~owner =
+  let* (ex_token, ctxt) = make_ex_token ctxt ~ticketer ~typ ~content in
   let* owner = make_contract owner in
-  let* (key, amount, ctxt) =
-    wrap
-    @@ Ticket_balance_key.ticket_balance_key_and_amount ctxt ex_ticket ~owner
+  let* (key, ctxt) =
+    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner ex_token
   in
-  return (key, amount, ctxt)
+  return (key, ctxt)
 
 let equal_script_hash ~loc msg key1 key2 =
   Assert.equal
@@ -91,23 +86,11 @@ let not_equal_script_hash ~loc msg key1 key2 =
 let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
     ~content2 ~owner1 ~owner2 assert_condition =
   let* ctxt = new_ctxt () in
-  let* (key1, amount1, ctxt) =
-    make_key
-      ctxt
-      ~ticketer:ticketer1
-      ~typ:typ1
-      ~content:content1
-      ~amount:amount1
-      ~owner:owner1
+  let* (key1, ctxt) =
+    make_key ctxt ~ticketer:ticketer1 ~typ:typ1 ~content:content1 ~owner:owner1
   in
-  let* (key2, amount2, _) =
-    make_key
-      ctxt
-      ~ticketer:ticketer2
-      ~typ:typ2
-      ~content:content2
-      ~amount:amount2
-      ~owner:owner2
+  let* (key2, _) =
+    make_key ctxt ~ticketer:ticketer2 ~typ:typ2 ~content:content2 ~owner:owner2
   in
   assert_condition (key1, amount1) (key2, amount2)
 
@@ -118,24 +101,6 @@ let assert_keys_not_equal ~loc =
 let assert_keys_equal ~loc =
   assert_keys (fun (key1, _) (key2, _) ->
       equal_script_hash ~loc "Assert that keys are equal" key1 key2)
-
-let assert_amount ~loc ~ticketer ~typ ~content ~amount ~owner expected =
-  let* ctxt = new_ctxt () in
-  let* (_, amount, _ctxt) =
-    make_key ctxt ~ticketer ~typ ~content ~amount ~owner
-  in
-  Assert.equal_int ~loc (Z.to_int amount) expected
-
-(** Test that the amount returned is as expected. *)
-let test_amount () =
-  assert_amount
-    ~loc:__LOC__
-    ~ticketer:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ:"unit"
-    ~content:"Unit"
-    ~amount:42
-    ~owner:"KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
-    42
 
 (** Test that tickets with two different amounts map to the same hash.
     The amount is not part of the ticket balance key. *)
@@ -467,7 +432,6 @@ let test_option_some () =
 
 let tests =
   [
-    Tztest.tztest "Test amount" `Quick test_amount;
     Tztest.tztest "Test different ticketers" `Quick test_different_ticketers;
     Tztest.tztest "Test different owners" `Quick test_different_owners;
     Tztest.tztest "Test different content" `Quick test_different_content;

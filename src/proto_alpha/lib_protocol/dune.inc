@@ -136,6 +136,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    ticket_costs.mli ticket_costs.ml
    ticket_scanner.mli ticket_scanner.ml
+   ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -271,6 +272,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    ticket_costs.mli ticket_costs.ml
    ticket_scanner.mli ticket_scanner.ml
+   ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -406,6 +408,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    ticket_costs.mli ticket_costs.ml
    ticket_scanner.mli ticket_scanner.ml
+   ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
@@ -563,6 +566,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_tc_errors_registration
    Ticket_costs
    Ticket_scanner
+   Ticket_token
    Ticket_balance_key
    Script_interpreter_defs
    Script_interpreter
@@ -739,6 +743,7 @@ include Tezos_raw_protocol_alpha.Main
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    ticket_costs.mli ticket_costs.ml
    ticket_scanner.mli ticket_scanner.ml
+   ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml

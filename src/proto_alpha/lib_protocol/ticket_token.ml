@@ -23,46 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+type ex_token =
+  | Ex_token : {
+      ticketer : Alpha_context.Contract.t;
+      contents_type : 'a Script_typed_ir.comparable_ty;
+      contents : 'a;
+    }
+      -> ex_token
 
-(* This function extracts nodes of:
-    - Ticketer
-    - Type of content
-    - Content
-    - Owner
-   to generate at ticket-balance key-hash.
-*)
-let ticket_balance_key ctxt ~owner
-    (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
-  let loc = Micheline.dummy_location in
-  Script_ir_translator.unparse_comparable_ty ~loc ctxt contents_type
-  >>?= fun (cont_ty_unstripped, ctxt) ->
-  (* We strip the annotations from the content type in order to map
-     tickets with the same content type, but with different annotations, to the
-     same hash. *)
-  Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
-  >>?= fun ctxt ->
-  let typ = Script.strip_annotations cont_ty_unstripped in
-  let ticketer_address = (ticketer, Entrypoint.default) in
-  let owner_address = (owner, Entrypoint.default) in
-  let address_t = Script_typed_ir.address_t ~annot:None in
-  Script_ir_translator.unparse_data
-    ctxt
-    Script_ir_translator.Optimized_legacy
-    address_t
-    ticketer_address
-  >>=? fun (ticketer, ctxt) ->
-  Script_ir_translator.unparse_comparable_data
-    ~loc
-    ctxt
-    Script_ir_translator.Optimized_legacy
-    contents_type
-    contents
-  >>=? fun (contents, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Script_ir_translator.Optimized_legacy
-    address_t
-    owner_address
-  >>=? fun (owner, ctxt) ->
-  Lwt.return (Ticket_balance.make_key_hash ctxt ~ticketer ~typ ~contents ~owner)
+let token_and_amount_of_ex_ticket
+    (Ticket_scanner.Ex_ticket
+      (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
+  let amount = Alpha_context.Script_int.to_zint amount in
+  (Ex_token {ticketer; contents_type; contents}, amount)
