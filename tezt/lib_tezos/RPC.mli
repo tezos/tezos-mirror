@@ -951,3 +951,15 @@ module Votes : sig
     Client.t ->
     JSON.t Lwt.t
 end
+
+module Tx_rollup : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/state *)
+  val get_state :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    tx_rollup_hash:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
