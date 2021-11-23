@@ -49,10 +49,10 @@ function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no
 //Provides: Hacl_Blake2b_32_blake2b
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bkey = MlBytes2buf(key);
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.Blake2.blake2b(digest_len, bmsg, bkey);
+  var bret = H.Blake2.blake2b(digest_len, bmsg, bkey);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -60,9 +60,9 @@ function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) { // eslint-disab
 //Provides: Hacl_Hash_SHA2_hash_256
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Hash_SHA2_hash_256(msg, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.SHA2.hash_256(bmsg);
+  var bret = H.SHA2.hash_256(bmsg);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -70,9 +70,9 @@ function Hacl_Hash_SHA2_hash_256(msg, digest) { // eslint-disable-line no-unused
 //Provides: Hacl_Hash_SHA2_hash_512
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Hash_SHA2_hash_512(msg, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.SHA2.hash_512(bmsg);
+  var bret = H.SHA2.hash_512(bmsg);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -80,9 +80,9 @@ function Hacl_Hash_SHA2_hash_512(msg, digest) { // eslint-disable-line no-unused
 //Provides: Hacl_SHA3_sha3_256
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_SHA3_sha3_256(msg, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.SHA3.hash_256(bmsg);
+  var bret = H.SHA3.hash_256(bmsg);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -90,9 +90,9 @@ function Hacl_SHA3_sha3_256(msg, digest) { // eslint-disable-line no-unused-vars
 //Provides: Hacl_SHA3_sha3_512
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_SHA3_sha3_512(msg, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.SHA3.hash_512(bmsg);
+  var bret = H.SHA3.hash_512(bmsg);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -100,12 +100,12 @@ function Hacl_SHA3_sha3_512(msg, digest) { // eslint-disable-line no-unused-vars
 //Provides: Hacl_Impl_SHA3_keccak
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bmsg = MlBytes2buf(msg);
   // The length of the output buffer needs to be passed in explicitly because
   // since the buffer itself is not passed there is no way to retrive its
   // size in api.js
-  var bret = _HACL.SHA3.keccak(rate, capacity, bmsg, suffix, digest.l);
+  var bret = H.SHA3.keccak(rate, capacity, bmsg, suffix, digest.l);
   blit_buf_onto_MlBytes(bret[0], digest);
   return 0;
 }
@@ -113,10 +113,10 @@ function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) { // eslint-
 //Provides: Hacl_HMAC_compute_sha2_256
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_HMAC_compute_sha2_256 (output, key, msg) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bkey = MlBytes2buf(key);
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.HMAC.sha256(bkey, bmsg);
+  var bret = H.HMAC.sha256(bkey, bmsg);
   blit_buf_onto_MlBytes(bret[0], output);
   return 0;
 }
@@ -124,10 +124,10 @@ function Hacl_HMAC_compute_sha2_256 (output, key, msg) { // eslint-disable-line 
 //Provides: Hacl_HMAC_compute_sha2_512
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_HMAC_compute_sha2_512 (output, key, msg) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bkey = MlBytes2buf(key);
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.HMAC.sha512(bkey, bmsg);
+  var bret = H.HMAC.sha512(bkey, bmsg);
   blit_buf_onto_MlBytes(bret[0], output);
   return 0;
 }
@@ -135,9 +135,9 @@ function Hacl_HMAC_compute_sha2_512 (output, key, msg) { // eslint-disable-line 
 //Provides: Hacl_Curve25519_51_scalarmult
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bsk = MlBytes2buf(sk);
-  var bret = _HACL.Curve25519_51.secret_to_public(bsk);
+  var bret = H.Curve25519_51.secret_to_public(bsk);
   blit_buf_onto_MlBytes(bret[0], pk);
   return 0;
 }
@@ -145,11 +145,11 @@ function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) { // eslint-disable-li
 //Provides: Hacl_NaCl_crypto_secretbox_easy
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bm = MlBytes2buf(m);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.secretbox_easy(bm, bn, bk);
+  var bret = H.NaCl.secretbox_easy(bm, bn, bk);
   blit_buf_onto_MlBytes(bret[1], c);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -157,11 +157,11 @@ function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) { // eslint-disable-line no
 //Provides: Hacl_NaCl_crypto_secretbox_open_easy
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bc = MlBytes2buf(c);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.secretbox_open_easy(bc, bn, bk);
+  var bret = H.NaCl.secretbox_open_easy(bc, bn, bk);
   blit_buf_onto_MlBytes(bret[1], m);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -169,10 +169,10 @@ function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) { // eslint-disable-li
 //Provides: Hacl_NaCl_crypto_box_beforenm
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
   var bsk = MlBytes2buf(sk);
-  var bret = _HACL.NaCl.box_beforenm(bpk, bsk);
+  var bret = H.NaCl.box_beforenm(bpk, bsk);
   blit_buf_onto_MlBytes(bret[1], k);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -180,11 +180,11 @@ function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) { // eslint-disable-line no-un
 //Provides: Hacl_NaCl_crypto_box_easy_afternm
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bm = MlBytes2buf(m);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.box_easy_afternm(bm, bn, bk);
+  var bret = H.NaCl.box_easy_afternm(bm, bn, bk);
   blit_buf_onto_MlBytes(bret[1], c);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -192,11 +192,11 @@ function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) { // eslint-disable-line 
 //Provides: Hacl_NaCl_crypto_box_open_easy_afternm
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bc = MlBytes2buf(c);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.box_open_easy_afternm(bc, bn, bk);
+  var bret = H.NaCl.box_open_easy_afternm(bc, bn, bk);
   blit_buf_onto_MlBytes(bret[1], m);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -204,11 +204,11 @@ function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) { // eslint-disable-
 //Provides: Hacl_NaCl_crypto_box_detached_afternm
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bm = MlBytes2buf(m);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.box_detached_afternm(bm, bn, bk);
+  var bret = H.NaCl.box_detached_afternm(bm, bn, bk);
   blit_buf_onto_MlBytes(bret[1], c);
   blit_buf_onto_MlBytes(bret[2], tag);
   return (bret[0] === 0 ? 1 : 0);
@@ -217,12 +217,12 @@ function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) { // eslint-disa
 //Provides: Hacl_NaCl_crypto_box_open_detached_afternm
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var btag = MlBytes2buf(tag);
   var bc = MlBytes2buf(c);
   var bn = MlBytes2buf(n);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.NaCl.box_open_detached_afternm(bc, btag, bn, bk);
+  var bret = H.NaCl.box_open_detached_afternm(bc, btag, bn, bk);
   blit_buf_onto_MlBytes(bret[1], m);
   return (bret[0] === 0 ? 1 : 0);
 }
@@ -230,9 +230,9 @@ function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) { // eslint
 //Provides: Hacl_Ed25519_secret_to_public
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Ed25519_secret_to_public(out, secret) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bsecret = MlBytes2buf(secret);
-  var bret = _HACL.Ed25519.secret_to_public(bsecret);
+  var bret = H.Ed25519.secret_to_public(bsecret);
   blit_buf_onto_MlBytes(bret[0], out);
   return 0;
 }
@@ -240,10 +240,10 @@ function Hacl_Ed25519_secret_to_public(out, secret) { // eslint-disable-line no-
 //Provides: Hacl_Ed25519_sign
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Ed25519_sign(signature, sk, msg) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bsk = MlBytes2buf(sk);
   var bmsg = MlBytes2buf(msg);
-  var bret = _HACL.Ed25519.sign(bsk, bmsg);
+  var bret = H.Ed25519.sign(bsk, bmsg);
   blit_buf_onto_MlBytes(bret[0], signature);
   return 0;
 }
@@ -251,22 +251,22 @@ function Hacl_Ed25519_sign(signature, sk, msg) { // eslint-disable-line no-unuse
 //Provides: Hacl_Ed25519_verify
 //Requires: MlBytes2buf
 function Hacl_Ed25519_verify(pk, msg, signature) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
   var bmsg = MlBytes2buf(msg);
   var bsignature = MlBytes2buf(signature);
-  var bret = _HACL.Ed25519.verify(bpk, bmsg, bsignature);
+  var bret = H.Ed25519.verify(bpk, bmsg, bsignature);
   return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_ecdsa_sign_p256_without_hash
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_ecdsa_sign_p256_without_hash (privkey, m, k, result) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bm = MlBytes2buf(m);
   var bprivkey = MlBytes2buf(privkey);
   var bk = MlBytes2buf(k);
-  var bret = _HACL.P256.ecdsa_sign_without_hash(bm, bprivkey, bk);
+  var bret = H.P256.ecdsa_sign_without_hash(bm, bprivkey, bk);
   blit_buf_onto_MlBytes(bret[1], result);
   return (bret[0] ? 1 : 0);
 }
@@ -274,39 +274,39 @@ function Hacl_P256_ecdsa_sign_p256_without_hash (privkey, m, k, result) { // esl
 //Provides: Hacl_P256_ecdsa_verif_without_hash
 //Requires: MlBytes2buf
 function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
   var bmsg = MlBytes2buf(msg);
   var bsig_r = MlBytes2buf(sig_r);
   var bsig_s = MlBytes2buf(sig_s);
-  var bret = _HACL.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
+  var bret = H.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
   return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_is_more_than_zero_less_than_order
 //Requires: MlBytes2buf
 function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bsk = MlBytes2buf(sk);
-  var bret = _HACL.P256.is_more_than_zero_less_than_order(bsk);
+  var bret = H.P256.is_more_than_zero_less_than_order(bsk);
   return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_verify_q
 //Requires: MlBytes2buf
 function Hacl_P256_verify_q (pk) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
-  var bret = _HACL.P256.verify_q(bpk);
+  var bret = H.P256.verify_q(bpk);
   return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_ecp256dh_i
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bsk = MlBytes2buf(sk);
-  var bret = _HACL.P256.dh_initiator(bsk);
+  var bret = H.P256.dh_initiator(bsk);
   blit_buf_onto_MlBytes(bret[1], pk);
   return (bret[0] ? 1 : 0);
 }
@@ -314,9 +314,9 @@ function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
 //Provides: Hacl_P256_compression_compressed_form
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_compression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
-  var bret = _HACL.P256.compression_compressed_form(bpk);
+  var bret = H.P256.compression_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[0], out);
   return 0;
 }
@@ -324,9 +324,9 @@ function Hacl_P256_compression_compressed_form (pk, out) { // eslint-disable-lin
 //Provides: Hacl_P256_compression_not_compressed_form
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_compression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
-  var bret = _HACL.P256.compression_not_compressed_form(bpk);
+  var bret = H.P256.compression_not_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[0], out);
   return 0;
 }
@@ -334,9 +334,9 @@ function Hacl_P256_compression_not_compressed_form (pk, out) { // eslint-disable
 //Provides: Hacl_P256_decompression_compressed_form
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
-  var bret = _HACL.P256.decompression_compressed_form(bpk);
+  var bret = H.P256.decompression_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[1], out);
   return (bret[0] ? 1 : 0);
 }
@@ -344,9 +344,9 @@ function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-l
 //Provides: Hacl_P256_decompression_not_compressed_form
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
-  var _HACL = joo_global_object._HACL;
+  var H = joo_global_object._HACL;
   var bpk = MlBytes2buf(pk);
-  var bret = _HACL.P256.decompression_not_compressed_form(bpk);
+  var bret = H.P256.decompression_not_compressed_form(bpk);
   blit_buf_onto_MlBytes(bret[1], out);
   return (bret[0] ? 1 : 0);
 }
