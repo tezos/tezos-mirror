@@ -853,7 +853,10 @@ let prepare_first_block ~level ~timestamp ctxt =
           Constants_repr.Generated.generate
             ~consensus_committee_size
             ~blocks_per_minute:
-              (60 / Int64.to_int (Period_repr.to_seconds block_time))
+              {
+                numerator = 60;
+                denominator = Int64.to_int (Period_repr.to_seconds block_time);
+              }
         in
         Constants_repr.
           {

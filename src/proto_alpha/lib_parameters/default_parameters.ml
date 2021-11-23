@@ -38,7 +38,7 @@ let constants_mainnet =
         } =
     Constants.Generated.generate
       ~consensus_committee_size
-      ~blocks_per_minute:(60 / block_time)
+      ~blocks_per_minute:{numerator = 60; denominator = block_time}
   in
   {
     Constants.preserved_cycles = 5;
@@ -105,7 +105,7 @@ let constants_sandbox =
         } =
     Constants.Generated.generate
       ~consensus_committee_size
-      ~blocks_per_minute:(60 / block_time)
+      ~blocks_per_minute:{numerator = 60; denominator = block_time}
   in
   {
     constants_mainnet with
@@ -140,7 +140,9 @@ let constants_test =
           baking_reward_bonus_per_slot;
           endorsing_reward_per_slot;
         } =
-    Constants.Generated.generate ~consensus_committee_size ~blocks_per_minute:2
+    Constants.Generated.generate
+      ~consensus_committee_size
+      ~blocks_per_minute:{numerator = 2; denominator = 1}
   in
   {
     constants_mainnet with
