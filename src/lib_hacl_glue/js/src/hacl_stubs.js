@@ -25,7 +25,7 @@ function hacl_blit_buf_to_bytes(buf, MlBytes) {
 
 //Provides: _1_Lib_RandomBuffer_System_randombytes
 //Requires: hacl_blit_buf_to_bytes
-function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no-unused-vars
+function _1_Lib_RandomBuffer_System_randombytes(buf) {
   return ((typeof self !== 'undefined' && (self.crypto || self.msCrypto))
     ? function() { // Browsers
       var crypto = (self.crypto || self.msCrypto), QUOTA = 65536;
@@ -48,7 +48,7 @@ function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no
 
 //Provides: Hacl_Blake2b_32_blake2b
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) { // eslint-disable-line no-unused-vars
+function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
@@ -59,7 +59,7 @@ function Hacl_Blake2b_32_blake2b(key, msg, digest_len, digest) { // eslint-disab
 
 //Provides: Hacl_Hash_SHA2_hash_256
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Hash_SHA2_hash_256(msg, digest) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_SHA2_hash_256(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
   var bret = H.SHA2.hash_256(bmsg);
@@ -69,7 +69,7 @@ function Hacl_Hash_SHA2_hash_256(msg, digest) { // eslint-disable-line no-unused
 
 //Provides: Hacl_Hash_SHA2_hash_512
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Hash_SHA2_hash_512(msg, digest) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_SHA2_hash_512(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
   var bret = H.SHA2.hash_512(bmsg);
@@ -79,7 +79,7 @@ function Hacl_Hash_SHA2_hash_512(msg, digest) { // eslint-disable-line no-unused
 
 //Provides: Hacl_SHA3_sha3_256
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_SHA3_sha3_256(msg, digest) { // eslint-disable-line no-unused-vars
+function Hacl_SHA3_sha3_256(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
   var bret = H.SHA3.hash_256(bmsg);
@@ -89,7 +89,7 @@ function Hacl_SHA3_sha3_256(msg, digest) { // eslint-disable-line no-unused-vars
 
 //Provides: Hacl_SHA3_sha3_512
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_SHA3_sha3_512(msg, digest) { // eslint-disable-line no-unused-vars
+function Hacl_SHA3_sha3_512(msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
   var bret = H.SHA3.hash_512(bmsg);
@@ -99,7 +99,7 @@ function Hacl_SHA3_sha3_512(msg, digest) { // eslint-disable-line no-unused-vars
 
 //Provides: Hacl_Impl_SHA3_keccak
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) { // eslint-disable-line no-unused-vars
+function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) {
   var H = joo_global_object._HACL;
   var bmsg = hacl_create_buffer(msg);
   // The length of the output buffer needs to be passed in explicitly because
@@ -112,7 +112,7 @@ function Hacl_Impl_SHA3_keccak(rate, capacity, suffix, msg, digest) { // eslint-
 
 //Provides: Hacl_HMAC_compute_sha2_256
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_HMAC_compute_sha2_256 (output, key, msg) { // eslint-disable-line no-unused-vars
+function Hacl_HMAC_compute_sha2_256 (output, key, msg) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
@@ -123,7 +123,7 @@ function Hacl_HMAC_compute_sha2_256 (output, key, msg) { // eslint-disable-line 
 
 //Provides: Hacl_HMAC_compute_sha2_512
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_HMAC_compute_sha2_512 (output, key, msg) { // eslint-disable-line no-unused-vars
+function Hacl_HMAC_compute_sha2_512 (output, key, msg) {
   var H = joo_global_object._HACL;
   var bkey = hacl_create_buffer(key);
   var bmsg = hacl_create_buffer(msg);
@@ -134,7 +134,7 @@ function Hacl_HMAC_compute_sha2_512 (output, key, msg) { // eslint-disable-line 
 
 //Provides: Hacl_Curve25519_51_scalarmult
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) { // eslint-disable-line no-unused-vars
+function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
   var bret = H.Curve25519_51.secret_to_public(bsk);
@@ -144,7 +144,7 @@ function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) { // eslint-disable-li
 
 //Provides: Hacl_NaCl_crypto_secretbox_easy
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) {
   var H = joo_global_object._HACL;
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
@@ -156,7 +156,7 @@ function Hacl_NaCl_crypto_secretbox_easy(c, m, n, k) { // eslint-disable-line no
 
 //Provides: Hacl_NaCl_crypto_secretbox_open_easy
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) {
   var H = joo_global_object._HACL;
   var bc = hacl_create_buffer(c);
   var bn = hacl_create_buffer(n);
@@ -168,7 +168,7 @@ function Hacl_NaCl_crypto_secretbox_open_easy(m, c, n, k) { // eslint-disable-li
 
 //Provides: Hacl_NaCl_crypto_box_beforenm
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bsk = hacl_create_buffer(sk);
@@ -179,7 +179,7 @@ function Hacl_NaCl_crypto_box_beforenm(k, pk, sk) { // eslint-disable-line no-un
 
 //Provides: Hacl_NaCl_crypto_box_easy_afternm
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) {
   var H = joo_global_object._HACL;
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
@@ -191,7 +191,7 @@ function Hacl_NaCl_crypto_box_easy_afternm(c, m, n, k) { // eslint-disable-line 
 
 //Provides: Hacl_NaCl_crypto_box_open_easy_afternm
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) {
   var H = joo_global_object._HACL;
   var bc = hacl_create_buffer(c);
   var bn = hacl_create_buffer(n);
@@ -203,7 +203,7 @@ function Hacl_NaCl_crypto_box_open_easy_afternm(m, c, n, k) { // eslint-disable-
 
 //Provides: Hacl_NaCl_crypto_box_detached_afternm
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) {
   var H = joo_global_object._HACL;
   var bm = hacl_create_buffer(m);
   var bn = hacl_create_buffer(n);
@@ -216,7 +216,7 @@ function Hacl_NaCl_crypto_box_detached_afternm(c, tag, m, n, k) { // eslint-disa
 
 //Provides: Hacl_NaCl_crypto_box_open_detached_afternm
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) { // eslint-disable-line no-unused-vars
+function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) {
   var H = joo_global_object._HACL;
   var btag = hacl_create_buffer(tag);
   var bc = hacl_create_buffer(c);
@@ -229,7 +229,7 @@ function Hacl_NaCl_crypto_box_open_detached_afternm(m, c, tag, n, k) { // eslint
 
 //Provides: Hacl_Ed25519_secret_to_public
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Ed25519_secret_to_public(out, secret) { // eslint-disable-line no-unused-vars
+function Hacl_Ed25519_secret_to_public(out, secret) {
   var H = joo_global_object._HACL;
   var bsecret = hacl_create_buffer(secret);
   var bret = H.Ed25519.secret_to_public(bsecret);
@@ -239,7 +239,7 @@ function Hacl_Ed25519_secret_to_public(out, secret) { // eslint-disable-line no-
 
 //Provides: Hacl_Ed25519_sign
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_Ed25519_sign(signature, sk, msg) { // eslint-disable-line no-unused-vars
+function Hacl_Ed25519_sign(signature, sk, msg) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
   var bmsg = hacl_create_buffer(msg);
@@ -250,7 +250,7 @@ function Hacl_Ed25519_sign(signature, sk, msg) { // eslint-disable-line no-unuse
 
 //Provides: Hacl_Ed25519_verify
 //Requires: hacl_create_buffer
-function Hacl_Ed25519_verify(pk, msg, signature) { // eslint-disable-line no-unused-vars
+function Hacl_Ed25519_verify(pk, msg, signature) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bmsg = hacl_create_buffer(msg);
@@ -273,7 +273,7 @@ function Hacl_P256_ecdsa_sign_p256_without_hash (privkey, m, k, result) { // esl
 
 //Provides: Hacl_P256_ecdsa_verif_without_hash
 //Requires: hacl_create_buffer
-function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-disable-line no-unused-vars
+function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bmsg = hacl_create_buffer(msg);
@@ -285,7 +285,7 @@ function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-
 
 //Provides: Hacl_P256_is_more_than_zero_less_than_order
 //Requires: hacl_create_buffer
-function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-line no-unused-vars
+function Hacl_P256_is_more_than_zero_less_than_order (sk) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
   var bret = H.P256.is_more_than_zero_less_than_order(bsk);
@@ -294,7 +294,7 @@ function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-li
 
 //Provides: Hacl_P256_verify_q
 //Requires: hacl_create_buffer
-function Hacl_P256_verify_q (pk) { // eslint-disable-line no-unused-vars
+function Hacl_P256_verify_q (pk) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bret = H.P256.verify_q(bpk);
@@ -303,7 +303,7 @@ function Hacl_P256_verify_q (pk) { // eslint-disable-line no-unused-vars
 
 //Provides: Hacl_P256_ecp256dh_i
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
+function Hacl_P256_ecp256dh_i (pk, sk) {
   var H = joo_global_object._HACL;
   var bsk = hacl_create_buffer(sk);
   var bret = H.P256.dh_initiator(bsk);
@@ -313,7 +313,7 @@ function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
 
 //Provides: Hacl_P256_compression_compressed_form
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_P256_compression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+function Hacl_P256_compression_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bret = H.P256.compression_compressed_form(bpk);
@@ -323,7 +323,7 @@ function Hacl_P256_compression_compressed_form (pk, out) { // eslint-disable-lin
 
 //Provides: Hacl_P256_compression_not_compressed_form
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_P256_compression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+function Hacl_P256_compression_not_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bret = H.P256.compression_not_compressed_form(bpk);
@@ -333,7 +333,7 @@ function Hacl_P256_compression_not_compressed_form (pk, out) { // eslint-disable
 
 //Provides: Hacl_P256_decompression_compressed_form
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+function Hacl_P256_decompression_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bret = H.P256.decompression_compressed_form(bpk);
@@ -343,7 +343,7 @@ function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-l
 
 //Provides: Hacl_P256_decompression_not_compressed_form
 //Requires: hacl_create_buffer, hacl_blit_buf_to_bytes
-function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+function Hacl_P256_decompression_not_compressed_form (pk, out) {
   var H = joo_global_object._HACL;
   var bpk = hacl_create_buffer(pk);
   var bret = H.P256.decompression_not_compressed_form(bpk);
@@ -353,36 +353,36 @@ function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disab
 
 //Provides: Hacl_Hash_Core_SHA2_init_256
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_init_256(state) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_init_256(state) {
   caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_256');
 }
 
 //Provides: Hacl_Hash_Core_SHA2_update_256
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_update_256(state, bytes) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_update_256(state, bytes) {
   caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_256');
 }
 
 //Provides: Hacl_Hash_Core_SHA2_finish_256
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_finish_256(state, hash) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_finish_256(state, hash) {
     caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_256');
 }
 
 //Provides: Hacl_Hash_Core_SHA2_init_512
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_init_512(state) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_init_512(state) {
     caml_failwith(' not implemented Hacl_Hash_Core_SHA2_init_512');
 }
 
 //Provides: Hacl_Hash_Core_SHA2_update_512
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_update_512(state, bytes) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_update_512(state, bytes) {
     caml_failwith(' not implemented Hacl_Hash_Core_SHA2_update_512');
 }
 
 //Provides: Hacl_Hash_Core_SHA2_finish_512
 //Requires: caml_failwith
-function Hacl_Hash_Core_SHA2_finish_512(state, hash) { // eslint-disable-line no-unused-vars
+function Hacl_Hash_Core_SHA2_finish_512(state, hash) {
     caml_failwith(' not implemented Hacl_Hash_Core_SHA2_finish_512');
 }
