@@ -361,6 +361,14 @@ module Gas : sig
      [Unaccounted], an arbitrary value will be returned. *)
   val remaining_operation_gas : context -> Arith.fp
 
+  (** [reset_block_gas ctxt] returns a context where the remaining gas
+     in the block is reset to the constant [hard_gas_limit_per_block],
+     i.e., as if no operations have been included in the block.
+
+     /!\ Do not call this function unless you want to validate
+     operations on their own (like in the mempool). *)
+  val reset_block_gas : context -> context
+
   (** [level ctxt] is the current gas level in [ctxt] for the current
      operation. *)
   val level : context -> t

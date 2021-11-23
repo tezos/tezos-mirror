@@ -123,6 +123,8 @@ val update_remaining_operation_gas : t -> Gas_limit_repr.Arith.fp -> t
 
 val block_gas_level : t -> Gas_limit_repr.Arith.fp
 
+val update_remaining_block_gas : t -> Gas_limit_repr.Arith.fp -> t
+
 type error += Undefined_operation_nonce (* `Permanent *)
 
 val init_origination_nonce : t -> Operation_hash.t -> t

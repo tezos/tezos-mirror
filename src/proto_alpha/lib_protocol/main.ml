@@ -808,9 +808,11 @@ let check_manager_signature {chain_id; ctxt; _} op raw_op =
   Apply.check_manager_signature ctxt chain_id op raw_op
 
 let precheck_manager {ctxt; _} op =
-  (* We do not need to check the limit in block since the function
-     does not return a context. *)
-  Apply.precheck_manager_contents_list ctxt op ~check_limit_in_block:false
+  (* We do not account for the gas limit of the batch in the block
+     since this function does not return a context, but we check that
+     this limit is within bounds (and fail otherwise with a
+     permanenent error). *)
+  Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
   >|=? fun (_ :
              Alpha_context.t
              * 'kind Alpha_context.Kind.manager

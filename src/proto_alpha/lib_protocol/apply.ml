@@ -1135,9 +1135,8 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   in
   apply ctxt [] ops
 
-let precheck_manager_contents (type kind) ctxt ~(check_limit_in_block : bool)
-    (op : kind Kind.manager contents) :
-    (context * precheck_result) tzresult Lwt.t =
+let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
+    ~(only_batch : bool) : (context * precheck_result) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -1149,8 +1148,16 @@ let precheck_manager_contents (type kind) ctxt ~(check_limit_in_block : bool)
                                  }) =
     op
   in
-  (if check_limit_in_block then Gas.consume_limit_in_block ctxt gas_limit
-  else Gas.check_limit_is_valid ctxt gas_limit >|? fun () -> ctxt)
+  (if only_batch then
+   (* Gas.consume_limit_in_block will only raise a "temporary" error, however
+      when the precheck is called on a batch in isolation (like e.g. in the
+      mempool) it must "refuse" operations whose total gas_limit (the sum of
+      the gas_limits of each operation) is already above the block limit. We
+      add the "permanent" error Gas.Gas_limit_too_high on top of the trace to
+      this effect. *)
+   record_trace Gas.Gas_limit_too_high
+  else fun errs -> errs)
+  @@ Gas.consume_limit_in_block ctxt gas_limit
   >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt_before = ctxt in
@@ -1411,24 +1418,27 @@ let rec mark_skipped :
 (** Returns an updated context, and a list of prechecked contents containing
     balance updates for fees related to each manager operation in
     [contents_list]. *)
-let rec precheck_manager_contents_list :
-    type kind.
-    Alpha_context.t ->
-    kind Kind.manager contents_list ->
-    check_limit_in_block:bool ->
-    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
- fun ctxt contents_list ~check_limit_in_block ->
-  match[@coq_match_with_default] contents_list with
-  | Single contents ->
-      precheck_manager_contents ctxt ~check_limit_in_block contents
-      >>=? fun (ctxt, result) ->
-      return (ctxt, PrecheckedSingle {contents; result})
-  | Cons (contents, rest) ->
-      precheck_manager_contents ctxt ~check_limit_in_block contents
-      >>=? fun (ctxt, result) ->
-      precheck_manager_contents_list ctxt rest ~check_limit_in_block
-      >>=? fun (ctxt, results_rest) ->
-      return (ctxt, PrecheckedCons ({contents; result}, results_rest))
+let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
+  let rec rec_precheck_manager_contents_list :
+      type kind.
+      Alpha_context.t ->
+      kind Kind.manager contents_list ->
+      (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
+   fun ctxt contents_list ->
+    match[@coq_match_with_default] contents_list with
+    | Single contents ->
+        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
+        >>=? fun (ctxt, result) ->
+        return (ctxt, PrecheckedSingle {contents; result})
+    | Cons (contents, rest) ->
+        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
+        >>=? fun (ctxt, result) ->
+        rec_precheck_manager_contents_list ctxt rest
+        >>=? fun (ctxt, results_rest) ->
+        return (ctxt, PrecheckedCons ({contents; result}, results_rest))
+  in
+  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  rec_precheck_manager_contents_list ctxt contents_list
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =
@@ -2019,10 +2029,10 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
-  let check_limit_in_block =
+  let mempool_mode =
     match apply_mode with
-    | Partial_construction _ -> false
-    | Full_construction _ | Application _ -> true
+    | Partial_construction _ -> true
+    | Full_construction _ | Application _ -> false
   in
   match[@coq_match_with_default] contents_list with
   | Single (Preendorsement consensus_content) ->
@@ -2145,7 +2155,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt op ~check_limit_in_block
+      precheck_manager_contents_list ctxt op ~mempool_mode
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
@@ -2156,7 +2166,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         prechecked_contents_list
       >|= ok
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt op ~check_limit_in_block
+      precheck_manager_contents_list ctxt op ~mempool_mode
       >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
       apply_manager_contents_list
