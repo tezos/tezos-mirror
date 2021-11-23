@@ -56,6 +56,11 @@ Michelson
   replaced by ``SUB_MUTEZ; ASSERT_SOME`` (and ``SUB; DROP`` can be
   replaced by ``ASSERT_CMPGE``). (MR :gl:`!3079`)
 
+Precheck of operations
+----------------------
+
+- Expose `precheck_manager` and `check_manager_signature` (MR :gl:`!3872`)
+
 Bug Fixes
 ---------
 
@@ -85,7 +90,7 @@ Minor Changes
   these instructions are executed. (MR :gl:`!3524`)
 
 - The RPC ``../helpers/current_level`` does not support anymore a
-  negative ``offset`` argument. The level which used to be returned by 
+  negative ``offset`` argument. The level which used to be returned by
   ``../<block>/helpers/current_level?offset=-<n>`` can still be obtained by
   ``../<block~n>/helpers/current_level``. (MR :gl:`!3808`)
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,

@@ -804,4 +804,15 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
 
+let check_manager_signature {chain_id; ctxt; _} op raw_op =
+  Apply.check_manager_signature ctxt chain_id op raw_op
+
+let precheck_manager {ctxt; _} op =
+  Apply.precheck_manager_contents_list ctxt op
+  >|=? fun (_ :
+             Alpha_context.t
+             * ( 'kind Alpha_context.Kind.manager,
+                 Alpha_context.Receipt.balance_updates )
+               Apply_results.prechecked_contents_list) -> ()
+
 (* Vanity nonce: TBD *)
