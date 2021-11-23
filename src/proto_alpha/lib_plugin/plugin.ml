@@ -1217,7 +1217,7 @@ module RPC = struct
       trace_eval
         (fun () ->
           let exp_ty = Script_ir_translator.serialize_ty_for_error exp_ty in
-          Lwt.return @@ Script_tc_errors.Ill_typed_data (None, data, exp_ty))
+          Script_tc_errors.Ill_typed_data (None, data, exp_ty))
         (let allow_forged =
            true
            (* Safe since we ignore the value afterwards. *)

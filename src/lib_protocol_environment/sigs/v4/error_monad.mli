@@ -134,7 +134,7 @@ val record_trace_eval :
   (unit -> 'err) -> ('a, 'err trace) result -> ('a, 'err trace) result
 
 val trace_eval :
-  (unit -> 'err Lwt.t) ->
+  (unit -> 'err) ->
   ('b, 'err trace) result Lwt.t ->
   ('b, 'err trace) result Lwt.t
 

@@ -2387,9 +2387,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
     Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
-  let traced body =
-    trace_eval (fun () -> Lwt.return @@ parse_data_error ()) body
-  in
+  let traced body = trace_eval parse_data_error body in
   Gas.consume ctxt Typecheck_costs.parse_data_cycle
   (* We could have a smaller cost but let's keep it consistent with
      [parse_data] for now. *)
@@ -2483,9 +2481,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   in
   let fail_parse_data () = fail (parse_data_error ()) in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
-  let traced body =
-    trace_eval (fun () -> Lwt.return @@ parse_data_error ()) body
-  in
+  let traced body = trace_eval parse_data_error body in
   let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
   let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
       =
@@ -5702,7 +5698,7 @@ let parse_storage :
   trace_eval
     (fun () ->
       let storage_type = serialize_ty_for_error storage_type in
-      Lwt.return @@ Ill_typed_data (None, storage, storage_type))
+      Ill_typed_data (None, storage, storage_type))
     (parse_data
        ?type_logger
        ~stack_depth:0
