@@ -555,7 +555,7 @@ module Make
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Undecided -> (
             Prevalidation.apply_operation validation_state op >>= function
-            | Applied (new_validation_state, receipt) ->
+            | Applied (new_validation_state, receipt) -> (
                 post_filter
                   pv
                   ~validation_state_before:
@@ -564,16 +564,14 @@ module Make
                     (Prevalidation.validation_state new_validation_state)
                   op.protocol_data
                   receipt
-                >>= fun (accept, filter_state) ->
-                if accept then (
-                  handle ~notifier pv.shell (`Parsed op) `Applied ;
-                  let new_mempool = Mempool.cons_valid op.hash mempool in
-                  Lwt.return (filter_state, new_validation_state, new_mempool))
-                else (
-                  Distributed_db.Operation.clear_or_cancel
-                    pv.shell.parameters.chain_db
-                    oph ;
-                  Lwt.return (filter_state, validation_state, mempool))
+                >>= function
+                | `Passed_postfilter filter_state ->
+                    handle ~notifier pv.shell (`Parsed op) `Applied ;
+                    let new_mempool = Mempool.cons_valid op.hash mempool in
+                    Lwt.return (filter_state, new_validation_state, new_mempool)
+                | `Refused _ as classification ->
+                    handle ~notifier pv.shell (`Parsed op) classification ;
+                    Lwt.return (filter_state, validation_state, mempool))
             | Branch_delayed errors ->
                 handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
                 Lwt.return (filter_state, validation_state, mempool)

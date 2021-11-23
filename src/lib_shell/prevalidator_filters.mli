@@ -106,21 +106,19 @@ module type FILTER = sig
 
     (** [post_filter config ~filter_state ~validation_state_before
         ~validation_state_after (operation_data, operation_receipt)]
-        is called after a call to
-        [Prevalidation.apply_operation] in the prevalidator, on operations that
-        did not fail. It calls the [post_filter] function in the protocol
-        plugin and returns [`Applied] if no error occurs during the checking of
-        the [operation_receipt]. If an error occurs during the checks, returns
-        an error corresponding to the kind of the error returned by the
-        protocol. This function both takes a [state] as parameter and
-        returns a [state], because it can update it while executing. *)
+        is called after a call to [Prevalidation.apply_operation] in the
+        prevalidator, on operations that did not fail. It returns
+        [`Passed_postfilter] if the operation passes the filter. It returns
+        [`Refused] otherwise. This function both takes a [filter_state] as
+        parameter and returns a [filter_state], because it can update it while
+        executing. *)
     val post_filter :
       config ->
       filter_state:state ->
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
       Proto.operation_data * Proto.operation_receipt ->
-      (bool * state) Lwt.t
+      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
 
   module RPC : sig

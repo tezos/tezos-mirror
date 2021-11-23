@@ -80,7 +80,7 @@ module type FILTER = sig
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
       Proto.operation_data * Proto.operation_receipt ->
-      (bool * state) Lwt.t
+      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
 
   module RPC : sig
@@ -111,7 +111,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let post_filter _ ~filter_state ~validation_state_before:_
         ~validation_state_after:_ _ =
-      Lwt.return (true, filter_state)
+      Lwt.return (`Passed_postfilter filter_state)
   end
 
   module RPC = struct
