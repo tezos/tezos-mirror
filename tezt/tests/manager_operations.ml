@@ -211,9 +211,14 @@ module Helpers = struct
     `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)
 
   (** Initialize a network with two nodes *)
-  let init ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
-    let node1 = Node.create [Synchronisation_threshold 0; Connections 1] in
-    let node2 = Node.create [Synchronisation_threshold 0; Connections 1] in
+  let init ?(disable_operation_precheck = false)
+      ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
+    let args =
+      [Node.Synchronisation_threshold 0; Connections 1]
+      @ if disable_operation_precheck then [Disable_operations_precheck] else []
+    in
+    let node1 = Node.create args in
+    let node2 = Node.create args in
     let* client1 = Client.init ~endpoint:(Node node1) ()
     and* client2 = Client.init ~endpoint:(Node node2) () in
     let nodes =
@@ -289,7 +294,7 @@ module Memchecks = struct
     | `Applied -> "applied"
     | `Refused -> "refused"
     | `Branch_refused -> "branch_refused"
-    | `Branch_delayed -> "b ranch_delayed"
+    | `Branch_delayed -> "branch_delayed"
     | `Outdated -> "outdated"
     | `Unprocessed -> "unprocessed"
 
@@ -931,6 +936,595 @@ module Reveal = struct
     revealed_twice_in_batch_bad_second_key ~protocols
 end
 
+module Simple_transfers = struct
+  let test_simple_transfer_applied =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer applied"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let test_simple_transfer_low_balance_to_pay_fees =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer not enough balance to pay fees"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+      >|= JSON.as_int
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:((2 * bal) + 1) (* Too high fee *)
+        ~amount:1
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_low_balance_to_make_transfer =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer not enough balance to make transfer"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+      >|= JSON.as_int
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["balance_too_low"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(bal - 1) (* fee and amount too large: cannot pay [fee + amount] *)
+        ~amount:(bal / 2)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 1
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_counter_in_the_past =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer counter in the past"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+      >|= JSON.as_int
+    in
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(fee + 1)
+        ~amount:(bal - fee)
+        ~counter (* Specifying existing counter: wrong *)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_counter_in_the_future =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer counter in the future"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+      >|= JSON.as_int
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:(fee + 1)
+        ~amount:(bal - fee)
+        ~counter:
+          (counter + 5) (* Counter too large (aka "in the future"): wrong *)
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_wrong_signature =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with wrong signature"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* bal =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap2.public_key_hash
+        nodes.main.client
+      >|= JSON.as_int
+    in
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~signer:Constant.bootstrap3 (* signer is different from source *)
+        ~amount
+        ~fee
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main Constant.bootstrap2 bal
+    in
+    Memchecks.check_revealed
+      ~__LOC__
+      nodes.main
+      Constant.bootstrap2
+      ~revealed:true
+
+  let test_simple_transfer_not_enough_gas =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with not enough gas"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["gas_exhausted.operation"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee
+        ~amount
+        nodes.main.client
+        ~gas_limit:1
+      (* Gas too small *)
+    in
+    unit
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2077
+     Once this issue is fixed change the test to check that the operation is refused
+     and not propagated.
+
+     Note: At the moment, the pre-filter (hence pre-check) of the mempool is not
+     called for operations injected to the node directly (but rather for the
+     ones that are received from another node) otherwise these would have been
+     classified as "rejected".
+  *)
+  let test_simple_transfer_not_enough_fees_for_gas =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer with not enough fees to cover gas"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~observer_classification:`Refused
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~fee:150
+        ~amount
+        nodes.main.client
+    in
+    unit
+
+  let test_simple_transfer_low_balance_to_pay_allocation_1 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer with low balance to pay allocation (1)"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let* key2 = Client.gen_and_show_keys nodes.main.client in
+    let balance = amount - fee in
+    (* subtract fees payed for revelation *)
+    let to_transfer = balance - fee - 1 in
+    (* In theory, if the operation succeeds, there will remain 1 mutez on the account *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["backtracked"]
+        ~expected_errors:[["contract.cannot_pay_storage_fee"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:key2
+        ~gas_limit:1500
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main key1 (balance - fee)
+    in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:true
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key2 0 in
+    Memchecks.check_revealed ~__LOC__ nodes.main key2 ~revealed:false
+
+  let test_simple_transfer_low_balance_to_pay_allocation_2 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer with low balance to pay allocation (2)"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let* key2 = Client.gen_and_show_keys nodes.main.client in
+    let balance = amount - fee in
+    (* subtract revelation fees *)
+    let to_transfer = balance - fee in
+    (* In theory, if the operation succeeds, there will remain 0 mutez on the account *)
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["backtracked"]
+        ~expected_errors:[["contract.cannot_pay_storage_fee"]]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:key2
+        ~gas_limit:1900
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () =
+      Memchecks.check_balance ~__LOC__ nodes.main key1 (balance - fee)
+    in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:true
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key2 0 in
+    Memchecks.check_revealed ~__LOC__ nodes.main key2 ~revealed:false
+
+  let test_simple_transfer_of_the_whole_balance =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test simple transfer of the whole balance"
+      ~tags:["transaction"; "transfer"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key1 =
+      Helpers.init_fresh_account ~protocol ~reveal:true nodes ~amount ~fee
+    in
+    let balance = amount - fee in
+    (* subtract revelation fees *)
+    let to_transfer = balance - fee in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["applied"]
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:key1
+        ~dest:Constant.bootstrap2
+        ~gas_limit:1900
+        ~fee
+        ~amount:to_transfer
+        nodes.main.client
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key1 0 in
+    let* () =
+      Memchecks.check_revealed ~__LOC__ nodes.main key1 ~revealed:false
+    in
+    unit
+
+  let test_simple_transfers_successive_wrong_counters =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test succesive injections with same manager"
+      ~tags:["transaction"; "transfer"; "counters"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1) (* Reuse counter: wrong *)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks
+        ~__LOC__
+        nodes
+        ~classification_after_flush:`Branch_refused
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        ~amount:2
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks
+        ~__LOC__
+        nodes
+        ~classification_after_flush:`Absent
+        ~should_include:true
+      (* applied after flush *)
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 3)
+        ~amount:2
+        nodes.main.client
+    in
+    unit
+
+  let test_simple_transfers_successive_wrong_counters_no_op_pre =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        "Test successive injections with same manager (no operation precheck)"
+      ~tags:["transaction"; "transfer"; "counters"; "no_operation_precheck"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~disable_operation_precheck:true ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:[]
+        ~bake:false
+      @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        ~amount:1
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_transfer
+        ~protocol
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2) (* Reuse counter: wrong *)
+        ~amount:2
+        nodes.main.client
+    in
+    unit
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2244
+     Should be refused because this batch is never applicable. *)
+  let test_batch_simple_transfers_wrong_counters =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test batch with wrong counters (+1, +2, +2)"
+      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* op1 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        nodes.main.client
+    in
+    let* op2 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        nodes.main.client
+    in
+    let* op3 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2) (* Reuse counter: wrong *)
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch:[op1; op2; op3]
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2244
+     Should be refused because this batch is never applicable. *)
+  let test_batch_simple_transfers_wrong_counters_2 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test batch with wrong counters (+1, +2, +4)"
+      ~tags:["transaction"; "transfer"; "counters"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* counter =
+      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
+    in
+    let* op1 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        nodes.main.client
+    in
+    let* op2 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 2)
+        nodes.main.client
+    in
+    let* op3 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 4)
+        nodes.main.client
+    in
+    let* _ =
+      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch:[op1; op2; op3]
+        ~signer:Constant.bootstrap2
+        nodes.main.client
+    in
+    unit
+
+  let register ~protocols =
+    test_simple_transfer_applied ~protocols ;
+    test_simple_transfer_low_balance_to_pay_fees ~protocols ;
+    test_simple_transfer_low_balance_to_make_transfer ~protocols ;
+    test_simple_transfer_counter_in_the_past ~protocols ;
+    test_simple_transfer_counter_in_the_future ~protocols ;
+    test_simple_transfer_wrong_signature ~protocols ;
+    test_simple_transfer_not_enough_gas ~protocols ;
+    test_simple_transfer_not_enough_fees_for_gas ~protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_1 ~protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_2 ~protocols ;
+    test_simple_transfer_of_the_whole_balance ~protocols ;
+    test_simple_transfers_successive_wrong_counters ~protocols:[Alpha] ;
+    test_simple_transfers_successive_wrong_counters_no_op_pre ~protocols ;
+    test_batch_simple_transfers_wrong_counters ~protocols ;
+    test_batch_simple_transfers_wrong_counters_2 ~protocols
+end
+
 module Simple_contract_calls = struct
   let sucessful_smart_contract_call =
     Protocol.register_test
@@ -1050,4 +1644,5 @@ end
 let register ~protocols =
   Illtyped_originations.register ~protocols ;
   Reveal.register ~protocols ;
+  Simple_transfers.register ~protocols ;
   Simple_contract_calls.register ~protocols
