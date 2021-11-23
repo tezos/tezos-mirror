@@ -86,12 +86,10 @@ module type VIEW = sig
 
   (** {2 Folding} *)
 
-  (** [fold ?depth t root ~init ~f] recursively folds over the trees
+  (** [fold ?depth t root ~order ~init ~f] recursively folds over the trees
       and values of [t]. The [f] callbacks are called with a key relative
       to [root]. [f] is never called with an empty key for values; i.e.,
       folding over a value is a no-op.
-
-      Elements are traversed in lexical order of keys.
 
       The depth is 0-indexed. If [depth] is set (by default it is not), then [f]
       is only called when the conditions described by the parameter is true:
@@ -100,11 +98,16 @@ module type VIEW = sig
       - [Lt d] folds over nodes and contents of depth strictly less than [d].
       - [Le d] folds over nodes and contents of depth less than or equal to [d].
       - [Gt d] folds over nodes and contents of depth strictly more than [d].
-      - [Ge d] folds over nodes and contents of depth more than or equal to [d]. *)
+      - [Ge d] folds over nodes and contents of depth more than or equal to [d].
+
+      If [order] is [`Sorted] (the default), the elements are traversed in
+      lexicographic order of their keys. For large nodes, it is memory-consuming,
+      use [`Undefined] for a more memory efficient [fold]. *)
   val fold :
     ?depth:depth ->
     t ->
     key ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
