@@ -42,6 +42,7 @@ let read_partial_context =
             ~depth:(`Le depth)
             context
             path
+            ~order:`Sorted
             ~init
             ~f:(fun k tree acc ->
               let open Block_services in

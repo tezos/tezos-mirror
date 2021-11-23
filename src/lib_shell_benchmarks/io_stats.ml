@@ -86,7 +86,12 @@ let tree_statistics key_map =
   {total = !nodes; keys = !keys; dirs = !dirs; degrees; depths; sizes}
 
 let load_tree context key =
-  Context.fold context key ~init:Io_helpers.Key_map.empty ~f:(fun path t tree ->
+  Context.fold
+    context
+    key
+    ~order:`Sorted
+    ~init:Io_helpers.Key_map.empty
+    ~f:(fun path t tree ->
       Context.Tree.to_value t >|= function
       | Some bytes ->
           let len = Bytes.length bytes in
