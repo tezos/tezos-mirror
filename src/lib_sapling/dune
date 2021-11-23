@@ -8,7 +8,6 @@
  (libraries
   integers
   ctypes
-  ctypes.foreign
   ctypes.stubs
   hex
   data-encoding
