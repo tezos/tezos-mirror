@@ -65,7 +65,7 @@ let constants_mainnet =
     liquidity_baking_subsidy = Tez.of_mutez_exn 2_500_000L;
     (* level after protocol activation when liquidity baking shuts off:
          about 6 months after first activation on mainnet *)
-    liquidity_baking_sunset_level = 2_244_609l;
+    liquidity_baking_sunset_level = 3_063_809l;
     (* 1/3 window size of 2000 blocks with precision of 1000 for integer computation *)
     liquidity_baking_escape_ema_threshold = 666_667l;
     (* The rationale behind the value of this constant is that an
