@@ -32,17 +32,29 @@ It requires protocol environment V4, compared to V3 for Hangzhou.
 
 - Fix use of Micheline canonical encoding. (MR :gl:`!3764`)
 
+- Add concat_map. (MR :gl:`!3801`)
+
+- Make Micheline.canonical_location abstract. (MR :gl:`!3744`)
+
+- Error_monad: better tracing primitives. (MR :gl:`!3589`)
+
 Tenderbake
 ----------
 
 - A replacement of Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
 
-Tickets Strengthening
----------------------
+- Export participation RPC. (MR :gl:`!3822`)
+
+- Rename Bonds to Deposits. (MR :gl:`!3832`)
+
+Tickets Hardening
+-----------------
 
 - Add ticket-balance storage module. (MR :gl:`!3495`)
 
 - Add API for scanning values for tickets. (MR :gl:`!3591`)
+
+- Add API for generating ticket-balance key hashes. (MR :gl:`!3788`)
 
 Michelson
 ---------
@@ -83,7 +95,8 @@ Minor Changes
 
 - Update migration for protocol "I". (MR :gl:`!3668`)
 
-- Make `max_operations_ttl` a parametric constant of the protocol, now called `max_operations_time_to_live`. (MR :gl:`!3709`)
+- Make `max_operations_ttl` a parametric constant of the protocol, now called
+  `max_operations_time_to_live`. (MR :gl:`!3709`)
 
 - ``NOW`` and ``LEVEL`` are now passed to the Michelson interpreter as
   step constants instead of being read from the context each time
@@ -93,7 +106,14 @@ Minor Changes
   negative ``offset`` argument. The level which used to be returned by
   ``../<block>/helpers/current_level?offset=-<n>`` can still be obtained by
   ``../<block~n>/helpers/current_level``. (MR :gl:`!3808`)
+
+- Ensure annotations are non-empty. (MR :gl:`!3746`)
+
+- Only allow positive depth in context query RPC and other RPC.
+  (MR :gl:`!3564`)
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
-  :gl:`!3529`, :gl:`!3739``, :gl:`!3741`, :gl:`!3695`, :gl:`!3763`)
+  :gl:`!3529`, :gl:`!3739`, :gl:`!3741`, :gl:`!3695`, :gl:`!3763`,
+  :gl:`!3779`, :gl:`!3745`, :gl:`!3256`, :gl:`!3326`, :gl:`!3812`)
