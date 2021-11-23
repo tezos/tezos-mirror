@@ -1599,45 +1599,28 @@ module RPC = struct
         (match operation with
         | Reveal pk -> Contract.reveal_manager_key ctxt source pk
         | Transaction {parameters; _} ->
-            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-            let arg_bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Script.lazy_expr_encoding
+            Lwt.return
+            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
+            @@ (* Fail if not enough gas for complete deserialization cost *)
+            ( Script.force_decode_in_context
+                ~consume_deserialization_gas:Always
+                ctxt
                 parameters
-            in
-            let arg =
-              match
-                Data_encoding.Binary.of_bytes_opt
-                  Script.lazy_expr_encoding
-                  arg_bytes
-              with
-              | Some arg -> arg
-              | None -> assert false
-            in
-            Lwt.return
-            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-            @@ (* Fail if not enough gas for complete deserialization cost *)
-            ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
-              ctxt )
+            >|? fun (_arg, _new_ctxt) -> ctxt )
         | Origination {script; _} ->
-            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-            let script_bytes =
-              Data_encoding.Binary.to_bytes_exn Script.encoding script
-            in
-            let script =
-              match
-                Data_encoding.Binary.of_bytes_opt Script.encoding script_bytes
-              with
-              | Some script -> script
-              | None -> assert false
-            in
             Lwt.return
             @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
             @@ (* Fail if not enough gas for complete deserialization cost *)
-            ( Script.force_decode_in_context ctxt script.code
-            >>? fun (_code, ctxt) ->
-              Script.force_decode_in_context ctxt script.storage
-              >|? fun (_storage, ctxt) -> ctxt )
+            ( Script.force_decode_in_context
+                ~consume_deserialization_gas:Always
+                ctxt
+                script.code
+            >>? fun (_code, new_ctxt) ->
+              Script.force_decode_in_context
+                ~consume_deserialization_gas:Always
+                new_ctxt
+                script.storage
+              >|? fun (_storage, _new_ctxt) -> ctxt )
         | _ -> return ctxt)
         >>=? fun ctxt ->
         Contract.get_manager_key ctxt source >>=? fun _public_key ->

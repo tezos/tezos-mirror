@@ -230,13 +230,21 @@ type block_metadata = {
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
 
-type ('kind, 'a) prechecked_contents = {contents : 'kind contents; result : 'a}
+type precheck_result = {
+  consumed_gas : Gas.Arith.fp;
+  balance_updates : Receipt.balance_updates;
+}
 
-type (_, _) prechecked_contents_list =
+type 'kind prechecked_contents = {
+  contents : 'kind contents;
+  result : precheck_result;
+}
+
+type _ prechecked_contents_list =
   | PrecheckedSingle :
-      ('kind, 'a) prechecked_contents
-      -> ('kind, 'a) prechecked_contents_list
+      'kind prechecked_contents
+      -> 'kind prechecked_contents_list
   | PrecheckedCons :
-      ('kind Kind.manager, 'a) prechecked_contents
-      * ('rest Kind.manager, 'a) prechecked_contents_list
-      -> (('kind * 'rest) Kind.manager, 'a) prechecked_contents_list
+      'kind Kind.manager prechecked_contents
+      * 'rest Kind.manager prechecked_contents_list
+      -> ('kind * 'rest) Kind.manager prechecked_contents_list

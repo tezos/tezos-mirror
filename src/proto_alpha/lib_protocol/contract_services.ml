@@ -346,7 +346,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
           >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
-          Script.force_decode_in_context ctxt script.storage
+          Script.force_decode_in_context
+            ~consume_deserialization_gas:When_needed
+            ctxt
+            script.storage
           >>?= fun (storage, _ctxt) -> return_some storage) ;
   opt_register2 ~chunked:true S.entrypoint_type (fun ctxt v entrypoint () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
@@ -356,7 +359,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
-          Script.force_decode_in_context ctxt expr >>?= fun (expr, _) ->
+          Script.force_decode_in_context
+            ~consume_deserialization_gas:When_needed
+            ctxt
+            expr
+          >>?= fun (expr, _) ->
           parse_toplevel ctxt ~legacy expr
           >>=? fun ({arg_type; root_name; _}, ctxt) ->
           Lwt.return
@@ -379,7 +386,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
-          Script.force_decode_in_context ctxt expr >>?= fun (expr, _) ->
+          Script.force_decode_in_context
+            ~consume_deserialization_gas:When_needed
+            ctxt
+            expr
+          >>?= fun (expr, _) ->
           parse_toplevel ctxt ~legacy expr
           >>=? fun ({arg_type; root_name; _}, ctxt) ->
           Lwt.return

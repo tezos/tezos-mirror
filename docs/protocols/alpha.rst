@@ -103,6 +103,9 @@ Bug Fixes
 
 - Use Cache_costs.cache_find in cache find. (MR :gl:`!3752`)
 
+- Fix gas accounting for the deserialization of Michelson arguments in
+  operations. (MR :gl:`!3930`)
+
 Minor Changes
 -------------
 

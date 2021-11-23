@@ -1689,7 +1689,10 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
   >>=? fun (arg, ctxt) ->
-  Script.force_decode_in_context ctxt unparsed_script.code
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    unparsed_script.code
   >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->

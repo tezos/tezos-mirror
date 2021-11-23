@@ -813,8 +813,7 @@ let precheck_manager {ctxt; _} op =
   Apply.precheck_manager_contents_list ctxt op ~check_limit_in_block:false
   >|=? fun (_ :
              Alpha_context.t
-             * ( 'kind Alpha_context.Kind.manager,
-                 Alpha_context.Receipt.balance_updates )
+             * 'kind Alpha_context.Kind.manager
                Apply_results.prechecked_contents_list) -> ()
 
 (* Vanity nonce: TBD *)

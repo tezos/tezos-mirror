@@ -214,7 +214,7 @@ val apply_manager_contents_list :
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
-  ('a Kind.manager, Receipt.balance_updates) prechecked_contents_list ->
+  'a Kind.manager prechecked_contents_list ->
   (t * 'a Kind.manager contents_result_list) Lwt.t
 
 val apply_contents_list :
@@ -241,10 +241,7 @@ val precheck_manager_contents_list :
   t ->
   'kind Kind.manager contents_list ->
   check_limit_in_block:bool ->
-  (context
-  * ('kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
-  tzresult
-  Lwt.t
+  (context * 'kind Kind.manager prechecked_contents_list) tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)

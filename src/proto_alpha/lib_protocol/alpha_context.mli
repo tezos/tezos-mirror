@@ -673,8 +673,21 @@ module Script : sig
 
   val bytes_node_cost : bytes -> Gas.cost
 
+  (** Mode of deserialization gas consumption in {!force_decode}:
+
+      - {!Always}: the gas is taken independently of the internal state of the
+        [lazy_expr]
+      - {!When_needed}: the gas is consumed only if the [lazy_expr] has never
+        been deserialized before. *)
+  type consume_deserialization_gas = Always | When_needed
+
+  (** Decode an expression in the context after consuming the deserialization
+      gas cost (see {!consume_deserialization_gas}). *)
   val force_decode_in_context :
-    context -> lazy_expr -> (expr * context) tzresult
+    consume_deserialization_gas:consume_deserialization_gas ->
+    context ->
+    lazy_expr ->
+    (expr * context) tzresult
 
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult

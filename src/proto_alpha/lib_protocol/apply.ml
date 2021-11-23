@@ -784,13 +784,21 @@ let apply_manager_operation_content :
     source:Contract.t ->
     chain_id:Chain_id.t ->
     internal:bool ->
+    gas_consumed_in_precheck:Gas.cost option ->
     kind manager_operation ->
     (context
     * kind successful_manager_operation_result
     * packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~internal operation ->
+ fun ctxt
+     mode
+     ~payer
+     ~source
+     ~chain_id
+     ~internal
+     ~gas_consumed_in_precheck
+     operation ->
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -798,6 +806,13 @@ let apply_manager_operation_content :
   in
   Contract.must_exist ctxt source >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
+  (match gas_consumed_in_precheck with
+  | None -> Ok ctxt
+  | Some gas -> Gas.consume ctxt gas)
+  >>?= fun ctxt ->
+  let consume_deserialization_gas = Script.When_needed in
+  (* [note]: deserialization gas has already been accounted for in the gas
+     consumed by the precheck and the lazy_exprs have been forced. *)
   match operation with
   | Reveal _ ->
       return
@@ -808,12 +823,11 @@ let apply_manager_operation_content :
             : kind successful_manager_operation_result),
           [] )
   | Transaction {amount; parameters; destination; entrypoint} -> (
-      Script.force_decode_in_context ctxt parameters
-      (* [note]: for toplevel ops, cost is nil since the lazy value has
-                 already been forced at precheck. Otherwise fail early if not
-                 enough gas for complete deserialization cost *)
-      >>?=
-      fun (parameter, ctxt) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameter, ctxt) ->
       (match Contract.is_implicit destination with
       | None ->
           (if Tez.(amount = zero) then
@@ -923,11 +937,15 @@ let apply_manager_operation_content :
               in
               (ctxt, result, operations) ))
   | Origination {delegate; script; preorigination; credit} ->
-      Script.force_decode_in_context ctxt script.storage
-      (* see [note] *)
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
-      Script.force_decode_in_context ctxt script.code
-      (* see [note] *)
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.code
       >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
@@ -1012,7 +1030,8 @@ let apply_manager_operation_content :
         [] )
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
-      Script.force_decode_in_context ctxt value >>?= fun (expr, ctxt) ->
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt value
+      >>?= fun (expr, ctxt) ->
       (* Set the key to the value in storage. *)
       Global_constants_storage.register ctxt expr
       >>=? fun (ctxt, address, size) ->
@@ -1092,6 +1111,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~payer
             ~chain_id
             ~internal:true
+            ~gas_consumed_in_precheck:None
             operation)
         >>= function
         | Error errors ->
@@ -1117,7 +1137,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
 
 let precheck_manager_contents (type kind) ctxt ~(check_limit_in_block : bool)
     (op : kind Kind.manager contents) :
-    (context * Receipt.balance_updates) tzresult Lwt.t =
+    (context * precheck_result) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -1133,33 +1153,56 @@ let precheck_manager_contents (type kind) ctxt ~(check_limit_in_block : bool)
   else Gas.check_limit_is_valid ctxt gas_limit >|? fun () -> ctxt)
   >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
+  let ctxt_before = ctxt in
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   let source_contract = Contract.implicit_contract source in
   Contract.must_be_allocated ctxt source_contract >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
+  let consume_deserialization_gas = Script.Always in
+  (* We want to always consume the deserialization gas here, independently of
+     the internal state of the lazy_exprs in the arguments. Otherwise we might
+     risk getting different results if the operation has already been
+     deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
   | Reveal pk -> Contract.reveal_manager_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization cost *)
-      ( Script.force_decode_in_context ctxt parameters >|? fun (_arg, ctxt) ->
-        ctxt )
+      @@ (* Fail early if not enough gas for complete deserialization
+             cost or if deserialization fails. The gas consumed here is
+            "replayed" in [apply_manager_contents]. *)
+      ( Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          parameters
+      >|? fun (_arg, ctxt) -> ctxt )
   | Origination {script; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization cost *)
-      ( Script.force_decode_in_context ctxt script.code >>? fun (_code, ctxt) ->
-        Script.force_decode_in_context ctxt script.storage
+      @@ (* See comment in the Transaction branch *)
+      ( Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          script.code
+      >>? fun (_code, ctxt) ->
+        Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          script.storage
         >|? fun (_storage, ctxt) -> ctxt )
   | Register_global_constant {value} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (Script.force_decode_in_context ctxt value >|? fun (_, ctxt) -> ctxt)
+      @@ (* See comment in the Transaction branch *)
+      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
+      >|? fun (_value, ctxt) -> ctxt )
   | _ -> return ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
+  >|=? fun (ctxt, balance_updates) ->
+  let consumed_gas = Gas.consumed ~since:ctxt_before ~until:ctxt in
+  (ctxt, {balance_updates; consumed_gas})
 
 (** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
     associated to the transaction or origination result [smopr].
@@ -1244,7 +1287,7 @@ let burn_storage_fees :
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    (op : kind Kind.manager contents) :
+    ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
     * packed_internal_operation_result list)
@@ -1269,6 +1312,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ~source
     ~payer:source
     ~internal:false
+    ~gas_consumed_in_precheck
     ~chain_id
     operation
   >>= function
@@ -1333,24 +1377,32 @@ let rec mark_skipped :
     type kind.
     payload_producer:Signature.Public_key_hash.t ->
     Level.t ->
-    (kind Kind.manager, Receipt.balance_updates) prechecked_contents_list ->
+    kind Kind.manager prechecked_contents_list ->
     kind Kind.manager contents_result_list =
  fun ~payload_producer level prechecked_contents_list ->
   match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle {contents = Manager_operation {operation; _}; result} ->
+  | PrecheckedSingle
+      {
+        contents = Manager_operation {operation; _};
+        result = {balance_updates; _};
+      } ->
       Single_result
         (Manager_operation_result
            {
-             balance_updates = result;
+             balance_updates;
              operation_result = skipped_operation_result operation;
              internal_operation_results = [];
            })
-  | PrecheckedCons ({contents = Manager_operation {operation; _}; result}, rest)
-    ->
+  | PrecheckedCons
+      ( {
+          contents = Manager_operation {operation; _};
+          result = {balance_updates; _};
+        },
+        rest ) ->
       Cons_result
         ( Manager_operation_result
             {
-              balance_updates = result;
+              balance_updates;
               operation_result = skipped_operation_result operation;
               internal_operation_results = [];
             },
@@ -1364,23 +1416,19 @@ let rec precheck_manager_contents_list :
     Alpha_context.t ->
     kind Kind.manager contents_list ->
     check_limit_in_block:bool ->
-    (context
-    * (kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
-    tzresult
-    Lwt.t =
+    (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
  fun ctxt contents_list ~check_limit_in_block ->
   match[@coq_match_with_default] contents_list with
   | Single contents ->
       precheck_manager_contents ctxt ~check_limit_in_block contents
-      >>=? fun (ctxt, balance_updates) ->
-      return (ctxt, PrecheckedSingle {contents; result = balance_updates})
+      >>=? fun (ctxt, result) ->
+      return (ctxt, PrecheckedSingle {contents; result})
   | Cons (contents, rest) ->
       precheck_manager_contents ctxt ~check_limit_in_block contents
-      >>=? fun (ctxt, balance_updates) ->
+      >>=? fun (ctxt, result) ->
       precheck_manager_contents_list ctxt rest ~check_limit_in_block
-      >>=? fun (ctxt, results) ->
-      return
-        (ctxt, PrecheckedCons ({contents; result = balance_updates}, results))
+      >>=? fun (ctxt, results_rest) ->
+      return (ctxt, PrecheckedCons ({contents; result}, results_rest))
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =
@@ -1430,33 +1478,45 @@ let rec apply_manager_contents_list_rec :
     Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
-    (kind Kind.manager, Receipt.balance_updates) prechecked_contents_list ->
+    kind Kind.manager prechecked_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
  fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
   let level = Level.current ctxt in
   match[@coq_match_with_default] prechecked_contents_list with
-  | PrecheckedSingle {contents = Manager_operation _ as op; result} ->
-      apply_manager_contents ctxt mode chain_id op
+  | PrecheckedSingle
+      {
+        contents = Manager_operation _ as op;
+        result = {consumed_gas; balance_updates};
+      } ->
+      apply_manager_contents
+        ctxt
+        mode
+        chain_id
+        ~gas_consumed_in_precheck:(Some consumed_gas)
+        op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
-          {
-            balance_updates = result;
-            operation_result;
-            internal_operation_results;
-          }
+          {balance_updates; operation_result; internal_operation_results}
       in
       (ctxt_result, Single_result result)
-  | PrecheckedCons ({contents = Manager_operation _ as op; result}, rest) -> (
-      apply_manager_contents ctxt mode chain_id op >>= function
+  | PrecheckedCons
+      ( {
+          contents = Manager_operation _ as op;
+          result = {consumed_gas; balance_updates};
+        },
+        rest ) -> (
+      apply_manager_contents
+        ctxt
+        mode
+        chain_id
+        ~gas_consumed_in_precheck:(Some consumed_gas)
+        op
+      >>= function
       | (Failure, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
-              {
-                balance_updates = result;
-                operation_result;
-                internal_operation_results;
-              }
+              {balance_updates; operation_result; internal_operation_results}
           in
           Lwt.return
             ( Failure,
@@ -1464,11 +1524,7 @@ let rec apply_manager_contents_list_rec :
       | (Success ctxt, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
-              {
-                balance_updates = result;
-                operation_result;
-                internal_operation_results;
-              }
+              {balance_updates; operation_result; internal_operation_results}
           in
           apply_manager_contents_list_rec
             ctxt
