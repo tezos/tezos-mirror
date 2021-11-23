@@ -279,6 +279,11 @@ val fold_right2 :
   'c ->
   ('c, 'trace) result
 
+(** [fold_left_map f a xs] is a combination of [fold_left] and [map] that maps
+    over all elements of [xs] and threads an accumulator with initial value [a]
+    through calls to [f]. *)
+val fold_left_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+
 val for_all2 :
   when_different_lengths:'trace ->
   ('a -> 'b -> bool) ->
@@ -551,6 +556,48 @@ val fold_left_es :
   'b list ->
   ('a, 'trace) result Lwt.t
 
+(** [fold_left_map_e f a xs] is a combination of [fold_left_e] and [map_e] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. The list is traversed from left to right
+    and the first encountered error is returned. *)
+val fold_left_map_e :
+  ('a -> 'b -> ('a * 'c, 'trace) result) ->
+  'a ->
+  'b list ->
+  ('a * 'c list, 'trace) result
+
+(** [fold_left_map_s f a xs] is a combination of [fold_left_s] and [map_s] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. *)
+val fold_left_map_s :
+  ('a -> 'b -> ('a * 'c) Lwt.t) -> 'a -> 'b list -> ('a * 'c list) Lwt.t
+
+(** [fold_left_map_es f a xs] is a combination of [fold_left_es] and [map_es] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. The list is traversed from left to right
+    and the first encountered error is returned. *)
+val fold_left_map_es :
+  ('a -> 'b -> ('a * 'c, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a * 'c list, 'trace) result Lwt.t
+
+val fold_left_i : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+val fold_left_i_e :
+  (int -> 'a -> 'b -> ('a, 'trace) result) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result
+
+val fold_left_i_s : (int -> 'a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
+
+val fold_left_i_es :
+  (int -> 'a -> 'b -> ('a, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result Lwt.t
+
 (** This function is not tail-recursive *)
 val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 
@@ -802,7 +849,7 @@ val combine_with_leftovers :
 
 val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
-val compare_lengths : 'a list -> 'a list -> int
+val compare_lengths : 'a list -> 'b list -> int
 
 val compare_length_with : 'a list -> int -> int
 
