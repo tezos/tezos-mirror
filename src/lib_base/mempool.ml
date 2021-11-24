@@ -58,4 +58,6 @@ let remove oph {known_valid; pending} =
     pending = Operation_hash.Set.remove oph pending;
   }
 
+let cons_valid oph t = {t with known_valid = oph :: t.known_valid}
+
 let () = Data_encoding.Registration.register encoding

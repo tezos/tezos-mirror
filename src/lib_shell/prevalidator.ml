@@ -532,7 +532,7 @@ module Make
         errs ->
           (* Note that we don't need to distinguish some failure cases
              of [Filter.Mempool.precheck], hence grouping them under `Fail. *)
-          `Fail err
+          `Fail errs
       | `Undecided ->
           (* The caller will need to call the protocol's [apply_operation]
              function. *)
@@ -551,10 +551,7 @@ module Make
             Lwt.return (filter_state, validation_state, mempool)
         | `Prechecked ->
             handle ~notifier pv.shell (`Parsed op) `Applied ;
-            let new_mempool =
-              Mempool.
-                {mempool with known_valid = op.hash :: mempool.known_valid}
-            in
+            let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Undecided -> (
             Prevalidation.apply_operation validation_state op >>= function
@@ -570,13 +567,7 @@ module Make
                 >>= fun (accept, filter_state) ->
                 if accept then (
                   handle ~notifier pv.shell (`Parsed op) `Applied ;
-                  let new_mempool =
-                    Mempool.
-                      {
-                        mempool with
-                        known_valid = op.hash :: mempool.known_valid;
-                      }
-                  in
+                  let new_mempool = Mempool.cons_valid op.hash mempool in
                   Lwt.return (filter_state, new_validation_state, new_mempool))
                 else (
                   Distributed_db.Operation.clear_or_cancel
@@ -1263,7 +1254,7 @@ module Make
           timestamp = timestamp_system;
           live_blocks;
           live_operations;
-          mempool = {known_valid = []; pending = Operation_hash.Set.empty};
+          mempool = Mempool.empty;
           fetching;
           pending = Operation_hash.Map.empty;
           advertisement = `None;
