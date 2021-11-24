@@ -31,9 +31,9 @@
 *)
 
 open Tezos_mockup_registration.Mockup_args
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
-let chain_id_arb = QCheck.(map Chain_id.of_string string)
+let chain_id_gen = QCheck2.Gen.(map Chain_id.of_string string)
 
 (** {!val:Chain_id.choose} always prioritizes the config file over the default value *)
 let test_config_file_has_priority_over_default_value from_config_file_val =
@@ -43,11 +43,11 @@ let test_config_file_has_priority_over_default_value from_config_file_val =
   qcheck_eq' ~pp ~expected ~actual ()
 
 let test_prioritize_config_file =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:
       "Chain_id.choose always prioritizes the config file over the default \
        value"
-    chain_id_arb
+    chain_id_gen
     test_config_file_has_priority_over_default_value
 
 let () =
