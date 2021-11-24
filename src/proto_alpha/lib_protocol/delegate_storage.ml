@@ -188,10 +188,10 @@ let staking_balance ctxt delegate =
   else return Tez_repr.zero
 
 let pubkey ctxt delegate =
-  Contract_manager_storage.revealed_key
+  Contract_manager_storage.get_manager_key
     ctxt
     delegate
-    (Unregistered_delegate delegate)
+    ~error:(Unregistered_delegate delegate)
 
 let init ctxt contract delegate =
   Contract_manager_storage.is_manager_key_revealed ctxt delegate

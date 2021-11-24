@@ -50,22 +50,16 @@ val reveal_manager_key :
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [get_manager_key ctxt delegate] behaves as
-    [revealed_key ctxt delegate error], where error is an
-    [Unrevealed_manager_key]. However this function is undefined when the
-    delegate has no manager. *)
+(** [get_manager_key ?error ctxt pkh] returns the revealed manager key of the
+    contract represented by [pkh]. When [error] is not provided this function
+    fails with "get_manager_key" error if [pkh] does not have a manager, and
+    with [Unrevealed_manager_key] error if the manager has not revealed its key.
+    When [error] is provided, the function fails with the provided [error] in
+    both cases. *)
 val get_manager_key :
+  ?error:error ->
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
-
-(** [revealed_key ctxt delegate error] returns the revealed public key of
-    [delegate]. Fails with [error] if [delegate] does not have a manager, or if
-    its key has not been revealed. *)
-val revealed_key :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  error ->
   Signature.Public_key.t tzresult Lwt.t
 
 val remove_existing :

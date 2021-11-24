@@ -45,13 +45,15 @@ val record_global_constant_storage_space :
 val record_paid_storage_space :
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
 
-(** [check_storage_limit ctxt storage_limit] raises the [Storage_limit_too_high]
+(** [check_storage_limit ctxt ~storage_limit] raises the [Storage_limit_too_high]
      error iff [storage_limit] is negative or greater the constant
      [hard_storage_limit_per_operation]. *)
 val check_storage_limit : Raw_context.t -> storage_limit:Z.t -> unit tzresult
 
-(** [burn_storage_fees ctxt storage_limit payer consumed] takes funds from the
-    [payer] to pay the cost of the [consumed] storage.
+(** [burn_storage_fees ctxt ~storage_limit ~payer consumed] takes funds from the
+    [payer] to pay the cost of the [consumed] storage. This function has an
+    optional parameter [~origin] that allows to set the origin of returned
+    balance updates (by default the parameter is set to [Block_application]).
     Returns an updated context, an updated storage limit equal to
     [storage_limit - consumed], and the relevant balance updates.
     Raises the [Operation_quota_exceeded] error if [storage_limit < consumed].
