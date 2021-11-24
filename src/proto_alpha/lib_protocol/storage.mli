@@ -133,7 +133,9 @@ module Contract : sig
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
   (** The tez possessed by a contract and that can be used. A contract
-     may also possess tez in frozen deposits. *)
+     may also possess tez in frozen deposits. Empty balances (of zero
+     tez) are only allowed for originated contracts, not for implicit
+     ones. *)
   module Balance :
     Indexed_data_storage
       with type key = Contract_repr.t

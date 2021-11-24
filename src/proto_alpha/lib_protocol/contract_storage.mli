@@ -43,6 +43,12 @@ type error +=
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *) Failure of string
 
+(** [allocated ctxt contract] returns [true] if and only if the
+   contract is stored in [Storage.Contract.Balance]. *)
+val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+
+(** [exists ctxt contract] returns [true] if and only if either the
+   contract is originated or it is (implicit and) "allocated". *)
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 (** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
@@ -55,8 +61,10 @@ val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
     be consumed since that operation is not a manager operation. *)
 val must_exist : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
-val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
-
+(** [must_be_allocated ctxt contract] fails when the contract is not
+   allocated. It fails with [Non_existing_contract] if the contract is
+   originated, and it fails with [Empty_implicit_contract] if the
+   contract is implicit. *)
 val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
 val list : Raw_context.t -> Contract_repr.t list Lwt.t
