@@ -987,13 +987,14 @@ let reveal_error (cctxt : #Protocol_client_context.full) =
 
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ?simulation ~source ~src_pk ~src_sk ~fee ~gas_limit
-    ~storage_limit ?counter ~fee_parameter (type kind)
-    (operations : kind Annotated_manager_operation.annotated_list) :
+    ~storage_limit ?counter ?(replace_by_fees = false) ~fee_parameter
+    (type kind) (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
     tzresult
     Lwt.t =
+  ignore replace_by_fees ;
   (match counter with
   | None ->
       Alpha_services.Contract.counter cctxt (chain, block) source

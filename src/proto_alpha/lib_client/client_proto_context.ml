@@ -106,7 +106,7 @@ let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
     ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () =
+    ?counter ~fee_parameter ?replace_by_fees () =
   parse_arg_transfer arg >>=? fun parameters ->
   let contents =
     build_transaction_operation
@@ -133,6 +133,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~gas_limit:(Limit.of_option gas_limit)
     ~storage_limit:(Limit.of_option storage_limit)
     ?counter
+    ?replace_by_fees
     ~src_pk
     ~src_sk
     ~fee_parameter

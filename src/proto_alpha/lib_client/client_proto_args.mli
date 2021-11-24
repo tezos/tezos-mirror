@@ -76,6 +76,8 @@ val burn_cap_arg : (Tez.t, full) Clic.arg
 
 val no_waiting_for_endorsements_arg : (bool, full) Clic.arg
 
+val replace_by_fees_arg : (bool, full) Clic.arg
+
 val await_endorsements_arg : (bool, full) Clic.arg
 
 val force_switch : (bool, full) Clic.arg

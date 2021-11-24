@@ -221,6 +221,7 @@ val transfer :
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
+  ?replace_by_fees:bool ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
   Lwt.t
