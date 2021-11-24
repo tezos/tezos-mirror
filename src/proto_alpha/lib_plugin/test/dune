@@ -11,7 +11,8 @@
                    -open Tezos_micheline
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_plugin_alpha
-                   -open Tezos_protocol_environment_alpha)))
+                   -open Tezos_protocol_environment_alpha
+                   -open Tezos_protocol_alpha.Protocol)))
 
 (rule
  (alias buildtest)

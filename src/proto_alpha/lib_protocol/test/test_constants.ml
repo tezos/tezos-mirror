@@ -33,7 +33,7 @@
 open Test_tez
 
 let test_constants_consistency () =
-  let open Tezos_protocol_alpha_parameters.Default_parameters in
+  let open Default_parameters in
   List.iter_es
     Block.check_constants_consistency
     [constants_mainnet; constants_sandbox; constants_test]
@@ -43,9 +43,7 @@ let test_max_operations_ttl () =
   (* We check the rationale that the value for [max_operations_time_to_live] is the following:
 
      [minimal_time_between_blocks *  max_operations_time_to_live = 3600] *)
-  let constants =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-  in
+  let constants = Default_parameters.constants_mainnet in
   Environment.wrap_tzresult
     (Alpha_context.Period.mult
        (Int32.of_int constants.max_operations_time_to_live)
@@ -62,9 +60,7 @@ let test_max_operations_ttl () =
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
 let liquidity_baking_subsidy_param () =
-  let constants =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-  in
+  let constants = Default_parameters.constants_mainnet in
   constants.baking_reward_bonus_per_slot
   *? Int64.of_int (constants.consensus_committee_size / 3)
   >>?= fun baking_reward_bonus ->

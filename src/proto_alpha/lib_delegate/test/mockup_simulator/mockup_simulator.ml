@@ -36,8 +36,7 @@ type chain = block list
    wrapped into this type. *)
 type broadcast =
   | Broadcast_block of Block_hash.t * Block_header.t * Operation.t list list
-  | Broadcast_op of
-      Operation_hash.t * Tezos_raw_protocol_alpha.Alpha_context.packed_operation
+  | Broadcast_op of Operation_hash.t * Alpha_context.packed_operation
 
 (** The state of a mockup node. *)
 type state = {
@@ -114,10 +113,8 @@ module type Hooks = sig
     (Block_hash.t * Block_header.t) option Lwt.t
 
   val on_new_operation :
-    Operation_hash.t * Tezos_raw_protocol_alpha.Alpha_context.packed_operation ->
-    (Operation_hash.t * Tezos_raw_protocol_alpha.Alpha_context.packed_operation)
-    option
-    Lwt.t
+    Operation_hash.t * Alpha_context.packed_operation ->
+    (Operation_hash.t * Alpha_context.packed_operation) option Lwt.t
 
   val check_block_before_processing :
     level:int32 ->
@@ -594,9 +591,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
             List.map
               (fun (Operation.{shell; proto} as op) ->
                 let hash : Operation_hash.t = Operation.hash op in
-                let protocol_data :
-                    Tezos_raw_protocol_alpha.Alpha_context.packed_protocol_data
-                    =
+                let protocol_data : Alpha_context.packed_protocol_data =
                   Data_encoding.Binary.of_bytes_exn
                     Protocol.operation_data_encoding
                     proto
@@ -1011,11 +1006,9 @@ let default_config =
     timeout = 10;
     delegate_selection = Random;
     consensus_committee_size =
-      Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-        .consensus_committee_size;
+      Default_parameters.constants_mainnet.consensus_committee_size;
     consensus_threshold =
-      Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-        .consensus_threshold;
+      Default_parameters.constants_mainnet.consensus_threshold;
   }
 
 let make_baking_delegate

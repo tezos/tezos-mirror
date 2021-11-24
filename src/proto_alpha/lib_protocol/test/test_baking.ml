@@ -337,22 +337,19 @@ let test_committee_sampling () =
     let bootstrap_accounts =
       List.map
         (fun (acc, tez) ->
-          Tezos_protocol_alpha_parameters.Default_parameters
-          .make_bootstrap_account
+          Default_parameters.make_bootstrap_account
             (acc.Account.pkh, acc.Account.pk, tez))
         accounts
     in
     let constants =
       {
-        Tezos_protocol_alpha_parameters.Default_parameters.constants_test with
+        Default_parameters.constants_test with
         consensus_committee_size = max_round;
         consensus_threshold = 0;
       }
     in
     let parameters =
-      Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts
-        constants
+      Default_parameters.parameters_of_constants ~bootstrap_accounts constants
     in
     Block.genesis_with_parameters parameters >>=? fun genesis ->
     Plugin.RPC.Baking_rights.get Block.rpc_ctxt ~all:true ~max_round genesis
