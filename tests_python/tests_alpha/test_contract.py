@@ -616,7 +616,7 @@ class TestContracts:
     def test_zero_transfer_to_implicit_contract(self, client):
         pubkey = IDENTITIES['bootstrap3']['identity']
         err = (
-            'Transaction of 0ꜩ towards a contract without code are '
+            'Transactions of 0ꜩ towards a contract without code are '
             rf'forbidden \({pubkey}\).'
         )
         with utils.assert_run_failure(err):

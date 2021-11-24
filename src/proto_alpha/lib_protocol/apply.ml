@@ -471,7 +471,7 @@ let () =
     ~pp:(fun ppf contract ->
       Format.fprintf
         ppf
-        "Transaction of 0ꜩ towards a contract without code are forbidden \
+        "Transactions of 0ꜩ towards a contract without code are forbidden \
          (%a)."
         Contract.pp
         contract)
