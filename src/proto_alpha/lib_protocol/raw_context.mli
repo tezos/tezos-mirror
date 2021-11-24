@@ -127,13 +127,17 @@ val update_remaining_block_gas : t -> Gas_limit_repr.Arith.fp -> t
 
 type error += Undefined_operation_nonce (* `Permanent *)
 
+(** [init_origination_nonce ctxt hash] initialise the origination nonce in
+    memory from [hash]. See [Origination_nonce.t] for more information. *)
 val init_origination_nonce : t -> Operation_hash.t -> t
 
-val get_origination_nonce : t -> Contract_repr.origination_nonce tzresult
+val get_origination_nonce : t -> Origination_nonce.t tzresult
 
-val increment_origination_nonce :
-  t -> (t * Contract_repr.origination_nonce) tzresult
+val increment_origination_nonce : t -> (t * Origination_nonce.t) tzresult
 
+(** [unset_origination_nonce ctxt] unset the origination nonce in memory. To be
+    used only when no more origination can be done in that operation. See
+    [Origination_nonce.t] for more information. *)
 val unset_origination_nonce : t -> t
 
 (** {1 Generic accessors} *)

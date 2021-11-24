@@ -69,7 +69,7 @@ let contract_test () =
     let script =
       Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
     in
-    Op.origination (B b) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
     >>=? fun (operation, dst) ->
     Incremental.begin_construction b >>=? fun incr ->
     Incremental.add_operation incr operation >>=? fun incr ->

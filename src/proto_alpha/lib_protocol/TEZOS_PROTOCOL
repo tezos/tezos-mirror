@@ -12,6 +12,7 @@
         "Contract_hash",
         "Blinded_public_key_hash",
         "Block_payload_hash",
+        "Origination_nonce",
 
         "Slot_repr",
         "Tez_repr",

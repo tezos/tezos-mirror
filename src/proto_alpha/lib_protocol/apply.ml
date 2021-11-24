@@ -2179,7 +2179,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     ~payload_producer hash operation =
-  let ctxt = Contract.init_origination_nonce ctxt hash in
+  let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt operation in
   apply_contents_list
     ctxt
@@ -2191,7 +2191,7 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
-  let ctxt = Contract.unset_origination_nonce ctxt in
+  let ctxt = Origination_nonce.unset ctxt in
   (ctxt, {contents = result})
 
 let may_start_new_cycle ctxt =

@@ -77,8 +77,6 @@ let make ~rng_state =
   let ctxt = Incremental.alpha_ctxt vs in
   let ctxt =
     (* Required for eg Create_contract *)
-    Protocol.Alpha_context.Contract.init_origination_nonce
-      ctxt
-      Operation_hash.zero
+    Protocol.Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
   in
   return (ctxt, step_constants)

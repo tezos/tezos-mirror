@@ -89,7 +89,13 @@ val revelation :
 val failing_noop :
   Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
 
-val origination :
+(** [contract_origination ctxt source] Create a new contract origination
+    operation, sign it with [source] and returns it alongside the contract
+    address. The contract address is using the initial origination nonce with the
+    hash of the operation. If this operation is combine with [combine_operations]
+    then the contract address is false as the nonce is not based on the correct
+    operation hash. *)
+val contract_origination :
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->

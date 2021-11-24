@@ -211,7 +211,7 @@ type back = {
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
   fees : Tez_repr.t;
-  origination_nonce : Contract_repr.origination_nonce option;
+  origination_nonce : Origination_nonce.t option;
   temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
@@ -413,9 +413,7 @@ let () =
     (fun () -> Undefined_operation_nonce)
 
 let init_origination_nonce ctxt operation_hash =
-  let origination_nonce =
-    Some (Contract_repr.initial_origination_nonce operation_hash)
-  in
+  let origination_nonce = Some (Origination_nonce.initial operation_hash) in
   update_origination_nonce ctxt origination_nonce
 
 let increment_origination_nonce ctxt =
@@ -423,7 +421,7 @@ let increment_origination_nonce ctxt =
   | None -> error Undefined_operation_nonce
   | Some cur_origination_nonce ->
       let origination_nonce =
-        Some (Contract_repr.incr_origination_nonce cur_origination_nonce)
+        Some (Origination_nonce.incr cur_origination_nonce)
       in
       let ctxt = update_origination_nonce ctxt origination_nonce in
       ok (ctxt, cur_origination_nonce)

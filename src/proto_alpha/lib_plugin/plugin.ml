@@ -1589,7 +1589,7 @@ module RPC = struct
       in
       let operation : _ operation = {shell; protocol_data} in
       let hash = Operation.hash {shell; protocol_data} in
-      let ctxt = Contract.init_origination_nonce ctxt hash in
+      let ctxt = Origination_nonce.init ctxt hash in
       let payload_producer = Signature.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
@@ -1659,7 +1659,7 @@ module RPC = struct
 
     let register () =
       let originate_dummy_contract ctxt script balance =
-        let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+        let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
         Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
         >>=? fun (ctxt, dummy_contract) ->
         Contract.raw_originate

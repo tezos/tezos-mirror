@@ -213,19 +213,25 @@ module Lazy_storage = struct
       Contract_storage.Legacy_big_map_diff.encoding
 end
 
+module Origination_nonce = struct
+  let init = Raw_context.init_origination_nonce
+
+  let unset = Raw_context.unset_origination_nonce
+
+  module Internal_for_tests = Origination_nonce
+end
+
 module Contract = struct
   include Contract_repr
   include Contract_storage
-
-  let init_origination_nonce = Raw_context.init_origination_nonce
-
-  let unset_origination_nonce = Raw_context.unset_origination_nonce
 
   let is_manager_key_revealed = Contract_manager_storage.is_manager_key_revealed
 
   let reveal_manager_key = Contract_manager_storage.reveal_manager_key
 
   let get_manager_key = Contract_manager_storage.get_manager_key
+
+  module Internal_for_tests = Contract_repr
 end
 
 module Global_constants_storage = Global_constants_storage

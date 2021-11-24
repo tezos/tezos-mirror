@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,61 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+type t = {operation_hash : Operation_hash.t; origination_index : int32}
 
-let rng_state = Random.State.make [|42; 987897; 54120|]
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {operation_hash; origination_index} ->
+      (operation_hash, origination_index))
+    (fun (operation_hash, origination_index) ->
+      {operation_hash; origination_index})
+  @@ obj2 (req "operation" Operation_hash.encoding) (dft "index" int32 0l)
 
-let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
-  Micheline_printer.print_expr
-    fmtr
-    (Micheline_printer.printable
-       Protocol.Michelson_v1_primitives.string_of_prim
-       expr)
+let initial operation_hash = {operation_hash; origination_index = 0l}
 
-let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
-    print_script_expr
-    fmtr
-    exprs
-
-let typecheck_by_tezos =
-  let context_init_memory ~rng_state =
-    Context.init
-      ~rng_state
-      ~initial_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-    >>=? fun (block, _accounts) ->
-    Incremental.begin_construction
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
-      block
-    >>=? fun vs ->
-    let ctxt = Incremental.alpha_ctxt vs in
-    (* Required for eg Create_contract *)
-    return
-    @@ Protocol.Alpha_context.Origination_nonce.init
-         ctxt
-         Tezos_crypto.Operation_hash.zero
-  in
-  fun bef node ->
-    Stdlib.Result.get_ok
-      (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_ir_translator.Lambda
-             ctxt
-             ~legacy:false
-             (Micheline.root node)
-             bef
-           >|= Protocol.Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+let incr nonce =
+  let origination_index = Int32.succ nonce.origination_index in
+  {nonce with origination_index}

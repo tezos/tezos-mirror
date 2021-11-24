@@ -291,13 +291,15 @@ let failing_noop ctxt source arbitrary =
   Account.find source >>=? fun account -> return @@ sign account.sk ctxt op
 
 let originated_contract op =
-  let nonce = Contract.initial_origination_nonce (Operation.hash_packed op) in
-  Contract.originated_contract nonce
+  let nonce =
+    Origination_nonce.Internal_for_tests.initial (Operation.hash_packed op)
+  in
+  Contract.Internal_for_tests.originated_contract nonce
 
 exception Impossible
 
-let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
-    ?credit ?fee ?gas_limit ?storage_limit ctxt source =
+let contract_origination ?counter ?delegate ~script ?(preorigination = None)
+    ?public_key ?credit ?fee ?gas_limit ?storage_limit ctxt source =
   Context.Contract.manager ctxt source >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit =
