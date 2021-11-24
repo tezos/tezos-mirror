@@ -115,7 +115,9 @@ let rec iter_e f seq =
   let open Lwt_result_syntax in
   match n with
   | Nil -> return_unit
-  | Cons (item, seq) -> bind_from_result (f item) (fun () -> iter_e f seq)
+  | Cons (item, seq) ->
+      let*? () = f item in
+      iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 

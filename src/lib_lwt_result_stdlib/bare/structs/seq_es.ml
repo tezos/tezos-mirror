@@ -47,7 +47,9 @@ let empty () = nil_es
 (* we define [return] at the end of the file to avoid shadowing the opened
    Lwt_result_syntax *)
 
-let return_e r () = bind_from_result r (fun x -> return (Cons (x, empty)))
+let return_e r () =
+  let*? x = r in
+  return (Cons (x, empty))
 
 let return_s p () =
   let open Lwt_syntax in
@@ -105,7 +107,8 @@ let rec fold_left_e f acc seq =
   match n with
   | Nil -> return acc
   | Cons (item, seq) ->
-      bind_from_result (f acc item) (fun acc -> fold_left_e f acc seq)
+      let*? acc = f acc item in
+      fold_left_e f acc seq
 
 let fold_left_e f acc seq = fold_left_e f acc @@ protect seq
 
@@ -114,7 +117,7 @@ let rec fold_left_s f acc seq =
   match n with
   | Nil -> return acc
   | Cons (item, seq) ->
-      let* acc = lwt_ok @@ f acc item in
+      let*! acc = f acc item in
       fold_left_s f acc seq
 
 let fold_left_s f acc seq = fold_left_s f acc @@ protect seq
@@ -143,7 +146,9 @@ let rec iter_e f seq =
   let* n = seq () in
   match n with
   | Nil -> return_unit
-  | Cons (item, seq) -> bind_from_result (f item) (fun () -> iter_e f seq)
+  | Cons (item, seq) ->
+      let*? () = f item in
+      iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 
@@ -152,7 +157,7 @@ let rec iter_s f seq =
   match n with
   | Nil -> Lwt_result_syntax.return_unit
   | Cons (item, seq) ->
-      let* () = lwt_ok @@ f item in
+      let*! () = f item in
       iter_s f seq
 
 let iter_s f seq = iter_s f @@ protect seq
@@ -180,7 +185,8 @@ let rec map_e f seq () =
   match n with
   | Nil -> nil_es
   | Cons (item, seq) ->
-      bind_from_result (f item) (fun item -> return (Cons (item, map_e f seq)))
+      let*? item = f item in
+      return (Cons (item, map_e f seq))
 
 let map_e f seq = map_e f @@ protect seq
 
@@ -189,7 +195,7 @@ let rec map_s f seq () =
   match n with
   | Nil -> nil_es
   | Cons (item, seq) ->
-      let* item = lwt_ok @@ f item in
+      let*! item = f item in
       return (Cons (item, map_s f seq))
 
 let map_s f seq = map_s f @@ protect seq
@@ -238,8 +244,8 @@ let rec filter_e f seq () =
   match n with
   | Nil -> nil_es
   | Cons (item, seq) ->
-      bind_from_result (f item) (fun b ->
-          if b then return (Cons (item, filter_e f seq)) else filter_e f seq ())
+      let*? b = f item in
+      if b then return (Cons (item, filter_e f seq)) else filter_e f seq ()
 
 let filter_e f seq = filter_e f @@ protect seq
 
@@ -248,7 +254,7 @@ let rec filter_s f seq () =
   match n with
   | Nil -> nil_es
   | Cons (item, seq) ->
-      let* b = lwt_ok @@ f item in
+      let*! b = f item in
       if b then return (Cons (item, filter_s f seq)) else filter_s f seq ()
 
 let filter_s f seq = filter_s f @@ protect seq
@@ -278,10 +284,11 @@ let rec filter_map_e f seq () =
   let* n = seq () in
   match n with
   | Nil -> nil_es
-  | Cons (item, seq) ->
-      bind_from_result (f item) (function
-          | None -> filter_map_e f seq ()
-          | Some item -> return (Cons (item, filter_map_e f seq)))
+  | Cons (item, seq) -> (
+      let*? o = f item in
+      match o with
+      | None -> filter_map_e f seq ()
+      | Some item -> return (Cons (item, filter_map_e f seq)))
 
 let filter_map_e f seq = filter_map_e f @@ protect seq
 
@@ -290,7 +297,7 @@ let rec filter_map_s f seq () =
   match n with
   | Nil -> nil_es
   | Cons (item, seq) -> (
-      let* o = lwt_ok @@ f item in
+      let*! o = f item in
       match o with
       | None -> filter_map_s f seq ()
       | Some item -> return (Cons (item, filter_map_s f seq)))

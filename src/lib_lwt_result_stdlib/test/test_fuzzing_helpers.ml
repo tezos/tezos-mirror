@@ -346,7 +346,7 @@ module IterESOf = struct
     return_unit
 
   let fn_s r fn y =
-    let* t = lwt_ok @@ fn !r y in
+    let*! t = fn !r y in
     r := t ;
     return_unit
 
@@ -370,8 +370,8 @@ module IteriESOf = struct
     return_unit
 
   let fn_s r fn i y =
-    let* z = lwt_ok @@ fn i y in
-    let* t = lwt_ok @@ fn !r z in
+    let*! z = fn i y in
+    let*! t = fn !r z in
     r := t ;
     return_unit
 
@@ -412,7 +412,7 @@ module FoldESOf = struct
 
   let fn_e fn acc elt = Lwt.return @@ fn acc elt
 
-  let fn_s fn acc elt = lwt_ok @@ fn acc elt
+  let fn_s fn acc elt = Lwt_result.ok @@ fn acc elt
 
   let fn_es fn acc elt = fn acc elt
 end
@@ -427,8 +427,9 @@ module Fold2ESOf = struct
     Lwt.return @@ fn acc z
 
   let fn_s fn acc x y =
-    let* z = lwt_ok @@ fn x y in
-    lwt_ok @@ fn acc z
+    let*! z = fn x y in
+    let*! r = fn acc z in
+    return r
 
   let fn_es fn acc x y =
     let* z = fn x y in
@@ -442,7 +443,7 @@ module MapESOf = struct
 
   let fn_e const fn elt = Lwt.return @@ fn const elt
 
-  let fn_s const fn elt = lwt_ok @@ fn const elt
+  let fn_s const fn elt = Lwt_result.ok @@ fn const elt
 
   let fn_es const fn elt = fn const elt
 end
@@ -457,7 +458,7 @@ module MapEPOf = struct
     | Ok _ as ok -> Lwt.return ok
     | Error err -> fail err
 
-  let fn_s const fn elt = lwt_ok @@ fn const elt
+  let fn_s const fn elt = Lwt_result.ok @@ fn const elt
 
   let fn_es const fn elt =
     (* We need to transform an error into a trace. There are multiple ways to
@@ -479,7 +480,7 @@ module Map2ESOf = struct
 
   let fn_e fn x y = Lwt.return @@ fn x y
 
-  let fn_s fn x y = lwt_ok @@ fn x y
+  let fn_s fn x y = Lwt_result.ok @@ fn x y
 
   let fn_es fn x y = fn x y
 end
