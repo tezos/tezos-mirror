@@ -9,7 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "zarith" { >= "1.12" & < "1.13" } # the signature of the [Z] module has changed in 1.12
   "zarith_stubs_js"
-  "bls12-381" { >= "1.0.0" & < "1.1.0" } # for env4
+  "bls12-381" { >= "1.1.0" & < "1.2.0" } # for env4
   "tezos-base"
   "tezos-sapling"
   "tezos-protocol-environment-sigs"
