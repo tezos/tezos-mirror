@@ -121,11 +121,10 @@ val begin_partial_construction :
   t ->
   predecessor_level:Level.t ->
   escape_vote:bool ->
-  ( t
-    * packed_successful_manager_operation_result list
-    * Liquidity_baking.escape_ema,
-    error trace )
-  result
+  (t
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema)
+  tzresult
   Lwt.t
 
 type 'a full_construction = {
