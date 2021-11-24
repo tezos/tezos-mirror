@@ -97,7 +97,7 @@ let to_int32 t = t [@@inline]
 let to_slot round ~committee_size =
   to_int round >|? fun r ->
   let slot = r mod committee_size in
-  Slot_repr.of_int slot
+  Slot_repr.of_int_exn slot
 
 let encoding =
   Data_encoding.conv_with_guard
@@ -144,8 +144,6 @@ module Durations = struct
     round1 : Period_repr.t;
     other_rounds : Period_repr.t list;
   }
-
-  let to_list {round0; round1; other_rounds} = round0 :: round1 :: other_rounds
 
   let pp fmt t =
     Format.fprintf
@@ -252,20 +250,27 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
      list and the sum of the [round - 1]-th first elements of
      [round_durations]. *)
   let last_and_sum_loop round_durations ~round =
-    let rec loop round_durations ~round ~sum_acc =
-      match round_durations with
-      | [] -> assert false
-      | [last] when Compare.Int32.(round <> Int32.zero) ->
-          (last, Int64.add sum_acc (Period_repr.to_seconds last))
-      | d :: round_durations' ->
-          if Compare.Int32.(round = Int32.zero) then (d, sum_acc)
-          else
-            loop
-              round_durations'
-              ~round:(Int32.pred round)
-              ~sum_acc:(Int64.add sum_acc (Period_repr.to_seconds d))
-    in
-    loop (Durations.to_list round_durations) ~round ~sum_acc:Int64.zero
+    let open Durations in
+    if Compare.Int32.(round = Int32.zero) then
+      (round_durations.round0, Int64.zero)
+    else
+      let last = round_durations.round1
+      and sum_acc = Period_repr.to_seconds round_durations.round0 in
+
+      let rec loop round_durations ~round ~last ~sum_acc =
+        if Compare.Int32.(round = Int32.zero) then (last, sum_acc)
+        else
+          let sum_acc = Int64.add sum_acc (Period_repr.to_seconds last) in
+          match round_durations with
+          | [] -> (last, sum_acc)
+          | d :: round_durations' ->
+              loop round_durations' ~round:(Int32.pred round) ~sum_acc ~last:d
+      in
+      loop
+        round_durations.Durations.other_rounds
+        ~last
+        ~round:(Int32.pred round)
+        ~sum_acc
   in
   let parameters_len = Int32.of_int (Durations.length round_durations) in
   if round < parameters_len then

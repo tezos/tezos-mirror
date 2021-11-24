@@ -56,7 +56,7 @@ let max_value = (1 lsl 16) - 1
 
 let of_int_do_not_use_except_for_parameters i = i
 
-let of_int i =
+let of_int_exn i =
   if Compare.Int.(i < 0 || i > max_value) then
     invalid_arg
       (Format.sprintf

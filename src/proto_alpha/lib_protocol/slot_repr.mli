@@ -43,7 +43,7 @@ val of_int_do_not_use_except_for_parameters : int -> t
 
     @raise Invalid_argument if [i < 0 || i > max_value]
 *)
-val of_int : int -> t
+val of_int_exn : int -> t
 
 val to_int : t -> int
 

@@ -87,7 +87,7 @@ let internal_identifier_of_string raw =
   | Some index ->
       {
         (* We do not need to call sanitize here since we stop at the first '@'
-            from index 0. It is a guarantee that there is no '@* between 0 and
+            from index 0. It is a guarantee that there is no '@' between 0 and
            (index - 1 ). *)
         namespace = String.sub raw 0 index;
         id =
