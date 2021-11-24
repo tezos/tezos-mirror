@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol (double baking)
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^double baking$"
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^double baking$"
     Subject:      Double baking evidence operation may happen when a baker
                   baked two different blocks on the same level.
 *)

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Helpers RPCs)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^helpers rpcs$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^helpers rpcs$"
     Subject:    On RPCs.
 *)
 

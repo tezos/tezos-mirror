@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    liquidity baking
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^liquidity baking$"
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^liquidity baking$"
     Subject:      Test liquidity baking subsidies, CPMM storage updates,
                   sunset shut off, and escape hatch shut off.
 *)

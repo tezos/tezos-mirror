@@ -29,7 +29,7 @@ open Tztest
 (** Testing
     -------
     Component:    Raw_level_repr
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Raw_level_repr
+    Invocation:   dune exec ./src/proto_011_PtHangz2/lib_protocol/test/unit/main.exe -- test Raw_level_repr
     Dependencies: --
     Subject:      To test the modules (including the top-level)
                   in raw_level_repr.ml as individual units, particularly

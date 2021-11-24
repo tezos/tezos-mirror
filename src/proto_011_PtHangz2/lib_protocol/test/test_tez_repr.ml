@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_test_tez_repr
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/test_tez_repr.exe
     Subject:      Operations in Tez_repr
 *)
 
