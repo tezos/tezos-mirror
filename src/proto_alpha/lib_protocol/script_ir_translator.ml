@@ -4777,7 +4777,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, (I_TRANSFER_TOKENS as prim), [], annot),
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest, _), _), _)
     ) ->
-      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
+      Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
       check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, _, ctxt) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ITransfer_tokens (kinfo, k))} in
@@ -4785,7 +4785,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, (I_SET_DELEGATE as prim), [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
-      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
+      Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ISet_delegate (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest, annot) in
@@ -4803,7 +4803,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( Option_t (Key_hash_t _, _),
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
-      Tc_context.check_not_in_view loc tc_context prim >>?= fun () ->
+      Tc_context.check_not_in_view ~legacy loc tc_context prim >>?= fun () ->
       parse_two_var_annot loc annot >>?= fun (op_annot, addr_annot) ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code

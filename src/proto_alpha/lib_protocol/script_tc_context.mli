@@ -72,4 +72,5 @@ val add_lambda : t -> t
 
 val is_in_lambda : t -> bool
 
-val check_not_in_view : Script.location -> t -> Script.prim -> unit tzresult
+val check_not_in_view :
+  Script.location -> legacy:bool -> t -> Script.prim -> unit tzresult

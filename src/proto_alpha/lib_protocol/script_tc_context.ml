@@ -54,12 +54,12 @@ let add_lambda tc_context = {tc_context with in_lambda = true}
 
 let is_in_lambda {callsite = _; in_lambda} = in_lambda
 
-let check_not_in_view loc tc_context prim =
+let check_not_in_view loc ~legacy tc_context prim =
   match tc_context.callsite with
   (* The forbidden (stateful) instructions in views are in facts allowed in
      lambdas in views, because they could be returned to the caller, and then
      executed on his responsibility. *)
   | Toplevel _ | Data -> Result.return_unit
-  | View when is_in_lambda tc_context -> Result.return_unit
+  | View when is_in_lambda tc_context || legacy -> Result.return_unit
   | View ->
       error Script_tc_errors.(Forbidden_instr_in_context (loc, View, prim))
