@@ -9,12 +9,16 @@
     IMAGE_ARCH_PREFIX: ""
   script:
     - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
+    # Build normal, bare and debug image
     - ./scripts/create_docker_image.sh
         "${public_docker_image_name}"
         "${IMAGE_ARCH_PREFIX}${TAG_NAME}"
         "${build_deps_image_name}"
         "${build_deps_image_version}"
         "${CI_COMMIT_SHORT_SHA}"
+    # Test the bare image
+    - ./scripts/ci/docker_smoke_test.sh "${public_docker_image_name}bare:${IMAGE_ARCH_PREFIX}${TAG_NAME}" "${CI_COMMIT_SHORT_SHA}" version
+    # Push all images
     - docker push "${public_docker_image_name%?}:${IMAGE_ARCH_PREFIX}${TAG_NAME}"
     - docker push "${public_docker_image_name}bare:${IMAGE_ARCH_PREFIX}${TAG_NAME}"
     - docker push "${public_docker_image_name}debug:${IMAGE_ARCH_PREFIX}${TAG_NAME}"

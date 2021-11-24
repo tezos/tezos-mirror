@@ -41,6 +41,10 @@ current_ocaml_version := $(shell opam exec -- ocamlc -version)
 all:
 	@$(MAKE) build PROFILE=dev
 
+.PHONY: release
+release:
+	@$(MAKE) build PROFILE=release
+
 .PHONY: build-parameters
 build-parameters:
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) @copy-parameters
