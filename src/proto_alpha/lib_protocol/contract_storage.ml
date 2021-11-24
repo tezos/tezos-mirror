@@ -559,7 +559,8 @@ let update_script_storage c contract storage lazy_storage_diff =
   Storage.Contract.Used_storage_space.update c contract new_size
 
 let spend_only_call_from_token c contract amount =
-  Storage.Contract.Balance.get c contract >>=? fun balance ->
+  Storage.Contract.Balance.find c contract >>=? fun balance ->
+  let balance = Option.value balance ~default:Tez_repr.zero in
   match Tez_repr.(balance -? amount) with
   | Error _ -> fail (Balance_too_low (contract, balance, amount))
   | Ok new_balance -> (
