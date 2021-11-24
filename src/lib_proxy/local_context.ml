@@ -50,8 +50,9 @@ module Tree = struct
       (function Context_dangling_hash _ -> Lwt.return_none | exn -> raise exn)
 
   let remove_dangling_hash t =
+    let open Lwt_syntax in
     let kind = kind t in
-    add t [] Bytes.empty >>= fun t ->
+    let* t = add t [] Bytes.empty in
     match kind with
     | `Value -> Lwt.return t
     | `Tree -> add_tree t [] (empty store_empty)
@@ -60,10 +61,12 @@ module Tree = struct
      shallow node or contents. When this occurs we replace [t] with the empty
      node or contents. *)
   let add_tree t k v =
+    let open Lwt_syntax in
     Lwt.catch
       (fun () -> add_tree t k v)
       (function
         | Context_dangling_hash _ ->
-            remove_dangling_hash t >>= fun t -> add_tree t k v
+            let* t = remove_dangling_hash t in
+            add_tree t k v
         | exn -> raise exn)
 end

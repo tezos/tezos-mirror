@@ -107,14 +107,17 @@ let rec simple_tree_eq t1 t2 =
   | (SLeaf, d) | (d, SLeaf) -> is_empty d
 
 let rec irmin_tree_to_simple_tree tree =
+  let open Lwt_syntax in
   match Store.Tree.kind tree with
   | `Value -> Lwt.return SLeaf
   | `Tree ->
-      Store.Tree.list tree [] >>= fun pairs ->
-      Lwt_list.map_s
-        (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
-        pairs
-      >|= sdir_of_list
+      let* pairs = Store.Tree.list tree [] in
+      let+ l =
+        List.map_s
+          (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
+          pairs
+      in
+      sdir_of_list l
 
 let rec merkle_node_to_simple_tree node =
   let open Tezos_shell_services.Block_services in

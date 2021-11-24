@@ -118,13 +118,12 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     match protocol_hash_opt with
     | None ->
         let* protocol_hash = get_node_protocol rpc_context chain block in
-        let* () =
-          lwt_ok
-          @@ printer#warning
-               "protocol of %s unspecified, using the node's protocol: %a"
-               mode_str
-               Protocol_hash.pp
-               protocol_hash
+        let*! () =
+          printer#warning
+            "protocol of %s unspecified, using the node's protocol: %a"
+            mode_str
+            Protocol_hash.pp
+            protocol_hash
         in
         return protocol_hash
     | Some protocol_hash -> return protocol_hash
@@ -150,22 +149,21 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
       | fst_available :: _ ->
           let (module Proxy : Proxy_sig) = fst_available in
           let fst_available_proto = Proxy.protocol_hash in
-          let* () =
-            lwt_ok
-            @@ printer#warning
-                 "requested protocol (%a) not found in available proxy \
-                  environments: %a@;\
-                  Proceeding with the first available protocol (%a). This will \
-                  work if the mismatch is harmless, otherwise deserialization \
-                  is the failure most likely to happen."
-                 Protocol_hash.pp
-                 protocol_hash
-                 (Format.pp_print_list
-                    ~pp_sep:Format.pp_print_space
-                    Protocol_hash.pp)
-                 ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash))
-                    available)
-                 Protocol_hash.pp
-                 fst_available_proto
+          let*! () =
+            printer#warning
+              "requested protocol (%a) not found in available proxy \
+               environments: %a@;\
+               Proceeding with the first available protocol (%a). This will \
+               work if the mismatch is harmless, otherwise deserialization is \
+               the failure most likely to happen."
+              Protocol_hash.pp
+              protocol_hash
+              (Format.pp_print_list
+                 ~pp_sep:Format.pp_print_space
+                 Protocol_hash.pp)
+              ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash))
+                 available)
+              Protocol_hash.pp
+              fst_available_proto
           in
           return fst_available)

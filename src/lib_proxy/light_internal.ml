@@ -72,7 +72,7 @@ module Merkle = struct
               | Node -> `Node hash_str
             in
             return @@ Store.Tree.shallow repo irmin_hash)
-    | Data raw_context -> lwt_ok @@ raw_context_to_irmin_tree raw_context
+    | Data raw_context -> Lwt_result.ok @@ raw_context_to_irmin_tree raw_context
     | Continue subtree -> merkle_tree_to_irmin_tree repo subtree
 
   and merkle_tree_to_irmin_tree repo mtree : (Store.tree, string) result Lwt.t =
@@ -80,7 +80,7 @@ module Merkle = struct
     List.fold_left_es
       (fun built_tree (key, mnode) ->
         let* subtree = merkle_node_to_irmin_tree repo mnode in
-        lwt_ok @@ Store.Tree.add_tree built_tree [key] subtree)
+        Lwt_result.ok @@ Store.Tree.add_tree built_tree [key] subtree)
       (Store.Tree.empty Store.empty)
       (StringMap.bindings mtree)
 
@@ -119,7 +119,7 @@ module Merkle = struct
            and cannot be implemented externally in an efficient manner. *)
         (* Check the incoming data ([raw_context]) agrees with
                  the data in place ([tree]) *)
-        let* tree_in_merkle = lwt_ok @@ raw_context_to_irmin_tree raw_context in
+        let*! tree_in_merkle = raw_context_to_irmin_tree raw_context in
         let hash_in_merkle = Store.Tree.hash tree_in_merkle in
         let tree_hash = Store.Tree.hash tree in
         if Context_hash.equal hash_in_merkle tree_hash then
@@ -146,15 +146,14 @@ module Merkle = struct
     let* res =
       List.fold_left_es
         (fun built_tree (subkey, mnode) ->
-          let* subtree_opt =
-            lwt_ok @@ Store.Tree.find_tree built_tree [subkey]
-          in
+          let*! subtree_opt = Store.Tree.find_tree built_tree [subkey] in
           match subtree_opt with
           | None ->
               (* Integrating new data *)
               change := true ;
               let* subtree = merkle_node_to_irmin_tree repo mnode in
-              lwt_ok @@ Store.Tree.add_tree built_tree [subkey] subtree
+              let*! t = Store.Tree.add_tree built_tree [subkey] subtree in
+              return t
           | Some subtree -> (
               (* Unioning existing data *)
               let* subtree'_opt =
@@ -170,10 +169,9 @@ module Merkle = struct
                   change := true ;
                   (* This call to [Store.Tree.remove] should NOT
                      be necessary. Is there a bug in add_tree? *)
-                  let* build_tree' =
-                    lwt_ok @@ Store.Tree.remove built_tree [subkey]
-                  in
-                  lwt_ok @@ Store.Tree.add_tree build_tree' [subkey] subtree'))
+                  let*! build_tree' = Store.Tree.remove built_tree [subkey] in
+                  let*! t = Store.Tree.add_tree build_tree' [subkey] subtree' in
+                  return t))
         tree
         (StringMap.bindings mtree)
     in
@@ -209,7 +207,7 @@ module Merkle = struct
     let open Lwt_result_syntax in
     let apply_or_fail_at k f =
       (* Applies [f] on the tree mapped by [k] if present, otherwise fail *)
-      let* tree_opt = lwt_ok @@ Store.Tree.find_tree tree [k] in
+      let*! tree_opt = Store.Tree.find_tree tree [k] in
       match tree_opt with
       | None ->
           fail
