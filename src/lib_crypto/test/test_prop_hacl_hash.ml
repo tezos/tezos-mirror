@@ -32,7 +32,8 @@
                   SHA512.
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
+open QCheck2
 
 module Hash_Properties (Desc : sig
   val name : string
@@ -53,9 +54,10 @@ struct
     qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
 
   let test_prop_incremental_one =
-    QCheck.Test.make
+    Test.make
       ~name:(Desc.name ^ "_incremental_one")
-      QCheck.string
+      ~print:Print.string
+      Gen.string
       test_prop_incremental_one
 
   (** Verifies equivalence between the hash of the concatenation of [msg_ss]
@@ -70,9 +72,10 @@ struct
     qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
 
   let test_prop_incremental_list =
-    QCheck.Test.make
+    Test.make
       ~name:(Desc.name ^ "_incremental_list")
-      (QCheck.list QCheck.string)
+      ~print:Print.(list string)
+      Gen.(list string)
       test_prop_incremental_list
 
   let tests = [test_prop_incremental_one; test_prop_incremental_list]
