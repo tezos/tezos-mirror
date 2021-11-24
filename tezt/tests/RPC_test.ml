@@ -663,10 +663,6 @@ let mempool_node_flags =
       Connections 1;
       (* Number of connection allowed for each of our 2 nodes used in the
          mempool tests *)
-      Disable_operations_precheck;
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-         We use the disable-precheck option to force application of operation in
-         the prevalidator and to force classification in branch_refused *)
     ]
 
 (* Test the mempool RPCs: /chains/<chain>/mempool/...
@@ -686,6 +682,7 @@ let mempool_node_flags =
    - Branch_refused (Branch error classification in protocol)
    - Branch_delayed (Temporary)
    - Refused (Permanent)
+   - Outdated (Outdated)
 
    The main goal is to have a record of the encoding of the different
    operations returned by the RPC calls. This allows
@@ -704,10 +701,16 @@ let test_mempool protocol ?endpoint client =
   let* _ = Node.wait_for_level node level in
   let* node1_identity = Node.wait_for_identity node in
   let* () = Client.Admin.kick_peer ~peer:node1_identity client in
-  let* _ = Mempool.bake_empty_mempool client in
-  (* Outdated operation after the second empty baking. *)
+  (* Inject a transfer to increment the counter of bootstrap1. Bake with this
+     transfer to trigger the counter_in_the_past error for the following
+     transfer. *)
+  let* _ = Operation.inject_transfer client in
+  let* _ = Client.bake_for ?endpoint client in
+
+  (* Outdated operation: consensus_operation_for_old_level (classified as
+     outdated after the second empty baking). *)
   let* () = Client.endorse_for ~protocol ~force:true client in
-  let* _ = Mempool.bake_empty_mempool client in
+  let* _ = Mempool.bake_empty_mempool ~protocol client in
   let monitor_path =
     (* To test the monitor_operations rpc we use curl since the client does
        not support streaming RPCs yet. *)
@@ -720,45 +723,40 @@ let test_mempool protocol ?endpoint client =
        to record them. *)
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
-  (* Refused operation after the reclassification following the flush. *)
-  let* branch = Lwt.Infix.(RPC.get_branch client >|= JSON.as_string) in
-  let* _ =
-    Mempool.forge_and_inject_operation
-      ~branch
-      ~fee:10
-      ~gas_limit:1040
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap2.public_key_hash
-      ~counter:1
-      ~signer:Constant.bootstrap1
-      ~client
-  in
-  (* Applied operation. *)
-  let* _ =
-    Client.transfer
-      ?endpoint
-      ~amount:Tez.(of_int 2)
-      ~giver:Constant.bootstrap2.alias
-      ~receiver:Constant.bootstrap3.alias
+  let* counter =
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap1.Account.public_key_hash
       client
   in
-  (* This operation as the same giver as the previous one and so the same
-     counter. It is applied on a different branch since we bake an empty block
-     on the other endpoint. Once the nodes will be synced this operation will
-     be classified as Branch_refused because its counter is in the past on the
-     other endpoint. *)
+  let counter = JSON.as_int counter in
+  (* Branch_refused op: counter_in_the_past *)
   let* _ =
-    Client.transfer
-      ~endpoint:(Client.Node node)
-      ~amount:Tez.(of_int 2)
-      ~giver:Constant.bootstrap2.alias
-      ~receiver:Constant.bootstrap3.alias
+    Operation.inject_transfer
+      ~force:true
+      ~source:Constant.bootstrap1
+      ~counter
       client
   in
-  (* Branch_delayed operation after the empty baking. *)
-  let* _ = Client.endorse_for ?endpoint ~protocol ~force:true client in
-  (* Reconnect and sync nodes to force branch_refused operation and delay of
-     endorsement. *)
+  let* counter =
+    RPC.Contracts.get_counter
+      ~contract_id:Constant.bootstrap2.Account.public_key_hash
+      client
+  in
+  let counter = JSON.as_int counter in
+  (* Branch_delayed op: counter_in_the_future *)
+  let* _ =
+    Operation.inject_transfer
+      ~force:true
+      ~source:Constant.bootstrap2
+      ~counter:(counter + 5)
+      client
+  in
+  (* Refused op: fees_too_low *)
+  let* _ =
+    Operation.inject_transfer ~source:Constant.bootstrap3 ~fee:0 client
+  in
+  (* Applied op *)
+  let* _ = Operation.inject_transfer ~source:Constant.bootstrap4 client in
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
   let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
