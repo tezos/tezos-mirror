@@ -149,7 +149,7 @@ end
 
 type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
-module Bonds = struct
+module Deposits = struct
   type t = deposits
 
   let encoding =
@@ -382,9 +382,8 @@ module Contract = struct
     Indexed_context.Make_map
       (struct
         let name = ["frozen_deposits"]
-        (* named bond to avoid the clash with legacy_frozen_balance *)
       end)
-      (Bonds)
+      (Deposits)
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map

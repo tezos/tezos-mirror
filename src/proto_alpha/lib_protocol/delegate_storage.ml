@@ -378,7 +378,7 @@ let clear_outdated_slashed_deposits ctxt ~new_cycle =
 
 (* Return a map from delegates (with active stake at some cycle
    in the cycle window [from_cycle, to_cycle]) to the maximum
-   of the "bondable stake" for each such cycle (which is just the
+   of the stake to be deposited for each such cycle (which is just the
    [frozen_deposits_percentage] of the active stake at that cycle). Also
    return the delegates that have fallen out of the sliding window. *)
 let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
@@ -405,15 +405,16 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
       >|=? fun active_stakes ->
       List.fold_left
         (fun (maxima, delegates_to_remove) (delegate, stake) ->
-          let bondable_stake =
+          let stake_to_be_deposited =
             Tez_repr.(div_exn (mul_exn stake frozen_deposits_percentage) 100)
           in
           let maxima =
             Signature.Public_key_hash.Map.update
               delegate
               (function
-                | None -> Some bondable_stake
-                | Some maximum -> Some (Tez_repr.max maximum bondable_stake))
+                | None -> Some stake_to_be_deposited
+                | Some maximum ->
+                    Some (Tez_repr.max maximum stake_to_be_deposited))
               maxima
           in
           let delegates_to_remove =
@@ -443,18 +444,18 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun (maxima, delegates_to_remove) ->
   Signature.Public_key_hash.Map.fold_es
-    (fun delegate maximum_bondable_stake (ctxt, balance_updates) ->
+    (fun delegate maximum_stake_to_be_deposited (ctxt, balance_updates) ->
       (* Here we make sure to preserve the following invariant :
-         maximum_bondable_stake <= frozen_deposits + balance
+         maximum_stake_to_be_deposited <= frozen_deposits + balance
          See select_distribution_for_cycle *)
       let delegate_contract = Contract_repr.implicit_contract delegate in
       Frozen_deposits_storage.update_deposits_cap
         ctxt
         delegate_contract
-        maximum_bondable_stake
+        maximum_stake_to_be_deposited
       >>=? fun (ctxt, current_amount) ->
-      if Tez_repr.(current_amount > maximum_bondable_stake) then
-        Tez_repr.(current_amount -? maximum_bondable_stake)
+      if Tez_repr.(current_amount > maximum_stake_to_be_deposited) then
+        Tez_repr.(current_amount -? maximum_stake_to_be_deposited)
         >>?= fun to_reimburse ->
         Token.transfer
           ~origin
@@ -463,13 +464,13 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
           (`Delegate_balance delegate)
           to_reimburse
         >|=? fun (ctxt, bupds) -> (ctxt, bupds @ balance_updates)
-      else if Tez_repr.(current_amount < maximum_bondable_stake) then
-        Tez_repr.(maximum_bondable_stake -? current_amount)
+      else if Tez_repr.(current_amount < maximum_stake_to_be_deposited) then
+        Tez_repr.(maximum_stake_to_be_deposited -? current_amount)
         >>?= fun desired_to_freeze ->
         Storage.Contract.Balance.get ctxt delegate_contract >>=? fun balance ->
         (* In case the delegate hasn't been slashed in this cycle,
            the following invariant holds:
-           maximum_bondable_stake <= frozen_deposits + balance
+           maximum_stake_to_be_deposited <= frozen_deposits + balance
            See select_distribution_for_cycle
 
            If the delegate has been slashed during the cycle, the invariant

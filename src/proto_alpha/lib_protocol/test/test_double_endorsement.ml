@@ -438,8 +438,8 @@ let test_freeze_more_with_low_balance =
     Block.bake_until_cycle_end b3 >>=? fun c1 ->
     double_endorse_and_punish c1 account1 >>=? fun c2 ->
     (* Second denunciation has happened: we check that the full balance of
-       [account1] reflects the slashing of 50% of the original bond. Its current
-       deposits are thus 0tz. *)
+       [account1] reflects the slashing of 50% of the original deposit. Its
+       current deposits are thus 0tz. *)
     Context.Delegate.info (B c2) account1 >>=? fun info4 ->
     Assert.equal_tez ~loc:__LOC__ info4.full_balance Tez.zero >>=? fun () ->
     Assert.equal_tez ~loc:__LOC__ info4.frozen_deposits Tez.zero >>=? fun () ->
