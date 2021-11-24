@@ -19,6 +19,17 @@ manifest: $(foreach file, $(SOURCE), _build/$(file))
 	ocamlc -bin-annot -g -w @1..3@5..28@30..39@43@46..47@49..57@61..62 \
 		-I _build $^ -o manifest
 
+# Used in the CI.
+.PHONY: check
+check: all
+	@git diff HEAD --exit-code || ( \
+	  echo "Repository not clean after 'make -C manifest'."; \
+	  echo "You should not edit generated dune and .opam files directly."; \
+	  echo "Edit manifest/main.ml instead."; \
+	  echo "Then run 'make -C manifest' and commit the difference."; \
+	  exit 1 \
+	)
+
 .PHONY: clean
 clean:
 	rm -rf _build manifest
