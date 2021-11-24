@@ -43,16 +43,23 @@ module Revamped = struct
     let prefix = "step" ^ string_of_int counter in
     Log.info ~color ~prefix msg
 
-  (* We override the default [bake_for] comment to wait on a [flush]
-     event from the mempool because the [set_head] event used by the
-     default [bake_for] functions happens before a flush of the
-     mempool. For mempool tests, we generally prefer to ensure that a
-     [flush] did happen than a [set_head].
+  (* We override the default [bake_for] comment to wait on the next level
+     incremented after the new block. If [wait_for_flush] is set we wait on
+     a [flush] event from the mempool because the [set_head] event used by the
+     default [bake_for] functions happens before a flush of the mempool.
+     For mempool tests, we generally prefer to ensure that a [flush] did
+     happen than a [set_head].
 
-     Optionnaly, we can decide whether the block should be baked
-     without taking the operations of the mempool. *)
-  let bake_for ~empty ~protocol node client =
-    let mempool_flush_waiter = Node.wait_for_request ~request:`Flush node in
+     Optionally, we can decide whether the block should be baked
+     without taking the operations of the mempool.
+
+     This function returns the level of the client after the bake. *)
+  let bake_for ?(wait_for_flush = false) ~empty ~protocol node client =
+    let flush_waiter =
+      if wait_for_flush then Node.wait_for_request ~request:`Flush node
+      else unit
+    in
+    let* level = Client.level client in
     let* () =
       if empty then
         let* empty_mempool_file = Client.empty_mempool_file () in
@@ -63,7 +70,8 @@ module Revamped = struct
           client
       else Client.bake_for client
     in
-    mempool_flush_waiter
+    let* () = flush_waiter in
+    Node.wait_for_level node (level + 1)
 
   (** {2 Tests } *)
 
@@ -133,7 +141,7 @@ module Revamped = struct
     Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
 
     log_step 4 "Bake a block with an empty mempool." ;
-    let* () = bake_for ~empty:true ~protocol node client in
+    let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
     let* mempool_after_empty_block = RPC.get_mempool client in
 
     log_step 5 "Check that we did not lose any operation." ;
@@ -160,7 +168,13 @@ module Revamped = struct
     Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
 
     log_step 8 "Bake with an empty mempool twice." ;
-    let* () = repeat 2 (fun () -> bake_for ~protocol ~empty:true node client) in
+    let* () =
+      repeat 2 (fun () ->
+          let* _ =
+            bake_for ~wait_for_flush:true ~protocol ~empty:true node client
+          in
+          unit)
+    in
     let* last_mempool = RPC.get_mempool client in
 
     log_step 9 "Check endorsement is classified 'Outdated'." ;
