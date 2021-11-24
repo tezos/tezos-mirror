@@ -21,7 +21,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "quorum_max": 7000, "min_proposal_quorum": 500,
   "liquidity_baking_subsidy": "2500000",
   "liquidity_baking_sunset_level": 128,
-  "liquidity_baking_escape_ema_threshold": 1000000,
+  "liquidity_baking_escape_ema_threshold": 666667,
   "max_operations_time_to_live": 120, "round_durations": [ "1", "2" ],
   "consensus_committee_size": 256, "consensus_threshold": 0,
   "minimal_participation_ratio": { "numerator": 2, "denominator": 3 },
