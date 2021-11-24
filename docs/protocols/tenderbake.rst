@@ -2,14 +2,14 @@ Tenderbake
 ==========
 
 This page contains a summary of the changes brought by the Tenderbake merge request (:gl:`!3738`).
-Please refer to :doc:`the documentation<../alpha/consensus>` and to this `blog post<https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_ for an overview of the Tenderbake consensus algorithm and its motivation.
+Please refer to :doc:`the documentation<../alpha/consensus>` and to this `blog post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_ for an overview of the Tenderbake consensus algorithm and its motivation.
 
 Protocol
 --------
 
 The whole incentives scheme has been updated.
 In particular the security deposit mechanism has been overhauled.
-See :doc:`../alpha/consensus`.
+See :doc:`the documentation<../alpha/consensus>`.
 
 Rolls do not play an essential role anymore, in that the computation of delegates' rights is based directly on the delegates' stake.
 Snapshots are still used: it is the entire delegate's stake that is snapshot.
@@ -25,7 +25,7 @@ Operations
 
 The layout of the endorsement operations has changed. It consists of a level, a round, a slot, and a payload hash.
 
-There is a new consensus operation, `preendorsements`, with the same layout as an endorsement.
+There is a new consensus operation, `preendorsement`, with the same layout as an endorsement.
 
 There is a new anonymous operation, `double preendorsement evidence`, with the same layout as a double endorsement evidence.
 
