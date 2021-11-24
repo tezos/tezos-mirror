@@ -1119,7 +1119,7 @@ module Make
         new_pending_operations
         Operation_hash.Map.empty
       >>= fun new_pending_operations ->
-      Event.(emit operations_not_flushed)
+      Event.(emit operations_to_reclassify)
         (Operation_hash.Map.cardinal new_pending_operations)
       >>= fun () ->
       pv.shell.pending <- new_pending_operations ;
