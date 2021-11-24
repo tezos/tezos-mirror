@@ -41,7 +41,9 @@ It requires protocol environment V4, compared to V3 for Hangzhou.
 Tenderbake
 ----------
 
-- A replacement of Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
+- Tenderbake is a new consensus algorithm replacing Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
+
+- The list of breaking changes related to Tenderbake are described in a separate :doc:`change log<tenderbake>`
 
 - Export participation RPC. (MR :gl:`!3822`)
 
