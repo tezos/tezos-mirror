@@ -53,7 +53,7 @@ let set_ready baker =
   trigger_ready baker (Some ())
 
 let handle_raw_stdout baker line =
-  match line with "Baker started." -> set_ready baker | _ -> ()
+  if line =~ rex "^Baker v.+ for .+ started.$" then set_ready baker
 
 let create ~protocol ?name ?color ?event_pipe ?runner node client =
   let baker =
