@@ -56,10 +56,10 @@ end)
 
   let ( >|=? ) = Monad.Lwt_result_syntax.( let+ )
 
-  let ( >>?= ) = Monad.Lwt_result_syntax.bind_from_result
+  let ( >>?= ) = Monad.Lwt_result_syntax.( let*? )
 
   let ( >|?= ) r f =
-    match r with Error _ as e -> Lwt.return e | Ok o -> lwt_ok (f o)
+    match r with Error _ as e -> Lwt.return e | Ok o -> Lwt_result.ok (f o)
 
   (* default (traced-everywhere) helper types *)
   type tztrace = Error.error Trace.trace

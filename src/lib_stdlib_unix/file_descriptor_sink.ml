@@ -186,7 +186,7 @@ end) : Internal_event.SINK with type t = t = struct
                 else path
               in
               protect (fun () ->
-                  lwt_ok
+                  Lwt_result.ok
                   @@ Lwt_unix.(
                        let flags =
                          [O_WRONLY; O_CREAT]
@@ -277,7 +277,7 @@ end) : Internal_event.SINK with type t = t = struct
         !lwt_bad_citizen_hack
     in
     match K.kind with
-    | `Path -> lwt_ok @@ Lwt_unix.close output
+    | `Path -> Lwt_result.ok @@ Lwt_unix.close output
     | `Stdout | `Stderr -> return_unit
 end
 
