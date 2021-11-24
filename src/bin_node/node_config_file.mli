@@ -123,6 +123,7 @@ val update :
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
+  ?disable_mempool_precheck:bool ->
   ?enable_testchain:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->

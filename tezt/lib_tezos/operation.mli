@@ -164,6 +164,7 @@ val forge_and_inject_operation :
     - Default [gas_limit] is [1040] gas.
     - Default [source] is [Constant.bootstrap1].
     - Default [destination] is [Constant.bootstrap2].
+    - Default [force] is [false].
  *)
 val inject_transfer :
   ?protocol:Protocol.t ->
@@ -174,6 +175,7 @@ val inject_transfer :
   ?gas_limit:int ->
   ?source:Account.key ->
   ?destination:Account.key ->
+  ?force:bool ->
   Client.t ->
   string Lwt.t
 
@@ -188,6 +190,7 @@ val inject_transfers :
   ?gas_limit:int ->
   ?source:Account.key ->
   ?destination:Account.key ->
+  ?force:bool ->
   node:Node.t ->
   number_of_operations:int ->
   Client.t ->

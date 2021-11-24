@@ -23,6 +23,13 @@ be documented here either.
 Node
 ----
 
+- Manager operations do no longer need to be executed before being
+  propagated over the network. This feature will be available from
+  protocol `I`, provided the latter is activated. The aim is to
+  increase the throughput of transactions gossiped over the network,
+  while reducing the load on the Octez node's prevalidator
+  (aka the mempool).
+
 - The following RPCs output format changed:
   1. ``/workers/block_validator``,
   2. ``/workers/chain_validators``,

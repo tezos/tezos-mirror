@@ -548,6 +548,54 @@ module Mempool = struct
         Lwt.return @@ pre_filter_manager config op bytes)
     >>= fun res -> Lwt.return (res, filter_state)
 
+  let precheck_manager :
+      type t.
+      validation_state ->
+      Tezos_base.Operation.shell_header ->
+      t Kind.manager protocol_data ->
+      [> `Prechecked
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
+      Lwt.t =
+   fun validation_state
+       shell
+       ({contents; _} as protocol_data : t Kind.manager protocol_data) ->
+    ( Main.precheck_manager validation_state contents >>=? fun () ->
+      let (raw_operation : t Kind.manager operation) =
+        Alpha_context.{shell; protocol_data}
+      in
+      Main.check_manager_signature validation_state contents raw_operation )
+    >|= function
+    | Ok () -> `Prechecked
+    | Error err -> (
+        let err = Environment.wrap_tztrace err in
+        match classify_trace err with
+        | Branch -> `Branch_refused err
+        | Permanent -> `Refused err
+        | Temporary -> `Branch_delayed err
+        | Outdated -> `Outdated err)
+
+  let precheck :
+      validation_state:validation_state ->
+      Tezos_base.Operation.shell_header ->
+      Main.operation_data ->
+      [ `Prechecked
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace
+      | `Undecided ]
+      Lwt.t =
+   fun ~validation_state shell_header (Operation_data protocol_data) ->
+    match protocol_data.contents with
+    | Single (Manager_operation _) ->
+        precheck_manager validation_state shell_header protocol_data
+    | Cons (Manager_operation _, _) ->
+        precheck_manager validation_state shell_header protocol_data
+    | Single _ -> Lwt.return `Undecided
+
   open Apply_results
 
   let rec post_filter_manager :

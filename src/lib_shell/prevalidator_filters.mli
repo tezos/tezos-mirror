@@ -51,6 +51,31 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
+    (** [precheck validation_state shell_header op] should be used to
+        decide whether an operation can be propagated over the gossip
+        network without executing it. This is a wrapper around
+        [Proto.precheck_manager] and [Proto.check_signature]. This
+        function hereby has a similar return type.
+
+        Returns [`Prechecked] if the operation was successfully
+        prechecked. If the function returns [`Undecided] it means that
+        [apply_operation] should be called.
+
+        Note: Currently this function directly returns [`Undecided] for
+        non-manager operations.
+        This function can return [`Prechecked] only for manager operations. *)
+    val precheck :
+      validation_state:Proto.validation_state ->
+      Tezos_base.Operation.shell_header ->
+      Proto.operation_data ->
+      [ `Prechecked
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace
+      | `Undecided ]
+      Lwt.t
+
     val pre_filter :
       config ->
       filter_state:state ->

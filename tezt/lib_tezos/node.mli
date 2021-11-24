@@ -73,6 +73,7 @@ type argument =
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
+  | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
 
 (** Tezos node states. *)
 type t
@@ -246,6 +247,7 @@ module Config_file : sig
     ?operations_request_timeout:float ->
     ?max_refused_operations:int ->
     ?operations_batch_size:int ->
+    ?disable_operations_precheck:bool ->
     JSON.t ->
     JSON.t
 

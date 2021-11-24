@@ -654,6 +654,21 @@ let get_client_port client =
          proxy server only. Both have an endpoint and hence a RPC port so this \
          should not happen."
 
+let mempool_node_flags =
+  Node.
+    [
+      Synchronisation_threshold 0;
+      (* Node does not need to be synchronized with peers before being
+         bootstrapped *)
+      Connections 1;
+      (* Number of connection allowed for each of our 2 nodes used in the
+         mempool tests *)
+      Disable_operations_precheck;
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
+         We use the disable-precheck option to force application of operation in
+         the prevalidator and to force classification in branch_refused *)
+    ]
+
 (* Test the mempool RPCs: /chains/<chain>/mempool/...
 
    Tested RPCs:
@@ -682,7 +697,7 @@ let get_client_port client =
    - POST unban_operation
    - POST unban_all_operations *)
 let test_mempool protocol ?endpoint client =
-  let* node = Node.init [Synchronisation_threshold 0; Connections 1] in
+  let* node = Node.init mempool_node_flags in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
   let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
   let level = 1 in
@@ -939,7 +954,7 @@ let register () =
               ( "mempool",
                 test_mempool Protocol.Alpha,
                 None,
-                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
+                Some mempool_node_flags );
             ])
       ()
   in

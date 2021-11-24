@@ -62,21 +62,18 @@
    plugin, the prevalidator still works. However, it may propagate
    outdated operations and the prevalidator can be slower. Indeed,
    plugins add more restrictions on the validation of operations. The
-   plugin comes with two functions: a [pre_filter] and [post_filter].
-   The [pre_filter] is applied when an operation is received for the
-   first time through the network or is reclassified after a flush.
+   plugin comes with three functions: [pre_filter], [precheck] and
+   [post_filter]. With the exception of locally injected operations,
+   pending operations are first pre-filtered.
+   The [precheck] is applied before classifying an operation.
    The [post_filter] is applied every time an operation is classified
-   as [Applied]. Except when an operation is injected, every pending
-   operation was first prefiltered.
+   as [Applied].
 
    Error classification:
 
    The [apply_operation] function from the economic protocol can
    classify an operation as [Refused], [Branch_refused],
-   [Branch_delayed], or [Applied]. Alternatively, it can be found to
-   be [outdated] if its branch is not in [live_blocks]: such an
-   operation is not considered classified and we immediately forget
-   about it.
+   [Branch_delayed], [Outdated] or [Applied].
 
      - An operation is [Refused] if the operation cannot be parsed or
    if the protocol rejects this operation with an error classified as
@@ -97,10 +94,13 @@
    or if the protocol rejects this operation with an error classified
    as [Temporary].
 
-     - An operation is [Applied] if the protocol applied the operation
-   on the current validation state. Operations are stored in the
-   reverse order of application so that adding a new [Applied]
-   operation can be done at the head of the list.
+     - An operation is [Applied] if it has been successfully
+   prechecked, or if the economic protocol succeeded in applying the
+   operation on the current validation state. The point of
+   prechecking an operation is that it is faster than having the protocol apply
+   the operation. Operations are stored in the reverse order of application
+   so that adding a new [Applied] operation can be done at the head
+   of the list.
 
    The [classification] data-structure (implemented in
    [Prevalidator_classification]) is used by the [prevalidator] to
@@ -199,6 +199,7 @@ type limits = {
   max_refused_operations : int;
   operation_timeout : Time.System.Span.t;
   operations_batch_size : int;
+  disable_precheck : bool;
 }
 
 (* Minimal delay between two mempool advertisements *)
@@ -517,6 +518,26 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
+  let precheck pv validation_state (op : Protocol.operation_data operation) =
+    let validation_state = Prevalidation.validation_state validation_state in
+    if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
+    else
+      Filter.Mempool.precheck ~validation_state op.raw.shell op.protocol_data
+      >|= function
+      | `Prechecked ->
+          (* The [precheck] optimization triggers: no need to call the
+              protocol [apply_operation]. *)
+          `Prechecked
+      | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
+        errs ->
+          (* Note that we don't need to distinguish some failure cases
+             of [Filter.Mempool.precheck], hence grouping them under `Fail. *)
+          `Fail errs
+      | `Undecided ->
+          (* The caller will need to call the protocol's [apply_operation]
+             function. *)
+          `Undecided
+
   let classify_operation ~notifier pv filter_state validation_state mempool op
       oph =
     match Prevalidation.parse op with
@@ -524,46 +545,52 @@ module Make
         handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
     | Ok op -> (
-        Prevalidation.apply_operation validation_state op >>= function
-        | Applied (new_validation_state, receipt) ->
-            post_filter
-              pv
-              ~validation_state_before:
-                (Prevalidation.validation_state validation_state)
-              ~validation_state_after:
-                (Prevalidation.validation_state new_validation_state)
-              op.protocol_data
-              receipt
-            >>= fun (accept, filter_state) ->
-            if accept then (
-              handle ~notifier pv.shell (`Parsed op) `Applied ;
-              let new_mempool =
-                Mempool.
-                  {mempool with known_valid = op.hash :: mempool.known_valid}
-              in
-              Lwt.return (filter_state, new_validation_state, new_mempool))
-            else (
-              Distributed_db.Operation.clear_or_cancel
-                pv.shell.parameters.chain_db
-                oph ;
-              Lwt.return (filter_state, validation_state, mempool))
-        | Branch_delayed errors ->
-            handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
+        precheck pv validation_state op >>= function
+        | `Fail errs ->
+            handle ~notifier pv.shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
-        | Branch_refused errors ->
-            handle ~notifier pv.shell (`Parsed op) (`Branch_refused errors) ;
-            Lwt.return (filter_state, validation_state, mempool)
-        | Refused errors ->
-            handle ~notifier pv.shell (`Parsed op) (`Refused errors) ;
-            Lwt.return (filter_state, validation_state, mempool)
-        | Outdated errors ->
-            handle ~notifier pv.shell (`Parsed op) (`Outdated errors) ;
-            Lwt.return (filter_state, validation_state, mempool))
+        | `Prechecked ->
+            handle ~notifier pv.shell (`Parsed op) `Applied ;
+            let new_mempool = Mempool.cons_valid op.hash mempool in
+            Lwt.return (filter_state, validation_state, new_mempool)
+        | `Undecided -> (
+            Prevalidation.apply_operation validation_state op >>= function
+            | Applied (new_validation_state, receipt) ->
+                post_filter
+                  pv
+                  ~validation_state_before:
+                    (Prevalidation.validation_state validation_state)
+                  ~validation_state_after:
+                    (Prevalidation.validation_state new_validation_state)
+                  op.protocol_data
+                  receipt
+                >>= fun (accept, filter_state) ->
+                if accept then (
+                  handle ~notifier pv.shell (`Parsed op) `Applied ;
+                  let new_mempool = Mempool.cons_valid op.hash mempool in
+                  Lwt.return (filter_state, new_validation_state, new_mempool))
+                else (
+                  Distributed_db.Operation.clear_or_cancel
+                    pv.shell.parameters.chain_db
+                    oph ;
+                  Lwt.return (filter_state, validation_state, mempool))
+            | Branch_delayed errors ->
+                handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
+                Lwt.return (filter_state, validation_state, mempool)
+            | Branch_refused errors ->
+                handle ~notifier pv.shell (`Parsed op) (`Branch_refused errors) ;
+                Lwt.return (filter_state, validation_state, mempool)
+            | Refused errors ->
+                handle ~notifier pv.shell (`Parsed op) (`Refused errors) ;
+                Lwt.return (filter_state, validation_state, mempool)
+            | Outdated errors ->
+                handle ~notifier pv.shell (`Parsed op) (`Outdated errors) ;
+                Lwt.return (filter_state, validation_state, mempool)))
 
   (* Classify pending operations into either: [Refused |
-     Branch_delayed | Branch_refused | Applied].  To ensure fairness
-     with other worker requests, classification of operations is done
-     by batch of [operation_batch_size] operations.
+     Branch_delayed | Branch_refused | Applied | Outdated].
+     To ensure fairness with other worker requests, classification of
+     operations is done by batch of [operation_batch_size] operations.
 
      This function ensures the following invariants:
 
@@ -579,7 +606,6 @@ module Make
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-
   let classify_pending_operations ~notifier w pv state =
     Operation_hash.Map.fold_es
       (fun oph op (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
@@ -654,6 +680,8 @@ module Make
               {
                 (* Using List.rev_map is ok since the size of pv.shell.classification.applied
                    cannot be too big. *)
+                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
+                   This field does not only contain valid operation *)
                 Mempool.known_valid =
                   List.rev_map fst pv.shell.classification.applied_rev;
                 pending = remaining_pendings;
@@ -1091,7 +1119,7 @@ module Make
         new_pending_operations
         Operation_hash.Map.empty
       >>= fun new_pending_operations ->
-      Event.(emit operations_not_flushed)
+      Event.(emit operations_to_reclassify)
         (Operation_hash.Map.cardinal new_pending_operations)
       >>= fun () ->
       pv.shell.pending <- new_pending_operations ;
@@ -1226,7 +1254,7 @@ module Make
           timestamp = timestamp_system;
           live_blocks;
           live_operations;
-          mempool = {known_valid = []; pending = Operation_hash.Set.empty};
+          mempool = Mempool.empty;
           fetching;
           pending = Operation_hash.Map.empty;
           advertisement = `None;

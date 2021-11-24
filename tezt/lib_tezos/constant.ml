@@ -93,6 +93,8 @@ let bootstrap5 : Account.key =
 let all_secret_keys =
   [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
 
+let all_bootstrap_keys = List.filter (( <> ) activator) all_secret_keys
+
 (** The default burn for an implicit account. *)
 let implicit_account_burn =
   (* as per the "origination_size" constant *)

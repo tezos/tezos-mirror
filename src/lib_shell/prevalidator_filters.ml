@@ -50,6 +50,18 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
+    val precheck :
+      validation_state:Proto.validation_state ->
+      Tezos_base.Operation.shell_header ->
+      Proto.operation_data ->
+      [ `Prechecked
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace
+      | `Undecided ]
+      Lwt.t
+
     val pre_filter :
       config ->
       filter_state:state ->
@@ -92,6 +104,8 @@ module No_filter (Proto : Registered_protocol.T) = struct
     let init _ ?validation_state:_ ~predecessor:_ () = return_unit
 
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
+
+    let precheck ~validation_state:_ _ _ = Lwt.return `Undecided
 
     let pre_filter _ ~filter_state ?validation_state_before:_ _ =
       Lwt.return (`Undecided, filter_state)
