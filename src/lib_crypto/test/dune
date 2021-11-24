@@ -10,7 +10,7 @@
   tezos-error-monad
   zarith
   zarith_stubs_js
-  tezos-hacl-glue-unix
+  tezos-hacl
   data-encoding
   alcotest
   alcotest-lwt

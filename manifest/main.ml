@@ -73,9 +73,11 @@ let conf_rust = opam_only "conf-rust" V.True
 
 let coq_of_ocaml = opam_only "coq-of-ocaml" V.(exactly "2.5.0")
 
-let ctypes = external_lib "ctypes" V.(at_least "0.18.0")
+let ctypes = external_lib ~js_compatible:true "ctypes" V.(at_least "0.18.0")
 
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
+
+let ctypes_stubs_js = external_lib ~js_compatible:true "ctypes_stubs_js" V.True
 
 let data_encoding =
   external_lib
@@ -100,9 +102,14 @@ let fmt_cli = external_sublib fmt "fmt.cli"
 
 let fmt_tty = external_sublib fmt "fmt.tty"
 
-let hacl_star = external_lib "hacl-star" V.(at_least "0.4.2" && less_than "0.5")
+let hacl_star =
+  external_lib
+    ~js_compatible:true
+    ~node_wrapper_flags:["--hacl"; "1.1.0"]
+    "hacl-star"
+    V.(at_least "0.4.2" && less_than "0.5")
 
-let hacl_star_raw = external_lib "hacl-star-raw" V.True
+let hacl_star_raw = external_lib ~js_compatible:true "hacl-star-raw" V.True
 
 let hacl_x25519 = external_lib "hacl_x25519" V.True
 
@@ -110,7 +117,7 @@ let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
 
 let index = external_lib "index" V.(at_least "1.3.0")
 
-let integers = external_lib "integers" V.True
+let integers = external_lib ~js_compatible:true "integers" V.True
 
 let ipaddr =
   external_lib
@@ -126,8 +133,6 @@ let irmin_pack =
   external_lib "irmin-pack" V.(at_least "2.10.0" && less_than "2.11.0")
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
-
-let js_of_ocaml = external_lib ~js_compatible:true "js_of_ocaml" V.True
 
 let json_data_encoding =
   external_lib
@@ -485,31 +490,21 @@ let tezos_error_monad =
       ]
     ~js_compatible:true
 
-(* NOTE: tezos_*_glue are virtual packages;
-   either the unix or js implementation must be installed. *)
-let tezos_hacl_glue =
+let tezos_hacl =
   public_lib
-    "tezos-hacl-glue"
-    ~path:"src/lib_hacl_glue/virtual"
-    ~synopsis:"Tezos: thin layer of glue around hacl-star (virtual package)"
+    "tezos-hacl"
+    ~path:"src/lib_hacl"
+    ~synopsis:"Tezos: thin layer around hacl-star"
     ~ocaml:V.(at_least "4.08")
-    ~virtual_modules:["hacl"]
-    ~js_compatible:true
-
-let tezos_hacl_glue_unix =
-  public_lib
-    "tezos-hacl-glue-unix"
-    ~path:"src/lib_hacl_glue/unix"
-    ~synopsis:"Tezos: thin layer of glue around hacl-star (unix implementation)"
-    ~implements:tezos_hacl_glue
-    ~deps:[hacl_star; hacl_star_raw]
+    ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
+    ~js_of_ocaml:[[S "javascript_files"; S "hacl_stubs.js"]]
     ~conflicts:[hacl_x25519]
 
-let _tezos_hacl_glue_unix_tests =
+let _tezos_hacl_tests =
   tests
     ["test_hacl"; "test_prop_hacl_hash"; "test_prop_signature_pk"]
-    ~path:"src/lib_hacl_glue/unix/test"
-    ~opam:"src/lib_hacl_glue/unix/tezos-hacl-glue-unix"
+    ~path:"src/lib_hacl/test"
+    ~opam:"src/lib_hacl/tezos-hacl"
     ~deps:
       [
         tezos_stdlib |> open_;
@@ -517,95 +512,33 @@ let _tezos_hacl_glue_unix_tests =
         zarith;
         zarith_stubs_js;
         data_encoding |> open_;
-        tezos_hacl_glue |> open_;
-        tezos_hacl_glue_unix;
-        qcheck_alcotest;
-        tezos_test_helpers;
-      ]
-    ~modes:[Native]
-
-let hacl_star_raw_empty =
-  public_lib
-    "hacl-star-raw-empty"
-    ~path:"src/lib_hacl_glue/js/src"
-    ~opam:"src/lib_hacl_glue/js/hacl-star-raw-empty"
-    ~synopsis:"Tezos: thin layer of glue around hacl-star (javascript version)"
-    ~modules:[]
-    ~js_compatible:true
-    ~foreign_stubs:{language = C; flags = []; names = ["hacl_star"]}
-
-let tezos_hacl_glue_js =
-  public_lib
-    "tezos-hacl-glue-js"
-    ~path:"src/lib_hacl_glue/js/src"
-    ~opam:"src/lib_hacl_glue/js/tezos-hacl-glue-js"
-    ~synopsis:"Tezos: thin layer of glue around hacl-star (javascript version)"
-    ~implements:tezos_hacl_glue
-    ~deps:[hacl_star_raw_empty]
-    ~js_of_ocaml:[[S "javascript_files"; S "hacl_stubs.js"]]
-    ~opam_only_deps:
-      [(* Build dependency for users of the library. *) js_of_ocaml]
-    ~node_wrapper_flags:["--hacl"; "1.1.0"]
-    ~modules:["hacl"]
-
-(* We use virtual libraries, and want to compile the same test with
-   unix and js. In order to do this, we copy tests from the unix
-   directory and change the library providing the implementation of
-   the virtual lib (tezos-hacl-glue-js) *)
-let _tezos_hacl_glue_js_tests_1 =
-  test_exes
-    ["test_hacl"; "test_prop_signature_pk"]
-    ~path:"src/lib_hacl_glue/js/test"
-    ~opam:"src/lib_hacl_glue/js/tezos-hacl-glue-js"
-    ~modes:[JS]
-    ~deps:
-      [
-        tezos_stdlib |> open_;
-        tezos_error_monad |> open_ ~m:"TzLwtreslib";
-        zarith;
-        zarith_stubs_js;
-        data_encoding |> open_;
-        tezos_hacl_glue |> open_;
-        tezos_hacl_glue_js;
+        tezos_hacl |> open_;
         qcheck_alcotest;
         tezos_test_helpers;
       ]
     ~all_modules_except:["test"]
+    ~modes:[Native; JS]
     ~js_compatible:true
 
-let _tezos_hacl_glue_js_tests_2 =
-  test_exe
+let _tezos_hacl_tests_1 =
+  test
     "test"
-    ~path:"src/lib_hacl_glue/js/test"
-    ~opam:"src/lib_hacl_glue/js/tezos-hacl-glue-js"
-    ~modes:[JS]
-    ~deps:[tezos_hacl_glue_js]
-    ~modules:["test"]
-    ~js_compatible:true
-    ~dune:
-      (let open Dune in
-      let copy file =
-        [
-          S "rule";
-          [
-            S "action";
-            [S "copy"; S ("../../unix/test/" ^ file); S (file ^ ".from-unix")];
-          ];
-        ]
-      in
-      let diff file =
-        alias_rule
-          "runtest_js"
-          ~action:[S "diff"; S file; S (file ^ ".from-unix")]
-      in
+    ~path:"src/lib_hacl/test"
+    ~opam:"src/lib_hacl/tezos-hacl"
+    ~deps:
       [
-        copy "test_hacl.ml";
-        copy "vectors_p256.ml";
-        copy "test_prop_signature_pk.ml";
-        diff "test_hacl.ml";
-        diff "vectors_p256.ml";
-        diff "test_prop_signature_pk.ml";
-      ])
+        tezos_stdlib;
+        tezos_error_monad;
+        zarith;
+        zarith_stubs_js;
+        data_encoding;
+        tezos_hacl;
+        qcheck_alcotest;
+        tezos_test_helpers;
+      ]
+    ~modules:["test"]
+    ~modes:[Native; JS]
+    ~js_compatible:true
 
 let _tezos_error_monad_tests =
   test
@@ -643,7 +576,7 @@ let tezos_crypto =
         data_encoding |> open_;
         tezos_lwt_result_stdlib;
         lwt;
-        tezos_hacl_glue;
+        tezos_hacl;
         secp256k1_internal;
         tezos_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_rpc |> open_;
@@ -664,7 +597,7 @@ let _tezos_crypto_tests =
         tezos_error_monad |> open_ ~m:"TzLwtreslib";
         zarith;
         zarith_stubs_js;
-        tezos_hacl_glue_unix;
+        tezos_hacl;
         data_encoding |> open_;
         alcotest;
         alcotest_lwt;
@@ -828,10 +761,6 @@ let tezos_base =
       ]
     ~dune:Dune.[ocamllex "point_parser"]
 
-(* tezos-crypto depends on the tezos glue packages that
-   are dune virtual packages and require an implementation.
-   tezos-base.unix is used in many executables as a proxy to
-   force linking of the unix implementation of the tezos crypto libraries. *)
 let tezos_base_unix =
   public_lib
     "tezos-base.unix"
@@ -843,7 +772,7 @@ let tezos_base_unix =
         tezos_crypto |> open_;
         tezos_base |> open_;
         bls12_381_unix;
-        tezos_hacl_glue_unix (* unix implementation of hacl *);
+        tezos_hacl;
         tezos_stdlib |> open_;
         tezos_stdlib_unix |> open_;
         data_encoding |> open_;

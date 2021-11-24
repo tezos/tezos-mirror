@@ -1,0 +1,70 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(tests
+ (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
+ (package tezos-hacl)
+ (modes native js)
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  zarith
+  zarith_stubs_js
+  data-encoding
+  tezos-hacl
+  qcheck-alcotest
+  tezos-test-helpers)
+ (js_of_ocaml)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding
+   -open Tezos_hacl))
+ (modules (:standard \ test)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
+   %{dep:./test_hacl.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
+   %{dep:./test_prop_hacl_hash.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
+   %{dep:./test_prop_signature_pk.bc.js})))
+
+(test
+ (name test)
+ (package tezos-hacl)
+ (modes native js)
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  zarith
+  zarith_stubs_js
+  data-encoding
+  tezos-hacl
+  qcheck-alcotest
+  tezos-test-helpers)
+ (js_of_ocaml)
+ (modules test))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl)
+ (action
+  (run %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0 %{dep:./test.bc.js})))

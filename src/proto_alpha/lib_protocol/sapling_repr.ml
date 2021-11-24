@@ -127,7 +127,7 @@ let ciphertext_size =
   let epk_size = string_size_gen 32 in
   let nonce_enc_size =
     string_size_gen 24
-    (* from lib_hacl_glue/unix/hacl.ml:Nonce.size *)
+    (* from lib_hacl/hacl.ml:Nonce.size *)
   in
   let payload_out_size =
     string_size_gen (32 + 32 + 16)

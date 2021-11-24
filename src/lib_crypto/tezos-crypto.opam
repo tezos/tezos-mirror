@@ -13,14 +13,13 @@ depends: [
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-lwt-result-stdlib"
   "lwt" { >= "5.4.0" }
-  "tezos-hacl-glue"
+  "tezos-hacl"
   "secp256k1-internal"
   "tezos-error-monad"
   "tezos-rpc"
   "ringo" { = "0.7" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "tezos-hacl-glue-unix" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.15" }

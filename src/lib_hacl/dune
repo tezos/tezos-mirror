@@ -2,10 +2,11 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_hacl_glue_unix)
- (public_name tezos-hacl-glue-unix)
- (implements tezos-hacl-glue)
+ (name tezos_hacl)
+ (public_name tezos-hacl)
  (instrumentation (backend bisect_ppx))
  (libraries
   hacl-star
-  hacl-star-raw))
+  hacl-star-raw
+  ctypes_stubs_js)
+ (js_of_ocaml (javascript_files hacl_stubs.js)))

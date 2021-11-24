@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_hacl_glue
+open Tezos_hacl
 
 type rsa_secret = {p : Z.t; q : Z.t}
 

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl_glue/runtest
+    Invocation:   dune build @src/lib_hacl/runtest
     Subject:      Tests the consistency between the [DIRECT_HASH] and
                   [INCREMENTAL_HASH] interfaces of hashes SHA256 and
                   SHA512.

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl_glue/runtest
+    Invocation:   dune build @src/lib_hacl/runtest
     Subject:      Property-tests over the interface Hacl.SIGNATURE checking
                   the equivalence between [pk_of_bytes_without_validation]
                   and [pk_of_bytes] on valid public keys.
