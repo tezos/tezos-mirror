@@ -115,7 +115,7 @@ Dependencies on other merge requests, other relationships to MRs, to
 issues, etc, should also be mentioned.
 
 While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developers prefixes the MR with ``WIP:``. This will tell everybody
+work in progress, the developer prefixes the MR with ``WIP:``. This will tell everybody
 they can look at the code, comment, but there is still work to be done and the
 branch can change and history be rewritten.
 
@@ -642,5 +642,5 @@ little. We welcome specific issues or contributions there too.
 Developer Tools
 ~~~~~~~~~~~~~~~
 
-Somme tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
+Some tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
 In particular, it contains ``tztop``, a REPL (interactive read-eval-print loop) based on ``utop``.
