@@ -29,7 +29,7 @@ Going further
 ~~~~~~~~~~~~~
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
-This kind of small contribution can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 
