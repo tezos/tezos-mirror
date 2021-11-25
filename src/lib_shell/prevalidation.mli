@@ -86,6 +86,12 @@ module type T = sig
   val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit
+
+  module Internal_for_tests : sig
+    (** Returns operations for which {!apply_operation} returned [Applied _]
+        so far. *)
+    val to_applied : t -> (operation_data operation * operation_receipt) list
+  end
 end
 
 (** How-to obtain an instance of this module's main module type: {!T} *)
@@ -97,6 +103,9 @@ module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
      and type chain_store = Store.chain_store
 
 module Internal_for_tests : sig
+  (** Returns the {!Operation.t} underlying an {!operation} *)
+  val to_raw : _ operation -> Operation.t
+
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
 
       If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to

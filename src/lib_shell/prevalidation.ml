@@ -91,6 +91,10 @@ module type T = sig
   val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit
+
+  module Internal_for_tests : sig
+    val to_applied : t -> (operation_data operation * operation_receipt) list
+  end
 end
 
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
@@ -237,6 +241,9 @@ module MakeAbstract
     | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
     | Outdated err -> fprintf ppf "outdated (%a)" pp_print_trace err
 
+  module Internal_for_tests = struct
+    let to_applied {applied; _} = applied
+  end
 end
 
 module Production_chain_store :
@@ -257,6 +264,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   MakeAbstract (Production_chain_store) (Proto)
 
 module Internal_for_tests = struct
+  let to_raw {raw; _} = raw
+
   let safe_binary_of_bytes = safe_binary_of_bytes
 
   module type CHAIN_STORE = CHAIN_STORE
