@@ -113,14 +113,14 @@ val mk_origination :
 
 (** {2 Forging, signing and injecting operations} *)
 
-(** Sign the bytes message with the secret key of the account given in
-    argument. Returns the corresponding Tezos signature. This function
-    can be used to sign transactions, blocks, etc.  *)
-val sign_bytes :
-  watermark:Tezos_crypto.Signature.watermark ->
-  Account.key ->
-  Bytes.t ->
-  Tezos_crypto.Signature.t
+(** [sign_manager_op_bytes ~signer op_bytes] signs [op_bytes] with
+    [signer]'s secret key and the watermark [Generic_operation]. *)
+val sign_manager_op_bytes :
+  signer:Account.key -> bytes -> Tezos_crypto.Signature.t
+
+(** Same as [sign_manager_op_bytes], but the input operation content
+    and output signature are strings containing hexadecimal data. *)
+val sign_manager_op_hex : signer:Account.key -> string -> string
 
 (** [forge_and_inject_operation] allows to forge, sign and inject to a
     node, via the provided [client], the list [batch] of managed operations.

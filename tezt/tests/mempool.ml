@@ -508,16 +508,6 @@ let operation_json_branch ~branch operations_json =
     branch
     operations_json
 
-let sign_operation ~signer op_str_hex =
-  let signature =
-    Operation.sign_bytes
-      ~watermark:Generic_operation
-      signer
-      (Hex.to_bytes (`Hex op_str_hex))
-  in
-  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
-  signature
-
 let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
     ~client =
   let op_json = operation_json ~fee ~gas_limit ~source ~destination ~counter in
@@ -544,7 +534,7 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
       ~counter
       ~client
   in
-  let signature = sign_operation ~signer op_str_hex in
+  let signature = Operation.sign_manager_op_hex ~signer op_str_hex in
   let* oph = inject_operation ~client op_str_hex signature in
   return oph
 
@@ -754,10 +744,7 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let op_str_hex = JSON.as_string op_hex in
   let signature =
-    Operation.sign_bytes
-      ~watermark:Generic_operation
-      signer
-      (Hex.to_bytes (`Hex op_str_hex))
+    Operation.sign_manager_op_bytes ~signer (Hex.to_bytes (`Hex op_str_hex))
   in
   let* _run =
     let* chain_id = RPC.get_chain_id client in
@@ -1319,7 +1306,9 @@ let refetch_failed_operation =
       ~counter:(counter + 1)
       ~client:client_1
   in
-  let signature = sign_operation ~signer:Constant.bootstrap1 op_str_hex in
+  let signature =
+    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_str_hex
+  in
   let failed_fetching_waiter = wait_for_failed_fetch node_2 in
   let* oph = inject_operation ~client:client_1 op_str_hex signature in
   let* () = failed_fetching_waiter in
@@ -2436,7 +2425,9 @@ let force_operation_injection =
       ~counter (* Invalid counter *)
       ~client:client2
   in
-  let signature = sign_operation ~signer:Constant.bootstrap2 op_str_hex in
+  let signature =
+    Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_str_hex
+  in
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
   let p = RPC.spawn_inject_operation ~data:(`String signed_op) client1 in
@@ -2519,7 +2510,9 @@ let injecting_old_operation_fails =
       ~counter:(counter + 1)
       ~client
   in
-  let signature = sign_operation ~signer:Constant.bootstrap1 op_str_hex in
+  let signature =
+    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_str_hex
+  in
   log_step 5 step5 ;
   let process =
     RPC.spawn_inject_operation ~data:(`String (op_str_hex ^ signature)) client

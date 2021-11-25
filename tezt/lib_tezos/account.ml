@@ -24,13 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This type is used to construct values for secret keys.
-
-    Note: The tests only use unencrypted keys for the moment, please
-    add new constructors for other keys here, as needed. *)
-type secret_key =
-  | Unencrypted of string
-      (** The string does NOT contain the 'unencrypted:' prefix *)
+type secret_key = Unencrypted of string
 
 type key = {
   alias : string;
@@ -38,6 +32,13 @@ type key = {
   public_key : string;
   secret_key : secret_key;
 }
+
+let sign_bytes ~watermark ~signer (message : Bytes.t) =
+  let (Unencrypted b58_secret_key) = signer.secret_key in
+  let secret_key =
+    Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
+  in
+  Tezos_crypto.Signature.sign ~watermark secret_key message
 
 let write_stresstest_sources_file (accounts : key list) =
   let account_to_json (account : key) =
