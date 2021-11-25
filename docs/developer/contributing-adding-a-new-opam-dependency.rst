@@ -55,17 +55,17 @@ be updated.
 You can work on your feature, using the types and values provided by
 your new dependency.
 
-Creating a work-in-progress MR (optional)
------------------------------------------
+Creating a draft MR (optional)
+------------------------------
 
 If you need to share your work in the early stages of development to
-gather feedback, you can start by creating a work-in-progress (WIP) MR.
+gather feedback, you can start by creating a work-in-progress (Draft) MR.
 This MR will include a hack (described below) to bypass the normal CI
 process. Because of this, it will not be mergeable as is but it will
 pass the CI and allow you to work collaboratively with other
 developers.
 
-To give the CI access to your new dependency, **insert the WIP opam commands to
+To give the CI access to your new dependency, **insert temporary opam commands to
 the CI yaml files.** The opam commands have the following form:
 
 ::
@@ -84,10 +84,10 @@ dependencies, you need to pin all of them and upgrade all of them. E.g., if
        - opam upgrade --yes foo bar
 
 In the case where your new dependency brings many transitive dependencies, this
-hack might not be worth it. You can skip this WIP MR and go directly for the
+hack might not be worth it. You can skip this Draft MR and go directly for the
 finalised MR as per the section below.
 
-If you do decide to open the WIP MR anyway, you must insert the yaml chunk into
+If you do decide to open the Draft MR anyway, you must insert the yaml chunk into
 multiple places in the CI yaml files. The list of places that you need to insert
 this chunk into may change with the CI. At the time of writing, you must insert it
 into the following places:
@@ -110,13 +110,13 @@ into the following places:
 With this ``opam pin`` hack, it can be tested but it cannot be merged
 onto master. You can push you branch to Gitlab and open an MR.
 
-- Do not forget to mark your MR as WIP on Gitlab.
+- Do not forget to mark your MR as Draft on Gitlab.
 - You should also use one dedicated commit to introduce the ``opam pin`` hack. Use an easily identifiable title for the commit. It will be easy to remove afterwards.
 
 Finalising the MR
 -----------------
 
-The ``opam pin`` CI yaml hack is satisfactory for a WIP MR. But it is
+The ``opam pin`` CI yaml hack is satisfactory for a Draft MR. But it is
 not mergeable. In order to get to a mergeable MR, you must perform the
 following steps.
 
