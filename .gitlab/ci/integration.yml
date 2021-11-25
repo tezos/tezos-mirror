@@ -51,6 +51,7 @@ script:snapshot_alpha_and_link:
   script:
     - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
     - make
+    - dune build src/proto_"$new_proto_version"_*/
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##
