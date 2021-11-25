@@ -281,7 +281,7 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
         ~sum_acc
   in
   let parameters_len = Int32.of_int (Durations.length round_durations) in
-  if round < parameters_len then
+  if round <= parameters_len then
     (* Let τ be the sequence of round durations (exactly as computed
        by function [duration_of_round]). We just sum the constants
        in [round_durations]:
