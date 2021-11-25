@@ -17,6 +17,7 @@
   ringo
   zarith
   zarith_stubs_js)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib

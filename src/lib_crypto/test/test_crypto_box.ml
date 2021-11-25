@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,19 +36,6 @@ let (sk, pk, pkh) = Crypto_box.random_keypair ()
 let zero_nonce = Crypto_box.zero_nonce
 
 let chkey = Crypto_box.precompute sk pk
-
-(** The test defines a proof-of-work target, generates a proof-of-work
-    for that target, and then verifies it the proof of work is accepted
-    by [Crypto_box.check_proof_of_work].
-*)
-let test_check_pow () =
-  let open Lwt.Infix in
-  let target = Crypto_box.make_pow_target 2. in
-  Crypto_box.generate_proof_of_work pk target >|= fun pow ->
-  Alcotest.(check bool)
-    "check_pow"
-    (Crypto_box.check_proof_of_work pk pow target)
-    true
 
 (** Checks the neuterize function, i.e. the [pk] corresponds to the
     generated public key from secret key [sk].
@@ -109,5 +97,3 @@ let tests =
         ("HACL* box", `Quick, test_fast_box (Bytes.of_string "test"));
       ] );
   ]
-
-let tests_lwt = [("crypto_box", [("Check PoW", `Slow, test_check_pow)])]
