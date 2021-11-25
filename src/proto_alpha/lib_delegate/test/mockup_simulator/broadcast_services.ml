@@ -57,7 +57,7 @@ module S = struct
     RPC_service.post_service
       ~description:"Broadcast an operation."
       ~query:dests_query
-      ~input:Tezos_raw_protocol_alpha.Alpha_context.Operation.encoding
+      ~input:Alpha_context.Operation.encoding
       ~output:unit
       RPC_path.(path / "operation")
 end

@@ -168,9 +168,7 @@ let test_a_really_deactivated_account_is_not_in_the_committee () =
      has rights) and become active again, or, in case it is inactive for another
      [preserved_cycles], it has no more rights, thus cannot be part of the
      committee. *)
-  let constants =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
-  in
+  let constants = Default_parameters.constants_test in
   Block.bake_until_n_cycle_end
     (constants.preserved_cycles + 1)
     ~policy:(By_account m2.pkh)
@@ -306,9 +304,7 @@ let test_delegation () =
   (match delegate with
   | None -> assert false
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
-  let constants =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
-  in
+  let constants = Default_parameters.constants_test in
   let one_roll = constants.tokens_per_roll in
   Op.transaction (B b) a1 a3 one_roll >>=? fun transact ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->

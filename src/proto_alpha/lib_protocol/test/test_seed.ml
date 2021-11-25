@@ -185,7 +185,7 @@ let test_unrevealed () =
   let open Alpha_context in
   let constants =
     {
-      Tezos_protocol_alpha_parameters.Default_parameters.constants_test with
+      Default_parameters.constants_test with
       endorsing_reward_per_slot = Tez.one_mutez;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;

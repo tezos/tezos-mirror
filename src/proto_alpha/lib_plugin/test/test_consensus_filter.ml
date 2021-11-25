@@ -25,8 +25,7 @@
 
 open Lib_test.Qcheck_helpers
 open Plugin.Mempool
-open Tezos_protocol_alpha.Protocol.Alpha_context
-open Tezos_protocol_alpha.Protocol
+open Alpha_context
 
 let config drift_opt =
   {

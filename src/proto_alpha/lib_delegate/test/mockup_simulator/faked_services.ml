@@ -89,9 +89,7 @@ module type Mocked_services_hooks = sig
      number, starting from 0). If [dests] is not provided, broadcast
      to all nodes. *)
   val broadcast_operation :
-    ?dests:int list ->
-    Tezos_raw_protocol_alpha.Alpha_context.packed_operation ->
-    unit tzresult Lwt.t
+    ?dests:int list -> Alpha_context.packed_operation -> unit tzresult Lwt.t
 
   (** Simulate waiting for the node to be bootstrapped. Because the
       simulated node is already bootstrapped, returns the current head
