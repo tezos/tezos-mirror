@@ -50,6 +50,8 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
+    val remove : filter_state:state -> Operation_hash.t -> state
+
     val precheck :
       config ->
       filter_state:state ->
@@ -104,6 +106,8 @@ module No_filter (Proto : Registered_protocol.T) = struct
     type state = unit
 
     let init _ ?validation_state:_ ~predecessor:_ () = return_unit
+
+    let remove ~filter_state _ = filter_state
 
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
 

@@ -220,6 +220,22 @@ module Mempool = struct
     ignore filter_state ;
     init config ?validation_state ~predecessor ()
 
+  let remove ~(filter_state : state) oph =
+    match
+      Operation_hash.Map.find oph filter_state.operation_hash_to_manager
+    with
+    | None -> filter_state
+    | Some source ->
+        {
+          filter_state with
+          op_prechecked_managers =
+            Signature.Public_key_hash.Set.remove
+              source
+              filter_state.op_prechecked_managers;
+          operation_hash_to_manager =
+            Operation_hash.Map.remove oph filter_state.operation_hash_to_manager;
+        }
+
   let get_manager_operation_gas_and_fee contents =
     let open Operation in
     let l = to_list (Contents_list contents) in

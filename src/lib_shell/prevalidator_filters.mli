@@ -57,7 +57,11 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
-    (** [precheck ~filter_state ~validation_state shell_header op oph] should be
+    (** [remove ~filter_state oph] removes the operation manager linked to
+        [oph] from the state of the filter *)
+    val remove : filter_state:state -> Operation_hash.t -> state
+
+    (** [precheck ~filter_state ~validation_state shell_header oph] should be
         used to decide whether an operation can be propagated over the gossip
         network without executing it. This is a wrapper around
         [Proto.precheck_manager] and [Proto.check_signature]. This

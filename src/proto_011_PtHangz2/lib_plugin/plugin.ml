@@ -94,6 +94,8 @@ module Mempool = struct
     ignore filter_state ;
     init config ?validation_state ~predecessor ()
 
+  let remove ~filter_state _ = filter_state
+
   let default_minimal_fees =
     match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
