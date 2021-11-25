@@ -123,6 +123,9 @@ Minor Changes
 - Only allow positive depth in context query RPC and other RPC.
   (MR :gl:`!3564`)
 
+- Liquidity Baking: postpone the sunset level by 819,200 blocks and
+  decrease the escape hatch threshold from one half to one third.
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
