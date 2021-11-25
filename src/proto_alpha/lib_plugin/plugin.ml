@@ -158,14 +158,29 @@ module Mempool = struct
   type state = {
     grandparent_level_start : Alpha_context.Timestamp.t option;
     round_zero_duration : Period.t option;
+    op_prechecked_managers : Signature.Public_key_hash.Set.t;
+        (** Set of all managers that are the source of manager operations
+            applied in the mempool. Each manager in the set should be accessible
+            with an operation hash in [operation_hash_to_manager]. *)
+    operation_hash_to_manager : Signature.Public_key_hash.t Operation_hash.Map.t;
+        (** Map of operation hash to manager used to remove a manager from
+            [op_prechecked_managers] with an operation hash. Each manager in the
+            map should also be in [op_prechecked_managers]. *)
   }
+
+  let empty : state =
+    {
+      grandparent_level_start = None;
+      round_zero_duration = None;
+      op_prechecked_managers = Signature.Public_key_hash.Set.empty;
+      operation_hash_to_manager = Operation_hash.Map.empty;
+    }
 
   let init config ?(validation_state : validation_state option) ~predecessor ()
       =
     ignore config ;
     (match validation_state with
-    | None ->
-        return {grandparent_level_start = None; round_zero_duration = None}
+    | None -> return empty
     | Some {ctxt; _} ->
         let {
           Tezos_base.Block_header.fitness = predecessor_fitness;
@@ -193,6 +208,7 @@ module Mempool = struct
           >>?= fun proposal_offset ->
           return
             {
+              empty with
               grandparent_level_start =
                 Some Timestamp.(predecessor_timestamp - proposal_offset);
               round_zero_duration = Some round_zero_duration;
@@ -234,47 +250,82 @@ module Mempool = struct
       (function Fees_too_low -> Some () | _ -> None)
       (fun () -> Fees_too_low)
 
+  type Environment.Error_monad.error += Manager_restriction
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"plugin_filter.manager_restriction"
+      ~title:"Only one manager operation per manager per block allowed"
+      ~description:"Only one manager operation per manager per block allowed"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Only one manager operation per manager per block allowed")
+      Data_encoding.unit
+      (function Manager_restriction -> Some () | _ -> None)
+      (fun () -> Manager_restriction)
+
+  let check_manager_restriction filter_state source =
+    if
+      Signature.Public_key_hash.Set.mem
+        source
+        filter_state.op_prechecked_managers
+    then
+      (* Manager already seen: one manager per block limitation triggered. *)
+      Error (`Branch_delayed [Environment.wrap_tzerror Manager_restriction])
+    else Ok ()
+
   let pre_filter_manager :
       type t.
       config ->
+      state ->
       t Kind.manager contents_list ->
+      public_key_hash ->
       int ->
       [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ] =
-   fun config op size ->
-    match get_manager_operation_gas_and_fee op with
-    | Error err ->
-        let err = Environment.wrap_tztrace err in
-        `Refused err
-    | Ok (fee, gas) ->
-        let fees_in_nanotez =
-          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
-        in
-        let minimal_fees_in_nanotez =
-          Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
-        in
-        let minimal_fees_for_gas_in_nanotez =
-          Q.mul
-            config.minimal_nanotez_per_gas_unit
-            (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
-        in
-        let minimal_fees_for_size_in_nanotez =
-          Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
-        in
-        if
-          Q.compare
-            fees_in_nanotez
-            (Q.add
-               minimal_fees_in_nanotez
-               (Q.add
-                  minimal_fees_for_gas_in_nanotez
-                  minimal_fees_for_size_in_nanotez))
-          >= 0
-        then `Passed_prefilter
-        else `Refused [Environment.wrap_tzerror Fees_too_low]
+   fun config filter_state op source size ->
+    let check_gas_and_fee () =
+      match get_manager_operation_gas_and_fee op with
+      | Error err ->
+          let err = Environment.wrap_tztrace err in
+          `Refused err
+      | Ok (fee, gas) ->
+          let fees_in_nanotez =
+            Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
+          in
+          let minimal_fees_in_nanotez =
+            Q.mul
+              (Q.of_int64 (Tez.to_mutez config.minimal_fees))
+              (Q.of_int 1000)
+          in
+          let minimal_fees_for_gas_in_nanotez =
+            Q.mul
+              config.minimal_nanotez_per_gas_unit
+              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
+          in
+          let minimal_fees_for_size_in_nanotez =
+            Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
+          in
+          if
+            Q.compare
+              fees_in_nanotez
+              (Q.add
+                 minimal_fees_in_nanotez
+                 (Q.add
+                    minimal_fees_for_gas_in_nanotez
+                    minimal_fees_for_size_in_nanotez))
+            >= 0
+          then `Passed_prefilter
+          else `Refused [Environment.wrap_tzerror Fees_too_low]
+    in
+    match check_manager_restriction filter_state source with
+    | Error errs -> errs
+    | Ok () -> check_gas_and_fee ()
 
   type Environment.Error_monad.error += Outdated_endorsement
 
@@ -457,7 +508,7 @@ module Mempool = struct
       acceptable ~drift ~op_earliest_ts ~now_timestamp
 
   let pre_filter_far_future_consensus_ops config
-      ~filter_state:({grandparent_level_start; round_zero_duration} : state)
+      ~filter_state:({grandparent_level_start; round_zero_duration; _} : state)
       ?validation_state_before
       ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t
       =
@@ -545,39 +596,61 @@ module Mempool = struct
     | Single (Proposals _)
     | Single (Ballot _) ->
         Lwt.return @@ `Passed_prefilter
-    | Single (Manager_operation _) as op ->
-        Lwt.return @@ pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op ->
-        Lwt.return @@ pre_filter_manager config op bytes
+    | Single (Manager_operation {source; _}) as op ->
+        Lwt.return (pre_filter_manager config filter_state op source bytes)
+    | Cons (Manager_operation {source; _}, _) as op ->
+        Lwt.return (pre_filter_manager config filter_state op source bytes)
 
   let precheck_manager :
       type t.
+      state ->
       validation_state ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
+      public_key_hash ->
       [> `Prechecked_manager
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
       Lwt.t =
-   fun validation_state
+   fun filter_state
+       validation_state
        shell
-       ({contents; _} as protocol_data : t Kind.manager protocol_data) ->
-    ( Main.precheck_manager validation_state contents >>=? fun () ->
-      let (raw_operation : t Kind.manager operation) =
-        Alpha_context.{shell; protocol_data}
-      in
-      Main.check_manager_signature validation_state contents raw_operation )
-    >|= function
-    | Ok () -> `Prechecked_manager
-    | Error err -> (
-        let err = Environment.wrap_tztrace err in
-        match classify_trace err with
-        | Branch -> `Branch_refused err
-        | Permanent -> `Refused err
-        | Temporary -> `Branch_delayed err
-        | Outdated -> `Outdated err)
+       ({contents; _} as protocol_data : t Kind.manager protocol_data)
+       source ->
+    let precheck_manager_and_check_signature () =
+      ( Main.precheck_manager validation_state contents >>=? fun () ->
+        let (raw_operation : t Kind.manager operation) =
+          Alpha_context.{shell; protocol_data}
+        in
+        Main.check_manager_signature validation_state contents raw_operation )
+      >|= function
+      | Ok () -> `Prechecked_manager
+      | Error err -> (
+          let err = Environment.wrap_tztrace err in
+          match classify_trace err with
+          | Branch -> `Branch_refused err
+          | Permanent -> `Refused err
+          | Temporary -> `Branch_delayed err
+          | Outdated -> `Outdated err)
+    in
+    match check_manager_restriction filter_state source with
+    | Error err -> Lwt.return err
+    | Ok () -> precheck_manager_and_check_signature ()
+
+  let add_manager_restriction filter_state oph source =
+    {
+      filter_state with
+      op_prechecked_managers =
+        (* Manager not seen yet, record it for next ops *)
+        Signature.Public_key_hash.Set.add
+          source
+          filter_state.op_prechecked_managers;
+      operation_hash_to_manager =
+        Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
+        (* Record which manager is used for the operation hash. *);
+    }
 
   let precheck :
       config ->
@@ -597,23 +670,27 @@ module Mempool = struct
        ~filter_state
        ~validation_state
        shell_header
-       _oph
+       oph
        (Operation_data protocol_data) ->
+    let precheck_manager protocol_data source =
+      precheck_manager
+        filter_state
+        validation_state
+        shell_header
+        protocol_data
+        source
+      >|= function
+      | `Prechecked_manager ->
+          `Passed_precheck (add_manager_restriction filter_state oph source)
+      | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+        errs ->
+          errs
+    in
     match protocol_data.contents with
-    | Single (Manager_operation _) -> (
-        precheck_manager validation_state shell_header protocol_data
-        >|= function
-        | `Prechecked_manager -> `Passed_precheck filter_state
-        | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
-          errs ->
-            errs)
-    | Cons (Manager_operation _, _) -> (
-        precheck_manager validation_state shell_header protocol_data
-        >|= function
-        | `Prechecked_manager -> `Passed_precheck filter_state
-        | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
-          errs ->
-            errs)
+    | Single (Manager_operation {source; _}) ->
+        precheck_manager protocol_data source
+    | Cons (Manager_operation {source; _}, _) ->
+        precheck_manager protocol_data source
     | Single _ -> Lwt.return `Undecided
 
   open Apply_results
