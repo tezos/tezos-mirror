@@ -157,7 +157,7 @@ module Generated : sig
 
   (* This function is meant to be used just in lib_parameters and in the
      migration code to be sure that the parameters are consistent. *)
-  val generate : consensus_committee_size:int -> blocks_per_minute:int -> t
+  val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
 end
 
 module Proto_previous : sig

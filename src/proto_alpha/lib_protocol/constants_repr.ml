@@ -444,7 +444,10 @@ module Generated = struct
        be 80 tez. *)
     let rewards_per_minute = Tez_repr.(mul_exn one 80) in
     let rewards_per_block =
-      Tez_repr.(div_exn rewards_per_minute blocks_per_minute)
+      Tez_repr.(
+        div_exn
+          (mul_exn rewards_per_minute blocks_per_minute.denominator)
+          blocks_per_minute.numerator)
     in
     let rewards_half = Tez_repr.(div_exn rewards_per_block 2) in
     let rewards_quarter = Tez_repr.(div_exn rewards_per_block 4) in

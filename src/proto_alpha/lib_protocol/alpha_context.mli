@@ -760,7 +760,7 @@ module Constants : sig
       endorsing_reward_per_slot : Tez.t;
     }
 
-    val generate : consensus_committee_size:int -> blocks_per_minute:int -> t
+    val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
   end
 
   val parametric_encoding : parametric Data_encoding.t
