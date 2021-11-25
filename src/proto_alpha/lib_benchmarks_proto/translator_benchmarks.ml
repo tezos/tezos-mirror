@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Script_typed_ir
 
 (** {2 [Script_ir_translator] benchmarks} *)
 
@@ -609,13 +608,26 @@ end
 
 let () = Registration_helpers.register (module Merge_types)
 
-(* A dummy type generator, sampling linear terms of a given size. *)
-let rec dummy_type_generator depth =
+(* A dummy type generator, sampling linear terms of a given size.
+   The generator always returns types of the shape:
+
+   [pair unit (pair unit (pair unit ...))]
+
+   This structure is the worse-case of the unparsing function for types because
+   an extra test is performed to determine if the comb type needs to be folded.
+ *)
+let rec dummy_type_generator size =
   let open Script_ir_translator in
-  if depth = 0 then Ex_ty (unit_t ~annot:None)
+  let open Script_typed_ir in
+  if size <= 1 then Ex_ty (unit_t ~annot:None)
   else
-    match dummy_type_generator (depth - 1) with
-    | Ex_ty something -> Ex_ty (Michelson_types.list something)
+    match dummy_type_generator (size - 2) with
+    | Ex_ty r ->
+        let l = unit_t ~annot:None in
+        Ex_ty
+          (match pair_t (-1) (l, None, None) (r, None, None) ~annot:None with
+          | Error _ -> assert false
+          | Ok t -> t)
 
 (* A dummy comparable type generator, sampling linear terms of a given size. *)
 let rec dummy_comparable_type_generator size =
@@ -683,8 +695,8 @@ module Parse_type_benchmark : Benchmark.S = struct
     let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
-      let depth = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator depth in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_type_generator size in
       match ty with
       | Ex_ty ty ->
           Environment.wrap_tzresult @@ unparse_ty ctxt ty
@@ -696,7 +708,11 @@ module Parse_type_benchmark : Benchmark.S = struct
               (Gas_helpers.fp_to_z
                  (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
           in
-          let workload = Type_workload {nodes = depth; consumed} in
+          let nodes =
+            let x = Script_typed_ir.ty_size ty in
+            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+          in
+          let workload = Type_workload {nodes; consumed} in
           let closure () = ignore (parse_ty ctxt unparsed) in
           ok (Generator.Plain {workload; closure}) )
     |> function
@@ -731,8 +747,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
     let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
-      let depth = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator depth in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_type_generator size in
       match ty with
       | Ex_ty ty ->
           Environment.wrap_tzresult @@ unparse_ty ctxt ty >>? fun (_, ctxt') ->
@@ -741,7 +757,11 @@ module Unparse_type_benchmark : Benchmark.S = struct
               (Gas_helpers.fp_to_z
                  (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
           in
-          let workload = Type_workload {nodes = depth; consumed} in
+          let nodes =
+            let x = Script_typed_ir.ty_size ty in
+            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+          in
+          let workload = Type_workload {nodes; consumed} in
           let closure () = ignore (unparse_ty ctxt ty) in
           ok (Generator.Plain {workload; closure}) )
     |> function
@@ -761,6 +781,11 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen size_model)
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)
@@ -779,6 +804,11 @@ module Unparse_comparable_type_benchmark : Benchmark.S = struct
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
       let ty = dummy_comparable_type_generator size in
+      let nodes =
+        let (Script_ir_translator.Ex_comparable_ty ty) = ty in
+        let x = Script_typed_ir.comparable_ty_size ty in
+        Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+      in
       match ty with
       | Ex_comparable_ty comp_ty ->
           Environment.wrap_tzresult
@@ -789,7 +819,7 @@ module Unparse_comparable_type_benchmark : Benchmark.S = struct
               (Gas_helpers.fp_to_z
                  (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
           in
-          let workload = Type_workload {nodes = size; consumed} in
+          let workload = Type_workload {nodes; consumed} in
           let closure () =
             ignore
               (Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty)
