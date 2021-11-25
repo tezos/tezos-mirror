@@ -47,12 +47,22 @@ let () =
     (function Endorsement_branch_not_live -> Some () | _ -> None)
     (fun () -> Endorsement_branch_not_live)
 
+module type CHAIN_STORE = sig
+  type chain_store
+
+  val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+
+  val chain_id : chain_store -> Chain_id.t
+end
+
 module type T = sig
   type operation_data
 
   type operation_receipt
 
   type validation_state
+
+  type chain_store
 
   type t
 
@@ -61,7 +71,7 @@ module type T = sig
   val parse_unsafe : bytes -> operation_data tzresult
 
   val create :
-    Store.chain_store ->
+    chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
     live_operations:Operation_hash.Set.t ->
@@ -90,16 +100,21 @@ let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
   | None -> error Parse_error
   | Some protocol_data -> ok protocol_data
 
-module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+module MakeAbstract
+    (Chain_store : CHAIN_STORE)
+    (Proto : Tezos_protocol_environment.PROTOCOL) :
   T
     with type operation_data = Proto.operation_data
      and type operation_receipt = Proto.operation_receipt
-     and type validation_state = Proto.validation_state = struct
+     and type validation_state = Proto.validation_state
+     and type chain_store = Chain_store.chain_store = struct
   type operation_data = Proto.operation_data
 
   type operation_receipt = Proto.operation_receipt
 
   type validation_state = Proto.validation_state
+
+  type chain_store = Chain_store.chain_store
 
   type t = {
     state : Proto.validation_state;
@@ -141,7 +156,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     } =
       Store.Block.header predecessor
     in
-    Store.Block.context chain_store predecessor >>=? fun predecessor_context ->
+    Chain_store.context chain_store predecessor >>=? fun predecessor_context ->
     let predecessor_hash = Store.Block.hash predecessor in
     Block_validation.update_testchain_status
       predecessor_context
@@ -163,7 +178,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       Shell_context.wrap_disk_context predecessor_context
     in
     Proto.begin_construction
-      ~chain_id:(Store.Chain.chain_id chain_store)
+      ~chain_id:(Chain_store.chain_id chain_store)
       ~predecessor_context
       ~predecessor_timestamp
       ~predecessor_fitness
@@ -221,8 +236,30 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
     | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
     | Outdated err -> fprintf ppf "outdated (%a)" pp_print_trace err
+
 end
+
+module Production_chain_store :
+  CHAIN_STORE with type chain_store = Store.chain_store = struct
+  type chain_store = Store.chain_store
+
+  let context = Store.Block.context
+
+  let chain_id = Store.Chain.chain_id
+end
+
+module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+  T
+    with type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
+     and type chain_store = Production_chain_store.chain_store =
+  MakeAbstract (Production_chain_store) (Proto)
 
 module Internal_for_tests = struct
   let safe_binary_of_bytes = safe_binary_of_bytes
+
+  module type CHAIN_STORE = CHAIN_STORE
+
+  module Make = MakeAbstract
 end

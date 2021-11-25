@@ -48,6 +48,8 @@ module type T = sig
 
   type validation_state
 
+  type chain_store
+
   type t
 
   val parse : Operation.t -> operation_data operation tzresult
@@ -64,7 +66,7 @@ module type T = sig
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
-    Store.chain_store ->
+    chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
     live_operations:Operation_hash.Set.t ->
@@ -86,11 +88,13 @@ module type T = sig
   val pp_result : Format.formatter -> result -> unit
 end
 
-module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+(** How-to obtain an instance of this module's main module type: {!T} *)
+module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
   T
     with type operation_data = Proto.operation_data
      and type operation_receipt = Proto.operation_receipt
      and type validation_state = Proto.validation_state
+     and type chain_store = Store.chain_store
 
 module Internal_for_tests : sig
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
@@ -102,4 +106,29 @@ module Internal_for_tests : sig
       Move this function to [data_encoding] or [tezos_base] and consider not catching some exceptions
       *)
   val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
+
+  module type CHAIN_STORE = sig
+    (** The [chain_store] type. Implemented by
+        {!Tezos_store.Store.chain_store} in production and mocked in
+        tests *)
+    type chain_store
+
+    (** [context store block] checkouts and returns the context of [block] *)
+    val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+
+    (** [chain_id store] returns the {!Chain_id.t} to which [store] corresponds *)
+    val chain_id : chain_store -> Chain_id.t
+  end
+
+  (** A variant of [Make] above that is parameterized by {!CHAIN_STORE},
+      for mocking purposes. *)
+  module Make : functor
+    (Chain_store : CHAIN_STORE)
+    (Proto : Tezos_protocol_environment.PROTOCOL)
+    ->
+    T
+      with type operation_data = Proto.operation_data
+       and type operation_receipt = Proto.operation_receipt
+       and type validation_state = Proto.validation_state
+       and type chain_store = Chain_store.chain_store
 end
