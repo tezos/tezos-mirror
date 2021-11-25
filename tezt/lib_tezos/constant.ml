@@ -90,10 +90,13 @@ let bootstrap5 : Account.key =
       Unencrypted "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
   }
 
-let all_secret_keys =
-  [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+let bootstrap_keys =
+  [bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
 
-let all_bootstrap_keys = List.filter (( <> ) activator) all_secret_keys
+(** Initial number of bootstrap accounts *)
+let default_bootstrap_count = List.length bootstrap_keys
+
+let all_secret_keys = activator :: bootstrap_keys
 
 (** The default burn for an implicit account. *)
 let implicit_account_burn =
