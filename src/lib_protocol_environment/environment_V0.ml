@@ -719,12 +719,12 @@ struct
       | Some sub_tree -> add_tree ctxt to_ sub_tree >>= Lwt.return_some
 
     let fold_keys s root ~init ~f =
-      Context.fold s root ~init ~f:(fun k v acc ->
+      Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with `Value -> f k acc | `Tree -> Lwt.return acc)
 
     let fold t root ~init ~f =
-      Context.fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
+      Context.fold ~depth:(`Eq 1) t root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with
           | `Value -> f (`Key k) acc

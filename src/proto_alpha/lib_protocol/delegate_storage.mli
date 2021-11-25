@@ -103,6 +103,7 @@ val delegate_participation_info :
 (** Iterate on all registered delegates. *)
 val fold :
   Raw_context.t ->
+  order:[`Sorted | `Undefined] ->
   init:'a ->
   f:(Signature.Public_key_hash.t -> 'a -> 'a Lwt.t) ->
   'a Lwt.t

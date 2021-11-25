@@ -125,6 +125,7 @@ module Contract : sig
   (** The domain of alive contracts *)
   val fold :
     Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
@@ -267,7 +268,12 @@ module Big_map : sig
   end
 
   (** The domain of alive big maps *)
-  val fold : Raw_context.t -> init:'a -> f:(id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold :
+    Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(id -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   val list : Raw_context.t -> id list Lwt.t
 

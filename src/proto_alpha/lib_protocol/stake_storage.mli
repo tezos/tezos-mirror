@@ -82,6 +82,7 @@ val init_first_cycles :
 val fold :
   Raw_context.t ->
   f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
+  order:[`Sorted | `Undefined] ->
   'a ->
   'a tzresult Lwt.t
 
@@ -101,6 +102,7 @@ val get :
 
 val fold_on_active_delegates_with_rolls :
   Raw_context.t ->
+  order:[`Sorted | `Undefined] ->
   init:'a ->
   f:(Signature.Public_key_hash.t -> unit -> 'a -> 'a Lwt.t) ->
   'a Lwt.t

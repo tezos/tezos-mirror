@@ -176,8 +176,8 @@ module Context = struct
   let fold ?depth
       (Context
         {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
-      ~init ~f =
-    Ops.fold ?depth ctxt key ~init ~f:(fun k v acc ->
+      ~order ~init ~f =
+    Ops.fold ?depth ctxt key ~order ~init ~f:(fun k v acc ->
         let v = Tree {ops; tree = v; equality_witness; impl_name} in
         f k v acc)
 
@@ -247,8 +247,8 @@ module Context = struct
     let fold ?depth
         (Tree
           {ops = (module Ops) as ops; tree = t; equality_witness; impl_name})
-        key ~init ~f =
-      Ops.Tree.fold ?depth t key ~init ~f:(fun k v acc ->
+        key ~order ~init ~f =
+      Ops.Tree.fold ?depth t key ~order ~init ~f:(fun k v acc ->
           let v = Tree {ops; tree = v; equality_witness; impl_name} in
           f k v acc)
 

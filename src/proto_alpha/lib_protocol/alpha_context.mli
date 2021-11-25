@@ -1495,7 +1495,11 @@ module Delegate : sig
     context -> Signature.Public_key_hash.t -> Tez.t option -> context Lwt.t
 
   val fold :
-    context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(public_key_hash -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   val list : context -> public_key_hash list Lwt.t
 

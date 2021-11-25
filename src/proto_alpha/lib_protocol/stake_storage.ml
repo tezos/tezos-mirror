@@ -182,6 +182,7 @@ let select_distribution_for_cycle ctxt cycle pubkey =
        Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
          ctxt
          index
+         ~order:`Sorted
          ~init:([], Tez_repr.zero)
          ~f:(fun delegate () (acc, total_stake) ->
            Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
@@ -270,9 +271,10 @@ let init_first_cycles ctxt pubkey =
   (* Precompute a snapshot for cycle (preserved_cycles + 1) *)
   snapshot ctxt
 
-let fold ctxt ~f init =
+let fold ctxt ~f ~order init =
   Storage.Stake.Active_delegate_with_one_roll.fold
     ctxt
+    ~order
     ~init:(Ok init)
     ~f:(fun delegate () acc ->
       acc >>?= fun acc ->

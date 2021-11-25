@@ -131,8 +131,8 @@ let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
 let add_tree ctxt key tree =
   Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
 
-let fold ?depth ctxt key ~init ~f =
-  Tree.fold ?depth ctxt.tree (data_key key) ~init ~f
+let fold ?depth ctxt key ~order ~init ~f =
+  Tree.fold ?depth ctxt.tree (data_key key) ~order ~init ~f
 
 let current_protocol_key = ["protocol"]
 

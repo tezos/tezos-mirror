@@ -1005,7 +1005,8 @@ let add_or_remove_tree ctxt k = function
 
 let list ctxt ?offset ?length k = Context.list (context ctxt) ?offset ?length k
 
-let fold ?depth ctxt k ~init ~f = Context.fold ?depth (context ctxt) k ~init ~f
+let fold ?depth ctxt k ~order ~init ~f =
+  Context.fold ?depth (context ctxt) k ~order ~init ~f
 
 module Tree :
   Raw_context_intf.TREE

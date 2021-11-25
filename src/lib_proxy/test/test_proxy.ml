@@ -44,7 +44,7 @@ let tree_testable = Alcotest.testable Local.Tree.pp Local.Tree.equal
 let nb_nodes = function
   | None -> Lwt.return 0
   | Some tree ->
-      Local.Tree.fold tree tree_root ~init:0 ~f:(fun _ _ acc ->
+      Local.Tree.fold tree tree_root ~order:`Sorted ~init:0 ~f:(fun _ _ acc ->
           Lwt.return (acc + 1))
 
 module type MOCKED_PROTO_RPC = sig

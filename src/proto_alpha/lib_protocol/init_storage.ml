@@ -82,6 +82,7 @@ let unfreeze_all_remaining_deposits_rewards_and_fees ctxt migration_cycle =
       | Some unfrozen_cycle ->
           Storage.Legacy_delegates_with_frozen_balance.fold
             (ctxt, unfrozen_cycle)
+            ~order:`Sorted
             ~init:(Ok (ctxt, balance_updates))
             ~f:(fun delegate acc ->
               acc >>?= fun (ctxt, bus) ->
@@ -165,6 +166,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       Raw_context.remove_existing_tree ctxt ["block_priority"] >>=? fun ctxt ->
       Storage.Legacy_active_delegates_with_rolls.fold
         ctxt
+        ~order:`Sorted
         ~init:(Ok ctxt)
         ~f:(fun pkh ctxt ->
           ctxt >>?= fun ctxt ->
@@ -193,7 +195,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
           return (stake, pk_map))
         (Signature.Public_key_hash.Map.empty, Misc.Public_key_map.empty)
       >>=? fun (stakes, _pk_map) ->
-      Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:(fun pkh ctxt ->
+      Storage.Delegates.fold
+        ctxt
+        ~order:`Sorted
+        ~init:(Ok ctxt)
+        ~f:(fun pkh ctxt ->
           ctxt >>?= fun ctxt ->
           Roll_storage_legacy.get_change ctxt pkh >>=? fun change ->
           Storage.Roll_legacy.Delegate_change.remove ctxt pkh >>= fun ctxt ->
