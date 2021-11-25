@@ -43,6 +43,7 @@ type tag =
   | Builtin
   | Gtoc
   | Cache
+  | Carbonated_map
 
 type michelson_term_kind = Data | Code
 
@@ -354,6 +355,7 @@ let string_of_tag (tag : tag) =
   | Builtin -> "builtin"
   | Gtoc -> "global_constants"
   | Cache -> "cache"
+  | Carbonated_map -> "carbonated_map"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in

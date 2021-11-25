@@ -141,6 +141,7 @@ type tag =
   | Builtin
   | Gtoc
   | Cache
+  | Carbonated_map
 
 type list_mode = All | Any | Exactly
 
