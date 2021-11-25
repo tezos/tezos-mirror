@@ -252,10 +252,10 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
      Let [n] be [length round_durations] then:
      - if [round < n] then return
         (round_duration (round),
-         sum(round_durations 0 + .... + round_durations (round - 1)))
+         round_duration 0 + ... + round_duration (round - 1))
      - otherwise (round >= n) then return
        (round_duration (n - 1),
-        sum(round_duration 0 + .... + round_duration (n - 1)))
+        round_duration 0 + ... + round_duration (n - 1))
   *)
   let last_and_sum_loop round_durations ~round =
     let open Durations in

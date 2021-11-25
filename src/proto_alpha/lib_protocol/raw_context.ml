@@ -88,19 +88,19 @@ module Raw_consensus = struct
     locked_round_evidence : (Round_repr.t * int) option;
         (** Record the preendorsement power for a locked round. *)
     preendorsements_quorum_round : Round_repr.t option;
-        (** If there is a predeensorement quorum, record the round
-            associated with the quorum. *)
+        (** in block construction mode, record the round of preendorsements
+            included in a block. *)
     endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
     grand_parent_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
 
-      - [i \in endorsements_seen => Int_map.mem allowed_endorsements i]
+      - [slot \in endorsements_seen => Int_map.mem slot allowed_endorsements]
 
-      - [i \in preendorsements_seen => Int_map.mem allowed_preendorsements i]
+      - [slot \in preendorsements_seen => Int_map.mem slot allowed_preendorsements]
 
-      - [i \in endorsements_seen => included_endorsements > 0]
+      - [ |endorsements_seen| > 0 => |included endorsements| > 0]
 
   *)
 
