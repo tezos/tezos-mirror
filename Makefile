@@ -53,10 +53,10 @@ build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
+	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
 		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
 endif
