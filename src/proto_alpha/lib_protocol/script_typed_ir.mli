@@ -395,6 +395,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       k : ('c, 't, 'r, 'f) kinstr;
     }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
+  | IOpt_map : {
+      kinfo : ('a option, 's) kinfo;
+      body : ('a, 's, 'b, 's) kinstr;
+      k : ('b option, 's, 'c, 't) kinstr;
+    }
+      -> ('a option, 's, 'c, 't) kinstr
   (*
      Unions
      ------
@@ -1098,6 +1104,18 @@ and (_, _, _, _) continuation =
   | KReturn :
       's * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
+  (* This continuation is useful when stack head requires some wrapping or
+     unwrapping before it can be passed forward. For instance this continuation
+     is used after a [MAP] instruction applied to an option in order to wrap the
+     result back in a [Some] constructor.
+
+     /!\ When using it, make sure the function runs in constant time or that gas
+     has been properly charged beforehand.
+     Also make sure it runs with a small, bounded stack.
+  *)
+  | KMap_head :
+      ('a -> 'b) * ('b, 's, 'r, 'f) continuation
+      -> ('a, 's, 'r, 'f) continuation
   (* This continuation comes right after a [Dip i] to restore the topmost
      element ['b] of the stack after having executed [i] in the substack
      of type ['a * 's]. *)

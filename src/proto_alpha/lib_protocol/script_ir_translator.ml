@@ -3220,6 +3220,44 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       option_t loc t ~annot:ty_name >>?= fun ty ->
       let stack_ty = Item_t (ty, stack, annot) in
       typed ctxt loc cons_none stack_ty
+  | (Prim (loc, I_MAP, [body], annot), Item_t (Option_t (t, _), rest, opt_annot))
+    -> (
+      check_kind [Seq_kind] body >>?= fun () ->
+      parse_var_type_annot loc annot >>?= fun (ret_annot, opt_ty_name) ->
+      let elt_annot = gen_access_annot opt_annot default_some_annot in
+      non_terminal_recursion
+        ?type_logger
+        ~legacy
+        tc_context
+        ctxt
+        body
+        (Item_t (t, rest, elt_annot))
+      >>=? fun (judgement, ctxt) ->
+      Lwt.return
+      @@
+      match judgement with
+      | Typed ({loc; aft = Item_t (ret, aft_rest, _aft_annot); _} as kibody) ->
+          let invalid_map_body () =
+            let aft = serialize_stack_for_error ctxt kibody.aft in
+            Invalid_map_body (loc, aft)
+          in
+          record_trace_eval
+            invalid_map_body
+            ( merge_stacks ~legacy loc ctxt 1 aft_rest rest
+            >>? fun (Eq, rest, ctxt) ->
+              option_t loc ret ~annot:opt_ty_name >>? fun opt_ty ->
+              let final_stack = Item_t (opt_ty, rest, ret_annot) in
+              let hinfo =
+                {iloc = loc; kstack_ty = Item_t (ret, aft_rest, ret_annot)}
+              in
+              let cinfo = kinfo_of_descr kibody in
+              let body = kibody.instr.apply cinfo (IHalt hinfo) in
+              let apply kinfo k = IOpt_map {kinfo; body; k} in
+              typed_no_lwt ctxt loc {apply} final_stack )
+      | Typed {aft = Bot_t; _} ->
+          let aft = serialize_stack_for_error ctxt Bot_t in
+          error (Invalid_map_body (loc, aft))
+      | Failed _ -> error (Invalid_map_block_fail loc))
   | ( Prim (loc, I_IF_NONE, [bt; bf], annot),
       (Item_t (Option_t (t, _), rest, option_annot) as bef) ) ->
       check_kind [Seq_kind] bt >>?= fun () ->

@@ -983,6 +983,34 @@ module Registration_section = struct
                k = halt_unit;
              })
         ()
+
+    let () =
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_IOpt_map
+        ~salt:"none"
+        ~stack:(None, ((), eos))
+        ~kinstr:
+          (IOpt_map
+             {
+               kinfo = kinfo (option unit @$ unit @$ bot);
+               body = halt_unitunit;
+               k = halt (option unit @$ unit @$ bot);
+             })
+        ()
+
+    let () =
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_IOpt_map
+        ~salt:"some"
+        ~stack:(Some (), ((), eos))
+        ~kinstr:
+          (IOpt_map
+             {
+               kinfo = kinfo (option unit @$ unit @$ bot);
+               body = halt_unitunit;
+               k = halt (option unit @$ unit @$ bot);
+             })
+        ()
   end
 
   module Unions = struct
@@ -3090,6 +3118,16 @@ module Registration_section = struct
             let (key, map) = Maps.generate_map_and_key_in_map cfg rng_state in
             let cont = KMap_exit_body (kbody, [], map, key, KNil) in
             Ex_stack_and_cont {stack = ((), ((), eos)); cont})
+        ()
+
+    let () =
+      (* KMap_head -> KNil *)
+      continuation_benchmark
+        ~amplification:100
+        ~name:Interpreter_workload.N_KMap_head
+        ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
+          let cont = KMap_head (Option.some, KNil) in
+          Ex_stack_and_cont {stack = ((), ((), eos)); cont})
         ()
   end
 end

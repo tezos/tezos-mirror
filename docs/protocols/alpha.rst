@@ -70,6 +70,15 @@ Michelson
   replaced by ``SUB_MUTEZ; ASSERT_SOME`` (and ``SUB; DROP`` can be
   replaced by ``ASSERT_CMPGE``). (MR :gl:`!3079`)
 
+- The ``MAP`` instruction can now also be applied to values of type ``option
+  a``. In this case the block of code given is executed if and only if the value
+  at the top of the stack is ``Some a``. It should map the value at the top of
+  the stack into a value of any type ``b``. The block has access to the
+  remainder of the stack also, but its type should remain unchanged. The result
+  of the instruction is the stack returned by the applied block of code, where
+  the value at the top is wrapped in ``Some`` again. If the value at the top of
+  input stack is ``None``, the instruction does nothing. (MR :gl:`!3574`)
+
 Precheck of operations
 ----------------------
 

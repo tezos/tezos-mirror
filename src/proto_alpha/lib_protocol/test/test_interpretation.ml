@@ -252,6 +252,71 @@ let error_encoding_tests =
       ("Cannot_serialize_storage", Cannot_serialize_storage);
     ]
 
+module Test_map_instr_on_options = struct
+  type storage = {prev : int option; total : int}
+
+  (* storage: (last input * total); param replaces the last input and
+     if some – gets added to the total. *)
+  let test_map_option_script =
+    {| { parameter (option int);
+         storage (pair (option int) int);
+         code {
+           UNPAIR ;
+           DIP { CDR } ;
+           MAP {
+             DUP ;
+             DIP { ADD } ;
+           } ;
+           PAIR ;
+           NIL operation ;
+           PAIR ;
+        }
+      } |}
+
+  let run_test_map_opt_script param {prev; total} =
+    let storage =
+      Option.fold
+        ~none:(Format.sprintf "Pair None %d" total)
+        ~some:(fun p -> Format.sprintf "Pair (Some %d) %d" p total)
+        prev
+    in
+    let parameter =
+      Option.fold ~none:"None" ~some:(Format.sprintf "Some %d") param
+    in
+    test_context () >>=? fun ctxt ->
+    run_script ctxt test_map_option_script ~storage ~parameter ()
+
+  let assume_storage_shape =
+    let open Micheline in
+    let open Michelson_v1_primitives in
+    function
+    | Prim (_, D_Pair, [Prim (_, D_None, [], _); Int (_, total)], _) ->
+        {prev = None; total = Z.to_int total}
+    | Prim (_, D_Pair, [Prim (_, D_Some, [Int (_, prev)], _); Int (_, total)], _)
+      ->
+        {prev = Some (Z.to_int prev); total = Z.to_int total}
+    | _ -> QCheck.assume_fail ()
+
+  let assertions storage_before storage_after = function
+    | None ->
+        Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int storage_after.prev
+        >>=? fun () ->
+        Assert.equal_int ~loc:__LOC__ storage_before.total storage_after.total
+    | Some input ->
+        Assert.get_some ~loc:__LOC__ storage_after.prev >>=? fun prev_aft ->
+        Assert.equal_int ~loc:__LOC__ input prev_aft >>=? fun () ->
+        Assert.equal_int
+          ~loc:__LOC__
+          (storage_before.total + input)
+          storage_after.total
+
+  let test_mapping (input, prev, total) =
+    let storage_before = {prev; total} in
+    run_test_map_opt_script input storage_before >>=? fun ({storage; _}, _) ->
+    let new_storage = assume_storage_shape (Micheline.root storage) in
+    assertions storage_before new_storage input
+end
+
 let tests =
   [
     Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
@@ -265,5 +330,13 @@ let tests =
       `Quick
       test_multiplication_close_to_overflow_passes;
     Tztest.tztest "test stack overflow error" `Slow test_stack_overflow;
+    Tztest.tztest_qcheck
+      ~name:"test map instr against options"
+      QCheck.(
+        triple
+          (option small_signed_int)
+          (option small_signed_int)
+          small_signed_int)
+      Test_map_instr_on_options.test_mapping;
   ]
   @ error_encoding_tests

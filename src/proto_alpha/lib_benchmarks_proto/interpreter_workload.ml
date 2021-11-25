@@ -52,6 +52,7 @@ type instruction_name =
   | N_ICons_some
   | N_ICons_none
   | N_IIf_none
+  | N_IOpt_map
   (* unions *)
   | N_ILeft
   | N_IRight
@@ -224,6 +225,7 @@ type continuation_name =
   | N_KCons
   | N_KReturn
   | N_KView_exit
+  | N_KMap_head
   | N_KUndip
   | N_KLoop_in
   | N_KLoop_in_left
@@ -254,6 +256,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICons_some -> "N_ICons_some"
   | N_ICons_none -> "N_ICons_none"
   | N_IIf_none -> "N_IIf_none"
+  | N_IOpt_map -> "N_IOpt_map"
   | N_ILeft -> "N_ILeft"
   | N_IRight -> "N_IRight"
   | N_IIf_left -> "N_IIf_left"
@@ -408,6 +411,7 @@ let string_of_continuation_name : continuation_name -> string =
   | N_KCons -> "N_KCons"
   | N_KReturn -> "N_KReturn"
   | N_KView_exit -> "N_KView_exit"
+  | N_KMap_head -> "N_KMap_head"
   | N_KUndip -> "N_KUndip"
   | N_KLoop_in -> "N_KLoop_in"
   | N_KLoop_in_left -> "N_KLoop_in_left"
@@ -471,6 +475,7 @@ let all_instructions =
     N_ICons_some;
     N_ICons_none;
     N_IIf_none;
+    N_IOpt_map;
     N_ILeft;
     N_IRight;
     N_IIf_left;
@@ -624,6 +629,7 @@ let all_continuations =
     N_KCons;
     N_KReturn;
     N_KView_exit;
+    N_KMap_head;
     N_KUndip;
     N_KLoop_in;
     N_KLoop_in_left;
@@ -714,6 +720,8 @@ module Instructions = struct
   let cons_none = ir_sized_step N_ICons_none nullary
 
   let if_none = ir_sized_step N_IIf_none nullary
+
+  let opt_map = ir_sized_step N_IOpt_map nullary
 
   let left = ir_sized_step N_ILeft nullary
 
@@ -1087,6 +1095,8 @@ module Control = struct
 
   let view_exit = cont_sized_step N_KView_exit nullary
 
+  let map_head = cont_sized_step N_KMap_head nullary
+
   let undip = cont_sized_step N_KUndip nullary
 
   let loop_in = cont_sized_step N_KLoop_in nullary
@@ -1179,6 +1189,7 @@ let extract_ir_sized_step :
   | (ICons_some (_, _), _) -> Instructions.cons_some
   | (ICons_none (_, _), _) -> Instructions.cons_none
   | (IIf_none _, _) -> Instructions.if_none
+  | (IOpt_map _, _) -> Instructions.opt_map
   | (ICons_left (_, _), _) -> Instructions.left
   | (ICons_right (_, _), _) -> Instructions.right
   | (IIf_left _, _) -> Instructions.if_left
@@ -1430,6 +1441,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KNil -> Control.nil
   | KCons _ -> Control.cons
   | KReturn _ -> Control.return
+  | KMap_head (_, _) -> Control.map_head
   | KUndip _ -> Control.undip
   | KLoop_in _ -> Control.loop_in
   | KLoop_in_left _ -> Control.loop_in_left
