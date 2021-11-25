@@ -1,153 +1,47 @@
-#! /usr/bin/env bash
+#! /bin/sh
 
 set -e
 
 usage="Usage:
-$ ./scripts/link_protocol.sh src/proto_<version_number>_<short_hash>
+$ ./scripts/link_protocol.sh src/proto_<new_version>_<new_hash>
 
-Inserts the protocol with the given version number and short hash in the right
-files of the build system to compile it, and replaces the occurrences of
-
-   proto_<predecessor_version_number>_<predecessor_short_hash>
-
-in the code by
-
-   proto_<predecessor_version_number>_<predecessor_short_hash>
-   proto_<version_number>_<short_hash>
+This updates manifest/manifest.ml to add the new protocol.
+Then, it runs make -C manifest to regenerate the relevant files.
 "
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
 
-if [ ! -d "$1" ]; then
+new_version="$(basename "$1" | awk -F'_' '{print $2}')"
+new_hash="$(basename "$1" | awk -F'_' '{print $3}')"
+
+if [ -z "${new_version}" ] ; then
     echo "$usage"
     exit 1
 fi
 
-new_version=$(basename $1 | awk -F'_' '{print $2}')
-new_hash=$(basename $1 | awk -F'_' '{print $3}')
-full_hash=$(jq .hash < $1/lib_protocol/TEZOS_PROTOCOL)
-replacement=${new_version}-${new_hash}
-if [[ -z "${new_version}" || -z "${new_hash}" || -z "${full_hash}" ]] ; then
+if [ -z "${new_hash}" ] ; then
     echo "$usage"
     exit 1
 fi
 
-# The pattern to look for is "00X-<hash>".
-# Once found it's either replaced or the line is duplicated and then replaced
-old_version=$( printf '%03d' $((10#$new_version -1)) )
-old_dir=$(ls -d src/proto_${old_version}_*)
-old_hash=$(basename $old_dir | awk -F'_' '{print $3}')
-pattern=${old_version}-${old_hash}
+# Copy the part of manifest/main.ml that is before the declaration of alpha.
+echo "Updating manifest: copy header..."
+grep -B 1000000 'let alpha = active "alpha"' manifest/main.ml | head --lines=-1 > manifest/main.ml.new
 
-echo "Pattern to duplicate / substitute: $pattern"
+# Insert the new lines we want to insert.
+echo "Updating manifest: add new line..."
+echo "  let _${new_version}_${new_hash} = active ~number:${new_version} \"${new_hash}\"" >> manifest/main.ml.new
+echo "" >> manifest/main.ml.new
 
-# if a line matches PATTERN, a new line is printed where the pattern is replaced
-duplicate_and_replace() {
-    PATTERN=$1
-    REPLACEMENT=$2
-    shift 2
+# Copy the rest of the original file.
+echo "Updating manifest: copy footer..."
+grep -A 1000000 'let alpha = active "alpha"' manifest/main.ml >> manifest/main.ml.new
 
-    for file in $*
-    do
-        echo "Adding $replacement in: $file"
-        awk '{
-        print
-        if ($0 ~ PATTERN) {
-           sub(PATTERN,REPLACEMENT)
-           print
-        }}' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
-        mv tmp_file "$file"
-    done
-}
+# Replace the original file.
+echo "Updating manifest: replace file..."
+mv manifest/main.ml.new manifest/main.ml
 
-duplicate_and_replace_only_1_occ() {
-    PATTERN=$1
-    REPLACEMENT=$2
-    shift 2
-
-    for file in $*
-    do
-        echo "Adding $replacement in: $file (only one occurrence)"
-        awk '{
-        if (   prevlast !~ PATTERN\
-            &&      last ~ PATTERN\
-            &&       $0 !~ PATTERN) {
-           gsub(PATTERN,REPLACEMENT,last)
-           print last
-        }
-        print
-        {prevlast = last}
-        {last = $0}
-
-       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
-       mv tmp_file "$file"
-    done
-}
-
-duplicate_and_replace_when_3_occ() {
-    PATTERN=$1
-    REPLACEMENT=$2
-    shift 2
-
-    for file in $*
-    do
-        echo "Adding $replacement in: $file (when 3 occurrences)"
-        awk '{
-        if (   prevprevlast ~ PATTERN\
-            &&     prevlast ~ PATTERN\
-            &&         last ~ PATTERN\
-            &&          $0 !~ PATTERN) {
-           gsub(PATTERN, REPLACEMENT, prevprevlast)
-           gsub(PATTERN, REPLACEMENT, prevlast)
-           gsub(PATTERN, REPLACEMENT, last)
-           {print prevprevlast}
-           {print prevlast}
-           {print last}
-        }
-        print
-        {prevprevlast = prevlast}
-        {prevlast = last}
-        {last = $0}
-
-       }' PATTERN=$PATTERN REPLACEMENT=$REPLACEMENT "$file" > tmp_file
-       mv tmp_file "$file"
-    done
-}
-
-# the minimum needed, although you can't bake
-duplicate_and_replace ${pattern} ${replacement} active_protocol_versions
-
-# activate in client to bake and use RPCs
-duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-                                 src/bin_client/dune
-duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-                                 src/bin_client/dune
-duplicate_and_replace -${pattern} -${replacement} \
-                      src/bin_client/tezos-client.opam
-
-# activate in node
-duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-                                 src/bin_node/dune
-duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-                                 src/bin_node/dune
-duplicate_and_replace -${pattern} -${replacement} \
-                      src/bin_node/tezos-node.opam
-duplicate_and_replace -${pattern} -${replacement} \
-                      src/bin_validation/{dune,tezos-validator.opam}
-
-# activate in codec
-duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-                                 src/bin_codec/dune
-duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-                                 src/bin_codec/dune
-duplicate_and_replace -${pattern} -${replacement} \
-                      src/bin_codec/tezos-codec.opam
-
-# activate in proxy
-duplicate_and_replace_when_3_occ -${pattern} -${replacement} \
-                                 src/bin_proxy_server/dune
-duplicate_and_replace_only_1_occ -${pattern} -${replacement} \
-                                 src/bin_proxy_server/dune
-duplicate_and_replace -${pattern} -${replacement} \
-                      src/bin_proxy_server/tezos-proxy-server.opam
+# Generate everything from the manifest.
+echo "Updating manifest: generate dune and opam files..."
+make -C manifest

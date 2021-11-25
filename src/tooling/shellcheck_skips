@@ -13,7 +13,6 @@ scripts/ci/docker_registry_read.sh
 scripts/ci/docker_registry_tag.sh
 scripts/create_docker_image.sh
 scripts/install_sapling_parameters.sh
-scripts/link_protocol.sh
 scripts/opam-check.sh
 scripts/opam-remove.sh
 scripts/opam-upgrade.sh
