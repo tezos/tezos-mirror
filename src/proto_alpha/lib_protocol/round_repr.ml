@@ -246,9 +246,17 @@ let () =
     of the duration of rounds [0] to [round-1]. Note that [round] is
     necessarily a positive number. *)
 let level_offset_of_round (round_durations : Durations.t) ~round =
-  (* Auxiliary function to return a pair of the last element of the
-     list and the sum of the [round - 1]-th first elements of
-     [round_durations]. *)
+  (* [last_and_sum_loop] is an auxiliary function with the
+     specification below.
+
+     Let [n] be [length round_durations] then:
+     - if [round < n] then return
+        (round_duration (round),
+         sum(round_durations 0 + .... + round_durations (round - 1)))
+     - otherwise (round >= n) then return
+       (round_duration (n - 1),
+        sum(round_duration 0 + .... + round_duration (n - 1)))
+  *)
   let last_and_sum_loop round_durations ~round =
     let open Durations in
     if Compare.Int32.(round = Int32.zero) then
