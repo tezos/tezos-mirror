@@ -1172,7 +1172,13 @@ let merge_temporary_floating block_store =
      the previous one. *)
   Floating_block_store.all_files_exists chain_dir RW_TMP
   >>= fun is_rw_tmp_present ->
-  (if is_rw_tmp_present then return_unit else return_unit) >>=? fun () ->
+  (if is_rw_tmp_present then
+   let rw_tmp_floating_store_dir_path =
+     Naming.floating_blocks_dir chain_dir RW_TMP |> Naming.dir_path
+   in
+   Lwt_utils_unix.remove_dir rw_tmp_floating_store_dir_path
+  else Lwt.return_unit)
+  >>= fun () ->
   Floating_block_store.init chain_dir ~readonly:false (Restore RW)
   >>= fun rw_restore ->
   Lwt.finalize
