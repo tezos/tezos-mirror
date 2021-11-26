@@ -1137,27 +1137,24 @@ module Make
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
       | `None -> `None
 
-    let on_ban pv oph_to_ban =
-      Distributed_db.Operation.clear_or_cancel
-        pv.shell.parameters.chain_db
-        oph_to_ban ;
+    let remove pv oph =
+      Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
       pv.shell.advertisement <-
-        remove_from_advertisement oph_to_ban pv.shell.advertisement ;
+        remove_from_advertisement oph pv.shell.advertisement ;
       pv.shell.banned_operations <-
-        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      if Classification.is_in_mempool oph_to_ban pv.shell.classification then
-        if not (Classification.is_applied oph_to_ban pv.shell.classification)
-        then (
+        Operation_hash.Set.add oph pv.shell.banned_operations ;
+      if Classification.is_in_mempool oph pv.shell.classification then
+        if not (Classification.is_applied oph pv.shell.classification) then (
           pv.filter_state <-
-            Filter.Mempool.remove ~filter_state:pv.filter_state oph_to_ban ;
-          return (Classification.remove oph_to_ban pv.shell.classification))
+            Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
+          return (Classification.remove oph pv.shell.classification))
         else
           (* Modifying the list of operations classified as [Applied]
              might change the classification of all the operations in
-             the mempool. Hence if the banned operation has been
+             the mempool. Hence if the removed operation has been
              applied we flush the mempool to force the
              reclassification of all the operations except the one
-             banned. *)
+             removed. *)
           on_flush
             ~handle_branch_refused:false
             pv
@@ -1165,14 +1162,16 @@ module Make
             pv.shell.live_blocks
             pv.shell.live_operations
           >|=? fun () ->
-          pv.shell.pending <-
-            Operation_hash.Map.remove oph_to_ban pv.shell.pending
+          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending
       else (
-        pv.shell.pending <-
-          Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
-        pv.shell.fetching <-
-          Operation_hash.Set.remove oph_to_ban pv.shell.fetching ;
+        pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
+        pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
         return_unit)
+
+    let on_ban pv oph_to_ban =
+      pv.shell.banned_operations <-
+        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
+      remove pv oph_to_ban
 
     let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
      fun w request ->
