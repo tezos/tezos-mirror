@@ -57,6 +57,9 @@ type block_info = {
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
+  live_blocks : Block_hash.Set.t;
+      (** Set of live blocks for this block that is used to filter
+          old or too recent operations. *)
 }
 
 type cache = {

@@ -90,6 +90,7 @@ type block_info = {
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
+  live_blocks : Block_hash.Set.t;
 }
 
 type cache = {
@@ -150,27 +151,30 @@ let block_info_encoding =
            prequorum;
            quorum;
            payload;
+           live_blocks;
          } ->
-      ( hash,
-        shell,
-        payload_hash,
-        payload_round,
-        round,
-        protocol,
-        next_protocol,
-        prequorum,
-        List.map Operation.pack quorum,
-        payload ))
-    (fun ( hash,
-           shell,
-           payload_hash,
-           payload_round,
-           round,
-           protocol,
-           next_protocol,
-           prequorum,
-           quorum,
-           payload ) ->
+      ( ( hash,
+          shell,
+          payload_hash,
+          payload_round,
+          round,
+          protocol,
+          next_protocol,
+          prequorum,
+          List.map Operation.pack quorum,
+          payload ),
+        live_blocks ))
+    (fun ( ( hash,
+             shell,
+             payload_hash,
+             payload_round,
+             round,
+             protocol,
+             next_protocol,
+             prequorum,
+             quorum,
+             payload ),
+           live_blocks ) ->
       {
         hash;
         shell;
@@ -182,18 +186,21 @@ let block_info_encoding =
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
         payload;
+        live_blocks;
       })
-    (obj10
-       (req "hash" Block_hash.encoding)
-       (req "shell" Block_header.shell_header_encoding)
-       (req "payload_hash" Block_payload_hash.encoding)
-       (req "payload_round" Round.encoding)
-       (req "round" Round.encoding)
-       (req "protocol" Protocol_hash.encoding)
-       (req "next_protocol" Protocol_hash.encoding)
-       (req "prequorum" (option prequorum_encoding))
-       (req "quorum" (list (dynamic_size Operation.encoding)))
-       (req "payload" Operation_pool.payload_encoding))
+    (merge_objs
+       (obj10
+          (req "hash" Block_hash.encoding)
+          (req "shell" Block_header.shell_header_encoding)
+          (req "payload_hash" Block_payload_hash.encoding)
+          (req "payload_round" Round.encoding)
+          (req "round" Round.encoding)
+          (req "protocol" Protocol_hash.encoding)
+          (req "next_protocol" Protocol_hash.encoding)
+          (req "prequorum" (option prequorum_encoding))
+          (req "quorum" (list (dynamic_size Operation.encoding)))
+          (req "payload" Operation_pool.payload_encoding))
+       (obj1 (req "live_blocks" Block_hash.Set.encoding)))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult

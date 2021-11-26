@@ -51,6 +51,8 @@ val pool_to_list_list : pool -> packed_operation list list
 
 val pool_of_list_list : packed_operation list list -> pool
 
+val filter_pool : (packed_operation -> bool) -> pool -> pool
+
 type ordered_pool = {
   ordered_consensus : packed_operation list;
   ordered_votes : packed_operation list;

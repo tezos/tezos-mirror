@@ -443,6 +443,8 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
       in
       List.map_es lookup_head heads
 
+    let live_blocks block = live_blocks state block
+
     let raw_protocol_data block =
       locate_block state block >>=? fun x -> return x.raw_protocol_data
   end in

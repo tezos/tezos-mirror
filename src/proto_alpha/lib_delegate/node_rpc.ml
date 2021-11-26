@@ -65,7 +65,7 @@ let extract_prequorum preendorsements =
   | _ -> None
 
 let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
-    current_protocol next_protocol =
+    current_protocol next_protocol live_blocks =
   Events.(emit raw_info (block_hash, shell.Tezos_base.Block_header.level))
   >>= fun () ->
   let open Protocol_client_context in
@@ -97,7 +97,6 @@ let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
   let prequorum =
     Option.fold ~none:None ~some:extract_prequorum preendorsements
   in
-
   return
     {
       Baking_state.hash = block_hash;
@@ -110,6 +109,7 @@ let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
       prequorum;
       quorum;
       payload;
+      live_blocks;
     }
 
 let dummy_payload_hash = Block_payload_hash.zero
@@ -141,6 +141,12 @@ let info cctxt ~chain ~block () =
         protocol_data.contents.payload_hash,
         protocol_data.contents.payload_round ))
   >>=? fun (hash, shell, payload_hash, payload_round) ->
+  (Chain_services.Blocks.live_blocks cctxt ~chain ~block () >>= function
+   | Error _ ->
+       (* The RPC might fail when a block's metadata is not available *)
+       Lwt.return Block_hash.Set.empty
+   | Ok live_blocks -> Lwt.return live_blocks)
+  >>= fun live_blocks ->
   raw_info
     cctxt
     ~chain
@@ -150,6 +156,7 @@ let info cctxt ~chain ~block () =
     payload_round
     current_protocol
     next_protocol
+    live_blocks
 
 let find_in_cache_or_fetch cctxt ?cache ~chain block_hash =
   let open Baking_cache in

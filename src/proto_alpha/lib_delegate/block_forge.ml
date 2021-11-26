@@ -109,12 +109,31 @@ let finalize_block_header shell_header timestamp validation_result
   in
   return header
 
+let retain_live_operations_only ~live_blocks operation_pool =
+  Operation_pool.filter_pool
+    (fun ({shell; _} : packed_operation) ->
+      Block_hash.Set.mem shell.branch live_blocks)
+    operation_pool
+
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     ~timestamp ~liquidity_baking_escape_vote fees_config ~seed_nonce_hash
     ~payload_round simulation_mode simulation_kind constants =
   let predecessor_block = (pred_info : Baking_state.block_info) in
   let hard_gas_limit_per_block = constants.Constants.hard_gas_limit_per_block in
   let chain = `Hash chain_id in
+  let simulation_kind =
+    match simulation_kind with
+    | Filter operation_pool ->
+        (* We cannot include operations that are not live with respect
+           to our predecessor otherwise the node would reject the block. *)
+        let filtered_pool =
+          retain_live_operations_only
+            ~live_blocks:pred_info.live_blocks
+            operation_pool
+        in
+        Filter filtered_pool
+    | Apply _ as x -> x
+  in
   (match (simulation_mode, simulation_kind) with
   | (Baking_state.Node, Filter operation_pool) ->
       let filtered_operations =

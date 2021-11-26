@@ -317,3 +317,11 @@ let extract_operations_of_list_list = function
       let payload = {votes_payload; anonymous_payload; managers_payload} in
       Some (preendorsements, endorsements, payload)
   | _ -> None
+
+let filter_pool p {consensus; votes; anonymous; managers} =
+  {
+    consensus = OpSet.filter p consensus;
+    votes = OpSet.filter p votes;
+    anonymous = OpSet.filter p anonymous;
+    managers = OpSet.filter p managers;
+  }
