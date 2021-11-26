@@ -115,6 +115,7 @@ install-dependencies:
 html: Makefile api/errors.rst rpc p2p install-dependencies
 	echo "$$(echo ':orphan:'; echo ''; cat ../CHANGES.rst)" > CHANGES.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	@ln -s active "$(BUILDDIR)/011" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
