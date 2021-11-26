@@ -72,7 +72,13 @@ module Index : Storage_description.INDEX with type t = Address.t
 (** A smart contract rollup has a kind, which assigns meaning to
    rollup operations. *)
 module Kind : sig
-  type t = unit
+  (**
+
+     The list of available rollup kinds.
+
+     This list must only be appended for backward compatibility.
+  *)
+  type t = Example_arith
 
   val encoding : t Data_encoding.t
 end

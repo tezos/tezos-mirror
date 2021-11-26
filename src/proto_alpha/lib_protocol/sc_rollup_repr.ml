@@ -155,7 +155,23 @@ module Index = struct
 end
 
 module Kind = struct
-  type t = unit
+  (*
 
-  let encoding = Data_encoding.unit
+      Each time we add a data constructor to [t], we also need:
+      - to extend [Sc_rollups.all] with this new constructor ;
+      - to update [Sc_rollups.kind_of_string] and [encoding].
+
+  *)
+  type t = Example_arith
+
+  let example_arith_case =
+    Data_encoding.(
+      case
+        ~title:"Example_arith smart contract rollup kind"
+        (Tag 0)
+        unit
+        (function Example_arith -> Some ())
+        (fun () -> Example_arith))
+
+  let encoding = Data_encoding.union ~tag_size:`Uint16 [example_arith_case]
 end

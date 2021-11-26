@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context.Sc_rollup
+
 module PVM = struct
   type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
 
@@ -37,10 +39,26 @@ module PVM = struct
   type t = (module S)
 end
 
-let of_kind _ = failwith "No PVM implemented yet"
+let all = [Kind.Example_arith]
 
-let kind_of _ = failwith "No PVM implemented yet"
+let kind_of_string = function "arith" -> Some Kind.Example_arith | _ -> None
 
-let all_names = []
+let example_arith_pvm = (module Sc_rollup_arith : PVM.S)
 
-let from ~name:_ = None
+let of_kind = function Kind.Example_arith -> example_arith_pvm
+
+let kind_of (module M : PVM.S) =
+  match kind_of_string M.name with
+  | Some k -> k
+  | None ->
+      failwith
+        (Format.sprintf "The module named %s is not in Sc_rollups.all." M.name)
+
+let from ~name = Option.map of_kind (kind_of_string name)
+
+let all_names =
+  List.map
+    (fun k ->
+      let (module M : PVM.S) = of_kind k in
+      M.name)
+    all

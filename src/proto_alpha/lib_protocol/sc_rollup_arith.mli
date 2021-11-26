@@ -23,38 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
+(** This module provides a temporary toy rollup. *)
+
 open Alpha_context.Sc_rollup
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+val name : string
 
-  module type S = sig
-    val name : string
+val parse_boot_sector : string -> PVM.boot_sector option
 
-    val parse_boot_sector : string -> boot_sector option
-
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
-
-  type t = (module S)
-end
-
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
-
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
-
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
+val pp_boot_sector : Format.formatter -> PVM.boot_sector -> unit

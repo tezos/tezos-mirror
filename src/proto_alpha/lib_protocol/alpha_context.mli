@@ -1901,7 +1901,7 @@ module Sc_rollup : sig
   type t = Address.t
 
   module Kind : sig
-    type t = unit
+    type t = Example_arith
 
     val encoding : t Data_encoding.t
   end
