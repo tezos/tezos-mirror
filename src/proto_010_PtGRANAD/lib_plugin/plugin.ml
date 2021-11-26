@@ -172,7 +172,7 @@ module Mempool = struct
       config ->
       t Kind.manager contents_list ->
       int ->
-      [ `Undecided
+      [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
@@ -206,7 +206,7 @@ module Mempool = struct
                   minimal_fees_for_gas_in_nanotez
                   minimal_fees_for_size_in_nanotez))
           >= 0
-        then `Undecided
+        then `Passed_prefilter
         else `Refused [Environment.wrap_tzerror Fees_too_low]
 
   type Environment.Error_monad.error += Outdated_endorsement
@@ -238,7 +238,7 @@ module Mempool = struct
       (function Wrong_operation -> Some () | _ -> None)
       (fun () -> Wrong_operation)
 
-  let pre_filter config ~filter_state ?validation_state_before
+  let pre_filter config ~filter_state:_ ?validation_state_before
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
@@ -260,13 +260,13 @@ module Mempool = struct
             _;
           }) -> (
         match validation_state_before with
-        | None -> `Undecided
+        | None -> `Passed_prefilter
         | Some {ctxt; mode; _} -> (
             match mode with
             | Partial_construction {predecessor} ->
                 if Block_hash.(predecessor = branch) then
                   (* conensus operation for the current head. *)
-                  `Undecided
+                  `Passed_prefilter
                 else
                   let current_level = (Level.current ctxt).level in
                   let delta = Raw_level.diff current_level level in
@@ -285,10 +285,10 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        `Undecided
+        `Passed_prefilter
     | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
     | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes)
-    |> fun res -> Lwt.return (res, filter_state)
+    |> fun res -> Lwt.return res
 
   let precheck ~validation_state:_ _ _ = Lwt.return `Undecided
 

@@ -85,24 +85,23 @@ module type FILTER = sig
     (** [pre_filter config ~filter_state ?validation_state_before operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
-        plugin and returns [`Undecided] if no error occurs during checking of
-        the [operation_data]. We classify an operation that pass the prefilter
-        as [`Undecided] since we do not know yet if the operation is applicable
-        or not. If an error occurs during the checks, this function returns an error
-        corresponding to the kind of the error returned by the protocol.
-        This function both takes a [state] as parameter and
-        returns a [state], because it can update it while executing. *)
+        plugin and returns [`Passed_prefilter] if no error occurs during
+        checking of the [operation_data]. More tests are done using the
+        [filter_state]. We classify an operation that passes the prefilter as
+        [`Passed_prefilter] since we do not know yet if the operation is
+        applicable or not. If an error occurs during the checks, this function
+        returns an error corresponding to the kind of the error returned by the
+        protocol. *)
     val pre_filter :
       config ->
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      ([ `Undecided
-       | `Branch_delayed of tztrace
-       | `Branch_refused of tztrace
-       | `Refused of tztrace
-       | `Outdated of tztrace ]
-      * state)
+      [ `Passed_prefilter
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     (** [post_filter config ~filter_state ~validation_state_before

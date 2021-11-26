@@ -236,7 +236,7 @@ module Mempool = struct
       config ->
       t Kind.manager contents_list ->
       int ->
-      [ `Undecided
+      [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
@@ -270,7 +270,7 @@ module Mempool = struct
                   minimal_fees_for_gas_in_nanotez
                   minimal_fees_for_size_in_nanotez))
           >= 0
-        then `Undecided
+        then `Passed_prefilter
         else `Refused [Environment.wrap_tzerror Fees_too_low]
 
   type Environment.Error_monad.error += Outdated_endorsement
@@ -518,7 +518,7 @@ module Mempool = struct
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
-    (match contents with
+    match contents with
     | Single (Failing_noop _) ->
         Lwt.return @@ `Refused [Environment.wrap_tzerror Wrong_operation]
     | Single (Preendorsement consensus_content)
@@ -529,7 +529,7 @@ module Mempool = struct
           ?validation_state_before
           consensus_content
         >>= fun keep ->
-        if keep then Lwt.return `Undecided
+        if keep then Lwt.return `Passed_prefilter
         else
           Lwt.return
           @@ `Branch_refused
@@ -541,12 +541,11 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        Lwt.return @@ `Undecided
+        Lwt.return @@ `Passed_prefilter
     | Single (Manager_operation _) as op ->
         Lwt.return @@ pre_filter_manager config op bytes
     | Cons (Manager_operation _, _) as op ->
-        Lwt.return @@ pre_filter_manager config op bytes)
-    >>= fun res -> Lwt.return (res, filter_state)
+        Lwt.return @@ pre_filter_manager config op bytes
 
   let precheck_manager :
       type t.

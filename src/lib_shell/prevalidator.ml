@@ -465,14 +465,14 @@ module Make
       operation_stream
       (classification, hash, shell_header, op_data)
 
-  let pre_filter pv oph raw : (bool * Filter.Mempool.state) Lwt.t =
+  let pre_filter pv oph raw : bool Lwt.t =
     match Prevalidation.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel
           pv.shell.parameters.chain_db
           oph ;
-        (false, pv.filter_state)
+        false
     | Ok parsed_op -> (
         let op =
           {
@@ -491,16 +491,15 @@ module Make
           pv.filter_config
           op.Filter.Proto.protocol_data
         >|= function
-        | ( ((`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _)
-            as errs),
-            filter_state ) ->
+        | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
+          errs ->
             handle
               ~notifier:(mk_notifier pv.operation_stream)
               pv.shell
               (`Parsed parsed_op)
               errs ;
-            (false, filter_state)
-        | (`Undecided, filter_state) -> (true, filter_state))
+            false
+        | `Passed_prefilter -> true)
 
   let post_filter pv ~validation_state_before ~validation_state_after op receipt
       =
@@ -946,8 +945,7 @@ module Make
       if already_handled then return_unit
       else
         pre_filter pv oph op >>= function
-        | (true, new_filter_state) ->
-            pv.filter_state <- new_filter_state ;
+        | true ->
             if
               not
                 (Block_hash.Set.mem
@@ -963,9 +961,7 @@ module Make
                  Should this have an influence on the peer's score ? *)
               pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
               return_unit)
-        | (false, filter_state) ->
-            pv.filter_state <- filter_state ;
-            return_unit
+        | false -> return_unit
 
     let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
@@ -1111,12 +1107,8 @@ module Make
       Operation_hash.Map.fold_s
         (fun oph op pending ->
           pre_filter pv oph op >|= function
-          | (true, filter_state) ->
-              pv.filter_state <- filter_state ;
-              Operation_hash.Map.add oph op pending
-          | (false, filter_state) ->
-              pv.filter_state <- filter_state ;
-              pending)
+          | true -> Operation_hash.Map.add oph op pending
+          | false -> pending)
         new_pending_operations
         Operation_hash.Map.empty
       >>= fun new_pending_operations ->
