@@ -113,6 +113,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -243,6 +244,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -373,6 +375,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -525,6 +528,7 @@ include Tezos_raw_protocol_alpha.Main
    Global_constants_costs
    Global_constants_storage
    Tx_rollup_storage
+   Sc_rollup_storage
    Alpha_context
    Carbonated_map_costs
    Carbonated_map
@@ -696,6 +700,7 @@ include Tezos_raw_protocol_alpha.Main
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml

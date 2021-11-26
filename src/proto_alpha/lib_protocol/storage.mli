@@ -702,3 +702,26 @@ module Tx_rollup : sig
        and type value = Tx_rollup_repr.state
        and type t := Raw_context.t
 end
+
+(** Smart contract rollup *)
+module Sc_rollup : sig
+  (**
+
+     Each smart contract rollup is associated to:
+
+     - a PVM kind (provided at creation time, read-only) ;
+     - a boot sector (provided at creation time, read-only).
+
+  *)
+  module PVM_kind :
+    Indexed_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Sc_rollup_repr.Kind.t
+       and type t := Raw_context.t
+
+  module Boot_sector :
+    Indexed_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Sc_rollup_repr.PVM.boot_sector
+       and type t := Raw_context.t
+end

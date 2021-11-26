@@ -91,6 +91,7 @@
         "Global_constants_costs",
         "Global_constants_storage",
         "Tx_rollup_storage",
+        "Sc_rollup_storage",
 
         "Alpha_context",
         "Carbonated_map_costs",
