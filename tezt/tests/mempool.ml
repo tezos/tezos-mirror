@@ -367,6 +367,61 @@ module Revamped = struct
     Check.((expected_mempool = mempool) Mempool.classified_typ ~error_msg) ;
     unit
 
+  (** This test bans an operation and checks that a branch_delayed operation
+      is classified again. *)
+  let ban_operation_branch_delayed_reevaluated =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"ban_operation_branch_delayed_reevaluated"
+      ~tags:["mempool"; "ban"; "branch_delayed"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) = Client.init_with_protocol ~protocol `Client () in
+
+    log_step 2 "Forge and inject an operation on the node." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node in
+    let* oph1 = Operation.inject_transfer ~amount:1 client in
+    let* () = injection_waiter in
+
+    log_step
+      3
+      "Check that the operation %s is applied in the node's mempool."
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {Mempool.empty with applied = [oph1]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 4 "Forge and inject an operation with the same manager." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node in
+    let* oph2 = Operation.inject_transfer ~force:true ~amount:2 client in
+    let* () = injection_waiter in
+
+    log_step
+      5
+      "Check that the operation %s is branch_delayed in the node's mempool."
+      oph2 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {expected_mempool with branch_delayed = [oph2]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 6 "Ban the operation %s." oph1 ;
+    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+
+    log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {Mempool.empty with applied = [oph2]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+    unit
+
   (** This test checks the one operation per manager per block restriction on
       injection.
       We inject two operations with the same manager and check that the second
@@ -853,155 +908,6 @@ let _bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
   if log then
     Log.info "Baked for %s with an empty mempool." (Client.name client) ;
   waiter
-
-(** This test tries to ban an operation and check that a branch
-   refused operation is classified again.
-
-   Scenario:
-
-   + Node 1 activates a protocol and synchronise with Node 2
-
-   + Forge and inject an operation on Node 1 and Node 2 with the same
-   source and same counter
-
-   + Check that the operations are in the mempool
-
-   + Bake an empty block to enforce mempool synchronisation between Node 1 and Node 2
-
-   + Ban the operation which was applied on Node 1 (or Node 2)
-
-   + Check that the other operation which was branch refused becomes applied *)
-let ban_operation_branch_refused_reevaluated =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"ban_operation_branch_refused_reevaluated"
-    ~tags:["flush"; "mempool"; "ban"]
-  @@ fun protocol ->
-  let* node_1 =
-    Node.init [Synchronisation_threshold 0; Disable_operations_precheck]
-  in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-     We use the disable-precheck option to force application of operation in
-     the prevalidator and to force classification in branch_refused. *)
-  let* node_2 =
-    Node.init [Synchronisation_threshold 0; Disable_operations_precheck]
-  in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-     We use the disable-precheck option to force application of operation in
-     the prevalidator and to force classification in branch_refused. *)
-  let endpoint_1 = Client.(Node node_1) in
-  let endpoint_2 = Client.(Node node_2) in
-  let* client_1 = Client.init ~endpoint:endpoint_1 () in
-  let* client_2 = Client.init ~endpoint:endpoint_2 () in
-  let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  Log.info "activated protocol" ;
-  let* _ = Node.wait_for_level node_1 1 in
-  let* _ = Node.wait_for_level node_2 1 in
-  let* node2_identity = Node.wait_for_identity node_2 in
-  let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in
-  Log.info "nodes are at level 1" ;
-  let* counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client_1
-  in
-  let counter = JSON.as_int counter in
-  let* branch = RPC.get_branch client_1 in
-  let branch = JSON.as_string branch in
-  let injection_waiter = wait_for_injection node_1 in
-  let* oph =
-    forge_and_inject_operation
-      ~branch
-      ~fee:1000
-      ~gas_limit:1040
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap2.public_key_hash
-      ~counter:(counter + 1)
-      ~signer:Constant.bootstrap1
-      ~client:client_1
-  in
-  let* () = injection_waiter in
-  Log.info "%s injected on node 1" JSON.(oph |> as_string) ;
-  let* mempool_after_injections = RPC.get_mempool_pending_operations client_1 in
-  check_operation_is_in_applied_mempool mempool_after_injections oph ;
-  Log.info "Forged operation are applied in the mempool" ;
-  let injection_waiter = wait_for_injection node_2 in
-  let* oph2 =
-    forge_and_inject_operation
-      ~branch
-      ~fee:1000
-      ~gas_limit:1040
-      ~source:Constant.bootstrap1.public_key_hash
-      ~destination:Constant.bootstrap3.public_key_hash
-      ~counter:(counter + 1)
-      ~signer:Constant.bootstrap1
-      ~client:client_2
-  in
-  let* () = injection_waiter in
-  Log.info
-    "%s injected on node 2 with the same counter as %s"
-    JSON.(oph2 |> as_string)
-    JSON.(oph |> as_string) ;
-  let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
-  let* empty_mempool_file = Client.empty_mempool_file () in
-  let flush_waiter_1 = wait_for_flush node_1 in
-  let flush_waiter_2 = wait_for_flush node_2 in
-  let* () =
-    Client.bake_for
-      ~protocol
-      ~mempool:empty_mempool_file
-      ~monitor_node_mempool:false
-      client_1
-  in
-  let* () = flush_waiter_1 and* () = flush_waiter_2 in
-  Log.info "bake block to ensure mempool synchronisation" ;
-  let* mempool_after_injections_1 =
-    RPC.get_mempool_pending_operations client_1
-  in
-  let mempool_count_after_injections_1 =
-    count_mempool mempool_after_injections_1
-  in
-  let* mempool_after_injections_2 =
-    RPC.get_mempool_pending_operations client_2
-  in
-  let mempool_count_after_injections_2 =
-    count_mempool mempool_after_injections_2
-  in
-  let (oph_to_ban, oph_remaining, client) =
-    (* It may be possible that node 1 is never aware of the second
-       operation if:
-
-       - Node 2 receives the blocks
-
-       - Node 2 evaluates the operations and classify the second
-       operation as branch refused.
-
-       However, this is unlikely for the moment since node 2 will
-       advertise its mempool before flushing. *)
-    let (mempool, client) =
-      if mempool_count_after_injections_1.total = 2 then
-        (mempool_after_injections_1, client_1)
-      else if mempool_count_after_injections_2.total = 2 then
-        (mempool_after_injections_2, client_2)
-      else
-        Test.fail
-          "A problem occured during the test (probably a flakyness issue)."
-    in
-    let oph_applied = JSON.(mempool |-> "applied" |=> 0 |-> "hash") in
-    let oph_refused = JSON.(mempool |-> "branch_refused" |=> 0 |=> 0) in
-    (oph_refused, oph_applied, client)
-  in
-  Log.info "ban operation %s" JSON.(oph_to_ban |> as_string) ;
-  let* _ =
-    RPC.mempool_ban_operation
-      ~data:(`String JSON.(oph_to_ban |> as_string))
-      client
-  in
-  let* mempool_after_ban = RPC.get_mempool_pending_operations client in
-  Log.info "check operation %s is applied" JSON.(oph_remaining |> as_string) ;
-  check_operation_is_in_applied_mempool mempool_after_ban oph_remaining ;
-  Lwt.return_unit
 
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
@@ -3410,6 +3316,7 @@ let test_request_operations_peer =
 let register ~protocols =
   Revamped.flush_mempool ~protocols ;
   Revamped.recycling_branch_refused ~protocols ;
+  Revamped.ban_operation_branch_delayed_reevaluated ~protocols ;
   Revamped.one_operation_per_manager_per_block_restriction_injection ~protocols ;
   Revamped.one_operation_per_manager_per_block_restriction_propagation
     ~protocols ;
@@ -3422,7 +3329,6 @@ let register ~protocols =
   ban_operation_and_check_applied ~protocols ;
   unban_operation_and_reinject ~protocols ;
   unban_all_operations ~protocols ;
-  ban_operation_branch_refused_reevaluated ~protocols ;
   test_do_not_reclassify ~protocols ;
   test_pending_operation_version ~protocols ;
   force_operation_injection ~protocols ;
