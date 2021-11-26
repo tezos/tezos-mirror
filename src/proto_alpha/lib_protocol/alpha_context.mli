@@ -2336,7 +2336,7 @@ module Consensus : sig
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 end
 
-(** See {! Tezos_raw_protocol_alpha.Token }. *)
+(** See 'token.mli' for more explanation. *)
 module Token : sig
   type container =
     [ `Contract of Contract.t
