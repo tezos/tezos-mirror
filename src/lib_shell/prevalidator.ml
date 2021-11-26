@@ -1147,7 +1147,10 @@ module Make
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       if Classification.is_in_mempool oph_to_ban pv.shell.classification then
         if not (Classification.is_applied oph_to_ban pv.shell.classification)
-        then return (Classification.remove oph_to_ban pv.shell.classification)
+        then (
+          pv.filter_state <-
+            Filter.Mempool.remove ~filter_state:pv.filter_state oph_to_ban ;
+          return (Classification.remove oph_to_ban pv.shell.classification))
         else
           (* Modifying the list of operations classified as [Applied]
              might change the classification of all the operations in
