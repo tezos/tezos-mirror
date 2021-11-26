@@ -2275,8 +2275,8 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
   | None -> return main_chain_store
   | Some history_mode ->
       let previous_history_mode = Chain.history_mode main_chain_store in
-      fail_when
-        (history_mode <> previous_history_mode)
+      fail_unless
+        (History_mode.equal history_mode previous_history_mode)
         (Cannot_switch_history_mode
            {previous_mode = previous_history_mode; next_mode = history_mode})
       >>=? fun () -> return main_chain_store)
