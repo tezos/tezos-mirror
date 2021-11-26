@@ -539,6 +539,105 @@ module Revamped = struct
         Mempool.classified_typ
         ~error_msg:"node3 mempool expected to be %L, got %R") ;
     unit
+
+  (** This test checks that one operation per manager per block is not enabled
+      if precheck is disabled. *)
+  let one_operation_per_manager_per_block_disable_precheck =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_disable_precheck"
+      ~tags:["mempool"; "manager_restriction"; "disable_precheck"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize a node, with the precheck of operation disable and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0; Disable_operations_precheck]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Forge and inject an operation on the node." ;
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    let injection_waiter = Node.wait_for_request ~request:`Inject node in
+    let* oph1 =
+      Operation.inject_transfer ~counter:(counter + 1) ~amount:1 client
+    in
+    let* () = injection_waiter in
+
+    log_step
+      3
+      "Check that the operation %s is applied in the node's mempool."
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {Mempool.empty with applied = [oph1]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step
+      4
+      "Forge and force inject an operation with the same manager that should \
+       fail because the counter was not incremented." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node in
+    let* oph2 =
+      Operation.inject_transfer
+        ~counter:(counter + 1)
+        ~force:true
+        ~amount:2
+        client
+    in
+    let* () = injection_waiter in
+
+    log_step
+      5
+      "Check that the operation %s is applied and that %s is branch_refused in \
+       the node's mempool."
+      oph1
+      oph2 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph1]; branch_refused = [oph2]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step
+      6
+      "Forge and inject an operation with the same manager with incremented \
+       counter." ;
+    let injection_waiter = Node.wait_for_request ~request:`Inject node in
+    let* oph3 =
+      Operation.inject_transfer ~counter:(counter + 2) ~amount:2 client
+    in
+    let* () = injection_waiter in
+
+    log_step
+      7
+      "Check that the operations %s and %s are applied and that %s is \
+       branch_refused in the node's mempool."
+      oph1
+      oph3
+      oph2 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph1; oph3]; branch_refused = [oph2]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3314,6 +3413,7 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_restriction_injection ~protocols ;
   Revamped.one_operation_per_manager_per_block_restriction_propagation
     ~protocols ;
+  Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
