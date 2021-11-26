@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Shell
-    Invocation:   dune exec src/lib_shell/test/test_locator.exe test_locator
+    Invocation:   dune exec src/lib_shell/test/test_locator.exe
     Subject:      Checks operations on locators.
 *)
 
@@ -335,11 +335,11 @@ let compute_size_chain size_locator =
 (** Test if the linear and exponential locator are the same and outputs
     their timing.
     Run the test with:
-    $ dune build @runbench_locator
+    $ dune build @runtest_locator
     Copy the output to a file timing.dat and plot it with:
     $ generate_locator_plot.sh timing.dat
 *)
-let test_locator base_dir =
+let bench_locator base_dir =
   let size_chain = 80000 in
   (* timing locators with average over [runs] times *)
   let runs = 10 in
@@ -556,11 +556,14 @@ let tests =
     wrap "test protocol locator" test_protocol_locator;
   ]
 
-let bench = [wrap "locator" test_locator]
+let bench = [wrap "bench locator" bench_locator]
 
 let tests =
-  try if Sys.argv.(1) = "--no-bench" then tests else tests @ bench
-  with _ -> tests @ bench
+  tests
+  @
+  if Array.length Sys.argv > 1 then
+    match Sys.argv.(1) with "--bench" -> bench | _ -> []
+  else []
 
 let () =
   Alcotest_lwt.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
