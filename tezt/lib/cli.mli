@@ -61,11 +61,17 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 (** How many times to loop. *)
 type loop_mode = Infinite | Count of int
 
-(** Command-line options. *)
+(** Command-line options.
+
+    [log_file] is [Some channel] where [channel] is open on [filename]
+    if [--log-file filename] was specified on the command line.
+    [channel] is automatically replaced by another channel if {!init}
+    is called again with [--log-file]. [channel] is automatically closed
+    either when replaced by another one or at exit. *)
 type options = {
   mutable color : bool;
   mutable log_level : log_level;
-  mutable log_file : string option;
+  mutable log_file : out_channel option;
   mutable log_buffer_size : int;
   mutable commands : bool;
   mutable temporary_file_mode : temporary_file_mode;
@@ -99,5 +105,9 @@ val options : options
     to override this behavior. Note that [args] must not contain the executable
     name ([Sys.argv.(0)]), only actual arguments.
 
-    If you do not call [init], [options] will contain only default values. *)
+    If you do not call [init], [options] will contain only default values.
+
+    Warning: if [--log-file] is specified, the file is truncated.
+    So if you call [init] several times with the same [--log-file] argument,
+    all logs between the calls to [init] are lost in this file. *)
 val init : ?args:string list -> unit -> unit

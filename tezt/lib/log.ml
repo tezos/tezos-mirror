@@ -143,8 +143,6 @@ module Color = struct
   end
 end
 
-let log_file = Option.map open_out Cli.options.log_file
-
 (* The log buffer is a queue with a maximum size.
    Older items are dropped. *)
 module Log_buffer = struct
@@ -229,7 +227,7 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
             progress_msg,
             message )
         in
-        Option.iter (log_line_to ~use_colors:false line) log_file ;
+        Option.iter (log_line_to ~use_colors:false line) Cli.options.log_file ;
         match (Cli.options.log_level, level) with
         | (_, Quiet) -> invalid_arg "Log.log_string: level cannot be Quiet"
         | (Error, Error)

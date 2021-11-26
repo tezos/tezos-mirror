@@ -35,7 +35,7 @@ type loop_mode = Infinite | Count of int
 type options = {
   mutable color : bool;
   mutable log_level : log_level;
-  mutable log_file : string option;
+  mutable log_file : out_channel option;
   mutable log_buffer_size : int;
   mutable commands : bool;
   mutable temporary_file_mode : temporary_file_mode;
@@ -89,6 +89,8 @@ let options =
     junit = None;
   }
 
+let () = at_exit @@ fun () -> Option.iter close_out options.log_file
+
 let init ?args () =
   let set_log_level = function
     | "quiet" -> options.log_level <- Quiet
@@ -98,6 +100,14 @@ let init ?args () =
     | "info" -> options.log_level <- Info
     | "debug" -> options.log_level <- Debug
     | level -> raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
+  in
+  let set_log_file filename =
+    Option.iter close_out options.log_file ;
+    (* The channel we open here will be closed either:
+       - by the next call to [set_log_file], if there are several [--log-file]
+         arguments or if [Cli.init] is called several times;
+       - at exit. *)
+    options.log_file <- Some (open_out filename)
   in
   let set_job_count value =
     if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
@@ -142,7 +152,7 @@ let init ?args () =
           "<LEVEL> Set log level to LEVEL. Possible LEVELs are: quiet, error, \
            warn, report, info, debug. Default is report." );
         ( "--log-file",
-          Arg.String (fun f -> options.log_file <- Some f),
+          Arg.String set_log_file,
           "<FILE> Also log to FILE (in verbose mode: --log-level only applies \
            to stdout)." );
         ( "--log-buffer-size",
