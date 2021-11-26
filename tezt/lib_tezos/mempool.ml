@@ -40,9 +40,28 @@ let typ : t Check.typ =
   convert
     (fun mempool ->
       sort
-        (mempool.applied @ mempool.branch_delayed @ mempool.branch_refused
-       @ mempool.refused @ mempool.outdated @ mempool.unprocessed))
+        (mempool.applied
+        @ sort mempool.branch_delayed
+        @ sort mempool.branch_refused
+        @ sort mempool.refused @ sort mempool.outdated
+        @ sort mempool.unprocessed))
     (list string)
+
+(* A comparable type for mempool where ordering does not matter. *)
+let classified_typ : t Check.typ =
+  let open Check in
+  let sort = List.sort compare in
+  convert
+    (fun mempool ->
+      [
+        sort mempool.applied;
+        sort mempool.branch_delayed;
+        sort mempool.branch_refused;
+        sort mempool.refused;
+        sort mempool.outdated;
+        sort mempool.unprocessed;
+      ])
+    (list (list string))
 
 let empty =
   {

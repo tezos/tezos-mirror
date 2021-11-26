@@ -232,7 +232,7 @@ module Revamped = struct
     in
     Check.(
       (expected_mempool_after_injection = mempool_after_injection)
-        Mempool.typ
+        Mempool.classified_typ
         ~error_msg) ;
 
     log_step
@@ -282,7 +282,7 @@ module Revamped = struct
     in
     Check.(
       (expected_mempool_after_second_injection = mempool_after_second_injection)
-        Mempool.typ
+        Mempool.classified_typ
         ~error_msg) ;
 
     log_step 8 "Bake on node1 (head increment)." ;
@@ -309,7 +309,7 @@ module Revamped = struct
     in
     Check.(
       (expected_mempool_after_second_injection = mempool_after_head_increment)
-        Mempool.typ
+        Mempool.classified_typ
         ~error_msg) ;
 
     log_step
@@ -356,7 +356,7 @@ module Revamped = struct
       {empty with branch_refused = [oph2]; outdated}
     in
     let error_msg = "expected mempool from node1 was %L got %R" in
-    Check.((expected_mempool = mempool) Mempool.typ ~error_msg) ;
+    Check.((expected_mempool = mempool) Mempool.classified_typ ~error_msg) ;
     unit
 end
 
