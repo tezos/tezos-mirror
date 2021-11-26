@@ -33,5 +33,6 @@ let run proto =
      Perform_inference.main ())
 
 let () =
+  Cli.init () ;
   Background.start (fun x -> raise x) ;
   run Protocol.Alpha
