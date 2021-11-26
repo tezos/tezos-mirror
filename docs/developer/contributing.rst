@@ -115,11 +115,11 @@ Dependencies on other merge requests, other relationships to MRs, to
 issues, etc, should also be mentioned.
 
 While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developer prefixes the MR with ``WIP:``. This will tell everybody
+work in progress, the developer prefixes the MR with ``Draft:``. This will tell everybody
 they can look at the code, comment, but there is still work to be done and the
 branch can change and history be rewritten.
 
-Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the WIP status of the
+Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the Draft status of the
 MR and freezes the branch. From this moment on, the developer will refrain to
 rewrite history, but he/she can add new commits and rebase the branch for
 syncing it with master (this can be done regularly to make sure the branch does
@@ -310,7 +310,7 @@ Therefore, when creating your MR, observe the following rules:
   of the :ref:`reviewer field <reviewers_field>` below.
 
 - *Check progress*:
-  It is important to maintain to a minimum the number of your MRs that are in WIP state,
+  It is important to maintain to a minimum the number of your MRs that are in Draft state,
   and to constantly check that the discussion is progressing.
 
 Example of an MR with a good, clean history (each bullet is a commit,
@@ -386,7 +386,7 @@ or respond to a comment) or one of the merge request authors (if they need
 to update the code or respond to a comment).
 
 If a merge request has no assignee, it is implicitly the role of the
-:ref:`merge dispatcher <merge_dispatcher>` to assign it to someone.
+:ref:`merge coordinator <merge_coordinator>` to assign it to someone.
 
 Even though merge requests could require action from several people
 to be merged, we avoid assigning more than one to avoid diluting responsibility.
@@ -408,7 +408,7 @@ To find reviewers, either:
     consists of a link to the MR and a one sentence summary.
   - Look at authors of the code you are modifying using
     `git blame <https://git-scm.com/docs/git-blame>`_.
-  - Ask help to the :ref:`merge dispatcher <merge_dispatcher>`, either
+  - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
     by asking him/here on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
@@ -416,6 +416,8 @@ you may or may not be able to use the *Reviewers* field for specifying
 the reviewers. If you don't have the right, mention the reviewers using
 their GitLab handle (username prefixed with ``@``) in a comment.
 It causes GitLab to send a notification to them.
+
+.. _draft_mode:
 
 Merge Request "Draft" Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

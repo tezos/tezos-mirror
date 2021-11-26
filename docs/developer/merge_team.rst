@@ -9,25 +9,37 @@ https://gitlab.com/tezos/tezos/ repository.
 They are automatically selected as approvers when you create a merge
 request.
 
-.. _merge_dispatcher:
+.. _merge_coordinator:
 
-Merge Dispatcher
-----------------
+Merge Coordinator
+-----------------
 
-Every week, a dedicated member of the Octez merge team, called the *merge dispatcher*,
-is in charge of making sure merge requests get merged.
-Their role is to:
+The *merge coordinator* is a member of the Octez merge team whose role
+is to make sure the merge request (MR) process is going smoothly. Duties
+of the merge coordinator include:
 
-- make sure merge requests follow the :ref:`MR workflow <mr_workflow>`;
-- update labels;
-- ask people to review, fix issues, etc.;
-- make sure that merge requests are assigned to someone;
-- merge the merge requests that are ready.
+* Make sure merge requests follow the :ref:`MR workflow <mr_workflow>`:
+  the :ref:`assignee <assignee_field>` is correct, the :ref:`reviewers <reviewers_field>`
+  are correct; and the :ref:`draft <draft_mode>` status is correct.
+* Supervise the ready (non-draft) MRs to ensure that the right actions are being taken;
+  advise how to make them move forward.
+* Assist with removing blockers, organize the optimal sequencing of MRs.
+* Assist with notifying blocking persons that they are a bottleneck:
+  find MRs blocked on review and ask updates to the blocking reviewer,
+  find another reviewer if relevant.
+* Actually perform MR reviews/approvals where appropriate, upgrade
+  approvals from outside the Octez merge team when relevant.
+* Coordinate with and alert developers working on CI in the case of problems
+  that affect the flow of MRs.
+* Help MR authors understand their responsibilities.
+* Coordinate with leaders of the various companies of the Tezos ecosystem to
+  make sure the process is understood and shared.
+* Improve and augment the documentation about the MR process.
 
-Each week, :gl:`Issue 1062 <tezos/tezos#1062>` is
-re-assigned to the current merge dispatcher to make it easy to find out
-who it is. Don't hesitate to contact the merge dispatcher if you need help
-to get your merge request moving.
+To make it easy to find out who the current merge coordinator is,
+:gl:`meta-issue 1062 <tezos/tezos#1062>` is assigned to the merge coordinator.
+Don't hesitate to contact the merge coordinator if you think you can
+benefit of their help to move your merge request forward.
 
 Getting into the Octez Merge Team
 ---------------------------------
