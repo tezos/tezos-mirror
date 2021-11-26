@@ -125,6 +125,7 @@ Minor Changes
 
 - Liquidity Baking: postpone the sunset level by 819,200 blocks and
   decrease the escape hatch threshold from one half to one third.
+  (MR :gl:`!3911`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
