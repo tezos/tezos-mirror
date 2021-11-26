@@ -685,7 +685,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
             let open Apply_results in
             function
             | Successful_manager_result (Reveal_result _)
-            | Successful_manager_result (Delegation_result _) ->
+            | Successful_manager_result (Delegation_result _)
+            | Successful_manager_result (Tx_rollup_origination_result _) ->
                 balance_updates_rev
             | Successful_manager_result (Set_deposits_limit_result _) ->
                 balance_updates_rev
@@ -717,7 +718,8 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Delegation_result _)
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
-            | Successful_manager_result (Set_deposits_limit_result _) ->
+            | Successful_manager_result (Set_deposits_limit_result _)
+            | Successful_manager_result (Tx_rollup_origination_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

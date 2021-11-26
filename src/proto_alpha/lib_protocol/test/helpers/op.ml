@@ -476,3 +476,24 @@ let dummy_script =
     }
 
 let dummy_script_cost = Test_tez.of_mutez_exn 9_500L
+
+let originated_tx_rollup op =
+  let nonce =
+    Origination_nonce.Internal_for_tests.initial (Operation.hash_packed op)
+  in
+  (nonce, Tx_rollup.Internal_for_tests.originated_tx_rollup nonce)
+
+let tx_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    Tx_rollup_origination
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  let op = sign account.sk ctxt to_sign_op in
+  (op, originated_tx_rollup op |> snd)

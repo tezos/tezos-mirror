@@ -93,6 +93,8 @@ let constants_mainnet =
       {numerator = 1; denominator = 2};
     delegate_selection = Constants.Random;
     tx_rollup_enable = false;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
+    tx_rollup_origination_size = 60_000;
   }
 
 let constants_sandbox =

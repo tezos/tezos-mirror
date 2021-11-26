@@ -29,7 +29,8 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "max_slashing_period": 2, "frozen_deposits_percentage": 5,
   "double_baking_punishment": "640000000",
   "ratio_of_frozen_deposits_slashed_per_double_endorsement":
-    { "numerator": 1, "denominator": 2 }, "tx_rollup_enable": false }
+    { "numerator": 1, "denominator": 2 }, "tx_rollup_enable": false,
+  "tx_rollup_origination_size": 60000 }
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

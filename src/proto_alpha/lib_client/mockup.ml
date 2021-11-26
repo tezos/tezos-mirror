@@ -68,6 +68,7 @@ module Protocol_constants_overrides = struct
     ratio_of_frozen_deposits_slashed_per_double_endorsement :
       Constants.ratio option;
     tx_rollup_enable : bool option;
+    tx_rollup_origination_size : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -112,7 +113,7 @@ module Protocol_constants_overrides = struct
                   c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                   c.chain_id,
                   c.timestamp ),
-                c.tx_rollup_enable ) ) ) ))
+                (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -147,7 +148,7 @@ module Protocol_constants_overrides = struct
                      ratio_of_frozen_deposits_slashed_per_double_endorsement,
                      chain_id,
                      timestamp ),
-                   tx_rollup_enable ) ) ) ) ->
+                   (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -184,6 +185,7 @@ module Protocol_constants_overrides = struct
           chain_id;
           timestamp;
           tx_rollup_enable;
+          tx_rollup_origination_size;
         })
       (merge_objs
          (obj9
@@ -233,7 +235,9 @@ module Protocol_constants_overrides = struct
                         Constants.ratio_encoding)
                      (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding))
-                  (obj1 (opt "tx_rollup_enable" Data_encoding.bool))))))
+                  (obj2
+                     (opt "tx_rollup_enable" Data_encoding.bool)
+                     (opt "tx_rollup_origination_size" int31))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -293,6 +297,7 @@ module Protocol_constants_overrides = struct
           Some
             parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement;
         tx_rollup_enable = Some parametric.tx_rollup_enable;
+        tx_rollup_origination_size = Some parametric.tx_rollup_origination_size;
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -335,6 +340,7 @@ module Protocol_constants_overrides = struct
       double_baking_punishment = None;
       ratio_of_frozen_deposits_slashed_per_double_endorsement = None;
       tx_rollup_enable = None;
+      tx_rollup_origination_size = None;
       chain_id = None;
       timestamp = None;
     }
@@ -554,6 +560,12 @@ module Protocol_constants_overrides = struct
             override_value = o.tx_rollup_enable;
             pp = pp_print_bool;
           };
+        O
+          {
+            name = "tx_rollup_origination_size";
+            override_value = o.tx_rollup_origination_size;
+            pp = pp_print_int;
+          };
       ]
     in
     let fields_with_override =
@@ -673,6 +685,10 @@ module Protocol_constants_overrides = struct
               as they are not protocol constants... *);
          tx_rollup_enable =
            Option.value ~default:c.tx_rollup_enable o.tx_rollup_enable;
+         tx_rollup_origination_size =
+           Option.value
+             ~default:c.tx_rollup_origination_size
+             o.tx_rollup_origination_size;
        }
         : Constants.parametric)
 end

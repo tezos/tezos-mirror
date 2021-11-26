@@ -162,6 +162,10 @@ module Delegate : sig
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
 end
 
+module Tx_rollup : sig
+  val state : t -> Tx_rollup.t -> Tx_rollup.state option tzresult Lwt.t
+end
+
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init :

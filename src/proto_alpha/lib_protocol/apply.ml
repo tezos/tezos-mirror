@@ -1107,6 +1107,19 @@ let apply_manager_operation_content :
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                 },
               [] ))
+  | Tx_rollup_origination ->
+      fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_disabled
+      >>=? fun () ->
+      Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
+      let result =
+        Tx_rollup_origination_result
+          {
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            originated_tx_rollup;
+            balance_updates = [];
+          }
+      in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -1307,6 +1320,15 @@ let burn_storage_fees :
               global_address = payload.global_address;
             } )
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Tx_rollup_origination_result payload ->
+      let payer = `Contract payer in
+      Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates = origination_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_origination_result {payload with balance_updates} )
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :

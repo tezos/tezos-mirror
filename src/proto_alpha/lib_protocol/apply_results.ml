@@ -86,6 +86,12 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.set_deposits_limit successful_manager_operation_result
+  | Tx_rollup_origination_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      originated_tx_rollup : Tx_rollup.t;
+    }
+      -> Kind.tx_rollup_origination successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -449,6 +455,46 @@ module Manager_result = struct
       ~inj:(fun (consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Set_deposits_limit_result {consumed_gas = consumed_milligas})
+
+  let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.tx_rollup_origination_case
+      ~encoding:
+        Data_encoding.(
+          obj4
+            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (req "originated_rollup" Tx_rollup.encoding))
+      ~iselect:(function
+        | Internal_operation_result
+            (({operation = Tx_rollup_origination; _} as op), res) ->
+            Some (op, res)
+        | _ -> None)
+      ~select:(function
+        | Successful_manager_result (Tx_rollup_origination_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Tx_rollup_origination_manager_kind
+      ~proj:(function
+        | Tx_rollup_origination_result
+            {balance_updates; consumed_gas; originated_tx_rollup} ->
+            ( balance_updates,
+              Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              originated_tx_rollup ))
+      ~inj:
+        (fun ( balance_updates,
+               consumed_gas,
+               consumed_milligas,
+               originated_tx_rollup ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Tx_rollup_origination_result
+          {
+            balance_updates;
+            consumed_gas = consumed_milligas;
+            originated_tx_rollup;
+          })
 end
 
 let internal_operation_result_encoding :
@@ -485,6 +531,7 @@ let internal_operation_result_encoding :
          make Manager_result.delegation_case;
          make Manager_result.register_global_constant_case;
          make Manager_result.set_deposits_limit_case;
+         make Manager_result.tx_rollup_origination_case;
        ]
 
 let successful_manager_operation_result_encoding :
@@ -581,6 +628,10 @@ let equal_manager_kind :
     ->
       Some Eq
   | (Kind.Set_deposits_limit_manager_kind, _) -> None
+  | ( Kind.Tx_rollup_origination_manager_kind,
+      Kind.Tx_rollup_origination_manager_kind ) ->
+      Some Eq
+  | (Kind.Tx_rollup_origination_manager_kind, _) -> None
 
 module Encoding = struct
   type 'kind case =
@@ -926,6 +977,17 @@ module Encoding = struct
               res ) ->
             Some (op, res)
         | _ -> None)
+
+  let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
+    make_manager_case
+      Operation.Encoding.tx_rollup_origination_case
+      Manager_result.tx_rollup_origination_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Tx_rollup_origination; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
 end
 
 let contents_result_encoding =
@@ -962,6 +1024,7 @@ let contents_result_encoding =
          make delegation_case;
          make register_global_constant_case;
          make set_deposits_limit_case;
+         make tx_rollup_origination_case;
        ]
 
 let contents_and_result_encoding =
@@ -1003,6 +1066,7 @@ let contents_and_result_encoding =
          make delegation_case;
          make register_global_constant_case;
          make set_deposits_limit_case;
+         make tx_rollup_origination_case;
        ]
 
 type 'kind contents_result_list =
@@ -1280,6 +1344,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | (Manager_operation {operation = Set_deposits_limit _; _}, _) -> None
+  | ( Manager_operation {operation = Tx_rollup_origination; _},
+      Manager_operation_result
+        {operation_result = Applied (Tx_rollup_origination_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Tx_rollup_origination; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Tx_rollup_origination_result _, _); _}
+    ) ->
+      Some Eq
+  | ( Manager_operation {operation = Tx_rollup_origination; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Tx_rollup_origination_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Tx_rollup_origination; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Tx_rollup_origination_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | (Manager_operation {operation = Tx_rollup_origination; _}, _) -> None
 
 let rec kind_equal_list :
     type kind kind2.

@@ -179,3 +179,18 @@ val ballot :
 val dummy_script : Script.t
 
 val dummy_script_cost : Tez.t
+
+(** [tx_rollup_origination ctxt source] Originate a new tx rollup operation,
+    sign it with [source] and returns it alongside the tx rollup address. The
+    tx_rollup address is using the initial origination nonce with the hash of the
+    operation. If this operation is combined with [combine_operations] then the
+    tx rollup address is false as the nonce is not based on the correct operation
+    hash. *)
+val tx_rollup_origination :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  (Operation.packed * Tx_rollup.t) tzresult Lwt.t

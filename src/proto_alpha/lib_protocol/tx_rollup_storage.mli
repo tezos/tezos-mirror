@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
@@ -25,15 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Originated contracts and tx rollups handles are crafted from the hash of the
-    operation that triggered their origination (and nothing else). As a single
-    operation can trigger several originations, the corresponding handles are
-    forged from a deterministic sequence of nonces, initialized with the hash of
-    the operation. *)
-type t = {operation_hash : Operation_hash.t; origination_index : int32}
+(** [originate context] originates a new tx rollup and returns its hash
+    generated from the [origination_nonce] in context. It also increment the
+    [origination_nonce]. *)
+val originate :
+  Raw_context.t -> (Raw_context.t * Tx_rollup_repr.t) tzresult Lwt.t
 
-val encoding : t Data_encoding.t
-
-val initial : Operation_hash.t -> t
-
-val incr : t -> t
+(** [state context tx_rollup] is the current state of [tx_rollup] in the
+    context. *)
+val state :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_repr.state option tzresult Lwt.t

@@ -204,6 +204,7 @@ type parametric = {
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   delegate_selection : delegate_selection;
   tx_rollup_enable : bool;
+  tx_rollup_origination_size : int;
 }
 
 let parametric_encoding =
@@ -242,7 +243,7 @@ let parametric_encoding =
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                 c.delegate_selection ),
-              c.tx_rollup_enable ) ) ) ))
+              (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -275,7 +276,7 @@ let parametric_encoding =
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
                    delegate_selection ),
-                 tx_rollup_enable ) ) ) ) ->
+                 (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -310,6 +311,7 @@ let parametric_encoding =
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
         delegate_selection;
         tx_rollup_enable;
+        tx_rollup_origination_size;
       })
     (merge_objs
        (obj9
@@ -357,7 +359,9 @@ let parametric_encoding =
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       ratio_encoding)
                    (dft "delegate_selection" delegate_selection_encoding Random))
-                (obj1 (req "tx_rollup_enable" bool))))))
+                (obj2
+                   (req "tx_rollup_enable" bool)
+                   (req "tx_rollup_origination_size" int31))))))
 
 type t = {fixed : fixed; parametric : parametric}
 
