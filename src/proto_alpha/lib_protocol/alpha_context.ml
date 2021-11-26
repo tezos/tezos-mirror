@@ -55,6 +55,11 @@ module Slot = struct
   let slot_range = List.slot_range
 end
 
+module Sc_rollup = struct
+  include Sc_rollup_repr
+  include Sc_rollup_storage
+end
+
 include Operation_repr
 
 module Operation = struct

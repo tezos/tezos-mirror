@@ -138,6 +138,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_operations.mli sc_rollup_operations.ml
+   sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
@@ -269,6 +271,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_operations.mli sc_rollup_operations.ml
+   sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
@@ -400,6 +404,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_operations.mli sc_rollup_operations.ml
+   sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml
@@ -553,6 +559,8 @@ include Tezos_raw_protocol_alpha.Main
    Ticket_balance_key
    Script_interpreter_defs
    Script_interpreter
+   Sc_rollup_operations
+   Sc_rollups
    Baking
    Amendment
    Apply_results
@@ -725,6 +733,8 @@ include Tezos_raw_protocol_alpha.Main
    ticket_balance_key.mli ticket_balance_key.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
+   sc_rollup_operations.mli sc_rollup_operations.ml
+   sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
    apply_results.mli apply_results.ml

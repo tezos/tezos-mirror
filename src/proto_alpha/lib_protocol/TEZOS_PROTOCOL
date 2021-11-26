@@ -118,6 +118,8 @@
         "Ticket_balance_key",
         "Script_interpreter_defs",
         "Script_interpreter",
+        "Sc_rollup_operations",
+        "Sc_rollups",
 
         "Baking",
         "Amendment",

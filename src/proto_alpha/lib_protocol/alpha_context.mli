@@ -1888,6 +1888,31 @@ module Block_header : sig
     unit tzresult
 end
 
+(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
+module Sc_rollup : sig
+  module PVM : sig
+    type boot_sector
+
+    val boot_sector_of_string : string -> boot_sector
+  end
+
+  module Address : S.HASH
+
+  type t = Address.t
+
+  module Kind : sig
+    type t = unit
+
+    val encoding : t Data_encoding.t
+  end
+
+  val originate :
+    context ->
+    kind:Kind.t ->
+    boot_sector:PVM.boot_sector ->
+    (context * t * Z.t) tzresult Lwt.t
+end
+
 module Kind : sig
   type preendorsement_consensus_kind = Preendorsement_consensus_kind
 
