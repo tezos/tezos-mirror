@@ -211,12 +211,19 @@ val apply_contents_list :
   (t * 'kind contents_result_list) tzresult Lwt.t
 
 (** [precheck_manager_contents_list validation_state contents_list]
-    Returns an updated context, and a list of prechecked contents
-    containing balance updates for fees related to each manager
-    operation in [contents_list]. *)
+   Returns an updated context, and a list of prechecked contents
+   containing balance updates for fees related to each manager
+   operation in [contents_list]
+
+    If [check_limit_in_block], the function checks whether adding the
+   gas consumed by this operation into would reach the [gas_limit] of
+   a block. This check is necessary in [Application] and
+   [Full_construction] mode. It is optional in [Partial_construction]
+   mode and is currently deactivated for this mode. *)
 val precheck_manager_contents_list :
   t ->
   'kind Kind.manager contents_list ->
+  check_limit_in_block:bool ->
   (context
   * ('kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
   tzresult
