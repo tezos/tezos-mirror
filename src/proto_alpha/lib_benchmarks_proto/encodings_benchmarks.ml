@@ -297,6 +297,9 @@ module Timestamp = struct
         Generator.Plain {workload = (); closure})
 end
 
+(* when benchmarking, compile bls12-381-unix without ADX, see
+   https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
+*)
 module BLS = struct
   open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
 
