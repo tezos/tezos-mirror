@@ -516,6 +516,7 @@ let all_instructions =
     N_IDiff_timestamps;
     N_IAdd_tez;
     N_ISub_tez;
+    N_ISub_tez_legacy;
     N_IMul_teznat;
     N_IMul_nattez;
     N_IEdiv_teznat;
