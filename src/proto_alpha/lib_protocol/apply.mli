@@ -113,6 +113,8 @@ type error += (* `Branch *) Empty_transaction of Contract.t
 
 type error += (* `Permanent *) Tx_rollup_disabled
 
+type error += (* `Permanent *) Sc_rollup_feature_disabled
+
 val begin_partial_construction :
   t ->
   predecessor_level:Level.t ->

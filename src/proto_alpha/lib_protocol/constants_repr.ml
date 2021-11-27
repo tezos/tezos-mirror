@@ -174,6 +174,7 @@ type parametric = {
   initial_seed : State_hash.t option;
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
+  sc_rollup_enable : bool;
 }
 
 let parametric_encoding =
@@ -213,7 +214,8 @@ let parametric_encoding =
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                 c.initial_seed ),
-              (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
+              ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
+                c.sc_rollup_enable ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -247,7 +249,8 @@ let parametric_encoding =
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
                    initial_seed ),
-                 (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
+                 ( (tx_rollup_enable, tx_rollup_origination_size),
+                   sc_rollup_enable ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -284,6 +287,7 @@ let parametric_encoding =
         initial_seed;
         tx_rollup_enable;
         tx_rollup_origination_size;
+        sc_rollup_enable;
       })
     (merge_objs
        (obj9
@@ -332,9 +336,11 @@ let parametric_encoding =
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       ratio_encoding)
                    (opt "initial_seed" State_hash.encoding))
-                (obj2
-                   (req "tx_rollup_enable" bool)
-                   (req "tx_rollup_origination_size" int31))))))
+                (merge_objs
+                   (obj2
+                      (req "tx_rollup_enable" bool)
+                      (req "tx_rollup_origination_size" int31))
+                   (obj1 (req "sc_rollup_enable" bool)))))))
 
 type t = {fixed : fixed; parametric : parametric}
 

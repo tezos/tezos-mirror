@@ -23,60 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(*
-
-   Helpers
-   =======
-
+(** Testing
+    -------
+    Component:    Rollup layer 1 logic
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^sc rollup$"
+    Subject:      Test smart contract rollup
 *)
-let test ~__FILE__ ~output_file title =
-  Protocol.register_regression_test
-    ~output_file
-    ~__FILE__
-    ~title
-    ~tags:["sc_rollup"]
 
-let setup f ~protocol =
-  let sc_rollup_enable = [(["sc_rollup_enable"], Some "true")] in
-  let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base sc_rollup_enable in
-  let* (node, client) =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ()
+open Protocol
+open Alpha_context
+
+(** [test_disable_feature_flag ()] tries to originate a smart contract
+   rollup with the feature flag is deactivated and checks that it
+   fails. *)
+let test_disable_feature_flag () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
-  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  f node client bootstrap1_key
+  Incremental.begin_construction b >>=? fun i ->
+  let kind = Sc_rollup.Kind.Example_arith in
+  let boot_sector = Sc_rollup.PVM.boot_sector_of_string "" in
+  Op.sc_rollup_origination (I i) contract kind boot_sector >>=? fun op ->
+  let expect_failure = function
+    | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ ->
+        failwith
+          "It should not be possible to send a smart contract rollup operation \
+           when the feature flag is disabled."
+  in
+  Incremental.add_operation ~expect_failure i op >>= fun _i -> return_unit
 
-(*
-
-   Tests
-   =====
-
-*)
-
-(* Originate a new SCORU of the arithmetic kind
-   --------------------------------------------
-
-   - Rollup addresses are fully determined by operation hashes and origination nonce.
-
-*)
-let test_origination =
-  let output_file = "sc_rollup_origination" in
-  test
-    ~__FILE__
-    ~output_file
-    "origination of a SCORU executes without error"
-    (fun protocol ->
-      setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* rollup_address =
-        Client.originate_sc_rollup
-          ~burn_cap:Tez.(of_int 9999999)
-          ~src:bootstrap1_key
-          ~kind:"arith"
-          ~boot_sector:""
-          client
-      in
-      let* () = Client.bake_for client in
-      Regression.capture rollup_address ;
-      return ())
-
-let register ~protocols = test_origination ~protocols
+let tests =
+  [
+    Tztest.tztest
+      "check effect of disabled feature flag"
+      `Quick
+      test_disable_feature_flag;
+  ]
