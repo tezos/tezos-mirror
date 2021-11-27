@@ -117,12 +117,10 @@ val transfer_n :
     Returns a [Empty_implicit_delegated_contract] error if [src] is an
     implicit contract that delegates to a different contract, and whose balance
     is equal to [amount].
-    Returns a [Non_existing_contract] error if [amount = Tez_repr.zero], and
+    Returns a [Non_existing_contract] error if
     [dest] refers to an originated contract that is not allocated.
     Returns a [Empty_transaction] error if [amount = Tez_repr.zero], and [dest]
     refers to an implicit contract.
-    Returns a [Non_existing_contract] error if [amount <> Tez_repr.zero], and
-    [dest] refers to an originated contract that is not allocated.
     Returns a [Addition_overflow] error if [dest] refers to a sink whose balance
     is greater than [Int64.max - amount].
     Returns a [Wrong_level] error if [src] or [dest] refer to a level that is

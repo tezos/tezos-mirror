@@ -86,12 +86,16 @@ let init ctxt ~typecheck ?no_reward_cycles accounts contracts =
           })
       >>= fun ctxt ->
       (* Store the final reward. *)
-      Storage.Ramp_up.Rewards.init
-        ctxt
-        (Cycle_repr.of_int32_exn (Int32.of_int cycles))
-        ( constants.baking_reward_fixed_portion,
-          constants.baking_reward_bonus_per_slot,
-          constants.endorsing_reward_per_slot ))
+      Storage.Ramp_up.(
+        Rewards.init
+          ctxt
+          (Cycle_repr.of_int32_exn (Int32.of_int cycles))
+          {
+            baking_reward_fixed_portion = constants.baking_reward_fixed_portion;
+            baking_reward_bonus_per_slot =
+              constants.baking_reward_bonus_per_slot;
+            endorsing_reward_per_slot = constants.endorsing_reward_per_slot;
+          }))
   >|=? fun ctxt -> (ctxt, balance_updates)
 
 let cycle_end ctxt last_cycle =
@@ -99,9 +103,12 @@ let cycle_end ctxt last_cycle =
   Storage.Ramp_up.Rewards.find ctxt next_cycle >>=? function
   | None -> return ctxt
   | Some
-      ( baking_reward_fixed_portion,
-        baking_reward_bonus_per_slot,
-        endorsing_reward_per_slot ) ->
+      Storage.Ramp_up.
+        {
+          baking_reward_fixed_portion;
+          baking_reward_bonus_per_slot;
+          endorsing_reward_per_slot;
+        } ->
       Storage.Ramp_up.Rewards.remove_existing ctxt next_cycle >>=? fun ctxt ->
       Raw_context.patch_constants ctxt (fun c ->
           {

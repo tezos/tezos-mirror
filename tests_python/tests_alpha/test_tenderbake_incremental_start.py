@@ -8,7 +8,7 @@ from . import protocol
 NUM_NODES = 5  # because we assume 5 (bootstrap) accounts
 NUM_EARLY_START_NODES = 2
 ROUND_DURATION = 4
-ROUND_DURATIONS = [str(ROUND_DURATION), str(ROUND_DURATION)]
+ROUND_DURATIONS = {'round0': str(ROUND_DURATION), 'round1': str(ROUND_DURATION)}
 TEST_DURATION = 5 * ROUND_DURATION
 
 

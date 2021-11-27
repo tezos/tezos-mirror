@@ -245,7 +245,7 @@ module type CONSENSUS = sig
   val current_endorsement_power : t -> int
 
   (** Initializes the map of allowed endorsements and preendorsements,
-     this function must only be called only once and before applying
+     this function must be called only once and before applying
      any consensus operation.  *)
   val initialize_consensus_operation :
     t ->
@@ -294,9 +294,8 @@ module type CONSENSUS = sig
       This function is only used in [Full_construction] mode.  *)
   val set_preendorsements_quorum_round : t -> round -> t
 
-  (** [locked_round_evidence ctx payload_hash] returns the
-     preendorsement power recorded for this hash as long as the round
-     of the proposal. *)
+  (** [locked_round_evidence ctx] returns the round of the recorded
+     preendorsements as well as their power. *)
   val locked_round_evidence : t -> (round * int) option
 
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t

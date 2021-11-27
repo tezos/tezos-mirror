@@ -43,7 +43,7 @@ let encoding =
          | None -> ok {level; locked_round; predecessor_round; round}
          | Some locked_round_val ->
              if Round_repr.(round <= locked_round_val) then
-               Error "locked round not less than round"
+               Error "Locked round must be smaller than round."
              else ok {level; locked_round; predecessor_round; round})
        (obj4
           (req "level" Raw_level_repr.encoding)
@@ -107,21 +107,21 @@ let () =
     `Permanent
     ~id:"outdated_fitness"
     ~title:"Outdated fitness"
-    ~description:"Outdated fitness: refering to a previous version"
+    ~description:"Outdated fitness: referring to a previous version"
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "Outdated fitness: refering to a previous version.")
+      Format.fprintf ppf "Outdated fitness: referring to a previous version.")
     Data_encoding.empty
     (function Outdated_fitness -> Some () | _ -> None)
     (fun () -> Outdated_fitness) ;
   register_error_kind
     `Permanent
     ~id:"locked_round_not_less_than_round"
-    ~title:"Locked round not less than round"
-    ~description:"The locked round is bigger or equal than the round"
+    ~title:"Locked round not smaller than round"
+    ~description:"The round is smaller than or equal to the locked round."
     ~pp:(fun ppf (round, locked_round) ->
       Format.fprintf
         ppf
-        "Incorrect fitness: round %a is less or equal than locked round %a."
+        "Incorrect fitness: round %a is less than or equal to locked round %a."
         Round_repr.pp
         round
         Round_repr.pp
@@ -234,7 +234,7 @@ let check_except_locked_round fitness ~level ~predecessor_round =
     level = expected_level;
     locked_round = _;
     predecessor_round = expected_predecessor_round;
-    _;
+    round = _;
   } =
     fitness
   in
@@ -249,7 +249,7 @@ let check_locked_round fitness ~locked_round =
     level = _;
     locked_round = expected_locked_round;
     predecessor_round = _;
-    _;
+    round = _;
   } =
     fitness
   in

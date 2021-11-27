@@ -26,10 +26,11 @@
 type error +=
   | (* `Branch *) Unrevealed_manager_key of Contract_repr.t
   | (* `Permanent *)
-      Inconsistent_hash of
-      Signature.Public_key.t
-      * Signature.Public_key_hash.t
-      * Signature.Public_key_hash.t
+      Inconsistent_hash of {
+      public_key : Signature.Public_key.t;
+      expected_hash : Signature.Public_key_hash.t;
+      provided_hash : Signature.Public_key_hash.t;
+    }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
 
 (** [init ctxt contract manager] associates [manager] to [contract]. This

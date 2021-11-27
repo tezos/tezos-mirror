@@ -59,9 +59,9 @@ val to_int32 : t -> int32
     greater than Int32.max_int. *)
 val of_int : int -> t tzresult
 
-(** Building a round from an int.
+(** Building an int from a round.
     Returns an error if the value does not fit in max_int. (current
-    32bit encoding always fit in int on 64bit architecture though). *)
+    32bit encodings always fit in int on 64bit architecture though). *)
 val to_int : t -> int tzresult
 
 (** Returns the slot corresponding to the given round [r], that is [r
@@ -147,14 +147,24 @@ module Durations : sig
   val first : t -> Period_repr.t
 end
 
+(** [level_offset_of_round round_durations ~round:r] represents the offset of the
+    starting time of round [r] with respect to the start of the level.
+    round = 0      1     2    3                            r
+
+          |-----|-----|-----|-----|-----|--- ... ... --|------|-------
+                                                       |
+          <------------------------------------------->
+                              level_offset
+*)
+val level_offset_of_round : Durations.t -> round:t -> Period_repr.t tzresult
+
 type round_and_offset = {round : t; offset : Period_repr.t}
 
-(** [round_and_offset round_durations level_offset], where [level_offset]
+(** [round_and_offset round_durations ~level_offset], where [level_offset]
     represents a time offset with respect to the start of the first round,
     returns a tuple [(r, round_offset)] where the round [r] is such that
-    [round_delay r <= level_offset < round_delay (r+1)] and
-    [round_offset := level_offset - round_delay r], where
-    [round_delay r := if r = 0 then 0 else sum_{i=0}^{r-1} (round_duration i)]
+    [level_offset_of_round(r) <= level_offset < level_offset_of_round(r+1)] and
+    [round_offset := level_offset - level_offset_of_round(r)]].
 
     round = 0      1     2    3                            r
 
@@ -171,7 +181,8 @@ type round_and_offset = {round : t; offset : Period_repr.t}
 val round_and_offset :
   Durations.t -> level_offset:Period_repr.t -> round_and_offset tzresult
 
-(** [timestamp_of_round round_durations pred_ts pred_round round] returns the
+(** [timestamp_of_round round_durations ~predecessor_timestamp:pred_ts
+     ~predecessor_round:pred_round ~round] returns the
     starting time of round [round] given that the timestamp and the round of
     the block at the previous level is [pred_ts] and [pred_round],
     respectively.
@@ -190,7 +201,10 @@ val round_and_offset :
     cur_round =                           0      1            | round
                                                               |
                                                             res_ts
-    *)
+
+    Precisely, the resulting timestamp is:
+      [pred_ts + round_duration(pred_round) + level_offset_of_round(round)].
+*)
 val timestamp_of_round :
   Durations.t ->
   predecessor_timestamp:Time_repr.t ->
@@ -214,7 +228,12 @@ val timestamp_of_round :
   cur_round = 0     1      current      considered
                             round         round
 
-    It also works when [considered_round] is lower than [current_round] *)
+    It also works when [considered_round] is lower than [current_round].
+
+  Precisely, the resulting timestamp is:
+    [current_timestamp - level_offset_of_round(current_round)
+                       + level_offset_of_round(considered_round)].
+*)
 val timestamp_of_another_round_same_level :
   Durations.t ->
   current_timestamp:Time_repr.t ->
@@ -222,10 +241,14 @@ val timestamp_of_another_round_same_level :
   considered_round:t ->
   Time_repr.t tzresult
 
-(** [round_of_timestamp round_durations pred_ts pred_round ts] returns the
-    round to which the timestamp [ts] belongs to, given that the timestamp and
-    the round of the block at the previous level is [pred_ts] and [pred_round],
-    respectively.
+(** [round_of_timestamp round_durations ~predecessor_timestamp ~predecessor_round
+     ~timestamp:ts] returns the round to which the timestamp [ts] belongs to,
+    given that the timestamp and the round of the block at the previous level is
+    [pred_ts] and [pred_round], respectively.
+
+    Precisely, the resulting round is:
+      [round_and_offset round_durations ~level_offset:diff] where
+    [diff = ts - (predecessor_timestamp + round_duration(predecessor_round)].
 
     Returns an error when the timestamp is before the level start.*)
 val round_of_timestamp :
@@ -234,14 +257,3 @@ val round_of_timestamp :
   predecessor_round:t ->
   timestamp:Time_repr.t ->
   t tzresult
-
-(** [level_offset round_durations r] represents the offset of the starting time
-    of round [r] with respect to the start of the level
-    round = 0      1     2    3                            r
-
-          |-----|-----|-----|-----|-----|--- ... ... --|------|-------
-                                                       |
-          <------------------------------------------->
-                              level_offset
-*)
-val level_offset_of_round : Durations.t -> round:t -> Period_repr.t tzresult

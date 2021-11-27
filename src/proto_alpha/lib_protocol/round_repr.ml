@@ -37,7 +37,7 @@ let succ = Int32.succ
 
 let pp fmt i = Format.fprintf fmt "%ld" i
 
-type error += Negative_round of int32
+type error += Negative_round of int
 
 type error += Round_overflow of int
 
@@ -47,41 +47,46 @@ let () =
     `Permanent
     ~id:"negative_round"
     ~title:"Negative round"
-    ~description:"Round cannot be build out of negative int32."
+    ~description:"Round cannot be built out of negative integers."
     ~pp:(fun ppf i ->
       Format.fprintf
         ppf
-        "Negative round cannot be build out of negative int32 (%ld)"
+        "Negative round cannot be built out of negative integers (%Ld)"
         i)
-    (obj1 (req "Negative_round" int32))
-    (function Negative_round i -> Some i | _ -> None)
-    (fun i -> Negative_round i) ;
+    (obj1 (req "Negative_round" int64))
+    (function Negative_round i -> Some (Int64.of_int i) | _ -> None)
+    (fun i -> Negative_round (Int64.to_int i)) ;
   register_error_kind
     `Permanent
     ~id:"round_overflow"
     ~title:"Round overflow"
     ~description:
-      "Round cannot be build out of integer greater than maximum int32 value."
+      "Round cannot be built out of integer greater than maximum int32 value."
     ~pp:(fun ppf i ->
       Format.fprintf
         ppf
-        "Round cannot be build out of integer greater than maximum int32 value \
+        "Round cannot be built out of integer greater than maximum int32 value \
          (%Ld)"
         i)
     (obj1 (req "Negative_round" int64))
     (function Round_overflow i -> Some (Int64.of_int i) | _ -> None)
     (fun i -> Round_overflow (Int64.to_int i))
 
-let of_int32 i = if i >= 0l then Ok i else error (Negative_round i) [@@inline]
+let of_int32 i =
+  if i >= 0l then Ok i else error (Negative_round (Int32.to_int i))
+  [@@inline]
 
 let pred r =
   let p = Int32.pred r in
   of_int32 p
 
 let of_int i =
-  let i32 = Int32.of_int i in
-  if Compare.Int.(Int32.to_int i32 = i) then of_int32 i32
-  else error (Round_overflow i)
+  if Compare.Int.(i < 0) then error (Negative_round i)
+  else
+    (* i is positive *)
+    let i32 = Int32.of_int i in
+    if Compare.Int.(Int32.to_int i32 = i) then Ok i32
+    else error (Round_overflow i)
 
 let to_int i32 =
   let i = Int32.to_int i32 in
@@ -92,11 +97,10 @@ let to_int32 t = t [@@inline]
 let to_slot round ~committee_size =
   to_int round >|? fun r ->
   let slot = r mod committee_size in
-  Slot_repr.of_int_do_not_use_except_for_parameters slot
+  Slot_repr.of_int_exn slot
 
 let encoding =
-  let open Data_encoding in
-  conv_with_guard
+  Data_encoding.conv_with_guard
     (fun i -> i)
     (fun i ->
       match of_int32 i with
@@ -110,6 +114,7 @@ module Durations = struct
         round : Period_repr.t;
         next_round : Period_repr.t;
       }
+    | Round_durations_must_be_at_least_one_second of {round : Period_repr.t}
 
   let () =
     register_error_kind
@@ -134,15 +139,25 @@ module Durations = struct
         | _ -> None)
       (fun (round, next_round) -> Non_increasing_rounds {round; next_round})
 
-  type t = Period_repr.t list
+  type t = {
+    round0 : Period_repr.t;
+    round1 : Period_repr.t;
+    other_rounds : Period_repr.t list;
+  }
 
-  let pp fmt l =
-    Format.(
-      pp_print_list
-        ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
-        Period_repr.pp)
+  let pp fmt t =
+    Format.fprintf
       fmt
-      l
+      "%a,@ %a,@ %a"
+      Period_repr.pp
+      t.round0
+      Period_repr.pp
+      t.round1
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+          Period_repr.pp)
+      t.other_rounds
 
   let rec check_ordered = function
     | [_] | [] -> Result.return_unit
@@ -154,64 +169,61 @@ module Durations = struct
 
   let create ?(other_rounds = []) ~round0 ~round1 () =
     error_when
-      Period_repr.(round1 < round0)
-      (Non_increasing_rounds {round = round0; next_round = round1})
+      Compare.Int64.(Period_repr.to_seconds round0 < 1L)
+      (Round_durations_must_be_at_least_one_second {round = round0})
     >>? fun () ->
-    match other_rounds with
-    | [] -> ok [round0; round1]
-    | r :: _ ->
-        error_when
-          Period_repr.(round1 > r)
-          (Non_increasing_rounds {round = round1; next_round = r})
-        >>? fun () ->
-        check_ordered other_rounds >>? fun () ->
-        ok (round0 :: round1 :: other_rounds)
+    check_ordered (round0 :: round1 :: other_rounds) >>? fun () ->
+    ok {round0; round1; other_rounds}
 
-  let create_opt ?(other_rounds = []) ~round0 ~round1 () =
-    match create ~other_rounds ~round0 ~round1 () with
+  let create_opt ?other_rounds ~round0 ~round1 () =
+    match create ?other_rounds ~round0 ~round1 () with
     | Ok v -> Some v
     | Error _ -> None
 
   let encoding =
     let open Data_encoding in
     conv_with_guard
-      (fun l -> l)
-      (function
-        | round0 :: round1 :: other_rounds -> (
-            match create_opt ~round0 ~round1 ~other_rounds () with
-            | None -> Error "The provided round durations are not increasing."
-            | Some rounds -> Ok rounds)
-        | [] | [_] ->
-            Error "Round durations are expected to have at least two elements")
-      (Data_encoding.list Period_repr.encoding)
+      (fun {round0; round1; other_rounds} ->
+        ( round0,
+          round1,
+          match other_rounds with [] -> None | _ :: _ -> Some other_rounds ))
+      (fun (round0, round1, other_rounds) ->
+        match create_opt ~round0 ~round1 ?other_rounds () with
+        | None -> Error "The provided round durations are not increasing."
+        | Some rounds -> Ok rounds)
+      (obj3
+         (req "round0" Period_repr.encoding)
+         (req "round1" Period_repr.encoding)
+         (opt "other_rounds" (list Period_repr.encoding)))
 
-  let round_duration round_durations round =
+  let round_duration {round0; round1; other_rounds} round =
     assert (Compare.Int32.(round >= 0l)) ;
-    match round_durations with
-    | duration0 :: duration1 :: durations ->
-        if Compare.Int32.(round = 0l) then duration0
-        else if Compare.Int32.(round = 1l) then duration1
-        else
-          let rec loop i ultimate penultimate = function
-            | d :: ds ->
-                if Compare.Int32.(i = 0l) then d
-                else loop (Int32.pred i) d ultimate ds
-            | [] ->
-                (* The last element of the list is the ultimate *)
-                let last = Period_repr.to_seconds ultimate in
-                let last_but_one = Period_repr.to_seconds penultimate in
-                let diff = Int64.sub last last_but_one in
-                assert (Compare.Int64.(diff >= 0L)) ;
-                let offset = Int32.succ i in
-                let duration = Int64.(add last (mul diff (of_int32 offset))) in
-                Period_repr.of_seconds_exn duration
-          in
-          loop (Int32.sub round 2l) duration1 duration0 durations
-    | _ ->
-        (* Durations are at least length 2, so this should not happen *)
-        assert false
+    if Compare.Int32.(round = 0l) then round0
+    else if Compare.Int32.(round = 1l) then round1
+    else
+      let rec loop i ~ultimate ~penultimate = function
+        | d :: ds ->
+            if Compare.Int32.(i = 0l) then d
+            else loop (Int32.pred i) ~ultimate:d ~penultimate:ultimate ds
+        | [] ->
+            (* The last element of the list is the ultimate. *)
+            let last = Period_repr.to_seconds ultimate in
+            let last_but_one = Period_repr.to_seconds penultimate in
+            let diff = Int64.sub last last_but_one in
+            assert (Compare.Int64.(diff >= 0L)) ;
+            let offset = Int32.succ i in
+            let duration = Int64.(add last (mul diff (of_int32 offset))) in
+            Period_repr.of_seconds_exn duration
+      in
+      loop
+        (Int32.sub round 2l)
+        ~ultimate:round1
+        ~penultimate:round0
+        other_rounds
 
-  let first = function h :: _ -> h | _ -> assert false
+  let first {round0; _} = round0
+
+  let length {other_rounds; _} = List.length other_rounds + 2
 end
 
 type error += Round_too_high of int32
@@ -234,30 +246,48 @@ let () =
     of the duration of rounds [0] to [round-1]. Note that [round] is
     necessarily a positive number. *)
 let level_offset_of_round (round_durations : Durations.t) ~round =
-  (* Auxiliary function to return a pair of the last element of the
-     list and the sum the [round - 1]-th first elements of
-     [round_durations]. *)
-  let rec last_and_sum_loop round_durations ~round ~sum_acc =
-    match round_durations with
-    | [] -> assert false
-    | [last] when Compare.Int32.(round <> Int32.zero) ->
-        (last, Int64.add sum_acc (Period_repr.to_seconds last))
-    | d :: round_durations' ->
-        if Compare.Int32.(round = Int32.zero) then (d, sum_acc)
+  (* [last_and_sum_loop] is an auxiliary function with the
+     specification below.
+
+     Let [n] be [length round_durations] then:
+     - if [round < n] then return
+        (round_duration (round),
+         round_duration 0 + ... + round_duration (round - 1))
+     - otherwise (round >= n) then return
+       (round_duration (n - 1),
+        round_duration 0 + ... + round_duration (n - 1))
+  *)
+  let last_and_sum_loop round_durations ~round =
+    let open Durations in
+    if Compare.Int32.(round = Int32.zero) then
+      (round_durations.round0, Int64.zero)
+    else
+      let last = round_durations.round1
+      and sum_acc = Period_repr.to_seconds round_durations.round0 in
+
+      let rec loop round_durations ~round ~last ~sum_acc =
+        if Compare.Int32.(round = Int32.zero) then (last, sum_acc)
         else
-          last_and_sum_loop
-            round_durations'
-            ~round:(Int32.pred round)
-            ~sum_acc:(Int64.add sum_acc (Period_repr.to_seconds d))
+          let sum_acc = Int64.add sum_acc (Period_repr.to_seconds last) in
+          match round_durations with
+          | [] -> (last, sum_acc)
+          | d :: round_durations' ->
+              loop round_durations' ~round:(Int32.pred round) ~sum_acc ~last:d
+      in
+      loop
+        round_durations.Durations.other_rounds
+        ~last
+        ~round:(Int32.pred round)
+        ~sum_acc
   in
-  let parameters_len = Int32.of_int (List.length round_durations) in
-  if round < parameters_len then
+  let parameters_len = Int32.of_int (Durations.length round_durations) in
+  if round <= parameters_len then
     (* Let τ be the sequence of round durations (exactly as computed
        by function [duration_of_round]). We just sum the constants
        in [round_durations]:
        Σ_{k = 0}^{round - 1} (τ_k)
     *)
-    ok (snd (last_and_sum_loop round_durations ~round ~sum_acc:Int64.zero))
+    ok (snd (last_and_sum_loop round_durations ~round))
   else
     (* Instead of recursively adding durations given by calling
        function [round_duration], basic algebra gives the same result
@@ -277,11 +307,9 @@ let level_offset_of_round (round_durations : Durations.t) ~round =
     (* 1. Sum the constants in [round_durations] until the last but
        one. *)
     let (round_durations_last, sum_round_durations) =
-      last_and_sum_loop
-        round_durations
-        ~round:(Int32.pred parameters_len)
-        ~sum_acc:Int64.zero
+      last_and_sum_loop round_durations ~round:(Int32.pred parameters_len)
     in
+
     (* 2. Compute the rest of the terms arithmetically (instead of
        recursively). *)
     let sum_after_round_durations =
@@ -324,10 +352,11 @@ let () =
 
 type round_and_offset = {round : int32; offset : Period_repr.t}
 
-(** complexity linear in the resulting round.
-
-    Could do better by growing the considered round exponentially and then
-   refining by dichotomy.  *)
+(** Complexity: in the worst case, O(log max_int)*O(|round_durations|^2).
+    Normally, [level_offset] is small enough for [check_first] to
+    return the searched round, thus the binary search will not be performed.
+    [check_first] can be made to run in O(round_duration) but it is kept
+    this way for simplicity given that currently |round_durations| = 2. *)
 let round_and_offset round_durations ~level_offset =
   let level_offset_in_seconds = Period_repr.to_seconds level_offset in
   let rec check_first ~max_round round =
@@ -360,12 +389,10 @@ let round_and_offset round_durations ~level_offset =
     else Int32.max_int
   in
   let rec bin_search min_r max_r =
-    let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
-    if Compare.Int32.(min_r = right_bound) then
+    if Compare.Int32.(min_r >= right_bound) then
       error (Level_offset_too_high level_offset)
-    else if Compare.Int32.(min_r = Int32.pred max_r) then
-      bin_search min_r (Int32.succ max_r)
     else
+      let round = Int32.(add min_r (div (sub max_r min_r) 2l)) in
       level_offset_of_round round_durations ~round:(Int32.succ round)
       >>? fun next_level_offset ->
       if
@@ -377,7 +404,7 @@ let round_and_offset round_durations ~level_offset =
         if
           Compare.Int64.(
             Period_repr.to_seconds level_offset < current_level_offset)
-        then bin_search min_r (Int32.pred round)
+        then bin_search min_r round
         else
           ok
             {
@@ -389,14 +416,13 @@ let round_and_offset round_durations ~level_offset =
                      current_level_offset);
             }
   in
-  let n = List.length round_durations in
+  let n = Durations.length round_durations in
   check_first ~max_round:n 0l >>? fun res ->
   match res with
   | Some result -> ok result
   | None -> bin_search (Int32.of_int n) right_bound
 
-(** Complexity: Constant time if [round_duration] and [level_offset_of_round] are in
-   constant time *)
+(** Complexity: O(|round_durations|). *)
 let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     ~round =
   let pred_round_duration =
@@ -408,10 +434,10 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
      its last round [predecessor_round]. *)
   Time_repr.(predecessor_timestamp +? pred_round_duration)
   >>? fun start_of_current_level ->
+  (* Finally, we sum the durations of the rounds at the current level l until
+     reaching current [round]. *)
   level_offset_of_round round_durations ~round >>? fun level_offset ->
   let level_offset = Period_repr.of_seconds_exn level_offset in
-  (* Finally, we sum of round durations of current level l until
-     reaching current [round]. *)
   Time_repr.(start_of_current_level +? level_offset)
 
 (** Unlike [timestamp_of_round], this function gets the starting time
@@ -422,8 +448,7 @@ let timestamp_of_round round_durations ~predecessor_timestamp ~predecessor_round
     [round_durations] description, some [current_round], and its
     starting time [current_timestamp].
 
-    Complexity: Constant time if [round_duration] and
-    [level_offset_of_round] are in constant time *)
+    Complexity: O(|round_durations|). *)
 let timestamp_of_another_round_same_level round_durations ~current_timestamp
     ~current_round ~considered_round =
   level_offset_of_round round_durations ~round:considered_round

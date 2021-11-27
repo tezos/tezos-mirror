@@ -516,7 +516,10 @@ let wrong_branch_operation_dismissal =
       [
         (["consensus_threshold"], Some "1");
         ( ["round_durations"],
-          Some (Format.sprintf "[\"%d\", \"2\"]" first_round_duration) );
+          Some
+            (Format.sprintf
+               "{ \"round0\": \"%d\", \"round1\": \"2\"}"
+               first_round_duration) );
       ]
   in
   let* () =

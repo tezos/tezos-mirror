@@ -149,7 +149,7 @@ end
 
 type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
-module Bonds = struct
+module Deposits = struct
   type t = deposits
 
   let encoding =
@@ -382,9 +382,8 @@ module Contract = struct
     Indexed_context.Make_map
       (struct
         let name = ["frozen_deposits"]
-        (* named bond to avoid the clash with legacy_frozen_balance *)
       end)
-      (Bonds)
+      (Deposits)
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map
@@ -1492,6 +1491,12 @@ module Commitments =
 (** Ramp up rewards... *)
 
 module Ramp_up = struct
+  type reward = {
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
+  }
+
   module Rewards =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Raw_context)
@@ -1500,14 +1505,31 @@ module Ramp_up = struct
          end))
          (Make_index (Cycle_repr.Index))
          (struct
-           type t = Tez_repr.t * Tez_repr.t * Tez_repr.t
+           type t = reward
 
            let encoding =
              Data_encoding.(
-               obj3
-                 (req "baking_reward_fixed_portion" Tez_repr.encoding)
-                 (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                 (req "endorsing_reward_per_slot" Tez_repr.encoding))
+               conv
+                 (fun {
+                        baking_reward_fixed_portion;
+                        baking_reward_bonus_per_slot;
+                        endorsing_reward_per_slot;
+                      } ->
+                   ( baking_reward_fixed_portion,
+                     baking_reward_bonus_per_slot,
+                     endorsing_reward_per_slot ))
+                 (fun ( baking_reward_fixed_portion,
+                        baking_reward_bonus_per_slot,
+                        endorsing_reward_per_slot ) ->
+                   {
+                     baking_reward_fixed_portion;
+                     baking_reward_bonus_per_slot;
+                     endorsing_reward_per_slot;
+                   })
+                 (obj3
+                    (req "baking_reward_fixed_portion" Tez_repr.encoding)
+                    (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
+                    (req "endorsing_reward_per_slot" Tez_repr.encoding)))
          end)
 end
 

@@ -159,7 +159,8 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("consensus_committee_size", int 67); ("consensus_threshold", int 6)
           ; ( "minimal_participation_ratio"
             , dict [("numerator", int 2); ("denominator", int 3)] )
-          ; ("round_durations", list (ksprintf string "%d") [1; 1])
+          ; ( "round_durations"
+            , dict [("round0", string "1"); ("round1", string "1")] )
           ; ("max_slashing_period", int 2)
           ; ("frozen_deposits_percentage", int 10)
           ; ( "ratio_of_frozen_deposits_slashed_per_double_endorsement"

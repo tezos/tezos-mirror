@@ -31,7 +31,7 @@
    include the hash of the block that precedes the block where these operations
    should be included. *)
 
-(** [hash block_hash round oplh] creates a payload hash given a
+(** [hash ~predecessor:block_hash round oplh] creates a payload hash given a
     [block_hash], the first [round] at which the payload was proposed
     and the hash [oplh] of the non-consensus operations. *)
 val hash :

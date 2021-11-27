@@ -52,10 +52,10 @@ let link c contract delegate =
   >|= ok
 
 let unlink c contract =
-  Storage.Contract.Balance.get c contract >>=? fun balance ->
   Storage.Contract.Delegate.find c contract >>=? function
   | None -> return c
   | Some delegate ->
+      Storage.Contract.Balance.get c contract >>=? fun balance ->
       (* Removes the balance of the contract from the delegate *)
       Stake_storage.remove_stake c delegate balance >>=? fun c ->
       Storage.Contract.Delegated.remove

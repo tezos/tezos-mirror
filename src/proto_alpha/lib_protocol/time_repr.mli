@@ -49,7 +49,7 @@ val ( -? ) : time -> time -> Period_repr.t tzresult
 
 (** [t - p] Returns a timestamps [p] seconds before [t].
 
-    Todo: This function should be made available in the environement rather than
-    implemented here.
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2054
+    This function should be made available in the environment.
  *)
 val ( - ) : time -> Period_repr.t -> time

@@ -86,22 +86,21 @@ module Raw_consensus = struct
         (** Record the preendorsements already seen. Only initial slots
             are indexed. *)
     locked_round_evidence : (Round_repr.t * int) option;
-        (** Associate for each round the [payload_hashes] seen and how
-            many people have seen it. *)
+        (** Record the preendorsement power for a locked round. *)
     preendorsements_quorum_round : Round_repr.t option;
-        (** If there is a predeensorement quorum, record the round
-            associate with the quorum. *)
+        (** in block construction mode, record the round of preendorsements
+            included in a block. *)
     endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
     grand_parent_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
 
-      - If [i \in endorsements_seen => \exists data, Int_map.find_opt allowed_endorsements i = Some data]
+      - [slot \in endorsements_seen => Int_map.mem slot allowed_endorsements]
 
-      - If [i \in preendorsements_seen => \exists data, Int_map.find_opt allowed_preendorsements i = Some data]
+      - [slot \in preendorsements_seen => Int_map.mem slot allowed_preendorsements]
 
-      - If [i \in endorsements_seen => included_endorsements > 0]
+      - [ |endorsements_seen| > 0 => |included endorsements| > 0]
 
   *)
 
@@ -868,8 +867,10 @@ let prepare_first_block ~level ~timestamp ctxt =
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
-            tokens_per_roll = c.tokens_per_roll;
-            (* NB: it will still during the migration, but a bit later *)
+            tokens_per_roll =
+              (* NB: the old value is used during the migration, and
+                 changed to a new value there *)
+              c.tokens_per_roll;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             (* Same value as in the previous protocol. *)
@@ -1131,11 +1132,10 @@ let non_consensus_operations ctxt = List.rev (non_consensus_operations ctxt)
 
 let set_sampler_for_cycle ctxt cycle sampler_with_seed =
   let map = sampler_state ctxt in
-  match Cycle_repr.Map.find cycle map with
-  | None ->
-      let map = Cycle_repr.Map.add cycle sampler_with_seed map in
-      Ok (update_sampler_state ctxt map)
-  | Some _ -> Error `Sampler_already_set
+  if Cycle_repr.Map.mem cycle map then Error `Sampler_already_set
+  else
+    let map = Cycle_repr.Map.add cycle sampler_with_seed map in
+    Ok (update_sampler_state ctxt map)
 
 let sampler_for_cycle ctxt cycle =
   let map = sampler_state ctxt in

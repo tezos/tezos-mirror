@@ -76,16 +76,24 @@ let sanitize namespace =
          separator)
   else namespace
 
+let create_namespace = sanitize
+
 let string_of_internal_identifier {namespace; id} =
   namespace ^ String.make 1 separator ^ id
 
 let internal_identifier_of_string raw =
-  match String.split_on_char separator raw with
-  | [] -> assert false
-  | namespace :: id ->
-      (* An identifier may contain [separator], hence we concatenate
-         possibly splitted parts of [id]. *)
-      {namespace = sanitize namespace; id = String.concat "" id}
+  match String.index_opt raw separator with
+  | None -> assert false
+  | Some index ->
+      {
+        (* We do not need to call sanitize here since we stop at the first '@'
+            from index 0. It is a guarantee that there is no '@' between 0 and
+           (index - 1 ). *)
+        namespace = String.sub raw 0 index;
+        id =
+          (let delim_idx = index + 1 in
+           String.sub raw delim_idx (String.length raw - delim_idx));
+      }
 
 let internal_identifier_of_key key =
   let raw = Raw_context.Cache.identifier_of_key key in
@@ -98,12 +106,9 @@ let key_of_internal_identifier ~cache_index identifier =
 let make_key =
   let namespaces = ref [] in
   fun ~cache_index ~namespace ->
-    let namespace = sanitize namespace in
     if List.mem ~equal:String.equal namespace !namespaces then
       invalid_arg
-        (Format.sprintf
-           "Cache key namespace %s already exist."
-           (namespace :> string))
+        (Format.sprintf "Cache key namespace %s already exist." namespace)
     else (
       namespaces := namespace :: !namespaces ;
       fun ~id ->
@@ -131,7 +136,7 @@ module Admin = struct
   let key_rank context key = Raw_context.Cache.key_rank context key
 
   let value_of_key ctxt key =
-    (* [value_of_key] is a maintainance operation: it is typically run
+    (* [value_of_key] is a maintenance operation: it is typically run
        when a node reboots. For this reason, this operation is not
        carbonated. *)
     let ctxt = Raw_context.set_gas_unlimited ctxt in

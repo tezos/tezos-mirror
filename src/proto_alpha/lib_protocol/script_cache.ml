@@ -52,7 +52,7 @@ let load_and_elaborate ctxt addr =
 module Client = struct
   type cached_value = cached_contract
 
-  let namespace = "contract"
+  let namespace = Cache.create_namespace "contract"
 
   let cache_index = 0
 

@@ -92,17 +92,16 @@ let listings_encoding =
 
 let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
+  let tokens_per_roll =
+    Tez_repr.to_mutez (Constants_storage.tokens_per_roll ctxt)
+  in
   Stake_storage.fold
     ctxt
     (ctxt, 0l)
     ~order:`Sorted
     ~f:(fun (delegate, stake) (ctxt, total) ->
-      let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
       let nb_rolls =
-        Int64.to_int32
-        @@ Int64.div
-             (Tez_repr.to_mutez stake)
-             (Tez_repr.to_mutez tokens_per_roll)
+        Int64.to_int32 @@ Int64.div (Tez_repr.to_mutez stake) tokens_per_roll
       in
       Storage.Vote.Listings.init ctxt delegate nb_rolls >|=? fun ctxt ->
       (ctxt, Int32.add total nb_rolls))
