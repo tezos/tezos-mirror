@@ -555,6 +555,11 @@ module Make
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
           `Passed_precheck filter_state
+      | `Passed_precheck_with_replace (old_oph, filter_state) ->
+          (* When using manager precheck, a simple removal from classication is
+             sufficient *)
+          Classification.remove old_oph pv.shell.classification ;
+          `Passed_precheck filter_state
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases

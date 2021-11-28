@@ -678,6 +678,7 @@ module Mempool = struct
       Operation_hash.t ->
       Main.operation_data ->
       [ `Passed_precheck of state
+      | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
