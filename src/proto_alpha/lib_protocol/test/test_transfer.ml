@@ -247,23 +247,6 @@ let test_missing_transaction () =
   Op.transaction (I b) contract_1 contract_2 amount >>=? fun _ ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
 
-(** Transfer one tez to an implicit contract, with fee equals balance of src. *)
-let test_transfer_one_to_implicit_with_bal_src_as_fee () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
-  let account = Account.new_account () in
-  Incremental.begin_construction b >>=? fun i ->
-  let src = Contract.implicit_contract account.Account.pkh in
-  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.balance (I i) src >>=? fun bal_src ->
-  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
-  Op.transaction (I i) ~fee:bal_src src dest Tez.one >>=? fun op ->
-  Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Balance_too_low _ -> true
-      | _ -> false)
-
 (********************)
 (* The following tests are for different kind of contracts:
    - implicit to implicit
@@ -733,10 +716,6 @@ let tests =
       "balance too low with two transfers"
       `Quick
       (test_balance_too_low_two_transfers Tez.one);
-    Tztest.tztest
-      "transfer one tez to an implicit contract with balance of src as fee"
-      `Quick
-      test_transfer_one_to_implicit_with_bal_src_as_fee;
     Tztest.tztest "invalid_counter" `Quick invalid_counter;
     Tztest.tztest
       "add the same operation twice"
