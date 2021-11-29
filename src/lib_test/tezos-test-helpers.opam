@@ -11,7 +11,7 @@ depends: [
   "fmt"
   "qcheck-alcotest"
   "alcotest" { >= "1.5.0" }
-  "alcotest-lwt" { >= "1.5.0" }
+  "lwt" { >= "5.4.0" }
   "pure-splitmix" { = "0.2" }
 ]
 build: [

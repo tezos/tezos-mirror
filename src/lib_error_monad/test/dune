@@ -1,15 +1,14 @@
 (test
  (name test_registration)
  (package tezos-error-monad)
+ (modes native js)
  (libraries
   tezos-error-monad
   data-encoding
   alcotest)
- (modes native js)
  (flags (:standard -open Tezos_error_monad)))
 
-
 (rule
-  (alias runtest_js)
-  (package tezos-error-monad)
-  (action (run node %{dep:./test_registration.bc.js})))
+ (alias runtest_js)
+ (package tezos-error-monad)
+ (action (run node %{dep:./test_registration.bc.js})))

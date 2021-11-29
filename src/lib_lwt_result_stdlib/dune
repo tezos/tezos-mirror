@@ -2,10 +2,10 @@
  (name tezos_lwt_result_stdlib)
  (public_name tezos-lwt-result-stdlib)
  (instrumentation (backend bisect_ppx))
- (js_of_ocaml)
  (libraries
   lwt
   tezos-lwt-result-stdlib.bare.sigs
   tezos-lwt-result-stdlib.bare.structs
   tezos-lwt-result-stdlib.traced.sigs
-  tezos-lwt-result-stdlib.traced.structs))
+  tezos-lwt-result-stdlib.traced.structs)
+ (js_of_ocaml))

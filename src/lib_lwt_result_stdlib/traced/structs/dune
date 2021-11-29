@@ -2,8 +2,8 @@
  (name traced_structs)
  (public_name tezos-lwt-result-stdlib.traced.structs)
  (instrumentation (backend bisect_ppx))
- (js_of_ocaml)
  (libraries
   lwt
   tezos-lwt-result-stdlib.traced.sigs
-  tezos-lwt-result-stdlib.bare.structs))
+  tezos-lwt-result-stdlib.bare.structs)
+ (js_of_ocaml))
