@@ -806,7 +806,7 @@ module Recyle_operations = struct
     let* classification_pendings_ops =
       (* For classification and pending, we want operations that are NOT in
          the blocks already. Hence: *)
-      External_generators.op_map_gen ~block_hash_t
+      External_generators.op_map_gen ~block_hash_t ()
       >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
     in
     let* (classification_ops, pending_ops) =
