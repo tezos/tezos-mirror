@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name lib_test)
  (public_name tezos-test-helpers)
@@ -12,6 +15,4 @@
  (js_of_ocaml)
  (flags (:standard -linkall)))
 
-;; This rule is necessary for `make lint-tests-pkg`, without it dune
-;; complains that the alias is empty
 (rule (alias runtest_js) (action progn))

@@ -1,6 +1,5 @@
-; See src/bin_node/dune to understand in detail how this file abuses
-; the alternative dependency mechanism of dune to implement optional
-; dependencies.
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (env (static (flags (:standard -ccopt -static))))
 

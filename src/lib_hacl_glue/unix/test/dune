@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (tests
  (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
  (package tezos-hacl-glue-unix)

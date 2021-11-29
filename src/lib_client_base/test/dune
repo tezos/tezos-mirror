@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (tests
  (names bip39_tests pbkdf_tests)
  (package tezos-client-base)

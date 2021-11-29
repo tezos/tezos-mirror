@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (test
  (name test_proxy_server_config)
  (package tezos-proxy-server-config)

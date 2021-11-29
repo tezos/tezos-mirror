@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_version)
  (public_name tezos-version)
@@ -8,6 +11,5 @@
 
 (rule
  (targets generated_git_info.ml)
- ; Ensures the hash update whenever a source file is modified ;
  (deps (universe) (:script get-git-info.mlt))
  (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
