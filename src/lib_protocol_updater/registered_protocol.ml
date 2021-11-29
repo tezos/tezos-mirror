@@ -34,10 +34,6 @@ module type T = sig
     include P
   end
 
-  module Block_services : module type of struct
-    include Block_services.Make (P) (P)
-  end
-
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
 end
@@ -64,7 +60,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -85,7 +80,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -106,7 +100,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -127,7 +120,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -148,7 +140,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -226,7 +217,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -256,7 +246,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -286,7 +275,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -316,7 +304,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -346,7 +333,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end

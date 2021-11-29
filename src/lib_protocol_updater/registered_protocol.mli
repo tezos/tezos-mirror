@@ -34,10 +34,6 @@ module type T = sig
     include P
   end
 
-  module Block_services : module type of struct
-    include Block_services.Make (P) (P)
-  end
-
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
 end
