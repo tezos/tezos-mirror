@@ -52,14 +52,23 @@ To see the usage of one specific command, you may also type the command without 
 
    tezos-client transfer
 
-However, beware that the commands available on the client depend on the specific
-protocol run by the node. For instance, ``transfer`` is not available when
-the node runs the genesis protocol, which may happen for a few minutes when
-launching a node for the first time, or when the client is not connected to a
-node. In the last case, the above command generates a warning::
+.. warning::
 
-    Warning:
-      Failed to acquire the protocol version from the node
+    Beware that the commands available on the client depend on the specific
+    protocol run by the node. For instance, ``transfer`` is not available when
+    the node runs the genesis protocol, which may happen for a few minutes when
+    launching a node for the first time, **or when the client is not connected
+    to a node**. In the last case, the above command generates a warning
+    followed by an error::
+
+        Warning:
+          Failed to acquire the protocol version from the node
+          [...]
+        Error:
+          Unrecognized command.
+          Try using the man command to get more information.
+        Usage:
+          [...]
 
 .. _tezos_client_protocol:
 

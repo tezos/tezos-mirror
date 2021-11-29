@@ -45,7 +45,7 @@ _`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
     baking/endorsing right for that block_. At the start of a Cycle_,
     baking and endorsing rights are computed for all the block_ heights in the
-    cycle_, based on the proportion of Rolls owned by each account.
+    cycle_, based on the proportion of the stake owned by each account.
 
     For each block_ height, there are several accounts that are allowed to bake.
     These different accounts are given different Priorities.

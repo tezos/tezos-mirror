@@ -332,6 +332,9 @@ The bonus per additional endorsement slot is in turn ``bonus /
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional endorsements included in a block). The rewards per
 endorsement slot are ``endorsing_rewards / CONSENSUS_COMMITTEE_SIZE``.
+Assuming ``CONSENSUS_COMMITTEE_SIZE = 8000``, we obtain a bonus per slot of
+``10 / (8000 / 3) = 0.00375`` tez and an endorsing
+rewards per slot of ``20 / 8000 = 0.0025`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
@@ -349,13 +352,12 @@ included during that cycle has been ``3,123,456`` slots. Given that this number 
 bigger than the minimum required (``3,276,800 * 2 / 3``), it receives an endorsing
 reward of ``3,276,800 * 0.0025 = 8192`` tez for that cycle.
 
-
 .. _slashing_alpha:
 
 Slashing
 ^^^^^^^^
 
-Like in Emmy*, not revealing nonces and double singing are punishable. If a
+Like in Emmy*, not revealing nonces and double signing are punishable. If a
 validator does not reveal its nonce by the end of the cycle, it does not receive
 its endorsing rewards. If a validator double signs, that is, it double bakes or
 it double (pre)endorses (which means voting on two different proposals at the
@@ -380,7 +382,7 @@ participation of a selfish baker does not have an impact.
 .. _cs_constants_alpha:
 
 Consensus protocol parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------
 
 .. list-table::
    :widths: 55 25
@@ -391,7 +393,7 @@ Consensus protocol parameters
    * - ``CONSENSUS_COMMITTEE_SIZE``
      - 7000
    * - ``CONSENSUS_THRESHOLD``
-     - ``ceil(2*CONSENSUS_COMMITTEE_SIZE/3)``
+     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)``
    * - ``ROUND_DURATIONS``
      - [30s, 45s]
    * - ``MINIMAL_PARTICIPATION_RATIO``
@@ -407,9 +409,9 @@ Consensus protocol parameters
    * - ``BAKING_REWARD_FIXED_PORTION``
      - 10 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` tez
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.004286 tez
    * - ``ENDORSING_REWARD_PER_SLOT``
-     - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` tez
+     - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
 
 
 Further External Resources

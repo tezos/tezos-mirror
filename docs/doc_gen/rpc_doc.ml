@@ -346,7 +346,7 @@ let pp_document ppf descriptions version =
   Format.pp_set_max_indent ppf 9000 ;
   let version_suffix = if version = "" then "" else "_" ^ version in
   Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version_suffix) ;
-  Rst.pp_h2 ppf "RPCs - Index" ;
+  Rst.pp_h1 ppf "RPCs - Reference" ;
   List.iter
     (fun (name, intro, prefix, rpc_dir) ->
       (* If provided, insert the introductory include *)

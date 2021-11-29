@@ -11,8 +11,6 @@ protocol itself. Consequently the amendment rules themselves are subject to
 amendments.
 
 The rest of this page gives more details about the amendment and voting process.
-Other than this page, there is an excellent overview from `Jacob
-Arluck on medium <https://medium.com/tezos/amending-tezos-b77949d97e1e>`__.
 
 Periods
 -------
@@ -35,7 +33,7 @@ The five periods are as follows:
 
   At the end of a **proposal period**, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated number of rolls that delegates supporting the
+  measured in the cumulated number of :ref:`rolls <Roll>` that delegates supporting the
   proposal have. E.g., a proposal supported by a single delegate with 100 rolls
   has more support than a proposal supported by two delegates with 20 rolls
   each.
@@ -315,8 +313,13 @@ ballots can be submitted once with::
 
     tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
 
-Other resources
-~~~~~~~~~~~~~~~
+Further External Resources
+--------------------------
+
+Further details and explanations on the voting procedure can be found at:
+
+- `the Open Tezos entry<https://opentezos.com/tezos-basics/governance-on-chain>`_
+- `the Tezos Agora entry<https://www.tezosagora.org/learn#the-five-stages-of-tezos-governance>`_.
 
 For more details on the client commands refer to the manual at
 :ref:`client_manual_alpha`.
