@@ -23,6 +23,8 @@ DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
+PROFILE?=dev
+VALID_PROFILES=dev release static
 
 TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
     $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
@@ -35,11 +37,15 @@ ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
 
+ifeq ($(filter ${VALID_PROFILES},${PROFILE}),)
+$(error Unexpected dune profile (got: ${PROFILE}, expecting one of: ${VALID_PROFILES}))
+endif
+
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
 
 .PHONY: all
 all:
-	@$(MAKE) build PROFILE=dev
+	@$(MAKE) build
 
 .PHONY: release
 release:
@@ -47,18 +53,18 @@ release:
 
 .PHONY: build-parameters
 build-parameters:
-	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) @copy-parameters
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) \
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
-	@dune build @check
+	@dune build --profile=$(PROFILE) @check
 endif
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
@@ -72,20 +78,20 @@ generate_dune: ${DUNE_INCS}
 
 ${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
   src/proto_%/lib_protocol/TEZOS_PROTOCOL
-	dune build @$(dir $@)/runtest_dune_template --auto-promote
+	dune build --profile=$(PROFILE) @$(dir $@)/runtest_dune_template --auto-promote
 	touch $@
 
 .PHONY: all.pkg
 all.pkg: generate_dune
-	@dune build \
+	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
 $(addsuffix .pkg,${PACKAGES}): %.pkg:
-	@dune build \
+	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name $*.opam -print))
 
 $(addsuffix .test,${PACKAGES}): %.test:
-	@dune build \
+	@dune build --profile=$(PROFILE) \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
 .PHONY: coverage-report
@@ -108,24 +114,24 @@ enable-time-measurement:
 
 .PHONY: build-sandbox
 build-sandbox:
-	@dune build src/bin_sandbox/main.exe
+	@dune build --profile=$(PROFILE) src/bin_sandbox/main.exe
 	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 .PHONY: build-test
 build-test: build-sandbox
-	@dune build @buildtest
+	@dune build --profile=$(PROFILE) @buildtest
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
-	@dune build $(COVERAGE_OPTIONS) @runtest_compile_protocol
-	@dune build $(COVERAGE_OPTIONS) @runtest_out_of_opam
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d -exec test -f \{\}/dune \; -print 2>/dev/null | LC_COLLATE=C sort)
 PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
 PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
 
 $(PROTO_TARGETS): %.test_proto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) $(COVERAGE_OPTIONS)
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
 
 .PHONY: test-proto-unit
 test-proto-unit: $(PROTO_TARGETS)
@@ -136,7 +142,7 @@ NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
 NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
 
 $(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) $(COVERAGE_OPTIONS)
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit: $(NONPROTO_TARGETS)
@@ -146,7 +152,7 @@ test-unit: test-nonproto-unit test-proto-unit
 
 .PHONY: test-unit-alpha
 test-unit-alpha:
-	@dune build @src/proto_alpha/lib_protocol/runtest
+	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
 .PHONY: test-python
 test-python: all
@@ -171,17 +177,17 @@ test-js:
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
-	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
+	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
 test-tezt-i:
-	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
+	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
 test-tezt-c:
-	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
+	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 test-tezt-v:
-	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
+	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
 .PHONY: test-tezt-coverage
 test-tezt-coverage:
-	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
+	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
 test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
@@ -203,7 +209,7 @@ test-coverage-tenderbake:
 
 .PHONY: lint-opam-dune
 lint-opam-dune:
-	@dune build @runtest_dune_template
+	@dune build --profile=$(PROFILE) @runtest_dune_template
 
 
 # Ensure that all unit tests are restricted to their opam package
@@ -223,7 +229,7 @@ test: lint-opam-dune test-code
 check-linting:
 	@src/tooling/lint.sh --check-scripts
 	@src/tooling/lint.sh --check-ocamlformat
-	@dune build @fmt
+	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
 	@$(MAKE) -C tests_python lint
@@ -233,7 +239,7 @@ check-python-linting:
 fmt: fmt-ocaml fmt-python
 
 fmt-ocaml:
-	@dune build @fmt --auto-promote
+	@dune build --profile=$(PROFILE) @fmt --auto-promote
 
 fmt-python:
 	@$(MAKE) -C tests_python fmt
@@ -294,7 +300,7 @@ docker-image: docker-image-build docker-image-debug docker-image-bare docker-ima
 
 .PHONY: install
 install:
-	@dune build @install
+	@dune build --profile=$(PROFILE) @install
 	@dune install
 
 .PHONY: uninstall
