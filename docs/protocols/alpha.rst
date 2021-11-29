@@ -22,6 +22,12 @@ Bug Fixes
 Minor Changes
 -------------
 
+- The RPC ``../context/delegates`` takes two additional Boolean flags
+  ``with_minimal_stake`` and ``without_minimal_stake``, which allow to
+  enumerate only the delegates that have at least a minimal stake to
+  participate in consensus and in governance, or do not have such a
+  minimal stake, respectively. (MR :gl:`!3951`)
+
 Michelson
 ---------
 
