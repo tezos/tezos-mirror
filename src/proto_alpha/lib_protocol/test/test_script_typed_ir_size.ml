@@ -338,7 +338,7 @@ module Tests = struct
     check_stats
       "value_size"
       ~expected_mean:(1., 0.2)
-      ~expected_stddev:(0., 0.5)
+      ~expected_stddev:(0., 0.7)
       ~expected_ratios:(1., 9.)
 
   let lambda_size nsamples =
