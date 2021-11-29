@@ -344,14 +344,7 @@ end
 
 type t = (module T)
 
-module Make
-    (Filter : Prevalidator_filters.FILTER)
-    (Arg : ARG)
-    (Requester : Requester.REQUESTER
-                   with type t := Distributed_db.chain_db
-                    and type key := Operation_hash.t
-                    and type value := Operation.t
-                    and type param := unit) : T = struct
+module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -1271,7 +1264,8 @@ module Make
         Classification.
           {
             map_size_limit = limits.max_refused_operations;
-            on_discarded_operation = Requester.clear_or_cancel chain_db;
+            on_discarded_operation =
+              Distributed_db.Operation.clear_or_cancel chain_db;
           }
       in
       let classification = Classification.create classification_parameters in
@@ -1387,7 +1381,6 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 
             let chain_id = chain_id
           end)
-          (Distributed_db.Operation)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
