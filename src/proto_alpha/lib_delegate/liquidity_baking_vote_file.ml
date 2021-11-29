@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol_client_context
 module Events = Baking_events.Liquidity_baking
 
 type per_block_votes = {liquidity_baking_escape_vote : bool option}
