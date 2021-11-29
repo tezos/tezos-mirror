@@ -14,6 +14,4 @@
 
 ;; This rule is necessary for `make lint-tests-pkg`, without it dune
 ;; complains that the alias is empty
-(rule
-  (alias runtest_js)
-  (action progn))
+(rule (alias runtest_js) (action progn))

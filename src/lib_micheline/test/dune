@@ -1,13 +1,13 @@
 (test
  (name test_parser)
  (package tezos-micheline)
+ (modes native js)
  (libraries
   tezos-micheline
   alcotest)
- (modes native js)
  (flags (:standard -open Tezos_micheline)))
 
 (rule
-  (alias runtest_js)
-  (package tezos-micheline)
-  (action (run node %{dep:./test_parser.bc.js})))
+ (alias runtest_js)
+ (package tezos-micheline)
+ (action (run node %{dep:./test_parser.bc.js})))

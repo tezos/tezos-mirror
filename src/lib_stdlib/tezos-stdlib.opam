@@ -13,11 +13,11 @@ depends: [
   "zarith_stubs_js"
   "lwt" { >= "5.4.0" }
   "alcotest" { with-test & >= "1.5.0" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
-  "lwt_log" {with-test}
   "bigstring" {with-test}
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "lwt_log" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

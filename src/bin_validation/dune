@@ -1,5 +1,4 @@
-(env
- (release (ocamlopt_flags (:standard -O3))))
+(env (release (ocamlopt_flags (:standard -O3))))
 
 (library
  (name tezos_validator)
