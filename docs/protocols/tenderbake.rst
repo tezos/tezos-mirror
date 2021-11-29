@@ -148,11 +148,13 @@ The following RPCs have been removed or renamed:
 The following RPCs have changed:
 
 - ``../helpers/baking_rights``:
+
   - Instead of an optional list of ``cycle`` arguments, the RPC only takes one optional ``cycle`` argument.
   - The argument ``max_priority`` has been renamed to ``max_round``.
   - The output field ``priority`` has been renamed to ``round``.
 
 - ``../helpers/endorsing_rights``:
+
   - Instead of an optional list of ``cycle`` arguments, the RPC only takes one optional ``cycle`` argument.
   - The output is now grouped per level. For each level, the output
     contains the delegates' rights and the estimated time at which the
@@ -214,5 +216,3 @@ The following commands have been added:
 - ``tezos-client set deposits limit for <src> to <deposits_limit>``: sets the deposits limit for a registered delegate.
 
 - ``tezos-client unset deposits limit for <src>``: remove the deposits limit of a registered delegate.
-
-

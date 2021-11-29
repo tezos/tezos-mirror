@@ -150,7 +150,7 @@ balance). Let us first (re)define these and related concepts.
   of the maximum active stake during the last ``PRESERVED_CYCLES + MAX_SLASHING_PERIOD``. This amount
   represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
-  :ref:`slashing`).  Taking the maximum over an
+  :ref:`slashing_alpha`).  Taking the maximum over an
   interval of cycles (instead of just considering the active stake at
   the cycle where the bad action can occur) allows to avoid situations
   where a malicious delegate empties its accounts between the time when

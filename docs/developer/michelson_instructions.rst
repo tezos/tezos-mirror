@@ -91,7 +91,7 @@ Michelson types
 Before we talk about internal representations, we need to have a brief look at
 how the interpreter handles types of Michelson expressions internally. Types
 ``ty`` and ``stack_ty`` are both defined in
-:src:`/src/proto_alpha/lib_protocol/script_typed_ir.ml`. Type ``ty`` enumerates
+:src:`src/proto_alpha/lib_protocol/script_typed_ir.ml`. Type ``ty`` enumerates
 all types known to the Michelson interpreter and is parametrised by the
 underlying OCaml type in which Michelson values are actually stored in memory.
 Thus, when values of the ty type are pattern-matched on, their type parameters
@@ -148,7 +148,7 @@ For instance ``ICar`` instruction is defined as::
 
 The reason why the third parameter of the resulting ``kinstr`` is ``'r`` and not
 simply ``'a`` (which is the type of the first element of the pair at the top of the
-initial stack) is because this constructor also contains the next instruction, 
+initial stack) is because this constructor also contains the next instruction,
 which produces a value of some arbitrary type ``'r``. However, note
 that this next instruction should expect ``'a`` at the top of its initial stack.
 
@@ -184,7 +184,7 @@ The translator
 Now that we have chosen a primitive to represent our instruction in the code and
 an internal representation (IR), we need to provide a rule that translates the
 former into the latter. ``parse_instr`` function in
-:src:`/src/proto_alpha/lib_protocol/script_ir_translator.ml` is responsible for
+:src:`src/proto_alpha/lib_protocol/script_ir_translator.ml` is responsible for
 this. Notice that the function ``parse_instr``, despite what its name suggests,
 matches on pre-parsed Micheline AST. Micheline parser is not a part of the
 protocol and therefore must be run by the client before the script is submitted
@@ -215,7 +215,7 @@ correct), which makes for faster execution. For this reason it is essential that
 each IR contains a value of type ``kinfo`` (or an equivalent thereof), from
 which the translator can obtain the type the stack should have after this
 instruction is executed. Function ``kinfo_of_kinstr`` in
-:src:`/src/proto_alpha/lib_protocol/script_typed_ir.ml` is responsible for this
+:src:`src/proto_alpha/lib_protocol/script_typed_ir.ml` is responsible for this
 extraction.
 
 An interesting situation occurs with instructions regulating control flow. These
@@ -242,7 +242,7 @@ The precise return type of ``parse_instr`` is ``judgement`` defined in
     apply :
       'r 'f. ('a, 's) kinfo -> ('b, 'u, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr;
   }
-  
+
   type ('a, 's, 'b, 'u) descr = {
     loc : Script.location;
     bef : ('a, 's) stack_ty;

@@ -318,8 +318,8 @@ Further External Resources
 
 Further details and explanations on the voting procedure can be found at:
 
-- `the Open Tezos entry<https://opentezos.com/tezos-basics/governance-on-chain>`_
-- `the Tezos Agora entry<https://www.tezosagora.org/learn#the-five-stages-of-tezos-governance>`_.
+- `Governance on-chain <https://opentezos.com/tezos-basics/governance-on-chain>`_ on Open Tezos
+- `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
 :ref:`client_manual_alpha`.

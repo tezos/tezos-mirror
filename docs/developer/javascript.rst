@@ -1,5 +1,5 @@
 Compiling (part of) the Octez codebase to JavaScript
-==================================================
+====================================================
 
 We want to expose a JavaScript API while staying in sync with the
 OCaml codebase. A way to achieve this is to compile OCaml code to
@@ -29,6 +29,7 @@ One way to achieve this is to rely on ``nvm``.  Use the following
 commands to install `nvm` and `node`:
 
 ::
+
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
     scripts/install_builld_deps.js.sh
 
@@ -69,8 +70,8 @@ alcotest tests in JavaScript:
 - and a new rule in the dune file to execute the test with node.
 - dune build @runtest_js
 
-
 ::
+
    (tests
      (names mytest)
      (libraries alcotest)
@@ -91,11 +92,12 @@ In order to run inline_tests in javascript:
 - run `dune exec ./src/tooling/run_js_inline_tests.exe`
 
 ::
-   (library
-     (name mylib)
-     (js_of_ocaml)
-     (inline_tests)
-   )
+
+    (library
+      (name mylib)
+      (js_of_ocaml)
+      (inline_tests)
+    )
 
 JavaScript test failures
 ------------------------
@@ -104,6 +106,7 @@ There are plenty of reasons that can explain why a test fails when
 running in JavaScript and succeed otherwise.
 
 Here is a non exhaustive list:
+
 - Integer (``int``) are 32bit, not 63bit.
 - The stack is much smaller by default on JavaScript VMs, it's easier to stackoverflow.
 - There is no general tailcall optimization. In particular, cps will not be optimized.
