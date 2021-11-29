@@ -122,7 +122,7 @@ let test_order _ _ =
     world := "a_outer" :: !world ;
     Lwt.return r_a
   in
-  let* () = Lwt_main.yield () in
+  let* () = Lwt.pause () in
   (* PROMISE B *)
   let p_b =
     let* r_b =
@@ -133,7 +133,7 @@ let test_order _ _ =
     world := "b_outer" :: !world ;
     Lwt.return r_b
   in
-  let* () = Lwt_main.yield () in
+  let* () = Lwt.pause () in
   (* Wake up A *)
   Lwt.wakeup wker (Ok 0) ;
   (* Check that both A and B get expected results *)

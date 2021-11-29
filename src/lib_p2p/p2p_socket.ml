@@ -417,7 +417,7 @@ module Reader = struct
 
   let read_message st init =
     let rec loop status =
-      Lwt_unix.yield () >>= fun () ->
+      Lwt.pause () >>= fun () ->
       let open Data_encoding.Binary in
       match status with
       | Success {result; size; stream} -> return (result, size, stream)
@@ -517,7 +517,7 @@ module Writer = struct
     | Ok bytes -> ok (Utils.cut st.binary_chunks_size bytes)
 
   let rec worker_loop st =
-    Lwt_unix.yield () >>= fun () ->
+    Lwt.pause () >>= fun () ->
     protect ~canceler:st.canceler (fun () ->
         Lwt_pipe.Maybe_bounded.pop st.messages >>= return)
     >>= function

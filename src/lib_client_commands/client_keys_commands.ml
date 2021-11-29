@@ -151,7 +151,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                  cctxt#message "Tried %d keys without finding a match" attempts
                 else Lwt.return_unit)
                 >>= fun () ->
-                Lwt_unix.yield () >>= fun () -> loop (attempts + 1)
+                Lwt.pause () >>= fun () -> loop (attempts + 1)
             in
             loop 1 >>=? fun key_hash ->
             cctxt#message "Generated '%s' under the name '%s'." key_hash name

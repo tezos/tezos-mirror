@@ -335,7 +335,7 @@ module Real = struct
         | Error _ ->
             Events.(emit message_read_error) (P2p_conn.info conn).peer_id
             >>= fun () ->
-            Lwt_unix.yield () >>= fun () -> recv_any net ())
+            Lwt.pause () >>= fun () -> recv_any net ())
 
   let send _net conn m =
     P2p_conn.write conn m >>= function
