@@ -30,7 +30,8 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "double_baking_punishment": "640000000",
   "ratio_of_frozen_deposits_slashed_per_double_endorsement":
     { "numerator": 1, "denominator": 2 }, "tx_rollup_enable": false,
-  "tx_rollup_origination_size": 60000 }
+  "tx_rollup_origination_size": 60000, "sc_rollup_enable": false,
+  "sc_rollup_origination_size": 6314 }
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

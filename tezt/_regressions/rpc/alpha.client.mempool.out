@@ -1759,6 +1759,54 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                               "kind"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_originate",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_originate"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "kind": {
+                                "oneOf": [
+                                  {
+                                    "title": "Example_arith smart contract rollup kind"
+                                  }
+                                ]
+                              },
+                              "boot_sector": {
+                                "$ref": "#/definitions/unistring"
+                              }
+                            },
+                            "required": [
+                              "boot_sector",
+                              "kind",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
                           }
                         ]
                       },
@@ -2095,6 +2143,48 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "fields": [
                       {
                         "description": {
+                          "title": "X_1"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint16",
+                          "kind": {
+                            "size": 2,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Example_arith smart contract rollup kind"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
                           "title": "alpha.scripted.contracts"
                         },
                         "encoding": {
@@ -2403,7 +2493,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_1"
+                          "title": "X_2"
                         },
                         "encoding": {
                           "fields": [
@@ -3818,7 +3908,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_1",
+                                    "name": "X_2",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -4282,6 +4372,107 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Tx_rollup_origination"
+                            },
+                            {
+                              "tag": 200,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "kind",
+                                  "layout": {
+                                    "name": "X_1",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "boot_sector",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Sc_rollup_originate"
                             }
                           ]
                         }
@@ -6107,6 +6298,54 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             },
                             "required": [
                               "tx_rollup_origination",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Sc_rollup_originate",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "sc_rollup_originate"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "kind": {
+                                "oneOf": [
+                                  {
+                                    "title": "Example_arith smart contract rollup kind"
+                                  }
+                                ]
+                              },
+                              "boot_sector": {
+                                "$ref": "#/definitions/unistring"
+                              }
+                            },
+                            "required": [
+                              "boot_sector",
+                              "kind",
                               "storage_limit",
                               "gas_limit",
                               "counter",
