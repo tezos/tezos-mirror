@@ -52,3 +52,38 @@ test_coverage:
     paths:
       - _coverage_report/
     expire_in: 15 days
+
+# This job fetchs coverage files by precedent test stage. It creates the html,
+# summary and cobertura reports. It also provide a coverage % for the merge request.
+
+unified_coverage:
+  extends:
+    - .default_settings_template
+    - .rules_template__development
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
+  stage: test_coverage
+  # This job requires all artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` by setting `dependencies` 
+  # to `null`.
+  dependencies:
+  script:
+    # List corrupted coverage files found in artifacts
+    - CORRUPTED_FILES=$(find $BISECT_FILE -name \*.corrupted.coverage -type f -print | wc -l)
+    - if [ $CORRUPTED_FILES != 0 ]; then
+        echo "Corrupted files were found, please report this in https://gitlab.com/tezos/tezos/-/issues/1529:";
+        find $BISECT_FILE -name \*.corrupted.coverage -type f -print;
+        exit 1;
+      fi
+    - make coverage-report
+    - make coverage-report-summary
+    - make coverage-report-cobertura
+  coverage: '/Coverage: \d+\/\d+ \(([^%]+%)\)/'
+  artifacts:
+    expose_as: 'Coverage report'
+    when: always
+    reports:
+      cobertura: _coverage_report/cobertura.xml
+    paths:
+      - _coverage_report/
+    expire_in: 15 days
