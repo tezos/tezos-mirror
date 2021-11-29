@@ -2,7 +2,6 @@ variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
   build_deps_image_version: b19761585ca2dc325f8035eceb3eec2873edc174
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
-  public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
@@ -46,6 +45,8 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
@@ -58,6 +59,8 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
@@ -77,6 +80,8 @@ variables:
       when: on_success
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
     - when: never
 
 # Rules for all the jobs that are run only for the master branch
@@ -85,6 +90,8 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
 
@@ -105,6 +112,8 @@ variables:
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - changes:
         - docs/introduction/*.sh
