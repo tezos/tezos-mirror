@@ -82,6 +82,7 @@ type state = {
   mutable pool_size : int;
       (** [Some l] if [single_op_per_pkh_per_block] is true *)
   mutable shuffled_pool : source list option;
+  mutable revealed : Signature.Public_key_hash.Set.t;
   mutable last_block : Block_hash.t;
   new_block_condition : unit Lwt_condition.t;
   injected_operations : Operation_hash.t list Block_hash.Table.t;
@@ -256,14 +257,22 @@ let unnormalize_source src_org =
   | Wallet_pkh -> Wallet_pkh src_org.source.pkh
   | Wallet_alias alias -> Wallet_alias alias
 
-let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
-    =
+(** Samples from [state.pool]. Used to generate the destination of a
+    transfer, and its source only when [state.shuffled_pool] is [None]
+    meaning that [--single-op-per-pkh-per-block] is not set. *)
+let sample_any_source_from_pool state rng_state =
+  let idx = Random.State.int rng_state state.pool_size in
+  match List.nth state.pool idx with
+  | None -> assert false
+  | Some src_org -> Lwt.return src_org.source
+
+(** Generates the source of a transfer. If [state.shuffled_pool] has a
+    value (meaning that [--single-op-per-pkh-per-block] is active) then
+    it is sampled from there, otherwise from [state.pool]. *)
+let rec sample_source_from_pool state rng_state
+    (cctxt : Protocol_client_context.full) =
   match state.shuffled_pool with
-  | None -> (
-      let idx = Random.State.int rng_state state.pool_size in
-      match List.nth state.pool idx with
-      | None -> assert false
-      | Some src_org -> Lwt.return src_org.source)
+  | None -> sample_any_source_from_pool state rng_state
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
       debug_msg (fun () ->
@@ -280,12 +289,12 @@ let rec sample_from_pool state rng_state (cctxt : Protocol_client_context.full)
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
-      sample_from_pool state rng_state cctxt
+      sample_source_from_pool state rng_state cctxt
 
 let random_seed rng_state =
   Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng_state 256))
 
-let generate_fresh pool rng_state =
+let generate_fresh_source pool rng_state =
   let seed = random_seed rng_state in
   let (pkh, pk, sk) = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
@@ -305,7 +314,7 @@ let on_new_head (cctxt : Protocol_client_context.full) f =
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     (parameters : parameters) (state : state) rng_state =
-  sample_from_pool state rng_state cctxt >>= fun src ->
+  sample_source_from_pool state rng_state cctxt >>= fun src ->
   Alpha_services.Contract.balance
     cctxt
     (chain, block)
@@ -325,8 +334,8 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     let fresh =
       Random.State.float rng_state 1.0 < parameters.fresh_probability
     in
-    (if fresh then Lwt.return (generate_fresh state rng_state)
-    else sample_from_pool state rng_state cctxt)
+    (if fresh then Lwt.return (generate_fresh_source state rng_state)
+    else sample_any_source_from_pool state rng_state)
     >>= fun dest ->
     let amount =
       match parameters.strategy with
@@ -423,77 +432,86 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
              given by the RPC. *)
           pcounter
   in
-  (Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
-   >>=? function
-   | None ->
-       let reveal_counter = Z.succ freshest_counter in
-       let transf_counter = Z.succ reveal_counter in
-       let reveal =
-         Manager_operation
-           {
-             source = transfer.src.pkh;
-             fee = Tez.zero;
-             counter = reveal_counter;
-             gas_limit = cost_of_manager_operation;
-             storage_limit = Z.zero;
-             operation = Reveal transfer.src.pk;
-           }
-       in
-       let manager_op =
-         manager_op_of_transfer
-           parameters
-           {transfer with counter = Some transf_counter}
-       in
-       let list = Cons (reveal, Single manager_op) in
-       Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-       Signature.Public_key_hash.Table.add
-         state.counters
-         transfer.src.pkh
-         (branch, transf_counter) ;
-       (if !verbose then
-        cctxt#message
-          "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-          Signature.Public_key_hash.pp
-          transfer.src.pkh
-          Z.pp_print
-          reveal_counter
-          Z.pp_print
-          transf_counter
-          Signature.Public_key_hash.pp
-          transfer.dst
-       else Lwt.return_unit)
-       >>= fun () ->
-       (* NB: regardless of our best efforts to keep track of counters, injection can fail with
-          "counter in the future" if a block switch happens in between the moment we
-          get the branch and the moment we inject, and the new block does not include
-          all the operations we injected. *)
-       inject_contents cctxt chain branch transfer.src.sk list
-   | Some _ ->
-       let transf_counter = Z.succ freshest_counter in
-       let manager_op =
-         manager_op_of_transfer
-           parameters
-           {transfer with counter = Some transf_counter}
-       in
-       let list = Single manager_op in
-       Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-       Signature.Public_key_hash.Table.add
-         state.counters
-         transfer.src.pkh
-         (branch, transf_counter) ;
-       (if !verbose then
-        cctxt#message
-          "injecting transfer from %a (counter=%a) to %a"
-          Signature.Public_key_hash.pp
-          transfer.src.pkh
-          Z.pp_print
-          transf_counter
-          Signature.Public_key_hash.pp
-          transfer.dst
-       else Lwt.return_unit)
-       >>= fun () ->
-       (* See comment above. *)
-       inject_contents cctxt chain branch transfer.src.sk list)
+  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
+   return true
+  else (
+    (* Either the [manager_key] RPC tells us the key is already
+       revealed, or we immediately inject a reveal operation: in any
+       case the key is revealed in the end. *)
+    state.revealed <-
+      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+    Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
+    >>=? fun pk_opt -> return (Option.is_some pk_opt)))
+  >>=? fun already_revealed ->
+  (if not already_revealed then (
+   let reveal_counter = Z.succ freshest_counter in
+   let transf_counter = Z.succ reveal_counter in
+   let reveal =
+     Manager_operation
+       {
+         source = transfer.src.pkh;
+         fee = Tez.zero;
+         counter = reveal_counter;
+         gas_limit = cost_of_manager_operation;
+         storage_limit = Z.zero;
+         operation = Reveal transfer.src.pk;
+       }
+   in
+   let manager_op =
+     manager_op_of_transfer
+       parameters
+       {transfer with counter = Some transf_counter}
+   in
+   let list = Cons (reveal, Single manager_op) in
+   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+   Signature.Public_key_hash.Table.add
+     state.counters
+     transfer.src.pkh
+     (branch, transf_counter) ;
+   (if !verbose then
+    cctxt#message
+      "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+      Signature.Public_key_hash.pp
+      transfer.src.pkh
+      Z.pp_print
+      reveal_counter
+      Z.pp_print
+      transf_counter
+      Signature.Public_key_hash.pp
+      transfer.dst
+   else Lwt.return_unit)
+   >>= fun () ->
+   (* NB: regardless of our best efforts to keep track of counters, injection can fail with
+      "counter in the future" if a block switch happens in between the moment we
+      get the branch and the moment we inject, and the new block does not include
+      all the operations we injected. *)
+   inject_contents cctxt chain branch transfer.src.sk list)
+  else
+    let transf_counter = Z.succ freshest_counter in
+    let manager_op =
+      manager_op_of_transfer
+        parameters
+        {transfer with counter = Some transf_counter}
+    in
+    let list = Single manager_op in
+    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+    Signature.Public_key_hash.Table.add
+      state.counters
+      transfer.src.pkh
+      (branch, transf_counter) ;
+    (if !verbose then
+     cctxt#message
+       "injecting transfer from %a (counter=%a) to %a"
+       Signature.Public_key_hash.pp
+       transfer.src.pkh
+       Z.pp_print
+       transf_counter
+       Signature.Public_key_hash.pp
+       transfer.dst
+    else Lwt.return_unit)
+    >>= fun () ->
+    (* See comment above. *)
+    inject_contents cctxt chain branch transfer.src.sk list)
   >>= function
   | Ok op_hash ->
       debug_msg (fun () ->
@@ -651,12 +669,13 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     dont_wait
       (fun () ->
         on_new_head cctxt (fun (block, _) ->
-            state.last_block <- block ;
-            state.shuffled_pool <-
-              Some
-                (List.shuffle
-                   ~rng_state
-                   (List.map (fun src_org -> src_org.source) state.pool)) ;
+            if not (Block_hash.equal block state.last_block) then (
+              state.last_block <- block ;
+              state.shuffled_pool <-
+                Some
+                  (List.shuffle
+                     ~rng_state
+                     (List.map (fun src_org -> src_org.source) state.pool))) ;
             Lwt_condition.broadcast state.new_block_condition () ;
             Lwt.return_unit))
       (fun trace ->
@@ -731,7 +750,15 @@ let fresh_probability_arg =
   arg
     ~long:"fresh-probability"
     ~placeholder:"float in [0;1]"
-    ~doc:"probability for a destination to be a fresh account"
+    ~doc:
+      (Format.sprintf
+         "Probability for each transaction's destination to be a fresh \
+          account. The default value is %g. This new account may then be used \
+          as source or destination of subsequent transactions, just like the \
+          accounts that were initially provided to the command. Note that when \
+          [--single-op-per-pkh-per-block] is set, the new account will not be \
+          used as source until the head changes."
+         default_parameters.fresh_probability)
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
          match float_of_string s with
          | exception _ ->
@@ -939,6 +966,7 @@ let generate_random_transactions =
                       ~rng_state
                       (List.map (fun src_org -> src_org.source) sources))
                 else None);
+              revealed = Signature.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
               new_block_condition = Lwt_condition.create ();
               injected_operations = Block_hash.Table.create 1023;

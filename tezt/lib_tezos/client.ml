@@ -787,7 +787,8 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash -> return hash
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?transfers ?tps client =
+    ?(source_accounts = []) ?seed ?transfers ?tps
+    ?(single_op_per_pkh_per_block = false) client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -824,24 +825,39 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     in
     Ezjsonm.value_to_string (`A source_objs)
   in
-  let make_int_arg (name : string) = function
+  let seed =
+    (* Note: Tezt does not call [Random.self_init] so this is not
+       randomized from one run to the other (if the exact same tests
+       are run).
+
+       The goal here is to use different seeds for instances of the
+       [stresstest] command called in the same test, so that they
+       don't all inject the same operations. *)
+    (match seed with Some seed -> seed | None -> Random.int 0x3FFFFFFF)
+    |> Int.to_string
+  in
+  let make_int_opt_arg (name : string) = function
     | Some (arg : int) -> [name; Int.to_string arg]
     | None -> []
   in
   spawn_command ?endpoint client
-  @@ ["stresstest"; "transfer"; "using"; sources]
-  @ make_int_arg "--transfers" transfers
-  @ make_int_arg "--tps" tps
+  @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
+  @ make_int_opt_arg "--transfers" transfers
+  @ make_int_opt_arg "--tps" tps
+  @
+  if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
-let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts
-    ?transfers ?tps client =
+let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
+    ?transfers ?tps ?single_op_per_pkh_per_block client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
     ?source_pkhs
     ?source_accounts
+    ?seed
     ?transfers
     ?tps
+    ?single_op_per_pkh_per_block
     client
   |> Process.check
 
@@ -1129,33 +1145,45 @@ let get_parameter_file ?additional_bootstrap_account_count
       in
       return (Some parameter_file)
 
-let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
+let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
-    ?additional_bootstrap_account_count ?default_accounts_balance
-    ?parameter_file tag ~protocol () =
+    ?(keys = Constant.all_secret_keys) tag () =
+  match tag with
+  | (`Client | `Proxy) as mode ->
+      let* node = Node.init ?event_level ?event_sections_levels nodes_args in
+      let endpoint = Node node in
+      let mode =
+        match mode with
+        | `Client -> Client (Some endpoint, None)
+        | `Proxy -> Proxy endpoint
+      in
+      let client =
+        create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
+      in
+      let* () = Lwt_list.iter_s (import_secret_key client) keys in
+      return (node, client)
+  | `Light ->
+      let* (client, node1, _) =
+        init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
+      in
+      return (node1, client)
+
+let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
+    ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
+    ?default_accounts_balance ?parameter_file tag ~protocol () =
   let* (node, client) =
-    match tag with
-    | (`Client | `Proxy) as mode ->
-        let* node = Node.init ?event_level ?event_sections_levels nodes_args in
-        let endpoint = Node node in
-        let mode =
-          match mode with
-          | `Client -> Client (Some endpoint, None)
-          | `Proxy -> Proxy endpoint
-        in
-        let client =
-          create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
-        in
-        let* () =
-          Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
-        in
-        return (node, client)
-    | `Light ->
-        let* (client, node1, _) =
-          init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
-        in
-        return (node1, client)
+    init_with_node
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      ?event_level
+      ?event_sections_levels
+      ?nodes_args
+      tag
+      ()
   in
   let* parameter_file =
     get_parameter_file

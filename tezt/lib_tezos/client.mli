@@ -578,26 +578,34 @@ val convert_data_to_json :
 
     [sources] is a string containing all the [source_aliases],
     [source_pkhs], and [source_accounts] in JSON format as expected by
-    the [stresstest] command.
+    the [stresstest] command. Each optional argument [source_aliases],
+    [source_pkhs], and [source_accounts] defaults to an empty
+    list. However, if all three are empty, then the [sources] given to
+    the command are [Constant.bootstrap_keys] i.e. [bootstrap1], ...,
+    [bootstrap5].
 
-    Default values:
-    - [endpoint]: cf {!create}
-    - [source_aliases], [source_pkhs], and [source_accounts]: each of
-      these defaults to an empty list. However, if all three are empty,
-      then the [sources] given to the command are
-      [Constant.bootstrap_keys] i.e. [bootstrap1], ..., [bootstrap5]
+    The parameter [--seed <seed>] is always provided (because without
+    it, the [stresstest] command would use a fixed seed). If the
+    corresponding optional argument is not provided to the function,
+    then a new random seed is generated.
 
-    Optional parameters (if the argument is not provided to this
-    function, neither is the corresponding parameter to the command):
+    Optional parameters (provided only if the function is called with
+    the corresponding optional argument):
     - [--transfers <transfers>]
-    - [--tps <tps>] *)
+    - [--tps <tps>]
+    - [--single-op-per-pkh-per-block] (if the argument
+      [single_op_per_pkh_per_block] is [true])
+
+    [endpoint]: cf {!create} *)
 val stresstest :
   ?endpoint:endpoint ->
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
+  ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
+  ?single_op_per_pkh_per_block:bool ->
   t ->
   unit Lwt.t
 
@@ -607,8 +615,10 @@ val spawn_stresstest :
   ?source_aliases:string list ->
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
+  ?seed:int ->
   ?transfers:int ->
   ?tps:int ->
+  ?single_op_per_pkh_per_block:bool ->
   t ->
   Process.t
 
@@ -760,6 +770,28 @@ val init :
   ?media_type:media_type ->
   unit ->
   t Lwt.t
+
+(** Set up a client and node(s).
+
+    - Create a client with mode [Client], [Light], or [Proxy].
+    - Import all secret [?keys] (by default, {!Constant.all_secret_keys}).
+
+    In addition to the client, returns the first created node
+    (if [`Light] is passed, a second node has been created, but it is
+    not exposed). *)
+val init_with_node :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?nodes_args:Node.argument list ->
+  ?keys:Account.key list ->
+  [`Client | `Light | `Proxy] ->
+  unit ->
+  (Node.t * t) Lwt.t
 
 (** Set up a client and node(s) and activate a protocol.
 
