@@ -107,6 +107,10 @@ Node
   RPC. When this field is set to ``false``, type checking details are
   omitted. This can be used to improve the performances of this RPC.
 
+- Fix the comparison operator of history modes to avoid considering
+  the default history modes as not equal to an history mode manually
+  set to the same default value.
+
 Client
 ------
 
