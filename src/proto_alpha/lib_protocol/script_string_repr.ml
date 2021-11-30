@@ -25,7 +25,9 @@
 
 (** Strings of printable characters *)
 
-type t = string (* Invariant: contains only printable characters *)
+type repr = string (* Invariant: contains only printable characters *)
+
+type t = String_tag of repr [@@ocaml.unboxed]
 
 type error += Non_printable_character of (int * string)
 
@@ -52,11 +54,11 @@ let () =
     (function Non_printable_character (pos, s) -> Some (pos, s) | _ -> None)
     (fun (pos, s) -> Non_printable_character (pos, s))
 
-let empty = ""
+let empty = String_tag ""
 
 let of_string v =
   let rec check_printable_ascii i =
-    if Compare.Int.(i < 0) then ok v
+    if Compare.Int.(i < 0) then ok (String_tag v)
     else
       match v.[i] with
       | '\n' | '\x20' .. '\x7E' -> check_printable_ascii (i - 1)
@@ -64,14 +66,16 @@ let of_string v =
   in
   check_printable_ascii (String.length v - 1)
 
-let to_string s = s
+let to_string (String_tag s) = s
 
-let compare = Compare.String.compare
+let compare (String_tag x) (String_tag y) = Compare.String.compare x y
 
-let length = String.length
+let length (String_tag s) = String.length s
 
-let concat_pair x y = x ^ y
+let concat_pair (String_tag x) (String_tag y) = String_tag (x ^ y)
 
-let concat l = String.concat "" l
+let concat l =
+  let l = List.map (fun (String_tag s) -> s) l in
+  String_tag (String.concat "" l)
 
-let sub s offset length = String.sub s offset length
+let sub (String_tag s) offset length = String_tag (String.sub s offset length)
