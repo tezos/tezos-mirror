@@ -932,7 +932,7 @@ module type S = sig
 
   (** {3 conversion} *)
 
-  val to_seq : 'a t -> 'a Stdlib.Seq.t
+  val to_seq : 'a list -> 'a Stdlib.Seq.t
 
   val of_seq : 'a Stdlib.Seq.t -> 'a list
 end

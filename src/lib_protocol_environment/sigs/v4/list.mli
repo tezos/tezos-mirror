@@ -867,7 +867,7 @@ val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
 (** {3 conversion} *)
 
-val to_seq : 'a t -> 'a Seq.t
+val to_seq : 'a list -> 'a Seq.t
 
 val of_seq : 'a Seq.t -> 'a list
 
