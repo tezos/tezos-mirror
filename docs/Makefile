@@ -127,7 +127,7 @@ install-dependencies:
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 html: Makefile api/errors.rst rpc p2p install-dependencies
-	cp ../CHANGES.rst .
+	echo "$$(echo ':orphan:'; echo ''; cat ../CHANGES.rst)" > CHANGES.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 # pylint does not support pyproject.toml configuration for now
