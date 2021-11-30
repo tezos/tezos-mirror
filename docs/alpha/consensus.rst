@@ -99,6 +99,9 @@ preendorsement quorum for a candidate block in a previous round, is required to 
 the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
+
+.. _finality_alpha:
+
 Transaction and block finality
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -381,8 +384,8 @@ participation of a selfish baker does not have an impact.
 
 .. _cs_constants_alpha:
 
-Consensus protocol parameters
------------------------------
+Consensus related protocol parameters
+-------------------------------------
 
 .. list-table::
    :widths: 55 25
@@ -412,6 +415,34 @@ Consensus protocol parameters
      - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.004286 tez
    * - ``ENDORSING_REWARD_PER_SLOT``
      - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
+
+
+.. _shell_proto_revisit_alpha:
+
+Shell-protocol interaction revisited
+------------------------------------
+
+:ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
+Namely, these two notions are the protocol-specific header and the fitness.
+As in Emmy*, the protocol-specific header contains the fields:
+
+- ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
+- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_alpha>`, used to generate entropy on the chain
+- ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
+- ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_alpha>` that requests ending the subsidy.
+
+There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_alpha>`.
+
+.. _fitness_alpha:
+
+The fitness is given by the tuple ``(level, locked_round, predecessor_round, round)``.
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_alpha>`.
+In Emmy*, only the level mattered.
+But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
+Therefore the fitness also includes the block's round.
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_alpha>`.
+Therefore the fitness also includes the predecessor block's round.
+
 
 
 Further External Resources
