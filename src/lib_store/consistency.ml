@@ -233,7 +233,7 @@ let fix_floating_stores chain_dir =
   >>=? fun () ->
   Store_events.(emit fix_floating_stores ()) >>= fun () -> return_unit
 
-(* [fix_head ~chain_dir block_store genesis_block] iter through the
+(* [fix_head chain_dir block_store genesis_block] iter through the
    floating blocks and set, as head, the fittest block found. *)
 let fix_head chain_dir block_store genesis_block =
   let floating_stores = Block_store.floating_block_stores block_store in
@@ -287,12 +287,12 @@ let fix_head chain_dir block_store genesis_block =
            cemented block known. *)
       else return floating_head)
   >>=? fun inferred_head ->
-  (* Make sure that the infered head have metadata *)
+  (* Make sure that the inferred head have metadata *)
   (Block_store.read_block_metadata
      block_store
      (Block_store.Block (Block_repr.hash floating_head, 0))
    >>=? function
-   | None -> fail (Corrupted_store "infered head must have metadata")
+   | None -> fail (Corrupted_store "inferred head must have metadata")
    | Some _ -> return_unit)
   >>=? fun () ->
   (* Try to load the current head *)
@@ -305,7 +305,7 @@ let fix_head chain_dir block_store genesis_block =
     emit fix_head (stored_head, Block_repr.descriptor inferred_head))
   >>= fun () -> return inferred_head
 
-(* [fix_savepoint_and_caboose ~chain_dir block_store head]
+(* [fix_savepoint_and_caboose chain_dir block_store head]
    Fix the savepoint by setting it to the lowest block with metadata.
    Assumption:
    - block store is valid and available.
@@ -534,7 +534,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
    | None -> fail (Corrupted_store "Failed to find a valid caboose"))
   >>=? fun caboose -> return (savepoint, caboose)
 
-(* [fix_checkpoint ~chain_dir block_store head] fixes the checkpoint
+(* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
    by setting it to the lowest block with metadata which is higher
    that the last allowed fork level of the current head (and <=
    head_level).
@@ -597,7 +597,8 @@ let fix_checkpoint chain_dir block_store head =
   Store_events.(emit fix_checkpoint (stored_checkpoint, inferred_checkpoint))
   >>= fun () -> return inferred_checkpoint
 
-(* [fix_protocol_levels context_index block_store genesis_header ~head]
+(* [fix_protocol_levels context_index block_store genesis_header ~head
+    ~savepoint]
    fixes protocol levels table by searching for all the protocol
    levels in the block store (cemented and floating). Fixing this
    table is possible in archive mode only.
@@ -873,7 +874,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
     cemented_protocol_levels
     floating_protocol_levels
 
-(* [fix_chain_state ~chain_dir ~head ~cementing_highwatermark
+(* [fix_chain_state chain_dir ~head ~cementing_highwatermark
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
    ~protocol_levels ~chain_config ~genesis ~genesis_context] writes, as
    [Stored_data.t], the given arguments. *)
@@ -942,7 +943,7 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
   else Lwt.return 0)
   >>= fun nb_cycles_metadata ->
   let nb_cycles = List.length cemented_blocks_files in
-  (* If the infered offset equals the default offset value then we
+  (* If the inferred offset equals the default offset value then we
      assume that "default" was the previous value. *)
   let offset =
     if
@@ -971,10 +972,10 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
          full or rolling. We choose full as the less destructive. *)
       Full offset
   in
-  Store_events.(emit restore_infered_history_mode history_mode) >>= fun () ->
+  Store_events.(emit restore_inferred_history_mode history_mode) >>= fun () ->
   return {history_mode; genesis; expiration = None}
 
-(* [fix_chain_config ?history_mode ~chain_dir block_store genesis
+(* [fix_chain_config ?history_mode chain_dir block_store genesis
    caboose savepoint] infers the history mode. *)
 let fix_chain_config ?history_mode chain_dir block_store genesis caboose
     savepoint =

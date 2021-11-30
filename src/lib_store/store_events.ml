@@ -315,11 +315,11 @@ let restore_history_mode =
     ("history_mode", History_mode.encoding)
     ~pp1:History_mode.pp
 
-let restore_infered_history_mode =
+let restore_inferred_history_mode =
   declare_1
     ~section
     ~level:Internal_event.Notice
-    ~name:"restore_infered_history_mode"
+    ~name:"restore_inferred_history_mode"
     ~msg:
       "history mode was successfully restored to {history_mode}. Warning: this \
        history mode may differ from the one preceding the restore procedure \
