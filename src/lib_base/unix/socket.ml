@@ -35,15 +35,19 @@ let handle_literal_ipv6 host =
   | Error (`Msg _) -> host
   | Ok ipaddr -> Ipaddr.to_string ipaddr
 
-let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
+let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) =
+  let open Lwt_tzresult_syntax in
+  function
   | Unix path ->
       let addr = Lwt_unix.ADDR_UNIX path in
       let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
       Lwt_unix.set_close_on_exec sock ;
-      Lwt_unix.connect sock addr >>= fun () -> return sock
+      let*! () = Lwt_unix.connect sock addr in
+      return sock
   | Tcp (host, service, opts) -> (
       let host = handle_literal_ipv6 host in
-      Lwt_unix.getaddrinfo host service opts >>= function
+      let*! addrs = Lwt_unix.getaddrinfo host service opts in
+      match addrs with
       | [] -> failwith "could not resolve host '%s'" host
       | addrs ->
           let rec try_connect acc = function
@@ -58,15 +62,19 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
               -> (
                 let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
                 Lwt_unix.set_close_on_exec sock ;
-                protect
-                  ~on_error:(fun e ->
-                    Lwt_unix.close sock >>= fun () -> Lwt.return_error e)
-                  (fun () ->
-                    Lwt_unix.with_timeout
-                      (Ptime.Span.to_float_s timeout)
-                      (fun () ->
-                        Lwt_unix.connect sock ai_addr >>= fun () -> return sock))
-                >>= function
+                let*! r =
+                  protect
+                    ~on_error:(fun e ->
+                      let*! () = Lwt_unix.close sock in
+                      Lwt.return_error e)
+                    (fun () ->
+                      Lwt_unix.with_timeout
+                        (Ptime.Span.to_float_s timeout)
+                        (fun () ->
+                          let*! () = Lwt_unix.connect sock ai_addr in
+                          return sock))
+                in
+                match r with
                 | Ok sock -> return sock
                 | Error (e : error trace) ->
                     let acc =
@@ -79,37 +87,44 @@ let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) = function
           try_connect None addrs)
 
 let with_connection ?timeout addr f =
-  connect ?timeout addr >>=? fun conn ->
+  let open Lwt_result_syntax in
+  let* conn = connect ?timeout addr in
   protect
     (fun () ->
-      f conn >>=? fun a ->
-      Lwt_utils_unix.safe_close conn >>=? fun () -> return a)
+      let* a = f conn in
+      let* () = Lwt_utils_unix.safe_close conn in
+      return a)
     ~on_error:(fun e ->
-      Lwt_utils_unix.safe_close conn >>=? fun () -> Lwt.return (Error e))
+      let* () = Lwt_utils_unix.safe_close conn in
+      Lwt.return (Error e))
 
-let bind ?(backlog = 10) = function
+let bind ?(backlog = 10) =
+  let open Lwt_syntax in
+  function
   | Unix path ->
       let addr = Lwt_unix.ADDR_UNIX path in
       let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
       Lwt_unix.set_close_on_exec sock ;
-      Lwt_unix.bind sock addr >>= fun () ->
+      let* () = Lwt_unix.bind sock addr in
       Lwt_unix.listen sock backlog ;
-      return [sock]
+      return_ok [sock]
   | Tcp (host, service, opts) -> (
-      Lwt_unix.getaddrinfo
-        (handle_literal_ipv6 host)
-        service
-        (AI_PASSIVE :: opts)
-      >>= function
+      let* addrs =
+        Lwt_unix.getaddrinfo
+          (handle_literal_ipv6 host)
+          service
+          (AI_PASSIVE :: opts)
+      in
+      match addrs with
       | [] -> failwith "could not resolve host '%s'" host
       | addrs ->
           let do_bind {Unix.ai_family; ai_socktype; ai_protocol; ai_addr; _} =
             let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
             Lwt_unix.set_close_on_exec sock ;
             Lwt_unix.setsockopt sock SO_REUSEADDR true ;
-            Lwt_unix.bind sock ai_addr >>= fun () ->
+            let* () = Lwt_unix.bind sock ai_addr in
             Lwt_unix.listen sock backlog ;
-            return sock
+            return_ok sock
           in
           Tezos_error_monad.TzLwtreslib.List.map_es do_bind addrs)
 
@@ -125,14 +140,16 @@ let maximum_length_of_message_payload =
   1 lsl (size_of_length_of_message_payload * 8)
 
 let send fd encoding message =
+  let open Lwt_tzresult_syntax in
   let length_of_message_payload =
     Data_encoding.Binary.length encoding message
   in
   assert (length_of_message_payload >= 0) ;
-  fail_unless
-    (length_of_message_payload < maximum_length_of_message_payload)
-    Unexpected_size_of_encoded_value
-  >>=? fun () ->
+  let* () =
+    fail_unless
+      (length_of_message_payload < maximum_length_of_message_payload)
+      Unexpected_size_of_encoded_value
+  in
   let total_length_of_message =
     size_of_length_of_message_payload + length_of_message_payload
   in
@@ -151,33 +168,39 @@ let send fd encoding message =
   match Data_encoding.Binary.write encoding message serialisation_state with
   | Error we -> fail (Encoding_error we)
   | Ok last ->
-      fail_unless
-        (last = total_length_of_message)
-        Unexpected_size_of_encoded_value
-      >>=? fun () ->
+      let* () =
+        fail_unless
+          (last = total_length_of_message)
+          Unexpected_size_of_encoded_value
+      in
       (* we set the beginning of the buf with the length of what is next *)
       Tezos_stdlib.TzEndian.set_int16
         message_serialisation_buffer
         0
         length_of_message_payload ;
       protect (fun () ->
-          Lwt_utils_unix.write_bytes fd message_serialisation_buffer >|= ok)
+          Lwt_result.ok
+          @@ Lwt_utils_unix.write_bytes fd message_serialisation_buffer)
 
 let recv ?timeout fd encoding =
+  let open Lwt_tzresult_syntax in
   let header_buf = Bytes.create size_of_length_of_message_payload in
-  protect (fun () ->
-      Lwt_utils_unix.read_bytes_with_timeout
-        ?timeout
-        ~len:size_of_length_of_message_payload
-        fd
-        header_buf
-      >|= ok)
-  >>=? fun () ->
+  let* () =
+    protect (fun () ->
+        Lwt_result.ok
+        @@ Lwt_utils_unix.read_bytes_with_timeout
+             ?timeout
+             ~len:size_of_length_of_message_payload
+             fd
+             header_buf)
+  in
   let len = Tezos_stdlib.TzEndian.get_uint16 header_buf 0 in
   let buf = Bytes.create len in
-  protect (fun () ->
-      Lwt_utils_unix.read_bytes_with_timeout ?timeout ~len fd buf >|= ok)
-  >>=? fun () ->
+  let* () =
+    protect (fun () ->
+        Lwt_result.ok
+        @@ Lwt_utils_unix.read_bytes_with_timeout ?timeout ~len fd buf)
+  in
   let buf = Bytes.unsafe_to_string buf in
   match Data_encoding.Binary.read encoding buf 0 len with
   | Error re -> fail (Decoding_error re)

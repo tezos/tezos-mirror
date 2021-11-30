@@ -36,10 +36,12 @@ open Tezos_event_logging_test_helpers
 let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
     : unit Alcotest_lwt.test_case =
   Alcotest_lwt.test_case name speed (fun _sw () ->
-      f () >>= function
+      let open Lwt_syntax in
+      let* r = f () in
+      match r with
       | Ok () -> Lwt.return_unit
       | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close () >>= fun () ->
+          let* () = Tezos_stdlib_unix.Internal_event_unix.close () in
           Format.printf "@\n%a@." pp_print_trace err ;
           Lwt.fail Alcotest.Test_error)
 
@@ -62,9 +64,11 @@ let mock_sink : Mock_sink.t Internal_event.sink_definition =
     Sinks can only be registered and activated once, and not removed thereafter.
 *)
 let with_empty_mock_sink (f : unit -> unit Lwt.t) : unit Lwt.t =
+  let open Lwt_syntax in
   if not (Mock_sink.is_activated ()) then (
     Internal_event.All_sinks.register mock_sink ;
-    Internal_event.All_sinks.activate (Uri.of_string "mock-log://") >>= function
+    let* r = Internal_event.All_sinks.activate (Uri.of_string "mock-log://") in
+    match r with
     | Ok _ -> f ()
     | Error errors ->
         Format.printf

@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
-
 type t = Block_header.t * Block_hash.t list
 
 let pp ppf (hd, h_lst) =
@@ -194,11 +192,13 @@ let to_steps_truncate ~limit ~save_point seed locator =
       {block; predecessor = pred; step; strict_step} :: acc)
 
 let compute ~get_predecessor ~caboose ~size block_hash header seed =
+  let open Error_monad.Lwt_syntax in
   let rec loop acc size state current_block_hash =
     if size = 0 then Lwt.return acc
     else
       let (step, state) = Step.next state in
-      get_predecessor current_block_hash step >>= function
+      let* o = get_predecessor current_block_hash step in
+      match o with
       | None ->
           if Block_hash.equal caboose current_block_hash then Lwt.return acc
           else Lwt.return (caboose :: acc)
@@ -211,24 +211,27 @@ let compute ~get_predecessor ~caboose ~size block_hash header seed =
   if size <= 0 then Lwt.return (header, [])
   else
     let initial_state = Step.init seed block_hash in
-    loop [] size initial_state block_hash >>= fun hist ->
+    let* hist = loop [] size initial_state block_hash in
     Lwt.return (header, List.rev hist)
 
 type validity = Unknown | Known_valid | Known_invalid
 
 let unknown_prefix ~is_known locator =
+  let open Error_monad.Lwt_syntax in
   let (head, history) = locator in
   let rec loop hist acc =
     match hist with
     | [] -> Lwt.return (Unknown, locator)
     | h :: t -> (
-        is_known h >>= function
+        let* k = is_known h in
+        match k with
         | Known_valid -> Lwt.return (Known_valid, (head, List.rev (h :: acc)))
         | Known_invalid ->
             Lwt.return (Known_invalid, (head, List.rev (h :: acc)))
         | Unknown -> loop t (h :: acc))
   in
-  is_known (Block_header.hash head) >>= function
+  let* k = is_known (Block_header.hash head) in
+  match k with
   | Known_valid -> Lwt.return (Known_valid, (head, []))
   | Known_invalid -> Lwt.return (Known_invalid, (head, []))
   | Unknown -> loop history []

@@ -54,10 +54,11 @@ let encoding =
           (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
 
 let generate_with_bound ?yield_every ?max pow_target =
-  let open Lwt.Infix in
+  let open Error_monad.Lwt_syntax in
   let (secret_key, public_key, peer_id) = Crypto_box.random_keypair () in
-  Crypto_box.generate_proof_of_work ?yield_every ?max public_key pow_target
-  >|= fun proof_of_work_stamp ->
+  let+ proof_of_work_stamp =
+    Crypto_box.generate_proof_of_work ?yield_every ?max public_key pow_target
+  in
   {peer_id; public_key; secret_key; proof_of_work_stamp}
 
 let generate ?yield_every pow_target =

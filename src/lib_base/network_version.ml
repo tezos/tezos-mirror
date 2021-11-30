@@ -84,24 +84,27 @@ let may_select_version ~compare accepted_versions remote_version motive =
   else P2p_rejection.rejecting motive
 
 let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
+  let open Error_monad.Result_syntax in
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
   if chain_name <> remote.chain_name then
     P2p_rejection.rejecting Unknown_chain_name
   else
-    let open Error_monad in
-    may_select_version
-      ~compare:Distributed_db_version.compare
-      distributed_db_versions
-      remote.distributed_db_version
-      Deprecated_distributed_db_version
-    >>? fun distributed_db_version ->
-    may_select_version
-      ~compare:P2p_version.compare
-      p2p_versions
-      remote.p2p_version
-      Deprecated_p2p_version
-    >>? fun p2p_version -> ok {chain_name; distributed_db_version; p2p_version}
+    let* distributed_db_version =
+      may_select_version
+        ~compare:Distributed_db_version.compare
+        distributed_db_versions
+        remote.distributed_db_version
+        Deprecated_distributed_db_version
+    in
+    let* p2p_version =
+      may_select_version
+        ~compare:P2p_version.compare
+        p2p_versions
+        remote.p2p_version
+        Deprecated_p2p_version
+    in
+    return {chain_name; distributed_db_version; p2p_version}
 
 let () = Data_encoding.Registration.register ~pp encoding
 
