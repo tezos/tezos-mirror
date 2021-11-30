@@ -11,6 +11,8 @@ documentation:build:
     - .rules_template__development
   stage: build
   needs: []
+  before_script:
+    - . $HOME/.venv/bin/activate
   script:
     # CLI manuals are not built in this job. This hack removes their inclusion to
     # suppress the error sphinx would otherwise throw. Unfortunately, there doesn't
@@ -31,6 +33,8 @@ documentation:build_all:
     - .rules_template__development_manual
   stage: manual
   needs: []
+  before_script:
+    - . $HOME/.venv/bin/activate
   script:
     - make -C docs all
   artifacts:
@@ -52,6 +56,7 @@ documentation:linkcheck:
       artifacts: true
   before_script:
     - . ./scripts/version.sh
+    - . $HOME/.venv/bin/activate
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck
