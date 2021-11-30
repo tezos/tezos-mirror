@@ -115,7 +115,8 @@ variables:
       when: never
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - changes:
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes:
         - docs/introduction/*.sh
       when: always
     # Run when there is label on the merge request.
