@@ -464,7 +464,9 @@ module Script_int : module type of Script_int_repr
 module Script_timestamp : sig
   open Script_int
 
-  type t
+  type repr
+
+  type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
   val compare : t -> t -> int
 

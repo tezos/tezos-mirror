@@ -29,9 +29,13 @@
 
 open Script_int_repr
 
+type repr
+
 (** Representation of timestamps specific to the Michelson interpreter.
-    A number of seconds since the epoch. *)
-type t
+    A number of seconds since the epoch.
+    [t] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
+type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
 (** Convert a number of seconds since the epoch to a timestamp.*)
 val of_int64 : int64 -> t
