@@ -132,13 +132,11 @@ variables:
     - when: manual
       allow_failure: true
 
+# The job `unified_coverage` runs on master and one development pipelines. It
+# runs on merge requests, unless the `ci--no-coverage` tag is set.
 .rules_template__development_unified_coverage:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: never
-    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
