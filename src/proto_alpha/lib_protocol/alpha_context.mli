@@ -89,7 +89,11 @@ module Slot : sig
 end
 
 module Tez : sig
-  include BASIC_DATA
+  type repr
+
+  type t = Tez_tag of repr [@@ocaml.unboxed]
+
+  include BASIC_DATA with type t := t
 
   type tez = t
 

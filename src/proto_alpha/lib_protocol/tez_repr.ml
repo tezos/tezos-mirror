@@ -28,7 +28,11 @@ let id = "tez"
 
 let name = "mutez"
 
-include Compare.Int64 (* invariant: positive *)
+open Compare.Int64 (* invariant: positive *)
+
+type repr = t
+
+type t = Tez_tag of repr [@@ocaml.unboxed]
 
 type error +=
   | Addition_overflow of t * t (* `Temporary *)
@@ -39,17 +43,19 @@ type error +=
 
 (* `Temporary *)
 
-let zero = 0L
+let zero = Tez_tag 0L
 
 (* all other constant are defined from the value of one micro tez *)
-let one_mutez = 1L
+let one_mutez = Tez_tag 1L
 
-let one_cent = Int64.mul one_mutez 10_000L
+let mul_int (Tez_tag tez) i = Tez_tag (Int64.mul tez i)
 
-let fifty_cents = Int64.mul one_cent 50L
+let one_cent = mul_int one_mutez 10_000L
+
+let fifty_cents = mul_int one_cent 50L
 
 (* 1 tez = 100 cents = 1_000_000 mutez *)
-let one = Int64.mul one_cent 100L
+let one = mul_int one_cent 100L
 
 let of_string s =
   let triplets = function
@@ -70,7 +76,8 @@ let of_string s =
       let len = String.length s in
       String.init 6 (fun i -> if Compare.Int.(i < len) then s.[i] else '0')
     in
-    Int64.of_string_opt (remove_commas left ^ pad_to_six (remove_commas right))
+    let prepared = remove_commas left ^ pad_to_six (remove_commas right) in
+    Option.map (fun i -> Tez_tag i) (Int64.of_string_opt prepared)
   in
   match String.split_on_char '.' s with
   | [left; right] ->
@@ -86,7 +93,7 @@ let of_string s =
       else None
   | _ -> None
 
-let pp ppf amount =
+let pp ppf (Tez_tag amount) =
   let mult_int = 1_000_000L in
   let[@coq_struct "amount"] rec left ppf amount =
     let (d, r) = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
@@ -111,24 +118,33 @@ let pp ppf amount =
 
 let to_string t = Format.asprintf "%a" pp t
 
-let ( -? ) t1 t2 =
-  if t2 <= t1 then ok (Int64.sub t1 t2)
-  else error (Subtraction_underflow (t1, t2))
+let ( -? ) tez1 tez2 =
+  let (Tez_tag t1) = tez1 in
+  let (Tez_tag t2) = tez2 in
+  if t2 <= t1 then ok (Tez_tag (Int64.sub t1 t2))
+  else error (Subtraction_underflow (tez1, tez2))
 
-let sub_opt t1 t2 = if t2 <= t1 then Some (Int64.sub t1 t2) else None
+let sub_opt (Tez_tag t1) (Tez_tag t2) =
+  if t2 <= t1 then Some (Tez_tag (Int64.sub t1 t2)) else None
 
-let ( +? ) t1 t2 =
+let ( +? ) tez1 tez2 =
+  let (Tez_tag t1) = tez1 in
+  let (Tez_tag t2) = tez2 in
   let t = Int64.add t1 t2 in
-  if t < t1 then error (Addition_overflow (t1, t2)) else ok t
+  if t < t1 then error (Addition_overflow (tez1, tez2)) else ok (Tez_tag t)
 
-let ( *? ) t m =
-  if m < 0L then error (Negative_multiplicator (t, m))
-  else if m = 0L then ok 0L
-  else if t > Int64.(div max_int m) then error (Multiplication_overflow (t, m))
-  else ok (Int64.mul t m)
+let ( *? ) tez m =
+  let (Tez_tag t) = tez in
+  if m < 0L then error (Negative_multiplicator (tez, m))
+  else if m = 0L then ok (Tez_tag 0L)
+  else if t > Int64.(div max_int m) then
+    error (Multiplication_overflow (tez, m))
+  else ok (Tez_tag (Int64.mul t m))
 
-let ( /? ) t d =
-  if d <= 0L then error (Invalid_divisor (t, d)) else ok (Int64.div t d)
+let ( /? ) tez d =
+  let (Tez_tag t) = tez in
+  if d <= 0L then error (Invalid_divisor (tez, d))
+  else ok (Tez_tag (Int64.div t d))
 
 let mul_exn t m =
   match t *? Int64.(of_int m) with
@@ -140,18 +156,18 @@ let div_exn t d =
   | Ok v -> v
   | Error _ -> invalid_arg "div_exn"
 
-let of_mutez t = if t < 0L then None else Some t
+let of_mutez t = if t < 0L then None else Some (Tez_tag t)
 
 let of_mutez_exn x =
   match of_mutez x with None -> invalid_arg "Tez.of_mutez" | Some v -> v
 
-let to_mutez t = t
+let to_mutez (Tez_tag t) = t
 
 let encoding =
   let open Data_encoding in
-  Data_encoding.def
-    name
-    (check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n))
+  let decode (Tez_tag t) = Z.of_int64 t in
+  let encode = Json.wrap_error (fun i -> Tez_tag (Z.to_int64 i)) in
+  Data_encoding.def name (check_size 10 (conv decode encode n))
 
 let () =
   let open Data_encoding in
@@ -243,3 +259,23 @@ let () =
     (fun (a, b) -> Invalid_divisor (a, b))
 
 type tez = t
+
+let compare (Tez_tag x) (Tez_tag y) = compare x y
+
+let ( = ) (Tez_tag x) (Tez_tag y) = x = y
+
+let ( <> ) (Tez_tag x) (Tez_tag y) = x <> y
+
+let ( < ) (Tez_tag x) (Tez_tag y) = x < y
+
+let ( > ) (Tez_tag x) (Tez_tag y) = x > y
+
+let ( <= ) (Tez_tag x) (Tez_tag y) = x <= y
+
+let ( >= ) (Tez_tag x) (Tez_tag y) = x >= y
+
+let equal (Tez_tag x) (Tez_tag y) = equal x y
+
+let max (Tez_tag x) (Tez_tag y) = Tez_tag (max x y)
+
+let min (Tez_tag x) (Tez_tag y) = Tez_tag (min x y)
