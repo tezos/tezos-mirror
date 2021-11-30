@@ -26,10 +26,15 @@
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   open Encoding
-  module Store =
-    Irmin_pack_mem.Make (Node) (Commit) (Conf) (Metadata) (Contents) (Path)
-      (Branch)
-      (Hash)
+
+  module Store = struct
+    module Maker = Irmin_pack_mem.Maker (Conf)
+    include Maker.Make (Schema)
+    module Schema = Tezos_context_encoding.Context.Schema
+  end
+
+  type kinded_key = [`Node of Store.node_key | `Value of Store.contents_key]
+
   module Tree = Tezos_context_helpers.Context.Make_tree (Store)
   include Tree
   include Tezos_context_helpers.Context.Make_proof (Store)
@@ -78,7 +83,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let unshallow context =
     let open Lwt_syntax in
     let* children = Store.Tree.list context.tree [] in
-    Store.Private.Repo.batch context.repo (fun x y _ ->
+    Store.Backend.Repo.batch context.repo (fun x y _ ->
         List.iter_s
           (fun (s, k) ->
             match Store.Tree.destruct k with
@@ -92,22 +97,24 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let raw_commit ~time ?(message = "") context =
     let open Lwt_syntax in
     let info =
-      Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+      Store.Info.v (Time.Protocol.to_seconds time) ~author:"Tezos" ~message
     in
-    let parents = List.map Store.Commit.hash context.parents in
+    let parents = List.map Store.Commit.key context.parents in
     let* () = unshallow context in
     let+ h = Store.Commit.v context.repo ~info ~parents context.tree in
     Store.Tree.clear context.tree ;
     h
 
+  module Commit_hash = Irmin.Hash.Typed (Hash) (Store.Backend.Commit_portable)
+
   let hash ~time ?(message = "") context =
     let info =
-      Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+      Store.Info.v (Time.Protocol.to_seconds time) ~author:"Tezos" ~message
     in
-    let parents = List.map (fun c -> Store.Commit.hash c) context.parents in
+    let parents = List.map (fun c -> Store.Commit.key c) context.parents in
     let node = Store.Tree.hash context.tree in
-    let commit = Store.Private.Commit.Val.v ~parents ~node ~info in
-    let x = Store.Private.Commit.Key.hash commit in
+    let commit = Store.Backend.Commit_portable.v ~parents ~node ~info in
+    let x = Commit_hash.hash commit in
     Hash.to_context_hash x
 
   let commit ~time ?message context =

@@ -3585,7 +3585,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           Store.Unsafe.restore_from_snapshot
             ~notify
             dst_store_dir
-            ~context_index
             ~genesis
             ~genesis_context_hash
             ~floating_blocks_stream

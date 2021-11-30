@@ -383,7 +383,7 @@ module type S = sig
   type index
 
   (** The type of tree for which to build a shallow tree with [shallow] *)
-  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
+  type kinded_key
 
   module Tree : sig
     include
@@ -415,9 +415,9 @@ module type S = sig
 
     val make_repo : unit -> repo Lwt.t
 
-    (** [shallow repo h] is the shallow tree having hash [h] based on
+    (** [shallow repo k] is the shallow tree having key [k] based on
         the repository [r]. *)
-    val shallow : repo -> kinded_hash -> tree
+    val shallow : repo -> kinded_key -> tree
   end
 
   (** [produce r h f] runs [f] on top of a real store [r], producing a proof and
@@ -430,7 +430,7 @@ module type S = sig
       Calling [produce_proof] recursively has an undefined behaviour. *)
   type ('proof, 'result) producer :=
     index ->
-    kinded_hash ->
+    kinded_key ->
     (tree -> (tree * 'result) Lwt.t) ->
     ('proof * 'result) Lwt.t
 

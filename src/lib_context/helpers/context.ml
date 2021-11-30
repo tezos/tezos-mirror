@@ -26,15 +26,7 @@
 
 open Tezos_context_encoding.Context
 
-module type DB =
-  Irmin.S
-    with type key = Path.t
-     and type contents = Contents.t
-     and type branch = Branch.t
-     and type hash = Hash.t
-     and type step = Path.step
-     and type metadata = Metadata.t
-     and type Key.step = Path.step
+module type DB = Irmin.Generic_key.S with module Schema = Schema
 
 module Kinded_hash = struct
   let of_context_hash = function
@@ -175,11 +167,10 @@ module Make_tree (Store : DB) = struct
     fun () -> Store.Repo.v @@ Irmin_pack.config @@ random_store_name ()
 
   let shallow repo kinded_hash =
-    Store.Tree.shallow
-      repo
-      (match kinded_hash with
-      | `Node hash -> `Node (Hash.of_context_hash hash)
-      | `Value hash -> `Contents (Hash.of_context_hash hash, ()))
+    let kinded_hash =
+      match kinded_hash with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    Store.Tree.shallow repo kinded_hash
 
   let list tree ?offset ?length key =
     Store.Tree.list ~cache:true tree ?offset ?length key
@@ -188,7 +179,7 @@ module Make_tree (Store : DB) = struct
 
   exception Context_dangling_hash of string
 
-  exception Dangling_hash = Store.Private.Node.Val.Dangling_hash
+  exception Dangling_hash = Store.Backend.Node.Val.Dangling_hash
 
   let find_tree tree key =
     Lwt.catch
@@ -676,20 +667,24 @@ module Make_proof (Store : DB) = struct
     let of_stream = to_proof State.of_stream
   end
 
-  let produce_tree_proof repo hash f =
+  let produce_tree_proof repo key f =
     let open Lwt_syntax in
-    let hash = Kinded_hash.of_context_hash hash in
-    let+ (p, r) = Store.Tree.produce_proof repo hash f in
+    let key =
+      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    let+ (p, r) = Store.Tree.produce_proof repo key f in
     (Proof.to_tree p, r)
 
   let verify_tree_proof proof f =
     let proof = Proof.of_tree proof in
     Store.Tree.verify_proof proof f
 
-  let produce_stream_proof repo hash f =
+  let produce_stream_proof repo key f =
     let open Lwt_syntax in
-    let hash = Kinded_hash.of_context_hash hash in
-    let+ (p, r) = Store.Tree.produce_stream repo hash f in
+    let key =
+      match key with `Node n -> `Node n | `Value v -> `Contents (v, ())
+    in
+    let+ (p, r) = Store.Tree.produce_stream repo key f in
     (Proof.to_stream p, r)
 
   let verify_stream_proof proof f =

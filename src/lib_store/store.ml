@@ -3055,7 +3055,7 @@ module Unsafe = struct
         Lwt.return (Error errs))
 
   let restore_from_snapshot ?(notify = fun () -> Lwt.return_unit) store_dir
-      ~context_index ~genesis ~genesis_context_hash ~floating_blocks_stream
+      ~genesis ~genesis_context_hash ~floating_blocks_stream
       ~new_head_with_metadata ~protocol_levels ~history_mode =
     let open Lwt_tzresult_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
@@ -3184,7 +3184,6 @@ module Unsafe = struct
           | (Some block, Some commit_info) ->
               let*! is_consistent =
                 Context.check_protocol_commit_consistency
-                  context_index
                   ~expected_context_hash:(Block.context_hash block)
                   ~given_protocol_hash:protocol
                   ~author:commit_info.author
