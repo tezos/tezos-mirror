@@ -12,6 +12,10 @@ documentation:build:
   stage: build
   needs: []
   script:
+    # CLI manuals are not built in this job. This hack removes their inclusion to
+    # suppress the error sphinx would otherwise throw. Unfortunately, there doesn't
+    # seem to be a more elegant way to suppress this warning.
+    - "sed -i 's@:file:.*[.]html@:file: /dev/null@' ./docs/*/cli-commands.rst"
     - make -C docs html
   artifacts:
     expose_as: 'Documentation - excluding odoc and CLI manuals'
