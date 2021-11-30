@@ -38,6 +38,12 @@ It requires protocol environment V4, compared to V3 for Hangzhou.
 
 - Error_monad: better tracing primitives. (MR :gl:`!3589`)
 
+- Error-monad: simpler trace_eval. (MR :gl:`!3869`)
+
+- Add missing functions from Lwtreslib. (MR :gl:`!3905`)
+
+- Expose an order for folding over the context. (MR :gl:`!3910`)
+
 Tenderbake
 ----------
 
@@ -48,6 +54,12 @@ Tenderbake
 - Export participation RPC. (MR :gl:`!3822`)
 
 - Rename Bonds to Deposits. (MR :gl:`!3832`)
+
+- Fix issues related to token management in Tenderbake. (MR :gl:`!3811`)
+
+- Inherit block times. (MR :gl:`!3850`)
+
+- Address comments on Tenderbake. (MR :gl:`!3906`)
 
 Tickets Hardening
 -----------------
@@ -83,6 +95,8 @@ Precheck of operations
 ----------------------
 
 - Expose `precheck_manager` and `check_manager_signature` (MR :gl:`!3872`)
+
+- Remove the gas block limit for prevalidator mode. (MR :gl:`!3802`)
 
 Bug Fixes
 ---------
@@ -127,8 +141,11 @@ Minor Changes
   decrease the escape hatch threshold from one half to one third.
   (MR :gl:`!3911`)
 
+- Bump up bls12-381.1.1.0. (MRs :gl:`!3914`, :gl:`!3942`)
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
   :gl:`!3529`, :gl:`!3739`, :gl:`!3741`, :gl:`!3695`, :gl:`!3763`,
-  :gl:`!3779`, :gl:`!3745`, :gl:`!3256`, :gl:`!3326`, :gl:`!3812`)
+  :gl:`!3779`, :gl:`!3745`, :gl:`!3256`, :gl:`!3326`, :gl:`!3812`,
+  :gl:`!3920`, :gl:`!3929`)
