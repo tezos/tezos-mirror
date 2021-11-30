@@ -445,7 +445,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?refused:bool ->
       ?outdated:bool ->
       unit ->
-      (((Operation_hash.t * Next_proto.operation) * error list) list
+      (((Operation_hash.t * Next_proto.operation) * error trace) list
        Lwt_stream.t
       * stopper)
       tzresult
@@ -694,7 +694,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; refused : bool
           ; outdated : bool >,
           unit,
-          ((Operation_hash.t * Next_proto.operation) * error list) list )
+          ((Operation_hash.t * Next_proto.operation) * error trace) list )
         RPC_service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)

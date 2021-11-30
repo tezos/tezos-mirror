@@ -48,7 +48,7 @@ module Slot_Map = Slot.Map
 
 (* type of operations stream, as returned by monitor_operations RPC *)
 type ops_stream =
-  ((Operation_hash.t * packed_operation) * error list) list Lwt_stream.t
+  ((Operation_hash.t * packed_operation) * error trace) list Lwt_stream.t
 
 type 'a state = {
   (* Endorsements seen so far *)
