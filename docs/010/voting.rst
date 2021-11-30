@@ -66,8 +66,8 @@ protocol that the hash identifies is invalid, the activation step fails.
 
 A protocol is invalid if the code cannot be compiled (e.g., if the code is not
 valid source code), if the code uses functions not present in the
-:ref:`protocol environment <protocol_environment>`, or if it downgrades the
-:ref:`protocol environment <protocol_environment>` version.
+:doc:`protocol environment <../developer/protocol_environment>`, or if it
+downgrades the protocol environment version.
 
 If the protocol is invalid and the activation fails, the chain becomes stuck.
 Thus, when voting, it is important to vote for hashes that designate a protocol

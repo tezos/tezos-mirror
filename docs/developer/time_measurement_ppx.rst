@@ -1,5 +1,3 @@
-.. _time_measurement_ppx:
-
 Time measurement PPX
 ====================
 

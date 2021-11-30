@@ -180,7 +180,7 @@ protocol in an alternative environment possible.
 
   - :package:`tezos-protocol-environment-sigs` contains the modules
     that are available to the economic protocol. A review of this
-    sandbox is available :ref:`here<protocol_environment>`. These
+    sandbox is available :doc:`here <../developer/protocol_environment>`. These
     modules include a stripped-down standard library, and interfaces
     to the crypto APIs, RPC definitions, and a key-value store.
 

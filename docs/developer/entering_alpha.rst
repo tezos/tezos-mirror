@@ -7,7 +7,7 @@ name and is not related to the old Alphanet :ref:`test network <test-networks>`.
 Before reading that document, you may want to:
 
 -  read the whitepaper,
--  read :ref:`how the economic protocol is
+-  read :doc:`how the economic protocol is
    sandboxed <protocol_environment>`.
 
 As all protocols, Alpha is made of a series of OCaml interface and
