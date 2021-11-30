@@ -97,8 +97,8 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 .PHONY: coverage-report
 coverage-report:
-	@bisect-ppx-report html --ignore-missing-files  -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
-	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
+	@bisect-ppx-report html --ignore-missing-files -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
+	@echo "Report should be available in file://$(shell pwd)/${COVERAGE_REPORT}/index.html"
 
 .PHONY: coverage-report-summary
 coverage-report-summary:
