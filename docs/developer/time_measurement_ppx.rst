@@ -155,7 +155,7 @@ The PPX provides the handling of three attributes:
   Ocaml expressions execution.
   The ``<label>`` inside the payload will be used to tag the measured time.
   The ``<metadata>`` is an Ocaml expression that can be added optionally
-  and should evalutes in a list of strings. It can be given to add
+  and should evaluate to a list of ``string``\s. It can be given to add
   additional contextual information to the measurement and it can permit
   to discrimine it from other measurements registered with the same label.
 
