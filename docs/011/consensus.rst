@@ -44,10 +44,11 @@ Terminology
 A *block* in the blockchain consists of a header and a list of operations. The
 header has a shell part (common to all protocols) and a
 protocol-specific part. In Emmy*, :ref:`the protocol-specific part of the
-header<emmyp_fitness_and_header_011>` contains, most notably, a timestamp, a
-priority (a natural number), and the endorsements for the block at the previous
-level. *Endorsements* are operations that can be seen as votes for a given
-block. Each block is signed.
+header<emmyp_fitness_and_header_011>` contains, most notably, a
+priority (a natural number). The consensus operations in a block are called *endorsements*.
+These operations can be seen as votes for a given block.
+The endorsements included a block at level ``l`` are votes for the block at the previous
+level ``l-1``. Each block is signed.
 
 Before being endorsed, blocks are baked. *Baking* is the action of producing and
 signing a block. Corresponding to these two actions of baking and endorsing, at
@@ -172,6 +173,7 @@ protocol-specific header:
     ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_011>`).
   - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
     proof-of-work for the block, as a spam prevention measure.
+  - ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_011>` that requests ending the subsidy.
 
 
 The consensus algorithm is implemented in Tezos in five components: the shell,
