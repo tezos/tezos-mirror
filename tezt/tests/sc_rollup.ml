@@ -29,12 +29,12 @@
    =======
 
 *)
-let test ~__FILE__ ~output_file title =
+let test ~__FILE__ ~output_file ?(tags = []) title =
   Protocol.register_regression_test
     ~output_file
     ~__FILE__
     ~title
-    ~tags:["sc_rollup"]
+    ~tags:("sc_rollup" :: tags)
 
 let setup f ~protocol =
   let sc_rollup_enable = [(["sc_rollup_enable"], Some "true")] in
@@ -79,4 +79,49 @@ let test_origination =
       Regression.capture rollup_address ;
       return ())
 
-let register ~protocols = test_origination ~protocols
+(* Configuration of a rollup node
+   ------------------------------
+
+   A rollup node has a configuration file that must be initialized.
+
+*)
+let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
+  let* rollup_address =
+    Client.originate_sc_rollup
+      ~burn_cap:Tez.(of_int 9999999)
+      ~src:bootstrap1_key
+      ~kind:"arith"
+      ~boot_sector:""
+      tezos_client
+  in
+  let sc_rollup_node = Sc_rollup_node.create tezos_node in
+  let* configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node rollup_address
+  in
+  let* () = Client.bake_for tezos_client in
+  f rollup_address sc_rollup_node configuration_filename
+
+let test_rollup_node_configuration =
+  let output_file = "sc_rollup_node_configuration" in
+  test
+    ~__FILE__
+    ~output_file
+    "configuration of a smart contract optimistic rollup node"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun _rollup_address _sc_rollup_node filename ->
+      let read_configuration =
+        let open Ezjsonm in
+        match from_channel (open_in filename) with
+        | `O fields ->
+            (* Remove 'data-dir' as it is non deterministic. *)
+            `O (List.filter (fun (s, _) -> s <> "data-dir") fields) |> to_string
+        | _ ->
+            failwith "The configuration file does not have the expected format."
+      in
+      Regression.capture read_configuration ;
+      return ())
+
+let register ~protocols =
+  test_origination ~protocols ;
+  test_rollup_node_configuration ~protocols

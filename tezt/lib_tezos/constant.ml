@@ -36,6 +36,8 @@ let tezos_codec = "./tezos-codec"
 
 let tezos_snoop = "./tezos-snoop"
 
+let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
+
 let activator : Account.key =
   {
     alias = "activator";
