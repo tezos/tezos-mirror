@@ -52,7 +52,7 @@ because the sandbox contains accounts ``bootstrap1`` to ``bootstrap5`` with
 implicit credentials that allow them to bake blocks by using the usual RPCs in
 the shell (see :doc:`../user/sandbox`)::
 
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
 
 Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -155,10 +155,10 @@ Preparing the migration comprises the following steps:
    level,
 4. patch the shell to obtain a `yes-node` that can fake baker signatures, if we
    wish to import the context from Mainnet,
-5. create a `yes-wallet` that stores such fake signatures, if we wish to import
-   the context from Mainnet,
-6. compile the project, and
-7. import a context from Mainnet, if so wished.
+5. compile the project,
+6. import a context from Mainnet, if so wished, and
+7. create a `yes-wallet` that stores fake baker signatures, if we wish to import
+   the context from Mainnet.
 
 
 Steps 1--7 can be batched by invoking the script
@@ -318,7 +318,7 @@ As before, if we had opted for not snapshotting the Alpha protocol, we could pas
 the path ``src/proto_alpha`` as the parameter of the command above.
 
 If we are testing the migration on an empty context on the sandbox, then we
-should proceed directly to Section `6. Compile the project`_. Otherwise, the next
+should proceed directly to Section `5. Compile the project`_. Otherwise, the next
 two subsections detail how to produce credentials that will allow us to make the
 chain that we imported from Mainnet progress.
 
@@ -350,24 +350,7 @@ we would revert it::
   Apply anyway? [n] n
 
 
-5. Create a Yes-Wallet
-~~~~~~~~~~~~~~~~~~~~~~
-
-We also need to create a `yes-wallet`, which is a special wallet where secret
-keys actually encode the same bytes as their corresponding public keys. By
-adding to the yes-wallet the existing accounts of large bakers in Mainnet,
-e.g. ``foundation1`` to ``foundation8``, we would have enough rights to bake
-blocks at will. We can do so by running::
-
-  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in /tmp/yes-wallet
-
-This command creates a yes-wallet and places the yes-wallet folder in the
-system's temp directory (in our example, ``/tmp``) as given by the path argument
-``/tmp/yes-wallet``. If no path argument was given, the command would create the
-yes-wallet folder in the default path ``./yes-wallet``.
-
-
-6. Compile the Project
+5. Compile the Project
 ~~~~~~~~~~~~~~~~~~~~~~
 
 At this point we have to compile the Alpha protocol (or the snapshot Alpha
@@ -378,7 +361,7 @@ project under the ``src`` folder by invoking::
   $ make
 
 
-7. Import a Context From Mainnet
+6. Import a Context From Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we wish to test the migration in a realistic scenario, we need to import a
@@ -415,6 +398,29 @@ check that this prefix corresponds to the hash of a real block in Mainnet.
 Importing the context from a snapshot file is optional and should be performed
 only if we want to test the migration on a realistic context from
 Mainnet. Otherwise the migration will run on the sandbox.
+
+7. Create a Yes-Wallet
+~~~~~~~~~~~~~~~~~~~~~~
+
+We also need to create a `yes-wallet`, which is a special wallet where secret
+keys actually encode the same bytes as their corresponding public keys. By
+adding to the yes-wallet the existing accounts of Mainnet bakers, we would have
+enough rights to bake blocks at will. We can do so by running::
+
+  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
+
+This command creates a yes-wallet and places its folder in the
+system's temp directory (in our example, ``/tmp``) as given by the path argument
+``/tmp/yes-wallet``. If no path argument was given, the command would create the
+yes-wallet folder in the default path ``./yes-wallet``.
+
+.. note::
+   Prior to switching to the Tenderbake consensus algorithm it was sufficient to
+   create a minimal yes-wallet with 8 Foundation keys. Starting from Protocol I
+   this is no longer the case, because a number of bakers holding at least 2/3rds of the total endorsing power have to endorse a block
+   for it to be considered valid. That's why the wallet needs as many keys as it
+   can get.
+
 
 
 Batch Steps 1--7 Above
@@ -510,8 +516,15 @@ which migration will be triggered, which in our example is ``3``. Since
 activating the predecessor protocol increases the level by one, we need to bake
 two more blocks::
 
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
+
+.. note::
+   Prior to Tenderbake activation (i.e. to the Protocol I) the command above
+   requires a specific account to bake for. Any of ``bootstrap[0-9]`` accounts
+   can be used to do it:
+
+   ``$ tezos-client bake for bootstrap1 --minimal-timestamp``
 
 At this moment migration will be triggered and the protocol
 ``proto_007_<short_hash>`` will become active, and we will see the log message
@@ -545,7 +558,7 @@ Now, we can run the ``tezos-node`` command by specifying the test folder
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
-  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 We will now trigger the migration by baking blocks until the level reaches the
 one specified when setting the user-activated upgrades. The blocks can be baked
@@ -553,13 +566,20 @@ with the yes-wallet created in step 5 above, and with any of the accounts
 ``foundation1`` to ``foundation8``. In our example, we can bake one block by
 running the following command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
-If the chosen account ``foundation1`` ceases to have the priority to bake, we
-can switch to any of the remaining accounts ``foundation2`` to
-``foundation8``. We will always be able to make the chain progress since it is
-virtually impossible that at some moment all the eight accounts cease to have
-the priority to bake.
+.. note::
+   Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
+   a specific account to bake for. Any of ``foundation[1-8]`` accounts can be
+   used to do it.
+
+   ``$ tezos-client bake for foundation1 --minimal-timestamp``
+
+   If the chosen account ``foundation1`` ceases to have the priority to bake, we
+   can switch to any of the remaining accounts ``foundation2`` to
+   ``foundation8``. We will always be able to make the chain progress since it is
+   virtually impossible that at some moment all the eight accounts cease to have
+   the priority to bake.
 
 After baking three blocks the migration will be triggered and the protocol
 ``proto_007_<short_hash>`` will become active.  We will see the log message
@@ -578,12 +598,12 @@ copy the context of the original folder into the test folder. In our example::
 
 Now we run the node in the test folder by invoking::
 
-  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And finally, we bake the numbers of blocks specified by the user-activated
 upgrade, with the command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 
 Wrap up the Manual Migration Procedure
@@ -632,10 +652,10 @@ Activate predecessor of the Alpha protocol and move chain one level forward::
 
   $ tezos-activate-006-PsCARTHA
 
-Bake two more blocks by using account ``bootstrap1``::
+Bake two more blocks::
 
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message!
 
@@ -651,10 +671,10 @@ Activate predecessor of the Alpha protocol::
 
   $ tezos-activate-006-PsCARTHA
 
-Bake two blocks by using account ``bootstrap1``::
+Bake two blocks::
 
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
-  $ tezos-client bake for bootstrap1 --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
+  $ tezos-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -704,20 +724,25 @@ Copy original folder into test folder::
 
 Run the node`::
 
-  $ ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
-Bake three blocks by using accounts ``foundation1`` to ``foundation8``::
+Bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+
+.. note::
+   Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
+   a specific account to bake for. Any of ``foundation[0-9]`` accounts can be
+   used to do it.
 
 You should see the ``STITCHING!`` message!
 
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost
+  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
   ^C
 
 Clean up by removing test folder and copying original folder into fresh
@@ -729,13 +754,13 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 
 Run the node::
 
-  ./tezos-node run --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -837,13 +862,13 @@ developer to be able to inspect the storage after the migration has been
 performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
 the developer can start the node with the migrated context by invoking::
 
-  $ ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Once the node is up, it is possible to inspect the storage by using the Tezos
 client and/or the RPCs. New blocks can be baked with any of the accounts
 ``foundation1`` to ``foundation8`` by using the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 If the developer wishes not to start the node that results after the migration,
 the parameter ``--keep-temp`` can be omitted and the Tezt's temp folder will be
@@ -888,17 +913,17 @@ Run the migration test::
 
 Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
 
-  $ ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Use the client, to manually inspect the storage, or for example to bake new
 blocks with the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for foundation1 --minimal-timestamp
+  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
+  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
   ^C
 
 And run the migration test::
