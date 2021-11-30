@@ -47,17 +47,31 @@ let () =
     (function Endorsement_branch_not_live -> Some () | _ -> None)
     (fun () -> Endorsement_branch_not_live)
 
+module type CHAIN_STORE = sig
+  type chain_store
+
+  val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+
+  val chain_id : chain_store -> Chain_id.t
+end
+
 module type T = sig
-  module Proto : Tezos_protocol_environment.PROTOCOL
+  type operation_data
+
+  type operation_receipt
+
+  type validation_state
+
+  type chain_store
 
   type t
 
-  val parse : Operation.t -> Proto.operation_data operation tzresult
+  val parse : Operation.t -> operation_data operation tzresult
 
-  val parse_unsafe : bytes -> Proto.operation_data tzresult
+  val parse_unsafe : bytes -> operation_data tzresult
 
   val create :
-    Store.chain_store ->
+    chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
     live_operations:Operation_hash.Set.t ->
@@ -66,17 +80,21 @@ module type T = sig
     t tzresult Lwt.t
 
   type result =
-    | Applied of t * Proto.operation_receipt
+    | Applied of t * operation_receipt
     | Branch_delayed of tztrace
     | Branch_refused of tztrace
     | Refused of tztrace
     | Outdated of tztrace
 
-  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
+  val apply_operation : t -> operation_data operation -> result Lwt.t
 
-  val validation_state : t -> Proto.validation_state
+  val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit
+
+  module Internal_for_tests : sig
+    val to_applied : t -> (operation_data operation * operation_receipt) list
+  end
 end
 
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
@@ -86,9 +104,21 @@ let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
   | None -> error Parse_error
   | Some protocol_data -> ok protocol_data
 
-module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
-  T with module Proto = Proto = struct
-  module Proto = Proto
+module MakeAbstract
+    (Chain_store : CHAIN_STORE)
+    (Proto : Tezos_protocol_environment.PROTOCOL) :
+  T
+    with type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
+     and type chain_store = Chain_store.chain_store = struct
+  type operation_data = Proto.operation_data
+
+  type operation_receipt = Proto.operation_receipt
+
+  type validation_state = Proto.validation_state
+
+  type chain_store = Chain_store.chain_store
 
   type t = {
     state : Proto.validation_state;
@@ -130,7 +160,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     } =
       Store.Block.header predecessor
     in
-    Store.Block.context chain_store predecessor >>=? fun predecessor_context ->
+    Chain_store.context chain_store predecessor >>=? fun predecessor_context ->
     let predecessor_hash = Store.Block.hash predecessor in
     Block_validation.update_testchain_status
       predecessor_context
@@ -152,7 +182,7 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       Shell_context.wrap_disk_context predecessor_context
     in
     Proto.begin_construction
-      ~chain_id:(Store.Chain.chain_id chain_store)
+      ~chain_id:(Chain_store.chain_id chain_store)
       ~predecessor_context
       ~predecessor_timestamp
       ~predecessor_fitness
@@ -166,6 +196,9 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 
   let apply_operation pv op =
     if Operation_hash.Set.mem op.hash pv.live_operations then
+      (* As of November 2021, it is dubious that this case can happen.
+         If it can, it is more likely to be because of a consensus operation;
+         hence the returned error. *)
       Lwt.return (Outdated [Endorsement_branch_not_live])
     else
       protect (fun () ->
@@ -210,8 +243,35 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
     | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
     | Outdated err -> fprintf ppf "outdated (%a)" pp_print_trace err
+
+  module Internal_for_tests = struct
+    let to_applied {applied; _} = applied
+  end
 end
 
+module Production_chain_store :
+  CHAIN_STORE with type chain_store = Store.chain_store = struct
+  type chain_store = Store.chain_store
+
+  let context = Store.Block.context
+
+  let chain_id = Store.Chain.chain_id
+end
+
+module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+  T
+    with type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
+     and type chain_store = Production_chain_store.chain_store =
+  MakeAbstract (Production_chain_store) (Proto)
+
 module Internal_for_tests = struct
+  let to_raw {raw; _} = raw
+
   let safe_binary_of_bytes = safe_binary_of_bytes
+
+  module type CHAIN_STORE = CHAIN_STORE
+
+  module Make = MakeAbstract
 end

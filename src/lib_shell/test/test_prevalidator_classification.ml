@@ -31,7 +31,6 @@
 *)
 
 open Lib_test.Qcheck_helpers
-module Generators = Prevalidator_generators
 module Classification = Prevalidator_classification
 
 module Operation_map = struct

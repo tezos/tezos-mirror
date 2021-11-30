@@ -288,26 +288,17 @@ module Block = struct
   let set_to_list s = Set.to_seq s |> List.of_seq
 end
 
+module External_generators = Generators
+
 (** [QCheck] generators used in tests below *)
 module Generators = struct
-  (** A generator of maps of operations and their hashes. [?block_hash_t]
-      is an optional generator for the branch of operations. *)
-  let op_map_gen ?block_hash_t : Operation.t Operation_hash.Map.t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let* ops =
-      small_list (Prevalidator_generators.operation_gen ?block_hash_t)
-    in
-    (* Op_map.of_seq eliminates duplicate keys (if any) *)
-    List.map (fun op -> (Operation.hash op, op)) ops
-    |> List.to_seq |> Op_map.of_seq |> return
-
   let block_gen : Block.t QCheck.Gen.t =
     let open QCheck.Gen in
     let* ops =
       let ops_list_gen =
         (* Having super long list of operations isn't necessary.
            In addition it slows everything down. *)
-        list_size (int_range 0 10) Prevalidator_generators.operation_gen
+        list_size (int_range 0 10) External_generators.operation_gen
       in
       (* In production these lists are exactly of size 4, being more general *)
       ops_list_gen |> list_size (int_range 0 8)
@@ -771,13 +762,13 @@ module Recyle_operations = struct
       {map_size_limit; on_discarded_operation = Fun.const ()}
     in
     let* classes =
-      list_size (pure length) Prevalidator_generators.classification_gen
+      list_size (pure length) External_generators.classification_gen
     in
     assert (List.length classes == length) ;
     let t = Prevalidator_classification.create parameters in
     List.iter
       (fun (classification, (oph, op)) ->
-        Prevalidator_generators.add_if_not_present classification oph op t)
+        External_generators.add_if_not_present classification oph op t)
       (List.combine_drop classes bindings) ;
     return t
 
@@ -810,12 +801,12 @@ module Recyle_operations = struct
          For the remaining 50%, generate branch randomly, so likely outside
          live_blocks. *)
       frequency
-        [(1, Prevalidator_generators.block_hash_gen); (1, oneofl blocks_hashes)]
+        [(1, External_generators.block_hash_gen); (1, oneofl blocks_hashes)]
     in
     let* classification_pendings_ops =
       (* For classification and pending, we want operations that are NOT in
          the blocks already. Hence: *)
-      Generators.op_map_gen ~block_hash_t
+      External_generators.op_map_gen ~block_hash_t ()
       >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
     in
     let* (classification_ops, pending_ops) =

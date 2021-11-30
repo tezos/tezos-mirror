@@ -43,16 +43,58 @@ let block_hash_gen : Block_hash.t QCheck.Gen.t =
   and+ path = list_size (0 -- 100) string_gen in
   Block_hash.hash_string ?key path
 
-(** Operations don't contain "valid" proto bytes but we don't care
-    as far as [Prevalidator_classification] is concerned. [block_hash_t]
-    is an optional generator for the branch. If omitted {!block_hash_gen}
-    is used. *)
-let operation_gen ?block_hash_t : Operation.t QCheck.Gen.t =
+(** A generator of operations.
+    - [string_gen] is the generator for protocol bytes. By default, it is
+      {!string_gen} above. This default is fine for cases where having
+      valid proto bytes doesn't matter (for example for {!Prevalidator_classification}).
+    - [block_hash_t] is an optional generator for the branch.
+      If omitted {!block_hash_gen} is used. *)
+let operation_gen ?(string_gen = string_gen) ?block_hash_t :
+    Operation.t QCheck.Gen.t =
   let open QCheck.Gen in
   let prod_block_hash_gen = Option.value ~default:block_hash_gen block_hash_t in
   let+ branch = prod_block_hash_gen
   and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
+
+(** A generator of maps of operations and their hashes. Parameters are:
+    - [string_gen] is an optional generator for the protocol bytes.
+    - [?block_hash_t] is an optional generator for the branch of operations.
+
+    Because it returns a map,
+    this generator guarantees that all returned operations are distinct
+    (because their hashes differ). *)
+let op_map_gen ?string_gen ?block_hash_t () :
+    Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  let open QCheck.Gen in
+  let+ ops = small_list (operation_gen ?string_gen ?block_hash_t) in
+  (* Op_map.of_seq eliminates duplicate keys (if any) *)
+  List.map (fun op -> (Operation.hash op, op)) ops
+  |> List.to_seq |> Operation_hash.Map.of_seq
+
+(** A generator like {!op_map_gen} but which guarantees the size
+    of the returned maps: they are exactly of size [n]. We need
+    a custom function (as opposed to using a QCheck function for lists
+    of fixed lengths) because we *need* to return maps, because we need
+    the properties that all operations hashes are different. *)
+let op_map_gen_n ?string_gen ?block_hash_t ~(n : int) :
+    Operation.t Operation_hash.Map.t QCheck.Gen.t =
+  let open QCheck.Gen in
+  let map_take_n n m =
+    Operation_hash.Map.bindings m
+    |> List.take_n n |> List.to_seq |> Operation_hash.Map.of_seq
+  in
+  let merge _oph old _new = Some old in
+  let rec go (ops : Operation.t Operation_hash.Map.t) =
+    if Operation_hash.Map.cardinal ops >= n then
+      (* Done *)
+      return (map_take_n n ops)
+    else
+      (* Not enough operations yet, generate more *)
+      let* new_ops = op_map_gen ?string_gen ?block_hash_t () in
+      go (Operation_hash.Map.union merge ops new_ops)
+  in
+  go Operation_hash.Map.empty
 
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck.Gen.t =

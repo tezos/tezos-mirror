@@ -68,7 +68,9 @@ module type PROTOCOL = sig
   (** The maximum size of a block header in bytes. *)
   val max_block_length : int
 
-  (** The maximum size of an operation in bytes. *)
+  (** The maximum size of an {!operation} in bytes. This value is bigger than the size
+      of the bytes required for {!operation_data}, because this value accounts
+      for the shell header. *)
   val max_operation_data_length : int
 
   (** Operations quota for each validation pass. The length of the

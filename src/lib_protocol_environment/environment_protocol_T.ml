@@ -46,7 +46,9 @@ open Environment_context
    are abstracted from the economic protocol.
 
    [module type T] defines the same signature as the last [Vx]
-   environment ([module type Vx_T]). *)
+   environment ([module type Vx_T]).
+
+   If you want to mock this module type, see {!Environment_protocol_T_test}. *)
 module type T = sig
   (* Documentation for this interface may be found in
      module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
