@@ -53,7 +53,7 @@ module type Mocked_services_hooks = sig
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
-    ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace) list
+    ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace option) list
     RPC_answer.stream
 
   (** Lists block hashes from the chain, up to the last checkpoint, sorted

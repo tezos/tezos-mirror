@@ -27,6 +27,8 @@ let list ctxt = RPC_context.make_call RPC_service.error_service ctxt () () ()
 
 let encoding = RPC_service.error_encoding
 
+let opt_encoding = RPC_service.error_opt_encoding
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1753
 
    the error should not be in the error monad. *)

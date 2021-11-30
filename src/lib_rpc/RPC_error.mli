@@ -29,4 +29,6 @@ val list : #RPC_context.simple -> Json_schema.schema tzresult Lwt.t
 
 val encoding : error trace Data_encoding.t
 
+val opt_encoding : error trace option Data_encoding.t
+
 val bad_version : given:int -> supported:int list -> RPC_service.error

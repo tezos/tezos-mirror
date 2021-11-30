@@ -566,7 +566,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "$ref": "#/definitions/Signature"
                         },
                         "error": {
-                          "$ref": "#/definitions/error"
+                          "$ref": "#/definitions/error_opt"
                         }
                       },
                       "required": [
@@ -1939,7 +1939,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "title": "A nonce hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
-                      "error": {
+                      "error_opt": {
                         "description": "The full list of error is available with the global RPC `GET errors`"
                       },
                       "fitness": {
@@ -4351,7 +4351,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "kind": "dyn",
-                              "name": "error",
+                              "name": "error_opt",
                               "num_fields": 1,
                               "size": "Uint30"
                             },

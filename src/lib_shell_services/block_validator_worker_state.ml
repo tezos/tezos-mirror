@@ -150,7 +150,7 @@ module Event = struct
           (obj3
              (req "failed_validation" Request.validation_view_encoding)
              (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+             (req "errors" RPC_error.encoding))
           (function
             | Validation_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Validation_failure (r, s, err));
@@ -162,7 +162,7 @@ module Event = struct
                 "failed_validation_after_precheck"
                 Request.validation_view_encoding)
              (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+             (req "errors" RPC_error.encoding))
           (function
             | Validation_failure_after_precheck (r, s, err) -> Some (r, s, err)
             | _ -> None)
@@ -173,7 +173,7 @@ module Event = struct
           (obj3
              (req "failed_precheck" Request.validation_view_encoding)
              (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+             (req "errors" RPC_error.encoding))
           (function
             | Precheck_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Precheck_failure (r, s, err));
@@ -209,7 +209,7 @@ module Event = struct
           (obj3
              (req "preapplication_failure" Request.preapplication_view_encoding)
              (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+             (req "errors" RPC_error.encoding))
           (function
             | Preapplication_failure (r, s, e) -> Some (r, s, e) | _ -> None)
           (fun (r, s, e) -> Preapplication_failure (r, s, e));

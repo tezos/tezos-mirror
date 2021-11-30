@@ -1305,7 +1305,9 @@ module Make
              let current_mempool =
                List.concat
                  [applied; prechecked; refused; branch_refused; branch_delayed]
-               |> List.map (fun (hash, op, errors) -> ((hash, op), errors))
+               |> List.map (function
+                      | (hash, op, []) -> ((hash, op), None)
+                      | (hash, op, errors) -> ((hash, op), Some errors))
              in
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
@@ -1326,12 +1328,12 @@ module Make
                      when filter_result kind ->
                        let errors =
                          match kind with
-                         | `Prechecked | `Applied -> []
+                         | `Prechecked | `Applied -> None
                          | `Branch_delayed errors
                          | `Branch_refused errors
-                         | `Refused errors ->
-                             errors
-                         | `Outdated errors -> errors
+                         | `Refused errors
+                         | `Outdated errors ->
+                             Some errors
                        in
                        Lwt.return_some
                          [((hash, {Filter.Proto.shell; protocol_data}), errors)]
