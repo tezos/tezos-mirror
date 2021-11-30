@@ -55,6 +55,11 @@ release:
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
+.PHONY: $(TEZOS_BIN)
+$(TEZOS_BIN): generate_dune
+	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	cp -f _build/install/default/bin/$@ ./
+
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))

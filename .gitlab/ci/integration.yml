@@ -43,14 +43,14 @@ script:prepare_migration_test:
 
 script:snapshot_alpha_and_link:
   extends: .test_template
-  before_script:
+  script:
     - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
     - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
-    - make
-  script:
+    - make tezos-protocol-compiler
     - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
     - make
+    - dune build src/proto_"$new_proto_version"_*/
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##
