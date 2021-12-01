@@ -305,6 +305,7 @@ module type T = sig
   type types_state = {
     shell : types_state_shell;
     mutable filter_state : Filter.Mempool.state;
+        (** Internal state of the filter in the plugin *)
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       (Classification.classification
@@ -464,14 +465,14 @@ module Make
       operation_stream
       (classification, hash, shell_header, op_data)
 
-  let pre_filter pv oph raw : (bool * Filter.Mempool.state) Lwt.t =
+  let pre_filter pv oph raw : bool Lwt.t =
     match Prevalidation.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel
           pv.shell.parameters.chain_db
           oph ;
-        (false, pv.filter_state)
+        false
     | Ok parsed_op -> (
         let op =
           {
@@ -490,16 +491,15 @@ module Make
           pv.filter_config
           op.Filter.Proto.protocol_data
         >|= function
-        | ( ((`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _)
-            as errs),
-            filter_state ) ->
+        | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
+          errs ->
             handle
               ~notifier:(mk_notifier pv.operation_stream)
               pv.shell
               (`Parsed parsed_op)
               errs ;
-            (false, filter_state)
-        | (`Undecided, filter_state) -> (true, filter_state))
+            false
+        | `Passed_prefilter -> true)
 
   let post_filter pv ~validation_state_before ~validation_state_after op receipt
       =
@@ -518,16 +518,23 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let precheck pv validation_state (op : Protocol.operation_data operation) =
+  let precheck pv validation_state oph (op : Protocol.operation_data operation)
+      =
     let validation_state = Prevalidation.validation_state validation_state in
     if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
     else
-      Filter.Mempool.precheck ~validation_state op.raw.shell op.protocol_data
+      Filter.Mempool.precheck
+        pv.filter_config
+        ~filter_state:pv.filter_state
+        ~validation_state
+        op.raw.shell
+        oph
+        op.protocol_data
       >|= function
-      | `Prechecked ->
+      | `Passed_precheck filter_state ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
-          `Prechecked
+          `Passed_precheck filter_state
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -545,17 +552,17 @@ module Make
         handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
     | Ok op -> (
-        precheck pv validation_state op >>= function
+        precheck pv validation_state oph op >>= function
         | `Fail errs ->
             handle ~notifier pv.shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
-        | `Prechecked ->
+        | `Passed_precheck filter_state ->
             handle ~notifier pv.shell (`Parsed op) `Applied ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Undecided -> (
             Prevalidation.apply_operation validation_state op >>= function
-            | Applied (new_validation_state, receipt) ->
+            | Applied (new_validation_state, receipt) -> (
                 post_filter
                   pv
                   ~validation_state_before:
@@ -564,16 +571,14 @@ module Make
                     (Prevalidation.validation_state new_validation_state)
                   op.protocol_data
                   receipt
-                >>= fun (accept, filter_state) ->
-                if accept then (
-                  handle ~notifier pv.shell (`Parsed op) `Applied ;
-                  let new_mempool = Mempool.cons_valid op.hash mempool in
-                  Lwt.return (filter_state, new_validation_state, new_mempool))
-                else (
-                  Distributed_db.Operation.clear_or_cancel
-                    pv.shell.parameters.chain_db
-                    oph ;
-                  Lwt.return (filter_state, validation_state, mempool))
+                >>= function
+                | `Passed_postfilter filter_state ->
+                    handle ~notifier pv.shell (`Parsed op) `Applied ;
+                    let new_mempool = Mempool.cons_valid op.hash mempool in
+                    Lwt.return (filter_state, new_validation_state, new_mempool)
+                | `Refused _ as classification ->
+                    handle ~notifier pv.shell (`Parsed op) classification ;
+                    Lwt.return (filter_state, validation_state, mempool))
             | Branch_delayed errors ->
                 handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
                 Lwt.return (filter_state, validation_state, mempool)
@@ -945,8 +950,7 @@ module Make
       if already_handled then return_unit
       else
         pre_filter pv oph op >>= function
-        | (true, new_filter_state) ->
-            pv.filter_state <- new_filter_state ;
+        | true ->
             if
               not
                 (Block_hash.Set.mem
@@ -962,9 +966,7 @@ module Make
                  Should this have an influence on the peer's score ? *)
               pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
               return_unit)
-        | (false, filter_state) ->
-            pv.filter_state <- filter_state ;
-            return_unit
+        | false -> return_unit
 
     let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
@@ -1110,12 +1112,8 @@ module Make
       Operation_hash.Map.fold_s
         (fun oph op pending ->
           pre_filter pv oph op >|= function
-          | (true, filter_state) ->
-              pv.filter_state <- filter_state ;
-              Operation_hash.Map.add oph op pending
-          | (false, filter_state) ->
-              pv.filter_state <- filter_state ;
-              pending)
+          | true -> Operation_hash.Map.add oph op pending
+          | false -> pending)
         new_pending_operations
         Operation_hash.Map.empty
       >>= fun new_pending_operations ->
@@ -1139,24 +1137,24 @@ module Make
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
       | `None -> `None
 
-    let on_ban pv oph_to_ban =
-      Distributed_db.Operation.clear_or_cancel
-        pv.shell.parameters.chain_db
-        oph_to_ban ;
+    let remove pv oph =
+      Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
       pv.shell.advertisement <-
-        remove_from_advertisement oph_to_ban pv.shell.advertisement ;
+        remove_from_advertisement oph pv.shell.advertisement ;
       pv.shell.banned_operations <-
-        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      if Classification.is_in_mempool oph_to_ban pv.shell.classification then
-        if not (Classification.is_applied oph_to_ban pv.shell.classification)
-        then return (Classification.remove oph_to_ban pv.shell.classification)
+        Operation_hash.Set.add oph pv.shell.banned_operations ;
+      if Classification.is_in_mempool oph pv.shell.classification then
+        if not (Classification.is_applied oph pv.shell.classification) then (
+          pv.filter_state <-
+            Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
+          return (Classification.remove oph pv.shell.classification))
         else
           (* Modifying the list of operations classified as [Applied]
              might change the classification of all the operations in
-             the mempool. Hence if the banned operation has been
+             the mempool. Hence if the removed operation has been
              applied we flush the mempool to force the
              reclassification of all the operations except the one
-             banned. *)
+             removed. *)
           on_flush
             ~handle_branch_refused:false
             pv
@@ -1164,14 +1162,16 @@ module Make
             pv.shell.live_blocks
             pv.shell.live_operations
           >|=? fun () ->
-          pv.shell.pending <-
-            Operation_hash.Map.remove oph_to_ban pv.shell.pending
+          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending
       else (
-        pv.shell.pending <-
-          Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
-        pv.shell.fetching <-
-          Operation_hash.Set.remove oph_to_ban pv.shell.fetching ;
+        pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
+        pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
         return_unit)
+
+    let on_ban pv oph_to_ban =
+      pv.shell.banned_operations <-
+        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
+      remove pv oph_to_ban
 
     let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
      fun w request ->

@@ -86,6 +86,9 @@ module Mempool = struct
     minimal_nanotez_per_gas_unit : nanotez;
     minimal_nanotez_per_byte : nanotez;
     allow_script_failure : bool;
+        (** If [true], this makes [post_filter_manager] unconditionally return
+            [`Passed_postfilter filter_state], no matter the operation's
+            success. *)
     clock_drift : Period.t option;
   }
 
@@ -155,14 +158,29 @@ module Mempool = struct
   type state = {
     grandparent_level_start : Alpha_context.Timestamp.t option;
     round_zero_duration : Period.t option;
+    op_prechecked_managers : Signature.Public_key_hash.Set.t;
+        (** Set of all managers that are the source of manager operations
+            applied in the mempool. Each manager in the set should be accessible
+            with an operation hash in [operation_hash_to_manager]. *)
+    operation_hash_to_manager : Signature.Public_key_hash.t Operation_hash.Map.t;
+        (** Map of operation hash to manager used to remove a manager from
+            [op_prechecked_managers] with an operation hash. Each manager in the
+            map should also be in [op_prechecked_managers]. *)
   }
+
+  let empty : state =
+    {
+      grandparent_level_start = None;
+      round_zero_duration = None;
+      op_prechecked_managers = Signature.Public_key_hash.Set.empty;
+      operation_hash_to_manager = Operation_hash.Map.empty;
+    }
 
   let init config ?(validation_state : validation_state option) ~predecessor ()
       =
     ignore config ;
     (match validation_state with
-    | None ->
-        return {grandparent_level_start = None; round_zero_duration = None}
+    | None -> return empty
     | Some {ctxt; _} ->
         let {
           Tezos_base.Block_header.fitness = predecessor_fitness;
@@ -190,6 +208,7 @@ module Mempool = struct
           >>?= fun proposal_offset ->
           return
             {
+              empty with
               grandparent_level_start =
                 Some Timestamp.(predecessor_timestamp - proposal_offset);
               round_zero_duration = Some round_zero_duration;
@@ -200,6 +219,22 @@ module Mempool = struct
       ~predecessor () =
     ignore filter_state ;
     init config ?validation_state ~predecessor ()
+
+  let remove ~(filter_state : state) oph =
+    match
+      Operation_hash.Map.find oph filter_state.operation_hash_to_manager
+    with
+    | None -> filter_state
+    | Some source ->
+        {
+          filter_state with
+          op_prechecked_managers =
+            Signature.Public_key_hash.Set.remove
+              source
+              filter_state.op_prechecked_managers;
+          operation_hash_to_manager =
+            Operation_hash.Map.remove oph filter_state.operation_hash_to_manager;
+        }
 
   let get_manager_operation_gas_and_fee contents =
     let open Operation in
@@ -231,47 +266,82 @@ module Mempool = struct
       (function Fees_too_low -> Some () | _ -> None)
       (fun () -> Fees_too_low)
 
+  type Environment.Error_monad.error += Manager_restriction
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"plugin_filter.manager_restriction"
+      ~title:"Only one manager operation per manager per block allowed"
+      ~description:"Only one manager operation per manager per block allowed"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Only one manager operation per manager per block allowed")
+      Data_encoding.unit
+      (function Manager_restriction -> Some () | _ -> None)
+      (fun () -> Manager_restriction)
+
+  let check_manager_restriction filter_state source =
+    if
+      Signature.Public_key_hash.Set.mem
+        source
+        filter_state.op_prechecked_managers
+    then
+      (* Manager already seen: one manager per block limitation triggered. *)
+      Error (`Branch_delayed [Environment.wrap_tzerror Manager_restriction])
+    else Ok ()
+
   let pre_filter_manager :
       type t.
       config ->
+      state ->
       t Kind.manager contents_list ->
+      public_key_hash ->
       int ->
-      [ `Undecided
+      [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ] =
-   fun config op size ->
-    match get_manager_operation_gas_and_fee op with
-    | Error err ->
-        let err = Environment.wrap_tztrace err in
-        `Refused err
-    | Ok (fee, gas) ->
-        let fees_in_nanotez =
-          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
-        in
-        let minimal_fees_in_nanotez =
-          Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
-        in
-        let minimal_fees_for_gas_in_nanotez =
-          Q.mul
-            config.minimal_nanotez_per_gas_unit
-            (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
-        in
-        let minimal_fees_for_size_in_nanotez =
-          Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
-        in
-        if
-          Q.compare
-            fees_in_nanotez
-            (Q.add
-               minimal_fees_in_nanotez
-               (Q.add
-                  minimal_fees_for_gas_in_nanotez
-                  minimal_fees_for_size_in_nanotez))
-          >= 0
-        then `Undecided
-        else `Refused [Environment.wrap_tzerror Fees_too_low]
+   fun config filter_state op source size ->
+    let check_gas_and_fee () =
+      match get_manager_operation_gas_and_fee op with
+      | Error err ->
+          let err = Environment.wrap_tztrace err in
+          `Refused err
+      | Ok (fee, gas) ->
+          let fees_in_nanotez =
+            Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
+          in
+          let minimal_fees_in_nanotez =
+            Q.mul
+              (Q.of_int64 (Tez.to_mutez config.minimal_fees))
+              (Q.of_int 1000)
+          in
+          let minimal_fees_for_gas_in_nanotez =
+            Q.mul
+              config.minimal_nanotez_per_gas_unit
+              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
+          in
+          let minimal_fees_for_size_in_nanotez =
+            Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
+          in
+          if
+            Q.compare
+              fees_in_nanotez
+              (Q.add
+                 minimal_fees_in_nanotez
+                 (Q.add
+                    minimal_fees_for_gas_in_nanotez
+                    minimal_fees_for_size_in_nanotez))
+            >= 0
+          then `Passed_prefilter
+          else `Refused [Environment.wrap_tzerror Fees_too_low]
+    in
+    match check_manager_restriction filter_state source with
+    | Error errs -> errs
+    | Ok () -> check_gas_and_fee ()
 
   type Environment.Error_monad.error += Outdated_endorsement
 
@@ -454,7 +524,7 @@ module Mempool = struct
       acceptable ~drift ~op_earliest_ts ~now_timestamp
 
   let pre_filter_far_future_consensus_ops config
-      ~filter_state:({grandparent_level_start; round_zero_duration} : state)
+      ~filter_state:({grandparent_level_start; round_zero_duration; _} : state)
       ?validation_state_before
       ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t
       =
@@ -518,9 +588,9 @@ module Mempool = struct
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
-    (match contents with
+    match contents with
     | Single (Failing_noop _) ->
-        Lwt.return @@ `Refused [Environment.wrap_tzerror Wrong_operation]
+        Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
     | Single (Preendorsement consensus_content)
     | Single (Endorsement consensus_content) ->
         pre_filter_far_future_consensus_ops
@@ -529,11 +599,11 @@ module Mempool = struct
           ?validation_state_before
           consensus_content
         >>= fun keep ->
-        if keep then Lwt.return `Undecided
+        if keep then Lwt.return `Passed_prefilter
         else
           Lwt.return
-          @@ `Branch_refused
-               [Environment.wrap_tzerror Consensus_operation_in_far_future]
+            (`Branch_refused
+              [Environment.wrap_tzerror Consensus_operation_in_far_future])
     | Single (Seed_nonce_revelation _)
     | Single (Double_preendorsement_evidence _)
     | Single (Double_endorsement_evidence _)
@@ -541,107 +611,195 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        Lwt.return @@ `Undecided
-    | Single (Manager_operation _) as op ->
-        Lwt.return @@ pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op ->
-        Lwt.return @@ pre_filter_manager config op bytes)
-    >>= fun res -> Lwt.return (res, filter_state)
+        Lwt.return @@ `Passed_prefilter
+    | Single (Manager_operation {source; _}) as op ->
+        Lwt.return (pre_filter_manager config filter_state op source bytes)
+    | Cons (Manager_operation {source; _}, _) as op ->
+        Lwt.return (pre_filter_manager config filter_state op source bytes)
 
   let precheck_manager :
       type t.
+      state ->
       validation_state ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
-      [> `Prechecked
+      public_key_hash ->
+      [> `Prechecked_manager
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
       Lwt.t =
-   fun validation_state
+   fun filter_state
+       validation_state
        shell
-       ({contents; _} as protocol_data : t Kind.manager protocol_data) ->
-    ( Main.precheck_manager validation_state contents >>=? fun () ->
-      let (raw_operation : t Kind.manager operation) =
-        Alpha_context.{shell; protocol_data}
-      in
-      Main.check_manager_signature validation_state contents raw_operation )
-    >|= function
-    | Ok () -> `Prechecked
-    | Error err -> (
-        let err = Environment.wrap_tztrace err in
-        match classify_trace err with
-        | Branch -> `Branch_refused err
-        | Permanent -> `Refused err
-        | Temporary -> `Branch_delayed err
-        | Outdated -> `Outdated err)
+       ({contents; _} as protocol_data : t Kind.manager protocol_data)
+       source ->
+    let precheck_manager_and_check_signature () =
+      ( Main.precheck_manager validation_state contents >>=? fun () ->
+        let (raw_operation : t Kind.manager operation) =
+          Alpha_context.{shell; protocol_data}
+        in
+        Main.check_manager_signature validation_state contents raw_operation )
+      >|= function
+      | Ok () -> `Prechecked_manager
+      | Error err -> (
+          let err = Environment.wrap_tztrace err in
+          match classify_trace err with
+          | Branch -> `Branch_refused err
+          | Permanent -> `Refused err
+          | Temporary -> `Branch_delayed err
+          | Outdated -> `Outdated err)
+    in
+    match check_manager_restriction filter_state source with
+    | Error err -> Lwt.return err
+    | Ok () -> precheck_manager_and_check_signature ()
+
+  let add_manager_restriction filter_state oph source =
+    {
+      filter_state with
+      op_prechecked_managers =
+        (* Manager not seen yet, record it for next ops *)
+        Signature.Public_key_hash.Set.add
+          source
+          filter_state.op_prechecked_managers;
+      operation_hash_to_manager =
+        Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
+        (* Record which manager is used for the operation hash. *);
+    }
 
   let precheck :
+      config ->
+      filter_state:state ->
       validation_state:validation_state ->
       Tezos_base.Operation.shell_header ->
+      Operation_hash.t ->
       Main.operation_data ->
-      [ `Prechecked
+      [ `Passed_precheck of state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace
       | `Undecided ]
       Lwt.t =
-   fun ~validation_state shell_header (Operation_data protocol_data) ->
+   fun _
+       ~filter_state
+       ~validation_state
+       shell_header
+       oph
+       (Operation_data protocol_data) ->
+    let precheck_manager protocol_data source =
+      precheck_manager
+        filter_state
+        validation_state
+        shell_header
+        protocol_data
+        source
+      >|= function
+      | `Prechecked_manager ->
+          `Passed_precheck (add_manager_restriction filter_state oph source)
+      | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+        errs ->
+          errs
+    in
     match protocol_data.contents with
-    | Single (Manager_operation _) ->
-        precheck_manager validation_state shell_header protocol_data
-    | Cons (Manager_operation _, _) ->
-        precheck_manager validation_state shell_header protocol_data
+    | Single (Manager_operation {source; _}) ->
+        precheck_manager protocol_data source
+    | Cons (Manager_operation {source; _}, _) ->
+        precheck_manager protocol_data source
     | Single _ -> Lwt.return `Undecided
 
   open Apply_results
 
+  type Environment.Error_monad.error += Skipped_operation
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"postfilter.skipped_operation"
+      ~title:"The operation has been skipped by the protocol"
+      ~description:"The operation has been skipped by the protocol"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation has been skipped by the protocol")
+      Data_encoding.unit
+      (function Skipped_operation -> Some () | _ -> None)
+      (fun () -> Skipped_operation)
+
+  type Environment.Error_monad.error += Backtracked_operation
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"postfilter.backtracked_operation"
+      ~title:"The operation has been backtracked by the protocol"
+      ~description:"The operation has been backtracked by the protocol"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation has been backtracked by the protocol")
+      Data_encoding.unit
+      (function Backtracked_operation -> Some () | _ -> None)
+      (fun () -> Backtracked_operation)
+
   let rec post_filter_manager :
       type t.
       Alpha_context.t ->
+      state ->
       t Kind.manager contents_result_list ->
       config ->
-      bool Lwt.t =
-   fun ctxt op config ->
-    match op with
+      [`Passed_postfilter of state | `Refused of tztrace] =
+   fun ctxt filter_state result config ->
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2181
+       This function should be unit tested.
+       The errors that can be raised if allow_script_failure is enable should
+       be tested. *)
+    match result with
     | Single_result (Manager_operation_result {operation_result; _}) -> (
+        let check_allow_script_failure errs =
+          if config.allow_script_failure then `Passed_postfilter filter_state
+          else `Refused errs
+        in
         match operation_result with
-        | Applied _ -> Lwt.return_true
-        | Skipped _ | Failed _ | Backtracked _ ->
-            Lwt.return config.allow_script_failure)
+        | Applied _ -> `Passed_postfilter filter_state
+        | Skipped _ ->
+            check_allow_script_failure
+              [Environment.wrap_tzerror Skipped_operation]
+        | Failed (_, errors) ->
+            check_allow_script_failure (Environment.wrap_tztrace errors)
+        | Backtracked (_, errors) ->
+            check_allow_script_failure
+              (match errors with
+              | Some e -> Environment.wrap_tztrace e
+              | None -> [Environment.wrap_tzerror Backtracked_operation]))
     | Cons_result (Manager_operation_result res, rest) -> (
         post_filter_manager
           ctxt
+          filter_state
           (Single_result (Manager_operation_result res))
           config
-        >>= function
-        | false -> Lwt.return_false
-        | true -> post_filter_manager ctxt rest config)
+        |> function
+        | `Passed_postfilter filter_state ->
+            post_filter_manager ctxt filter_state rest config
+        | `Refused _ as errs -> errs)
 
   let post_filter config ~(filter_state : state) ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
-    (match receipt with
+    match receipt with
     | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
         match contents with
-        | Single_result (Preendorsement_result _) -> Lwt.return_true
-        | Single_result (Endorsement_result _) -> Lwt.return_true
-        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
-        | Single_result (Double_preendorsement_evidence_result _) ->
-            Lwt.return_true
-        | Single_result (Double_endorsement_evidence_result _) ->
-            Lwt.return_true
-        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
-        | Single_result (Activate_account_result _) -> Lwt.return_true
-        | Single_result Proposals_result -> Lwt.return_true
-        | Single_result Ballot_result -> Lwt.return_true
-        | Single_result (Manager_operation_result _) as op ->
-            post_filter_manager ctxt op config
-        | Cons_result (Manager_operation_result _, _) as op ->
-            post_filter_manager ctxt op config))
-    >>= fun res -> Lwt.return (res, filter_state)
+        | Single_result (Preendorsement_result _)
+        | Single_result (Endorsement_result _)
+        | Single_result (Seed_nonce_revelation_result _)
+        | Single_result (Double_preendorsement_evidence_result _)
+        | Single_result (Double_endorsement_evidence_result _)
+        | Single_result (Double_baking_evidence_result _)
+        | Single_result (Activate_account_result _)
+        | Single_result Proposals_result
+        | Single_result Ballot_result ->
+            Lwt.return (`Passed_postfilter filter_state)
+        | Single_result (Manager_operation_result _) as result ->
+            Lwt.return (post_filter_manager ctxt filter_state result config)
+        | Cons_result (Manager_operation_result _, _) as result ->
+            Lwt.return (post_filter_manager ctxt filter_state result config))
 end
 
 module View_helpers = struct

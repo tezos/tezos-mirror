@@ -50,11 +50,16 @@ module type FILTER = sig
       unit ->
       state tzresult Lwt.t
 
+    val remove : filter_state:state -> Operation_hash.t -> state
+
     val precheck :
+      config ->
+      filter_state:state ->
       validation_state:Proto.validation_state ->
       Tezos_base.Operation.shell_header ->
+      Operation_hash.t ->
       Proto.operation_data ->
-      [ `Prechecked
+      [ `Passed_precheck of state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
@@ -67,12 +72,11 @@ module type FILTER = sig
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      ([ `Undecided
-       | `Branch_delayed of tztrace
-       | `Branch_refused of tztrace
-       | `Refused of tztrace
-       | `Outdated of tztrace ]
-      * state)
+      [ `Passed_prefilter
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     val post_filter :
@@ -81,7 +85,7 @@ module type FILTER = sig
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
       Proto.operation_data * Proto.operation_receipt ->
-      (bool * state) Lwt.t
+      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
 
   module RPC : sig
@@ -103,16 +107,19 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let init _ ?validation_state:_ ~predecessor:_ () = return_unit
 
+    let remove ~filter_state _ = filter_state
+
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
 
-    let precheck ~validation_state:_ _ _ = Lwt.return `Undecided
+    let precheck _ ~filter_state:_ ~validation_state:_ _ _ _ =
+      Lwt.return `Undecided
 
-    let pre_filter _ ~filter_state ?validation_state_before:_ _ =
-      Lwt.return (`Undecided, filter_state)
+    let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
+      Lwt.return `Passed_prefilter
 
     let post_filter _ ~filter_state ~validation_state_before:_
         ~validation_state_after:_ _ =
-      Lwt.return (true, filter_state)
+      Lwt.return (`Passed_postfilter filter_state)
   end
 
   module RPC = struct

@@ -2,10 +2,10 @@ tezt/_regressions/rpc/granada.proxy.mempool.out
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
 [{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":1}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.prefilter.outdated_endorsement"}]}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":3}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/pending_operations
 protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
@@ -14,9 +14,9 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
-              "source": "[PUBLIC_KEY_HASH]", "fee": "402",
-              "counter": "1", "gas_limit": "1520", "storage_limit": "0",
-              "amount": "2000000",
+              "source": "[PUBLIC_KEY_HASH]",
+              "fee": "1000", "counter": "1", "gas_limit": "1040",
+              "storage_limit": "257", "amount": "1000000",
               "destination": "[PUBLIC_KEY_HASH]" } ],
         "signature":
           "[SIGNATURE]" } ],
@@ -26,9 +26,9 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
           "branch": "[BRANCH_HASH]",
           "contents":
             [ { "kind": "transaction",
-                "source": "[PUBLIC_KEY_HASH]",
-                "fee": "10", "counter": "1", "gas_limit": "1040",
-                "storage_limit": "0", "amount": "1000",
+                "source": "[PUBLIC_KEY_HASH]", "fee": "0",
+                "counter": "1", "gas_limit": "1040", "storage_limit": "257",
+                "amount": "1000000",
                 "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
@@ -60,8 +60,8 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
           "contents":
             [ { "kind": "transaction",
                 "source": "[PUBLIC_KEY_HASH]",
-                "fee": "402", "counter": "1", "gas_limit": "1520",
-                "storage_limit": "0", "amount": "2000000",
+                "fee": "1000", "counter": "1", "gas_limit": "1040",
+                "storage_limit": "257", "amount": "1000000",
                 "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
@@ -75,23 +75,21 @@ protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWn
         { "protocol": "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV",
           "branch": "[BRANCH_HASH]",
           "contents":
-            [ { "kind": "endorsement_with_slot",
-                "endorsement":
-                  { "branch":
-                      "[BRANCH_HASH]",
-                    "operations": { "kind": "endorsement", "level": 3 },
-                    "signature":
-                      "[SIGNATURE]" },
-                "slot": 3 } ],
+            [ { "kind": "transaction",
+                "source": "[PUBLIC_KEY_HASH]",
+                "fee": "1000", "counter": "5", "gas_limit": "1040",
+                "storage_limit": "257", "amount": "1000000",
+                "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
           "error":
             [ { "kind": "temporary",
-                "id": "proto.010-PtGRANAD.prefilter.outdated_endorsement" } ] } ] ],
-  "unprocessed": [] }
+                "id": "proto.010-PtGRANAD.contract.counter_in_the_future",
+                "contract": "[PUBLIC_KEY_HASH]",
+                "expected": "1", "found": "5" } ] } ] ], "unprocessed": [] }
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.010-PtGRANAD.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":3}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.prefilter.outdated_endorsement"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.010-PtGRANAD.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.010-PtGRANAD.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.010-PtGRANAD.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/filter
 protocol of proxy unspecified, using the node's protocol: PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV

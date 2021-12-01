@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The mempool type description. *)
 type t = {
   applied : string list;
   branch_delayed : string list;
@@ -32,8 +33,12 @@ type t = {
   unprocessed : string list;
 }
 
-(** The mempool type description. *)
+(** A comparable type for mempool where classification and ordering
+   does not matter. *)
 val typ : t Check.typ
+
+(* A comparable type for mempool where ordering does not matter. *)
+val classified_typ : t Check.typ
 
 val empty : t
 
