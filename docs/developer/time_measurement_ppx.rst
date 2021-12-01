@@ -1,5 +1,3 @@
-.. _time_measurement_ppx:
-
 Time measurement PPX
 ====================
 
@@ -12,7 +10,7 @@ expressions and to log these measurements when desired. Since it uses
 together with ``Tezt`` framework to perform the benchmarking of specific
 parts of Tezos node.
 
-**This PPX is only intended to be used for tests. As the current runtime 
+**This PPX is only intended to be used for tests. As the current runtime
 implemetation performs memory allocation, an unwise usage could mess with
 the garbage collector or blow up your memory.**
 
@@ -95,7 +93,7 @@ time measurement in order to discriminate it later. This key is computed from th
 that was given inside the attribute ``[@time.duration f_time]``.
 ``"f_time"`` is the label of the key, an identifier that represents the name of the
 measurement.
-``[]`` is a list of string that contains some additional metadata. It can be useful
+``[]`` is a list of strings that contains some additional metadata. It can be useful
 to distinguish several measurements registered with the same label, for example if
 the expression is evaluated in a loop. In our case, the list is empty because no
 metadata was provided in the attribute's payload.
@@ -145,7 +143,7 @@ is displayed on standard output. For example:
 
 .. code-block::
 
-    Aug 23 17:52:58.593 - benchmarking: time measurements: 
+    Aug 23 17:52:58.593 - benchmarking: time measurements:
     Aug 23 17:52:58.593 - benchmarking:   [(f_time, 0.000177); (g_time, 0.005658)]
 
 Compatible Ocaml Attributes
@@ -157,13 +155,13 @@ The PPX provides the handling of three attributes:
   Ocaml expressions execution.
   The ``<label>`` inside the payload will be used to tag the measured time.
   The ``<metadata>`` is an Ocaml expression that can be added optionally
-  and should evalutes in a list of ``string``s. It can be given to add
+  and should evaluate to a list of ``string``\s. It can be given to add
   additional contextual information to the measurement and it can permit
   to discrimine it from other measurements registered with the same label.
 
   Be careful, annotating ``Lwt.t`` values with this attribute may
   not give consistent time measurements since it will only measure
-  the time spent to return the corresponding promise. 
+  the time spent to return the corresponding promise.
 
 - ``[@time.duration_lwt <label> (<metadata>)]`` does the same as
   ``[@time.duration]`` except that it must annotate an expression evaluating
@@ -188,7 +186,3 @@ A helper has been added in the ``Makefile``, so you just need to run the followi
 command to instrument the node during the compilation:::
 
     ./make enable-time-measurement
-
-
-
-

@@ -59,7 +59,9 @@ therefore protocol specific. The context may contain, for instance, a list of
 accounts and their balances. More generally, the context must provide enough
 information to determine the validity of a block. Given a context and a block,
 the ``apply`` function returns the updated context if the block is valid and has
-a higher *fitness*. The fitness determines a total ordering between blocks.
+a higher :ref:`fitness<fitness_alpha>`. The fitness determines a total ordering between blocks.
+
+.. _shell_proto_interact_alpha:
 
 Shell-protocol interaction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,7 +77,7 @@ Blocks
 
 A block consists of a header and operations. A block's header is
 composed of two parts: :ref:`the protocol-agnostic part<shell_header>`
-and :ref:`the protocol-specific part<emmyp_fitness_and_header_alpha>`.
+and :ref:`the protocol-specific part<shell_proto_revisit_alpha>`.
 This separation enables the shell to interact with different
 protocols.
 
