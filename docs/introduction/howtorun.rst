@@ -276,12 +276,12 @@ the endorsing rights for that account and, upon reception of a new
 block, verifies the validity of the block and emits an endorsement
 operation.
 It can endorse for a specific account or if omitted it endorses for
-all accounts.
+all known accounts.
 
 .. note::
 
    In the Alpha protocol, the endorser daemon no longer exists, its role being
-   played by the baker daemon in the corresponding consenus algorithm.
+   played by the baker daemon in the corresponding consensus algorithm.
    Therefore, there is no ``tezos-endorser-alpha`` executable, but endorser
    executables ``tezos-endorser-NNN-*`` exist for protocols up to 011
    (Hangzhou).
