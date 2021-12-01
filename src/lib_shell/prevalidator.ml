@@ -518,14 +518,14 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let precheck pv validation_state oph (op : Protocol.operation_data operation)
-      =
+  let precheck pv filter_state validation_state oph
+      (op : Protocol.operation_data operation) =
     let validation_state = Prevalidation.validation_state validation_state in
     if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
     else
       Filter.Mempool.precheck
         pv.filter_config
-        ~filter_state:pv.filter_state
+        ~filter_state
         ~validation_state
         op.raw.shell
         oph
@@ -552,7 +552,7 @@ module Make
         handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
     | Ok op -> (
-        precheck pv validation_state oph op >>= function
+        precheck pv filter_state validation_state oph op >>= function
         | `Fail errs ->
             handle ~notifier pv.shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
