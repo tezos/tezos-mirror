@@ -897,6 +897,90 @@ module Revamped = struct
         bool
         ~error_msg:"a flush have been triggered after the ban") ;
     unit
+
+  (* This test checks that on a ban of an applied operation the flush respect
+     the 1M invariant. *)
+  let one_operation_per_manager_per_block_flush_on_ban =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_flush_on_ban"
+      ~tags:["mempool"; "manager_restriction"; "flush"; "ban"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    log_step 2 "Inject a transfer." ;
+    let* oph1 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap2
+        client
+    in
+
+    log_step 3 "Inject a transfer with a different source." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        client
+    in
+
+    log_step
+      4
+      "Inject a transfer with the same source but different destination. This \
+       operation should be classified as branch_delayed with the 1M \
+       restriction." ;
+    let* oph3 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~destination:Constant.bootstrap3
+        client
+    in
+
+    log_step
+      5
+      "Check that the mempool contains %s and %s as applied, %s as \
+       branch_delayed."
+      oph1
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph1; oph2]; branch_delayed = [oph3]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 5 "Ban the operation %s." oph1 ;
+    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+
+    log_step
+      6
+      "Check that %s is not in the mempool anymore and that one operation is \
+       applied and the other is branch_delayed between %s and %s."
+      oph1
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (List.length mempool.applied = 1)
+        int
+        ~error_msg:"applied mempool should contain only one operation, got %L") ;
+    Check.(
+      (List.length mempool.branch_delayed = 1)
+        int
+        ~error_msg:
+          "branch_delayed mempool should contain only one operation, got %L") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3527,6 +3611,7 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
   Revamped.one_operation_per_manager_per_block_flush ~protocols ;
   Revamped.one_operation_per_manager_per_block_ban ~protocols ;
+  Revamped.one_operation_per_manager_per_block_flush_on_ban ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
