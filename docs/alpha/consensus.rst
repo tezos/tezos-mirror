@@ -294,10 +294,9 @@ validator slots above the threshold of :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE 
 the included endorsements represent. The bonus is also distributed
 immediately.
 
-The endorsing rewards are shared among all validators, proportionally
-to their *expected* number of validator slots. The endorsing reward
-may be received even if the validator's endorsement is not included in
-a block. However, two conditions must be met:
+The endorsing rewards are distributed at the end of the cycle.
+The endorsing reward may be received even if not all of the validator's endorsements are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
+However, two conditions must be met:
 
  - the validator has revealed its nonce, and
  - the validator has been present during the cycle.
@@ -310,7 +309,6 @@ corresponding level) of all the endorsements included by the delegate during the
 cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expected number of
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
-The endorsing rewards are distributed at the end of the cycle.
 
 Regarding the concrete values for rewards, we first fix the total reward per
 level, call it ``total_rewards``, to ``80 / blocks_per_minute`` tez.
