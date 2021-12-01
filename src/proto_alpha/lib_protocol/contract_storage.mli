@@ -24,25 +24,31 @@
 (*****************************************************************************)
 
 type error +=
-  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
+  | (* `Temporary *)
+      Balance_too_low of
+      Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
       Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.contract
-  | (* `Temporary *)
+  | (* `Branch *)
       Empty_implicit_contract of Signature.Public_key_hash.t
-  | (* `Temporary *)
+  | (* `Branch *)
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
-  | (* `Temporary *)
-      Empty_transaction of Contract_repr.t (* `Temporary *)
-  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Failure of string
-(* `Permanent *)
+      Inconsistent_public_key of
+      Signature.Public_key.t * Signature.Public_key.t
+  | (* `Permanent *) Failure of string
 
+(** [allocated ctxt contract] returns [true] if and only if the
+   contract is stored in [Storage.Contract.Balance]. *)
+val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+
+(** [exists ctxt contract] returns [true] if and only if either the
+   contract is originated or it is (implicit and) "allocated". *)
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 (** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
@@ -55,8 +61,10 @@ val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
     be consumed since that operation is not a manager operation. *)
 val must_exist : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
-val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
-
+(** [must_be_allocated ctxt contract] fails when the contract is not
+   allocated. It fails with [Non_existing_contract] if the contract is
+   originated, and it fails with [Empty_implicit_contract] if the
+   contract is implicit. *)
 val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
 val list : Raw_context.t -> Contract_repr.t list Lwt.t

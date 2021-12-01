@@ -1473,8 +1473,6 @@ module Receipt : sig
 
   val balance_updates_encoding : balance_updates Data_encoding.t
 
-  val cleanup_balance_updates : balance_updates -> balance_updates
-
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 

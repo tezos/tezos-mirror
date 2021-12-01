@@ -72,8 +72,5 @@ type balance_updates = (balance * balance_update * update_origin) list
 
 val balance_updates_encoding : balance_updates Data_encoding.t
 
-(** Remove zero-valued balances from a list of updates. *)
-val cleanup_balance_updates : balance_updates -> balance_updates
-
 (** Group updates by (balance x origin), and remove zero-valued balances. *)
 val group_balance_updates : balance_updates -> balance_updates tzresult

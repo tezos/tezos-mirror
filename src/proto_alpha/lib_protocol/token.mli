@@ -95,8 +95,8 @@ val balance : Raw_context.t -> container -> Tez_repr.t tzresult Lwt.t
     as though [transfer src dest amount] was invoked for each pair
     [(src, amount)] in [sources], however a single balance update is generated
     for the total amount transferred to [dest].
-    When [sources] is an empty list, the function behaves as though [sources] was
-    mapped to [[(`Minted, Tez.zero)]]. *)
+    When [sources] is an empty list, the function does nothing to the context,
+    and returns an empty list of balance updates. *)
 val transfer_n :
   ?origin:Receipt_repr.update_origin ->
   Raw_context.t ->
@@ -119,8 +119,8 @@ val transfer_n :
     is equal to [amount].
     Returns a [Non_existing_contract] error if
     [dest] refers to an originated contract that is not allocated.
-    Returns a [Empty_transaction] error if [amount = Tez_repr.zero], and [dest]
-    refers to an implicit contract.
+    Returns a [Non_existing_contract] error if [amount <> Tez_repr.zero], and
+    [dest] refers to an originated contract that is not allocated.
     Returns a [Addition_overflow] error if [dest] refers to a sink whose balance
     is greater than [Int64.max - amount].
     Returns a [Wrong_level] error if [src] or [dest] refer to a level that is

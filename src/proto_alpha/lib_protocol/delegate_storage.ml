@@ -343,15 +343,13 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       (if sufficient_participation && has_revealed_nonces then
        (* Sufficient participation: we pay the rewards *)
-       if Tez_repr.(rewards <> zero) then
-         Token.transfer
-           ctxt
-           `Endorsing_rewards
-           (`Contract delegate_contract)
-           rewards
-         >|=? fun (ctxt, payed_rewards_receipts) ->
-         (ctxt, payed_rewards_receipts @ balance_updates)
-       else return (ctxt, balance_updates)
+       Token.transfer
+         ctxt
+         `Endorsing_rewards
+         (`Contract delegate_contract)
+         rewards
+       >|=? fun (ctxt, payed_rewards_receipts) ->
+       (ctxt, payed_rewards_receipts @ balance_updates)
       else
         (* Insufficient participation or unrevealed nonce: no rewards *)
         Token.transfer
@@ -810,18 +808,14 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
   let pay_payload_producer ctxt delegate =
     let contract = Contract_repr.implicit_contract delegate in
     Token.balance ctxt `Block_fees >>=? fun block_fees ->
-    if Tez_repr.(block_fees <> zero || baking_reward <> zero) then
-      Token.transfer_n
-        ctxt
-        [(`Block_fees, block_fees); (`Baking_rewards, baking_reward)]
-        (`Contract contract)
-    else return (ctxt, [])
+    Token.transfer_n
+      ctxt
+      [(`Block_fees, block_fees); (`Baking_rewards, baking_reward)]
+      (`Contract contract)
   in
   let pay_block_producer ctxt delegate bonus =
     let contract = Contract_repr.implicit_contract delegate in
-    if Tez_repr.(bonus <> zero) then
-      Token.transfer ctxt `Baking_bonuses (`Contract contract) bonus
-    else return (ctxt, [])
+    Token.transfer ctxt `Baking_bonuses (`Contract contract) bonus
   in
   pay_payload_producer ctxt payload_producer
   >>=? fun (ctxt, balance_updates_payload_producer) ->

@@ -28,12 +28,12 @@
 open Alpha_context
 
 type error +=
-  | (* `Temporary *)
+  | (* `Permanent *)
       Not_enough_endorsements of {
       required : int;
       endorsements : int;
     }
-  | (* `Permanent *)
+  | (* `Temporary *)
       Wrong_consensus_operation_branch of
       Block_hash.t * Block_hash.t
   | (* `Permanent *)
@@ -105,6 +105,7 @@ type error +=
       limit : Tez.t;
       max_limit : Tez.t;
     }
+  | (* `Branch *) Empty_transaction of Contract.t
 
 let () =
   register_error_kind
@@ -461,13 +462,27 @@ let () =
     (function
       | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
       | _ -> None)
-    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit})
+    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.empty_transaction"
+    ~title:"Empty transaction"
+    ~description:"Forbidden to credit 0ꜩ to a contract without code."
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "Transactions of 0ꜩ towards a contract without code are forbidden \
+         (%a)."
+        Contract.pp
+        contract)
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function Empty_transaction c -> Some c | _ -> None)
+    (fun c -> Empty_transaction c)
 
-type error += Wrong_voting_period of int32 * int32
+type error += (* `Temporary *) Wrong_voting_period of int32 * int32
 
-(* `Temporary *)
-
-type error += Internal_operation_replay of packed_internal_operation
+type error +=
+  | (* `Permanent *) Internal_operation_replay of packed_internal_operation
 
 type denunciation_kind = Preendorsement | Endorsement | Block
 
@@ -485,7 +500,8 @@ let pp_denunciation_kind fmt : denunciation_kind -> unit = function
   | Endorsement -> Format.fprintf fmt "endorsement"
   | Block -> Format.fprintf fmt "baking"
 
-type error += Invalid_denunciation of denunciation_kind
+type error += (* `Permanent *)
+              Invalid_denunciation of denunciation_kind
 
 type error +=
   | (* `Permanent *)
@@ -495,7 +511,7 @@ type error +=
       delegate2 : Signature.Public_key_hash.t;
     }
 
-type error += (* `Permanent *) Unrequired_denunciation
+type error += (* `Branch *) Unrequired_denunciation
 
 type error +=
   | (* `Temporary *)
@@ -506,20 +522,19 @@ type error +=
     }
 
 type error +=
-  | (* `Branch *)
+  | (* `Permanent *)
       Outdated_denunciation of {
       kind : denunciation_kind;
       level : Raw_level.t;
       last_cycle : Cycle.t;
     }
 
-(* `Permanent *)
+type error +=
+  | (* Permanent *) Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
-type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+type error += (* Permanent *) Multiple_revelation
 
-type error += Multiple_revelation
-
-type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
+type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
 
 type error += (* `Permanent *) Inconsistent_sources
 
@@ -799,10 +814,23 @@ let apply_manager_operation_content :
                  enough gas for complete deserialization cost *)
       >>?=
       fun (parameter, ctxt) ->
-      Option.fold
-        (Contract.is_implicit destination)
-        ~none:return_false
-        ~some:(fun _ -> Contract.allocated ctxt destination >|=? not)
+      (match Contract.is_implicit destination with
+      | None ->
+          (if Tez.(amount = zero) then
+           (* Detect potential call to non existent contract. *)
+           Contract.must_exist ctxt destination
+          else return_unit)
+          >>=? fun () ->
+          (* Since the contract is originated, nothing will be allocated
+             or the next transfer of tokens will fail. *)
+          return_false
+      | Some _ ->
+          (* Transfers of zero to implicit accounts are forbidden. *)
+          error_when Tez.(amount = zero) (Empty_transaction destination)
+          >>?= fun () ->
+          (* If the implicit contract is not yet allocated at this point then
+             the next transfer of tokens will allocate it. *)
+          Contract.allocated ctxt destination >|=? not)
       >>=? fun allocated_destination_contract ->
       Token.transfer ctxt (`Contract source) (`Contract destination) amount
       >>=? fun (ctxt, balance_updates) ->
