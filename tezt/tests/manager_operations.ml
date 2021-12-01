@@ -160,11 +160,25 @@ module Memchecks = struct
     in
     Lwt.npick [notify_promise; processed_promise]
 
-  let check_operation_is_in_applied_mempool ~__LOC__ ?(explain = "")
+  let check_operation_is_in_mempool ~__LOC__ classification ?(explain = "")
       (mempool : Mempool.t) oph =
-    if List.mem oph mempool.Mempool.applied then
-      Log.ok "  - %s found in mempool.applied %s" oph explain
-    else Test.fail ~__LOC__ "%s was not found in mempool.applied %s" oph explain
+    let (mempool_classified_ops, classification_str) =
+      match classification with
+      | `Applied -> (mempool.applied, "mempool.applied")
+      | `Refused -> (mempool.refused, "mempool.refused")
+      | `Branch_refused -> (mempool.branch_refused, "mempool.branch_refused")
+      | `Branch_delayed -> (mempool.branch_delayed, "mempool.branch_delayed")
+      | `Outdated -> (mempool.outdated, "mempool.outdated")
+    in
+    if List.mem oph mempool_classified_ops then
+      Log.ok "  - %s found in %s %s." oph classification_str explain
+    else
+      Test.fail
+        ~__LOC__
+        "%s was not found in %s %s"
+        oph
+        classification_str
+        explain
 
   let check_operation_not_in_applied_mempool ~__LOC__ ?(explain = "")
       (mempool : Mempool.t) oph =
@@ -174,10 +188,16 @@ module Memchecks = struct
         "%s is in mempool.applied %s but should not be"
         oph
         explain
-    else Log.ok "  - %s was not in mempool.applied %s" oph explain
+    else Log.ok "  - %s was not in mempool.applied %s." oph explain
 
   let get_op_status op =
     JSON.(op |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+
+  let get_op_errors_ids op =
+    let errs =
+      JSON.(op |-> "metadata" |-> "operation_result" |-> "errors" |> as_list)
+    in
+    List.map (fun err -> JSON.(err |-> "id" |> as_string)) errs
 
   (** Wait for nodes to be synchronized, i.e. for node observer to be
      at the same level as main node (the baker only bakes on main node
@@ -187,11 +207,63 @@ module Memchecks = struct
     let level_main = JSON.(level1_json |-> "level" |> as_int) in
     Node.wait_for_level nodes.observer.node level_main
 
+  let is_in_block ?block client oph =
+    let* head = RPC.get_block ?block client in
+    let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
+    Lwt.return
+    @@ List.exists (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
+
+  let check_op_not_included_in_block ?block ?(explain = "") client oph =
+    let* in_block = is_in_block ?block client oph in
+    if in_block then Test.fail ~__LOC__ "%s found in head block %s" oph explain
+    else Log.ok "  - %s not included in block %s." oph explain ;
+    unit
+
+  let check_op_not_propagated ?(explain = "") observer oph observer_result =
+    Lwt_list.iter_p
+      (function
+        | `Notify_mempool (known_valid, pending) ->
+            if List.mem oph known_valid then
+              Test.fail
+                "%s was propagated to observer node as valid %s"
+                oph
+                explain
+            else if List.mem oph pending then
+              Test.fail
+                "%s was propagated to observer node as pending %s"
+                oph
+                explain
+            else () ;
+            return ()
+        | `New_block_hash block ->
+            check_op_not_included_in_block
+              ?block
+              observer.client
+              oph
+              ~explain:("of observer node " ^ explain))
+      observer_result
+    >|= fun () ->
+    Log.ok "  - %s was not propagated to observer node %s." oph explain
+
   (** Check that operation whose hash is [oph] is included in the
       block [block] or the head, with the statuses [expected_statuses]
-      (there can be several is the operation is a batch). *)
-  let check_status_in_block ~who ~oph ~expected_statuses ?block client =
-    Log.info "- Checking inclusion and status of operation in %s's block" who ;
+      (there can be several if the operation is a batch).
+
+      If [expected_statuses] is empty, check that the operation is not
+      included in the block.
+
+      Also check (when argument [expected_errors] is provided) that it
+      is included with these errors (all elements in each item of the list
+      must be a substring of one of the errors). If one of the list of
+      errors is empty, then the operation at this position in the batch must
+      be included without errors.
+      For instance [~expected_errors:[["ill_typed"]]] checks that there is
+      only one operation in the batch and that the result {i contains} an error
+      with ["ill_typed"] somewhere in its identifier.
+  *)
+  let check_status_in_block ~who ~oph ~expected_statuses ?expected_errors ?block
+      client =
+    Log.info "- Checking inclusion and status of operation in %s's block." who ;
     let* head = RPC.get_block ?block client in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     let head_hash = JSON.(head |-> "hash" |> as_string) in
@@ -218,6 +290,40 @@ module Memchecks = struct
             (JSON.encode op))
       op_contents
       expected_statuses ;
+    (* Check errors *)
+    (match expected_errors with
+    | None -> ()
+    | Some expected_errors ->
+        Check.((List.length op_contents = List.length expected_errors) int)
+          ~error_msg:
+            "expected contents to contain %R values (wrt. expected errors), \
+             got %L" ;
+        List.iter2
+          (fun op expected_errors ->
+            let errors = get_op_errors_ids op in
+            match expected_errors with
+            | [] ->
+                if errors <> [] then
+                  Test.fail
+                    ~__LOC__
+                    "Operation should not have any errors:\n%s"
+                    (JSON.encode op)
+            | _ ->
+                List.iter
+                  (fun expected_error ->
+                    if
+                      not
+                      @@ List.exists (fun s -> s =~ rex expected_error) errors
+                    then
+                      Test.fail
+                        ~__LOC__
+                        "Operation is not included with error %s. Errors are \
+                         [%s]"
+                        expected_error
+                        (String.concat ", " errors))
+                  expected_errors)
+          op_contents
+          expected_errors) ;
     return head_hash
 
   (** Inject an opertion while performing a series of checks:
@@ -231,44 +337,103 @@ module Memchecks = struct
       - Check that the operation is included in said block
       - Check that the operation is not in the mempool anymore
   *)
-  let with_applied_checks ~__LOC__ nodes ~expected_statuses inject =
-    Log.section "Checking applied operation" ;
+  let with_applied_checks ~__LOC__ nodes ~expected_statuses ?expected_errors
+      ?(bake = true) inject =
+    Log.section "Checking applied operation." ;
     let* _ = wait_sync nodes in
     let client = nodes.main.client in
     let wait_observer = wait_for_notify nodes.observer.node in
-    Log.info "- Injecting operation" ;
+    Log.info "- Injecting operation." ;
     let* oph = inject () in
     let* mempool_after_injection = RPC.get_mempool client in
-    check_operation_is_in_applied_mempool
+    check_operation_is_in_mempool
+      `Applied
       ~__LOC__
       ~explain:"after injection"
       mempool_after_injection
       oph ;
-    Log.info "- Waiting for observer to be notified of operation" ;
+    Log.info "- Waiting for observer to be notified of operation." ;
     let* observer_result = wait_observer in
-    Log.info "- Checking observer received operations" ;
+    Log.info "- Checking observer received operations." ;
     let (known_valid, pending) = observer_result in
     if List.mem oph known_valid then
-      Log.ok "  - %s was propagated to observer node as valid" oph
+      Log.ok "  - %s was propagated to observer node as valid." oph
     else if List.mem oph pending then
       Test.fail ~__LOC__ "%s was propagated to observer node as pending" oph ;
     let* mempool_observer = RPC.get_mempool nodes.observer.client in
-    check_operation_is_in_applied_mempool
+    check_operation_is_in_mempool
+      `Applied
       ~__LOC__
       ~explain:"in observer"
       mempool_observer
       oph ;
-    Log.info "- Baking (should include operation %s)" oph ;
-    let* () = bake_and_wait_block nodes.main in
-    let* _head_hash =
-      check_status_in_block ~oph ~expected_statuses ~who:"main" client
+    if bake then (
+      Log.info "- Baking (should include operation %s)." oph ;
+      let* () = bake_and_wait_block nodes.main in
+      let* _head_hash =
+        check_status_in_block
+          ~oph
+          ~expected_statuses
+          ?expected_errors
+          ~who:"main"
+          client
+      in
+      let* mempool_after_baking = RPC.get_mempool client in
+      check_operation_not_in_applied_mempool
+        ~__LOC__
+        ~explain:"after baking"
+        mempool_after_baking
+        oph ;
+      return oph)
+    else return oph
+
+  let with_refused_checks ~__LOC__ nodes inject =
+    Log.section "Checking refused operation." ;
+    let* _ = wait_sync nodes in
+    let client = nodes.main.client in
+    let wait_observer =
+      wait_for_notify_or_processed_block nodes.observer.node
     in
+    Log.info "- Injecting operation." ;
+    let* oph = inject () in
+    let* mempool_after_injection = RPC.get_mempool client in
+    check_operation_is_in_mempool
+      `Refused
+      ~__LOC__
+      mempool_after_injection
+      oph
+      ~explain:"after injection" ;
+    check_operation_not_in_applied_mempool
+      ~__LOC__
+      mempool_after_injection
+      oph
+      ~explain:"after injection" ;
+    Log.info "- Baking (should not include operation %s)." oph ;
+    let* () = bake_and_wait_block nodes.main in
+    Log.info "- Waiting for observer to see operation or block." ;
+    let* observer_result = wait_observer in
+    Log.info "- Checking mempool of main node." ;
     let* mempool_after_baking = RPC.get_mempool client in
     check_operation_not_in_applied_mempool
       ~__LOC__
-      ~explain:"after baking"
       mempool_after_baking
-      oph ;
+      oph
+      ~explain:"after baking" ;
+    check_operation_is_in_mempool
+      `Refused
+      ~__LOC__
+      mempool_after_baking
+      oph
+      ~explain:"after baking" ;
+    Log.info "- Checking that observer did not observe operation." ;
+    let* () = check_op_not_included_in_block client oph ~explain:"newly baked"
+    and* () =
+      check_op_not_propagated
+        nodes.observer
+        oph
+        observer_result
+        ~explain:"(refused)"
+    in
     return oph
 end
 
@@ -289,7 +454,7 @@ module Helpers = struct
     Cluster.symmetric_add_peer node1 node2 ;
     let* () = Cluster.start ~event_sections_levels [node1; node2] in
     let* () = Client.activate_protocol ~protocol client1 in
-    Log.info "Activated protocol" ;
+    Log.info "Activated protocol." ;
     let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
     return nodes
 
