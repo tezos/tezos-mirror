@@ -812,6 +812,91 @@ module Revamped = struct
              oph2
              oph3)) ;
     unit
+
+  (** This test checks that an operation applied is not reclassified and stays
+      applied after the ban of a branch_delayed operation. *)
+  let one_operation_per_manager_per_block_ban =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_ban"
+      ~tags:["mempool"; "manager_restriction"; "ban"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Force inject a transfer with a counter in the futur." ;
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    let* oph1 =
+      Operation.inject_transfer
+        ~force:true
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 2)
+        client
+    in
+
+    log_step 3 "Inject a transfer with a correct counter." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      4
+      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 5 "Ban the operation %s." oph1 ;
+    let to_reclassified = ref false in
+    let _ =
+      Node.wait_for node "operations_to_reclassify.v0" (fun _ ->
+          to_reclassified := true ;
+          Some ())
+    in
+    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+
+    log_step
+      6
+      "Check that the mempool contains %s as applied and that %s is not in the \
+       mempool anymore."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {Mempool.empty with applied = [oph2]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 7 "Check that no flush have been triggered after the ban." ;
+    Check.(
+      (!to_reclassified = false)
+        bool
+        ~error_msg:"a flush have been triggered after the ban") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3441,6 +3526,7 @@ let register ~protocols =
     ~protocols ;
   Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
   Revamped.one_operation_per_manager_per_block_flush ~protocols ;
+  Revamped.one_operation_per_manager_per_block_ban ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
