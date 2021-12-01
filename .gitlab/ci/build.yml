@@ -64,3 +64,49 @@ build_x86_64:
   variables:
     ARCH: "x86_64"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
+
+# similar to the build template above, this template
+# compiles all binaries using the static profile.
+.build_static_binaries_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies_template
+  before_script:
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
+    # dune build @install make ocamlopt stack overflow when compiling
+    # protocol functor with static linking (because of
+    # liquidity_baking_cpmm.ml).
+    # Let's skip protocol functors, they are not needed for the release
+    - dune build
+      @src/lib_protocol_compiler/install
+      $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done)
+      --profile static
+    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
+    # Strip debug symbols in binaries
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+  artifacts:
+    paths:
+      - tezos-binaries/*
+
+# Static binaries for x86_64 are necessary for development branches, as we want to make
+# sure the build does not break. We also need it for release tags, to as its artifacts
+# are published in the stage `publish_release`. For this reason, we build it in all pipelines.
+
+# arm64 static binaries are built in the stage `build_release` and only for master and releases.
+build:static-x86_64-linux-binaries:
+  extends: .build_static_binaries_template
+  script:
+    - sudo apk --no-cache --virtual add upx
+    # Compress resulting binaries
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+  stage: build
+
+build:static-arm64-linux-binaries:
+  extends:
+      - .build_static_binaries_template
+      - .rules_template__master_and_releases
+  stage: build_release
+  script:
+    - echo "No compression for now"
+  tags:
+    - arm64
