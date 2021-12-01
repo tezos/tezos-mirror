@@ -32,6 +32,7 @@ __pycache__
 /tezos-sandbox
 /tezos-codec
 /tezos-snoop
+/tezos-tps-evaluation
 
 /src/proto_*/parameters/*-parameters.json
 
