@@ -200,8 +200,10 @@ cycles* of complete history (approximately three weeks), as we keep 5
 cycles beyond the minimal number of cycles, that is 2 + 5 = 7. It is
 possible to increase this parameter to keep more history or, on the
 contrary, decrease it to reduce the storage size. For example, it is
-possible to run a baker and a delegation service on rolling mode with
-*7 additional cycles* providing two more weeks to dispatch rewards.
+possible to run a baker and a delegation service on rolling mode as
+long as we keep 7 cycles (to provide two more weeks to dispatch
+rewards), meaning that at least 5 additional cycles must be kept.
+
 
 When initialzing your node on an empty storage, you may specify the
 history mode and number of additional cycles using ``--history-mode
