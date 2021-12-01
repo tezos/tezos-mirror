@@ -171,6 +171,15 @@ an operation with the same manager. This limitation was already
 present implicitely if you were using the `tezos-client` commands.
 Batches of operations can be used to get around this restriction.
 
+To mitigate the limitation itself, a user can inject an operation with the same
+manager and the same counter, but with a higher fee to replace an already existing
+operation in the prevalidator. Only one of the two operations will be eventually
+included in a block. To be able to replace the first operation, the fee and the
+"fee/gas limit" ratio of the second one is supposed to be higher than the first's
+by a factor (currently fixed to 5%). In case of successful replacement, the old
+operation is re-classified as `\`Outdated`.
+
+
 Distributed DB
 --------------
 .. _DDB_component:
