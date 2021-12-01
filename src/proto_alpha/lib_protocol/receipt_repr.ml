@@ -30,7 +30,7 @@ type balance =
   | Block_fees
   | Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Deposits of Signature.Public_key_hash.t
-  | NonceRevelation_rewards
+  | Nonce_revelation_rewards
   | Double_signing_evidence_rewards
   | Endorsing_rewards
   | Baking_rewards
@@ -75,7 +75,7 @@ let balance_encoding =
            ~title:"Block_fees"
            (obj2
               (req "kind" (constant "accumulator"))
-              (req "category" (constant "fees")))
+              (req "category" (constant "block fees")))
            (function Block_fees -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Block_fees);
          case
@@ -100,18 +100,18 @@ let balance_encoding =
            (fun ((), (), d) -> Deposits d);
          case
            (Tag 5)
-           ~title:"NonceRevelation_rewards"
+           ~title:"Nonce_revelation_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "rewards")))
-           (function NonceRevelation_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> NonceRevelation_rewards);
+              (req "category" (constant "nonce revelation rewards")))
+           (function Nonce_revelation_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Nonce_revelation_rewards);
          case
            (Tag 6)
            ~title:"Double_signing_evidence_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "rewards")))
+              (req "category" (constant "double signing evidence rewards")))
            (function
              | Double_signing_evidence_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Double_signing_evidence_rewards);
@@ -120,7 +120,7 @@ let balance_encoding =
            ~title:"Endorsing_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "rewards")))
+              (req "category" (constant "endorsing rewards")))
            (function Endorsing_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Endorsing_rewards);
          case
@@ -128,7 +128,7 @@ let balance_encoding =
            ~title:"Baking_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "rewards")))
+              (req "category" (constant "baking rewards")))
            (function Baking_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Baking_rewards);
          case
@@ -136,7 +136,7 @@ let balance_encoding =
            ~title:"Baking_bonuses"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "rewards")))
+              (req "category" (constant "baking bonuses")))
            (function Baking_bonuses -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Baking_bonuses);
          case
@@ -154,7 +154,7 @@ let balance_encoding =
            ~title:"Storage_fees"
            (obj2
               (req "kind" (constant "burned"))
-              (req "category" (constant "storage_fees")))
+              (req "category" (constant "storage fees")))
            (function Storage_fees -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Storage_fees);
          case
@@ -170,7 +170,7 @@ let balance_encoding =
            ~title:"Lost_endorsing_rewards"
            (obj5
               (req "kind" (constant "burned"))
-              (req "category" (constant "rewards"))
+              (req "category" (constant "lost endorsing rewards"))
               (req "delegate" Signature.Public_key_hash.encoding)
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))
@@ -218,7 +218,7 @@ let balance_encoding =
               (req "kind" (constant "minted"))
               (req "category" (constant "invoice")))
            (function Invoice -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Burned);
+           (fun ((), ()) -> Invoice);
          case
            (Tag 19)
            ~title:"Initial_commitments"
@@ -270,7 +270,7 @@ let compare_balance ba bb =
         | Block_fees -> 2
         | Legacy_deposits _ -> 3
         | Deposits _ -> 4
-        | NonceRevelation_rewards -> 5
+        | Nonce_revelation_rewards -> 5
         | Double_signing_evidence_rewards -> 6
         | Endorsing_rewards -> 7
         | Baking_rewards -> 8

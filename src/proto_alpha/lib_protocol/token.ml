@@ -172,7 +172,7 @@ let spend ctxt src amount origin =
   | `Initial_commitments -> return (ctxt, Initial_commitments)
   | `Minted -> return (ctxt, Minted)
   | `Liquidity_baking_subsidies -> return (ctxt, Liquidity_baking_subsidies)
-  | `Revelation_rewards -> return (ctxt, NonceRevelation_rewards)
+  | `Revelation_rewards -> return (ctxt, Nonce_revelation_rewards)
   | `Double_signing_evidence_rewards ->
       return (ctxt, Double_signing_evidence_rewards)
   | `Endorsing_rewards -> return (ctxt, Endorsing_rewards)
