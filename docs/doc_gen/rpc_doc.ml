@@ -32,7 +32,7 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-    (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
+    (* TODO tezos/tezos#2170: adapt rest of this list *)
     ( "011",
       "011 Hangzhou",
       Some "/include/rpc_introduction.rst.inc",

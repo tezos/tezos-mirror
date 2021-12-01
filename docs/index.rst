@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================

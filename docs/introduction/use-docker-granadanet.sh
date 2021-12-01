@@ -1,4 +1,4 @@
-# TODO nomadic-labs/tezos#462: search shifted protocol name/no; rename script
+# TODO tezos/tezos#2170: search shifted protocol name/no; rename script
 trap 'exit $?' ERR
 set -x
 cd

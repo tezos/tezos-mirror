@@ -1,4 +1,4 @@
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 .. _howtouse:
 

@@ -25,7 +25,7 @@ Their OpenAPI specification can be found at:
 
 - `rpc-openapi.json (version 11.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
-.. TODO nomadic-labs/tezos#462: add/remove section(s)
+.. TODO tezos/tezos#2170: add/remove section(s)
 
 Granada RPCs
 -------------

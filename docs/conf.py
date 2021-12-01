@@ -89,7 +89,7 @@ exclude_patterns = [
     'doc_gen',
     '010',
 ]
-# TODO nomadic-labs/tezos#462: exclude the active protocol 'NNN' above
+# TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
