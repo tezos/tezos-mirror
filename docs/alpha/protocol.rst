@@ -55,3 +55,8 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    global_constants
+
+.. toctree::
+   :maxdepth: 2
+
+   plugins
