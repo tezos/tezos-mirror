@@ -40,6 +40,7 @@ val index : context -> index
 val init :
   ?patch_context:(context -> context tzresult Lwt.t) ->
   ?readonly:bool ->
+  ?indexing_strategy:[`Always | `Minimal] ->
   string ->
   index Lwt.t
 

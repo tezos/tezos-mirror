@@ -603,10 +603,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let init ?patch_context ?(readonly = false) root =
     let open Lwt_syntax in
+    let indexing_strategy = Irmin_pack.Pack_store.Indexing_strategy.minimal in
     let+ repo =
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
+           ~indexing_strategy
            ~index_log_size:!index_log_size
            ~lru_size:!lru_size
            root)
