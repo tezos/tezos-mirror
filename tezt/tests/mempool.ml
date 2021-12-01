@@ -708,6 +708,110 @@ module Revamped = struct
         Mempool.classified_typ
         ~error_msg:"mempool expected to be %L, got %R") ;
     unit
+
+  (** This test checks that an operation branch_delayed is still branch_delayed
+      after a flush either because of the one operation per manager per block or
+      the previous reason it was branch_delayed for. *)
+  let one_operation_per_manager_per_block_flush =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_flush"
+      ~tags:["mempool"; "manager_restriction"; "flush"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Force inject a transfer with a counter in the futur." ;
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    let* oph1 =
+      Operation.inject_transfer
+        ~force:true
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 2)
+        client
+    in
+
+    log_step 3 "Inject a transfer with a correct counter." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      4
+      "Inject a transfer with a correct counter but different destination." ;
+    let* oph3 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~destination:Constant.bootstrap3
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      5
+      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1; oph3]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 6 "Flush the mempool." ;
+    let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
+
+    log_step
+      7
+      "Check that the mempool still contains %s as branch_delayed after the \
+       flush."
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (List.mem oph1 mempool.branch_delayed = true)
+        bool
+        ~error_msg:(sf "%s should be in branch_delayed" oph1)) ;
+
+    log_step
+      8
+      "Check that if %s is applied then %s is branch_delayed or the other way \
+       around."
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (((List.mem oph2 mempool.branch_delayed && List.mem oph3 mempool.applied)
+       || (List.mem oph3 mempool.branch_delayed && List.mem oph2 mempool.applied)
+       )
+      = true)
+        bool
+        ~error_msg:
+          (sf
+             "applied should contain either %s or %s and branch_delayed should \
+              contain the other one"
+             oph2
+             oph3)) ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3336,6 +3440,7 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_restriction_propagation
     ~protocols ;
   Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
+  Revamped.one_operation_per_manager_per_block_flush ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
