@@ -37,6 +37,7 @@ let config drift_opt =
       Option.map
         (fun drift -> Period.of_seconds_exn (Int64.of_int drift))
         drift_opt;
+    replace_by_fee_factor = Q.make (Z.of_int 105) (Z.of_int 100);
   }
 
 type Environment.Error_monad.error += Generation_failure

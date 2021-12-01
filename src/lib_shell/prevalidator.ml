@@ -220,6 +220,36 @@ type limits = {
 (* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
+type error +=
+  | Manager_operation_replaced of {
+      old_hash : Operation_hash.t;
+      new_hash : Operation_hash.t;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"prevalidator.manager_operation_replaced"
+    ~title:"Manager operation replaced"
+    ~description:"The manager operation has been replaced"
+    ~pp:(fun ppf (old_hash, new_hash) ->
+      Format.fprintf
+        ppf
+        "The manager operation %a has been replaced with %a"
+        Operation_hash.pp
+        old_hash
+        Operation_hash.pp
+        new_hash)
+    (Data_encoding.obj2
+       (Data_encoding.req "old_hash" Operation_hash.encoding)
+       (Data_encoding.req "new_hash" Operation_hash.encoding))
+    (function
+      | Manager_operation_replaced {old_hash; new_hash} ->
+          Some (old_hash, new_hash)
+      | _ -> None)
+    (fun (old_hash, new_hash) ->
+      Manager_operation_replaced {old_hash; new_hash})
+
 module Name = struct
   type t = Chain_id.t * Protocol_hash.t
 
@@ -538,6 +568,40 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
+  let remove_from_advertisement oph = function
+    | `Pending mempool -> `Pending (Mempool.remove oph mempool)
+    | `None -> `None
+
+  (* This function retrieves an old/replaced operation and reclassifies it as
+     [`Outdated]. Note that we don't need to re-flush the mempool, as this
+     function is only called in precheck mode.
+
+     The operation is expected to be (a) parsable and (b) in the "prechecked"
+     class. So, we softly handle the situations where the operation is
+     unparsable or not found in any class in case this invariant is broken
+     for some reason.
+  *)
+  let reclassify_replaced_manager_op ~notifier old_hash new_hash shell =
+    shell.advertisement <-
+      remove_from_advertisement old_hash shell.advertisement ;
+    match Classification.remove old_hash shell.classification with
+    | Some (op, _class) -> (
+        (* In this block, we add [old_hash] to the classification. This
+           does not break the "classes are disjoint" invariant, because we
+           just removed [old_hash] with [!Classification.remove] above. *)
+        match Prevalidation_t.parse op with
+        | Error errors ->
+            (* This should likely not happen, as we already parsed the op *)
+            handle ~notifier shell (`Unparsed (old_hash, op)) (`Refused errors)
+        | Ok op ->
+            let err = Manager_operation_replaced {old_hash; new_hash} in
+            handle ~notifier shell (`Parsed op) (`Outdated [err]))
+    | None ->
+        (* This case should not happen. *)
+        Distributed_db.Operation.clear_or_cancel
+          shell.parameters.chain_db
+          old_hash
+
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
       oph (op : Filter.Proto.operation_data operation) =
     let validation_state = Prevalidation_t.validation_state validation_state in
@@ -556,10 +620,9 @@ module Make
               protocol [apply_operation]. *)
           `Passed_precheck filter_state
       | `Passed_precheck_with_replace (old_oph, filter_state) ->
-          (* When using manager precheck, a simple removal from classication is
-             sufficient *)
-          Classification.remove old_oph pv.shell.classification ;
-          `Passed_precheck filter_state
+          (* Same as `Passed_precheck, but the operation whose hash is returned
+             should be reclassified to Outdated *)
+          `Passed_precheck_with_replace (old_oph, filter_state)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -589,6 +652,11 @@ module Make
             handle ~notifier shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
         | `Passed_precheck filter_state ->
+            handle ~notifier shell (`Parsed op) `Applied ;
+            let new_mempool = Mempool.cons_valid op.hash mempool in
+            Lwt.return (filter_state, validation_state, new_mempool)
+        | `Passed_precheck_with_replace (old_oph, filter_state) ->
+            reclassify_replaced_manager_op ~notifier old_oph oph shell ;
             handle ~notifier shell (`Parsed op) `Applied ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
@@ -937,10 +1005,6 @@ module Make
             shell.parameters.chain_db
             ~mempool
             shell.predecessor
-
-    let remove_from_advertisement oph = function
-      | `Pending mempool -> `Pending (Mempool.remove oph mempool)
-      | `None -> `None
 
     let remove pv oph =
       Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;

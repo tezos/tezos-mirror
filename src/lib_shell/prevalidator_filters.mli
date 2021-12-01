@@ -62,16 +62,17 @@ module type FILTER = sig
     val remove : filter_state:state -> Operation_hash.t -> state
 
     (** [precheck config ~filter_state ~validation_state shell_header oph]
-        should be used to decide whether an operation can be propagated over
-        the gossip network without executing it. This is a wrapper around
+        should be used to decide whether an operation can be gossiped to the
+        network without executing it. This is a wrapper around
         [Proto.precheck_manager] and [Proto.check_signature]. This
         function hereby has a similar return type.
 
         Returns [`Passed_precheck] if the operation was successfully
-        prechecked. If the function returns [`Undecided] it means that
-        [apply_operation] should be called. In case the operation is
-        successfully prechecked but replaces an already prechecked operation
-        [oph'], the result [``Passed_precheck_with_replace old_oph] is returned.
+        prechecked. In case the operation is successfully prechecked
+        but replaces an already prechecked operation [old_oph], the
+        result [`Passed_precheck_with_replace old_oph] is returned.
+        If the function returns [`Undecided] it means that 
+        [apply_operation] should be called.
 
         This function takes a [state] as parameter and returns it updated if the
         operation has been [prechecked]. *)
