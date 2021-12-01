@@ -257,6 +257,15 @@ build-deps:
 build-dev-deps:
 	@./scripts/install_build_deps.sh --dev
 
+.PHONY: build-tps-deps
+build-tps-deps:
+	@./scripts/install_build_deps.sh --tps
+
+.PHONY: build-tps
+build-tps:
+	@dune build ./src/bin_tps_evaluation
+	@cp ./_build/install/default/bin/tezos-tps-evaluation .
+
 .PHONY: docker-image-build
 docker-image-build:
 	@docker build \

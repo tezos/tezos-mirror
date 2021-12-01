@@ -32,7 +32,9 @@
     - dune build @runtest_dune_template
     # 2. Actually build
     - make all build-test
-    # 3. clean-up caches before uploading the cache
+    # 3. Also build the tps evaluation tool which is not part of the default build.
+    - dune build src/bin_tps_evaluation
+    # 4. clean-up caches before uploading the cache
     - opam clean
   cache:
     key: "$CI_COMMIT_REF_SLUG"
