@@ -322,3 +322,17 @@ val make_aggregate_sk_uri : Uri.t -> aggregate_sk_uri tzresult
 val make_sapling_uri : Uri.t -> sapling_uri tzresult
 
 val make_pvss_sk_uri : Uri.t -> pvss_sk_uri tzresult
+
+(** Mnemonic of 24 common english words from which a key can be derived.
+    The mnemonic follows the BIP-39 spec. *)
+module Mnemonic : sig
+  val new_random : Bip39.t
+
+  (** [to_32_bytes mmnemonic] is a 32 long bytes. BIP-39 gives 64 bytes of
+      entropy where z-cache or bls needs 32 bytes. We xor the two halves in case
+      the entropy is not well distributed. *)
+  val to_32_bytes : Bip39.t -> bytes
+
+  (** Pretty printer for printing a list of words of a mnemonic. *)
+  val words_pp : Format.formatter -> string list -> unit
+end

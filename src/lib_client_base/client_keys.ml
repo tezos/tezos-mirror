@@ -738,3 +738,27 @@ let alias_keys cctxt name =
 
 let force_switch () =
   Clic.switch ~long:"force" ~short:'f' ~doc:"overwrite existing keys" ()
+
+module Mnemonic = struct
+  let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
+
+  let to_32_bytes mnemonic =
+    let seed_64_to_seed_32 (seed_64 : bytes) : bytes =
+      assert (Bytes.length seed_64 = 64) ;
+      let first_32 = Bytes.sub seed_64 0 32 in
+      let second_32 = Bytes.sub seed_64 32 32 in
+      let seed_32 = Bytes.create 32 in
+      for i = 0 to 31 do
+        Bytes.set
+          seed_32
+          i
+          (Char.chr
+             (Char.code (Bytes.get first_32 i)
+             lxor Char.code (Bytes.get second_32 i)))
+      done ;
+      seed_32
+    in
+    seed_64_to_seed_32 (Bip39.to_seed mnemonic)
+
+  let words_pp = Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
+end
