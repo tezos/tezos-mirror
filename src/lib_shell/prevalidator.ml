@@ -465,13 +465,12 @@ module Make
       operation_stream
       (classification, hash, shell_header, op_data)
 
-  let pre_filter pv oph raw : bool Lwt.t =
+  let pre_filter shell ~filter_config ~filter_state ~validation_state ~chain_db
+      ~notifier oph raw : bool Lwt.t =
     match Prevalidation.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
-        Distributed_db.Operation.clear_or_cancel
-          pv.shell.parameters.chain_db
-          oph ;
+        Distributed_db.Operation.clear_or_cancel chain_db oph ;
         false
     | Ok parsed_op -> (
         let op =
@@ -483,29 +482,25 @@ module Make
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
-            (Option.of_result pv.validation_state)
+            (Option.of_result validation_state)
         in
         Filter.Mempool.pre_filter
-          ~filter_state:pv.filter_state
+          ~filter_state
           ?validation_state_before
-          pv.filter_config
+          filter_config
           op.Filter.Proto.protocol_data
         >|= function
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
           errs ->
-            handle
-              ~notifier:(mk_notifier pv.operation_stream)
-              pv.shell
-              (`Parsed parsed_op)
-              errs ;
+            handle ~notifier shell (`Parsed parsed_op) errs ;
             false
         | `Passed_prefilter -> true)
 
-  let post_filter pv ~validation_state_before ~validation_state_after op receipt
-      =
+  let post_filter ~filter_config ~filter_state ~validation_state_before
+      ~validation_state_after op receipt =
     Filter.Mempool.post_filter
-      pv.filter_config
-      ~filter_state:pv.filter_state
+      filter_config
+      ~filter_state
       ~validation_state_before
       ~validation_state_after
       (op, receipt)
@@ -518,14 +513,14 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let precheck pv validation_state oph (op : Protocol.operation_data operation)
-      =
+  let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
+      oph (op : Protocol.operation_data operation) =
     let validation_state = Prevalidation.validation_state validation_state in
-    if pv.shell.parameters.limits.disable_precheck then Lwt.return `Undecided
+    if disable_precheck then Lwt.return `Undecided
     else
       Filter.Mempool.precheck
-        pv.filter_config
-        ~filter_state:pv.filter_state
+        filter_config
+        ~filter_state
         ~validation_state
         op.raw.shell
         oph
@@ -545,26 +540,34 @@ module Make
              function. *)
           `Undecided
 
-  let classify_operation ~notifier pv filter_state validation_state mempool op
-      oph =
+  let classify_operation ~notifier shell ~filter_config ~filter_state
+      ~validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle ~notifier pv.shell (`Unparsed (oph, op)) (`Refused errors) ;
+        handle ~notifier shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
     | Ok op -> (
-        precheck pv validation_state oph op >>= function
+        precheck
+          ~disable_precheck:shell.parameters.limits.disable_precheck
+          ~filter_config
+          ~filter_state
+          ~validation_state
+          oph
+          op
+        >>= function
         | `Fail errs ->
-            handle ~notifier pv.shell (`Parsed op) errs ;
+            handle ~notifier shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
         | `Passed_precheck filter_state ->
-            handle ~notifier pv.shell (`Parsed op) `Applied ;
+            handle ~notifier shell (`Parsed op) `Applied ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Undecided -> (
             Prevalidation.apply_operation validation_state op >>= function
             | Applied (new_validation_state, receipt) -> (
                 post_filter
-                  pv
+                  ~filter_config
+                  ~filter_state
                   ~validation_state_before:
                     (Prevalidation.validation_state validation_state)
                   ~validation_state_after:
@@ -572,24 +575,25 @@ module Make
                   op.protocol_data
                   receipt
                 >>= function
-                | `Passed_postfilter filter_state ->
-                    handle ~notifier pv.shell (`Parsed op) `Applied ;
+                | `Passed_postfilter new_filter_state ->
+                    handle ~notifier shell (`Parsed op) `Applied ;
                     let new_mempool = Mempool.cons_valid op.hash mempool in
-                    Lwt.return (filter_state, new_validation_state, new_mempool)
+                    Lwt.return
+                      (new_filter_state, new_validation_state, new_mempool)
                 | `Refused _ as classification ->
-                    handle ~notifier pv.shell (`Parsed op) classification ;
+                    handle ~notifier shell (`Parsed op) classification ;
                     Lwt.return (filter_state, validation_state, mempool))
             | Branch_delayed errors ->
-                handle ~notifier pv.shell (`Parsed op) (`Branch_delayed errors) ;
+                handle ~notifier shell (`Parsed op) (`Branch_delayed errors) ;
                 Lwt.return (filter_state, validation_state, mempool)
             | Branch_refused errors ->
-                handle ~notifier pv.shell (`Parsed op) (`Branch_refused errors) ;
+                handle ~notifier shell (`Parsed op) (`Branch_refused errors) ;
                 Lwt.return (filter_state, validation_state, mempool)
             | Refused errors ->
-                handle ~notifier pv.shell (`Parsed op) (`Refused errors) ;
+                handle ~notifier shell (`Parsed op) (`Refused errors) ;
                 Lwt.return (filter_state, validation_state, mempool)
             | Outdated errors ->
-                handle ~notifier pv.shell (`Parsed op) (`Outdated errors) ;
+                handle ~notifier shell (`Parsed op) (`Outdated errors) ;
                 Lwt.return (filter_state, validation_state, mempool)))
 
   (* Classify pending operations into either: [Refused |
@@ -611,29 +615,31 @@ module Make
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier w pv state =
+  let classify_pending_operations ~notifier w shell filter_config filter_state
+      state =
     Operation_hash.Map.fold_es
       (fun oph op (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
         if limit <= 0 then
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_filter_state, acc_validation_state, acc_mempool)
         else (
-          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
+          shell.pending <- Operation_hash.Map.remove oph shell.pending ;
           classify_operation
             ~notifier
-            pv
-            acc_filter_state
-            acc_validation_state
+            shell
+            ~filter_config
+            ~filter_state:acc_filter_state
+            ~validation_state:acc_validation_state
             acc_mempool
             op
             oph
           >|= fun (new_filter_state, new_validation_state, new_mempool) ->
           ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
-      pv.shell.pending
-      ( pv.filter_state,
+      shell.pending
+      ( filter_state,
         state,
         Mempool.empty,
-        pv.shell.parameters.limits.operations_batch_size )
+        shell.parameters.limits.operations_batch_size )
     >>= function
     | Error (filter_state, state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
@@ -663,7 +669,13 @@ module Make
         | 0 -> Lwt.return_unit
         | n ->
             Event.(emit processing_n_operations) n >>= fun () ->
-            classify_pending_operations ~notifier w pv state
+            classify_pending_operations
+              ~notifier
+              w
+              pv.shell
+              pv.filter_config
+              pv.filter_state
+              state
             >>= fun (filter_state, state, advertised_mempool) ->
             let remaining_pendings =
               Operation_hash.Map.fold
@@ -949,7 +961,16 @@ module Make
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
       else
-        pre_filter pv oph op >>= function
+        pre_filter
+          pv.shell
+          ~filter_config:pv.filter_config
+          ~filter_state:pv.filter_state
+          ~validation_state:pv.validation_state
+          ~chain_db:pv.shell.parameters.chain_db
+          ~notifier:(mk_notifier pv.operation_stream)
+          oph
+          op
+        >>= function
         | true ->
             if
               not
@@ -1111,7 +1132,16 @@ module Make
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
         (fun oph op pending ->
-          pre_filter pv oph op >|= function
+          pre_filter
+            pv.shell
+            ~filter_config:pv.filter_config
+            ~filter_state:pv.filter_state
+            ~validation_state:pv.validation_state
+            ~chain_db:pv.shell.parameters.chain_db
+            ~notifier:(mk_notifier pv.operation_stream)
+            oph
+            op
+          >|= function
           | true -> Operation_hash.Map.add oph op pending
           | false -> pending)
         new_pending_operations

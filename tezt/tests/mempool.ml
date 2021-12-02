@@ -225,9 +225,12 @@ module Revamped = struct
     let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Inject a transfer operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph = Operation.inject_transfer ~amount:1 client1 in
-    let* () = injection_waiter in
+    let* oph =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~amount:1
+        client1
+    in
     Log.info "%s injected on node1." oph ;
 
     log_step 3 "Check that the operation %s is classified as 'Applied'." oph ;
@@ -272,11 +275,14 @@ module Revamped = struct
         client1
     in
     let counter = JSON.as_int counter in
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
     let* oph2 =
-      Operation.inject_transfer ~force:true ~counter ~amount:2 client1
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~force:true
+        ~counter
+        ~amount:2
+        client1
     in
-    let* () = injection_waiter in
     Log.info "%s injected on node1." oph2 ;
 
     log_step 7 "Check that the operation %s is branch_refused." oph2 ;
@@ -379,9 +385,9 @@ module Revamped = struct
     let* (node, client) = Client.init_with_protocol ~protocol `Client () in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
-    let* oph1 = Operation.inject_transfer ~amount:1 client in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node) ~amount:1 client
+    in
 
     log_step
       3
@@ -395,9 +401,13 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and inject an operation with the same manager." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
-    let* oph2 = Operation.inject_transfer ~force:true ~amount:2 client in
-    let* () = injection_waiter in
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~force:true
+        ~amount:2
+        client
+    in
 
     log_step
       5
@@ -452,19 +462,20 @@ module Revamped = struct
     let* () = Client.Admin.connect_address ~peer:node2 client1 in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph1 = Operation.inject_transfer client1 in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    in
 
     log_step
       3
       "Forge and inject an operation on node1 with the same source but \
        different destination." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
     let* oph2 =
-      Operation.inject_transfer ~destination:Constant.bootstrap3 client1
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~destination:Constant.bootstrap3
+        client1
     in
-    let* () = injection_waiter in
 
     log_step
       4
@@ -544,19 +555,20 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph1 = Operation.inject_transfer client1 in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    in
 
     log_step
       3
       "Forge and inject an operation on node2 with the same manager and \
        counter but a different destination." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node2 in
     let* oph2 =
-      Operation.inject_transfer ~destination:Constant.bootstrap3 client2
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node2)
+        ~destination:Constant.bootstrap3
+        client2
     in
-    let* () = injection_waiter in
 
     log_step
       4
@@ -621,11 +633,13 @@ module Revamped = struct
         client
     in
     let counter = JSON.as_int counter in
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph1 =
-      Operation.inject_transfer ~counter:(counter + 1) ~amount:1 client
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~counter:(counter + 1)
+        ~amount:1
+        client
     in
-    let* () = injection_waiter in
 
     log_step
       3
@@ -642,15 +656,14 @@ module Revamped = struct
       4
       "Forge and force inject an operation with the same manager that should \
        fail because the counter was not incremented." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph2 =
       Operation.inject_transfer
+        ~wait_for_injection:(Some node)
         ~counter:(counter + 1)
         ~force:true
         ~amount:2
         client
     in
-    let* () = injection_waiter in
 
     log_step
       5
@@ -671,11 +684,13 @@ module Revamped = struct
       6
       "Forge and inject an operation with the same manager with incremented \
        counter." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph3 =
-      Operation.inject_transfer ~counter:(counter + 2) ~amount:2 client
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~counter:(counter + 2)
+        ~amount:2
+        client
     in
-    let* () = injection_waiter in
 
     log_step
       7
@@ -692,6 +707,279 @@ module Revamped = struct
       (expected_mempool = mempool)
         Mempool.classified_typ
         ~error_msg:"mempool expected to be %L, got %R") ;
+    unit
+
+  (** This test checks that an operation branch_delayed is still branch_delayed
+      after a flush either because of the one operation per manager per block or
+      the previous reason it was branch_delayed for. *)
+  let one_operation_per_manager_per_block_flush =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_flush"
+      ~tags:["mempool"; "manager_restriction"; "flush"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Force inject a transfer with a counter in the futur." ;
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    let* oph1 =
+      Operation.inject_transfer
+        ~force:true
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 2)
+        client
+    in
+
+    log_step 3 "Inject a transfer with a correct counter." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      4
+      "Inject a transfer with a correct counter but different destination." ;
+    let* oph3 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~destination:Constant.bootstrap3
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      5
+      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1; oph3]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 6 "Flush the mempool." ;
+    let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
+
+    log_step
+      7
+      "Check that the mempool still contains %s as branch_delayed after the \
+       flush."
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (List.mem oph1 mempool.branch_delayed = true)
+        bool
+        ~error_msg:(sf "%s should be in branch_delayed" oph1)) ;
+
+    log_step
+      8
+      "Check that if %s is applied then %s is branch_delayed or the other way \
+       around."
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (((List.mem oph2 mempool.branch_delayed && List.mem oph3 mempool.applied)
+       || (List.mem oph3 mempool.branch_delayed && List.mem oph2 mempool.applied)
+       )
+      = true)
+        bool
+        ~error_msg:
+          (sf
+             "applied should contain either %s or %s and branch_delayed should \
+              contain the other one"
+             oph2
+             oph3)) ;
+    unit
+
+  (** This test checks that an operation applied is not reclassified and stays
+      applied after the ban of a branch_delayed operation. *)
+  let one_operation_per_manager_per_block_ban =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_ban"
+      ~tags:["mempool"; "manager_restriction"; "ban"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+
+    log_step 2 "Force inject a transfer with a counter in the futur." ;
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+    let* oph1 =
+      Operation.inject_transfer
+        ~force:true
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 2)
+        client
+    in
+
+    log_step 3 "Inject a transfer with a correct counter." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~counter:(counter + 1)
+        client
+    in
+
+    log_step
+      4
+      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 5 "Ban the operation %s." oph1 ;
+    let to_reclassified = ref false in
+    let _ =
+      Node.wait_for node "operations_to_reclassify.v0" (fun _ ->
+          to_reclassified := true ;
+          Some ())
+    in
+    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+
+    log_step
+      6
+      "Check that the mempool contains %s as applied and that %s is not in the \
+       mempool anymore."
+      oph2
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool = {Mempool.empty with applied = [oph2]} in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 7 "Check that no flush have been triggered after the ban." ;
+    Check.(
+      (!to_reclassified = false)
+        bool
+        ~error_msg:"a flush have been triggered after the ban") ;
+    unit
+
+  (* This test checks that on a ban of an applied operation the flush respect
+     the 1M invariant. *)
+  let one_operation_per_manager_per_block_flush_on_ban =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_flush_on_ban"
+      ~tags:["mempool"; "manager_restriction"; "flush"; "ban"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    log_step 2 "Inject a transfer." ;
+    let* oph1 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap2
+        client
+    in
+
+    log_step 3 "Inject a transfer with a different source." ;
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        client
+    in
+
+    log_step
+      4
+      "Inject a transfer with the same source but different destination. This \
+       operation should be classified as branch_delayed with the 1M \
+       restriction." ;
+    let* oph3 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~source:Constant.bootstrap1
+        ~destination:Constant.bootstrap3
+        client
+    in
+
+    log_step
+      5
+      "Check that the mempool contains %s and %s as applied, %s as \
+       branch_delayed."
+      oph1
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph1; oph2]; branch_delayed = [oph3]}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 5 "Ban the operation %s." oph1 ;
+    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+
+    log_step
+      6
+      "Check that %s is not in the mempool anymore and that one operation is \
+       applied and the other is branch_delayed between %s and %s."
+      oph1
+      oph2
+      oph3 ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (List.length mempool.applied = 1)
+        int
+        ~error_msg:"applied mempool should contain only one operation, got %L") ;
+    Check.(
+      (List.length mempool.branch_delayed = 1)
+        int
+        ~error_msg:
+          "branch_delayed mempool should contain only one operation, got %L") ;
     unit
 end
 
@@ -3321,6 +3609,9 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_restriction_propagation
     ~protocols ;
   Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
+  Revamped.one_operation_per_manager_per_block_flush ~protocols ;
+  Revamped.one_operation_per_manager_per_block_ban ~protocols ;
+  Revamped.one_operation_per_manager_per_block_flush_on_ban ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;

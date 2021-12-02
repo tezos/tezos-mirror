@@ -165,6 +165,8 @@ val forge_and_inject_operation :
     - Default [source] is [Constant.bootstrap1].
     - Default [destination] is [Constant.bootstrap2].
     - Default [force] is [false].
+    - Default [wait_for_injection] is [None]
+
  *)
 val inject_transfer :
   ?protocol:Protocol.t ->
@@ -176,6 +178,7 @@ val inject_transfer :
   ?source:Account.key ->
   ?destination:Account.key ->
   ?force:bool ->
+  ?wait_for_injection:Node.t option ->
   Client.t ->
   string Lwt.t
 
@@ -191,6 +194,7 @@ val inject_transfers :
   ?source:Account.key ->
   ?destination:Account.key ->
   ?force:bool ->
+  ?wait_for_injection:Node.t option ->
   node:Node.t ->
   number_of_operations:int ->
   Client.t ->
