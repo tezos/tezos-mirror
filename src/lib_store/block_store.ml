@@ -350,12 +350,13 @@ let read_predecessor_block_by_level_opt block_store ?(read_metadata = false)
 let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
     level =
   let head_level = Block_repr.level head in
-  read_block
-    block_store
-    ~read_metadata
-    (Block (Block_repr.hash head, Int32.(to_int (sub head_level level))))
+  let head_hash = Block_repr.hash head in
+  let distance = Int32.(to_int (sub head_level level)) in
+  read_block block_store ~read_metadata (Block (head_hash, distance))
   >>=? function
-  | None -> fail (Bad_level {head_level; given_level = level})
+  | None ->
+      if distance < 0 then fail (Bad_level {head_level; given_level = level})
+      else fail (Block_not_found {hash = head_hash; distance})
   | Some b -> return b
 
 (* TODO optimize this by reading chunks of contiguous data and
