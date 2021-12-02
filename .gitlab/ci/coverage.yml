@@ -59,7 +59,7 @@ test_coverage:
 unified_coverage:
   extends:
     - .default_settings_template
-    - .rules_template__development
+    - .rules_template__development_unified_coverage
     - .image_template__runtime_build_test_dependencies_template
     - .template__coverage
   stage: test_coverage
