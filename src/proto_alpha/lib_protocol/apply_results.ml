@@ -390,9 +390,10 @@ module Manager_result = struct
       ~op_case:
         Operation.Encoding.Manager_operations.register_global_constant_case
       ~encoding:
-        (obj4
+        (obj5
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
       ~iselect:(function
@@ -407,12 +408,26 @@ module Manager_result = struct
       ~proj:(function
         | Register_global_constant_result
             {balance_updates; consumed_gas; size_of_constant; global_address} ->
-            (balance_updates, consumed_gas, size_of_constant, global_address))
+            ( balance_updates,
+              Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              size_of_constant,
+              global_address ))
       ~kind:Kind.Register_global_constant_manager_kind
       ~inj:
-        (fun (balance_updates, consumed_gas, size_of_constant, global_address) ->
+        (fun ( balance_updates,
+               consumed_gas,
+               consumed_milligas,
+               size_of_constant,
+               global_address ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Register_global_constant_result
-          {balance_updates; consumed_gas; size_of_constant; global_address})
+          {
+            balance_updates;
+            consumed_gas = consumed_milligas;
+            size_of_constant;
+            global_address;
+          })
 
   let delegation_case =
     make
