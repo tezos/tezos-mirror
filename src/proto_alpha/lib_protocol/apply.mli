@@ -257,7 +257,7 @@ val are_endorsements_required : t -> level:Raw_level.t -> bool tzresult Lwt.t
 
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
-  endorsing_power:int -> minimum:int -> unit tzresult Lwt.t
+  endorsing_power:int -> minimum:int -> unit tzresult
 
 (** [check_manager_signature validation_state op raw_operation]
     The function starts by retrieving the public key hash [pkh] of the manager

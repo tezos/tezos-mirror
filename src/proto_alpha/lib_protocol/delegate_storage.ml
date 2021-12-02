@@ -295,7 +295,7 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
   let number_of_endorsements_per_cycle =
     blocks_per_cycle * consensus_committee_size
   in
-  return
+  Result.return
     (Z.to_int
        (Z.div
           (Z.mul
@@ -338,7 +338,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         ctxt
         ~total_active_stake
         ~active_stake
-      >>=? fun expected_slots ->
+      >>?= fun expected_slots ->
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       (if sufficient_participation && has_revealed_nonces then
        (* Sufficient participation: we pay the rewards *)
@@ -757,7 +757,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
                 ctxt
                 ~total_active_stake
                 ~active_stake
-              >>=? fun expected_slots ->
+              >>?= fun expected_slots ->
               let Constants_repr.{numerator; denominator} =
                 Constants_storage.minimal_participation_ratio ctxt
               in
@@ -835,7 +835,7 @@ let delegate_participation_info ctxt delegate =
         ctxt
         ~total_active_stake
         ~active_stake
-      >>=? fun expected_cycle_activity ->
+      >>?= fun expected_cycle_activity ->
       let Constants_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt
       in
