@@ -193,7 +193,7 @@ let forge_and_inject_operation ?protocol ?branch ?async ?force ~batch ~signer
 
 let inject_transfer ?protocol ?branch ?counter ?amount ?fee ?gas_limit
     ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?force
-    client =
+    ?(wait_for_injection = None) client =
   let* op =
     mk_transfer
       ~source
@@ -204,17 +204,26 @@ let inject_transfer ?protocol ?branch ?counter ?amount ?fee ?gas_limit
       ?amount
       client
   in
-  forge_and_inject_operation
-    ?force
-    ?protocol
-    ?branch
-    ~batch:[op]
-    ~signer:source
-    client
+  let waiter =
+    match wait_for_injection with
+    | None -> Lwt.return_unit
+    | Some node -> Node.wait_for_request ~request:`Inject node
+  in
+  let* oph =
+    forge_and_inject_operation
+      ?force
+      ?protocol
+      ?branch
+      ~batch:[op]
+      ~signer:source
+      client
+  in
+  let* () = waiter in
+  Lwt.return oph
 
 let inject_transfers ?protocol ?amount ?fee ?gas_limit
     ?(source = Constant.bootstrap1) ?(destination = Constant.bootstrap2) ?force
-    ~node ~number_of_operations client =
+    ?wait_for_injection ~node ~number_of_operations client =
   let* branch = get_injection_branch ~branch:None client in
   (* Counter needs to be computed manually to ensure several
      operations of the same manager can be included in the same block.
@@ -228,6 +237,7 @@ let inject_transfers ?protocol ?amount ?fee ?gas_limit
         let* oph =
           inject_transfer
             ?force
+            ?wait_for_injection
             ?protocol
             ?fee
             ?gas_limit
