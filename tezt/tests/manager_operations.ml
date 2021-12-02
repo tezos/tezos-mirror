@@ -344,7 +344,7 @@ module Memchecks = struct
     let client = nodes.main.client in
     let wait_observer = wait_for_notify nodes.observer.node in
     Log.info "- Injecting operation." ;
-    let* oph = inject () in
+    let* (`OpHash oph) = inject () in
     let* mempool_after_injection = RPC.get_mempool client in
     check_operation_is_in_mempool
       `Applied
@@ -395,7 +395,7 @@ module Memchecks = struct
       wait_for_notify_or_processed_block nodes.observer.node
     in
     Log.info "- Injecting operation." ;
-    let* oph = inject () in
+    let* (`OpHash oph) = inject () in
     let* mempool_after_injection = RPC.get_mempool client in
     check_operation_is_in_mempool
       `Refused
@@ -502,14 +502,18 @@ module Illtyped_originations = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
-      Memchecks.with_applied_checks ~__LOC__ nodes ~expected_statuses:["failed"]
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["ill_typed_contract"; "bad_return"]]
       @@ fun () ->
-      Helpers.originate_contract
+      Operation.inject_origination
         ~protocol
         ~source:Constant.bootstrap1
-        ~init_storage:(`O [("int", `String "0")])
-        ~code:Contracts.illtyped_contract_body_1
-        nodes.main
+        ~init_storage:(`Json (`O [("int", `String "0")]))
+        ~code:(`Json Contracts.illtyped_contract_body_1)
+        nodes.main.client
     in
     unit
 
@@ -521,14 +525,18 @@ module Illtyped_originations = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _oph =
-      Memchecks.with_applied_checks ~__LOC__ nodes ~expected_statuses:["failed"]
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["ill_typed_contract"; "bad_return"]]
       @@ fun () ->
-      Helpers.originate_contract
+      Operation.inject_origination
         ~protocol
         ~source:Constant.bootstrap1
-        ~init_storage:(`O [("int", `String "0")])
-        ~code:Contracts.illtyped_contract_body_2
-        nodes.main
+        ~init_storage:(`Json (`O [("int", `String "0")]))
+        ~code:(`Json Contracts.illtyped_contract_body_2)
+        nodes.main.client
     in
     unit
 
@@ -539,20 +547,19 @@ module Illtyped_originations = struct
       ~tags:["precheck"; "illtyped"; "origination"; "typing"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* code =
-      Client.convert_script_to_json
-        nodes.main.client
-        ~script:"./tezt/tests/contracts/proto_alpha/parsable_contract.tz"
-    in
     let* _oph =
-      Memchecks.with_applied_checks ~__LOC__ nodes ~expected_statuses:["failed"]
+      Memchecks.with_applied_checks
+        ~__LOC__
+        nodes
+        ~expected_statuses:["failed"]
+        ~expected_errors:[["ill_typed_data"; "invalid_constant"]]
       @@ fun () ->
-      Helpers.originate_contract
+      Operation.inject_origination
         ~protocol
         ~source:Constant.bootstrap1
-        ~init_storage:(`O [("int", `String "-10")])
-        ~code
-        nodes.main
+        ~init_storage:(`Json (`O [("int", `String "-10")]))
+        ~code:(`File "./tezt/tests/contracts/proto_alpha/parsable_contract.tz")
+        nodes.main.client
     in
     unit
 
@@ -597,7 +604,7 @@ module Deserialisation = struct
     let* op =
       Operation.mk_call
         ~entrypoint:"default"
-        ~arg:(`O [("bytes", `String (make_zero_hex ~size_kB))])
+        ~arg:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
         ~gas_limit
         ~dest:contract
         ~source
