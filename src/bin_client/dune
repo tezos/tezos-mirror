@@ -4,7 +4,7 @@
 
 (env
  (static
-  (flags (:standard -ccopt -static -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+  (flags (:standard -ccopt -static))))
 
 (executables
  (names main_client main_admin)
