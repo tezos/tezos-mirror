@@ -307,8 +307,8 @@ let delegate_participated_enough ctxt delegate =
   Storage.Contract.Remaining_allowed_missed_slots.find ctxt delegate
   >>=? function
   | None -> return_true
-  | Some remaining_allowed_missed_levels ->
-      return Compare.Int.(remaining_allowed_missed_levels > 0)
+  | Some remaining_allowed_missed_slots ->
+      return Compare.Int.(remaining_allowed_missed_slots >= 0)
 
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
@@ -923,7 +923,7 @@ let delegate_participation_info ctxt delegate =
       in
       let (current_pending_rewards, expected_endorsing_rewards) =
         match remaining with
-        | Some r when Compare.Int.(r <= 0) -> (Tez_repr.zero, Tez_repr.zero)
+        | Some r when Compare.Int.(r < 0) -> (Tez_repr.zero, Tez_repr.zero)
         | _ ->
             ( Tez_repr.mul_exn endorsing_reward_per_slot optimal_cycle_activity,
               expected_endorsing_rewards )
