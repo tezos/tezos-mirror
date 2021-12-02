@@ -225,9 +225,12 @@ module Revamped = struct
     let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Inject a transfer operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph = Operation.inject_transfer ~amount:1 client1 in
-    let* () = injection_waiter in
+    let* oph =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~amount:1
+        client1
+    in
     Log.info "%s injected on node1." oph ;
 
     log_step 3 "Check that the operation %s is classified as 'Applied'." oph ;
@@ -272,11 +275,14 @@ module Revamped = struct
         client1
     in
     let counter = JSON.as_int counter in
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
     let* oph2 =
-      Operation.inject_transfer ~force:true ~counter ~amount:2 client1
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~force:true
+        ~counter
+        ~amount:2
+        client1
     in
-    let* () = injection_waiter in
     Log.info "%s injected on node1." oph2 ;
 
     log_step 7 "Check that the operation %s is branch_refused." oph2 ;
@@ -379,9 +385,9 @@ module Revamped = struct
     let* (node, client) = Client.init_with_protocol ~protocol `Client () in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
-    let* oph1 = Operation.inject_transfer ~amount:1 client in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node) ~amount:1 client
+    in
 
     log_step
       3
@@ -395,9 +401,13 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and inject an operation with the same manager." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
-    let* oph2 = Operation.inject_transfer ~force:true ~amount:2 client in
-    let* () = injection_waiter in
+    let* oph2 =
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~force:true
+        ~amount:2
+        client
+    in
 
     log_step
       5
@@ -452,19 +462,20 @@ module Revamped = struct
     let* () = Client.Admin.connect_address ~peer:node2 client1 in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph1 = Operation.inject_transfer client1 in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    in
 
     log_step
       3
       "Forge and inject an operation on node1 with the same source but \
        different destination." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
     let* oph2 =
-      Operation.inject_transfer ~destination:Constant.bootstrap3 client1
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node1)
+        ~destination:Constant.bootstrap3
+        client1
     in
-    let* () = injection_waiter in
 
     log_step
       4
@@ -544,19 +555,20 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node1 in
-    let* oph1 = Operation.inject_transfer client1 in
-    let* () = injection_waiter in
+    let* oph1 =
+      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    in
 
     log_step
       3
       "Forge and inject an operation on node2 with the same manager and \
        counter but a different destination." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node2 in
     let* oph2 =
-      Operation.inject_transfer ~destination:Constant.bootstrap3 client2
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node2)
+        ~destination:Constant.bootstrap3
+        client2
     in
-    let* () = injection_waiter in
 
     log_step
       4
@@ -621,11 +633,13 @@ module Revamped = struct
         client
     in
     let counter = JSON.as_int counter in
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph1 =
-      Operation.inject_transfer ~counter:(counter + 1) ~amount:1 client
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~counter:(counter + 1)
+        ~amount:1
+        client
     in
-    let* () = injection_waiter in
 
     log_step
       3
@@ -642,15 +656,14 @@ module Revamped = struct
       4
       "Forge and force inject an operation with the same manager that should \
        fail because the counter was not incremented." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph2 =
       Operation.inject_transfer
+        ~wait_for_injection:(Some node)
         ~counter:(counter + 1)
         ~force:true
         ~amount:2
         client
     in
-    let* () = injection_waiter in
 
     log_step
       5
@@ -671,11 +684,13 @@ module Revamped = struct
       6
       "Forge and inject an operation with the same manager with incremented \
        counter." ;
-    let injection_waiter = Node.wait_for_request ~request:`Inject node in
     let* oph3 =
-      Operation.inject_transfer ~counter:(counter + 2) ~amount:2 client
+      Operation.inject_transfer
+        ~wait_for_injection:(Some node)
+        ~counter:(counter + 2)
+        ~amount:2
+        client
     in
-    let* () = injection_waiter in
 
     log_step
       7
