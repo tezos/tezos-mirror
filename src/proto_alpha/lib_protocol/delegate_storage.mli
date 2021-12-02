@@ -95,9 +95,7 @@ type participation_info = {
       (** Endorsing rewards that will be distributed at the end of the
      cycle if activity at that point will be greater than the minimal
      required. If the activity is already known to be below the
-     required threshold, then the rewards are zero. (dynamic) *)
-  current_pending_rewards : Tez_repr.t;
-      (** Estimated accumulated endorsing rewards in the cycle so far. (dynamic) *)
+     required minimum, then the rewards are zero. (dynamic) *)
 }
 
 val delegate_participation_info :

@@ -837,28 +837,7 @@ type participation_info = {
   missed_slots : int;
   remaining_allowed_missed_slots : int;
   expected_endorsing_rewards : Tez_repr.t;
-  current_pending_rewards : Tez_repr.t;
 }
-
-(* the estimated activity is expressed in number of slots *)
-let estimated_activity_for_given_active_stake ctxt ~level ~total_active_stake
-    ~active_stake =
-  let consensus_committee_size =
-    Constants_storage.consensus_committee_size ctxt
-  in
-  let blocks_per_cycle =
-    Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
-  in
-  let estimated_number_of_slots =
-    (Int32.to_int level.Level_repr.cycle_position + 1)
-    mod blocks_per_cycle * consensus_committee_size
-  in
-  Z.to_int
-    (Z.div
-       (Z.mul
-          (Z.of_int64 (Tez_repr.to_mutez active_stake))
-          (Z.of_int estimated_number_of_slots))
-       (Z.of_int64 (Tez_repr.to_mutez total_active_stake)))
 
 (* Inefficient, only for RPC *)
 let delegate_participation_info ctxt delegate =
@@ -880,7 +859,6 @@ let delegate_participation_info ctxt delegate =
           missed_slots = 0;
           remaining_allowed_missed_slots = 0;
           expected_endorsing_rewards = Tez_repr.zero;
-          current_pending_rewards = Tez_repr.zero;
         }
   | Some active_stake ->
       Stake_storage.get_total_active_stake ctxt level.cycle
@@ -914,19 +892,10 @@ let delegate_participation_info ctxt delegate =
         | Some remaining ->
             (maximal_cycle_inactivity - remaining, Compare.Int.max 0 remaining)
       in
-      let optimal_cycle_activity =
-        estimated_activity_for_given_active_stake
-          ctxt
-          ~total_active_stake
-          ~active_stake
-          ~level
-      in
-      let (current_pending_rewards, expected_endorsing_rewards) =
+      let expected_endorsing_rewards =
         match remaining with
-        | Some r when Compare.Int.(r < 0) -> (Tez_repr.zero, Tez_repr.zero)
-        | _ ->
-            ( Tez_repr.mul_exn endorsing_reward_per_slot optimal_cycle_activity,
-              expected_endorsing_rewards )
+        | Some r when Compare.Int.(r < 0) -> Tez_repr.zero
+        | _ -> expected_endorsing_rewards
       in
       return
         {
@@ -935,5 +904,4 @@ let delegate_participation_info ctxt delegate =
           missed_slots;
           remaining_allowed_missed_slots;
           expected_endorsing_rewards;
-          current_pending_rewards;
         }

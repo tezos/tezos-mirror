@@ -124,35 +124,30 @@ let participation_info_encoding =
            missed_slots;
            remaining_allowed_missed_slots;
            expected_endorsing_rewards;
-           current_pending_rewards;
          } ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
         remaining_allowed_missed_slots,
-        expected_endorsing_rewards,
-        current_pending_rewards ))
+        expected_endorsing_rewards ))
     (fun ( expected_cycle_activity,
            minimal_cycle_activity,
            missed_slots,
            remaining_allowed_missed_slots,
-           expected_endorsing_rewards,
-           current_pending_rewards ) ->
+           expected_endorsing_rewards ) ->
       {
         expected_cycle_activity;
         minimal_cycle_activity;
         missed_slots;
         remaining_allowed_missed_slots;
         expected_endorsing_rewards;
-        current_pending_rewards;
       })
-    (obj6
+    (obj5
        (req "expected_cycle_activity" int31)
        (req "minimal_cycle_activity" int31)
        (req "missed_slots" int31)
        (req "remaining_allowed_missed_slots" int31)
-       (req "expected_endorsing_rewards" Tez.encoding)
-       (req "current_pending_rewards" Tez.encoding))
+       (req "expected_endorsing_rewards" Tez.encoding))
 
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
@@ -281,13 +276,11 @@ module S = struct
          'missed_slots' indicates the number of missed endorsing slots in the \
          cycle so far. The field 'remaining_allowed_missed_slots' indicates \
          the remaining amount of endorsing slots that can be missed in the \
-         cycle before forfeiting the rewards. The field \
+         cycle before forfeiting the rewards. Finally, \
          'expected_endorsing_rewards' indicates the endorsing rewards that \
          will be distributed at the end of the cycle if activity at that point \
          will be greater than the minimal required; if the activity is already \
-         known to be below the required minimum, then the rewards are zero. \
-         Finally, 'current_pending_rewards' indicates the estimated \
-         accumulated endorsing rewards in the cycle so far."
+         known to be below the required minimum, then the rewards are zero."
       ~query:RPC_query.empty
       ~output:participation_info_encoding
       RPC_path.(path / "participation")

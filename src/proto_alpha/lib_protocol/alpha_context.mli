@@ -1532,7 +1532,6 @@ module Delegate : sig
     missed_slots : int;
     remaining_allowed_missed_slots : int;
     expected_endorsing_rewards : Tez.t;
-    current_pending_rewards : Tez.t;
   }
 
   val delegate_participation_info :
