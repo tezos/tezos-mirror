@@ -806,4 +806,129 @@ module Illtyped_originations = struct
     initial_storage_illtyped ~protocols
 end
 
-let register ~protocols = Illtyped_originations.register ~protocols
+module Reveal = struct
+  (* This auxiliary function forges and injects a batched operation
+     made of two revelations pk1 and pk2. The tx is signed by the given key. *)
+  let mk_reveal_twice {client; _} key pk1 pk2 =
+    let* cpt = Operation.get_counter client ~source:key in
+    let s1 = {key with Account.public_key = pk1} in
+    let s2 = {key with Account.public_key = pk2} in
+    let* op1 = Operation.mk_reveal ~source:s1 ~counter:(cpt + 1) ~fee client in
+    let* op2 = Operation.mk_reveal ~source:s2 ~counter:(cpt + 2) ~fee client in
+    Operation.forge_and_inject_operation ~batch:[op1; op2] ~signer:key client
+
+  let simple_reveal_bad_pk =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple revelation with a wrong public key"
+      ~tags:["reveal"; "revelation"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    let* key_to_reveal = Client.gen_and_show_keys nodes.main.client in
+    Log.section "Make the revelation" ;
+    let* _oph =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      Operation.inject_public_key_revelation
+        ~protocol
+        ~source:key
+        ~public_key:
+          key_to_reveal.public_key (* key_to_reveal is different from key *)
+        ~fee
+        nodes.main.client
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let simple_reveal_not_a_pk =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple revelation with something that is not a public key"
+      ~tags:["reveal"; "revelation"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    Log.section "Make the revelation" ;
+    let* op = Operation.mk_reveal ~source:key ~fee nodes.main.client in
+    let patch_unsigned (`Hex op) =
+      (* public key is in the last field, add extra byte *)
+      `Hex (op ^ "00")
+    in
+    let* _oph =
+      Memchecks.with_absent_checks ~__LOC__ nodes @@ fun () ->
+      Operation.forge_and_inject_operation
+        ~protocol
+        ~batch:[op]
+        ~signer:key
+        ~patch_unsigned
+        nodes.main.client
+    in
+    unit
+
+  let revealed_twice_in_batch =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Correct public key revealed twice in a batch"
+      ~tags:["reveal"; "revelation"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    Log.section "Make the revelation" ;
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      mk_reveal_twice nodes.main key key.public_key key.public_key
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let revealed_twice_in_batch_bad_first_key =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Two reveals in a batch. First key is wrong"
+      ~tags:["reveal"; "revelation"; "batch"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    Log.section "Make the revelation" ;
+    let* _ =
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
+      mk_reveal_twice
+        nodes.main
+        key
+        Constant.bootstrap1.public_key
+        key.public_key
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let revealed_twice_in_batch_bad_second_key =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Two reveals in a batch. Second key is wrong"
+      ~tags:["reveal"; "revelation"]
+    @@ fun protocol ->
+    let* nodes = Helpers.init ~protocol () in
+    let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
+    Log.section "Make the revelation" ;
+    let* _ =
+      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      mk_reveal_twice
+        nodes.main
+        key
+        key.public_key
+        Constant.bootstrap1.public_key
+    in
+    let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
+    Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  let register ~protocols =
+    simple_reveal_bad_pk ~protocols ;
+    simple_reveal_not_a_pk ~protocols ;
+    revealed_twice_in_batch ~protocols ;
+    revealed_twice_in_batch_bad_first_key ~protocols ;
+    revealed_twice_in_batch_bad_second_key ~protocols
+end
+
+let register ~protocols =
+  Illtyped_originations.register ~protocols ;
+  Reveal.register ~protocols
