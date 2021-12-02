@@ -321,8 +321,8 @@ let register_signer signer =
   let module Signer = (val signer : SIGNER) in
   String.Hashtbl.replace signers_table Signer.scheme signer
 
-let find_signer_for_key ~scheme =
-  let open Lwt_tzresult_syntax in
+let find_signer_for_key ~scheme : (module SIGNER) tzresult =
+  let open Tzresult_syntax in
   match String.Hashtbl.find signers_table scheme with
   | None -> fail (Unregistered_key_scheme scheme)
   | Some signer -> return signer
@@ -348,12 +348,13 @@ let () =
     (function Signature_mismatch sk -> Some sk | _ -> None)
     (fun sk -> Signature_mismatch sk)
 
-let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a) : 'a =
-  let open Lwt_result_syntax in
+let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a tzresult Lwt.t)
+    =
+  let open Lwt_tzresult_syntax in
   match Uri.scheme uri with
   | None -> assert false
   | Some scheme ->
-      let* signer = find_signer_for_key ~scheme in
+      let*? signer = find_signer_for_key ~scheme in
       f signer
 
 let neuterize sk_uri =
@@ -501,7 +502,7 @@ let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
   | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
       let*! r =
-        let* signer = find_signer_for_key ~scheme:"remote" in
+        let*? signer = find_signer_for_key ~scheme:"remote" in
         let module Signer = (val signer : SIGNER) in
         let path = Signature.Public_key_hash.to_b58check pkh in
         let uri = Uri.make ~scheme:Signer.scheme ~path () in
