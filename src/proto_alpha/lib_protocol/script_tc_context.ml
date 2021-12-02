@@ -22,3 +22,12 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type t =
+  | Lambda : t
+  | Toplevel : {
+      storage_type : 'sto Script_typed_ir.ty;
+      param_type : 'param Script_typed_ir.ty;
+      root_name : Script_ir_annot.field_annot option;
+    }
+      -> t
