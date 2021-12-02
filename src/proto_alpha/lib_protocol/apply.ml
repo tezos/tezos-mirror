@@ -2607,13 +2607,13 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
   | Some nonce_hash ->
       Nonce.record_hash ctxt {nonce_hash; delegate = block_producer})
   >>=? fun ctxt ->
-  record_endorsing_participation ctxt >>=? fun ctxt ->
-  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
   (if required_endorsements then
+   record_endorsing_participation ctxt >>=? fun ctxt ->
    Baking.bonus_baking_reward ctxt ~endorsing_power:block_endorsing_power
-   >>? Result.return_some
-  else Result.return_none)
-  >>?= fun reward_bonus ->
+   >>?= fun rewards_bonus -> return (ctxt, Some rewards_bonus)
+  else return (ctxt, None))
+  >>=? fun (ctxt, reward_bonus) ->
+  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
   Delegate.record_baking_activity_and_pay_rewards_and_fees
     ctxt
     ~payload_producer
