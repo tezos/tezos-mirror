@@ -215,7 +215,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
        and [blocks_per_voting_period = 3], and enters an infinite loop
        with [blocks_per_voting_period = 1] and [blocks_per_voting_period = 0]. *)
     Protocol.write_parameter_file
-      ~base:(Right from_protocol)
+      ~base:(Right (from_protocol, None))
       [
         (["blocks_per_cycle"], Some "8");
         (["blocks_per_voting_period"], Some "4");

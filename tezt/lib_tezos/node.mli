@@ -203,8 +203,8 @@ val fresh_port : unit -> int
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Send SIGTERM to a node and wait for it to terminate. *)
-val terminate : t -> unit Lwt.t
+(** Send SIGTERM (or SIGKILL) to a node and wait for it to terminate. *)
+val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
 

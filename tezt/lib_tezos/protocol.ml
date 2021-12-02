@@ -74,14 +74,19 @@ type parameter_overrides = (string list * string option) list
 
 let write_parameter_file :
     ?additional_bootstrap_accounts:(Account.key * int option) list ->
-    base:(string, t) Either.t ->
+    base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
  fun ?(additional_bootstrap_accounts = []) ~base parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
   let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
-    let file = Either.fold ~left:Fun.id ~right:parameter_file base in
+    let file =
+      Either.fold
+        ~left:Fun.id
+        ~right:(fun (x, constants) -> parameter_file ?constants x)
+        base
+    in
     JSON.parse_file file |> JSON.unannotate
   in
   let parameters =

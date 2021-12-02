@@ -56,6 +56,10 @@ val init :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?runner:Runner.t ->
+  ?delegates:string list ->
   Node.t ->
   Client.t ->
   t Lwt.t
+
+(** Send SIGTERM (or SIGKILL) to a baker and wait for it to terminate. *)
+val terminate : ?kill:bool -> t -> unit Lwt.t

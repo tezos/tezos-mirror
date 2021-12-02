@@ -219,7 +219,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () = Client.Admin.connect_address client ~peer:node_2 in
   let* parameter_file =
     Protocol.write_parameter_file
-      ~base:(Either.Right protocol)
+      ~base:(Either.Right (protocol, None))
       [
         ( ["max_operations_time_to_live"],
           Some (string_of_int max_operations_ttl) );

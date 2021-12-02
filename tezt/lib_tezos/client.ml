@@ -806,7 +806,7 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?transfers ?tps
-    ?(single_op_per_pkh_per_block = false) client =
+    ?(single_op_per_pkh_per_block = false) ?fresh_probability client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -858,15 +858,20 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     | Some (arg : int) -> [name; Int.to_string arg]
     | None -> []
   in
+  let make_float_opt_arg (name : string) = function
+    | Some (arg : float) -> [name; Float.to_string arg]
+    | None -> []
+  in
   spawn_command ?endpoint client
   @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
   @ make_int_opt_arg "--transfers" transfers
   @ make_int_opt_arg "--tps" tps
+  @ make_float_opt_arg "--fresh-probability" fresh_probability
   @
   if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?transfers ?tps ?single_op_per_pkh_per_block client =
+    ?transfers ?tps ?single_op_per_pkh_per_block ?fresh_probability client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
@@ -876,6 +881,7 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?transfers
     ?tps
     ?single_op_per_pkh_per_block
+    ?fresh_probability
     client
   |> Process.check
 
@@ -1226,7 +1232,8 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file tag ~protocol () =
+    ?default_accounts_balance ?parameter_file ?timestamp_delay tag ~protocol ()
+    =
   let* (node, client) =
     init_with_node
       ?path
@@ -1245,9 +1252,11 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?additional_bootstrap_account_count
       ?default_accounts_balance
       ?parameter_file
-      ~protocol
+      ~protocol:(protocol, None)
       client
   in
-  let* () = activate_protocol ?parameter_file ~protocol client in
+  let* () =
+    activate_protocol ?parameter_file ~protocol ?timestamp_delay client
+  in
   let* _ = Node.wait_for_level node 1 in
   return (node, client)

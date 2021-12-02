@@ -104,7 +104,7 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
         | Some overrides ->
             let* file =
               Protocol.write_parameter_file
-                ~base:(Either.right protocol)
+                ~base:(Either.right (protocol, None))
                 overrides
             in
             Lwt.return_some file

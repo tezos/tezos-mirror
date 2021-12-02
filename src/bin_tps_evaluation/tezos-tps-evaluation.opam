@@ -8,12 +8,17 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "cmdliner"
-  "lwt"
   "data-encoding"
+  "lwt"
   "ppx_blob"
+  "tezos-base"
+  "tezos-client-base-unix"
+  "tezos-protocol-alpha"
+  "tezt"
+  "tezt-tezos"
   "caqti"
-  "caqti-lwt"
   "caqti-driver-postgresql"
+  "caqti-lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
