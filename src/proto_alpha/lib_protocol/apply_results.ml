@@ -391,9 +391,9 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.register_global_constant_case
       ~encoding:
         (obj4
-           (req "balance_updates" Receipt.balance_updates_encoding)
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
-           (req "storage_size" z)
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
       ~iselect:(function
         | Internal_operation_result
