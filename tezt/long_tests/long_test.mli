@@ -325,6 +325,22 @@ val time :
   (unit -> unit) ->
   unit Lwt.t
 
+(** Same as {!time}, but instead of measuring the duration taken
+    by [f ()] execution, delegates this responsability to [f] itself.
+
+    In this case, [f] represents a thunk that executes an expression
+    or a program and evaluates in the duration taken by its execution.*)
+val measure_and_check_regression :
+  ?previous_count:int ->
+  ?minimum_previous_count:int ->
+  ?margin:float ->
+  ?check:check ->
+  ?stddev:bool ->
+  ?repeat:int ->
+  InfluxDB.measurement ->
+  (unit -> float) ->
+  unit Lwt.t
+
 (** Same as {!time}, but for functions that return promises.
 
     Note that other concurrent promises may slow down the measured function
@@ -338,6 +354,22 @@ val time_lwt :
   ?repeat:int ->
   InfluxDB.measurement ->
   (unit -> unit Lwt.t) ->
+  unit Lwt.t
+
+(** Same as {!time_lwt}, but instead of measuring the duration taken
+    by [f ()] execution, delegates to [f] itself.
+
+    In this case, [f] represents a thunk that executes an expression
+    or a program and evaluates in the duration taken by its execution.*)
+val measure_and_check_regression_lwt :
+  ?previous_count:int ->
+  ?minimum_previous_count:int ->
+  ?margin:float ->
+  ?check:check ->
+  ?stddev:bool ->
+  ?repeat:int ->
+  InfluxDB.measurement ->
+  (unit -> float Lwt.t) ->
   unit Lwt.t
 
 (** {2 Graphs} *)
