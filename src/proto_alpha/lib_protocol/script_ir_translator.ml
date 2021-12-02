@@ -32,6 +32,7 @@ open Script_ir_annot
 open Script_typed_ir
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
+module Tc_context = Script_tc_context
 
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
@@ -93,14 +94,7 @@ let compose_descr :
       };
   }
 
-type tc_context =
-  | Lambda : tc_context
-  | Toplevel : {
-      storage_type : 'sto ty;
-      param_type : 'param ty;
-      root_name : field_annot option;
-    }
-      -> tc_context
+type tc_context = Tc_context.t
 
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
@@ -2649,7 +2643,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
       traced
       @@ parse_returning
-           Lambda
+           Tc_context.Lambda
            ?type_logger
            ~stack_depth:(stack_depth + 1)
            ctxt
@@ -2880,7 +2874,7 @@ and parse_view_returning :
   parse_instr
     ?type_logger
     ~stack_depth:0
-    Lambda
+    Tc_context.Lambda
     ctxt
     ~legacy
     view_code
@@ -4155,7 +4149,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
-        Lambda
+        Tc_context.Lambda
         ?type_logger
         ~stack_depth:(stack_depth + 1)
         ctxt
@@ -4856,7 +4850,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Toplevel {storage_type; param_type = arg_type; root_name})
+           (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
            ctxt
            ~legacy
            ?type_logger
@@ -4953,8 +4947,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               entrypoint
           in
           match tc_context with
-          | Lambda -> error (Self_in_lambda loc)
-          | Toplevel {param_type; root_name; storage_type = _} ->
+          | Tc_context.Lambda -> error (Self_in_lambda loc)
+          | Tc_context.Toplevel {param_type; root_name; storage_type = _} ->
               find_entrypoint param_type ~root_name entrypoint
               >>? fun (_, Ex_ty param_type) ->
               contract_t loc param_type ~annot:None >>? fun res_ty ->
@@ -5686,7 +5680,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       (Toplevel {storage_type; param_type = arg_type; root_name})
+       (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5816,7 +5810,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
-      (Toplevel {storage_type; param_type = arg_type; root_name})
+      (Tc_context.Toplevel {storage_type; param_type = arg_type; root_name})
       ctxt
       ~legacy
       ~stack_depth:0
