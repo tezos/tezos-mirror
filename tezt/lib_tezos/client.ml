@@ -510,9 +510,22 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
-let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
+let spawn_gen_keys =
+  let id = ref 0 in
+  fun ?alias client ->
+    let alias =
+      match alias with
+      | None ->
+          incr id ;
+          sf "tezt_%d" !id
+      | Some alias -> alias
+    in
+    (spawn_command client ["gen"; "keys"; alias], alias)
 
-let gen_keys ~alias client = spawn_gen_keys ~alias client |> Process.check
+let gen_keys ?alias client =
+  let (p, alias) = spawn_gen_keys ?alias client in
+  let* () = Process.check p in
+  return alias
 
 let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
@@ -545,12 +558,8 @@ let show_address ~alias client =
   in
   return @@ extract_key output
 
-let gen_and_show_keys ~alias client =
-  let* () = gen_keys ~alias client in
-  show_address ~alias client
-
-let gen_and_show_secret_keys ~alias client =
-  let* () = gen_keys ~alias client in
+let gen_and_show_keys ?alias client =
+  let* alias = gen_keys ?alias client in
   show_address ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
@@ -1129,7 +1138,7 @@ let get_parameter_file ?additional_bootstrap_account_count
         Lwt_list.map_s
           (fun i ->
             let alias = sf "bootstrap%d" i in
-            let* key = gen_and_show_secret_keys ~alias client in
+            let* key = gen_and_show_keys ~alias client in
             return (key, default_accounts_balance))
           (range 6 (5 + n))
       in

@@ -395,16 +395,14 @@ val show_address : alias:string -> t -> Account.key Lwt.t
     (which also implies that there is no output key to parse). *)
 val spawn_show_address : alias:string -> t -> Process.t
 
-(** Run [tezos-client gen keys]. *)
-val gen_keys : alias:string -> t -> unit Lwt.t
+(** Run [tezos-client gen keys] and return the key alias.
+
+    The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
+val gen_keys : ?alias:string -> t -> string Lwt.t
 
 (** A helper to run [tezos-client gen keys] followed by
     [tezos-client show address] to get the generated key. *)
-val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
-
-(** Same as [gen_and_show_keys] but returns a [Constant.key] instead of an
-    [Account.key]. *)
-val gen_and_show_secret_keys : alias:string -> t -> Account.key Lwt.t
+val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
