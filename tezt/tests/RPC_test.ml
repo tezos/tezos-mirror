@@ -704,7 +704,12 @@ let test_mempool protocol ?endpoint client =
   (* Inject a transfer to increment the counter of bootstrap1. Bake with this
      transfer to trigger the counter_in_the_past error for the following
      transfer. *)
-  let* _ = Operation.inject_transfer client in
+  let* _ =
+    Operation.inject_transfer
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client
+  in
   let* _ = Client.bake_for ?endpoint client in
 
   (* Outdated operation: consensus_operation_for_old_level (classified as
@@ -734,6 +739,7 @@ let test_mempool protocol ?endpoint client =
     Operation.inject_transfer
       ~force:true
       ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
       ~counter
       client
   in
@@ -748,15 +754,25 @@ let test_mempool protocol ?endpoint client =
     Operation.inject_transfer
       ~force:true
       ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap2
       ~counter:(counter + 5)
       client
   in
   (* Refused op: fees_too_low *)
   let* _ =
-    Operation.inject_transfer ~source:Constant.bootstrap3 ~fee:0 client
+    Operation.inject_transfer
+      ~source:Constant.bootstrap3
+      ~dest:Constant.bootstrap2
+      ~fee:0
+      client
   in
   (* Applied op *)
-  let* _ = Operation.inject_transfer ~source:Constant.bootstrap4 client in
+  let* _ =
+    Operation.inject_transfer
+      ~source:Constant.bootstrap4
+      ~dest:Constant.bootstrap2
+      client
+  in
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
   let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in

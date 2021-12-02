@@ -118,7 +118,7 @@ module Revamped = struct
       Lwt_list.map_s
         (fun i ->
           let alias = sf "bootstrap%d" i in
-          let* key = Client.gen_and_show_secret_keys ~alias client in
+          let* key = Client.gen_and_show_keys ~alias client in
           return (key, None))
         (range
            (Constant.default_bootstrap_count + 1)
@@ -225,10 +225,12 @@ module Revamped = struct
     let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Inject a transfer operation on node1." ;
-    let* oph =
+    let* (`OpHash oph) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node1)
+        ~wait_for_injection:node1
         ~amount:1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client1
     in
     Log.info "%s injected on node1." oph ;
@@ -275,12 +277,14 @@ module Revamped = struct
         client1
     in
     let counter = JSON.as_int counter in
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node1)
+        ~wait_for_injection:node1
         ~force:true
         ~counter
         ~amount:2
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client1
     in
     Log.info "%s injected on node1." oph2 ;
@@ -385,8 +389,13 @@ module Revamped = struct
     let* (node, client) = Client.init_with_protocol ~protocol `Client () in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let* oph1 =
-      Operation.inject_transfer ~wait_for_injection:(Some node) ~amount:1 client
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~amount:1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        client
     in
 
     log_step
@@ -401,11 +410,13 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and inject an operation with the same manager." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~force:true
         ~amount:2
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client
     in
 
@@ -462,18 +473,23 @@ module Revamped = struct
     let* () = Client.Admin.connect_address ~peer:node2 client1 in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let* oph1 =
-      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~wait_for_injection:node1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        client1
     in
 
     log_step
       3
       "Forge and inject an operation on node1 with the same source but \
        different destination." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node1)
-        ~destination:Constant.bootstrap3
+        ~wait_for_injection:node1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap3
         client1
     in
 
@@ -555,18 +571,23 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on node1." ;
-    let* oph1 =
-      Operation.inject_transfer ~wait_for_injection:(Some node1) client1
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~wait_for_injection:node1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        client1
     in
 
     log_step
       3
       "Forge and inject an operation on node2 with the same manager and \
        counter but a different destination." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node2)
-        ~destination:Constant.bootstrap3
+        ~wait_for_injection:node2
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap3
         client2
     in
 
@@ -633,11 +654,13 @@ module Revamped = struct
         client
     in
     let counter = JSON.as_int counter in
-    let* oph1 =
+    let* (`OpHash oph1) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~counter:(counter + 1)
         ~amount:1
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client
     in
 
@@ -656,12 +679,14 @@ module Revamped = struct
       4
       "Forge and force inject an operation with the same manager that should \
        fail because the counter was not incremented." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~counter:(counter + 1)
         ~force:true
         ~amount:2
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client
     in
 
@@ -684,11 +709,13 @@ module Revamped = struct
       6
       "Forge and inject an operation with the same manager with incremented \
        counter." ;
-    let* oph3 =
+    let* (`OpHash oph3) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~counter:(counter + 2)
         ~amount:2
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client
     in
 
@@ -734,20 +761,22 @@ module Revamped = struct
         client
     in
     let counter = JSON.as_int counter in
-    let* oph1 =
+    let* (`OpHash oph1) =
       Operation.inject_transfer
         ~force:true
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         ~counter:(counter + 2)
         client
     in
 
     log_step 3 "Inject a transfer with a correct counter." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         ~counter:(counter + 1)
         client
     in
@@ -755,11 +784,11 @@ module Revamped = struct
     log_step
       4
       "Inject a transfer with a correct counter but different destination." ;
-    let* oph3 =
+    let* (`OpHash oph3) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
-        ~destination:Constant.bootstrap3
+        ~dest:Constant.bootstrap3
         ~counter:(counter + 1)
         client
     in
@@ -837,20 +866,22 @@ module Revamped = struct
         client
     in
     let counter = JSON.as_int counter in
-    let* oph1 =
+    let* (`OpHash oph1) =
       Operation.inject_transfer
         ~force:true
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         ~counter:(counter + 2)
         client
     in
 
     log_step 3 "Inject a transfer with a correct counter." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         ~counter:(counter + 1)
         client
     in
@@ -916,18 +947,20 @@ module Revamped = struct
         ()
     in
     log_step 2 "Inject a transfer." ;
-    let* oph1 =
+    let* (`OpHash oph1) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap2
         client
     in
 
     log_step 3 "Inject a transfer with a different source." ;
-    let* oph2 =
+    let* (`OpHash oph2) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
         client
     in
 
@@ -936,11 +969,11 @@ module Revamped = struct
       "Inject a transfer with the same source but different destination. This \
        operation should be classified as branch_delayed with the 1M \
        restriction." ;
-    let* oph3 =
+    let* (`OpHash oph3) =
       Operation.inject_transfer
-        ~wait_for_injection:(Some node)
+        ~wait_for_injection:node
         ~source:Constant.bootstrap1
-        ~destination:Constant.bootstrap3
+        ~dest:Constant.bootstrap3
         client
     in
 
@@ -1135,12 +1168,11 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   let* op_hex =
     RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
   in
-  return (JSON.as_string op_hex)
+  return (`Hex (JSON.as_string op_hex))
 
-let inject_operation ~client op_str_hex signature =
+let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  let* res = RPC.inject_operation ~data:(`String signed_op) client in
-  return res
+  RPC.inject_operation ~data:(`String signed_op) client
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -1155,8 +1187,7 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
       ~client
   in
   let signature = Operation.sign_manager_op_hex ~signer op_str_hex in
-  let* oph = inject_operation ~client op_str_hex signature in
-  return oph
+  inject_operation ~client op_str_hex signature
 
 let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client ~node n =
@@ -1236,8 +1267,7 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in
-  let* res = RPC.inject_operation ~data:(`String signed_op) client in
-  return res
+  RPC.inject_operation ~data:(`String signed_op) client
 
 let check_batch_operations_are_in_applied_mempool ops oph n =
   let open JSON in
@@ -2881,7 +2911,7 @@ let force_operation_injection =
   in
   let* branch = RPC.get_branch client2 >|= JSON.as_string in
   Log.info "%s" step4_msg ;
-  let* op_str_hex =
+  let* (`Hex op_str_hex as op_hex) =
     forge_operation
       ~branch
       ~fee:1000 (* Minimal fees to successfully apply the transfer *)
@@ -2891,8 +2921,8 @@ let force_operation_injection =
       ~counter (* Invalid counter *)
       ~client:client2
   in
-  let signature =
-    Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_str_hex
+  let (`Hex signature) =
+    Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
   in
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
@@ -2966,7 +2996,7 @@ let injecting_old_operation_fails =
   (* + 1 for the activation block *)
   let* _ = Node.wait_for_level node (max_operations_ttl + blocks_to_bake + 1) in
   log_step 4 step4 ;
-  let* op_str_hex =
+  let* (`Hex op_str_hex as op_hex) =
     forge_operation
       ~branch
       ~fee:1000
@@ -2976,8 +3006,8 @@ let injecting_old_operation_fails =
       ~counter:(counter + 1)
       ~client
   in
-  let signature =
-    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_str_hex
+  let (`Hex signature) =
+    Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_hex
   in
   log_step 5 step5 ;
   let process =
