@@ -194,7 +194,7 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the full balance (in mutez) of a given delegate, including \
-         the frozen balances."
+         the frozen deposits. It does not include its delegated balance."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
@@ -211,8 +211,9 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the initial amount (that is, at the beginning of a cycle) of \
-         the frozen deposits (in mutez). It is the same as the current amount \
-         of the frozen deposits, unless the delegate has been punished."
+         the frozen deposits (in mutez). This amount is the same as the \
+         current amount of the frozen deposits, unless the delegate has been \
+         punished."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
@@ -223,8 +224,7 @@ module S = struct
         "Returns the total amount of tokens (in mutez) delegated to a given \
          delegate. This includes the balances of all the contracts that \
          delegate to it, but also the balance of the delegate itself and its \
-         frozen fees and deposits. The rewards do not count in the delegated \
-         balance until they are unfrozen."
+         frozen deposits."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
@@ -233,7 +233,7 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the frozen deposits limit for the given delegate or none if \
-         unbounded."
+         no limit is set."
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Tez.encoding)
       RPC_path.(path / "frozen_deposits_limit")
@@ -249,9 +249,9 @@ module S = struct
   let delegated_balance =
     RPC_service.get_service
       ~description:
-        "Returns the balances (in mutez) of all the contracts that delegate to \
-         a given delegate. This excludes the delegate's own balance and its \
-         frozen balances."
+        "Returns the sum (in mutez) of all balances of all the contracts that \
+         delegate to a given delegate. This excludes the delegate's own \
+         balance and its frozen deposits."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")
@@ -269,9 +269,9 @@ module S = struct
       ~description:
         "Returns the cycle by the end of which the delegate might be \
          deactivated if she fails to execute any delegate action. A \
-         deactivated delegate might be reactivated (without loosing any rolls) \
+         deactivated delegate might be reactivated (without loosing any stake) \
          by simply re-registering as a delegate. For deactivated delegates, \
-         this value contains the cycle by which they were deactivated."
+         this value contains the cycle at which they were deactivated."
       ~query:RPC_query.empty
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
