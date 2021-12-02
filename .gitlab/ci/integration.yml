@@ -87,7 +87,9 @@ integration:sandboxes:u-a-u:
     paths:
       - flextesa-hard-fork
       - flextesa-hard-fork-alpha
-      - $BISECT_FILE
+      # FIXME https://gitlab.com/tezos/tezos/-/issues/2189
+      # This job can produce corrupted coverage file
+      # - $BISECT_FILE
     expire_in: 1 day
     when: always
 
