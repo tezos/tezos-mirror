@@ -88,11 +88,10 @@ module Extra_generators = struct
   let event_gen t =
     let open QCheck.Gen in
     let add_gen =
-      let+ (classification, oph, op) =
-        triple
+      let+ (classification, (oph, op)) =
+        pair
           Generators.classification_gen
-          Generators.operation_hash_gen
-          Generators.operation_gen
+          (Generators.operation_with_hash_gen ())
       in
       Add_if_not_present (classification, oph, op)
     in
@@ -319,8 +318,8 @@ let test_is_applied =
   let open QCheck in
   Test.make
     ~name:"[is_applied] is well-behaved"
-    (make @@ Generators.(Gen.triple (t_gen ()) operation_hash_gen operation_gen))
-  @@ fun (t, oph, op) ->
+    (make @@ Generators.(Gen.pair (t_gen ()) (operation_with_hash_gen ())))
+  @@ fun (t, (oph, op)) ->
   Classification.add `Applied oph op t ;
   qcheck_eq_true ~actual:(Classification.is_applied oph t) ;
   qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
@@ -398,21 +397,19 @@ module Bounded = struct
     let* inputs =
       list_size
         (0 -- map_size_limit)
-        Generators.(triple classification_gen operation_hash_gen operation_gen)
+        Generators.(pair classification_gen (operation_with_hash_gen ()))
     in
     let t = Classification.create parameters in
     List.iter
-      (fun (classification, operation_hash, operation) ->
+      (fun (classification, (operation_hash, operation)) ->
         Classification.add classification operation_hash operation t)
       inputs ;
     let+ error_classification =
       oneofl [`Branch_delayed []; `Branch_refused []; `Refused []; `Outdated []]
     and+ first_bindings =
-      list_size (1 -- 10) Generators.(pair operation_hash_gen operation_gen)
+      list_size (1 -- 10) Generators.(operation_with_hash_gen ())
     and+ other_bindings =
-      list_repeat
-        map_size_limit
-        Generators.(pair operation_hash_gen operation_gen)
+      list_repeat map_size_limit Generators.(operation_with_hash_gen ())
     in
     (t, error_classification, first_bindings, other_bindings)
 
