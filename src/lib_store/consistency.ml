@@ -398,21 +398,21 @@ let fix_savepoint_and_caboose chain_dir block_store head =
     List.map_es
       (Floating_block_store.fold_left_s
          (fun (last_min, last_min_with_metadata) block ->
+           let block_level = Block_repr.level block in
            let lowest_block =
              match last_min with
-             | None -> Some (Block_repr.level block)
-             | Some last_min -> Some (min last_min (Block_repr.level block))
+             | None -> Some block_level
+             | Some last_min -> Some (min last_min block_level)
            in
            let lowest_block_with_metadata =
              match last_min_with_metadata with
              | None -> (
                  match Block_repr.metadata block with
-                 | Some _ -> Some (Block_repr.level block)
+                 | Some _ -> Some block_level
                  | None -> None)
              | Some last_min_with_metadata -> (
                  match Block_repr.metadata block with
-                 | Some _ ->
-                     Some (min last_min_with_metadata (Block_repr.level block))
+                 | Some _ -> Some (min last_min_with_metadata block_level)
                  | None -> Some last_min_with_metadata)
            in
            return (lowest_block, lowest_block_with_metadata))
@@ -421,9 +421,6 @@ let fix_savepoint_and_caboose chain_dir block_store head =
     >>=? fun l ->
     let min l = List.fold_left (Option.merge min) None l in
     let (lw, lwm) = List.split l in
-    (* If we have failed getting a block with metadata from both the
-       RO and RW floating stores, then it is not possible to determine
-       a savepoint. The store is broken. *)
     let lw = min lw in
     let lwm = min lwm in
     return (lw, lwm)
