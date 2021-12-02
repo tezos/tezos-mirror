@@ -444,11 +444,13 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
          maximum_stake_to_be_deposited <= frozen_deposits + balance
          See select_distribution_for_cycle *)
       let delegate_contract = Contract_repr.implicit_contract delegate in
-      Frozen_deposits_storage.update_deposits_cap
+      Frozen_deposits_storage.update_initial_amount
         ctxt
         delegate_contract
         maximum_stake_to_be_deposited
-      >>=? fun (ctxt, current_amount) ->
+      >>=? fun ctxt ->
+      Frozen_deposits_storage.get ctxt delegate_contract >>=? fun deposits ->
+      let current_amount = deposits.current_amount in
       if Tez_repr.(current_amount > maximum_stake_to_be_deposited) then
         Tez_repr.(current_amount -? maximum_stake_to_be_deposited)
         >>?= fun to_reimburse ->
@@ -491,14 +493,14 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   Signature.Public_key_hash.Set.fold_es
     (fun delegate (ctxt, balance_updates) ->
       let delegate_contract = Contract_repr.implicit_contract delegate in
+      Frozen_deposits_storage.update_initial_amount
+        ctxt
+        delegate_contract
+        Tez_repr.zero
+      >>=? fun ctxt ->
       Frozen_deposits_storage.get ctxt delegate_contract
       >>=? fun frozen_deposits ->
       if Tez_repr.(frozen_deposits.current_amount > zero) then
-        Frozen_deposits_storage.update_deposits_cap
-          ctxt
-          delegate_contract
-          Tez_repr.zero
-        >>=? fun (ctxt, (_current_amount : Tez_repr.t)) ->
         Token.transfer
           ~origin
           ctxt
