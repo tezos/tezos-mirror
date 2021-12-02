@@ -332,7 +332,7 @@ let test_transfer =
       client
   in
   Log.info "Transferred 10 tez." ;
-  let* () = Client.bake_for ~key:"bootstrap2" client in
+  let* () = Client.bake_for ~keys:["bootstrap2"] client in
   Log.info "Baked block for bootstrap2." ;
   return ()
 

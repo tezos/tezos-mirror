@@ -154,18 +154,18 @@ let double_bake =
   (* Step 3 *)
   let* () = Node.terminate node_2 in
   (* Craft a branch of size 2, baked by bootstrap1 *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 3) in
   (* Step 4 *)
   let* () = Node.terminate node_1 in
   let* () = Node.run node_2 [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node_2 in
   (* Craft a branch of size 2, the first block is baked by bootstrap2 *)
-  let* () = Client.bake_for ~key:bootstrap2_key client_2 in
+  let* () = Client.bake_for ~keys:[bootstrap2_key] client_2 in
   (* The second block is double baked by bootstrap1 to simulate a
      double bake *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_2 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_2 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   (* Step 5 *)
   let* () = Node.run node_1 [Synchronisation_threshold 0] in
@@ -191,7 +191,7 @@ let double_bake =
   (* Ensure that the denunciation is in node_3's mempool *)
   let* _ = denunciation_injection in
   (* Step 7 *)
-  let* () = Client.bake_for ~key:bootstrap1_key client_3 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_3 in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_2 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in

@@ -276,10 +276,13 @@ val empty_mempool_file : ?filename:string -> unit -> string Lwt.t
 val bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
-  ?key:string ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
-  ?monitor_node_mempool:bool ->
+  ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
@@ -289,29 +292,17 @@ val bake_for :
 val spawn_bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
-  ?key:string ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
-  ?monitor_node_mempool:bool ->
+  ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
   Process.t
-
-(** Run [tezos-client bake for].
-
-    Default [key] is {!Constant.bootstrap1.alias}. *)
-val tenderbake_for :
-  ?endpoint:endpoint ->
-  ?protocol:Protocol.t ->
-  ?keys:string list ->
-  ?minimal_timestamp:bool ->
-  ?mempool:string ->
-  ?monitor_node_mempool:bool ->
-  ?force:bool ->
-  ?context_path:string ->
-  t ->
-  unit Lwt.t
 
 (** Run [tezos-client endorse for].
 

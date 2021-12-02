@@ -54,7 +54,7 @@ module Revamped = struct
      without taking the operations of the mempool.
 
      This function returns the level of the client after the bake. *)
-  let bake_for ?key ?(wait_for_flush = false) ~empty ~protocol node client =
+  let bake_for ?keys ?(wait_for_flush = false) ~empty ~protocol node client =
     let flush_waiter =
       if wait_for_flush then Node.wait_for_request ~request:`Flush node
       else unit
@@ -65,11 +65,11 @@ module Revamped = struct
         let* empty_mempool_file = Client.empty_mempool_file () in
         Client.bake_for
           ~mempool:empty_mempool_file
-          ~monitor_node_mempool:false
+          ~ignore_node_mempool:true
           ~protocol
-          ?key
+          ?keys
           client
-      else Client.bake_for ?key client
+      else Client.bake_for ?keys client
     in
     let* () = flush_waiter in
     Node.wait_for_level node (level + 1)
@@ -252,7 +252,7 @@ module Revamped = struct
       oph ;
     let* level =
       bake_for
-        ~key:Constant.bootstrap4.public_key_hash
+        ~keys:[Constant.bootstrap4.public_key_hash]
         ~empty:false
         ~protocol
         node1
@@ -302,7 +302,7 @@ module Revamped = struct
     log_step 8 "Bake on node1 (head increment)." ;
     let bake_waiter1 = wait_for_operations_not_flushed_event node1 in
     let* () =
-      Client.bake_for ~key:Constant.bootstrap4.public_key_hash client1
+      Client.bake_for ~keys:[Constant.bootstrap4.public_key_hash] client1
     in
     let* pending = bake_waiter1 in
 
@@ -1863,12 +1863,7 @@ let wait_for_banned_operation_injection node oph =
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_mempool ?protocol ?endpoint client =
   let* mempool = Client.empty_mempool_file () in
-  Client.bake_for
-    ?protocol
-    ?endpoint
-    ~mempool
-    ~monitor_node_mempool:false
-    client
+  Client.bake_for ?protocol ?endpoint ~mempool ~ignore_node_mempool:true client
 
 (** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
