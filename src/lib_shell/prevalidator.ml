@@ -1866,3 +1866,86 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
+
+module Internal_for_tests = struct
+  include Tools
+
+  type nonrec ('a, 'b) types_state_shell = ('a, 'b) types_state_shell
+
+  let mk_types_state_shell ~(predecessor : Store.Block.t) ~(tools : 'a tools)
+      ~(worker : worker_tools) : (_, 'a) types_state_shell =
+    let parameters = {limits = default_limits; tools} in
+    let c_parameters : Classification.parameters =
+      {map_size_limit = 32; on_discarded_operation = Fun.const ()}
+    in
+    let advertisement = `None in
+    let banned_operations = Operation_hash.Set.empty in
+    let classification = Classification.create c_parameters in
+    let fetching = Operation_hash.Set.empty in
+    let mempool = Mempool.empty in
+    let live_blocks = Block_hash.Set.empty in
+    let live_operations = Operation_hash.Set.empty in
+    let pending = Pending_ops.empty in
+    let timestamp = Tezos_stdlib_unix.Systime_os.now () in
+    {
+      advertisement;
+      banned_operations;
+      classification;
+      fetching;
+      live_blocks;
+      live_operations;
+      mempool;
+      parameters;
+      pending;
+      predecessor;
+      timestamp;
+      worker;
+    }
+
+  module Make
+      (Filter : Prevalidator_filters.FILTER)
+      (Prevalidation_t : Prevalidation.T
+                           with type validation_state =
+                                 Filter.Proto.validation_state
+                            and type protocol_operation = Filter.Proto.operation
+                            and type operation_receipt =
+                                 Filter.Proto.operation_receipt) =
+  struct
+    module Internal = Make_s (Filter) (Prevalidation_t)
+
+    type nonrec types_state = Internal.types_state
+
+    let mk_types_state
+        ~(shell :
+           ( Prevalidation_t.protocol_operation,
+             Prevalidation_t.t )
+           types_state_shell) ~(validation_state : Prevalidation_t.t) :
+        types_state Lwt.t =
+      let filter_config = Filter.Mempool.default_config in
+      let predecessor = Store.Block.header shell.predecessor in
+      Filter.Mempool.init filter_config ~predecessor () >>= function
+      | Error err ->
+          let err_string =
+            Format.asprintf "%a" Error_monad.pp_print_trace err
+          in
+          Lwt_io.eprintf "%s" err_string >>= fun () -> assert false
+      | Ok filter_state ->
+          Lwt.return
+            Internal.
+              {
+                shell;
+                filter_config;
+                filter_state;
+                lock = Lwt_mutex.create ();
+                operation_stream = Lwt_watcher.create_input ();
+                rpc_directory = Lazy.from_fun (fun () -> assert false);
+                validation_state = Ok validation_state;
+              }
+
+    let to_shell (t : types_state) = t.shell
+
+    let handle_unprocessed = Internal.handle_unprocessed
+
+    module Requests = Internal.Requests
+  end
+end
