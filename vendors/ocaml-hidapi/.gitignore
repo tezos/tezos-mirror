@@ -1,0 +1,8 @@
+_build
+**/*.merlin
+*.install
+/ocaml-usb-*.tar.gz
+
+
+
+
