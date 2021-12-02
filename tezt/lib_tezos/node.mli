@@ -267,13 +267,16 @@ val spawn_config_init : t -> argument list -> Process.t
     This must be at least [`Notice], which is the level of event
     ["node_is_ready.v0"], needed for {!wait_for_ready}.
     The default value is [`Info] which is also the default event level
-    of the node..
+    of the node.
 
     [event_sections_levels] specifies the verbosity for events in sections whose
     prefix is in the list. For instance
     [~event_sections_levels:[("prevalidator", `Debug); ("validator.block", `Debug)]]
     will activate the logs at debug level for events whose section starts with
     ["prevalidator"] or ["validator.block"].
+    See {!Tezos_stdlib_unix.File_descriptor_sink} and
+    {{:https://tezos.gitlab.io/user/logging.html#file-descriptor-sinks}the logging documentation}
+    for a more precise semantic.
  *)
 val run :
   ?on_terminate:(Unix.process_status -> unit) ->
