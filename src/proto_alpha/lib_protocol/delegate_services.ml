@@ -149,7 +149,7 @@ let participation_info_encoding =
     (obj6
        (req "expected_cycle_activity" int31)
        (req "minimal_cycle_activity" int31)
-       (req "missed_slots" bool)
+       (req "missed_slots" int31)
        (req "remaining_allowed_missed_slots" int31)
        (req "expected_endorsing_rewards" Tez.encoding)
        (req "current_pending_rewards" Tez.encoding))
@@ -273,9 +273,21 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns cycle and level participation information. In particular this \
-         indicates the total number of slots that are required for a delegate \
-         to endorse in the current cycle in order to be awarded its endorsing \
-         rewards."
+         indicates, in the field 'expected_cycle_activity', the number of \
+         slots the delegate is expected to have in the cycle based on its \
+         active stake. The field 'minimal_cycle_activity' indicates the \
+         minimal endorsing slots in the cycle required to get endorsing \
+         rewards. It is computed based on 'expected_cycle_activity. The field \
+         'missed_slots' indicates the number of missed endorsing slots in the \
+         cycle so far. The field 'remaining_allowed_missed_slots' indicates \
+         the remaining amount of endorsing slots that can be missed in the \
+         cycle before forfeiting the rewards. The field \
+         'expected_endorsing_rewards' indicates the endorsing rewards that \
+         will be distributed at the end of the cycle if activity at that point \
+         will be greater than the minimal required; if the activity is already \
+         known to be below the required minimum, then the rewards are zero. \
+         Finally, 'current_pending_rewards' indicates the estimated \
+         accumulated endorsing rewards in the cycle so far."
       ~query:RPC_query.empty
       ~output:participation_info_encoding
       RPC_path.(path / "participation")

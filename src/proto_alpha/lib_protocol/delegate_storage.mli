@@ -77,22 +77,27 @@ type error +=
 val check_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> unit tzresult Lwt.t
 
-(** Participation information *)
+(** Participation information. We denote by:
+    - "static" information that does not change during the cycle
+    - "dynamic" information that may change during the cycle *)
 type participation_info = {
   expected_cycle_activity : int;
-      (** The total expected slots to be endorsed in the cycle *)
+      (** The total expected slots to be endorsed in the cycle. (static) *)
   minimal_cycle_activity : int;
-      (** The minimal endorsed slots in the cycle to get endorsing rewards *)
-  missed_slots : bool;
-      (** Whether the delegate has missed endorsing slots in the cycle *)
+      (** The minimal endorsing slots in the cycle to get endorsing
+      rewards. (static) *)
+  missed_slots : int;
+      (** The number of missed endorsing slots in the cycle. (dynamic) *)
   remaining_allowed_missed_slots : int;
       (** Remaining amount of endorsing slots that can be missed in the
-     cycle before forfeiting the rewards *)
+      cycle before forfeiting the rewards. (dynamic) *)
   expected_endorsing_rewards : Tez_repr.t;
       (** Endorsing rewards that will be distributed at the end of the
-      cycle if activity is greater than the minimal at that point *)
+     cycle if activity at that point will be greater than the minimal
+     required. If the activity is already known to be below the
+     required threshold, then the rewards are zero. (dynamic) *)
   current_pending_rewards : Tez_repr.t;
-      (** Estimated accumulated endorsing rewards in the cycle so far *)
+      (** Estimated accumulated endorsing rewards in the cycle so far. (dynamic) *)
 }
 
 val delegate_participation_info :

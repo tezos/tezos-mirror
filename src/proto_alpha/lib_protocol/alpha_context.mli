@@ -1529,7 +1529,7 @@ module Delegate : sig
   type participation_info = {
     expected_cycle_activity : int;
     minimal_cycle_activity : int;
-    missed_slots : bool;
+    missed_slots : int;
     remaining_allowed_missed_slots : int;
     expected_endorsing_rewards : Tez.t;
     current_pending_rewards : Tez.t;

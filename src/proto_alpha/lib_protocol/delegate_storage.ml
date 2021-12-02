@@ -763,13 +763,12 @@ let record_endorsing_participation ctxt ~delegate ~participation
       let contract = Contract_repr.implicit_contract delegate in
       Storage.Contract.Remaining_allowed_missed_slots.find ctxt contract
       >>=? function
-      | Some 0 -> return ctxt
       | Some n ->
-          let remaining = Compare.Int.max 0 (n - endorsing_power) in
+          let remaining_slots = n - endorsing_power in
           Storage.Contract.Remaining_allowed_missed_slots.update
             ctxt
             contract
-            remaining
+            remaining_slots
       | None -> (
           let level = Level_storage.current ctxt in
           Raw_context.stake_distribution_for_current_cycle ctxt
@@ -798,13 +797,11 @@ let record_endorsing_participation ctxt ~delegate ~participation
               in
               let minimal_activity = expected_slots * numerator / denominator in
               let maximal_inactivity = expected_slots - minimal_activity in
-              let remaining =
-                Compare.Int.max 0 (maximal_inactivity - endorsing_power)
-              in
+              let remaining_slots = maximal_inactivity - endorsing_power in
               Storage.Contract.Remaining_allowed_missed_slots.init
                 ctxt
                 contract
-                remaining))
+                remaining_slots))
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
@@ -837,12 +834,13 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
 type participation_info = {
   expected_cycle_activity : int;
   minimal_cycle_activity : int;
-  missed_slots : bool;
+  missed_slots : int;
   remaining_allowed_missed_slots : int;
   expected_endorsing_rewards : Tez_repr.t;
   current_pending_rewards : Tez_repr.t;
 }
 
+(* the estimated activity is expressed in number of slots *)
 let estimated_activity_for_given_active_stake ctxt ~level ~total_active_stake
     ~active_stake =
   let consensus_committee_size =
@@ -851,7 +849,7 @@ let estimated_activity_for_given_active_stake ctxt ~level ~total_active_stake
   let blocks_per_cycle =
     Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
   in
-  let estimated_number_of_endorsements =
+  let estimated_number_of_slots =
     (Int32.to_int level.Level_repr.cycle_position + 1)
     mod blocks_per_cycle * consensus_committee_size
   in
@@ -859,7 +857,7 @@ let estimated_activity_for_given_active_stake ctxt ~level ~total_active_stake
     (Z.div
        (Z.mul
           (Z.of_int64 (Tez_repr.to_mutez active_stake))
-          (Z.of_int estimated_number_of_endorsements))
+          (Z.of_int estimated_number_of_slots))
        (Z.of_int64 (Tez_repr.to_mutez total_active_stake)))
 
 (* Inefficient, only for RPC *)
@@ -879,7 +877,7 @@ let delegate_participation_info ctxt delegate =
         {
           expected_cycle_activity = 0;
           minimal_cycle_activity = 0;
-          missed_slots = false;
+          missed_slots = 0;
           remaining_allowed_missed_slots = 0;
           expected_endorsing_rewards = Tez_repr.zero;
           current_pending_rewards = Tez_repr.zero;
@@ -912,8 +910,9 @@ let delegate_participation_info ctxt delegate =
       >>=? fun remaining ->
       let (missed_slots, remaining_allowed_missed_slots) =
         match remaining with
-        | None -> (false, maximal_cycle_inactivity)
-        | Some remaining -> (true, remaining)
+        | None -> (0, maximal_cycle_inactivity)
+        | Some remaining ->
+            (maximal_cycle_inactivity - remaining, Compare.Int.max 0 remaining)
       in
       let optimal_cycle_activity =
         estimated_activity_for_given_active_stake
