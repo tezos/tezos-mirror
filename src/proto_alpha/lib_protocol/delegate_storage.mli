@@ -184,14 +184,16 @@ val punish_double_baking :
   Level_repr.t ->
   (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** Returns the amount of frozen deposits (aka frozen deposits).
+(** Returns a delegate's frozen deposits, both the current amount and
+   the initial freezed amount.
 
     A delegate's frozen balance is only composed of frozen deposits;
-    rewards and fees are not frozen, but simply credited at the right
-    moment.
-*)
+   rewards and fees are not frozen, but simply credited at the right
+   moment.  *)
 val frozen_deposits :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Storage.deposits tzresult Lwt.t
 
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance and of the

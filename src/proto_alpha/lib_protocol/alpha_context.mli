@@ -1583,7 +1583,9 @@ module Delegate : sig
     endorsing_power:int ->
     context tzresult Lwt.t
 
-  val frozen_deposits : context -> public_key_hash -> Tez.t tzresult Lwt.t
+  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
+
+  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
 
   val staking_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t

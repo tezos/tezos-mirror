@@ -51,6 +51,7 @@ let () =
 
 type info = {
   full_balance : Tez.t;
+  current_frozen_deposits : Tez.t;
   frozen_deposits : Tez.t;
   staking_balance : Tez.t;
   frozen_deposits_limit : Tez.t option;
@@ -66,6 +67,7 @@ let info_encoding =
   conv
     (fun {
            full_balance;
+           current_frozen_deposits;
            frozen_deposits;
            staking_balance;
            frozen_deposits_limit;
@@ -76,6 +78,7 @@ let info_encoding =
            voting_power;
          } ->
       ( full_balance,
+        current_frozen_deposits,
         frozen_deposits,
         staking_balance,
         frozen_deposits_limit,
@@ -85,6 +88,7 @@ let info_encoding =
         grace_period,
         voting_power ))
     (fun ( full_balance,
+           current_frozen_deposits,
            frozen_deposits,
            staking_balance,
            frozen_deposits_limit,
@@ -95,6 +99,7 @@ let info_encoding =
            voting_power ) ->
       {
         full_balance;
+        current_frozen_deposits;
         frozen_deposits;
         staking_balance;
         frozen_deposits_limit;
@@ -104,8 +109,9 @@ let info_encoding =
         grace_period;
         voting_power;
       })
-    (obj9
+    (obj10
        (req "full_balance" Tez.encoding)
+       (req "current_frozen_deposits" Tez.encoding)
        (req "frozen_deposits" Tez.encoding)
        (req "staking_balance" Tez.encoding)
        (opt "frozen_deposits_limit" Tez.encoding)
@@ -193,11 +199,20 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
 
+  let current_frozen_deposits =
+    RPC_service.get_service
+      ~description:
+        "Returns the current amount of the frozen deposits (in mutez)."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "current_frozen_deposits")
+
   let frozen_deposits =
     RPC_service.get_service
       ~description:
-        "Returns the amount of frozen deposits (in mutez) for a specific level \
-         or the total sum when no specific level is provided."
+        "Returns the initial amount (that is, at the beginning of a cycle) of \
+         the frozen deposits (in mutez). It is the same as the current amount \
+         of the frozen deposits, unless the delegate has been punished."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
@@ -318,7 +333,8 @@ let register () =
       Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
       {
         full_balance;
-        frozen_deposits;
+        current_frozen_deposits = frozen_deposits.current_amount;
+        frozen_deposits = frozen_deposits.initial_amount;
         staking_balance;
         frozen_deposits_limit;
         delegated_contracts;
@@ -330,9 +346,14 @@ let register () =
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
       >>=? fun () -> Delegate.full_balance ctxt pkh) ;
+  register1 ~chunked:false S.current_frozen_deposits (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
+      return deposits.current_amount) ;
   register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.frozen_deposits ctxt pkh) ;
+      Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
+      return deposits.initial_amount) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
@@ -365,6 +386,9 @@ let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 
 let full_balance ctxt block pkh =
   RPC_context.make_call1 S.full_balance ctxt block pkh () ()
+
+let current_frozen_deposits ctxt block pkh =
+  RPC_context.make_call1 S.current_frozen_deposits ctxt block pkh () ()
 
 let frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()

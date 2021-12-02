@@ -288,6 +288,7 @@ end
 module Delegate = struct
   type info = Delegate_services.info = {
     full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
     frozen_deposits_limit : Tez.t option;

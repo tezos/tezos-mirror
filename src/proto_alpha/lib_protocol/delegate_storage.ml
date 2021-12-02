@@ -532,12 +532,11 @@ let balance ctxt delegate =
 
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.implicit_contract delegate)
-  >>=? fun deposits -> return deposits.current_amount
 
 let full_balance ctxt delegate =
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
   balance ctxt delegate >>=? fun balance ->
-  Lwt.return Tez_repr.(frozen_deposits +? balance)
+  Lwt.return Tez_repr.(frozen_deposits.current_amount +? balance)
 
 let deactivated = Delegate_activation_storage.is_inactive
 
@@ -545,7 +544,8 @@ let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
   balance ctxt delegate >>=? fun balance ->
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
-  Tez_repr.(balance +? frozen_deposits) >>?= fun self_staking_balance ->
+  Tez_repr.(balance +? frozen_deposits.current_amount)
+  >>?= fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
 
 let fold = Storage.Delegates.fold

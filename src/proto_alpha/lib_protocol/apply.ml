@@ -1833,7 +1833,7 @@ let validate_consensus_contents (type kind) ctxt chain_id
   | Some (delegate_pk, delegate_pkh, voting_power) ->
       Delegate.frozen_deposits ctxt delegate_pkh >>=? fun frozen_deposits ->
       fail_unless
-        Tez.(frozen_deposits > zero)
+        Tez.(frozen_deposits.current_amount > zero)
         (Zero_frozen_deposits delegate_pkh)
       >>=? fun () ->
       Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
@@ -2381,7 +2381,9 @@ let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
   Stake_distribution.baking_rights_owner ctxt current_level ~round
   >>=? fun (ctxt, _slot, (_block_producer_pk, block_producer)) ->
   Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless Tez.(frozen_deposits > zero) (Zero_frozen_deposits block_producer)
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
   >>=? fun () ->
   Stake_distribution.baking_rights_owner
     ctxt
@@ -2439,7 +2441,9 @@ let begin_application ctxt chain_id (block_header : Block_header.t) fitness
     ~expected_commitment:current_level.expected_commitment
   >>?= fun () ->
   Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless Tez.(frozen_deposits > zero) (Zero_frozen_deposits block_producer)
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
   >>=? fun () ->
   Stake_distribution.baking_rights_owner
     ctxt
