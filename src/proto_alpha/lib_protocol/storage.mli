@@ -116,6 +116,8 @@ end
 
 type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
+type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+
 module Contract : sig
   (** Storage from this submodule must only be accessed through the
       module `Contract`. *)
@@ -142,13 +144,22 @@ module Contract : sig
        and type value = Tez_repr.t
        and type t := Raw_context.t
 
-  (** If the value is not set, the delegate didn't miss any endorsing opportunity.
-      If it is set, this represents the number of slots that a delegate can still
-      miss before forfeiting its endorsing rewards for the current cycle *)
-  module Remaining_allowed_missed_slots :
+  (** If the value is not set, the delegate didn't miss any endorsing
+     opportunity.  If it is set, this value is a record of type
+     [missed_endorsements_info], where:
+   - [remaining_slots] is the difference between the maximum number of
+     slots that can be missed and the number of missed slots;
+     therefore, when the number is positive, it represents the number
+     of slots that a delegate can still miss before forfeiting its
+     endorsing rewards for the current cycle; when the number is zero
+     it means rewards are not lost, but no further slots can be
+     missed anymore;
+   - [missed_levels] represents the number of missed levels (for
+     endorsing). *)
+  module Missed_endorsements :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = int
+       and type value = missed_endorsements_info
        and type t := Raw_context.t
 
   (** Frozen balance, see 'delegate_storage.mli' for more explanation.

@@ -54,8 +54,6 @@ end
 
 module Int31_index : sig
   include INDEX with type t = int
-
-  val encoding : int Data_encoding.t
 end = struct
   type t = int
 
@@ -74,8 +72,6 @@ end = struct
         encoding = Data_encoding.int31;
         compare = Compare.Int.compare;
       }
-
-  let encoding = Data_encoding.int31
 end
 
 module Make_index (H : Storage_description.INDEX) :
@@ -162,6 +158,19 @@ module Deposits = struct
          (req "actual_amount" Tez_repr.encoding))
 end
 
+type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+
+module Missed_endorsements_info = struct
+  type t = missed_endorsements_info
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {remaining_slots; missed_levels} -> (remaining_slots, missed_levels))
+      (fun (remaining_slots, missed_levels) -> {remaining_slots; missed_levels})
+      (obj2 (req "remaining_slots" int31) (req "missed_levels" int31))
+end
+
 module Contract = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
@@ -195,12 +204,12 @@ module Contract = struct
       end)
       (Tez_repr)
 
-  module Remaining_allowed_missed_slots =
+  module Missed_endorsements =
     Indexed_context.Make_map
       (struct
-        let name = ["remaining_allowed_missed_slots"]
+        let name = ["missed_endorsements"]
       end)
-      (Int31_index)
+      (Missed_endorsements_info)
 
   module Legacy_frozen_balance_index =
     Make_indexed_subcontext

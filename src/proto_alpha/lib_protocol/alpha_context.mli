@@ -1530,6 +1530,7 @@ module Delegate : sig
     expected_cycle_activity : int;
     minimal_cycle_activity : int;
     missed_slots : int;
+    missed_levels : int;
     remaining_allowed_missed_slots : int;
     expected_endorsing_rewards : Tez.t;
   }

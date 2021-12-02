@@ -88,6 +88,8 @@ type participation_info = {
       rewards. (static) *)
   missed_slots : int;
       (** The number of missed endorsing slots in the cycle. (dynamic) *)
+  missed_levels : int;
+      (** The number of missed endorsing levels in the cycle. (dynamic) *)
   remaining_allowed_missed_slots : int;
       (** Remaining amount of endorsing slots that can be missed in the
       cycle before forfeiting the rewards. (dynamic) *)
