@@ -64,21 +64,23 @@ let encoding =
           "level"
           ~description:
             "The level of the block relative to genesis. This is also the \
-             Shell's notion of level"
+             Shell's notion of level."
           Raw_level_repr.encoding)
        (req
           "level_position"
           ~description:
-            "The level of the block relative to the block that starts protocol \
-             alpha. This is specific to the protocol alpha. Other protocols \
-             might or might not include a similar notion."
+            "The level of the block relative to the successor of the genesis \
+             block. More precisely, it is the position of the block relative \
+             to the block that starts the \"Alpha family\" of protocols, which \
+             includes all protocols except Genesis (that is, from 001 \
+             onwards)."
           int32)
        (req
           "cycle"
           ~description:
             "The current cycle's number. Note that cycles are a \
              protocol-specific notion. As a result, the cycle number starts at \
-             0 with the first block of protocol alpha."
+             0 with the first block of the Alpha family of protocols."
           Cycle_repr.encoding)
        (req
           "cycle_position"
